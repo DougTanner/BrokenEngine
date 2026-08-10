@@ -1,0 +1,82 @@
+# Static analysis configuration for Broken Engine.
+#
+# Enabling in Visual Studio 2026:
+#   Project Properties -> Code Analysis -> General
+#     Enable Microsoft Code Analysis: Yes
+#     Enable Clang-Tidy:              Yes
+# Enable per project (BrokenEngineSandbox client/server, DataPacker) as desired;
+# pre-existing code may produce warnings until a follow-up cleanup pass lands.
+# WarningsAsErrors is empty by design.
+#
+# CLI:
+#   clang-tidy <file.cpp> -- -std=c++23
+#
+# Style guide reference: Documents/C++StyleGuide.txt
+#
+# clang-analyzer-* checks: VS defaults the ClangTidyChecks project property to
+# 'clang-analyzer-*' (Microsoft.Cpp.ClangTidy.props) and passes it via --checks,
+# which is APPENDED AFTER this file's Checks — so the analyzer runs despite the
+# leading '-*' here, and any analyzer exclusion added here would be re-enabled.
+# Analyzer enablement/exclusions therefore live in each vcxproj's <ClangTidyChecks>
+# (currently: clang-analyzer-* minus optin.core.EnumCastOutOfRange, which
+# false-positives on MSVC STL _BITMASK_OPS flag enums).
+#
+# Deferred (re-enable in a future cleanup pass once the codebase is prepared):
+#   misc-const-correctness          - high warning volume on existing locals
+#   readability-identifier-naming   - cannot express Hungarian prefixes (rule 3)
+
+Checks: >
+  -*,
+  bugprone-integer-division,
+  bugprone-misplaced-widening-cast,
+  bugprone-unchecked-optional-access,
+  bugprone-use-after-move,
+  cppcoreguidelines-pro-type-cstyle-cast,
+  cppcoreguidelines-slicing,
+  llvm-prefer-defined,
+  misc-static-assert,
+  misc-unused-parameters,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-using,
+  performance-for-range-copy,
+  performance-unnecessary-copy-initialization,
+  performance-unnecessary-value-param,
+  readability-implicit-bool-conversion
+
+WarningsAsErrors: ''
+HeaderFilterRegex: '(Common|Engine|DataPacker|Projects)/.*\.(h|hpp)$'
+FormatStyle: none
+
+# VS 2026 ships clang-tidy.exe without its LLVM resource-dir headers, so DirectXMath's
+# `#include <cpuid.h>` (taken via the __clang__ branch) fails to resolve. Each project
+# adds Common/ClangTidyShims to AdditionalIncludeDirectories; the empty stub there is
+# picked up by clang-tidy. MSVC ignores it (the cpuid.h #include is gated on __clang__).
+#
+# -Wno-unused-command-line-argument silences clang complaining about MSBuild forwarding
+# /Zc:preprocessor (an MSVC-only flag). Not a code-analysis check; pure noise.
+#
+# -fdelayed-template-parsing matches clang-cl/MSVC behavior: non-dependent names in
+# template bodies are looked up at instantiation, not at declaration. Avoids false
+# positives from include-order quirks that MSVC tolerates.
+#
+# -Wno-defaulted-function-deleted allows structs to use `= default` operator== even
+# when members have multiple viable operator== candidates (DirectXMath's defaulted
+# member version + the free functions in ExternalHeaders.h that callers invoke
+# explicitly via `::operator==(...)`). MSVC picks the member version; clang otherwise
+# implicitly deletes the defaulted operator and refuses to parse.
+ExtraArgsBefore:
+  - '-Wno-unused-command-line-argument'
+  - '-fdelayed-template-parsing'
+  - '-Wno-defaulted-function-deleted'
+
+# Appended after compile flags so they override anything earlier (e.g., a -Werror
+# upstream): -Wno-error demotes promoted warnings back to warnings, -ferror-limit=0
+# removes the 20-error stop cap so a single clang-tidy pass surfaces every finding.
+ExtraArgs:
+  - '-Wno-error'
+  - '-ferror-limit=0'
+
+CheckOptions:
+  readability-implicit-bool-conversion.AllowIntegerConditions: false
+  readability-implicit-bool-conversion.AllowPointerConditions: false

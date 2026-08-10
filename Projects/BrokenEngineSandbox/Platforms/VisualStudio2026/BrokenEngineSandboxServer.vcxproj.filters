@@ -1,0 +1,865 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{e35d3a05-faec-49a6-9f8c-a51693ff27a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Agent">
+      <UniqueIdentifier>{237139c6-f52e-48af-b40c-965138daa616}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Data">
+      <UniqueIdentifier>{1f2a3b4c-5d6e-7f8a-9b0c-d1e2f3a4b5c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Data\Shaders">
+      <UniqueIdentifier>{4c249a6c-c550-4fa7-b6ac-0423c9b76a55}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\File">
+      <UniqueIdentifier>{3fe45fda-e682-4800-9af3-387e4a8937cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics">
+      <UniqueIdentifier>{2115deb9-bcc9-4206-9525-647a5bce8f06}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Input">
+      <UniqueIdentifier>{9ffa8684-d430-4657-a59d-7e9ca35258fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Network">
+      <UniqueIdentifier>{d3e4f5a6-b7c8-9012-def0-345678901bcd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Network\Server">
+      <UniqueIdentifier>{50819ad8-bb36-4812-9614-0b7d05e0989e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Profile">
+      <UniqueIdentifier>{f7eaddd7-9069-4260-9d92-e4c38d010ec4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Render">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567891}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game">
+      <UniqueIdentifier>{a470bb84-b6ed-4e31-b3ff-6414dfd76133}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Agent">
+      <UniqueIdentifier>{099eb226-0661-4f95-918e-551150652f03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Network">
+      <UniqueIdentifier>{c5d6e7f8-a9b0-1234-5678-9abcdef01234}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Network\Client">
+      <UniqueIdentifier>{e80e1f00-b3a2-40fe-9df3-809396ba29bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Network\Server">
+      <UniqueIdentifier>{0089e6d6-1e73-45d5-8ba3-156da330284f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common">
+      <UniqueIdentifier>{e1fb165c-2138-41cf-ad28-2ff6586ba2c4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Log">
+      <UniqueIdentifier>{92d5a332-d26a-42e0-9f8b-93512e672685}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Threading">
+      <UniqueIdentifier>{4515adf2-9811-4b76-94b9-b85c885351d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Math">
+      <UniqueIdentifier>{37d71655-9435-464c-94b3-6b615553b994}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Ui">
+      <UniqueIdentifier>{487b4166-02bb-4e13-9a24-61c4b80f1d1b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Memory">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Save">
+      <UniqueIdentifier>{7f3a1b2c-4d5e-4a6b-9c8d-0e1f2a3b4c5d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Server">
+      <UniqueIdentifier>{8a4b2c3d-5e6f-4b7c-8d9e-1f2a3b4c5d6e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame">
+      <UniqueIdentifier>{0bce964a-aa76-4e39-b2da-686fc91624a0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame\Collections">
+      <UniqueIdentifier>{40783aaa-8ca0-45d5-bf06-250f0047f845}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame\Collections\Players">
+      <UniqueIdentifier>{a1b2c3d4-5678-9abc-def0-123456789abc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame\Collections\Missiles">
+      <UniqueIdentifier>{c3d4e5f6-7890-abcd-ef01-345678901234}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame\Collections\Targets">
+      <UniqueIdentifier>{b2c3d4e5-6789-abcd-ef01-23456789abcd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame\Collections\Spaceships">
+      <UniqueIdentifier>{d4e5f6a7-8901-bcde-f012-456789012345}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Ui">
+      <UniqueIdentifier>{fd1606d0-4688-43e7-96d0-0a61e35fefab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame">
+      <UniqueIdentifier>{66d8aaa9-9df9-4075-9ccb-b159475dd6b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections">
+      <UniqueIdentifier>{b74fae5c-9fee-44f4-bc5d-a1c3131c4cdb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\SmokeTrails">
+      <UniqueIdentifier>{a3c7e1f2-5d8b-4a9e-b6c4-2f1e8d3a7b5c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\WindRadials">
+      <UniqueIdentifier>{d4e8f2a1-7b3c-4d9e-a5f6-8c2d1e9b4a7f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\WindTrails">
+      <UniqueIdentifier>{d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f90}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame\Collections\Blasters">
+      <UniqueIdentifier>{e5f6a7b8-9012-cdef-0123-456789abcdef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\AreaLights">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7891-abcd-ef0123456789}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\Billboards">
+      <UniqueIdentifier>{b2c3d4e5-f6a7-8902-bcde-f01234567890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\Explosions">
+      <UniqueIdentifier>{c3d4e5f6-a7b8-9013-cdef-012345678901}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\HexShields">
+      <UniqueIdentifier>{d4e5f6a7-b8c9-0124-def0-123456789012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\PointLights">
+      <UniqueIdentifier>{e5f6a7b8-c9d0-1235-ef01-234567890123}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\Puffs">
+      <UniqueIdentifier>{f6a7b8c9-d0e1-2346-f012-345678901234}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\Pushers">
+      <UniqueIdentifier>{a7b8c9d0-e1f2-3457-0123-456789012345}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Frame\Collections\Sounds">
+      <UniqueIdentifier>{b8c9d0e1-f2a3-4568-1234-567890123456}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Profile">
+      <UniqueIdentifier>{b749dd10-dfa4-47bf-9eca-5cd238b25df3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Input">
+      <UniqueIdentifier>{613c3aa5-c7c0-4ad0-b2a4-6523cc0097ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataFiles">
+      <UniqueIdentifier>{e3cac6bc-4d0e-4867-af72-ef6f468edce5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Ui\Screens">
+      <UniqueIdentifier>{fbbb7c04-30bf-4a1f-aec6-6a4e95b1ac4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Ui\Screens">
+      <UniqueIdentifier>{212658d4-68e3-46eb-b66e-07fd431eb65e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderGlobalLayout.h">
+      <Filter>Engine\Data\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h">
+      <Filter>Engine\Data\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderMainLayout.h">
+      <Filter>Engine\Data\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\File\FileManager.h">
+      <Filter>Engine\File</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\File\PackChunks.h">
+      <Filter>Engine\File</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\File\DifferenceStream.h">
+      <Filter>Engine\File</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Game.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\SpawnTransfer.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\PlayerEvents.h">
+      <Filter>Game\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\ClientPlayerRegistry.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\GameMessages.h">
+      <Filter>Game\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\ServerSession.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\ServerFleetManager.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\ServerFleetSerialization.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\FleetNavigationController.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\ServerTransferManager.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\ServerBroadcaster.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\ServerClientManager.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\GamePacketType.h">
+      <Filter>Game\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\NetworkSessionContract.h">
+      <Filter>Game\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkCursor.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryResponder.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkManager.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkMessages.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkProtocol.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSessionContract.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\Server.h">
+      <Filter>Engine\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.h">
+      <Filter>Engine\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTypes.h">
+      <Filter>Engine\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.h">
+      <Filter>Engine\Profile</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Profile\ProfileManager.h">
+      <Filter>Game\Profile</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Common.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\DataFile.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\ExternalHeaders.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Flags.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Log\Log.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Log\LogTypes.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Threading\Multithreading.h">
+      <Filter>Common\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Threading\PersistentWorker.h">
+      <Filter>Common\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Math\MathUtils.h">
+      <Filter>Common\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Math\Random.h">
+      <Filter>Common\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Math\ConvexHull.h">
+      <Filter>Common\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\AlignedMemory.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\AllocationTracking.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Crc.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Determinism.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\FileUtils.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Serialization.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\StringUtils.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\TextureFormat.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\ScopedLambda.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Smoothed.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Workbuffer.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Threading\ThreadLocal.h">
+      <Filter>Common\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Timer.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Log\DiagnosticLog.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\WindowsUtils.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\StackWalker.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WrapperBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Frame.h">
+      <Filter>Game\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\FrameTick.h">
+      <Filter>Game\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\TerrainUtils.h">
+      <Filter>Game\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\FrameCollections.h">
+      <Filter>Game\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Ui\Localization.h">
+      <Filter>Game\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Players\Players.h">
+      <Filter>Game\Frame\Collections\Players</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.h">
+      <Filter>Game\Frame\Collections\Spaceships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h">
+      <Filter>Game\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h">
+      <Filter>Engine\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Ui\WindDepositsWrappers.h">
+      <Filter>Game\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Log\LogDifference.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Log\LogFormatters.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Pch.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Missiles\Missiles.h">
+      <Filter>Game\Frame\Collections\Missiles</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Blasters\Blasters.h">
+      <Filter>Game\Frame\Collections\Blasters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h">
+      <Filter>Engine\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\CrashReport.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Engine.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\GameBase.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\LaunchOptions.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandServer.h">
+      <Filter>Engine\Agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsShared.h">
+      <Filter>Engine\Agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\AgentCommands.h">
+      <Filter>Game\Agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h">
+      <Filter>Game\Agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Save\GameSaveLoad.h">
+      <Filter>Game\Save</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Collection.h">
+      <Filter>Engine\Frame\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionLifecycle.h">
+      <Filter>Engine\Frame\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionController.h">
+      <Filter>Engine\Frame\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionId.h">
+      <Filter>Engine\Frame\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionMemory.h">
+      <Filter>Engine\Frame\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameBase.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameStaticData.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuild.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuildInternal.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavQuery.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\GridCoord.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\HealthDamage.h">
+      <Filter>Game\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\StatusChange.h">
+      <Filter>Game\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Input\Input.h">
+      <Filter>Game\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="$(GameDataDirectory)\Texture.h">
+      <Filter>DataFiles</Filter>
+    </ClInclude>
+    <ClInclude Include="$(GameDataDirectory)\Audio.h">
+      <Filter>DataFiles</Filter>
+    </ClInclude>
+    <ClInclude Include="$(GameDataDirectory)\Font.h">
+      <Filter>DataFiles</Filter>
+    </ClInclude>
+    <ClInclude Include="$(GameDataDirectory)\Scene.h">
+      <Filter>DataFiles</Filter>
+    </ClInclude>
+    <ClInclude Include="$(GameDataDirectory)\Islands.h">
+      <Filter>DataFiles</Filter>
+    </ClInclude>
+    <ClInclude Include="$(GameDataDirectory)\Model.h">
+      <Filter>DataFiles</Filter>
+    </ClInclude>
+    <ClInclude Include="$(GameDataDirectory)\Data.h">
+      <Filter>DataFiles</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TimeStep.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\AreaDamage.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.h">
+      <Filter>Engine\Frame\Collections\Explosions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Targets\Targets.h">
+      <Filter>Game\Frame\Collections\Targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.h">
+      <Filter>Engine\Frame\Collections\Pushers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Ui\Screens\DeathMenuScreen.h">
+      <Filter>Game\Ui\Screens</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h">
+      <Filter>Game\Ui\Screens</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Ui\Screens\MenuUtils.h">
+      <Filter>Game\Ui\Screens</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\ErrorUtils.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainUtils.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Server\ServerDisplay.h">
+      <Filter>Game\Server</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">
+      <Filter>Engine\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\File\PackChunks.cpp">
+      <Filter>Engine\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Game.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\SpawnTransfer.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp">
+      <Filter>Game\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\ClientPlayerRegistry.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\ServerSession.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\ServerFleetManager.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\ServerFleetSerialization.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\FleetNavigationController.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\ServerTransferManager.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\ServerBroadcaster.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\ServerClientManager.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryResponder.cpp">
+      <Filter>Engine\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkManager.cpp">
+      <Filter>Engine\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\NetworkSerialization.cpp">
+      <Filter>Game\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\Server.cpp">
+      <Filter>Engine\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.cpp">
+      <Filter>Engine\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerReceive.cpp">
+      <Filter>Engine\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSend.cpp">
+      <Filter>Engine\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\CrashReport.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Main.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.cpp">
+      <Filter>Engine\Profile</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp">
+      <Filter>Engine\Profile</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Profile\ProfileManager.cpp">
+      <Filter>Game\Profile</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Workbuffer.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Threading\ThreadLocal.cpp">
+      <Filter>Common\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Determinism.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\StringUtils.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\TextureFormat.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\WindowsUtils.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Threading\Multithreading.cpp">
+      <Filter>Common\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Threading\PersistentWorker.cpp">
+      <Filter>Common\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Math\Random.cpp">
+      <Filter>Common\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Log\DiagnosticLog.cpp">
+      <Filter>Common\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Log\Log.cpp">
+      <Filter>Common\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Log\LogDifference.cpp">
+      <Filter>Common\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Smoothed.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Frame.cpp">
+      <Filter>Game\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\FrameTick.cpp">
+      <Filter>Game\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp">
+      <Filter>Game\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Common\Math\MathUtils.cpp">
+      <Filter>Common\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Players\Players.cpp">
+      <Filter>Game\Frame\Collections\Players</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersNavigation.cpp">
+      <Filter>Game\Frame\Collections\Players</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersCombat.cpp">
+      <Filter>Game\Frame\Collections\Players</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.cpp">
+      <Filter>Game\Frame\Collections\Spaceships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsCombat.cpp">
+      <Filter>Game\Frame\Collections\Spaceships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsNavigation.cpp">
+      <Filter>Game\Frame\Collections\Spaceships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Missiles\Missiles.cpp">
+      <Filter>Game\Frame\Collections\Missiles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Missiles\MissilesUpdate.cpp">
+      <Filter>Game\Frame\Collections\Missiles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Blasters\Blasters.cpp">
+      <Filter>Game\Frame\Collections\Blasters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersUpdate.cpp">
+      <Filter>Game\Frame\Collections\Blasters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp">
+      <Filter>Engine\Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\GameBase.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\LaunchOptions.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandServer.cpp">
+      <Filter>Engine\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsShared.cpp">
+      <Filter>Engine\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentUiRegistryServerStubs.cpp">
+      <Filter>Engine\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\AgentCommands.cpp">
+      <Filter>Game\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\AgentCommandsServer.cpp">
+      <Filter>Game\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\AgentCommandsServerQueries.cpp">
+      <Filter>Game\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Save\GameSaveLoad.cpp">
+      <Filter>Game\Save</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameStaticData.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavBuild.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavCellData.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavQuery.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Input\Input.cpp">
+      <Filter>Game\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\TimeStep.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\AreaDamage.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collision.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.cpp">
+      <Filter>Engine\Frame\Collections\Explosions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsSpawn.cpp">
+      <Filter>Engine\Frame\Collections\Explosions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsUpdate.cpp">
+      <Filter>Engine\Frame\Collections\Explosions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Targets\Targets.cpp">
+      <Filter>Game\Frame\Collections\Targets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Targets\TargetsUpdate.cpp">
+      <Filter>Game\Frame\Collections\Targets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.cpp">
+      <Filter>Engine\Frame\Collections\Pushers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\PushersUpdate.cpp">
+      <Filter>Engine\Frame\Collections\Pushers</Filter>
+    </ClCompile>
+
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Ui\Screens\DeathMenuScreen.cpp">
+      <Filter>Game\Ui\Screens</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Ui\Screens\MenuUtils.cpp">
+      <Filter>Game\Ui\Screens</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp">
+      <Filter>Game\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp">
+      <Filter>Game\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Server\ServerDisplay.cpp">
+      <Filter>Game\Server</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

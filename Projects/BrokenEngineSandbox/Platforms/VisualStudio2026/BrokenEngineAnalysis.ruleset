@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Explicit Release PREfast mode: IncludeAll mirrors AllRules; Release CodeAnalysisTreatWarningsAsErrors
+     separately promotes warnings to errors. No per-code exceptions remain. -->
+<RuleSet Name="Broken Engine Release Analysis Rules" Description="All Microsoft code-analysis rules. Applies only when RunCodeAnalysis=true." ToolsVersion="10.0">
+  <IncludeAll Action="Warning" />
+  <Rules AnalyzerId="Microsoft.Analyzers.NativeCodeAnalysis" RuleNamespace="Microsoft.Rules.Native">
+  </Rules>
+</RuleSet>

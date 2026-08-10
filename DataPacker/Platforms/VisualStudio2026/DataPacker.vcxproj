@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Common\ErrorUtils.cpp" />
+    <ClCompile Include="..\..\..\Common\Math\MathUtils.cpp" />
+    <ClCompile Include="..\..\..\Common\Workbuffer.cpp" />
+    <ClCompile Include="..\..\..\Common\Threading\ThreadLocal.cpp" />
+    <ClCompile Include="..\..\..\Common\Determinism.cpp" />
+    <ClCompile Include="..\..\..\Common\StringUtils.cpp" />
+    <ClCompile Include="..\..\..\Common\TextureFormat.cpp" />
+    <ClCompile Include="..\..\..\Common\WindowsUtils.cpp" />
+    <ClCompile Include="..\..\..\Common\Threading\Multithreading.cpp" />
+    <ClCompile Include="..\..\..\Common\Threading\PersistentWorker.cpp" />
+    <ClCompile Include="..\..\..\Common\Math\Random.cpp" />
+    <ClCompile Include="..\..\..\Common\Log\Log.cpp" />
+    <ClCompile Include="..\..\..\Common\Log\LogDifference.cpp" />
+    <ClCompile Include="..\..\..\Common\Smoothed.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\AudioRepair.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportAudio.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportCubemapIbl.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportScene.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneVerticesLoader.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneSkeletonLoader.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneAnimationLoader.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportIsland.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportJob.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportModel.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportRaw.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportShader.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportShaderDependencies.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\ExportTexture.cpp" />
+    <ClCompile Include="..\..\Source\Attribution.cpp" />
+    <ClCompile Include="..\..\Source\DiagnosticReporter.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Island\BakeIslandIntermediates.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Island\BakeRoute.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Island\ProcessBakedRegion.cpp" />
+    <ClCompile Include="..\..\Source\FileManager.cpp" />
+    <ClCompile Include="..\..\Source\InputFingerprint.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Island\GaeaArchetype.cpp" />
+    <ClCompile Include="..\..\Source\Main.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Texture\MigrateLegacyIntermediates.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Island\SubdivideBeachBand.cpp" />
+    <ClCompile Include="..\..\Source\Pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Texture\RdoSweep.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Texture\Texture.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\Common\Common.h" />
+    <ClInclude Include="..\..\..\Common\DataFile.h" />
+    <ClInclude Include="..\..\..\Common\ErrorUtils.h" />
+    <ClInclude Include="..\..\..\Common\ExternalHeaders.h" />
+    <ClInclude Include="..\..\..\Common\Flags.h" />
+    <ClInclude Include="..\..\..\Common\Log\Log.h" />
+    <ClInclude Include="..\..\..\Common\Log\LogTypes.h" />
+    <ClInclude Include="..\..\..\Common\Log\LogDifference.h" />
+    <ClInclude Include="..\..\..\Common\Log\LogFormatters.h" />
+    <ClInclude Include="..\..\..\Common\Math\MathUtils.h" />
+    <ClInclude Include="..\..\..\Common\Math\ConvexHull.h" />
+    <ClInclude Include="..\..\..\Common\Math\Random.h" />
+    <ClInclude Include="..\..\..\Common\ScopedLambda.h" />
+    <ClInclude Include="..\..\..\Common\Smoothed.h" />
+    <ClInclude Include="..\..\..\Common\Workbuffer.h" />
+    <ClInclude Include="..\..\..\Common\Threading\ThreadLocal.h" />
+    <ClInclude Include="..\..\..\Common\Timer.h" />
+    <ClInclude Include="..\..\..\Common\AlignedMemory.h" />
+    <ClInclude Include="..\..\..\Common\AllocationTracking.h" />
+    <ClInclude Include="..\..\..\Common\Crc.h" />
+    <ClInclude Include="..\..\..\Common\Determinism.h" />
+    <ClInclude Include="..\..\..\Common\FileUtils.h" />
+    <ClInclude Include="..\..\Source\InputFingerprint.h" />
+    <ClInclude Include="..\..\..\Common\Serialization.h" />
+    <ClInclude Include="..\..\..\Common\StringUtils.h" />
+    <ClInclude Include="..\..\..\Common\TextureFormat.h" />
+    <ClInclude Include="..\..\..\Common\WindowsUtils.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\AudioRepair.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportAudio.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportCubemapIbl.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportScene.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\SourceReadValidation.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneVerticesLoader.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneSkeletonLoader.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneAnimationLoader.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportIsland.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportJob.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportModel.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportRaw.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportShader.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\ExportTexture.h" />
+    <ClInclude Include="..\..\Source\Attribution.h" />
+    <ClInclude Include="..\..\Source\DiagnosticReporter.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Island\BakeIslandIntermediates.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Island\BakeIslandIntermediatesInternal.h" />
+    <ClInclude Include="..\..\Source\FileManager.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Island\GaeaArchetype.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Texture\MigrateLegacyIntermediates.h" />
+    <ClInclude Include="..\..\Source\Pch.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Island\SubdivideBeachBand.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Texture\RdoSweep.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Texture\Texture.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{D5EBBF67-C8FC-4602-BCE6-0CC55278F498}</ProjectGuid>
+    <RootNamespace>DataPacker</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+	<DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))</DataRepositoryRoot>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ClangTidyToolExeAdditionalOptions>--quiet</ClangTidyToolExeAdditionalOptions>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(ProjectDir)\Output\</OutDir>
+    <IntDir>$(ProjectDir)\Build\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName).$(Configuration)</TargetName>
+    <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(ProjectDir)\Output\</OutDir>
+    <IntDir>$(ProjectDir)\Build\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)</TargetName>
+    <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup>
+    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. -->
+    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange</ClangTidyChecks>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include\Volk;$(VK_SDK_PATH)\Include;$(VK_SDK_PATH)\Include\vulkan;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\..\Common;$(ProjectDir)\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\ThirdParty\DirectXTK\Src;$(ProjectDir)\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\ThirdParty\zlib;$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\ThirdParty\cmft\include;$(ProjectDir)\..\..\..\ThirdParty\cmft\dependency;$(ProjectDir)\..\..\..\ThirdParty\meshoptimizer\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>BT_DATA_PACKER;BT_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <DisableSpecificWarnings>28278;6385;6326;6340;6297;26115;26135;26408;26445</DisableSpecificWarnings>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>ThirdParty.$(Configuration).lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
+if errorlevel 1 exit /b %errorlevel%
+if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" (
+    echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2
+    exit /b 1
+)</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include\Volk;$(VK_SDK_PATH)\Include;$(VK_SDK_PATH)\Include\vulkan;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\..\Common;$(ProjectDir)\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\ThirdParty\DirectXTK\Src;$(ProjectDir)\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\ThirdParty\zlib;$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\ThirdParty\cmft\include;$(ProjectDir)\..\..\..\ThirdParty\cmft\dependency;$(ProjectDir)\..\..\..\ThirdParty\meshoptimizer\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>BT_DATA_PACKER;BT_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <EnablePREfast>true</EnablePREfast>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <DisableSpecificWarnings>28278;6385;6326;6340;6297;26115;26135;26408;26445</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <AdditionalDependencies>ThirdParty.$(Configuration).lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
+if errorlevel 1 exit /b %errorlevel%
+if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" (
+    echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2
+    exit /b 1
+)</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

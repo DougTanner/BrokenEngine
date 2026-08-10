@@ -1,0 +1,69 @@
+#version 460
+
+#include "ShaderLayouts.h"
+
+layout (local_size_x = kiComputeTileSize, local_size_y = kiComputeTileSize) in;
+
+// Uniforms
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
+{
+    GlobalLayout globalLayout;
+};
+
+layout (set = 1, binding = 1) uniform sampler2D objectShadowsBlurIntermediateSampler;
+layout (set = 1, binding = 2, r16) uniform writeonly image2D objectShadowsBlurTexture; // keShadowFormat
+
+void main()
+{
+	uint uiX = gl_GlobalInvocationID.x;
+	uint uiY = gl_GlobalInvocationID.y;
+
+	ivec2 i2Size = imageSize(objectShadowsBlurTexture);
+	if (uiX >= i2Size.x || uiY >= i2Size.y)
+		return;
+
+	int iRadius = globalLayout.iObjectShadowsBlurRadius;
+	float fRadiusOverSigma = float(iRadius) / max(globalLayout.fObjectShadowsBlurSigma, 1e-6f);
+
+	vec2 f2InvSize = 1.0f / vec2(i2Size);
+	vec2 f2Uv = (vec2(uiX, uiY) + 0.5f) * f2InvSize;
+
+	float fTotal = textureLod(objectShadowsBlurIntermediateSampler, f2Uv, 0.0f).x;
+	float fWeightSum = 1.0f;
+	// Intermediate and output grids match, so a linear sample at j + w2 / (w1 + w2) returns
+	// (w1 * T[j] + w2 * T[j + 1]) / (w1 + w2); multiplying it by the combined weight
+	// reconstructs the weighted sum.
+	for (int j = 1; j <= iRadius; j += 2)
+	{
+		float fA1 = float(j) / fRadiusOverSigma;
+		float fWeight1 = exp(-0.5f * fA1 * fA1);
+		if (j + 1 <= iRadius)
+		{
+			float fA2 = float(j + 1) / fRadiusOverSigma;
+			float fWeight2 = exp(-0.5f * fA2 * fA2);
+			float fCombinedWeight = fWeight1 + fWeight2;
+			// Both Gaussian weights can underflow to zero; that pair contributes nothing and cannot form an offset.
+			if (fCombinedWeight > 0.0f)
+			{
+				float fCombinedOffset = float(j) + fWeight2 / fCombinedWeight;
+				vec2 f2Offset = vec2(0.0f, fCombinedOffset) * f2InvSize;
+				fTotal += fCombinedWeight *
+					(textureLod(objectShadowsBlurIntermediateSampler, f2Uv + f2Offset, 0.0f).x
+						+ textureLod(objectShadowsBlurIntermediateSampler, f2Uv - f2Offset, 0.0f).x);
+				fWeightSum += 2.0f * fCombinedWeight;
+			}
+		}
+		else
+		{
+			// An odd radius leaves one unpaired outer tap on each side.
+			vec2 f2Offset = vec2(0.0f, float(j)) * f2InvSize;
+			fTotal += fWeight1 *
+				(textureLod(objectShadowsBlurIntermediateSampler, f2Uv + f2Offset, 0.0f).x
+					+ textureLod(objectShadowsBlurIntermediateSampler, f2Uv - f2Offset, 0.0f).x);
+			fWeightSum += 2.0f * fWeight1;
+		}
+	}
+
+	float fOutColor = 1.0f - globalLayout.fObjectShadowsIntensity * fTotal / fWeightSum;
+	imageStore(objectShadowsBlurTexture, ivec2(uiX, uiY), vec4(fOutColor, 0.0f, 0.0f, 0.0f));
+}

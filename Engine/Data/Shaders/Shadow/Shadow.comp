@@ -1,0 +1,73 @@
+#version 460
+
+#include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
+
+layout (local_size_x = kiComputeTileSize, local_size_y = kiComputeTileSize) in;
+
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
+{
+    GlobalLayout globalLayout;
+};
+
+layout (set = 1, binding = 1) uniform sampler2D elevationTextureSampler;
+layout (set = 1, binding = 2, r16) uniform writeonly image2D shadowTexture; // keShadowFormat
+
+void main()
+{
+	// The dispatch rounds the texture extent up to whole tiles, so the tail threads guard against it.
+	ivec2 i2Texel = ivec2(gl_GlobalInvocationID.xy);
+	if (any(greaterThanEqual(i2Texel, imageSize(shadowTexture))))
+		return;
+
+	uint x = uint(i2Texel.x);
+	uint y = uint(i2Texel.y);
+
+	vec2 f2InvElevationSize = globalLayout.f2ShadowElevationTextureSizeInv;
+
+	float fElevation = max(textureLod(elevationTextureSampler, vec2(float(x) + float(globalLayout.iShadowStartOffset), float(y)) * f2InvElevationSize, 0.0f).x, 0.0f);
+
+	// The CPU uploads fShadowDirectionMultiplier as exactly +/-1 (east/west sun march), so no sign() needed.
+	vec3 f3ToBaseNormal = vec3(globalLayout.fShadowDirectionMultiplier, 0.0f, 0.0f);
+
+	float fDistance = globalLayout.fShadowDistanceFalloff;
+	float fInvDistance = globalLayout.fShadowDistanceFalloffInv;
+
+	float fShadow = 0.0f;
+	float fOtherX = globalLayout.fShadowWidthScale;
+	int iEnd = int(globalLayout.iShadowElevationSize);
+	int iStart = int(x) + globalLayout.iShadowStartOffset + globalLayout.iShadowIncrement;
+	for (int i = iStart; i != iEnd; i += globalLayout.iShadowIncrement, fOtherX += globalLayout.fShadowWidthScale)
+	{
+		float fAbsOtherX = abs(fOtherX);
+		if (fAbsOtherX > fDistance)
+		{
+			break;
+		}
+
+		float fOtherElevation = max(textureLod(elevationTextureSampler, vec2(float(i), float(y)) * f2InvElevationSize, 0.0f).x, 0.0f);
+		if (fOtherElevation <= fElevation)
+		{
+			continue;
+		}
+
+		float fDistanceFactor = fInvDistance * (fDistance - fAbsOtherX);
+		if (fDistanceFactor < 0.01f)
+		{
+			break;
+		}
+
+		vec3 f3ToOtherNormal = normalize(vec3(fOtherX, 0.0, fOtherElevation - fElevation));
+		float fTerrainAngle = acos(clamp(dot(f3ToBaseNormal, f3ToOtherNormal), -1.0f, 1.0f));
+
+		float fFeather = globalLayout.fShadowFeather;
+		float fHeightMultiplier = clamp((fOtherElevation - globalLayout.fShadowHeightFadeBottom) * globalLayout.fShadowHeightFadeRangeInv, 0.0f, 1.0f);
+		fShadow = max(fHeightMultiplier * fDistanceFactor * mix(1.0f, 0.0f, (globalLayout.fShadowAngleOffsetSum - fTerrainAngle) * fFeather), fShadow);
+		if (fShadow >= 1.0f)
+		{
+			break;
+		}
+	}
+
+	imageStore(shadowTexture, ivec2(x, y), vec4((1.0f - fShadow) * globalLayout.fShadowMoonMultiplier, 0.0, 0.0, 0.0));
+}

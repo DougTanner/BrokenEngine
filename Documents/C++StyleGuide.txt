@@ -1,0 +1,295 @@
+Use the following rules for C++ code
+
+1. Use tabs for indentation	
+
+2. Curly braces go on the next line for functions, scopes, and lambdas. Struct or class initializers can have curly braces on the same line.
+
+	if ()
+	{
+	}
+
+	auto GetContent = [](const auto& rSource) -> std::pair<bool, std::string>
+	{
+	}
+
+3. Hungarian notation
+
+	Constexpr - k: inline constexpr float kfMinDepth = 0.0f;
+	Enum declaration - k: enum class TextureFlags { kMultisampling = 0x01, kRenderPass = 0x02, };
+
+	Static - s: static bool sbQuit = false;
+
+	Global - g: inline Graphics* gpGraphics = nullptr;
+	Member of a class - m (classes only, not structs): bool mbQuit = false;
+
+	Pointer - p: IXAudio2SourceVoice* pVoice = nullptr;
+	Reference - r: const game::MenuInput& rMenuInput
+
+	character - c: char cChar = 'a';
+	integer - i: int64_t iCount = 0;
+	unsigned integer, unsigned short, byte - ui: uint16_t suiMax = 0;
+	boolean - b: bool bEnabled = true;
+	enum variable - e: CpuCounters eCpuCounter
+	float, double - f: float fVolume = 1.0f;
+	XMFLOAT[2/3/4] - [f2/f3/f4]: XMFLOAT2 f2MousePosition {};
+	XMVector - vec: XMVECTOR vecPosition {};
+	XMMatrix - mat: XMMATRIX matWorld {};
+
+	std::string and std::string_view - no hungarian prefix
+	
+4. Use "#pragma once" for header guards: #pragma once
+
+5. Use RAII for allocations and locking: std::unique_ptr<game::Frame> mpCurrentFrame;
+
+6. Features are toggled via `inline constexpr bool kb*` variables in Pch.h (e.g., kbLogging, kbRecording). Use `if constexpr` for conditional compilation. Avoid using configuration differences directly (BT_DEBUG vs. BT_RELEASE):
+
+	if constexpr (kbLogging)
+	{
+		Log("message");
+	}
+
+7. Camel case, except for template parameters. Classes and functions start with an uppercase letter, variables start with a lowercase letter.
+
+	class RenderThread
+	constexpr uint32_t kuiThreadCount
+	template <typename T> or template <typename... TUV>
+
+8. Use i/j/k variable names in for loops, but prefer range-based for loop when possible. If a counter variable is required with a range-based for loop, use the C++20 syntax to include include an initializer statement. Use "it" for iterators.
+
+	for (size_t i = 0; i < mIslands.size(); ++i)
+
+9. Exceptions for fatal errors only (things that would cause the program to crash), not control flow
+
+10. "/" for header include paths, not "\\": #include "Graphics/Graphics.h"
+
+11. Use C++-style casts, static_cast reinterpret_cast etc...: static_cast<data::DataTypes>(i)
+
+12. For duration and time use std::chrono, use chrono_literals suffixes for example:
+	Nanoseconds - std::chrono::nanoseconds durationNanoseconds = 10ns;
+	Microseconds - us
+	Milliseconds - ms
+	Seconds - std::chrono::seconds seekSeconds = 1s;
+
+13. Default to int64_t: int64_t iCount = 0;
+    -Use int8_t, int16_t when packing into structs and arrays (if higher range of larger types is not required)
+	-Use unsigned integers when doing bitwise operations
+	-Use the corresponding type when dealing with directly with parameters and return values from other APIs (ex: Vulkan uses uint32_t)
+
+14. Use "Count" not "Num", ex: uint32_t kuiThreadCount = 3; not kuiNumThreads
+
+15. YOU MUST not use auto keyword unless:
+	a) It's an XMVECTOR or XMMATRIX: auto vecResult = XMVector3Normalize(vecInput);
+	b) The type is obvious from a template parameter to the right
+	c) It is an iterator
+	d) It is a structured binding: auto [it, bInserted] = map.try_emplace(key, value);
+	e) It is a lambda expression assigned directly to the variable: auto callback = []() {};
+
+IMPORTANT do not use auto in range-based for loops
+
+16. Never use operator[] on std::unordered_map/std::map — it silently inserts a default-constructed value when the key doesn't exist, which can mask bugs. Use these safe alternatives:
+
+	Read: map.at(key)
+	Write/assign: map.insert_or_assign(key, value)
+	Create-then-use: map.try_emplace(key).first->second
+	Ensure existence: map.try_emplace(key);
+
+	Access std::vectors with .at(): mIslands.at(0).quad
+
+17. Use size_t for std::vector sizes and indices: for (size_t i = 0; i < vec.size(); ++i)
+
+18. Use "const" if:
+	a) A pointer or reference is passed into a function and not modified: const game::MenuInput& rMenuInput
+	b) A reference in a ranged for loop is not modified: for (const Island& rIsland : mIslands)
+
+19. Use "typename" not "class" for template declarations, template parameters should be in all upper case ex: template <typename T, typename... TUV>
+
+20. Use uniform initialization only for structures, arrays, and initializer list constructed classes
+	int i = 0;
+	Class class(0, i);
+	Struct struct {a = 0, b = i};
+
+21. Prefer std::span<const T> (or std::span<T> for writable views) over pointer + size parameter pairs: void Receive(std::span<const uint8_t> packetData). Span parameters take no Hungarian prefix (packetData, crcs, buffer). C arrays remain fine for fixed-size storage; std::array is acceptable where value semantics or aggregate initialization help. Don't use std::bitset — use common::Flags or integer bitfields. (Engine, DataPacker, and ThirdParty Debug configs pin _ITERATOR_DEBUG_LEVEL=0 and STL hardening off, so span operator[]/iterators have no bounds checks in any config.)
+
+22. Have a comma at the end of every line in initializer lists
+
+	int pInts[] =
+	{
+		1,
+		2,
+	};
+
+23. Use 'using' keyword instead of typedefs: using MenuFlags_t = common::Flags<MenuFlags>;
+
+24. Normalized XMVECTORs should be postfixed with "Normal", a postfix of "Direction" also implies that it is normalized: XMVECTOR vecSunNormal, XMVECTOR vecDirection
+
+25. Use "static constexpr" at function scope, "inline constexpr" at global scope in headers
+
+	static constexpr float kfNoonStart = XM_PIDIV8;  // function scope
+	inline constexpr float kfMinDepth = 0.0f;  // global scope in header
+
+26. Avoid overuse of "using enum", try to only use on enums in direct header: using enum MenuFlags;
+
+27. Floating point constants should always have the decimal and first digit, even if it's 0, and should have 'f' appended: float fValue = 1.0f;
+
+28. Use nullptr instead of NULL: IXAudio2SourceVoice* pVoice = nullptr;
+
+29. Use override keyword on child class virtual functions: void Update() override;
+
+30. No space on ">>" ex: std::vector<std::vector<float>>
+
+31. Use static_assert instead of runtime assert whenever possible: static_assert(std::chrono::high_resolution_clock::is_steady);
+
+32. Use std::unordered_map instead of std::map: std::unordered_map<common::crc_t, Texture> mTextureMap;
+
+33. Do not use any constants from limits.h, instead use std::numeric_limits: std::numeric_limits<float>::max()
+
+34. Use digit separators for large numbers: uint32_t uiOneMillion = 1'000'000;
+
+35. Use the file system library std::filesystem
+
+36. Always initialize variables (unless it is a class with a constructor). Use inline variables with initializers in header (both globals and class members). Do not initalize class member variables in the .cpp file.: bool mbQuit = false;
+
+37. Use structured bindings for multiple return from functions with std::tuple<>: auto [bMultisampling, bPrevious, bChanged] = gMultisampling.Changed<bool>();
+
+38. Use structured bindings in range-based for loops over associative containers (std::map, std::unordered_map)
+
+	for (const auto& [rCrc, rTexture] : mTextureMap)
+	{
+		crcs.push_back(rTexture.mInfo.crc);
+	}
+
+39. Use [[maybe_unused]] when a variable is unused: void Func([[maybe_unused]] int64_t iUnused)
+
+40. Use std::string_view or std::wstring_view instead of "const char*" or std::string& or std::wstring& parameters into functions: void UpdateTextArea(TextAreas eTextArea, std::string_view pcCharacters);
+
+41. Explicitly use std:: namespace, do not `using namespace std;`: std::vector, std::string, std::unordered_map
+NOTE: The following global namespaces are allowed: `using namespace DirectX;`
+
+42. Use designated initializers for struct initializers: LazyChunk { .location = loc, .header = chunkHeader, }
+
+43. Run-Time Type Info (RTTI) is disabled, do not use it
+
+44. Prefer aligned data for "DirectX Math": XMStoreFloat4A is better than XMStoreFloat4
+
+46. Do not use Est (estimate) functions in "DirectX Math", they may have different behaviour on different architectures: Use XMVectorReciprocal(), not XMVectorReciprocalEst()
+
+47. Header include order (groups separated by blank line):
+	a) Corresponding .h file (always first)
+	b) engine:: includes
+	c) game:: includes
+	External C++/platform headers and common:: headers go in Pch.h
+	Within each group: sorted alphabetically, fewer subdirectories first
+
+	#include "Player.h"
+
+	#include "Graphics/Managers/BufferManager.h"
+	#include "Graphics/Managers/PipelineManager.h"
+
+	#include "Frame/Frame.h"
+	#include "Input/Input.h"
+
+48. Don't add extra curly brackets for scope to force close std::fstream, instead use .close() when no longer needed: fileStream.close();
+
+49. Class state is public by default and is read or mutated directly. Do not add getter, setter, drain, take, `Is*`, `Can*`, or other accessor methods for independently readable or mutable state. Do not add a function whose implementation is only one state access, one assignment, or one pass-through call; spreading its braces and statement across several lines does not make it acceptable. Put the member or composed component in `public:` and perform the operation at the caller.
+
+	`protected:` and `private:` are reserved for state whose members must be mutated together to preserve an invariant or operation order. The function protecting that state must contain the complete multi-statement mutation; a trivial accessor or forwarding layer is never justified. This rule targets state access and pass-through APIs, not a semantic codec or serialization adapter whose call defines the layer contract.
+
+50. if () statements compare booleans they don't take pointers:
+
+	if (pPointer != nullptr)
+	{
+	}
+
+51. Keep function parameters AND arguments all on the same line, regardless of line length. This applies to BOTH function declarations and function call sites. Never split a call's arguments across multiple lines just because the line is long — long is fine. The only exception is when an argument is itself a lambda or a struct/initializer-list literal, in which case the `{}` goes on the next line per rule 2 (and the other arguments still stay on the call line).
+
+	Declaration (good):
+	void CreateBuffer(std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VkDeviceMemory& rVkDeviceMemory);
+
+	Call (bad — arguments wrapped):
+	engine::gpAudioManager->PlayOneShot3d(rFrame,
+		data::kAudioMissileCrc,
+		vecMissilePosition, gMissileLaunchVolume.Get(), gMissilePitchMin.Get(), gMissilePitchRandom.Get());
+
+	Call (good — single line, however long):
+	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissileCrc, vecMissilePosition, gMissileLaunchVolume.Get(), gMissilePitchMin.Get(), gMissilePitchRandom.Get());
+
+	Lambda/struct exception (good):
+	common::gpMultithreading->Dispatch(iCount, [&](int64_t i)
+	{
+		// ...
+	});
+
+52. Put a space before "{}" universal initializers, ex: uuid_t uuid {}; XMFLOAT2 f2MousePosition {};
+
+53. Multiple .emplace_back() or .push_back() calls on a std::vector should be preceeded by .reserve() to avoid multiple reallocations and destructor calls
+
+54. Vulkan handle type member variables end with Vk{TypeName} suffix: VkCommandBuffer mGlobalVkCommandBuffer = VK_NULL_HANDLE;
+
+55. "enum class" should be used where possible, with the exception of enums created to index and count
+
+	enum Pipelines
+	{
+		kPipelineLog,
+		kPipelineObjectShadowsBlur,
+
+		kPipelineCount
+	};
+
+56. Use complete words in all variable and function names. Do not abbreviate (e.g., `rReconcileContext` not `ctx`, `bufferIt` not `bufIt`, `rCommandBuffer` not `cmdBuf`). Exception: loop counters `i`/`j`/`k` and iterators `it` (per rule 8).
+
+57. Do not use "Impl", "Internal", or similar non-word suffixes on function names. If a function reconciles, name it `Reconcile()`, not `ReconcileImpl()`. Use scope (private, anonymous namespace) to distinguish internal from public versions.
+
+58. Use `#if defined()` instead of `#ifdef` for preprocessor conditionals. This is more composable with logical operators:
+
+	#if defined(BT_CLIENT)
+	#if defined(BT_CLIENT) && defined(BT_DEBUG)
+
+59. Indent "case" statements one level from their "switch":
+
+60. Gate std::memcpy size on the destination, not the source. If sizes differ, use std::min(sizeof(source), sizeof(dest)):
+
+	std::memcpy(&dest, &source, std::min(sizeof(source), sizeof(dest)));
+
+
+	switch (eState)
+	{
+		case State::kIdle:
+			break;
+		case State::kRunning:
+			break;
+	}
+
+61. "if" and "else" bodies always use curly braces, even for a single statement (braces per rule 2):
+
+	if (pLine[0] != '\0')
+	{
+		++iCount;
+	}
+	else
+	{
+		break;
+	}
+
+62. Use early returns for guard and validation sequences. When several independent conditions each guard the same single-statement exit, write one "if" per condition instead of packing them into one large "if (A || B || C)" disjunction. Keep the conditions in their original order, grouped by concern; reordering them changes which condition is evaluated first:
+
+	Bad (independent guards packed into one disjunction):
+	if (pTarget == nullptr || !rFrame.mbSimulating || iProjectileCount == 0)
+	{
+		return;
+	}
+
+	Good (one early return per condition, original order kept):
+	if (pTarget == nullptr)
+	{
+		return;
+	}
+
+	if (!rFrame.mbSimulating)
+	{
+		return;
+	}
+
+	if (iProjectileCount == 0)
+	{
+		return;
+	}

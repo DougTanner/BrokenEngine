@@ -1,0 +1,318 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="DataPacker">
+      <UniqueIdentifier>{a9dafd12-37c3-4b96-9fb9-8974eb4ac5c1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataPacker\ExportJobs">
+      <UniqueIdentifier>{c0f1dadd-29fb-48de-9fdc-f0c5624d6e75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataPacker\ExportJobs\Scene">
+      <UniqueIdentifier>{7a3eb9d2-5c4f-4b1e-9d8a-e1f2b3c4d5e6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataPacker\ExportJobs\Island">
+      <UniqueIdentifier>{9e5483f5-bbca-4a1b-9c5b-9336d5deb525}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataPacker\ExportJobs\Texture">
+      <UniqueIdentifier>{eda49b86-ed60-4b7b-b056-9fe72d4329ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common">
+      <UniqueIdentifier>{1216d243-22f5-4761-9444-e281d11da6d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Log">
+      <UniqueIdentifier>{ebe6e924-5d53-470f-b731-a61b35a25e5a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Threading">
+      <UniqueIdentifier>{af05370e-eb98-42be-bf84-46cd5b6b93d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Math">
+      <UniqueIdentifier>{7a252b43-5af6-48fe-afe4-467c589de633}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Source\Main.cpp">
+      <Filter>DataPacker</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\FileManager.cpp">
+      <Filter>DataPacker</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\InputFingerprint.cpp">
+      <Filter>DataPacker</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Attribution.cpp">
+      <Filter>DataPacker</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\DiagnosticReporter.cpp">
+      <Filter>DataPacker</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Island\BakeIslandIntermediates.cpp">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Island\BakeRoute.cpp">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Island\ProcessBakedRegion.cpp">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Island\GaeaArchetype.cpp">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Island\SubdivideBeachBand.cpp">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Pch.cpp">
+      <Filter>DataPacker</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportJob.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportShader.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportShaderDependencies.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportTexture.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportModel.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportIsland.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Texture\Texture.cpp">
+      <Filter>DataPacker\ExportJobs\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\AudioRepair.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportAudio.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportCubemapIbl.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Texture\MigrateLegacyIntermediates.cpp">
+      <Filter>DataPacker\ExportJobs\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Texture\RdoSweep.cpp">
+      <Filter>DataPacker\ExportJobs\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportScene.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneVerticesLoader.cpp">
+      <Filter>DataPacker\ExportJobs\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneSkeletonLoader.cpp">
+      <Filter>DataPacker\ExportJobs\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneAnimationLoader.cpp">
+      <Filter>DataPacker\ExportJobs\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\ExportRaw.cpp">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\ErrorUtils.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Workbuffer.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Threading\ThreadLocal.cpp">
+      <Filter>Common\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Determinism.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\StringUtils.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\TextureFormat.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\WindowsUtils.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Threading\Multithreading.cpp">
+      <Filter>Common\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Threading\PersistentWorker.cpp">
+      <Filter>Common\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Math\Random.cpp">
+      <Filter>Common\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Log\Log.cpp">
+      <Filter>Common\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Log\LogDifference.cpp">
+      <Filter>Common\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Smoothed.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Common\Math\MathUtils.cpp">
+      <Filter>Common\Math</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Source\InputFingerprint.h">
+      <Filter>DataPacker</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Attribution.h">
+      <Filter>DataPacker</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\DiagnosticReporter.h">
+      <Filter>DataPacker</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\FileManager.h">
+      <Filter>DataPacker</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Island\BakeIslandIntermediates.h">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Island\BakeIslandIntermediatesInternal.h">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Island\GaeaArchetype.h">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Island\SubdivideBeachBand.h">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Pch.h">
+      <Filter>DataPacker</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportJob.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportModel.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportShader.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportTexture.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Math\MathUtils.h">
+      <Filter>Common\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Math\ConvexHull.h">
+      <Filter>Common\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Math\Random.h">
+      <Filter>Common\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\ScopedLambda.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Smoothed.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Workbuffer.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Threading\ThreadLocal.h">
+      <Filter>Common\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Timer.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\AlignedMemory.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\AllocationTracking.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Crc.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Determinism.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\FileUtils.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Serialization.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\StringUtils.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\TextureFormat.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\WindowsUtils.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Common.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\DataFile.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\ExternalHeaders.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Flags.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Log\Log.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Log\LogTypes.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportIsland.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Texture\RdoSweep.h">
+      <Filter>DataPacker\ExportJobs\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Texture\Texture.h">
+      <Filter>DataPacker\ExportJobs\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\AudioRepair.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportAudio.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportCubemapIbl.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Texture\MigrateLegacyIntermediates.h">
+      <Filter>DataPacker\ExportJobs\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportScene.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\SourceReadValidation.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneVerticesLoader.h">
+      <Filter>DataPacker\ExportJobs\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneSkeletonLoader.h">
+      <Filter>DataPacker\ExportJobs\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneAnimationLoader.h">
+      <Filter>DataPacker\ExportJobs\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Log\LogDifference.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\Log\LogFormatters.h">
+      <Filter>Common\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\ExportRaw.h">
+      <Filter>DataPacker\ExportJobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Common\ErrorUtils.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

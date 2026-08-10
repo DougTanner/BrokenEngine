@@ -1,0 +1,22 @@
+# Local-only files
+*.user
+*.local.json
+tmpclaude*
+Log.txt
+*.terrain.lock
+/.claude/build-locks/
+
+# Local-only directories
+__pycache__/
+.vs/
+Build/
+DiagnosticLogs/
+Output
+Temp
+Plans/Temp
+# Gaea 2 agent cache is local-only; independent of DataPacker's Gaea cache.
+.agents/skills/gaea2-shared/cache/
+.claude/worktrees/
+
+# Games
+/Projects/Coretide

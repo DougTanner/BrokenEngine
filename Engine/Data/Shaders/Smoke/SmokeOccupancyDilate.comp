@@ -1,0 +1,75 @@
+#version 460
+
+#include "ShaderLayouts.h"
+
+layout (local_size_x = kiOccupancyDilateGroupSize) in;
+
+// Uniforms
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
+{
+	GlobalLayout globalLayout;
+};
+
+layout (set = 1, binding = 1) readonly buffer occupancyBuffer
+{
+	uint occupancy[];
+};
+
+// Active tile list: [VkDispatchIndirectCommand (3 uint32s)] [packed tile indices...]
+layout (set = 1, binding = 2) buffer activeTileBuffer
+{
+	uint uiDispatchX;
+	uint uiDispatchY;
+	uint uiDispatchZ;
+	uint activeTiles[];
+};
+
+layout (scalar, set = 1, binding = 3) readonly buffer ownOccupancyBuffer
+{
+	uint ownOccupancy[];
+};
+
+// First-pass dilate (used before SmokeSpreadComputeB).
+//
+// SmokeSpreadComputeB samples TextureOne at the OUTPUT tile's UV directly (no cross-frame
+// remap), so ComputeB at current-frame tile (X, Y) produces nonzero iff prev-frame ComputeA
+// wrote nonzero at tile index (X, Y). That makes this a plain direct lookup with 5x5 box
+// (Chebyshev-2) dilation — no f4PreviousSmokeArea / f4SmokeArea math is needed here. The output
+// TextureTwo occupancy is unioned at the output tile index so stale storage is always rewritten.
+//
+// ComputeA's input (TextureTwo) DOES need a scale-aware lookup; that's done by the separate
+// SmokeOccupancyDilateRemap.comp run before SmokeSpreadComputeA.
+void main()
+{
+	uint uiTilesX = globalLayout.uiSmokeTilesX;
+	uint uiTilesY = globalLayout.uiSmokeTilesY;
+	uint uiTotalTiles = uiTilesX * uiTilesY;
+	uint uiTileIndex = gl_GlobalInvocationID.x;
+	if (uiTileIndex >= uiTotalTiles)
+		return;
+
+	uint uiTileY = uiTileIndex / uiTilesX;
+	uint uiTileX = uiTileIndex - uiTileY * uiTilesX;
+
+	bool bActive = (ownOccupancy[uiTileIndex >> 5] & (1u << (uiTileIndex & 31))) != 0;
+	for (int iDy = -2; iDy <= 2 && !bActive; ++iDy)
+	{
+		for (int iDx = -2; iDx <= 2 && !bActive; ++iDx)
+		{
+			int iNx = int(uiTileX) + iDx;
+			int iNy = int(uiTileY) + iDy;
+			if (iNx < 0 || iNy < 0 || uint(iNx) >= uiTilesX || uint(iNy) >= uiTilesY)
+				continue;
+
+			uint uiNeighborIndex = uint(iNy) * uiTilesX + uint(iNx);
+			if ((occupancy[uiNeighborIndex >> 5] & (1u << (uiNeighborIndex & 31))) != 0)
+				bActive = true;
+		}
+	}
+
+	if (bActive)
+	{
+		uint uiSlot = atomicAdd(uiDispatchX, 1u);
+		activeTiles[uiSlot] = uiTileIndex;
+	}
+}

@@ -1,0 +1,561 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|x64">
+      <Configuration>Profile</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{340DE792-5C3A-4877-9E68-0EA2ED7B6364}</ProjectGuid>
+    <RootNamespace>BrokenEngineSandboxServer</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ClangTidyToolExeAdditionalOptions>--quiet</ClangTidyToolExeAdditionalOptions>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <DataBuildMode Condition="'$(DataBuildMode)'==''">Local</DataBuildMode>
+    <DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(ProjectDir)..\..\..\..'))</DataRepositoryRoot>
+    <DataRepositoryIsLinkedWorktree>$([System.IO.File]::Exists('$(DataRepositoryRoot)\.git'))</DataRepositoryIsLinkedWorktree>
+    <RunDataPacker Condition="'$(RunDataPacker)'=='' and '$(DataBuildMode)'=='Local' and '$(DataRepositoryIsLinkedWorktree)'!='True'">true</RunDataPacker>
+    <RunDataPacker Condition="'$(RunDataPacker)'==''">false</RunDataPacker>
+    <GameDataDirectory Condition="'$(GameDataDirectory)'=='' and '$(DataBuildMode)'=='Local'">$(ProjectDir)Output\Data</GameDataDirectory>
+    <GeneratedDataIncludeRoot Condition="'$(GeneratedDataIncludeRoot)'=='' and '$(GameDataDirectory)'!=''">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetFullPath('$(GameDataDirectory)'))))</GeneratedDataIncludeRoot>
+    <GameDataDirectoryIsAbsolute Condition="'$(GameDataDirectory)'!=''">$([System.Text.RegularExpressions.Regex]::IsMatch('$(GameDataDirectory)', '^(?:[A-Za-z]:[\\/]|[\\/]{2})'))</GameDataDirectoryIsAbsolute>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(ProjectDir)\Output\</OutDir>
+    <IntDir>$(ProjectDir)\Build\$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName).$(Configuration)</TargetName>
+    <CustomBuildBeforeTargets>
+    </CustomBuildBeforeTargets>
+    <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
+    <LinkIncremental>false</LinkIncremental>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
+    <OutDir>$(ProjectDir)\Output\</OutDir>
+    <IntDir>$(ProjectDir)\Build\$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName).$(Configuration)</TargetName>
+    <CustomBuildBeforeTargets>
+    </CustomBuildBeforeTargets>
+    <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>NativeMinimumRules.ruleset</CodeAnalysisRuleSet>
+    <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(ProjectDir)\Output\</OutDir>
+    <IntDir>$(ProjectDir)\Build\$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)</TargetName>
+    <CustomBuildBeforeTargets />
+    <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)BrokenEngineAnalysis.ruleset</CodeAnalysisRuleSet>
+    <!-- Analysis diagnostics reach the post-link NativeCodeAnalysis task, not cl's console, so
+         TreatWarningAsError never sees them; this is what makes them fail the build. It takes effect
+         wherever RunCodeAnalysis is true - including the Release default set just below, so Visual
+         Studio Release builds enforce as well - and is inert only for agent builds, which pass
+         /p:RunCodeAnalysis=false. Keep CodeAnalysisNeverReportRuleErrors unset or the task silently
+         drops back to warnings. -->
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
+    <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup>
+    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. -->
+    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange</ClangTidyChecks>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>BT_ENGINE;BT_SERVER;BT_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MinimalRebuild>false</MinimalRebuild>
+      <EnableModules>false</EnableModules>
+      <BuildStlModules>false</BuildStlModules>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
+      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CustomBuildStep>
+      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(ProjectDir)\..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(ProjectDir)\..\..\..\..\Engine\Data" "$(ProjectDir)\..\..\Data" "$(GameDataDirectory)"</Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
+if errorlevel 1 exit /b %errorlevel%
+if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
+    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+)
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
+    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+)
+</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>BT_ENGINE;BT_SERVER;BT_PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <EnablePREfast>false</EnablePREfast>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <EnableModules>false</EnableModules>
+      <BuildStlModules>false</BuildStlModules>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CustomBuildStep>
+      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(ProjectDir)\..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(ProjectDir)\..\..\..\..\Engine\Data" "$(ProjectDir)\..\..\Data" "$(GameDataDirectory)"</Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
+if errorlevel 1 exit /b %errorlevel%
+if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
+    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+)
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
+    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+)
+</Command>
+      <Message>
+      </Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>BT_ENGINE;BT_SERVER;BT_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <EnablePREfast>true</EnablePREfast>
+      <!-- 4702: ThirdParty Clipper2 CheckPrecisionRange has an unreachable fallback after DoError() throws (exceptions enabled); benign, fires only at Release LTCG codegen where the ExternalHeaders.h push(0) cannot suppress it -->
+      <DisableSpecificWarnings>4702</DisableSpecificWarnings>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <EnableModules>false</EnableModules>
+      <BuildStlModules>false</BuildStlModules>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CustomBuildStep>
+      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(ProjectDir)\..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(ProjectDir)\..\..\..\..\Engine\Data" "$(ProjectDir)\..\..\Data" "$(GameDataDirectory)"</Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
+if errorlevel 1 exit /b %errorlevel%
+if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
+    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+)
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
+    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+)
+</Command>
+      <Message>
+      </Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\Common\Common.h" />
+    <ClInclude Include="..\..\..\..\Common\DataFile.h" />
+    <ClInclude Include="..\..\..\..\Common\ErrorUtils.h" />
+    <ClInclude Include="..\..\..\..\Common\ExternalHeaders.h" />
+    <ClInclude Include="..\..\..\..\Common\Flags.h" />
+    <ClInclude Include="..\..\..\..\Common\Log\Log.h" />
+    <ClInclude Include="..\..\..\..\Common\Log\LogTypes.h" />
+    <ClInclude Include="..\..\..\..\Common\Threading\Multithreading.h" />
+    <ClInclude Include="..\..\..\..\Common\Threading\PersistentWorker.h" />
+    <ClInclude Include="..\..\..\..\Common\Log\LogDifference.h" />
+    <ClInclude Include="..\..\..\..\Common\Log\LogFormatters.h" />
+    <ClInclude Include="..\..\..\..\Common\Math\MathUtils.h" />
+    <ClInclude Include="..\..\..\..\Common\StackWalker.h" />
+    <ClInclude Include="..\..\..\..\Common\Math\Random.h" />
+    <ClInclude Include="..\..\..\..\Common\Math\ConvexHull.h" />
+    <ClInclude Include="..\..\..\..\Common\ScopedLambda.h" />
+    <ClInclude Include="..\..\..\..\Common\Smoothed.h" />
+    <ClInclude Include="..\..\..\..\Common\Workbuffer.h" />
+    <ClInclude Include="..\..\..\..\Common\Threading\ThreadLocal.h" />
+    <ClInclude Include="..\..\..\..\Common\Timer.h" />
+    <ClInclude Include="..\..\..\..\Common\AlignedMemory.h" />
+    <ClInclude Include="..\..\..\..\Common\AllocationTracking.h" />
+    <ClInclude Include="..\..\..\..\Common\Crc.h" />
+    <ClInclude Include="..\..\..\..\Common\Determinism.h" />
+    <ClInclude Include="..\..\..\..\Common\FileUtils.h" />
+    <ClInclude Include="..\..\..\..\Common\Serialization.h" />
+    <ClInclude Include="..\..\..\..\Common\StringUtils.h" />
+    <ClInclude Include="..\..\..\..\Common\TextureFormat.h" />
+    <ClInclude Include="..\..\..\..\Common\Log\DiagnosticLog.h" />
+    <ClInclude Include="..\..\..\..\Common\WindowsUtils.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderGlobalLayout.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderMainLayout.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\File\DifferenceStream.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\File\FileManager.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\File\PackChunks.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Collection.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionLifecycle.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionController.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionId.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionMemory.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\AreaDamage.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameStaticData.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuild.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuildInternal.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavQuery.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\GridCoord.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainUtils.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TimeStep.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\CrashReport.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Engine.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\GameBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\LaunchOptions.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandServer.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsShared.h" />
+    <ClInclude Include="..\..\Source\Agent\AgentCommands.h" />
+    <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h" />
+    <ClInclude Include="..\..\Source\Save\GameSaveLoad.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkCursor.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryResponder.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkManager.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkMessages.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkProtocol.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSessionContract.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\Server.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTypes.h" />
+    <ClInclude Include="..\..\Source\Server\ServerDisplay.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.h" />
+    <ClInclude Include="..\..\Source\Profile\ProfileManager.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WrapperBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h" />
+    <ClInclude Include="..\..\Source\Frame\Collections\Blasters\Blasters.h" />
+    <ClInclude Include="..\..\Source\Frame\Collections\Missiles\Missiles.h" />
+    <ClInclude Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.h" />
+    <ClInclude Include="..\..\Source\Frame\Collections\Targets\Targets.h" />
+    <ClInclude Include="..\..\Source\Frame\Frame.h" />
+    <ClInclude Include="..\..\Source\Frame\FrameTick.h" />
+    <ClInclude Include="..\..\Source\Frame\TerrainUtils.h" />
+    <ClInclude Include="..\..\Source\Frame\FrameCollections.h" />
+    <ClInclude Include="..\..\Source\Frame\HealthDamage.h" />
+    <ClInclude Include="..\..\Source\Frame\StatusChange.h" />
+    <ClInclude Include="..\..\Source\Frame\Collections\Players\Players.h" />
+    <ClInclude Include="..\..\Source\Game.h" />
+    <ClInclude Include="..\..\Source\SpawnTransfer.h" />
+    <ClInclude Include="..\..\Source\Network\PlayerEvents.h" />
+    <ClInclude Include="..\..\Source\Network\Server\ClientPlayerRegistry.h" />
+    <ClInclude Include="..\..\Source\Network\GameMessages.h" />
+    <ClInclude Include="..\..\Source\Network\Server\ServerSession.h" />
+    <ClInclude Include="..\..\Source\Network\Server\ServerFleetManager.h" />
+    <ClInclude Include="..\..\Source\Network\Server\ServerFleetSerialization.h" />
+    <ClInclude Include="..\..\Source\Network\Server\FleetNavigationController.h" />
+    <ClInclude Include="..\..\Source\Network\Server\ServerTransferManager.h" />
+    <ClInclude Include="..\..\Source\Network\Server\ServerBroadcaster.h" />
+    <ClInclude Include="..\..\Source\Network\Server\ServerClientManager.h" />
+    <ClInclude Include="..\..\Source\Network\GamePacketType.h" />
+    <ClInclude Include="..\..\Source\Network\NetworkSessionContract.h" />
+    <ClInclude Include="..\..\Source\Input\Input.h" />
+    <ClInclude Include="..\..\Source\Pch.h" />
+    <ClInclude Include="..\..\Source\Ui\Localization.h" />
+    <ClInclude Include="..\..\Source\Ui\Screens\DeathMenuScreen.h" />
+    <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h" />
+    <ClInclude Include="..\..\Source\Ui\Screens\MenuUtils.h" />
+    <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h" />
+    <ClInclude Include="..\..\Source\Ui\WindDepositsWrappers.h" />
+    <ClInclude Include="$(GameDataDirectory)\Audio.h" />
+    <ClInclude Include="$(GameDataDirectory)\Data.h" />
+    <ClInclude Include="$(GameDataDirectory)\Font.h" />
+    <ClInclude Include="$(GameDataDirectory)\Scene.h" />
+    <ClInclude Include="$(GameDataDirectory)\Islands.h" />
+    <ClInclude Include="$(GameDataDirectory)\Model.h" />
+    <ClInclude Include="$(GameDataDirectory)\Texture.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Math\MathUtils.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Workbuffer.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Threading\ThreadLocal.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Determinism.cpp" />
+    <ClCompile Include="..\..\..\..\Common\StringUtils.cpp" />
+    <ClCompile Include="..\..\..\..\Common\TextureFormat.cpp" />
+    <ClCompile Include="..\..\..\..\Common\WindowsUtils.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Threading\Multithreading.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Threading\PersistentWorker.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Math\Random.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Log\DiagnosticLog.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Log\Log.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Log\LogDifference.cpp" />
+    <ClCompile Include="..\..\..\..\Common\Smoothed.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\File\PackChunks.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsSpawn.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsUpdate.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\PushersUpdate.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\AreaDamage.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collision.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameStaticData.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavBuild.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavCellData.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavQuery.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\TimeStep.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\GameBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\LaunchOptions.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandServer.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsShared.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentUiRegistryServerStubs.cpp" />
+    <ClCompile Include="..\..\Source\Agent\AgentCommands.cpp" />
+    <ClCompile Include="..\..\Source\Agent\AgentCommandsServer.cpp" />
+    <ClCompile Include="..\..\Source\Agent\AgentCommandsServerQueries.cpp" />
+    <ClCompile Include="..\..\Source\Save\GameSaveLoad.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\CrashReport.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Main.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryResponder.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkManager.cpp" />
+    <ClCompile Include="..\..\Source\Network\NetworkSerialization.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\Server.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerReceive.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSend.cpp" />
+    <ClCompile Include="..\..\Source\Server\ServerDisplay.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp" />
+    <ClCompile Include="..\..\Source\Profile\ProfileManager.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
+    <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp" />
+    <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Blasters\Blasters.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersUpdate.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Missiles\Missiles.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Missiles\MissilesUpdate.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsCombat.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsNavigation.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Targets\Targets.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Targets\TargetsUpdate.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Frame.cpp" />
+    <ClCompile Include="..\..\Source\Frame\FrameTick.cpp" />
+    <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Players\Players.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersNavigation.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersCombat.cpp" />
+    <ClCompile Include="..\..\Source\Game.cpp" />
+    <ClCompile Include="..\..\Source\SpawnTransfer.cpp" />
+    <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\ClientPlayerRegistry.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\ServerSession.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\ServerFleetManager.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\ServerFleetSerialization.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\FleetNavigationController.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\ServerTransferManager.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\ServerBroadcaster.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\ServerClientManager.cpp" />
+    <ClCompile Include="..\..\Source\Input\Input.cpp" />
+    <ClCompile Include="..\..\Source\Ui\Screens\DeathMenuScreen.cpp" />
+    <ClCompile Include="..\..\Source\Ui\Screens\MenuUtils.cpp" />
+  </ItemGroup>
+  <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />
+    <Error Condition="'$(RunDataPacker)'!='true' and '$(RunDataPacker)'!='false'" Text="RunDataPacker must be true or false; received '$(RunDataPacker)'." />
+    <Error Condition="'$(DataBuildMode)'=='Shared' and '$(RunDataPacker)'!='false'" Text="Shared DataBuildMode requires RunDataPacker=false." />
+    <Error Condition="'$(DataBuildMode)'=='Shared' and '$(GameDataDirectory)'==''" Text="Shared DataBuildMode requires an explicit absolute GameDataDirectory." />
+    <Error Condition="'$(DataBuildMode)'=='Shared' and '$(GameDataDirectoryIsAbsolute)'!='True'" Text="Shared GameDataDirectory must be an absolute path; received '$(GameDataDirectory)'." />
+  </Target>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

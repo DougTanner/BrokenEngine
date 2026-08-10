@@ -1,0 +1,34 @@
+#version 460
+
+#include "ShaderLayouts.h"
+
+layout (local_size_x = kiComputeTileSize, local_size_y = kiComputeTileSize) in;
+
+// Uniforms
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
+{
+    GlobalLayout globalLayout;
+};
+
+layout (set = 1, binding = 1) uniform sampler2D shadowTextureSampler;
+layout (set = 1, binding = 2, r16) uniform writeonly image2D shadowBlurIntermediateTexture; // keShadowFormat
+
+void main()
+{
+	// The dispatch rounds the texture extent up to whole tiles, so the tail threads guard against it.
+	ivec2 i2Texel = ivec2(gl_GlobalInvocationID.xy);
+	if (any(greaterThanEqual(i2Texel, imageSize(shadowBlurIntermediateTexture))))
+		return;
+	uint uiX = uint(i2Texel.x);
+	uint uiY = uint(i2Texel.y);
+
+	vec2 f2InvSize = globalLayout.f2ShadowTextureSizeInv;
+	float fTotal = 0.0f;
+	for (int i = -kiShadowBlurRadius; i <= kiShadowBlurRadius; ++i)
+	{
+		vec2 vUv = (vec2(float(int(uiX) + i), float(uiY)) + 0.5f) * f2InvSize;
+		fTotal += globalLayout.pfShadowBlurWeights[abs(i)] * textureLod(shadowTextureSampler, vUv, 0.0f).x;
+	}
+
+	imageStore(shadowBlurIntermediateTexture, ivec2(uiX, uiY), vec4(fTotal * globalLayout.fShadowBlurWeightSumInv, 0.0f, 0.0f, 0.0f));
+}

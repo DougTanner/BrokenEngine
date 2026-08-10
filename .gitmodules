@@ -1,0 +1,64 @@
+[submodule "ThirdParty/DirectXTK"]
+	path = ThirdParty/DirectXTK
+	url = https://github.com/Microsoft/DirectXTK.git
+[submodule "ThirdParty/tinyobjloader"]
+	path = ThirdParty/tinyobjloader
+	url = https://github.com/syoyo/tinyobjloader.git
+[submodule "ThirdParty/stb"]
+	path = ThirdParty/stb
+	url = https://github.com/nothings/stb.git
+[submodule "ThirdParty/SPIRV-Cross"]
+	path = ThirdParty/SPIRV-Cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+[submodule "ThirdParty/StackWalker"]
+	path = ThirdParty/StackWalker
+	url = https://github.com/JochenKalmbach/StackWalker.git
+[submodule "ThirdParty/bc7enc_rdo"]
+	path = ThirdParty/bc7enc_rdo
+	url = https://github.com/richgel999/bc7enc_rdo.git
+[submodule "ThirdParty/openexr"]
+	path = ThirdParty/openexr
+	url = https://github.com/AcademySoftwareFoundation/openexr.git
+[submodule "ThirdParty/zlib"]
+	path = ThirdParty/zlib
+	url = https://github.com/madler/zlib.git
+[submodule "ThirdParty/tinygltf"]
+	path = ThirdParty/tinygltf
+	url = https://github.com/syoyo/tinygltf.git
+[submodule "ThirdParty/gli"]
+	path = ThirdParty/gli
+	url = https://github.com/g-truc/gli.git
+[submodule "ThirdParty/glm"]
+	path = ThirdParty/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "ThirdParty/PerlinNoise"]
+	path = ThirdParty/PerlinNoise
+	url = https://github.com/Reputeless/PerlinNoise.git
+[submodule "ThirdParty/imgui"]
+	path = ThirdParty/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "ThirdParty/mimalloc"]
+	path = ThirdParty/mimalloc
+	url = https://github.com/microsoft/mimalloc.git
+[submodule "ThirdParty/cmft"]
+	path = ThirdParty/cmft
+	url = https://github.com/dariomanesku/cmft.git
+[submodule "ThirdParty/lz4"]
+	path = ThirdParty/lz4
+	url = https://github.com/lz4/lz4.git
+	branch = release
+[submodule "ThirdParty/enet"]
+	path = ThirdParty/enet
+	url = https://github.com/lsalzman/enet.git
+[submodule "ThirdParty/implot"]
+	path = ThirdParty/implot
+	url = https://github.com/epezent/implot.git
+[submodule "ThirdParty/meshoptimizer"]
+	path = ThirdParty/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer.git
+[submodule "ThirdParty/Clipper2"]
+	path = ThirdParty/Clipper2
+	url = git@github.com:AngusJohnson/Clipper2.git
+[submodule "ThirdParty/scb-check"]
+	path = ThirdParty/scb-check
+	url = https://github.com/gabeorlanski/scb-check.git

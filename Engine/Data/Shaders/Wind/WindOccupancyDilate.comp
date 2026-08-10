@@ -1,0 +1,76 @@
+#version 460
+
+#include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
+
+layout (local_size_x = kiOccupancyDilateGroupSize) in;
+
+// Uniforms
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
+{
+	GlobalLayout globalLayout;
+};
+
+layout (set = 1, binding = 1) readonly buffer occupancyBuffer
+{
+	uint occupancy[];
+};
+
+// Active tile list: [VkDispatchIndirectCommand (3 uint32s)] [packed tile indices...]
+layout (set = 1, binding = 2) buffer activeTileBuffer
+{
+	uint uiDispatchX;
+	uint uiDispatchY;
+	uint uiDispatchZ;
+	uint activeTiles[];
+};
+
+void main()
+{
+	uint uiTilesX = globalLayout.uiWindTilesX;
+	uint uiTilesY = globalLayout.uiWindTilesY;
+	uint uiTotalTiles = uiTilesX * uiTilesY;
+	uint uiTileIndex = gl_GlobalInvocationID.x;
+	if (uiTileIndex >= uiTotalTiles)
+		return;
+
+	uint uiTileY = uiTileIndex / uiTilesX;
+	uint uiTileX = uiTileIndex - uiTileY * uiTilesX;
+
+	// Occupancy is recorded in previous-frame texture-grid space, but the world area can shift
+	// AND scale between frames. Remap this tile's center world position into the previous-frame
+	// tile grid so the dilation finds the cells where wind actually was last frame.
+	// f2WindTilesInv = (1/uiWindTilesX, 1/uiWindTilesY) folded CPU-side (WindUniforms.cpp).
+	vec2 f2OutputUV = (vec2(uiTileX, uiTileY) + vec2(0.5f)) * globalLayout.f2WindTilesInv;
+	vec2 f2WorldPosition = VisibleAreaToWorld(f2OutputUV, globalLayout.f4SmokeArea);
+	vec4 f4Prev = globalLayout.f4PreviousSmokeArea;
+	// f2PreviousSmokeAreaSizeInv = (1/(z-x), 1/(w-y)) folded CPU-side (SmokeUniforms.cpp), preserving component order.
+	vec2 f2PrevUV = vec2(
+		(f2WorldPosition.x - f4Prev.x) * globalLayout.f2PreviousSmokeAreaSizeInv.x,
+		(f2WorldPosition.y - f4Prev.y) * globalLayout.f2PreviousSmokeAreaSizeInv.y);
+	int iPrevTileX = int(floor(f2PrevUV.x * float(uiTilesX)));
+	int iPrevTileY = int(floor(f2PrevUV.y * float(uiTilesY)));
+
+	// Check the corresponding previous-frame tile and its 5x5 box of neighbors (Chebyshev radius 2)
+	bool bActive = false;
+	for (int iDy = -2; iDy <= 2 && !bActive; ++iDy)
+	{
+		for (int iDx = -2; iDx <= 2 && !bActive; ++iDx)
+		{
+			int iNx = iPrevTileX + iDx;
+			int iNy = iPrevTileY + iDy;
+			if (iNx < 0 || iNy < 0 || uint(iNx) >= uiTilesX || uint(iNy) >= uiTilesY)
+				continue;
+
+			uint uiNeighborIndex = uint(iNy) * uiTilesX + uint(iNx);
+			if ((occupancy[uiNeighborIndex >> 5] & (1u << (uiNeighborIndex & 31))) != 0)
+				bActive = true;
+		}
+	}
+
+	if (bActive)
+	{
+		uint uiSlot = atomicAdd(uiDispatchX, 1u);
+		activeTiles[uiSlot] = uiTileIndex;
+	}
+}
