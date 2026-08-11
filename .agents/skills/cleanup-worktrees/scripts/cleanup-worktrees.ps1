@@ -91,6 +91,7 @@ function Write-Report {
 		[Parameter(Mandatory = $true)][string] $PrimaryHead,
 		[Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[object]] $Removed,
 		[Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[object]] $Retained,
+		[Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[string]] $TempRemoved,
 		[Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]] $SnapshotRefs,
 		[Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]] $Residuals
 	)
@@ -110,6 +111,11 @@ function Write-Report {
 	else {
 		foreach ($item in $Retained) { Write-Output "- $($item.Path) | $($item.Reason)" }
 	}
+	Write-Output 'Temp removed:'
+	if ($TempRemoved.Count -eq 0) { Write-Output '- none' }
+	else {
+		foreach ($item in $TempRemoved) { Write-Output "- $item" }
+	}
 	Write-Output 'Snapshot refs:'
 	if ($SnapshotRefs.Count -eq 0) { Write-Output '- none' }
 	else {
@@ -121,6 +127,7 @@ function Write-Report {
 
 $removed = [Collections.Generic.List[object]]::new()
 $retained = [Collections.Generic.List[object]]::new()
+$tempRemoved = [Collections.Generic.List[string]]::new()
 $residuals = [Collections.Generic.List[string]]::new()
 $snapshotRefs = @()
 $repositoryRoot = ''
@@ -205,16 +212,52 @@ try {
 		$removedItem.BranchStatus = 'deleted'
 	}
 
+	$tempRoot = Get-CanonicalPath -Path (Join-Path $repositoryRoot 'Temp')
+	if (Test-Path -LiteralPath $tempRoot -PathType Container) {
+		$eligibleTempFiles = @(Get-ChildItem -LiteralPath $tempRoot -Recurse -File -Force |
+			Where-Object { $_.LastWriteTime -le $cutoff } |
+			ForEach-Object { $_.FullName })
+		[Array]::Sort($eligibleTempFiles, [StringComparer]::OrdinalIgnoreCase)
+		foreach ($file in $eligibleTempFiles) {
+			if ($Preview) { $tempRemoved.Add("$file | eligible (preview)"); continue }
+			try {
+				Remove-Item -LiteralPath $file -Force -Confirm:$false -ErrorAction Stop
+				$tempRemoved.Add($file)
+			}
+			catch { $residuals.Add("temp file deletion failed for $file") }
+		}
+		if (-not $Preview) {
+			# Descending ordinal order visits children before parents, so nested
+			# just-emptied folders unwind bottom-up. Directory age uses CreationTime:
+			# deleting contents refreshes the folder's LastWriteTime, which would
+			# otherwise keep every just-emptied folder alive past this run.
+			$tempDirectories = @(Get-ChildItem -LiteralPath $tempRoot -Recurse -Directory -Force |
+				Where-Object { $_.CreationTime -le $cutoff } |
+				ForEach-Object { $_.FullName })
+			[Array]::Sort($tempDirectories, [StringComparer]::OrdinalIgnoreCase)
+			[Array]::Reverse($tempDirectories)
+			foreach ($directory in $tempDirectories) {
+				if (@(Get-ChildItem -LiteralPath $directory -Force).Count -ne 0) { continue }
+				try {
+					Remove-Item -LiteralPath $directory -Force -Confirm:$false -ErrorAction Stop
+					$tempRemoved.Add($directory)
+				}
+				catch { $residuals.Add("temp directory deletion failed for $directory") }
+			}
+		}
+		$tempRemoved.Sort([StringComparer]::OrdinalIgnoreCase)
+	}
+
 	$unexpectedRetained = @($retained | Where-Object { -not $_.Expected })
 	if ($Preview) { $cleanupStatus = 'PREVIEW' }
 	elseif ($residuals.Count -ne 0 -or $unexpectedRetained.Count -ne 0) { $cleanupStatus = 'PARTIAL' }
 	else { $cleanupStatus = 'COMPLETED' }
 	if ($unexpectedRetained.Count -ne 0) { $residuals.Add("$($unexpectedRetained.Count) worktree(s) retained for safety; see Retained") }
-	Write-Report -Status $cleanupStatus -RepositoryRoot $repositoryRoot -PrimaryBranch $primaryBranch -PrimaryHead $primaryHead -Removed $removed -Retained $retained -SnapshotRefs $snapshotRefs -Residuals $residuals.ToArray()
+	Write-Report -Status $cleanupStatus -RepositoryRoot $repositoryRoot -PrimaryBranch $primaryBranch -PrimaryHead $primaryHead -Removed $removed -Retained $retained -TempRemoved $tempRemoved -SnapshotRefs $snapshotRefs -Residuals $residuals.ToArray()
 	if ($cleanupStatus -eq 'PARTIAL') { exit 2 }
 }
 catch {
 	$residuals.Add($_.Exception.Message)
-	Write-Report -Status 'BLOCKED' -RepositoryRoot $(if ($repositoryRoot) { $repositoryRoot } else { '<unproven>' }) -PrimaryBranch $primaryBranch -PrimaryHead $primaryHead -Removed $removed -Retained $retained -SnapshotRefs $snapshotRefs -Residuals $residuals.ToArray()
+	Write-Report -Status 'BLOCKED' -RepositoryRoot $(if ($repositoryRoot) { $repositoryRoot } else { '<unproven>' }) -PrimaryBranch $primaryBranch -PrimaryHead $primaryHead -Removed $removed -Retained $retained -TempRemoved $tempRemoved -SnapshotRefs $snapshotRefs -Residuals $residuals.ToArray()
 	exit 1
 }
