@@ -78,6 +78,92 @@ static void WriteCrcHeader(const std::filesystem::path& rOutPath, const std::vec
 	VERIFY_SUCCESS(stream.good());
 }
 
+static bool IsFileLockedError(DWORD uiError)
+{
+	return uiError == ERROR_SHARING_VIOLATION || uiError == ERROR_LOCK_VIOLATION;
+}
+
+static bool IsFileLockedError(const std::error_code& rError)
+{
+	// std::filesystem reports Win32 codes through std::system_category on Windows
+	return rError.category() == std::system_category() && IsFileLockedError(static_cast<DWORD>(rError.value()));
+}
+
+// Publishes the manifest and pack over the previous output. A running BrokenEngineSandbox client or server keeps its
+// packs open share-read-only for the whole process lifetime, so without this the pack rename fails after the manifest
+// already published, leaving a torn publish. Returns false when the user cancels the export at the retry prompt.
+static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rManifestFile, const std::filesystem::path& rTemporaryPackFile, const std::filesystem::path& rPackFile)
+{
+	bool bManifestPublished = false;
+	bool bLocked = false;
+	while (true)
+	{
+		// The probe handle stays open across both renames: holding DELETE access while sharing read/write/delete lets
+		// our own rename through but stops a client or server launched mid-publish from re-opening the pack.
+		std::unique_ptr<void, decltype(&CloseHandle)> pProbe(nullptr, &CloseHandle);
+		if (!bLocked && std::filesystem::exists(rPackFile))
+		{
+			HANDLE hProbe = CreateFileW(rPackFile.native().c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
+			if (hProbe != INVALID_HANDLE_VALUE)
+			{
+				pProbe.reset(hProbe);
+			}
+			else
+			{
+				// Only a sharing/lock violation prompts; any other probe failure falls through to the renames so the existing top-level reporting describes it
+				bLocked = IsFileLockedError(GetLastError());
+			}
+		}
+
+		if (bLocked)
+		{
+			diagnostic::Record record
+			{
+				.eSeverity = diagnostic::Severity::kWarning,
+				.title = "Data Packer - Output File Locked",
+				.message = std::format("\"{}\" is locked by a running BrokenEngineSandbox client or server.\n\nClose it and press OK to retry, or press Cancel to abort the export.", rPackFile.string()),
+				.eButtons = diagnostic::ButtonContract::kOkCancel,
+				.eIcon = diagnostic::ModalIcon::kWarning,
+			};
+			if (diagnostic::Report(record) == diagnostic::ButtonResult::kCancelled)
+			{
+				return false;
+			}
+			bLocked = false;
+			continue;
+		}
+
+		// Manifest before pack, preserving the commit-point ordering and kill semantics documented at the header publish in RunExportJobs
+		std::error_code renameError;
+		if (!bManifestPublished)
+		{
+			std::filesystem::rename(rTemporaryManifestFile, rManifestFile, renameError);
+			if (renameError)
+			{
+				if (!IsFileLockedError(renameError))
+				{
+					throw std::filesystem::filesystem_error("Failed to publish manifest", rTemporaryManifestFile, rManifestFile, renameError);
+				}
+				// A lock that survives the probe must prompt rather than spin, so the next pass skips straight to the prompt
+				bLocked = true;
+				continue;
+			}
+			bManifestPublished = true;
+		}
+
+		std::filesystem::rename(rTemporaryPackFile, rPackFile, renameError);
+		if (!renameError)
+		{
+			return true;
+		}
+		if (!IsFileLockedError(renameError))
+		{
+			throw std::filesystem::filesystem_error("Failed to publish pack", rTemporaryPackFile, rPackFile, renameError);
+		}
+		bLocked = true;
+	}
+}
+
 template <IsExportJob T>
 bool RunExportJobs()
 {
@@ -420,8 +506,13 @@ bool RunExportJobs()
 			std::filesystem::remove(temporaryHeaderFile);
 		}
 
-		std::filesystem::rename(temporaryManifestFile, manifestFile);
-		std::filesystem::rename(temporaryPackFile, packFile);
+		if (!PublishManifestAndPack(temporaryManifestFile, manifestFile, temporaryPackFile, packFile))
+		{
+			// Cancelled at the locked-output prompt: discard the temporaries and fail this export type
+			std::filesystem::remove(temporaryManifestFile);
+			std::filesystem::remove(temporaryPackFile);
+			bFailed = true;
+		}
 	}
 
 	return !bFailed;

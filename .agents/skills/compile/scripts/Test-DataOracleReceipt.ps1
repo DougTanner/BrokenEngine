@@ -20,7 +20,6 @@ Import-Module (Join-Path $sharedScripts 'FinalizeWorkflowCommon.psm1') -Force
 $script:ExpectedDataFiles = @(
 	'Audio.h', 'Audio.manifest', 'Audio.pack',
 	'Data.h', 'DataTypes.h',
-	'Font.h', 'Font.manifest', 'Font.pack',
 	'Islands.h', 'Islands.manifest', 'Islands.pack',
 	'Model.h', 'Model.manifest', 'Model.pack',
 	'Raw.h', 'Raw.manifest', 'Raw.pack',
@@ -215,7 +214,7 @@ try {
 
 	$entryArray = $rootElement.GetProperty('entries')
 	if ($entryArray.ValueKind -ne [Text.Json.JsonValueKind]::Array) { throw 'Receipt.entries must be a JSON array.' }
-	if ($entryArray.GetArrayLength() -ne $script:ExpectedDataFiles.Count) { throw 'Receipt.entries does not contain exactly 26 entries.' }
+	if ($entryArray.GetArrayLength() -ne $script:ExpectedDataFiles.Count) { throw 'Receipt.entries does not contain exactly 23 entries.' }
 	$recordedEntries = [Collections.Generic.List[object]]::new()
 	$index = 0
 	foreach ($entryElement in $entryArray.EnumerateArray()) {

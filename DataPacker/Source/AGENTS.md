@@ -35,7 +35,7 @@ Tools builds have no allocation tracker, so the engine LOG float-format-spec res
 ## Design Patterns
 
 - Export processing: `RunExportJobs<T>()` performs content-based dirty checks and launches one `std::async` task per asset. Case-folded relative paths must be unique before deterministic sorting and aggregate assembly. A published pack older than any job's `.meta` fingerprint dirties the whole type, so an export killed between fingerprint commit and pack rename republishes from cached chunks on the next run.
-- Atomic output: Jobs write temporary files and rename only on complete success; generated headers update only when content differs.
+- Atomic output: Jobs write temporary files and rename only on complete success; generated headers update only when content differs. A running client or server holds its packs open for the whole process lifetime, so publishing a type keeps a delete-capable handle on the destination pack open across both renames and, on a sharing or lock violation, prompts to retry or cancel instead of leaving the manifest published beside an unreplaced pack. Cancelling discards that type's temporary manifest and pack and fails the type.
 - Reproducibility: Chunk ordering is machine-independent, but BC7 RDO, OpenCL IBL convolution, and GPU-accelerated Gaea bytes assume one authoritative bake host.
 
 ## Output Structure

@@ -34,6 +34,14 @@ Concretely: remove the `ScreenToWorld` definition and declaration; rewrite the `
 - `CameraBase.h` members and the `InVisibleArea` helpers
 - Decomposition of `CalculateMatricesAndVisibleArea` (reviewed and rejected as not warranted)
 
+## Coordination
+
+`Documents/Plans/Graphics/WaterVisibleAreaPortraitMargin.md` edits the
+aspect-ratio branch of `CalculateMatricesAndVisibleArea` in the same file, just
+above the `f4RawAreaIn` line this Plan deletes. Neither Plan may change the
+other's lines, and whichever lands second re-verifies its own line references
+before editing.
+
 ## Risk tier and invariants
 
 Expected Change Workflow Tier 2 — a scoped behavior surface: removing the public `ScreenToWorld` declaration is a public-signature change even though the search found zero callers, and the deletion plus comment repair is otherwise behavior-preserving. A caller this Plan's search missed would make the deletion itself invalid, not merely re-tier it. The file is whole-file `BT_CLIENT`-guarded client render state, outside deterministic PostRender/CRC state.

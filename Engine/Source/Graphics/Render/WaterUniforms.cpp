@@ -221,7 +221,6 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 	rGlobalLayout.fWaterWaveNormalBlend = gWaterWaveNormalBlend.Get();
 	rGlobalLayout.fWaterLowAmplitude = gWaterLowAmplitude.Get();
 	rGlobalLayout.fWaterMediumAmplitude = gWaterMediumAmplitude.Get();
-	rGlobalLayout.fWaterZOffsetTemp = gWaterZOffsetTemp.Get(); // DT: TEMP
 
 	rGlobalLayout.iWaterLowCount = static_cast<int>(std::min(gWaterLowCount.Get<int64_t>(), static_cast<int64_t>(gWaterLowMax.Get())));
 	rGlobalLayout.iWaterMediumCount = static_cast<int>(gWaterMediumCount.Get<int64_t>());

@@ -4,7 +4,6 @@
 #include "Blasters.h"
 
 #include "Frame/FrameStaticData.h"
-#include "Data/Audio.h"
 
 namespace engine
 {
@@ -43,7 +42,6 @@ void BlastersPostRender::AllocateAndCopy(BlastersPostRender& rCurrent, const Bla
 void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 {
 	BlastersInterpolate& rBlasters = *rFrame.interpolate.pBlasters;
-	BlastersPostRender& rPostRender = *rFrame.postRender.pBlasters;
 
 	// Add client-only owned objects
 	const BlastersType& rType = GetType(rBlasters.puiTypeIndices[iIndex]);
@@ -65,9 +63,6 @@ void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 	{
 		engine::WindTrailsPostRender::Add(rFrame, rBlasters.puiWindTrails[iIndex]);
 	}
-
-	rPostRender.puiSounds[iIndex] = {};
-	engine::SoundsPostRender::Add(rFrame, rPostRender.puiSounds[iIndex]);
 
 	// Sync wind trail
 	if (rBlasters.pfWindTrailIntensities[iIndex] > 0.0f)
@@ -110,18 +105,6 @@ void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 		});
 	}
-
-	// Sync sound
-	// DT: TEMP kAudioBlasterNew609840__eminyildirim__spacedroneambience7variation_0wavCrc sounds bad
-	// engine::SoundsInterpolate::Sync(rFrame.interpolate, rPostRender.puiSounds[iIndex],
-	// {
-	// 	.vecPosition = rBlasters.pVecPositions[iIndex],
-	// 	.vecVelocity = rPostRender.pVecVelocities[iIndex],
-	// 	.uiCrc = data::kAudioBlasterNew609840__eminyildirim__spacedroneambience7variation_0wavCrc,
-	// 	.fVolume = kfBlasterVolume,
-	// 	.fPitch = rPostRender.pfPitches[iIndex],
-	// 	.fFadeOutTime = kfBlasterFadeOutTime,
-	// });
 }
 
 void BlastersInterpolate::ClientInitAll(Frame& rFrame)
@@ -159,16 +142,12 @@ void BlastersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const 
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 
-	// Create sound with random pitch variation
-	float fPitch = kfBlasterPitchMin + common::Random<kfBlasterPitchRandom>(rFrame.postRender.randomEngine);
-	rCurrentPostRender.pfPitches[iIndex] = fPitch;
-
 #if defined(BT_CLIENT)
 	BlastersInterpolate::ClientInit(rFrame, iIndex);
 #endif
 }
 
-static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] BlastersInterpolate& rCurrentInterpolate, [[maybe_unused]] BlastersPostRender& rCurrentPostRender, [[maybe_unused]] int64_t i)
+static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] BlastersInterpolate& rCurrentInterpolate, [[maybe_unused]] int64_t i)
 {
 #if defined(BT_CLIENT)
 	if (rCurrentInterpolate.puiPointLights[i].IsValid())
@@ -183,7 +162,6 @@ static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] 
 	{
 		engine::WindTrailsPostRender::Remove(rFrame, rCurrentInterpolate.puiWindTrails[i]);
 	}
-	engine::SoundsPostRender::Remove(rFrame, rCurrentPostRender.puiSounds[i]);
 #endif // BT_CLIENT
 }
 
@@ -231,7 +209,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 		common::ValidateVector<false>(request.data.vecVelocity);
 		rFrame.postRender.transferRequests.push_back(request);
 
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
+		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
 
 		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	}
@@ -249,7 +227,7 @@ void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			continue;
 		}
 
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
+		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
 
 		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	}
@@ -281,7 +259,6 @@ bool BlastersPostRender::LogDifferences(const BlastersPostRender& rOther) const
 	{
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference_Vec("pVecVelocities", i, pVecVelocities[i], rOther.pVecVelocities[i]);
-		bEqual &= common::LogDifference<"pfPitches">(i, pfPitches[i], rOther.pfPitches[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 	}
 

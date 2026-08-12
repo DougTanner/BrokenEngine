@@ -17,7 +17,7 @@ inline constexpr bool kbScreenshots = true;
 inline constexpr bool kbAgent = true; // Compile-time gate for the agent command layer; runtime activation still requires --agent-port
 inline constexpr bool kbVulkanPipelineCache = false; // DT: TODO Need Crc and/or fallback if corrupt true;
 inline constexpr bool kbVulkanWireframe = false;
-inline constexpr bool kbFramebufferClearColor = true; // DT: TEMP kbVulkanWireframe;
+inline constexpr bool kbFramebufferClearColor = kbVulkanWireframe;
 
 #if defined(BT_SERVER)
 inline constexpr bool kbSingleInstance = true;
@@ -90,7 +90,7 @@ inline constexpr LogLevel keLogLevelDefault = kDebug; // Compile floor; runtime 
 inline constexpr LogLevel keLogLevelAudio = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelGraphics = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelLoading = keLogLevelDefault;
-inline constexpr LogLevel keLogLevelNavData = kVerbose; // DT: TEMP keLogLevelDefault;
+inline constexpr LogLevel keLogLevelNavData = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelNetwork = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelInput = keLogLevelDefault;
 
@@ -107,4 +107,4 @@ inline constexpr LogLevel keLogLevelInput = keLogLevelDefault;
 #include "Engine.h"
 #include "Network/GameMessages.h"
 
-inline constexpr engine::NetworkSimulationLevel keNetworkSimulation = engine::NetworkSimulationLevel::kChina; // DT: TEMP kDisabled;
+inline constexpr engine::NetworkSimulationLevel keNetworkSimulation = engine::NetworkSimulationLevel::kDisabled;

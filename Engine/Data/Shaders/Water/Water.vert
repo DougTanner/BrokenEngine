@@ -46,7 +46,7 @@ void main()
 	float fTerrainElevation = textureLod(elevationTextureSampler, WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea), 0.0f).x - globalLayout.fWaterHeight;
 	if (fTerrainElevation >= 0.0f)
 	{
-		f3OutPosition = vec3(f2WorldPosition, globalLayout.fWaterZOffsetTemp);
+		f3OutPosition = vec3(f2WorldPosition, 0.0f);
 		f3OutNormal = vec3(0.0f, 0.0f, 1.0f);
 		f2OutTexcoord = WorldToVisibleArea(f3OutPosition, globalLayout.f4VisibleArea);
 		gl_Position = Transform(vec4(f3OutPosition, 1.0f), mainLayout.f4x4ViewProjection);
@@ -72,8 +72,6 @@ void main()
 	{
 		f3OutPosition.z *= -fTerrainElevation / globalLayout.fWaterTerrainHeight;
 	}
-
-	f3OutPosition.z += globalLayout.fWaterZOffsetTemp; // DT: TEMP
 
 	gl_Position = Transform(vec4(f3OutPosition, 1.0f), mainLayout.f4x4ViewProjection);
 }

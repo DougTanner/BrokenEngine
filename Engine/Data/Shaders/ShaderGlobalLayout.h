@@ -248,7 +248,6 @@ struct GlobalLayout
 	float fWaterWaveNormalBlend INIT;
 	float fWaterLowAmplitude INIT;
 	float fWaterMediumAmplitude INIT;
-	float fWaterZOffsetTemp INIT; // DT: TEMP
 	float fWaterReducedNormalTimeX INIT;
 	float fWaterReducedNormalTimeY INIT;
 	float fWaterReducedNormalTimeTwoX INIT;

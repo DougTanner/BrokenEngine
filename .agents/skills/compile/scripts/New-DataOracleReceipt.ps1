@@ -19,7 +19,6 @@ Import-Module (Join-Path $sharedScripts 'FinalizeWorkflowCommon.psm1') -Force
 $script:ExpectedDataFiles = @(
 	'Audio.h', 'Audio.manifest', 'Audio.pack',
 	'Data.h', 'DataTypes.h',
-	'Font.h', 'Font.manifest', 'Font.pack',
 	'Islands.h', 'Islands.manifest', 'Islands.pack',
 	'Model.h', 'Model.manifest', 'Model.pack',
 	'Raw.h', 'Raw.manifest', 'Raw.pack',

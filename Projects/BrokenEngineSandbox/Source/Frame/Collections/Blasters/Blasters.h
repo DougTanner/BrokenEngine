@@ -9,19 +9,11 @@
 
 namespace engine { struct FrameStaticData; }
 #if defined(BT_CLIENT)
-#include "Frame/Collections/Sounds/Sounds.h"
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
 
 namespace game
 {
-
-// Shared constants (used across Blasters*.cpp files)
-inline constexpr float kfBlasterFadeOutTime = 0.1f;
-// Spawn-time pitch range MUST stay constexpr: pfPitches[i] is a shared CRC field, so the random draw must be
-// deterministic across client/server. Runtime-tweakable muzzle/launch cue pitch lives in SoundWrappers.h.
-inline constexpr float kfBlasterPitchMin = 0.75f;
-inline constexpr float kfBlasterPitchRandom = 0.5f;
 
 struct BlastersType
 {
@@ -101,7 +93,7 @@ using BlasterFlags_t = common::Flags<BlasterFlags>;
 
 struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 {
-	static constexpr int64_t kiVersion = 1;
+	static constexpr int64_t kiVersion = 2;
 
 	// Allocate and copy
 	static void AllocateAndCopy(BlastersPostRender& rCurrent, const BlastersPostRender& rPrevious);
@@ -115,23 +107,9 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 
 	BlasterFlags_t* __restrict pFlags = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
-#if defined(BT_CLIENT)
-	engine::sound_t* __restrict puiSounds = nullptr;
-#endif
-	float* __restrict pfPitches = nullptr;
 	engine::alignment_t* __restrict pAlignments = nullptr;
-	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pfPitches, rSelf.pAlignments); }
-#if defined(BT_CLIENT)
-	auto ClientMembers(this auto&& rSelf) { return std::tie(rSelf.puiSounds); }
-#endif
-	auto Members(this auto&& rSelf)
-	{
-#if defined(BT_CLIENT)
-		return std::tuple_cat(rSelf.SharedMembers(), rSelf.ClientMembers());
-#else
-		return rSelf.SharedMembers();
-#endif
-	}
+	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pAlignments); }
+	auto Members(this auto&& rSelf) { return rSelf.SharedMembers(); }
 
 	// Utility
 	bool LogDifferences(const BlastersPostRender& rOther) const;

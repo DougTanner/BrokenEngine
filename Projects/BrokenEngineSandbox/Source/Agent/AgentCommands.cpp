@@ -1,6 +1,6 @@
 #include "Agent/AgentCommands.h"
 
-#include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/Collections/Missiles/Missiles.h"
 #include "Game.h"
 
 namespace game
@@ -11,28 +11,75 @@ namespace
 
 // ---- collection_layout_capacity_fixture (Fix 2: physical-layout-capacity retention acceptance) ----
 
-// Deterministic per-row shared-member values. The identical formula drives the source-stream writer and the
-// post-read verification, so any row SharedCollectionRead fails to preserve is caught. ([[maybe_unused]]: the sole
-// callers live in the fixture's kbDebugInput-only branch, discarded on non-debug builds.)
-[[maybe_unused]] void FillBlasterSharedRow(BlastersPostRender& rBlasters, int64_t i, int64_t iSeed)
+// Deterministic per-row shared-member values. The identical formulas drive the source-stream writer and the
+// post-read verification, and they cover every MissilesPostRender::SharedMembers() column, so any column or row
+// SharedCollectionRead fails to preserve is caught. ([[maybe_unused]]: the sole callers live in the fixture's
+// kbDebugInput-only branch, discarded on non-debug builds.)
+
+// Distinct exactly-representable value per (row, column), so a column swapped with its neighbour cannot match.
+constexpr float MissileSharedRowScalar(int64_t i, int64_t iSeed, int64_t iColumn)
 {
-	rBlasters.pFlags[i] = ((i + iSeed) & 1) ? BlasterFlags_t {BlasterFlags::kTransfer} : BlasterFlags_t {BlasterFlags::kDestroy};
-	rBlasters.pVecVelocities[i] = XMVectorSet(static_cast<float>(i), static_cast<float>(iSeed), static_cast<float>(i + iSeed), 0.0f);
-	rBlasters.pfPitches[i] = static_cast<float>(iSeed * 1000 + i);
-	rBlasters.pAlignments[i] = engine::alignment_t {static_cast<uint32_t>(iSeed * 100 + i + 1)};
+	return static_cast<float>(iSeed * 100000 + i * 10 + iColumn);
 }
 
-[[maybe_unused]] bool BlasterSharedRowMatches(const BlastersPostRender& rBlasters, int64_t i, int64_t iSeed)
+constexpr MissileFlags_t MissileSharedRowFlags(int64_t i, int64_t iSeed)
 {
-	BlasterFlags_t expectedFlags = ((i + iSeed) & 1) ? BlasterFlags_t {BlasterFlags::kTransfer} : BlasterFlags_t {BlasterFlags::kDestroy};
-	XMVECTOR vecExpected = XMVectorSet(static_cast<float>(i), static_cast<float>(iSeed), static_cast<float>(i + iSeed), 0.0f);
-	return rBlasters.pFlags[i] == expectedFlags
-		&& XMVector4Equal(rBlasters.pVecVelocities[i], vecExpected)
-		&& rBlasters.pfPitches[i] == static_cast<float>(iSeed * 1000 + i)
-		&& rBlasters.pAlignments[i] == engine::alignment_t {static_cast<uint32_t>(iSeed * 100 + i + 1)};
+	return ((i + iSeed) & 1) ? MissileFlags_t {MissileFlags::kTransfer} : MissileFlags_t {MissileFlags::kExploding};
 }
 
-// Drives the real BlastersPostRender deserialization helpers through logical capacities 100 -> 70 -> 60 -> 150 on one
+constexpr engine::alignment_t MissileSharedRowAlignment(int64_t i, int64_t iSeed)
+{
+	return engine::alignment_t {static_cast<uint32_t>(iSeed * 100 + i + 1)};
+}
+
+constexpr target_t MissileSharedRowTarget(int64_t i, int64_t iSeed)
+{
+	return target_t {engine::uuid_t {iSeed * 100000 + i + 1}};
+}
+
+XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn)
+{
+	// Directions and velocities carry W=0.0.
+	return XMVectorSet(MissileSharedRowScalar(i, iSeed, iColumn), MissileSharedRowScalar(i, iSeed, iColumn + 1), MissileSharedRowScalar(i, iSeed, iColumn + 2), 0.0f);
+}
+
+[[maybe_unused]] void FillMissileSharedRow(MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
+{
+	rMissiles.pFlags[i] = MissileSharedRowFlags(i, iSeed);
+	rMissiles.pVecVelocities[i] = MissileSharedRowVector(i, iSeed, 0);
+	rMissiles.pVecExplosionDirections[i] = MissileSharedRowVector(i, iSeed, 3);
+	rMissiles.pVecStoredDirections[i] = MissileSharedRowVector(i, iSeed, 6);
+	rMissiles.puiTargets[i] = MissileSharedRowTarget(i, iSeed);
+	rMissiles.pfTimes[i] = MissileSharedRowScalar(i, iSeed, 9);
+	rMissiles.pfDeltaRotationDelays[i] = MissileSharedRowScalar(i, iSeed, 10);
+	rMissiles.pfDeltaRotations[i] = MissileSharedRowScalar(i, iSeed, 11);
+	rMissiles.pfNextJitter[i] = MissileSharedRowScalar(i, iSeed, 12);
+	rMissiles.pfDeltaRotationMax[i] = MissileSharedRowScalar(i, iSeed, 13);
+	rMissiles.pfAccelerations[i] = MissileSharedRowScalar(i, iSeed, 14);
+	rMissiles.pfPitches[i] = MissileSharedRowScalar(i, iSeed, 15);
+	rMissiles.pfExhaustLengths[i] = MissileSharedRowScalar(i, iSeed, 16);
+	rMissiles.pAlignments[i] = MissileSharedRowAlignment(i, iSeed);
+}
+
+[[maybe_unused]] bool MissileSharedRowMatches(const MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
+{
+	return rMissiles.pFlags[i] == MissileSharedRowFlags(i, iSeed)
+		&& XMVector4Equal(rMissiles.pVecVelocities[i], MissileSharedRowVector(i, iSeed, 0))
+		&& XMVector4Equal(rMissiles.pVecExplosionDirections[i], MissileSharedRowVector(i, iSeed, 3))
+		&& XMVector4Equal(rMissiles.pVecStoredDirections[i], MissileSharedRowVector(i, iSeed, 6))
+		&& rMissiles.puiTargets[i] == MissileSharedRowTarget(i, iSeed)
+		&& rMissiles.pfTimes[i] == MissileSharedRowScalar(i, iSeed, 9)
+		&& rMissiles.pfDeltaRotationDelays[i] == MissileSharedRowScalar(i, iSeed, 10)
+		&& rMissiles.pfDeltaRotations[i] == MissileSharedRowScalar(i, iSeed, 11)
+		&& rMissiles.pfNextJitter[i] == MissileSharedRowScalar(i, iSeed, 12)
+		&& rMissiles.pfDeltaRotationMax[i] == MissileSharedRowScalar(i, iSeed, 13)
+		&& rMissiles.pfAccelerations[i] == MissileSharedRowScalar(i, iSeed, 14)
+		&& rMissiles.pfPitches[i] == MissileSharedRowScalar(i, iSeed, 15)
+		&& rMissiles.pfExhaustLengths[i] == MissileSharedRowScalar(i, iSeed, 16)
+		&& rMissiles.pAlignments[i] == MissileSharedRowAlignment(i, iSeed);
+}
+
+// Drives the real MissilesPostRender deserialization helpers through logical capacities 100 -> 70 -> 60 -> 150 on one
 // reused instance, proving the transient iPhysicalLayoutCapacity holds the true buffer stride across shrink-reuse:
 // the two shrinks reuse the 100-wide buffer and (client) zero the full physical layout including rows 70-99, while the
 // >100-row read reallocates exactly once and publishes the new capacity only after the allocation succeeds.
@@ -53,17 +100,17 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		// Writes one shared-wire stream (metadata + SharedMembers) at (iCapacity, iCount) through the production Write path.
 		auto BuildStream = [](int64_t iCapacity, int64_t iCount, int64_t iSeed, std::stringstream& rStream)
 		{
-			BlastersPostRender source;
+			MissilesPostRender source;
 			engine::GrowCapacityWithCopy(source, iCapacity, 0, source.Members());
 			source.iCount = iCount;
 			for (int64_t i = 0; i < iCount; ++i)
 			{
-				FillBlasterSharedRow(source, i, iSeed);
+				FillMissileSharedRow(source, i, iSeed);
 			}
 			engine::CollectionWrite(rStream, source, source.SharedMembers());
 		};
 
-		BlastersPostRender dest;
+		MissilesPostRender dest;
 		nlohmann::json steps = nlohmann::json::array();
 
 		// Runs one production SharedCollectionRead into dest and records the capacity metadata and buffer-reuse decision.
@@ -129,7 +176,7 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		int64_t iSharedMismatches = 0;
 		for (int64_t i = 0; i < dest.iCount; ++i)
 		{
-			if (!BlasterSharedRowMatches(dest, i, 3))
+			if (!MissileSharedRowMatches(dest, i, 3))
 			{
 				++iSharedMismatches;
 			}

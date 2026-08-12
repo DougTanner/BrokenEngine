@@ -89,7 +89,6 @@ extern Wrapper gWaterMediumAmplitudeFadeEnd;
 
 // Depth
 extern Wrapper gWaterTerrainHeight;
-extern Wrapper gWaterZOffsetTemp; // DT: TEMP
 extern Wrapper gWaterTerrainFade;
 extern Wrapper gWaterTerrainFadeClamp;
 extern Wrapper gWaterHeight;

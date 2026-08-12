@@ -91,7 +91,6 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Medium Camera Fade End", &gWaterMediumAmplitudeFadeEnd},
 	// Depth
 	{"Water Terrain Height", &gWaterTerrainHeight},
-	{"DT: TEMP Z Offset", &gWaterZOffsetTemp}, // DT: TEMP
 	{"Water Terrain Fade", &gWaterTerrainFade},
 	{"Water Terrain Fade Clamp", &gWaterTerrainFadeClamp},
 	{"Water Height", &gWaterHeight},
@@ -247,7 +246,6 @@ void TweaksScreenBase::RenderWaterSection()
 		{
 			WrapperSeparatorText("Terrain Fade");
 			WrapperSlider("Water Terrain Height", iSection);
-			WrapperSlider("DT: TEMP Z Offset", iSection); // DT: TEMP
 			WrapperSlider("Water Terrain Fade", iSection);
 			WrapperSlider("Water Terrain Fade Clamp", iSection);
 

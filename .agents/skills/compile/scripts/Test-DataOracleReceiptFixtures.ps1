@@ -14,7 +14,6 @@ $otherBaseline = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 $expectedFiles = @(
 	'Audio.h', 'Audio.manifest', 'Audio.pack',
 	'Data.h', 'DataTypes.h',
-	'Font.h', 'Font.manifest', 'Font.pack',
 	'Islands.h', 'Islands.manifest', 'Islands.pack',
 	'Model.h', 'Model.manifest', 'Model.pack',
 	'Raw.h', 'Raw.manifest', 'Raw.pack',
