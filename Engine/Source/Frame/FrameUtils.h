@@ -274,8 +274,8 @@ bool LogDifferencesCollections(TUPLE_CURRENT&& current, TUPLE_OTHER&& other, std
 }
 
 // Reverse walk over a paired collection, releasing every element the predicate selects.
-// Reverse order keeps swap-and-pop removal safe. release takes the loop index by reference because
-// DestroyElement decrements it after a swap, so the swapped-in element is visited next.
+// Reverse order keeps swap-and-pop removal safe: the row swapped in from the tail has already been visited,
+// so release must not disturb the loop index.
 template <typename TInterpolate, typename TPostRender, typename TPredicate, typename TRelease>
 void DestroySweep(TInterpolate& rInterpolate, [[maybe_unused]] TPostRender& rPostRender, TPredicate predicate, TRelease release)
 {

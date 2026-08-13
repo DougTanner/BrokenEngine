@@ -21,6 +21,8 @@ try {
  if($status.ExitCode -ne 0 -or -not [string]::IsNullOrWhiteSpace($status.Stdout)){throw (New-NextPlanStateBlocker 'Session worktree must be clean before a plan claim.')}
  $validate=Invoke-NextPlanProcess $context.WorktreeCli @('plan','validate','--repo',$context.CommonDirectory,'--worktree',$context.Worktree) $context.Worktree
  $validation=ConvertFrom-NextPlanProcessJson $validate 'plan validate'; $projection=[ordered]@{}; foreach($name in @('status','code','message','diagnostics','notices','healedClaims')){if($validation.PSObject.Properties.Name -ccontains $name){$projection[$name]=$validation.$name}}; $result.validation=$projection
+ if($validate.ExitCode -eq 2 -and [string]$projection['code'] -ceq 'busy'){Complete-Claim 2 'blocked' 'scheduler.busy' 'Another session held the plan scheduler for the full wait; no Plan was claimed. Tell the user and retry later.'}
+ if($validate.ExitCode -eq 1 -and [string]$projection['code'] -ceq 'guard-unavailable'){Complete-Claim 1 'error' 'scheduler.guard-unavailable' 'The plan scheduler lock storage is unusable; no Plan was claimed. Tell the user - this is not a Plan metadata problem.'}
  if($validate.ExitCode -ne 0){$exit=if($validate.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'plan.validation-failed' 'Plan validation failed.'}
  if($null -ne $pattern){
   $candidates=[Collections.Generic.List[string]]::new()

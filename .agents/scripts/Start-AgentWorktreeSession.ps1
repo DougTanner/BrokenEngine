@@ -5,7 +5,7 @@ param(
 	[string] $ClientExecutable,
 	[string[]] $ClientArguments = @(),
 	[string] $ReattachWorktree,
-	[int] $WaitSeconds = 660
+	[int] $WaitSeconds = 500
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,7 +91,39 @@ try {
 		}
 		if ($branch -cnotmatch "^$Client/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$") { throw "Worktree '$reattachTarget' is not checked out on a $Client session branch: '$branch'." }
 		$owner = $branch.Substring($Client.Length + 1)
-		$baseline = @(Invoke-AgentGit @('-C', $reattachTarget, 'merge-base', 'HEAD', $primary.Head))[0].Trim()
+		if ($rebaseInProgress) { $baseline = @(Invoke-AgentGit @('-C', $reattachTarget, 'merge-base', 'HEAD', $primary.Head))[0].Trim() }
+		else {
+			# The primary branch name and the primary HEAD are read separately, so they disagree if that
+			# checkout switched branches between the two reads. Resolving the tip from the branch ref binds
+			# every step below - fork point, ancestor test, rebase target, baseline - to one branch, because
+			# rebasing onto another branch's tip would relocate this session's work.
+			$primaryTip = @(Invoke-AgentGit @('-C', $reattachTarget, 'rev-parse', "refs/heads/$($primary.Branch)"))[0].Trim()
+			# Rewriting the primary branch (a daily history squash) orphans the commits this branch was
+			# created from, and plain merge-base then resolves to before the rewritten commits, so the session
+			# diff would silently include work already on primary. The primary branch reflog still records the
+			# pre-rewrite tip, so --fork-point recovers where this branch actually diverged.
+			$forkPoint = @(& git -C $reattachTarget merge-base --fork-point "refs/heads/$($primary.Branch)" HEAD 2>$null)
+			$baseline = if ($LASTEXITCODE -eq 0 -and $forkPoint.Count -eq 1 -and -not [string]::IsNullOrWhiteSpace($forkPoint[0])) { $forkPoint[0].Trim() }
+				else { @(Invoke-AgentGit @('-C', $reattachTarget, 'merge-base', 'HEAD', $primaryTip))[0].Trim() }
+			& git -C $reattachTarget merge-base --is-ancestor $baseline $primaryTip
+			if ($LASTEXITCODE -ne 0) {
+				# The fork point left primary's history, so this branch still carries the rewritten commits:
+				# replay only the session's own commits onto the new tip. A refusal beats a partial repair, so
+				# a dirty tree is rejected outright and a failed replay is aborted back to what was found.
+				$repair = "git -C '$reattachTarget' rebase --onto $primaryTip $baseline $branch"
+				$refusal = "Primary branch '$($primary.Branch)' was rewritten: fork point $baseline is no longer on its history, which is now at $primaryTip. Replay this session onto the new tip manually: $repair"
+				if (@(Invoke-AgentGit @('-C', $reattachTarget, 'status', '--porcelain', '-z', '--untracked-files=all')).Count -ne 0) {
+					throw "Worktree '$reattachTarget' has staged, unstaged, or untracked changes, so it was left untouched. $refusal"
+				}
+				& git -C $reattachTarget rebase --onto $primaryTip $baseline $branch
+				if ($LASTEXITCODE -ne 0) {
+					& git -C $reattachTarget rebase --abort
+					if ($LASTEXITCODE -ne 0) { throw "Replaying this session onto the rewritten primary branch failed, and rolling that replay back failed too, so the worktree is left mid-rebase. Roll it back manually: git -C '$reattachTarget' rebase --abort. $refusal" }
+					throw "Replaying this session onto the rewritten primary branch failed and was aborted, so the worktree was left untouched. $refusal"
+				}
+				$baseline = $primaryTip
+			}
+		}
 		$identity = [pscustomobject]@{ Primary = $primary; Worktree = $reattachTarget; Branch = $branch; TargetBranch = $primary.Branch; Baseline = $baseline }
 	}
 	else {

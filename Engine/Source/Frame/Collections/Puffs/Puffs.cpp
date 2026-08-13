@@ -24,6 +24,7 @@ void PuffsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] c
 		[](auto& rI, auto& rPR, int64_t& i)
 		{
 			DestroyElement(rI, rPR, i, rI.Members(), rPR.Members());
+			--i;
 		});
 }
 

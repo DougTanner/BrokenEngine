@@ -17,6 +17,7 @@ struct LaunchOptions
 	common::Flags<LaunchOptionFlags> flags; // parsed boolean launch options (see LaunchOptionFlags)
 	std::filesystem::path logFile; // empty = no log-file sink
 	std::filesystem::path dataDirectory; // empty = executable-sibling Data; --data-directory supplies an existing absolute directory
+	std::filesystem::path appDataDirectory; // empty = roaming AppData; --app-data-directory supplies an existing absolute directory
 	VkExtent2D windowedExtent {0, 0}; // {0,0} = not requested; --windowed WxH forces a windowed client size (overrides fullscreen at the read sites, never mutates gFullscreen)
 };
 

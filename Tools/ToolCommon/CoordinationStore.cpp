@@ -17,7 +17,7 @@
 
 namespace toolcli::coordination
 {
-	Guard::Guard(const std::filesystem::path& rPath, int64_t iMaximumWaitMilliseconds) :
+	Guard::Guard(const std::filesystem::path& rPath, int64_t iMaximumWaitMilliseconds, int64_t iMaximumDeniedAccessMilliseconds) :
 		mPath(ExtendedLengthPath(rPath))
 	{
 		const std::chrono::milliseconds maximumWait = std::chrono::milliseconds((std::max)(static_cast<int64_t>(0), iMaximumWaitMilliseconds));
@@ -26,6 +26,7 @@ namespace toolcli::coordination
 			return;
 		}
 		const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now() + maximumWait;
+		std::optional<std::chrono::steady_clock::time_point> deniedRunStart;
 		do
 		{
 			mhFile.Reset(::CreateFileW(mPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, nullptr));
@@ -39,7 +40,25 @@ namespace toolcli::coordination
 			{
 				return;
 			}
-			const std::chrono::milliseconds remainingWait = (std::max)(std::chrono::milliseconds::zero(), std::chrono::duration_cast<std::chrono::milliseconds>(endTime - std::chrono::steady_clock::now()));
+			mbContentionObserved = mbContentionObserved || muiLastError == ERROR_SHARING_VIOLATION || muiLastError == ERROR_LOCK_VIOLATION;
+			const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+			// The denied-access budget covers the current consecutive run only: a sharing or lock violation proves a live holder rather than a stuck delete-pending window, so the next denied observation starts a fresh budget.
+			if (muiLastError == ERROR_ACCESS_DENIED)
+			{
+				if (!deniedRunStart)
+				{
+					deniedRunStart = now;
+				}
+				if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *deniedRunStart).count() >= iMaximumDeniedAccessMilliseconds)
+				{
+					return;
+				}
+			}
+			else
+			{
+				deniedRunStart.reset();
+			}
+			const std::chrono::milliseconds remainingWait = (std::max)(std::chrono::milliseconds::zero(), std::chrono::duration_cast<std::chrono::milliseconds>(endTime - now));
 			if (remainingWait == std::chrono::milliseconds::zero())
 			{
 				return;
@@ -67,6 +86,11 @@ namespace toolcli::coordination
 	bool Guard::TimedOut() const
 	{
 		return muiLastError == ERROR_SHARING_VIOLATION || muiLastError == ERROR_LOCK_VIOLATION;
+	}
+
+	bool Guard::ContentionObserved() const
+	{
+		return mbContentionObserved;
 	}
 
 	DWORD Guard::LastError() const

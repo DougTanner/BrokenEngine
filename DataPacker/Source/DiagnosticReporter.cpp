@@ -90,7 +90,16 @@ ButtonResult Report(const Record& rRecord)
 	{
 		LOG(kDefault, kWarning, "{}: {}", rRecord.title, text);
 	}
-	if (sbValidatedLinkedWorktree.load(std::memory_order_acquire))
+	// An automated run has no human to click the modal, so it must end with an exit code instead of blocking forever. The
+	// cost is that an OK/Cancel prompt, such as a pack file locked by a running client, now cancels and fails that asset
+	// type rather than waiting for the lock to clear.
+	static const bool sbNoninteractiveEnvironment = []()
+	{
+		wchar_t pcNoninteractive[2] {};
+		DWORD uiNoninteractiveLength = GetEnvironmentVariableW(L"BT_DATAPACKER_NONINTERACTIVE", pcNoninteractive, static_cast<DWORD>(std::size(pcNoninteractive)));
+		return uiNoninteractiveLength == 1 && pcNoninteractive[0] == L'1';
+	}();
+	if (sbNoninteractiveEnvironment || sbValidatedLinkedWorktree.load(std::memory_order_acquire))
 	{
 		return rRecord.eButtons == ButtonContract::kOk ? ButtonResult::kAcknowledged : ButtonResult::kCancelled;
 	}

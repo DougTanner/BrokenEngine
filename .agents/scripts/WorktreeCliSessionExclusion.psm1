@@ -3,7 +3,7 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1')
 
 $script:LedgerVersion = 2
-$script:DefaultWaitSeconds = 660
+$script:DefaultWaitSeconds = 500
 
 function Get-WorktreeCliRepositoryIdentity([string] $RepositoryRoot) {
 	$root = Get-AgentCanonicalPath $RepositoryRoot

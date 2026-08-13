@@ -188,9 +188,17 @@ static std::optional<uint64_t> GetReadableFileSize(const std::filesystem::path& 
 	return static_cast<uint64_t>(uiFileSizeValue);
 }
 
-static bool ValidatePublishedManifestChunkTable(int64_t iManifestChunkCount, uint64_t uiManifestFileSize, uint64_t& rChunkTableBytes)
+static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManifestFile, std::fstream& rManifestFileStream, int64_t iManifestChunkCount, std::vector<common::ChunkLocation>& rManifestChunkLocations)
 {
 	static constexpr uint64_t kuiChunkTableOffset = static_cast<uint64_t>(common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader))));
+
+	const std::optional<uint64_t> optionalManifestFileSize = GetReadableFileSize(rManifestFile);
+	if (!optionalManifestFileSize.has_value())
+	{
+		return false;
+	}
+
+	const uint64_t uiManifestFileSize = optionalManifestFileSize.value();
 	if (uiManifestFileSize < kuiChunkTableOffset)
 	{
 		return false;
@@ -215,23 +223,7 @@ static bool ValidatePublishedManifestChunkTable(int64_t iManifestChunkCount, uin
 		return false;
 	}
 
-	rChunkTableBytes = static_cast<uint64_t>(iManifestChunkCount) * sizeof(common::ChunkLocation);
-	return true;
-}
-
-static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManifestFile, std::fstream& rManifestFileStream, int64_t iManifestChunkCount, std::vector<common::ChunkLocation>& rManifestChunkLocations)
-{
-	const std::optional<uint64_t> optionalManifestFileSize = GetReadableFileSize(rManifestFile);
-	if (!optionalManifestFileSize.has_value())
-	{
-		return false;
-	}
-
-	uint64_t uiChunkTableBytes = 0;
-	if (!ValidatePublishedManifestChunkTable(iManifestChunkCount, optionalManifestFileSize.value(), uiChunkTableBytes))
-	{
-		return false;
-	}
+	const uint64_t uiChunkTableBytes = static_cast<uint64_t>(iManifestChunkCount) * sizeof(common::ChunkLocation);
 
 	try
 	{
@@ -242,7 +234,6 @@ static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManife
 		return false;
 	}
 
-	static constexpr uint64_t kuiChunkTableOffset = static_cast<uint64_t>(common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader))));
 	rManifestFileStream.seekg(static_cast<std::streamoff>(kuiChunkTableOffset), std::ios::beg);
 	if (!rManifestFileStream)
 	{
@@ -268,60 +259,6 @@ static bool LoadPublishedManifest(const std::filesystem::path& rManifestFile, in
 	return !bDirty && LoadPublishedManifestChunkTable(rManifestFile, manifestFileStream, riManifestChunkCount, rManifestChunkLocations);
 }
 
-static bool ValidatePublishedChunkLayout(const common::ChunkLocation& rChunkLocation, uint64_t uiExpectedOffset, uint64_t uiPackFileSize)
-{
-	static constexpr uint64_t kuiAlignmentBytes = static_cast<uint64_t>(common::kiAlignmentBytes);
-	if (rChunkLocation.uiOffset != uiExpectedOffset)
-	{
-		return false;
-	}
-	if (rChunkLocation.uiOffset % kuiAlignmentBytes != 0)
-	{
-		return false;
-	}
-	if (rChunkLocation.uiOffset > uiPackFileSize)
-	{
-		return false;
-	}
-	if (rChunkLocation.uiSize < static_cast<uint64_t>(common::kiChunkDataOffset))
-	{
-		return false;
-	}
-	if (rChunkLocation.uiSize > uiPackFileSize - rChunkLocation.uiOffset)
-	{
-		return false;
-	}
-	return true;
-}
-
-static bool ValidatePublishedChunkHeader(const common::ChunkLocation& rChunkLocation, std::fstream& rPackFileStream)
-{
-	common::ChunkHeader chunkHeader {};
-	rPackFileStream.seekg(static_cast<std::streamoff>(rChunkLocation.uiOffset), std::ios::beg);
-	if (!rPackFileStream)
-	{
-		return false;
-	}
-	rPackFileStream.read(reinterpret_cast<char*>(&chunkHeader), sizeof(chunkHeader));
-	if (!rPackFileStream)
-	{
-		return false;
-	}
-	if (rPackFileStream.gcount() != static_cast<std::streamsize>(sizeof(chunkHeader)))
-	{
-		return false;
-	}
-	if (chunkHeader.iMagic != common::ChunkHeader::kiMagic)
-	{
-		return false;
-	}
-	if (chunkHeader.crc != rChunkLocation.crc)
-	{
-		return false;
-	}
-	return true;
-}
-
 static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, const std::vector<common::ChunkLocation>& rManifestChunkLocations)
 {
 	const std::optional<uint64_t> optionalPackFileSize = GetReadableFileSize(rPackFile);
@@ -340,11 +277,26 @@ static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, 
 	uint64_t uiExpectedOffset = 0;
 	for (const common::ChunkLocation& rChunkLocation : rManifestChunkLocations)
 	{
-		if (!ValidatePublishedChunkLayout(rChunkLocation, uiExpectedOffset, optionalPackFileSize.value()))
+		if (rChunkLocation.uiOffset != uiExpectedOffset
+			|| rChunkLocation.uiOffset % kuiAlignmentBytes != 0
+			|| rChunkLocation.uiOffset > optionalPackFileSize.value()
+			|| rChunkLocation.uiSize < static_cast<uint64_t>(common::kiChunkDataOffset)
+			|| rChunkLocation.uiSize > optionalPackFileSize.value() - rChunkLocation.uiOffset)
 		{
 			return false;
 		}
-		if (!ValidatePublishedChunkHeader(rChunkLocation, packFileStream))
+
+		common::ChunkHeader chunkHeader {};
+		packFileStream.seekg(static_cast<std::streamoff>(rChunkLocation.uiOffset), std::ios::beg);
+		if (!packFileStream)
+		{
+			return false;
+		}
+		packFileStream.read(reinterpret_cast<char*>(&chunkHeader), sizeof(chunkHeader));
+		if (!packFileStream
+			|| packFileStream.gcount() != static_cast<std::streamsize>(sizeof(chunkHeader))
+			|| chunkHeader.iMagic != common::ChunkHeader::kiMagic
+			|| chunkHeader.crc != rChunkLocation.crc)
 		{
 			return false;
 		}
@@ -440,61 +392,10 @@ static void SortAndCheckDuplicateExportJobs(std::vector<std::unique_ptr<T>>& rEx
 }
 
 template <IsExportJob T>
-static void LaunchExportJobs(std::vector<std::unique_ptr<T>>& rExportJobs)
+static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rTemporaryPackFile, std::vector<std::unique_ptr<T>>& rExportJobs)
 {
-	// Run the jobs
-	for (std::unique_ptr<T>& rpExportJob : rExportJobs)
-	{
-		rpExportJob->mFuture = std::async(std::launch::async, &T::RunExport, rpExportJob.get());
-	}
-}
-
-template <IsExportJob T>
-static void DrainExportJobs(std::vector<std::unique_ptr<T>>& rExportJobs, std::fstream& rTemporaryManifestFileStream, std::fstream& rTemporaryPackFileStream, std::vector<diagnostic::ExportFailure>& rFailures)
-{
-	for (std::unique_ptr<T>& rpExportJob : rExportJobs)
-	{
-		try
-		{
-			std::vector<std::byte>& rData = rpExportJob->mFuture.get();
-
-			common::ChunkLocation chunkLocation =
-			{
-				.crc = rpExportJob->mCrc,
-				.uiOffset = static_cast<uint64_t>(rTemporaryPackFileStream.tellp()),
-				.uiSize = rData.size(),
-				.contentCrc = rData.empty() ? common::kCrcSeed : common::Crc(rData.data(), static_cast<int64_t>(rData.size())),
-			};
-			rTemporaryManifestFileStream.write(reinterpret_cast<char*>(&chunkLocation), sizeof(chunkLocation));
-
-			rTemporaryPackFileStream.write(reinterpret_cast<char*>(rData.data()), rData.size());
-			common::AlignOutputStream(rTemporaryPackFileStream);
-		}
-		catch (const std::exception& rException)
-		{
-			rFailures.push_back({.assetPath = rpExportJob->mInputPath, .message = rException.what()});
-		}
-	}
-}
-
-struct TemporaryExportFiles
-{
-	std::filesystem::path manifestFile;
-	std::filesystem::path packFile;
-	std::filesystem::path headerFile;
-	std::vector<diagnostic::ExportFailure> failures;
-};
-
-template <IsExportJob T>
-static TemporaryExportFiles WriteTemporaryExportFiles(const std::filesystem::path& rCacheDirectory, std::vector<std::unique_ptr<T>>& rExportJobs)
-{
-	TemporaryExportFiles result {};
-
 	// Open temporary manifest file and write header
-	result.manifestFile = rCacheDirectory;
-	result.manifestFile /= T::kName;
-	result.manifestFile += ".manifest";
-	std::fstream temporaryManifestFileStream(result.manifestFile, std::ios::out | std::ios::binary);
+	std::fstream temporaryManifestFileStream(rTemporaryManifestFile, std::ios::out | std::ios::binary);
 
 	common::DataHeader dataHeader {};
 	dataHeader.iMagic = common::DataHeader::kiMagic;
@@ -504,17 +405,33 @@ static TemporaryExportFiles WriteTemporaryExportFiles(const std::filesystem::pat
 	common::AlignOutputStream(temporaryManifestFileStream);
 
 	// Open temporary pack file
-	result.packFile = rCacheDirectory;
-	result.packFile /= T::kName;
-	result.packFile += ".pack";
-	std::fstream temporaryPackFileStream(result.packFile, std::ios::out | std::ios::binary);
+	std::fstream temporaryPackFileStream(rTemporaryPackFile, std::ios::out | std::ios::binary);
 
-	result.headerFile = rCacheDirectory;
-	result.headerFile /= T::kName;
-	result.headerFile += ".h";
+	std::vector<diagnostic::ExportFailure> failures;
+	failures.reserve(rExportJobs.size() + 1);
+	for (std::unique_ptr<T>& rpExportJob : rExportJobs)
+	{
+		try
+		{
+			std::vector<std::byte>& rData = rpExportJob->mFuture.get();
 
-	result.failures.reserve(rExportJobs.size() + 1);
-	DrainExportJobs(rExportJobs, temporaryManifestFileStream, temporaryPackFileStream, result.failures);
+			common::ChunkLocation chunkLocation =
+			{
+				.crc = rpExportJob->mCrc,
+				.uiOffset = static_cast<uint64_t>(temporaryPackFileStream.tellp()),
+				.uiSize = rData.size(),
+				.contentCrc = rData.empty() ? common::kCrcSeed : common::Crc(rData.data(), static_cast<int64_t>(rData.size())),
+			};
+			temporaryManifestFileStream.write(reinterpret_cast<char*>(&chunkLocation), sizeof(chunkLocation));
+
+			temporaryPackFileStream.write(reinterpret_cast<char*>(rData.data()), rData.size());
+			common::AlignOutputStream(temporaryPackFileStream);
+		}
+		catch (const std::exception& rException)
+		{
+			failures.push_back({.assetPath = rpExportJob->mInputPath, .message = rException.what()});
+		}
+	}
 
 	temporaryManifestFileStream.close();
 	temporaryPackFileStream.close();
@@ -523,10 +440,10 @@ static TemporaryExportFiles WriteTemporaryExportFiles(const std::filesystem::pat
 	// empty, so without this check the success path would rename truncated manifest/pack output over the good files.
 	if (!temporaryManifestFileStream.good() || !temporaryPackFileStream.good())
 	{
-		result.failures.push_back({.message = std::format("Stream write failed for \"{}\" manifest/pack output", T::kName)});
+		failures.push_back({.message = std::format("Stream write failed for \"{}\" manifest/pack output", T::kName)});
 	}
 
-	return result;
+	return failures;
 }
 
 template <IsExportJob T>
@@ -541,10 +458,28 @@ static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std
 	ScopedLogIndent scopedLogIndent;
 
 	SortAndCheckDuplicateExportJobs(rExportJobs);
-	LaunchExportJobs(rExportJobs);
-	TemporaryExportFiles temporaryFiles = WriteTemporaryExportFiles(gpFileManager->mCacheDirectory, rExportJobs);
 
-	bool bFailed = !temporaryFiles.failures.empty();
+	// Run the jobs
+	for (std::unique_ptr<T>& rpExportJob : rExportJobs)
+	{
+		rpExportJob->mFuture = std::async(std::launch::async, &T::RunExport, rpExportJob.get());
+	}
+
+	std::filesystem::path temporaryManifestFile = gpFileManager->mCacheDirectory;
+	temporaryManifestFile /= T::kName;
+	temporaryManifestFile += ".manifest";
+
+	std::filesystem::path temporaryPackFile = gpFileManager->mCacheDirectory;
+	temporaryPackFile /= T::kName;
+	temporaryPackFile += ".pack";
+
+	std::filesystem::path temporaryHeaderFile = gpFileManager->mCacheDirectory;
+	temporaryHeaderFile /= T::kName;
+	temporaryHeaderFile += ".h";
+
+	std::vector<diagnostic::ExportFailure> failures = WriteTemporaryExportFiles(temporaryManifestFile, temporaryPackFile, rExportJobs);
+
+	bool bFailed = !failures.empty();
 	if (bFailed)
 	{
 		diagnostic::Record record
@@ -554,16 +489,16 @@ static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std
 			.message = "One or more export jobs failed",
 			.eButtons = diagnostic::ButtonContract::kOk,
 			.eIcon = diagnostic::ModalIcon::kNone,
-			.exportFailures = std::move(temporaryFiles.failures),
+			.exportFailures = std::move(failures),
 		};
 		diagnostic::Report(record);
 
-		std::filesystem::remove(temporaryFiles.manifestFile);
-		std::filesystem::remove(temporaryFiles.packFile);
+		std::filesystem::remove(temporaryManifestFile);
+		std::filesystem::remove(temporaryPackFile);
 	}
 	else
 	{
-		WriteCrcHeader(temporaryFiles.headerFile, rExportJobs);
+		WriteCrcHeader(temporaryHeaderFile, rExportJobs);
 
 		// Only copy header if it has changed (causes game re-compilation otherwise). The header must publish
 		// before the pack: the pack rename is the commit point every dirty check keys off, so a header
@@ -574,20 +509,20 @@ static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std
 		// next run — an added/removed asset trips the manifest chunk-count comparison, a count-preserving
 		// rename trips CheckDirty and the fingerprint-newer-than-pack check, and a regenerated missing
 		// header already matches the pack.
-		if (!common::ContentsEqual(temporaryFiles.headerFile, rHeaderFile))
+		if (!common::ContentsEqual(temporaryHeaderFile, rHeaderFile))
 		{
-			std::filesystem::rename(temporaryFiles.headerFile, rHeaderFile);
+			std::filesystem::rename(temporaryHeaderFile, rHeaderFile);
 		}
 		else
 		{
-			std::filesystem::remove(temporaryFiles.headerFile);
+			std::filesystem::remove(temporaryHeaderFile);
 		}
 
-		if (!PublishManifestAndPack(temporaryFiles.manifestFile, rManifestFile, temporaryFiles.packFile, rPackFile))
+		if (!PublishManifestAndPack(temporaryManifestFile, rManifestFile, temporaryPackFile, rPackFile))
 		{
 			// Cancelled at the publish prompt: discard the temporaries and fail this export type
-			std::filesystem::remove(temporaryFiles.manifestFile);
-			std::filesystem::remove(temporaryFiles.packFile);
+			std::filesystem::remove(temporaryManifestFile);
+			std::filesystem::remove(temporaryPackFile);
 			bFailed = true;
 		}
 	}
@@ -830,13 +765,65 @@ int main(int argc, char* argv[])
 {
 	// Prevent multiple instances from running simultaneously
 	HANDLE hMutex = CreateMutex(nullptr, TRUE, "BrokenEngineDataPacker");
-	__assume(hMutex != nullptr);
-	auto mutexDeleter = [](void* pH) { ReleaseMutex(pH); CloseHandle(pH); };
+	if (hMutex == nullptr)
+	{
+		const DWORD uiError = GetLastError();
+		diagnostic::Record record
+		{
+			.eSeverity = diagnostic::Severity::kError,
+			.title = "Data Packer - std::exception",
+			.message = std::format("CreateMutex failed (Win32 {})", uiError),
+			.eButtons = diagnostic::ButtonContract::kOk,
+			.eIcon = diagnostic::ModalIcon::kNone,
+		};
+		diagnostic::Report(record);
+		return 1;
+	}
+
+	// A handle for an existing mutex is not owned until the wait succeeds, so failed waits only close it.
+	bool bOwnsMutex = true;
+	auto mutexDeleter = [&bOwnsMutex](void* pHandle)
+	{
+		if (bOwnsMutex)
+		{
+			ReleaseMutex(pHandle);
+		}
+		CloseHandle(pHandle);
+	};
 	std::unique_ptr<void, decltype(mutexDeleter)> pMutex(hMutex, mutexDeleter);
 	if (GetLastError() == ERROR_ALREADY_EXISTS)
 	{
+		bOwnsMutex = false;
 		std::printf("DataPacker is already running, waiting...\n");
-		WaitForSingleObject(hMutex, INFINITE);
+		const DWORD uiWaitResult = WaitForSingleObject(hMutex, INFINITE);
+		if (uiWaitResult == WAIT_FAILED)
+		{
+			const DWORD uiError = GetLastError();
+			diagnostic::Record record
+			{
+				.eSeverity = diagnostic::Severity::kError,
+				.title = "Data Packer - std::exception",
+				.message = std::format("WaitForSingleObject failed (Win32 {})", uiError),
+				.eButtons = diagnostic::ButtonContract::kOk,
+				.eIcon = diagnostic::ModalIcon::kNone,
+			};
+			diagnostic::Report(record);
+			return 1;
+		}
+		if (uiWaitResult != WAIT_OBJECT_0 && uiWaitResult != WAIT_ABANDONED)
+		{
+			diagnostic::Record record
+			{
+				.eSeverity = diagnostic::Severity::kError,
+				.title = "Data Packer - std::exception",
+				.message = std::format("WaitForSingleObject returned unexpected result {}", uiWaitResult),
+				.eButtons = diagnostic::ButtonContract::kOk,
+				.eIcon = diagnostic::ModalIcon::kNone,
+			};
+			diagnostic::Report(record);
+			return 1;
+		}
+		bOwnsMutex = true;
 	}
 
 	bool bSuccess = false;

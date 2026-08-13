@@ -11,6 +11,8 @@
 namespace toolcli::coordination
 {
 	inline constexpr int kiSchemaVersion = 2;
+	// A denied-access budget this large can never bind before an overall wait deadline.
+	inline constexpr int64_t kiUnboundedDeniedAccessMilliseconds = INT64_MAX;
 
 	struct Locator
 	{
@@ -22,7 +24,7 @@ namespace toolcli::coordination
 	class Guard
 	{
 	public:
-		explicit Guard(const std::filesystem::path& rPath, int64_t iMaximumWaitMilliseconds = 10'000);
+		explicit Guard(const std::filesystem::path& rPath, int64_t iMaximumWaitMilliseconds = 10'000, int64_t iMaximumDeniedAccessMilliseconds = kiUnboundedDeniedAccessMilliseconds);
 		~Guard();
 
 		Guard(const Guard&) = delete;
@@ -30,6 +32,8 @@ namespace toolcli::coordination
 
 		[[nodiscard]] bool IsValid() const;
 		[[nodiscard]] bool TimedOut() const;
+		// A live holder was proven at any point during acquisition; the final error can be a delete-pending flicker instead.
+		[[nodiscard]] bool ContentionObserved() const;
 		[[nodiscard]] DWORD LastError() const;
 		// "timed out" for contention, otherwise the acquisition's Windows error.
 		[[nodiscard]] std::string FailureReason() const;
@@ -38,6 +42,7 @@ namespace toolcli::coordination
 		Handle mhFile;
 		std::filesystem::path mPath;
 		DWORD muiLastError = ERROR_SUCCESS;
+		bool mbContentionObserved = false;
 	};
 
 	std::string CurrentUtcTimestamp();

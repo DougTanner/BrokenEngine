@@ -2,7 +2,7 @@
 param(
 	[Parameter(Mandatory = $true)]
 	[string] $RepositoryRoot,
-	[int] $WaitSeconds = 660
+	[int] $WaitSeconds = 500
 )
 
 $ErrorActionPreference = 'Stop'

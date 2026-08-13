@@ -68,7 +68,7 @@ Old-owner cleanup may refresh its heartbeat; that does not invalidate staleness 
 
 Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, normalized `GameDataDirectory`, fixed data baseline, and the path and SHA-256 of the selected `broken-engine-data-oracle/v1` receipt — the record file proving exactly which data files the build used. Before each launch and after verification, invoke the compile package's `scripts/Test-DataOracleReceipt.ps1` with that exact receipt/path/mode/baseline tuple and require its typed passing result. In Local mode, do the same for the independent primary Shared receipt. Stop on any receipt, path, mode, baseline, inventory, or byte mismatch. Never infer an identity, compare Shared and Local receipts for equality, switch data mode, fall back to Shared data, or run DataPacker/Gaea/texture export.
 
-Use the compiled configuration suffix. Ordinary same-machine runs pass `--loopback-only`. Create log parents under `$ROOT\Temp`. Do not change process working directories; `--data-directory` is the only data-root override.
+Use the compiled configuration suffix. Ordinary same-machine runs pass `--loopback-only`. Create log parents under `$ROOT\Temp`. Do not change process working directories; `--data-directory` is the only override selecting packed assets, and `--app-data-directory` is the only override selecting where saves, settings, caches, and replays are written.
 
 On Codex for Windows, launch with hidden `Start-Process -PassThru`, retain the returned exact PIDs, and use only those PIDs for lifecycle checks. Quote path-valued arguments because `Start-Process` joins `ArgumentList` items.
 

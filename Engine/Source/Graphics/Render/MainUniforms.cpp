@@ -440,12 +440,6 @@ static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
 {
-	// Reset the light-deposit accumulator before anything can return: the three deposit EndRender writers add
-	// into it and RenderLightingSpreadIndirect consumes it, both below. It lives here rather than in
-	// RenderLightingMain because the all-rings-empty path below returns before RenderLightingMain ever runs,
-	// which would leave a previous frame's count standing and hold the spread gate open on an empty frame.
-	giLightingDepositInstances = 0;
-
 	// Never-empty invariant: client mActiveCoords always contains mClientGridCoord (Game::ComputeActiveSet
 	// gameplay and main-menu branches, Game::Reset re-seed) and the boot prerender passes {kOriginCoord}, so
 	// this return is unreachable. It exists only to keep rRenderInterpolates.at(cameraCoord) below from throwing
@@ -547,8 +541,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	// Phase 3: EndRender — write indirect draw buffer counts
 	game::FrameInterpolate::EndRender(iCommandBuffer);
 
-	// Spread-chain gate, paired with the deposit counts EndRender just published. Must follow EndRender — that
-	// is where giLightingDepositInstances is summed.
+	// EndRender publishes deposit indirect counts before spread indirect parameters are published.
 	RenderLightingSpreadIndirect(iCommandBuffer);
 
 	// Phase 4: Game-specific debug rendering (per-coord, positions from fully-interpolated frame)

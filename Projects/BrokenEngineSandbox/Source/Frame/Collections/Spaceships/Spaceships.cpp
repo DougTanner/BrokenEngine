@@ -448,11 +448,11 @@ void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[
 		{
 			return (rCurrentPostRender.pFlags[i] & kExploding) && !(rCurrentInterpolate.pfDestroyedTimes[i] > 0.0f);
 		},
-		[&](int64_t& ri)
+		[&](int64_t i)
 		{
-			RemoveOwnedObjects(rFrame, rCurrentInterpolate, ri, false);
+			RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, false);
 
-			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, ri, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 		});
 }
 

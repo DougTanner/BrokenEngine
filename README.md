@@ -24,6 +24,8 @@ Setting up a new machine? [Documents/FreshMachineSetup.md](Documents/FreshMachin
 		- Windows 11 SDK (10.0.26100.6901)
 	- Optional components can also be installed later from "Tools" -> "Get Tools and Features..."
 
+- Gaea 2 (QuadSpinner), required to bake island terrain. DataPacker runs `Gaea.Swarm.exe` from the `GAEA2_PATH` environment variable when it is set and points at an existing path, and otherwise from the default install location `C:\Program Files\QuadSpinner\Gaea 2\Gaea.Swarm.exe`.
+
 - x64 CPython 3.12 or newer, required by every skill that needs host Python. `code-quality-metrics` uses the first `python` Application resolved through normal PATH precedence, then verifies that it is a supported CPython installation; the `gaea2-*` and `analyze-diagsession` skills locate an interpreter through `.agents/scripts/Detect-Python.ps1`, which also probes well-known install directories. The `py` launcher is not used as a fallback.
 
 ## Git

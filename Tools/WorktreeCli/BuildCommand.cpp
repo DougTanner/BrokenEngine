@@ -23,7 +23,7 @@ namespace toolcli
 {
 	namespace
 	{
-		constexpr int64_t kiBuildLockWaitSeconds = 660;
+		constexpr int64_t kiBuildLockWaitSeconds = 500;
 		constexpr size_t kuiMaxDiagnostics = 500;
 		constexpr size_t kuiMaxUnmatchedMessages = 50;
 		// Backtracking in the diagnostic regexes is superlinear; pathological MSVC template

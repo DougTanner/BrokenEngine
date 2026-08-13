@@ -101,11 +101,25 @@ function Get-AgentWorktreeSessionContext {
 	}
 	else { Get-AgentWorktreeGitValue $primaryRoot @('branch', '--show-current') 'primary branch' }
 	$primaryTip = Get-AgentWorktreeGitValue $primaryRoot @('rev-parse', "refs/heads/$primaryBranch") 'primary tip commit'
+	# Rewriting the primary branch (a daily history squash) leaves the recorded baseline resolvable but
+	# orphaned, and plain merge-base then resolves to before the rewritten commits, so the session diff
+	# would silently include work already on primary. Accept the recorded baseline only while it is still
+	# on the primary tip's history, and otherwise recover the true fork point from the primary branch's
+	# reflog. --fork-point can still answer with an older ancestor once the pre-rewrite tip has expired
+	# from that reflog, so the plain merge-base stays as the last resort rather than failing closed.
 	$baseline = $null
 	$configured = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_BASELINE', 'Process')
 	if (-not [string]::IsNullOrWhiteSpace($configured)) {
 		$resolved = @(& git -C $top rev-parse --quiet --verify "$configured^{commit}" 2>$null)
-		if ($LASTEXITCODE -eq 0 -and $resolved.Count -eq 1) { $baseline = $resolved[0].Trim() }
+		if ($LASTEXITCODE -eq 0 -and $resolved.Count -eq 1) {
+			$candidate = $resolved[0].Trim()
+			& git -C $top merge-base --is-ancestor $candidate $primaryTip
+			if ($LASTEXITCODE -eq 0) { $baseline = $candidate }
+		}
+	}
+	if ([string]::IsNullOrWhiteSpace($baseline)) {
+		$forkPoint = @(& git -C $top merge-base --fork-point "refs/heads/$primaryBranch" HEAD 2>$null)
+		if ($LASTEXITCODE -eq 0 -and $forkPoint.Count -eq 1) { $baseline = $forkPoint[0].Trim() }
 	}
 	if ([string]::IsNullOrWhiteSpace($baseline)) { $baseline = Get-AgentWorktreeGitValue $top @('merge-base', 'HEAD', $primaryTip) 'merge base with the primary tip' }
 	return [pscustomobject]@{

@@ -400,12 +400,12 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			bool bExplosionFinished = (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
 			return bSilentDespawn || bExplosionFinished;
 		},
-		[&](int64_t& ri)
+		[&](int64_t i)
 		{
 			// Owned effects and target may already be released by Fall() or Explode()
-			RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, ri);
+			RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 
-			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, ri, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 		});
 }
 

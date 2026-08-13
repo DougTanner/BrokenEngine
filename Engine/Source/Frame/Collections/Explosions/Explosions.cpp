@@ -294,6 +294,7 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 
 		// Remove the explosion using swap-and-pop
 		DestroyElement(rInterpolate, rPostRender, i, rInterpolate.Members(), rPostRender.Members());
+		--i;
 	}
 }
 

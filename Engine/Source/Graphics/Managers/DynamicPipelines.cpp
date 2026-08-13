@@ -134,23 +134,20 @@ void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_
 	mModelPipelineMaps[kDynamicModelPipelineModelShadow].insert_or_assign(crc, pPipelineShadow);
 }
 
-void DynamicPipelines::CreatePipelineLighting(common::crc_t crc, std::string_view name, int64_t iBufferSize)
+void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag)
 {
-	// Skip if lighting pipeline already exists
-	if (mPipelineMaps[kDynamicPipelineLighting].contains(crc))
+	if (mPipelineMaps[eType].contains(crc))
 	{
 		return;
 	}
 
-	// Create storage buffer for this lighting pipeline
 	gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, iBufferSize);
 
-	// Allocate pipeline and configure for area light rendering
-	AddPipeline(kDynamicPipelineLighting, crc,
+	AddPipeline(eType, crc,
 	{
 		.name = name,
 		.flags = {kRenderTarget, kPushConstants, kIndirectHostVisible, kMax, kUpdateAfterBind},
-		.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsVisibleAreavertCrc), &mrShaders.at(data::kShadersLightingAreaLightfragCrc)},
+		.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(fragmentShaderCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
 		.vkRenderPass = gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass,
 		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent,
@@ -158,10 +155,15 @@ void DynamicPipelines::CreatePipelineLighting(common::crc_t crc, std::string_vie
 		{
 			{.flags = kGlobalLayoutUniformBuffers},
 			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
-			{.flags = kSamplerRepeat},
+			{.flags = eSamplerFlag},
 			{.flags = kTextures},
 		},
 	});
+}
+
+void DynamicPipelines::CreatePipelineLighting(common::crc_t crc, std::string_view name, int64_t iBufferSize)
+{
+	CreateAreaLightingPipeline(kDynamicPipelineLighting, crc, name, iBufferSize, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersLightingAreaLightfragCrc, kSamplerRepeat);
 }
 
 void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers)
@@ -193,32 +195,7 @@ void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::strin
 
 void DynamicPipelines::CreatePipelineAxisAlignedLighting(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	// Skip if axis-aligned lighting pipeline already exists
-	if (mPipelineMaps[kDynamicPipelineAxisAlignedLighting].contains(crc))
-	{
-		return;
-	}
-
-	// Create storage buffer for this lighting pipeline
-	gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, iBufferSize);
-
-	// Allocate pipeline and configure for point light rendering
-	AddPipeline(kDynamicPipelineAxisAlignedLighting, crc,
-	{
-		.name = name,
-		.flags = {kRenderTarget, kPushConstants, kIndirectHostVisible, kMax, kUpdateAfterBind},
-		.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc), &mrShaders.at(data::kShadersLightingPointLightfragCrc)},
-		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.vkRenderPass = gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass,
-		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent,
-		.pDescriptorInfos =
-		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
-			{.flags = kSamplerClamp},
-			{.flags = kTextures},
-		},
-	});
+	CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, crc, name, iBufferSize, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc, kSamplerClamp);
 }
 
 void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_view name, int64_t iBufferSize)

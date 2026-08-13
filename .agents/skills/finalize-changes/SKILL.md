@@ -79,7 +79,13 @@ every other lease is foreign.
    every typed receipt verbatim, each `broken-engine-build-result/v1` envelope
    included, never summarized. A meaningful change to that diff re-runs review
    of the changed regions only.
-4. Invoke `scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` only after
+4. Re-resolve `PrimaryTip` through `Get-AgentWorktreeSessionContext` and compare
+   it against the approval-preparation result's `candidate.parent`. On mismatch,
+   open no review window, return no landing summary, and return a blocker naming
+   both values, so main re-reconciles before the confirmation is asked. On match,
+   proceed and state that verified live tip in the landing summary's `## Landing`
+   section.
+   Invoke `scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` only after
    the step-3 `/verify-changes` pass on the final diff has returned PASS, and
    immediately before the landing summary — never alongside step-2 preparation —
    so the user reviews the SmartGit window with verification already complete,
@@ -171,7 +177,16 @@ the affected regions and requires a refreshed summary and a fresh confirmation.
   `scripts/Invoke-FinalizeLanding.ps1` with the original approved arguments; it is
   idempotent against an already-advanced tip, including one its own internal
   rebase produced. Then delete the claim.
-- Primary history rewritten under the session: rebase the session branch with
+- Primary history rewritten under the session: reattaching through the wrapper
+  repairs this, rebasing the session branch onto the new primary tip; the step-4
+  re-check detects it mid-session. To repair it in place, recover the old fork
+  point with `git merge-base --fork-point refs/heads/<primary-branch> HEAD`,
+  then require `git merge-base --is-ancestor <old-fork-point> <new-primary-tip>`
+  to exit non-zero before using it: once the pre-rewrite tip has expired from
+  that branch's reflog, `--fork-point` succeeds with an older surviving
+  ancestor, and rebasing from it replays commits primary already carries. When
+  it is an ancestor the old fork point is not recoverable — stop and report a
+  blocker rather than guess one. Otherwise rebase the session branch with
   `git rebase --onto <new-primary-tip> <old-fork-point>` and re-export
   `BROKEN_ENGINE_BASELINE` to the new tip so attribution stays correct.
 

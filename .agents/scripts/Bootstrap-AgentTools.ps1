@@ -2,7 +2,7 @@
 param(
 	[Parameter(Mandatory = $true)]
 	[string] $RepositoryRoot,
-	[int] $WaitSeconds = 660
+	[int] $WaitSeconds = 500
 )
 
 $ErrorActionPreference = 'Stop'
@@ -106,6 +106,7 @@ try {
 		# below, so the post-build re-check covers a landing or user VS build that advances any consumed
 		# input during the prebuild. Best-effort like the prebuild: a snapshot failure disables it.
 		$dataPackerPreTrees = $null
+		$dataPackerPrebuiltClean = $false
 		try {
 			$dataPackerPreTrees = @(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:DataPacker', 'HEAD:Common', 'HEAD:ThirdParty'))
 			$dataPackerPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'DataPacker', 'Common', 'ThirdParty'))
@@ -140,6 +141,7 @@ try {
 				else {
 					$dataPackerStamp = ($dataPackerPreTrees + $dataPackerHash + $dataPackerBytes.Length) -join "`n"
 					[IO.File]::WriteAllText($dataPackerStampPath, $dataPackerStamp + "`n")
+					$dataPackerPrebuiltClean = $true
 				}
 			}
 			elseif ($null -ne $dataPackerPreTrees) {
@@ -147,7 +149,41 @@ try {
 			}
 		}
 		catch { Write-Warning "DataPacker Release prebuild failed, so new worktrees will build DataPacker locally: $($_.Exception.Message)" }
+		# Refresh the primary's generated data that Shared-mode worktrees consume. Gated on the prebuild's
+		# clean-snapshot stamp so the data is only ever produced by an exe just built and hash-verified from
+		# committed sources. Deliberately outside the best-effort prebuild try above: a run failure must
+		# abort session start rather than be swallowed by that warn-only catch. This can block for a long
+		# time - on DataPacker's own PC-global "BrokenEngineDataPacker" mutex, or on a rare full island bake -
+		# while this bootstrap mutex is held, timing out peer session starts; that cost is accepted and
+		# deliberately not bounded.
+		$refreshedDataDirectory = $null
+		if ($dataPackerPrebuiltClean) {
+			# A pack locked by a running game now auto-cancels the export instead of prompting, which would
+			# hard-fail session start, so an open client or server skips the run instead.
+			$gameProcesses = @(Get-Process -Name 'BrokenEngineSandbox*' -ErrorAction SilentlyContinue)
+			if ($gameProcesses.Count -ne 0) {
+				Write-Warning "Skipped the primary DataPacker run, so parent data was left as-is: $(($gameProcesses | ForEach-Object { "$($_.ProcessName) ($($_.Id))" } | Sort-Object -Unique) -join '; ') is running."
+			}
+			else {
+				$gameDataDirectory = Join-Path $root 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data'
+				$hadNoninteractive = Test-Path Env:BT_DATAPACKER_NONINTERACTIVE
+				$previousNoninteractive = [Environment]::GetEnvironmentVariable('BT_DATAPACKER_NONINTERACTIVE', 'Process')
+				try {
+					# The child inherits this process's environment block, so the restore below keeps the flag
+					# out of the agent CLI this bootstrap's caller launches afterwards.
+					$env:BT_DATAPACKER_NONINTERACTIVE = '1'
+					$dataPackerExitCode = Invoke-WorktreeCliTrackedProcess -Executable $dataPackerExe -ArgumentList @((Join-Path $root 'Engine\Data'), (Join-Path $root 'Projects\BrokenEngineSandbox\Data'), $gameDataDirectory) -WorkingDirectory $root
+				}
+				finally {
+					if ($hadNoninteractive) { $env:BT_DATAPACKER_NONINTERACTIVE = $previousNoninteractive }
+					else { Remove-Item Env:BT_DATAPACKER_NONINTERACTIVE -ErrorAction SilentlyContinue }
+				}
+				if ($dataPackerExitCode -ne 0) { throw "The primary DataPacker run failed with exit code $dataPackerExitCode, so '$gameDataDirectory' may be incomplete. Fix the offending asset in the primary checkout outside an agent session (or run DataPacker there directly), then retry." }
+				$refreshedDataDirectory = $gameDataDirectory
+			}
+		}
 		Write-Host "Built primary AgentTools and ThirdParty at '$worktreeCliOutput', '$agentHarnessOutput', and '$thirdPartyOutput'."
+		if ($null -ne $refreshedDataDirectory) { Write-Host "Refreshed primary data at '$refreshedDataDirectory'." }
 	}
 	finally { if ($held) { $mutex.ReleaseMutex() }; $mutex.Dispose() }
 }

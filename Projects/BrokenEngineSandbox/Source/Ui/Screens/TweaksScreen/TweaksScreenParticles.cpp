@@ -65,17 +65,8 @@ void TweaksScreen::RenderParticlesSection()
 
 	if (ImGui::BeginTabBar("ParticlesTabs"))
 	{
-		if (ImGui::BeginTabItem("Missile", nullptr, ((mApplySubtab & engine::SectionFlag(iSection)) && mActiveSubtab[iSection] == 0) ? ImGuiTabItemFlags_SetSelected : 0))
+		if (BeginSubtab("Missile", iSection, 0))
 		{
-			if ((mApplySubtab & engine::SectionFlag(iSection)) && mActiveSubtab[iSection] == 0)
-			{
-				mApplySubtab.Clear(engine::SectionFlag(iSection));
-			}
-			if (!(mApplySubtab & engine::SectionFlag(iSection)))
-			{
-				mActiveSubtab[iSection] = 0;
-			}
-
 			WrapperSeparatorText("Size");
 			WrapperSlider("Width",           iSection, 1.0f, "Missile Particle Width");
 			WrapperSlider("Length",          iSection, 1.0f, "Missile Particle Length");
@@ -99,17 +90,8 @@ void TweaksScreen::RenderParticlesSection()
 			ImGui::EndTabItem();
 		}
 
-		if (ImGui::BeginTabItem("Player", nullptr, ((mApplySubtab & engine::SectionFlag(iSection)) && mActiveSubtab[iSection] == 1) ? ImGuiTabItemFlags_SetSelected : 0))
+		if (BeginSubtab("Player", iSection, 1))
 		{
-			if ((mApplySubtab & engine::SectionFlag(iSection)) && mActiveSubtab[iSection] == 1)
-			{
-				mApplySubtab.Clear(engine::SectionFlag(iSection));
-			}
-			if (!(mApplySubtab & engine::SectionFlag(iSection)))
-			{
-				mActiveSubtab[iSection] = 1;
-			}
-
 			WrapperSeparatorText("Size");
 			WrapperSlider("Width",           iSection, 1.0f, "Player Particle Width");
 			WrapperSlider("Length",          iSection, 1.0f, "Player Particle Length");
@@ -133,17 +115,8 @@ void TweaksScreen::RenderParticlesSection()
 			ImGui::EndTabItem();
 		}
 
-		if (ImGui::BeginTabItem("Spaceship", nullptr, ((mApplySubtab & engine::SectionFlag(iSection)) && mActiveSubtab[iSection] == 2) ? ImGuiTabItemFlags_SetSelected : 0))
+		if (BeginSubtab("Spaceship", iSection, 2))
 		{
-			if ((mApplySubtab & engine::SectionFlag(iSection)) && mActiveSubtab[iSection] == 2)
-			{
-				mApplySubtab.Clear(engine::SectionFlag(iSection));
-			}
-			if (!(mApplySubtab & engine::SectionFlag(iSection)))
-			{
-				mActiveSubtab[iSection] = 2;
-			}
-
 			WrapperSeparatorText("Size");
 			WrapperSlider("Width",           iSection, 1.0f, "Spaceship Particle Width");
 			WrapperSlider("Length",          iSection, 1.0f, "Spaceship Particle Length");

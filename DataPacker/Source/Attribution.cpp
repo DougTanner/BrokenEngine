@@ -124,17 +124,18 @@ std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<std::fil
 	return licenseFiles;
 }
 
-void AppendPendingCopy(std::vector<PendingCopy>& rPendingCopies, const std::filesystem::path& rSourceFile, const std::filesystem::path& rDestination, std::string_view libraryName)
-{
-	if (!std::filesystem::exists(rDestination) || std::filesystem::last_write_time(rSourceFile) > std::filesystem::last_write_time(rDestination))
-	{
-		rPendingCopies.push_back({.source = rSourceFile, .destination = rDestination, .libraryName = std::string(libraryName)});
-	}
-}
-
 std::vector<PendingCopy> BuildPendingCopies(const std::filesystem::path& rThirdPartyDirectory, const std::filesystem::path& rAttributionDirectory)
 {
 	std::vector<PendingCopy> pendingCopies;
+
+	auto AddPendingCopy = [&pendingCopies](const std::filesystem::path& rSourceFile, const std::filesystem::path& rDestination, std::string_view libraryName)
+	{
+		if (!std::filesystem::exists(rDestination) || std::filesystem::last_write_time(rSourceFile) > std::filesystem::last_write_time(rDestination))
+		{
+			pendingCopies.push_back({.source = rSourceFile, .destination = rDestination, .libraryName = std::string(libraryName)});
+		}
+	};
+
 	std::vector<std::filesystem::directory_entry> libraries = DiscoverLibraries(rThirdPartyDirectory);
 	for (const std::filesystem::directory_entry& rDirectoryEntry : libraries)
 	{
@@ -158,7 +159,7 @@ std::vector<PendingCopy> BuildPendingCopies(const std::filesystem::path& rThirdP
 		std::vector<std::filesystem::path> licenseFiles = SelectLicenseFiles(files);
 		for (const std::filesystem::path& rLicenseFile : licenseFiles)
 		{
-			AppendPendingCopy(pendingCopies, rLicenseFile, libraryAttributionDirectory / rLicenseFile.filename(), libraryName);
+			AddPendingCopy(rLicenseFile, libraryAttributionDirectory / rLicenseFile.filename(), libraryName);
 		}
 	}
 	return pendingCopies;

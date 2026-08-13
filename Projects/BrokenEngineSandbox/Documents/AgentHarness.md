@@ -12,7 +12,10 @@ $ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
 $ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
 $TempDir = Join-Path $ROOT 'Temp'
 New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
+$AppDataRoot = Join-Path $TempDir 'AppData'
+New-Item -ItemType Directory -Force -Path $AppDataRoot | Out-Null
 $QuotedData = '"' + $GameDataDirectory + '"'
+$QuotedAppData = '"' + $AppDataRoot + '"'
 $ServerLog = Join-Path $TempDir 'server-agent.log'
 $ClientLog = Join-Path $TempDir 'client-agent.log'
 $ServerPid = $null
@@ -20,13 +23,17 @@ $ClientPid = $null
 
 $ServerProcess = Start-Process -FilePath $ServerExe -ArgumentList @(
 	'--agent-port', '27100', '--loopback-only', '--data-directory', $QuotedData,
+	'--app-data-directory', $QuotedAppData,
 	'--log-file', ('"' + $ServerLog + '"')) -WindowStyle Hidden -PassThru
 $ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @(
 	'--agent-port', '27101', '--loopback-only', '--data-directory', $QuotedData,
+	'--app-data-directory', $QuotedAppData,
 	'--windowed', '1600x900', '--log-file', ('"' + $ClientLog + '"')) -WindowStyle Hidden -PassThru
 $ServerPid = $ServerProcess.Id
 $ClientPid = $ClientProcess.Id
 ```
+
+Both processes share one `$AppDataRoot`, so saves, settings, caches, and replay artifacts land under this worktree instead of the per-user AppData folder, each process in its own `game::kGameName` child. Crash reports are the exception: the crash handler resolves its own path and still writes them to the shared per-user roaming AppData folder, so they are not isolated per worktree. A fresh root has no autosave and cold `pipeline.cache`/`BrdfLut.cache`, so the first launch after creating it is slower. The stopped-server AppData recipe below reads and backs up from `$AppDataRoot\Broken Engine Sandbox Server`, not `%APPDATA%`.
 
 After both generic deadline-limited `Wait-HarnessPing.ps1` readiness checks succeed (server port `27100`, then client port `27101`), restore the minimized agent-mode client and require a successful response confirming `result.minimized:false` before relying on Debug/Profile UI auto-connect:
 
@@ -105,7 +112,7 @@ G. Abort an injected start failure: `reset`, pause, arm `replay_inject_persisten
 
 #### Replay manifest v3 integrity matrix
 
-This is a stopped-server AppData test, not an agent command. Produce the valid multi-coordinate fixture above and prove one loop. Stop/release the server, back up the complete `F7.replay.manifest`, `.grid`, `.meta`, and every coord sibling; restore the backup before each change and relaunch. The v3 manifest is fixed-width little-endian: version, initial tick, activation count and `(activationTick,x,y)` records; a `hasFullFrames` byte; inventory count and ordered `(kind,coordKey,byteCount,sha256[32])` entries; then the 32-byte generation digest. Kinds are grid/meta/header/frames/checksums/fullframes = 0..5. The SHA-256 preimage is, in order, the four little-endian length bytes `2B 00 00 00`, the 43 bytes of `broken-engine/replay-manifest-generation/v3` without a NUL, then the exact manifest semantic payload bytes from version through inventory.
+This is a stopped-server AppData test, not an agent command. Produce the valid multi-coordinate fixture above and prove one loop. Stop/release the server, back up the complete `F7.replay.manifest`, `.grid`, `.meta`, and every coord sibling from `$AppDataRoot\Broken Engine Sandbox Server`; restore the backup before each change and relaunch. The v3 manifest is fixed-width little-endian: version, initial tick, activation count and `(activationTick,x,y)` records; a `hasFullFrames` byte; inventory count and ordered `(kind,coordKey,byteCount,sha256[32])` entries; then the 32-byte generation digest. Kinds are grid/meta/header/frames/checksums/fullframes = 0..5. The SHA-256 preimage is, in order, the four little-endian length bytes `2B 00 00 00`, the 43 bytes of `broken-engine/replay-manifest-generation/v3` without a NUL, then the exact manifest semantic payload bytes from version through inventory.
 
 For every rejection case, pause immediately after relaunch, record `status.activeCoords` and the live ID state, send `replay_play`, and require `status.replaying:false` with unchanged live state (no adoption). Corruption cases require a new `SaveLoadReplay aborted: corrupt replay data:` line.
 

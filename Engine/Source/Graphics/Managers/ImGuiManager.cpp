@@ -25,6 +25,9 @@ namespace engine
 namespace
 {
 
+// Keep integer-truncated ImGui geometry fields at least one pixel; WindowBorderHoverPadding is 4px by default.
+constexpr float kfMinimumStyleGeometryFactor = 0.25f;
+
 // Base hues per UiTheme; ApplyThemeColors derives the full ImGuiStyle::Colors[] set from these (designer-pass placeholders)
 struct ThemePalette
 {
@@ -220,7 +223,7 @@ void ImGuiManager::SetupThemeGeometry(float fUiScale)
 	rStyle.GrabMinSize = 12.0f;
 
 	// Scale UI element sizes to 2x at the 4K reference, times the resolution scale
-	rStyle.ScaleAllSizes(2.0f * fUiScale);
+	rStyle.ScaleAllSizes(std::max(kfMinimumStyleGeometryFactor, 2.0f * fUiScale));
 }
 
 void ImGuiManager::ApplyThemeColors(UiTheme eTheme)

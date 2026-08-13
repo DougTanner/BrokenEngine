@@ -468,6 +468,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameStaticData.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameUtils.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>

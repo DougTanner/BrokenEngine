@@ -39,7 +39,13 @@ invent a second scale factor.
 
 Scale is applied in three stacked, non-overlapping layers:
   - Style geometry (padding, spacing, rounding, ~35 fields) is pre-scaled once
-    per resolution change by SetupThemeGeometry via ScaleAllSizes(2.0f * fUiScale).
+    per resolution change by SetupThemeGeometry via
+    ScaleAllSizes(std::max(kfMinimumStyleGeometryFactor, 2.0f * fUiScale)).
+    At positive framebuffer heights below 270 pixels, the 0.25 style-geometry
+    floor keeps ImGui's integer-truncated WindowBorderHoverPadding and
+    WindowMinSize valid; mfUiScale, FontScaleDpi, and engine::UiScale() follow
+    the framebuffer height. At zero height, constructor and resize guards
+    retain the default or previous scale rather than collapsing it to zero.
   - Menu text is scaled by pushing a dynamic font sized off FontSizeBase, via
     ScopedMenuFont / kfMenuUiScale (2.0). Raw pixel constants multiply UiScale()
     at their use site.
@@ -66,9 +72,11 @@ player-menu scale exceptions.
 
 Files:
   Engine/Source/Graphics/Managers/ImGuiManager.cpp         Noto Sans SC Light default font load
-  Engine/Source/Graphics/Managers/ImGuiManager.h:110    inline constexpr float kfUiReferenceHeight = 2160.0f;
-  Engine/Source/Graphics/Managers/ImGuiManager.h:113    inline float UiScale()
-  Engine/Source/Graphics/Managers/ImGuiManager.cpp:221  rStyle.ScaleAllSizes(2.0f * fUiScale);
+  Engine/Source/Graphics/Managers/ImGuiManager.h:112    inline constexpr float kfUiReferenceHeight = 2160.0f;
+  Engine/Source/Graphics/Managers/ImGuiManager.h:115    inline float UiScale()
+  Engine/Source/Graphics/Managers/ImGuiManager.cpp:29   kfMinimumStyleGeometryFactor = 0.25f;
+  Engine/Source/Graphics/Managers/ImGuiManager.cpp:194  ImGuiManager::SetupThemeGeometry (style geometry and scale floor)
+  Engine/Source/Graphics/Managers/ImGuiManager.cpp:226  rStyle.ScaleAllSizes(std::max(kfMinimumStyleGeometryFactor, 2.0f * fUiScale));
   Projects/BrokenEngineSandbox/Source/Ui/Screens/MenuUtils.h:7   inline constexpr float kfMenuUiScale = 2.0f;
   Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase.cpp:28  static constexpr float kfUiScale = 1.5f;  (sanctioned exception)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/MenuUtils.h

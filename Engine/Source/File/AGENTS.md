@@ -5,6 +5,7 @@
 ## File Contracts
 
 - Asset data comes from the validated absolute `--data-directory` or the executable-sibling `Data` directory; the process working directory never selects assets. Client and server launches must use the same data root.
+- The AppData root comes from the validated absolute `--app-data-directory`, or from the roaming per-user AppData folder when the option is absent — and, when that folder cannot be resolved, from a logged `kError` fallback to a working-directory-relative path; `game::kGameName` names the client and server child beneath either root, so one supplied root still keeps the two processes in separate directories.
 - Versioned files share `WriteVersionHeader` / `ReadAndValidateVersionHeader`. Raw trivially-copyable payloads validate size; streamed payload types own their serialization. Change an on-disk layout and its owning version together.
 - One-shot writes are atomic through a sibling temporary and rename. Direct write streams opt out only with `kStreaming`; backup failure is reported but does not weaken the atomic main-file write.
 

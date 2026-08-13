@@ -68,6 +68,18 @@ candidate step's guarantees that it stages only authorized current changes,
 keeps unrelated state intact, and leaves already committed session work for the
 approval-preparation squash.
 
+## Coordination
+`Documents/Plans/Agents/CodexReviewMetricsCompareSandbox.md` edits the same
+`.agents/skills/finalize-changes/SKILL.md` normal-workflow and recovery prose,
+the same `references/scripts.md` contract list including the candidate-commit
+entry at `:9-12`, and — under its Defect F — the same
+`Invoke-FinalizeCandidateCommit.ps1`. It also owns approval preparation's commit
+message source, which this Plan does not touch. The two edits to the shared
+script are disjoint by construction: this Plan owns the literal authorized-path
+validation and the `-OwnedPaths` contract, that Plan owns only the
+`Assert-OwnedNotMixed` blocker message text at `:34`. Whichever lands second
+rebases onto the first and re-reads those regions before editing.
+
 ## Acceptance criteria
 - The documented resumed candidate-commit invocation states whether
   `-OwnedPaths` contains only current dirty authorized paths or the session's

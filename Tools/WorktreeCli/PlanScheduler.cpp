@@ -13,6 +13,9 @@ namespace toolcli
 	namespace
 	{
 		constexpr uint64_t kClaimLifetimeTicks = 48ull * 60ull * 60ull * 10'000'000ull;
+		// Scheduler changes queue behind peer sessions, so the guard waits far longer than the
+		// Guard default; deliberately separate from the build lock's wait.
+		constexpr int64_t kiSchedulerGuardWaitSeconds = 500;
 
 		struct Arguments
 		{
@@ -510,10 +513,11 @@ namespace toolcli
 			{
 				return Failure("storage-failed");
 			}
-			coordination::Guard guard(guardPath);
+			coordination::Guard guard(guardPath, kiSchedulerGuardWaitSeconds * 1'000, 10'000);
 			if (!guard.IsValid())
 			{
-				return Failure("busy", kiExitStateConflict);
+				// Only contention is a state conflict; anything else means the lock file itself is unusable.
+				return guard.ContentionObserved() ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
 			}
 			if (!requestedPlan.empty() && plans.find(requestedPlan) == plans.end())
 			{
@@ -683,10 +687,11 @@ namespace toolcli
 			{
 				return Failure("storage-failed");
 			}
-			coordination::Guard guard(guardPath);
+			coordination::Guard guard(guardPath, kiSchedulerGuardWaitSeconds * 1'000, 10'000);
 			if (!guard.IsValid())
 			{
-				return Failure("busy", kiExitStateConflict);
+				// Only contention is a state conflict; anything else means the lock file itself is unusable.
+				return guard.ContentionObserved() ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
 			}
 			const std::optional<std::wstring> primaryWorktree = coordination::CanonicalizeDirectoryPath(rArguments.primaryWorktree);
 			const std::optional<std::string> worktreeBranch = ResolveGitBranch(worktree);
@@ -798,10 +803,11 @@ namespace toolcli
 			{
 				return Failure("storage-failed");
 			}
-			coordination::Guard guard(guardPath);
+			coordination::Guard guard(guardPath, kiSchedulerGuardWaitSeconds * 1'000, 10'000);
 			if (!guard.IsValid())
 			{
-				return Failure("busy", kiExitStateConflict);
+				// Only contention is a state conflict; anything else means the lock file itself is unusable.
+				return guard.ContentionObserved() ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
 			}
 			std::wstring plan; Claim claim; bool bFound = false;
 			if (!FindSessionClaim(root, repo, rArguments, plan, claim, bFound))
@@ -835,10 +841,11 @@ namespace toolcli
 			{
 				return Failure("storage-failed");
 			}
-			coordination::Guard guard(guardPath);
+			coordination::Guard guard(guardPath, kiSchedulerGuardWaitSeconds * 1'000, 10'000);
 			if (!guard.IsValid())
 			{
-				return Failure("busy", kiExitStateConflict);
+				// Only contention is a state conflict; anything else means the lock file itself is unusable.
+				return guard.ContentionObserved() ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
 			}
 			std::wstring plan; Claim claim; bool bFound = false;
 			if (!FindSessionClaim(root, repo, rArguments, plan, claim, bFound))
@@ -904,10 +911,11 @@ namespace toolcli
 			{
 				return Failure("storage-failed");
 			}
-			coordination::Guard guard(guardPath);
+			coordination::Guard guard(guardPath, kiSchedulerGuardWaitSeconds * 1'000, 10'000);
 			if (!guard.IsValid())
 			{
-				return Failure("busy", kiExitStateConflict);
+				// Only contention is a state conflict; anything else means the lock file itself is unusable.
+				return guard.ContentionObserved() ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
 			}
 			std::wstring target; Claim claim; bool bFound = false;
 			if (!FindSessionClaim(root, repo, rArguments, target, claim, bFound))

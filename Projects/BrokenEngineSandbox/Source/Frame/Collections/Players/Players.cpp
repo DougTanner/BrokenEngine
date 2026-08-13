@@ -230,10 +230,10 @@ void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[may
 		{
 			return (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
 		},
-		[&](int64_t& ri)
+		[&](int64_t i)
 		{
-			engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[ri]);
-			engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.puiIds[ri], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+			engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
+			engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.puiIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 		});
 }
 

@@ -134,16 +134,15 @@ void RemoveIndexableElementAndClearHandle(TInterpolate& rInterpolate, TPostRende
 	rId = {};
 }
 
-// Removes element at index from paired collections using swap-and-pop.
-// Handles SwapElement on both collections, count decrement, and loop index adjustment.
+// Removes element at index from paired collections using swap-and-pop: the last row moves into index i, so
+// the row now at i has not been visited by a forward walk. Iteration state stays the caller's to adjust.
 template <typename TInterpolate, typename TPostRender, typename TInterpolateTuple, typename TPostRenderTuple>
-void DestroyElement(TInterpolate& rInterpolate, TPostRender& rPostRender, int64_t& i, TInterpolateTuple&& interpolateTuple, TPostRenderTuple&& postRenderTuple)
+void DestroyElement(TInterpolate& rInterpolate, TPostRender& rPostRender, int64_t i, TInterpolateTuple&& interpolateTuple, TPostRenderTuple&& postRenderTuple)
 {
 	if (rInterpolate.iCount - 1 > i) [[likely]]
 	{
 		SwapElement(rInterpolate, i, std::forward<TInterpolateTuple>(interpolateTuple));
 		SwapElement(rPostRender, i, std::forward<TPostRenderTuple>(postRenderTuple));
-		--i;
 	}
 	--rInterpolate.iCount;
 	--rPostRender.iCount;

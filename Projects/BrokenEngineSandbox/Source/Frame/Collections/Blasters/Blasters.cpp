@@ -225,11 +225,11 @@ void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		{
 			return rCurrentPostRender.pFlags[i] & kDestroy;
 		},
-		[&](int64_t& ri)
+		[&](int64_t i)
 		{
-			RemoveOwnedObjects(rFrame, rCurrentInterpolate, ri);
+			RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
 
-			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, ri, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 		});
 }
 

@@ -89,7 +89,6 @@ inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-ar
 // Set by CreateLightingTextures and by Camera on every frame with outward live-eye movement. PopulateLightingParameters
 // consumes it to force pure-current output and re-seed history; any lighting refresh cadence must refresh while it is pending.
 inline bool gbLightingTemporalReset = false;
-inline int64_t giLightingDepositInstances = 0; // Light-deposit quads this frame, reset and accumulated by the deposit EndRender writers; refreshes always process the spread chain so empty deposits publish fresh zeroes.
 void RenderLightingGlobal(int64_t iCommandBuffer);
 void RenderLightingMain(int64_t iCommandBuffer);
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer);
