@@ -192,10 +192,9 @@ public:
 	// time-scaling without each one re-deriving the delta.
 	float mfLastDeltaTime = 0.0f;
 #if defined(BT_CLIENT)
-	// Wall-clock seconds elapsed since the previous render frame. Cached here so display-rate consumers
-	// (Camera blend / shake decay / mfTime) drive off the same wall-clock measurement that the player
-	// interpolation alpha uses — otherwise a vsync miss makes the player advance by 2x the wall delta
-	// while the camera advances by a fixed 1/refreshRate, producing visible relative stutter at high zoom.
+	// Sim-scaled seconds elapsed since the previous render frame: wall delta multiplied by the active time
+	// ratio (equal to wall time at ratio 1.0). Cached here so render-rate consumers share the render clock's
+	// delta; camera blend / shake decay / mfTime and visual-error-offset decay use the same timing units.
 	double mfLastRenderFrameSeconds = 0.0;
 #endif // BT_CLIENT
 	std::unordered_map<GridCoord, CoordFrames> mCoordFrames;
@@ -211,6 +210,7 @@ protected:
 
 	void PrepareActiveSet();
 #if defined(BT_SERVER)
+	void RefreshReplayActiveSet();
 	void SwapFrames();
 	void BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveCoords);
 	void FinalizeFrameTick();

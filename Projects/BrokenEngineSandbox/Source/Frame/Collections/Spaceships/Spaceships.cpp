@@ -379,7 +379,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
-	const FrameBounds bounds = ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{
@@ -405,7 +405,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 			},
 			.iPushedTick = rFrame.interpolate.iTick,
 		};
-		ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
+		engine::ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
 
 		// Heap realloc warning: capacity exceeded during burst transfers. Expected max ~1-2/tick
 		// per source frame — anything higher suggests entities are re-flagging kTransfer across
@@ -443,17 +443,17 @@ void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
-	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
-	{
-		if (!(rCurrentPostRender.pFlags[i] & kExploding) || rCurrentInterpolate.pfDestroyedTimes[i] > 0.0f) [[likely]]
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender,
+		[&](int64_t i)
 		{
-			continue;
-		}
+			return (rCurrentPostRender.pFlags[i] & kExploding) && !(rCurrentInterpolate.pfDestroyedTimes[i] > 0.0f);
+		},
+		[&](int64_t& ri)
+		{
+			RemoveOwnedObjects(rFrame, rCurrentInterpolate, ri, false);
 
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, false);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-	}
+			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, ri, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+		});
 }
 
 void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)

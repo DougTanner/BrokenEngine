@@ -68,7 +68,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
-	const FrameBounds bounds = ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
 
 	// Reverse iteration for swap-and-pop safety with RemoveIndexableElement
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
@@ -108,7 +108,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		request.data.uiPendingWeaponModeTicks = rCurrentPostRender.puiPendingWeaponModeTicks[i];
 		request.data.uiClientGuidHigh = rCurrentPostRender.pClientGuids[i].uiHigh;
 		request.data.uiClientGuidLow = rCurrentPostRender.pClientGuids[i].uiLow;
-		ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
+		engine::ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
 
 		// Heap realloc warning: capacity exceeded during burst transfers. Expected max ~1-2/tick
 		// per source frame — anything higher suggests entities are re-flagging kTransfer across
@@ -432,16 +432,16 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		switch (riNavDirection)
 		{
 			case 0:
-				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(0.0f, Frame::kfCellHeight, 0.0f, 0.0f));
+				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(0.0f, engine::kfCellHeight, 0.0f, 0.0f));
 				break;
 			case 1:
-				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(0.0f, -Frame::kfCellHeight, 0.0f, 0.0f));
+				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(0.0f, -engine::kfCellHeight, 0.0f, 0.0f));
 				break;
 			case 2:
-				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(Frame::kfCellWidth, 0.0f, 0.0f, 0.0f));
+				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(engine::kfCellWidth, 0.0f, 0.0f, 0.0f));
 				break;
 			case 3:
-				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(-Frame::kfCellWidth, 0.0f, 0.0f, 0.0f));
+				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(-engine::kfCellWidth, 0.0f, 0.0f, 0.0f));
 				break;
 			default:
 				break;

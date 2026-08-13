@@ -148,6 +148,8 @@ void SpaceshipsPostRender::ApplyTerrainBounce(const engine::FrameStaticData& rSt
 		float fDirectionTerrainCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], vecTerrainNormal));
 		rfDeltaRotation = fDirectionTerrainCrossZ > 0.0f ? kfSpaceshipTerrainBounceRotation : -kfSpaceshipTerrainBounceRotation;
 
+		// Velocity W stays exactly 0 only because vecTerrainNormal's W is exactly 0 (XMVector3Cross zeroes it in
+		// IslandTerrain::NormalFromElevation); a normal from another source would drift the velocity W lane.
 		rVecVelocity = XMVector3Reflect(rVecVelocity, vecTerrainNormal);
 		rVecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * kfSpaceshipTerrainBounceVelocity), vecTerrainNormal, rVecVelocity);
 	}

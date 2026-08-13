@@ -99,6 +99,74 @@ nlohmann::json BuildFullStateFixtureState()
 	return result;
 }
 
+// Drives the matching-tick injection case: contiguous updates make the pending full-state tick the
+// replay endpoint, so the injected frame must end up as the committed ring head. rbClockForced
+// reports whether the client clock was moved before a throw, which decides whether the caller can
+// leave the fixture armed for a retry.
+void ExerciseFullStateMatchingTick(engine::GridCoord coord, nlohmann::json& rResult, bool& rbClockForced)
+{
+	auto coordIt = gpGame->mCoordFrames.find(coord);
+	if (coordIt == gpGame->mCoordFrames.end() || !coordIt->second.pendingFullState.has_value())
+	{
+		throw std::runtime_error("client_full_state_fixture requires a received pending full state");
+	}
+
+	engine::CoordFrames& rFrames = coordIt->second;
+	const int64_t iPendingTick = rFrames.pendingFullState->iTick;
+	const int64_t iDeferTargetTick = gpGame->TickCounter();
+	if (iPendingTick <= iDeferTargetTick)
+	{
+		throw std::runtime_error("client_full_state_fixture requires a pending full state ahead of client tick");
+	}
+
+	nlohmann::json beforeDefer = BuildFullStateFixtureCoordState(coord);
+	ReconcileDesyncInfo deferDesync = gpClientSession->mpReconciler->Run();
+	bool bPendingPreserved = rFrames.pendingFullState.has_value() && rFrames.pendingFullState->iTick == iPendingTick;
+	nlohmann::json afterDefer = BuildFullStateFixtureCoordState(coord);
+	if (!bPendingPreserved)
+	{
+		throw std::runtime_error("future pending full state was not deferred");
+	}
+
+	// A gap before the pending tick would route to direct adoption instead; the caller retries once
+	// the missing updates arrive.
+	for (int64_t iTick = rFrames.iConfirmedTick + 1; iTick <= iPendingTick; ++iTick)
+	{
+		if (!rFrames.serverUpdates.contains(iTick))
+		{
+			throw std::runtime_error("client_full_state_fixture requires contiguous server updates through the pending full state tick");
+		}
+	}
+
+	const float fPendingTime = rFrames.pendingFullState->pFrame->interpolate.fCurrentTime;
+	rbClockForced = true;
+	gpGame->SetTickCounter(iPendingTick);
+	gpGame->SetCurrentTime(fPendingTime);
+	gpGame->mTimeStep.ClearAccumulator();
+	ReconcileDesyncInfo injectionDesync = gpClientSession->mpReconciler->Run();
+
+	nlohmann::json afterInjection = BuildFullStateFixtureCoordState(coord);
+	bool bPendingCleared = !rFrames.pendingFullState.has_value();
+	int64_t iHeadTick = -1;
+	if (rFrames.iSnapshotCount > 0 && rFrames.snapshots[rFrames.iSnapshotHead] != nullptr)
+	{
+		iHeadTick = rFrames.snapshots[rFrames.iSnapshotHead]->interpolate.iTick;
+	}
+
+	rResult["pendingTick"] = iPendingTick;
+	rResult["deferTargetTick"] = iDeferTargetTick;
+	rResult["beforeDefer"] = std::move(beforeDefer);
+	rResult["afterDefer"] = std::move(afterDefer);
+	rResult["deferPendingPreserved"] = bPendingPreserved;
+	rResult["deferDesync"] = deferDesync.bDesync;
+	rResult["injectionDesync"] = injectionDesync.bDesync;
+	rResult["afterInjection"] = std::move(afterInjection);
+	rResult["pendingCleared"] = bPendingCleared;
+	rResult["headTick"] = iHeadTick;
+	rResult["confirmedTick"] = rFrames.iConfirmedTick;
+	rResult["confirmedOffset"] = rFrames.iConfirmedOffset;
+}
+
 void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!engine::PhysicalInputSuppressed())
@@ -159,9 +227,31 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		rResult = BuildFullStateFixtureState();
 		return;
 	}
+	if (action == "exercise_matching_tick")
+	{
+		bool bClockForced = false;
+		try
+		{
+			ExerciseFullStateMatchingTick(rDesyncManager.GetAgentFullStateFixtureCoord(), rResult, bClockForced);
+		}
+		catch (...)
+		{
+			// A precondition failure leaves the client untouched apart from reconciles it would run
+			// anyway, so keep the fixture armed and let the caller retry; 'clear' still releases it.
+			if (bClockForced)
+			{
+				rDesyncManager.ClearAgentFullStateFixture();
+			}
+			throw;
+		}
+
+		rDesyncManager.ClearAgentFullStateFixture();
+		rResult["cleared"] = true;
+		return;
+	}
 	if (action != "exercise_gap")
 	{
-		throw std::runtime_error("client_full_state_fixture 'action' must be arm_stall|inspect|exercise_gap|clear");
+		throw std::runtime_error("client_full_state_fixture 'action' must be arm_stall|inspect|exercise_gap|exercise_matching_tick|clear");
 	}
 
 	try
@@ -1244,8 +1334,9 @@ void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 	{
 		script.iWheelNotches = rParams.contains("notches") ? static_cast<int32_t>(rParams.at("notches").get<int64_t>()) : 1;
 
-		// Optional target coords: both present routes the ImGui wheel to the window under (x,y); neither leaves the
-		// previous pin in place. Either way the camera also zooms unless that hovered window can actually scroll.
+		// Optional target coords: both present routes the ImGui wheel to the window under (x,y); neither supplies a new
+		// ImGui target or preserves a pin from an earlier script. Either way the camera also zooms unless that hovered
+		// window can actually scroll.
 		bool bHasX = rParams.contains("x");
 		bool bHasY = rParams.contains("y");
 		if (bHasX != bHasY)

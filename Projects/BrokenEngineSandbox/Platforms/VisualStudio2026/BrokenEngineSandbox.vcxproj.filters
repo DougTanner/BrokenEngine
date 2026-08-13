@@ -678,9 +678,6 @@
     <ClInclude Include="$(GameDataDirectory)\Audio.h">
       <Filter>DataFiles</Filter>
     </ClInclude>
-    <ClInclude Include="$(GameDataDirectory)\Font.h">
-      <Filter>DataFiles</Filter>
-    </ClInclude>
     <ClInclude Include="$(GameDataDirectory)\Scene.h">
       <Filter>DataFiles</Filter>
     </ClInclude>

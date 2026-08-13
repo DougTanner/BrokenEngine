@@ -225,14 +225,16 @@ void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[may
 	}
 
 	// Remove dead players (reverse iteration for swap-and-pop safety)
-	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
-	{
-		if ((rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f)
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender,
+		[&](int64_t i)
 		{
-			engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
-			engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.puiIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-		}
-	}
+			return (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
+		},
+		[&](int64_t& ri)
+		{
+			engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[ri]);
+			engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.puiIds[ri], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+		});
 }
 
 static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
@@ -288,7 +290,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			float fCenterY = (XMVectorGetW(rStaticData.vecArea) + XMVectorGetY(rStaticData.vecArea)) * 0.5f;
 
 			XMVECTOR vecSpawnPosition = XMVectorSet(fCenterX + 45.0f, fCenterY + (-12.0f), engine::gBaseHeight.Get(), 1.0f);
-			ASSERT(!IsOutOfBounds(ComputeFrameBounds(rStaticData.vecArea), vecSpawnPosition));
+			ASSERT(!engine::IsOutOfBounds(engine::ComputeFrameBounds(rStaticData.vecArea), vecSpawnPosition));
 
 			PlayersPostRender::Spawn(rFrame,
 			{

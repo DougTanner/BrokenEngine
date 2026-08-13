@@ -249,10 +249,10 @@ namespace
 // Grid cell containing a world position, matching GlobalElevation/GlobalNormal's cell mapping.
 GridCoord CoordFromPosition(const XMFLOAT4A& f4Position)
 {
-	static constexpr float fCellWidth = game::Frame::kfCellWidth;
-	static constexpr float fCellHeight = game::Frame::kfCellHeight;
-	static constexpr float fCellMinX = game::Frame::kfBaseAreaMinX;
-	static constexpr float fCellMinY = game::Frame::kfBaseAreaMinY;
+	static constexpr float fCellWidth = kfCellWidth;
+	static constexpr float fCellHeight = kfCellHeight;
+	static constexpr float fCellMinX = kfBaseAreaMinX;
+	static constexpr float fCellMinY = kfBaseAreaMinY;
 
 	int32_t iGridX = static_cast<int32_t>(std::floor((f4Position.x - fCellMinX) / fCellWidth));
 	int32_t iGridY = static_cast<int32_t>(std::floor((f4Position.y - fCellMinY) / fCellHeight));
@@ -421,9 +421,9 @@ namespace
 // corner in world space.
 void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, float fCellOriginX, float fCellOriginY, std::vector<float>& rOutGrid)
 {
-	static constexpr int64_t kiDim = game::Frame::kiElevationGridDim;
-	static constexpr float fCellWidth = game::Frame::kfCellWidth;
-	static constexpr float fCellHeight = game::Frame::kfCellHeight;
+	static constexpr int64_t kiDim = kiElevationGridDim;
+	static constexpr float fCellWidth = kfCellWidth;
+	static constexpr float fCellHeight = kfCellHeight;
 	static constexpr float fGridPitchX = fCellWidth / static_cast<float>(kiDim);
 	static constexpr float fGridPitchY = fCellHeight / static_cast<float>(kiDim);
 
@@ -487,11 +487,11 @@ void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTempl
 
 void XM_CALLCONV IslandTerrain::BuildElevationGrid(GridCoord coord, const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const
 {
-	static constexpr int64_t kiDim = game::Frame::kiElevationGridDim;
-	static constexpr float fCellWidth = game::Frame::kfCellWidth;
-	static constexpr float fCellHeight = game::Frame::kfCellHeight;
-	static constexpr float fCellMinX = game::Frame::kfBaseAreaMinX;
-	static constexpr float fCellMinY = game::Frame::kfBaseAreaMinY;
+	static constexpr int64_t kiDim = kiElevationGridDim;
+	static constexpr float fCellWidth = kfCellWidth;
+	static constexpr float fCellHeight = kfCellHeight;
+	static constexpr float fCellMinX = kfBaseAreaMinX;
+	static constexpr float fCellMinY = kfBaseAreaMinY;
 
 	// Sea floor everywhere first; each placement then max-blends its footprint over the top
 	// (commutative max → splat order doesn't matter, matches GlobalElevation's per-point semantics).
@@ -509,10 +509,10 @@ void XM_CALLCONV IslandTerrain::BuildElevationGrid(GridCoord coord, const std::v
 
 FrameElevationSampler XM_CALLCONV IslandTerrain::MakeFrameElevationSampler(const FrameStaticData& rStaticData) const
 {
-	static constexpr float fCellWidth = game::Frame::kfCellWidth;
-	static constexpr float fCellHeight = game::Frame::kfCellHeight;
-	static constexpr float fCellMinX = game::Frame::kfBaseAreaMinX;
-	static constexpr float fCellMinY = game::Frame::kfBaseAreaMinY;
+	static constexpr float fCellWidth = kfCellWidth;
+	static constexpr float fCellHeight = kfCellHeight;
+	static constexpr float fCellMinX = kfBaseAreaMinX;
+	static constexpr float fCellMinY = kfBaseAreaMinY;
 
 	FrameElevationSampler sampler;
 	sampler.fSeaFloor = mfSeaFloorElevation;
@@ -542,9 +542,9 @@ float XM_CALLCONV FrameElevationSampler::Sample(FXMVECTOR vecPosition) const
 		return fSeaFloor;
 	}
 
-	static constexpr int64_t kiDim = game::Frame::kiElevationGridDim;
-	static constexpr float fCellWidth = game::Frame::kfCellWidth;
-	static constexpr float fCellHeight = game::Frame::kfCellHeight;
+	static constexpr int64_t kiDim = kiElevationGridDim;
+	static constexpr float fCellWidth = kfCellWidth;
+	static constexpr float fCellHeight = kfCellHeight;
 	static constexpr float fGridPitchX = fCellWidth / static_cast<float>(kiDim);
 	static constexpr float fGridPitchY = fCellHeight / static_cast<float>(kiDim);
 

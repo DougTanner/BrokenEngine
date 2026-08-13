@@ -779,6 +779,7 @@ void GameSaveLoad::SaveLoadReplay()
 				// relatches playback.
 				mReplayTransferCaptureInfo = {
 					.iRecordingEventTick = recordingCaptureInfo.iRecordingEventTick,
+					.iPlaybackEventTick = recordingCaptureInfo.iPlaybackEventTick,
 					.iWriterInputTick = recordingCaptureInfo.iWriterInputTick,
 					.iFollowingEmptyInputTick = recordingCaptureInfo.iFollowingEmptyInputTick,
 					.iFirstWriterInputTick = recordingCaptureInfo.iFirstWriterInputTick,

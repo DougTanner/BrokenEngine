@@ -1,7 +1,6 @@
 #include "IslandChainPlacement.h"
 
 #include "Frame/IslandTerrain.h"
-#include "Frame/Frame.h"
 
 namespace engine
 {
@@ -293,21 +292,21 @@ void GenerateIslandChain(GridCoord coord, std::vector<IslandPlacement>& rOut)
 {
 	rOut.clear();
 
-	const float fCellW = game::Frame::kfCellWidth;
-	const float fCellH = game::Frame::kfCellHeight;
-	const float fCellOriginX = game::Frame::kfBaseAreaMinX + static_cast<float>(coord.x) * fCellW;
-	const float fCellMaxY = game::Frame::kfBaseAreaMaxY + static_cast<float>(coord.y) * fCellH;
+	const float fCellW = kfCellWidth;
+	const float fCellH = kfCellHeight;
+	const float fCellOriginX = kfBaseAreaMinX + static_cast<float>(coord.x) * fCellW;
+	const float fCellMaxY = kfBaseAreaMaxY + static_cast<float>(coord.y) * fCellH;
 
 	CellContext context;
 	context.fCenterWorldX = fCellOriginX + 0.5f * fCellW;
 	context.fCenterWorldY = fCellMaxY - 0.5f * fCellH;
 	context.fHalfW = 0.5f * fCellW;
 	context.fHalfH = 0.5f * fCellH;
-	context.crcRandom = common::RandomEngine(game::SeedFromGridCoord(coord, kCrcPickSeedMultiplier));
-	context.positionRandom = common::RandomEngine(game::SeedFromGridCoord(coord, kPositionSeedMultiplier));
-	context.rotationRandom = common::RandomEngine(game::SeedFromGridCoord(coord, kRotationSeedMultiplier));
-	context.anchorRandom = common::RandomEngine(game::SeedFromGridCoord(coord, kAnchorSeedMultiplier));
-	context.curveRandom = common::RandomEngine(game::SeedFromGridCoord(coord, kCurveSeedMultiplier));
+	context.crcRandom = common::RandomEngine(SeedFromGridCoord(coord, kCrcPickSeedMultiplier));
+	context.positionRandom = common::RandomEngine(SeedFromGridCoord(coord, kPositionSeedMultiplier));
+	context.rotationRandom = common::RandomEngine(SeedFromGridCoord(coord, kRotationSeedMultiplier));
+	context.anchorRandom = common::RandomEngine(SeedFromGridCoord(coord, kAnchorSeedMultiplier));
+	context.curveRandom = common::RandomEngine(SeedFromGridCoord(coord, kCurveSeedMultiplier));
 	context.pOut = &rOut;
 	context.placedHullStorage.reserve(static_cast<size_t>(kiMaxIslandsPerCell));
 	context.placedHullViews.reserve(static_cast<size_t>(kiMaxIslandsPerCell));

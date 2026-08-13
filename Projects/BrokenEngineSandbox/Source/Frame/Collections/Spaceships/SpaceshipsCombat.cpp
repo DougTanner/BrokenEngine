@@ -153,7 +153,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 		return;
 	}
 
-	const FrameBounds bounds = ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -193,7 +193,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 			}
 		}
 
-		if (!(rCurrentPostRender.pFlags[i] & kExploding) && IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
+		if (!(rCurrentPostRender.pFlags[i] & kExploding) && engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
 			// Entity candidates at or beyond frame exit were filtered during PreCollision.
 			rCurrentPostRender.pFlags[i].Set(kTransfer);

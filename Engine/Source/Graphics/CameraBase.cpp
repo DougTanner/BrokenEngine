@@ -18,7 +18,9 @@ XMVECTOR XM_CALLCONV CameraBase::ScreenToWorld(FXMVECTOR vecScreenPos, float fHe
 	vecWorldPos = XMVectorSetZ(vecWorldPos, 1.0f);
 	auto vecRayEnd = XMVector3Unproject(vecWorldPos, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity());
 
-	return XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
+	// The SDK returns all-lane QNaN when the line is parallel to the plane (a camera looking exactly along Z=fHeight).
+	XMVECTOR vecIntersect = XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
+	return XMVector3IsNaN(vecIntersect) ? XMVectorSet(0.0f, 0.0f, fHeight, 1.0f) : vecIntersect;
 }
 
 XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPos) const
@@ -27,7 +29,9 @@ XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPos) const
 	// viewport convention are resolved by construction. Returns screen pixels in X/Y, projected depth in Z.
 	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferExtent2D.width);
 	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
-	return XMVector3Project(vecWorldPos, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity());
+	// The scalar XMVector3Project overload builds its viewport offset with W=0, so the returned screen position
+	// carries W=0; force the position W invariant.
+	return XMVectorSetW(XMVector3Project(vecWorldPos, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity()), 1.0f);
 }
 
 void CameraBase::CalculateMatricesAndVisibleArea()
@@ -83,6 +87,13 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 		vecRayEnd = XMVector3Unproject(XMLoadFloat3(&f3ScreenPos), 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, matIdentity);
 
 		vecIntersectPlane = XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
+		// The SDK returns all-lane QNaN when the corner ray is parallel to the Z=0 plane; a NaN corner would
+		// poison the visible area and every grid-snapped extent derived from it.
+		if (XMVector3IsNaN(vecIntersectPlane)) [[unlikely]]
+		{
+			vecIntersectPlane = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+		}
+
 		XMStoreFloat4(rCorner.pTarget, vecIntersectPlane);
 	}
 

@@ -26,8 +26,16 @@ Every delegation supplies one self-contained brief containing:
 The session baseline is the commit a session's work is diffed against, fixed
 when the session starts. The baseline and every other machine-derivable
 identity value in a brief are copied from `Get-AgentWorktreeSessionContext`
-output in `.agents/scripts/AgentWorktreeSession.psm1`, never retyped from
-memory or scrollback.
+output, never retyped from memory or scrollback. From the session worktree
+root:
+
+```powershell
+Import-Module ./.agents/scripts/AgentWorktreeSession.psm1
+Get-AgentWorktreeSessionContext
+```
+
+The leading `./` is required — without it PowerShell treats the path as a
+module name and searches `PSModulePath` instead of the worktree.
 
 Use `none` when a field has no value. Add only fields required by the invoked
 skill. Cite repository paths; do not paste root instructions, skill bodies, the

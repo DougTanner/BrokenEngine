@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-11T00:00:16.000Z","dependsOn":["Documents/Plans/Frame/EngineOwnedFrameConstants.md","Documents/Plans/Frame/FrameUtilsSharedHelpers.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-11T00:00:16.000Z","dependsOn":[]} -->
 # Move the terrain and frame-exit traces into the engine
 
 ## Context

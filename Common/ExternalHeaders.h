@@ -156,6 +156,19 @@ inline constexpr float XM_PIDIV32 = XM_PI / 32.0f;
 inline constexpr float XM_PIDIV64 = XM_PI / 64.0f;
 inline constexpr float XM_PIDIV128 = XM_PI / 128.0f;
 
+// The SDK rotate functions return the raw quaternion product, so W is a rounding residue that only cancels
+// algebraically - it violates the repository W invariant for directions. Re-zero W exactly. The raw names are
+// poisoned below, so these wrappers must stay above those defines to keep calling the real SDK functions.
+inline XMVECTOR XM_CALLCONV XMVector3RotateSafe(FXMVECTOR V, FXMVECTOR RotationQuaternion)
+{
+	return XMVectorSetW(XMVector3Rotate(V, RotationQuaternion), 0.0f);
+}
+
+inline XMVECTOR XM_CALLCONV XMVector3InverseRotateSafe(FXMVECTOR V, FXMVECTOR RotationQuaternion)
+{
+	return XMVectorSetW(XMVector3InverseRotate(V, RotationQuaternion), 0.0f);
+}
+
 }
 using namespace DirectX;
 
@@ -424,3 +437,10 @@ inline constexpr bool XmIsInf(float fValue)
 #else
 	#define BT_OFFSETOF(type, member) offsetof(type, member)
 #endif
+
+// Poison the raw DirectXMath rotate names so first-party code has to call the W-zeroing wrappers above.
+// Must stay after every third-party include in this header: DirectXTK (Audio.h) calls XMVector3Rotate
+// itself, and ThirdParty is not ours to edit. Everything first-party sees this header through the PCH
+// before any repository header, so the poison still covers all of our own code.
+#define XMVector3Rotate Use_XMVector3RotateSafe
+#define XMVector3InverseRotate Use_XMVector3InverseRotateSafe

@@ -11,7 +11,7 @@ struct ClientSpawnInfo
 {
 	int64_t iClientId = 0;
 	engine::ClientGuid clientGuid {};
-	// Default-constructed (invalid) guid means this spawn is not fleet-triggered.
+	// Default-constructed (empty) guid means this spawn is not fleet-triggered.
 	FleetGuid fleetGuid {};
 	int64_t iMemberIndex = -1;
 };

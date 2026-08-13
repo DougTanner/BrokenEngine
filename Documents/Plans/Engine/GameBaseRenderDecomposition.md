@@ -30,7 +30,7 @@ Caveat carried from verification: do not create forwarding micro-helpers merely 
 
 - `ServerUpdate`, `ClientUpdate`, `AdvanceRenderClock`, `BuildAndDispatchFrameTicks`, and every other function (recorded residuals, not targets)
 - Any behavior, ordering, or logging change; any public signature change
-- The `mfLastRenderFrameSeconds` sim-vs-wall fix (owned by the coordinated plan below)
+- The existing sim-scaled `mfLastRenderFrameSeconds` timing contract; it must not change during this decomposition.
 
 ## Risk tier and invariants
 
@@ -41,10 +41,6 @@ Tier 2 — frame-sequencing code motion in the client render path. Invariants: f
 - No function resulting from the decomposition exceeds cyclomatic complexity ten, measured by re-running `code-quality-metrics` Snapshot on `Engine/Source/GameBase.cpp`; a cohesive whole-phase helper above ten is recorded as a residual rather than split cosmetically.
 - Client and server both compile (guard-placement check).
 - Diff review confirms pure code motion: statement order and conditions unchanged inside each moved phase.
-
-## Coordination
-
-`Documents/Plans/Engine/RenderFrameSecondsWallClock.md` edits the delta measurement and `mfLastRenderFrameSeconds` assignment inside the interpolation phase. The two plans are order-independent: whichever lands second rebases mechanically; regions are identified by symbol, not line number.
 
 ## Notes
 

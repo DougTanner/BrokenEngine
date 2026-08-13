@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-06T22:03:15.813Z","dependsOn":["Documents/Plans/DataPacker/MainOrchestrationDecomposition.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-06T22:03:15.813Z","dependsOn":[]} -->
 # Reconcile stale files out of the generated Attribution tree
 
 ## Context

@@ -69,14 +69,14 @@ void Camera::Update(const Frame& rFrame)
 
 void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 {
-	// Use the wall-clock dt the engine just measured for player interpolation. Driving camera blend,
-	// shake decay, and mfTime off the same source keeps the camera in sync with the interpolated player
-	// across vsync misses — otherwise the player advances by the actual wall delta while the camera
-	// advances by a fixed 1/refreshRate, producing visible relative stutter at high zoom.
+	// Use the sim-scaled render delta the engine just measured: wall delta multiplied by the active time
+	// ratio (equal to wall time at ratio 1.0). Driving camera blend, shake decay, and mfTime off the same
+	// source keeps the camera in sync with the interpolated player across vsync misses; otherwise different
+	// deltas would produce visible relative stutter at high zoom.
 	float fDeltaTime = static_cast<float>(gpGame->mfLastRenderFrameSeconds);
 	mfTime += fDeltaTime;
 
-	// Decay camera shake using real-time
+	// Decay camera shake using sim-scaled render time
 	mfShake = std::max(mfShake - fDeltaTime * 2.0f, 0.0f);
 
 	miFrame = rFrameInterpolate.iTick;
@@ -142,7 +142,7 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 				mLastTrackedPlayerId = focusedId;
 			}
 
-			// Compute velocity from position delta using real time
+			// Compute velocity from position delta using sim-scaled render time
 			if (mfLastKnownPlayerTime > 0.0f && mfTime > mfLastKnownPlayerTime)
 			{
 				float fElapsedTime = mfTime - mfLastKnownPlayerTime;

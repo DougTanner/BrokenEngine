@@ -555,7 +555,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			throw std::runtime_error("'source' frame is not ready");
 		}
 
-		XMVECTOR vecPosition = XMVectorSet(static_cast<float>(destination.x) * Frame::kfCellWidth, static_cast<float>(destination.y) * Frame::kfCellHeight, engine::gBaseHeight.Get(), 1.0f);
+		XMVECTOR vecPosition = XMVectorSet(static_cast<float>(destination.x) * engine::kfCellWidth, static_cast<float>(destination.y) * engine::kfCellHeight, engine::gBaseHeight.Get(), 1.0f);
 		if (eType == StatusChangeType::kTransferBlaster)
 		{
 			auto destinationIt = gpGame->mCoordFrames.find(destination);
@@ -584,7 +584,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 				for (int64_t iGridX = 0; iGridX < kiTerrainGridDim; ++iGridX)
 				{
 					XMVECTOR vecCandidate = XMVectorSet(f4Area.x + (static_cast<float>(iGridX) + 0.5f) * fPitchX, f4Area.w + (static_cast<float>(iGridY) + 0.5f) * fPitchY, engine::gBaseHeight.Get(), 1.0f);
-					XMVECTOR vecNextCandidate = XMVectorSet(XMVectorGetX(vecCandidate) + kfDeltaTime, XMVectorGetY(vecCandidate), engine::gBaseHeight.Get(), 1.0f);
+					XMVECTOR vecNextCandidate = XMVectorSet(XMVectorGetX(vecCandidate) + engine::kfDeltaTime, XMVectorGetY(vecCandidate), engine::gBaseHeight.Get(), 1.0f);
 					if (engine::gpIslandTerrain->FrameElevation(rDestinationStaticData, vecCandidate) < engine::gBaseHeight.Get() &&
 						engine::gpIslandTerrain->FrameElevation(rDestinationStaticData, vecNextCandidate) < engine::gBaseHeight.Get())
 					{

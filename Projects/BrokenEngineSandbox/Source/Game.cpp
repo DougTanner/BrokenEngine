@@ -231,8 +231,8 @@ void Game::ComputeActiveSet()
 					{
 						continue;
 					}
-					float fOffsetX = static_cast<float>(i) * Frame::kfCellWidth;
-					float fOffsetY = static_cast<float>(j) * Frame::kfCellHeight;
+					float fOffsetX = static_cast<float>(i) * engine::kfCellWidth;
+					float fOffsetY = static_cast<float>(j) * engine::kfCellHeight;
 					float fNeighborMinX = fCellMinX + fOffsetX;
 					float fNeighborMaxX = fCellMaxX + fOffsetX;
 					float fNeighborMinY = fCellMinY + fOffsetY;
@@ -375,8 +375,8 @@ void Game::CreateFrameAtCoord(engine::GridCoord coord)
 
 	// Populate static data for this coord
 	engine::FrameStaticData& rStaticData = rFrames.staticData;
-	XMVECTOR vecBaseArea = XMVectorSet(Frame::kfBaseAreaMinX, Frame::kfBaseAreaMaxY, Frame::kfBaseAreaMaxX, Frame::kfBaseAreaMinY);
-	rStaticData.vecArea = ComputeFrameArea(vecBaseArea, coord);
+	XMVECTOR vecBaseArea = XMVectorSet(engine::kfBaseAreaMinX, engine::kfBaseAreaMaxY, engine::kfBaseAreaMaxX, engine::kfBaseAreaMinY);
+	rStaticData.vecArea = engine::ComputeFrameArea(vecBaseArea, coord);
 	rStaticData.coord = coord;
 	engine::GenerateIslandChain(coord, rStaticData.islands);
 	// navData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
@@ -503,7 +503,7 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 
 	// Populate static data for origin coord (used as the main-menu cell)
 	engine::FrameStaticData& rStaticData = rFrames.staticData;
-	rStaticData.vecArea = XMVectorSet(Frame::kfBaseAreaMinX, Frame::kfBaseAreaMaxY, Frame::kfBaseAreaMaxX, Frame::kfBaseAreaMinY);
+	rStaticData.vecArea = XMVectorSet(engine::kfBaseAreaMinX, engine::kfBaseAreaMaxY, engine::kfBaseAreaMaxX, engine::kfBaseAreaMinY);
 	rStaticData.coord = engine::kOriginCoord;
 	// Debug builds turn the main-menu cell into a single centered island browser ('E' cycles it);
 	// release builds keep the procedural island chain. Gameplay cells always use the chain.

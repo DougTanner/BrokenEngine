@@ -144,6 +144,9 @@ function New-RepositoryA() {
 	Set-FixtureText $root 'Engine/Source/Old.cpp' "int Old() { return 1; }`n"
 	Set-FixtureText $root 'Engine/Source/ShaderLayouts.h' "layouts`n"
 	Set-FixtureText $root 'Engine/Source/ShaderLayoutsBase.h' "layouts base`n"
+	Set-FixtureText $root 'Engine/Data/Shaders/ShaderGlobalLayout.h' "global layout`n"
+	Set-FixtureText $root 'Engine/Data/Shaders/ShaderMainLayout.h' "main layout`n"
+	Set-FixtureText $root 'Engine/Data/Shaders/ShaderFunctions.h' "shader functions`n"
 	Set-FixtureText $root 'Data/Shaders/Common.h' "common`n"
 	Set-FixtureText $root 'Data/Shaders/AGENTS.md' "shader docs`n"
 	Set-FixtureText $root 'Data/Shaders/Ray.rgen' "rgen`n"
@@ -161,7 +164,7 @@ function New-RepositoryA() {
 	Set-FixtureText $root 'Engine/Source/Keep.cpp' "1`n2`nthree`n4`n5`n"
 	Invoke-FixtureGit $root @('rm', '--quiet', 'Engine/Source/Delete.h')
 	Invoke-FixtureGit $root @('mv', 'Engine/Source/Old.cpp', 'Engine/Source/New.cpp')
-	foreach ($path in @('Engine/Source/ShaderLayouts.h', 'Engine/Source/ShaderLayoutsBase.h', 'Data/Shaders/Common.h', 'Data/Shaders/AGENTS.md', 'Data/Shaders/Ray.rgen', 'Data/Shaders/Geo.mesh', '.agents/skills/demo/SKILL.md', 'Documents/Plans/Area/Thing.md', 'Documents/Plans/AGENTS.md', 'Build/App.vcxproj', 'Tools/Run.ps1', 'Misc/data.json')) {
+	foreach ($path in @('Engine/Source/ShaderLayouts.h', 'Engine/Source/ShaderLayoutsBase.h', 'Engine/Data/Shaders/ShaderGlobalLayout.h', 'Engine/Data/Shaders/ShaderMainLayout.h', 'Engine/Data/Shaders/ShaderFunctions.h', 'Data/Shaders/Common.h', 'Data/Shaders/AGENTS.md', 'Data/Shaders/Ray.rgen', 'Data/Shaders/Geo.mesh', '.agents/skills/demo/SKILL.md', 'Documents/Plans/Area/Thing.md', 'Documents/Plans/AGENTS.md', 'Build/App.vcxproj', 'Tools/Run.ps1', 'Misc/data.json')) {
 		$full = Join-Path $root ($path -replace '/', [IO.Path]::DirectorySeparatorChar)
 		[IO.File]::WriteAllBytes($full, $script:Utf8.GetBytes(([IO.File]::ReadAllText($full)) + "changed`n"))
 	}
@@ -188,6 +191,9 @@ function Test-DefaultInventory($Fixture) {
 		'Engine/Source/New.cpp' = @('R', 'cpp')
 		'Engine/Source/ShaderLayouts.h' = @('M', 'dual-language-header')
 		'Engine/Source/ShaderLayoutsBase.h' = @('M', 'dual-language-header')
+		'Engine/Data/Shaders/ShaderGlobalLayout.h' = @('M', 'dual-language-header')
+		'Engine/Data/Shaders/ShaderMainLayout.h' = @('M', 'dual-language-header')
+		'Engine/Data/Shaders/ShaderFunctions.h' = @('M', 'glsl')
 		'Data/Shaders/Common.h' = @('M', 'glsl')
 		'Data/Shaders/Ray.rgen' = @('M', 'glsl')
 		'Data/Shaders/Geo.mesh' = @('M', 'glsl')
@@ -207,11 +213,11 @@ function Test-DefaultInventory($Fixture) {
 		Assert-Equal $expected[$path][1] $map[$path].class "default class of $path"
 	}
 	Assert-True (-not $map.ContainsKey('Engine/Source/Unlisted.cpp')) 'default omits the unlisted untracked path'
-	Assert-Equal 17 $run.Json.counts.total 'default counts.total'
+	Assert-Equal 20 $run.Json.counts.total 'default counts.total'
 	Assert-Equal 1 $run.Json.counts.unlistedUntracked 'default counts.unlistedUntracked'
 	Assert-Equal 4 $run.Json.counts.cpp 'default counts.cpp'
-	Assert-Equal 2 $run.Json.counts.'dual-language-header' 'default counts.dual-language-header'
-	Assert-Equal 3 $run.Json.counts.glsl 'default counts.glsl'
+	Assert-Equal 4 $run.Json.counts.'dual-language-header' 'default counts.dual-language-header'
+	Assert-Equal 4 $run.Json.counts.glsl 'default counts.glsl'
 	Assert-Equal 2 $run.Json.counts.doc 'default counts.doc'
 	Assert-Equal 1 $run.Json.counts.binary 'default counts.binary'
 	Assert-Equal 1 $run.Json.counts.other 'default counts.other'
@@ -228,7 +234,7 @@ function Test-DefaultInventory($Fixture) {
 		Assert-True ($run.Json.triggers.$name -eq $true) "default trigger $name is true"
 	}
 	Assert-True ($run.Json.truncated -eq $false) 'default truncated is false'
-	Assert-Equal 17 $run.Json.truncation.entries.emitted 'default emitted entry count'
+	Assert-Equal 20 $run.Json.truncation.entries.emitted 'default emitted entry count'
 	Assert-True ([string]::IsNullOrEmpty($run.Stderr)) 'default writes nothing to stderr'
 	Assert-CleanRepository $Fixture.Root $before 'default run'
 }
@@ -268,7 +274,7 @@ function Test-RegionInventory($Fixture) {
 		Assert-True ($null -eq $added[0].oldStartLine) 'regions added oldStartLine is null'
 		Assert-Equal 3 $added[0].addedLines 'regions added addedLines'
 	}
-	Assert-Equal 17 $run.Json.counts.total 'regions keeps the full counts'
+	Assert-Equal 20 $run.Json.counts.total 'regions keeps the full counts'
 }
 
 function Test-TargetsInventory($Fixture) {
@@ -280,6 +286,8 @@ function Test-TargetsInventory($Fixture) {
 	Assert-Equal 'schemaVersion,paths' (@($run.Json.PSObject.Properties.Name) -join ',') 'targets has exactly schemaVersion and paths'
 	$paths = @($run.Json.paths)
 	$expected = @(
+		'Engine/Data/Shaders/ShaderGlobalLayout.h'
+		'Engine/Data/Shaders/ShaderMainLayout.h'
 		'Engine/Source/Delete.h'
 		'Engine/Source/Keep.cpp'
 		'Engine/Source/New.cpp'
@@ -289,10 +297,34 @@ function Test-TargetsInventory($Fixture) {
 		'Engine/Source/Untracked.cpp'
 	)
 	Assert-Equal ($expected -join ' ; ') ($paths -join ' ; ') 'targets path set and ordinal ordering'
+	Assert-True ($paths -contains 'Engine/Data/Shaders/ShaderGlobalLayout.h') 'targets include ShaderGlobalLayout.h'
+	Assert-True ($paths -contains 'Engine/Data/Shaders/ShaderMainLayout.h') 'targets include ShaderMainLayout.h'
+	Assert-True (-not ($paths -contains 'Engine/Data/Shaders/ShaderFunctions.h')) 'targets exclude GLSL-only ShaderFunctions.h'
 	$unique = [Collections.Generic.HashSet[string]]::new([string[]] $paths, [StringComparer]::Ordinal)
 	Assert-Equal $paths.Count $unique.Count 'targets paths are unique'
 	Assert-True ($run.Stdout.EndsWith("`n")) 'targets end with one LF'
 	Assert-True (-not $run.Stdout.TrimStart().StartsWith('{"schemaVersion":"broken-engine-session-change-inventory')) 'targets stdout carries no envelope wrapper'
+}
+
+function Test-IndependentDualLanguageRoutes() {
+	foreach ($path in @('Engine/Data/Shaders/ShaderGlobalLayout.h', 'Engine/Data/Shaders/ShaderMainLayout.h')) {
+		$root = New-FixtureRoot ('dual-route-' + [IO.Path]::GetFileNameWithoutExtension($path))
+		Set-FixtureText $root $path "layout`n"
+		Invoke-FixtureGit $root @('add', '--all')
+		Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+		$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+		Set-FixtureText $root $path "layout changed`n"
+		$run = Invoke-InventoryReadOnly $root @('-RepositoryRoot', $root, '-Baseline', $baseline) ('independent route ' + $path)
+		Assert-Equal 0 $run.ExitCode ('independent route exit code for ' + $path)
+		if ($null -eq $run.Json) {
+			Assert-True $false ('independent route emitted JSON for ' + $path)
+			continue
+		}
+		$map = Get-EntryMap $run.Json
+		Assert-Equal 'dual-language-header' $map[$path].class ('independent route class for ' + $path)
+		Assert-True ($run.Json.triggers.repoCodeReview -eq $true) ('independent route repoCodeReview for ' + $path)
+		Assert-True ($run.Json.triggers.glslReview -eq $true) ('independent route glslReview for ' + $path)
+	}
 }
 
 # --- Repository B: cross-class renames ---------------------------------------------------------
@@ -643,6 +675,7 @@ try {
 	Test-DefaultInventory $repositoryA
 	Test-RegionInventory $repositoryA
 	Test-TargetsInventory $repositoryA
+	Test-IndependentDualLanguageRoutes
 	Test-BlockedArgument $repositoryA
 	Test-CrossClassRename
 	$repositoryC = New-RepositoryC

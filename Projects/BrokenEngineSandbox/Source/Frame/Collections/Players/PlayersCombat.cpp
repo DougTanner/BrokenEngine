@@ -248,7 +248,7 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
-	const FrameBounds bounds = ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -287,7 +287,7 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 			rCurrentInterpolate.pfDestroyedTimes[i] = kfDestroyTime;
 			rCurrentPostRender.pfDestroyedExplosionTimes[i] = kfDestroyExplosionInterval;
 		}
-		else if (IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
+		else if (engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
 			// Entity candidates at or beyond frame exit were filtered during PreCollision.
 			rCurrentPostRender.pFlags[i].Set(kTransfer);

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-11T00:00:17.000Z","dependsOn":["Documents/Plans/Frame/EngineOwnedFrameConstants.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-11T00:00:17.000Z","dependsOn":[]} -->
 # Hoist RunFrameTick into engine FrameBase
 
 ## Context

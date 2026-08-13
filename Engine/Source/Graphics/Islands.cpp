@@ -253,7 +253,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 			ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
 			++rTemplate.miRefCount;
 			rTemplate.muiLastUsedRenderFrame = gpGraphics->muiFrameCounter;
-			(void)gpIslandTerrain->AcquireTextureSlot(rPlacement.islandCrc);
+			std::ignore = gpIslandTerrain->AcquireTextureSlot(rPlacement.islandCrc);
 			++puiPerTemplateTotalCount[iTemplate];
 			if (IsMeshVisible(rPlacement, rTemplate))
 			{

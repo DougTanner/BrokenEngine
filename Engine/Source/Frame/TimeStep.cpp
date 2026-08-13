@@ -1,6 +1,5 @@
 #include "TimeStep.h"
 
-#include "Frame/Frame.h"
 #include "Profile/ProfileManager.h"
 
 namespace engine
@@ -35,7 +34,7 @@ int64_t TimeStep::TickRealtime()
 	// Death spiral prevention: detect excessive updates and auto-reduce time scale
 	if constexpr (kbDebugInput)
 	{
-		int64_t iEstimatedTicks = mTickRemainderNs / game::kTickNs;
+		int64_t iEstimatedTicks = mTickRemainderNs / kTickNs;
 		if (iEstimatedTicks > kiMaxTicksPerFrame && miTimeMultiply > 1) [[unlikely]]
 		{
 			LOG(kDefault, kWarning, "Death spiral detected: {} ticks at {}x speed", iEstimatedTicks, miTimeMultiply);
@@ -44,7 +43,7 @@ int64_t TimeStep::TickRealtime()
 	}
 
 	// Clamp accumulator to prevent backlog cascade (e.g., after background/focus loss)
-	std::chrono::nanoseconds maxAccumulator = game::kTickNs * kiMaxAccumulatorTicks;
+	std::chrono::nanoseconds maxAccumulator = kTickNs * kiMaxAccumulatorTicks;
 	if (mTickRemainderNs > maxAccumulator)
 	{
 		LOG(kDefault, kVerbose, "TimeStep::TickRealtime Accumulator clamped");
@@ -52,8 +51,8 @@ int64_t TimeStep::TickRealtime()
 	}
 
 	// Calculate number of ticks needed
-	int64_t iTicks = mTickRemainderNs / game::kTickNs;
-	mTickRemainderNs %= game::kTickNs;
+	int64_t iTicks = mTickRemainderNs / kTickNs;
+	mTickRemainderNs %= kTickNs;
 
 	return iTicks;
 }
@@ -65,7 +64,7 @@ void TimeStep::ClearAccumulator()
 
 void TimeStep::AbsorbUnusedTicks(int64_t iTicks)
 {
-	mTickRemainderNs += iTicks * game::kTickNs;
+	mTickRemainderNs += iTicks * kTickNs;
 }
 
 void TimeStep::SetTimeScale(int64_t iMultiply, int64_t iDivide)

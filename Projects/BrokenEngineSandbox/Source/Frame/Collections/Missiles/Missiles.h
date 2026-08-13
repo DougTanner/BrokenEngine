@@ -107,7 +107,7 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 
 struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 {
-	static constexpr int64_t kiVersion = 9;
+	static constexpr int64_t kiVersion = 10;
 
 	// Allocate and copy
 	static void AllocateAndCopy(MissilesPostRender& rCurrent, const MissilesPostRender& rPrevious);

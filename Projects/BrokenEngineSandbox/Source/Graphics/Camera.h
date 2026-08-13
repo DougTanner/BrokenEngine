@@ -50,7 +50,6 @@ public:
 
 	float mfTime = 0.0f;
 
-	XMVECTOR mVecCameraOffsetSmoothed {};
 	float mfCameraEyeHeight = kfCameraEyeHeightInitial;
 	float mfCameraEyeHeightTarget = kfCameraEyeHeightInitial;
 	XMVECTOR mVecLastKnownPlayerPosition {};

@@ -64,7 +64,7 @@ void RunFrameTick(const ActiveFrameRef& rRef, int64_t iTickCounter, float fCurre
 
 	// Phase 1: Interpolate
 	FrameInterpolate::AllocateAndCopy(rNext.interpolate, rCurrent.interpolate);
-	FrameInterpolate::Update(rNext.interpolate, rCurrent, kfDeltaTime);
+	FrameInterpolate::Update(rNext.interpolate, rCurrent, engine::kfDeltaTime);
 	rNext.interpolate.iTick = iTickCounter;
 	rNext.interpolate.fCurrentTime = fCurrentTime;
 

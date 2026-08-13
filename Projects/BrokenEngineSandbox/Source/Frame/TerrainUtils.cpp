@@ -131,9 +131,9 @@ float XM_CALLCONV ComputeTerrainAvoidance(const engine::FrameStaticData& rStatic
 
 SegmentHit XM_CALLCONV TracePointAgainstTerrain(const engine::FrameStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime)
 {
-	static constexpr int64_t kiGridDimension = Frame::kiElevationGridDim;
-	static constexpr float kfGridPitchX = Frame::kfCellWidth / static_cast<float>(kiGridDimension);
-	static constexpr float kfGridPitchY = Frame::kfCellHeight / static_cast<float>(kiGridDimension);
+	static constexpr int64_t kiGridDimension = engine::kiElevationGridDim;
+	static constexpr float kfGridPitchX = engine::kfCellWidth / static_cast<float>(kiGridDimension);
+	static constexpr float kfGridPitchY = engine::kfCellHeight / static_cast<float>(kiGridDimension);
 
 	engine::FrameElevationSampler sampler = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData);
 	XMFLOAT4A f4Start {};
@@ -276,7 +276,7 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const engine::FrameStaticData& r
 
 SegmentHit XM_CALLCONV TracePointToFrameExit(FXMVECTOR vecArea, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime)
 {
-	FrameBounds bounds = ComputeFrameBounds(vecArea);
+	engine::FrameBounds bounds = engine::ComputeFrameBounds(vecArea);
 	XMFLOAT4A f4Start {};
 	XMFLOAT4A f4End {};
 	XMStoreFloat4A(&f4Start, vecStartPosition);

@@ -5,7 +5,9 @@ namespace common
 
 XMVECTOR XM_CALLCONV ToBaseHeight(FXMVECTOR vecPosition, FXMVECTOR vecEyePosition, float fBaseHeight)
 {
-	return XMPlaneIntersectLine(XMPlaneFromPointNormal(XMVectorSet(0.0f, 0.0f, fBaseHeight, 0.0f), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)), vecPosition, vecEyePosition);
+	// The SDK returns all-lane QNaN when the position-to-eye line is parallel to the base-height plane.
+	XMVECTOR vecIntersect = XMPlaneIntersectLine(XMPlaneFromPointNormal(XMVectorSet(0.0f, 0.0f, fBaseHeight, 0.0f), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)), vecPosition, vecEyePosition);
+	return XMVector3IsNaN(vecIntersect) ? XMVectorSet(0.0f, 0.0f, fBaseHeight, 1.0f) : vecIntersect;
 }
 
 float RotationFromPosition(FXMVECTOR vecPosition)

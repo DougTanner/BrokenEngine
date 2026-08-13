@@ -41,6 +41,29 @@ struct GridCoord
 
 inline constexpr GridCoord kOriginCoord {0, 0};
 
+inline constexpr float kfCellWidth = 900.0f;
+inline constexpr float kfCellHeight = 900.0f;
+
+// Per-cell elevation grid resolution. 1024 × 1024 floats = 4 MB/cell at ~0.88-unit
+// spacing across kfCellWidth — sub-meter, fine enough that quantizing FrameElevation
+// queries to grid-cell centers is gameplay-invisible. See IslandTerrain::BuildElevationGrid.
+inline constexpr int64_t kiElevationGridDim = 1024;
+
+inline constexpr float kfBaseAreaMinX = -kfCellWidth / 2.0f;
+inline constexpr float kfBaseAreaMaxY = kfCellHeight / 2.0f;
+inline constexpr float kfBaseAreaMaxX = kfCellWidth / 2.0f;
+inline constexpr float kfBaseAreaMinY = -kfCellHeight / 2.0f;
+
+// Pre-mix coord.ToKey() into a 32-bit seed where both x and y bits influence the result.
+// Required because ToKey() packs x into bits 32-63: a naive `static_cast<uint32_t>(key)` would
+// drop x entirely. The 64-bit multiply spreads every input bit through the upper half of the
+// product, and the distinct multiplier per use case decorrelates offset and rotation streams.
+// RandomEngine's constructor then runs full splitmix64 on the 32-bit seed to produce its state.
+inline constexpr uint32_t SeedFromGridCoord(GridCoord coord, uint64_t uiMultiplier)
+{
+	return static_cast<uint32_t>((coord.ToKey() * uiMultiplier) >> 32);
+}
+
 } // namespace engine
 
 template<>

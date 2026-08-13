@@ -4,6 +4,7 @@
 
 #include "Frame/GridCoord.h"
 
+#include "Fleet.h"
 #include "Network/Client/ClientDesyncManager.h"
 #include "Network/Client/ClientReconciler.h"
 
@@ -19,7 +20,6 @@ struct ReceivedDebugFrame;
 namespace game
 {
 
-struct FleetGuid;
 struct Frame;
 struct ReceivedPlayerEvent;
 enum class GamePacketType : uint8_t;

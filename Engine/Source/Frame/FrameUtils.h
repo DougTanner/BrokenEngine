@@ -38,6 +38,53 @@ template<bool kbBlendVelocityToDirection = false>
 	return vecResult;
 }
 
+struct FrameBounds
+{
+	float fMinX {};
+	float fMinY {};
+	float fMaxX {};
+	float fMaxY {};
+};
+
+inline FrameBounds XM_CALLCONV ComputeFrameBounds(FXMVECTOR vecArea)
+{
+	// vecArea: x=minX, y=maxY, z=maxX, w=minY
+	return {
+		.fMinX = XMVectorGetX(vecArea),
+		.fMinY = XMVectorGetW(vecArea),
+		.fMaxX = XMVectorGetZ(vecArea),
+		.fMaxY = XMVectorGetY(vecArea),
+	};
+}
+
+// Compute world-space frame bounds for a given grid coordinate
+inline XMVECTOR XM_CALLCONV ComputeFrameArea(FXMVECTOR vecBaseArea, GridCoord coord)
+{
+	float fWidth = XMVectorGetZ(vecBaseArea) - XMVectorGetX(vecBaseArea);
+	float fHeight = XMVectorGetY(vecBaseArea) - XMVectorGetW(vecBaseArea);
+	XMVECTOR vecOffset = XMVectorSet(static_cast<float>(coord.x) * fWidth, static_cast<float>(coord.y) * fHeight, static_cast<float>(coord.x) * fWidth, static_cast<float>(coord.y) * fHeight);
+	return XMVectorAdd(vecBaseArea, vecOffset);
+}
+
+inline constexpr size_t kuiInitialTransferCapacity = 32;
+
+inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecPosition)
+{
+	float fPositionX = XMVectorGetX(vecPosition);
+	float fPositionY = XMVectorGetY(vecPosition);
+
+	return !(fPositionX > rBounds.fMinX && fPositionX < rBounds.fMaxX &&
+	         fPositionY > rBounds.fMinY && fPositionY < rBounds.fMaxY);
+}
+
+inline void XM_CALLCONV ComputeTransferDelta(const FrameBounds& rBounds, FXMVECTOR vecPosition, int8_t& rDeltaX, int8_t& rDeltaY)
+{
+	float fPositionX = XMVectorGetX(vecPosition);
+	float fPositionY = XMVectorGetY(vecPosition);
+	rDeltaX = static_cast<int8_t>((fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX <= rBounds.fMinX) ? -1 : 0);
+	rDeltaY = static_cast<int8_t>((fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY <= rBounds.fMinY) ? -1 : 0);
+}
+
 // Type list for fold expression iteration
 template<typename... TS>
 struct TypeList {};
@@ -224,6 +271,84 @@ bool LogDifferencesCollections(TUPLE_CURRENT&& current, TUPLE_OTHER&& other, std
 	bool bEqual = true;
 	((bEqual &= std::get<INDICES>(current).LogDifferences(std::get<INDICES>(other))), ...);
 	return bEqual;
+}
+
+// Reverse walk over a paired collection, releasing every element the predicate selects.
+// Reverse order keeps swap-and-pop removal safe. release takes the loop index by reference because
+// DestroyElement decrements it after a swap, so the swapped-in element is visited next.
+template <typename TInterpolate, typename TPostRender, typename TPredicate, typename TRelease>
+void DestroySweep(TInterpolate& rInterpolate, [[maybe_unused]] TPostRender& rPostRender, TPredicate predicate, TRelease release)
+{
+	for (int64_t i = rInterpolate.iCount - 1; i >= 0; --i)
+	{
+		if (!predicate(i)) [[likely]]
+		{
+			continue;
+		}
+
+		release(i);
+	}
+}
+
+template <typename INTERPOLATE, typename POST_RENDER>
+void ValidateCollectionPair(const INTERPOLATE& rInterpolate, const POST_RENDER& rPostRender)
+{
+	if (rInterpolate.iCount != rPostRender.iCount || rInterpolate.iCapacity != rPostRender.iCapacity)
+	{
+		throw common::CorruptStreamException("Frame collection pair count/capacity mismatch");
+	}
+}
+
+template <typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE, size_t... INDICES>
+void ValidateCollectionPairs(const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections, std::index_sequence<INDICES...>)
+{
+	(ValidateCollectionPair(std::get<INDICES>(rInterpolateCollections), std::get<INDICES>(rPostRenderCollections)), ...);
+}
+
+template <typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
+void ValidateCollectionPairs(const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections)
+{
+	static_assert(std::tuple_size_v<INTERPOLATE_TUPLE> == std::tuple_size_v<POST_RENDER_TUPLE>);
+	ValidateCollectionPairs(rInterpolateCollections, rPostRenderCollections, std::make_index_sequence<std::tuple_size_v<INTERPOLATE_TUPLE>> {});
+}
+
+// Collection tuple folds: left-to-right over the tuple, so CRC mixing and byte order follow tuple order
+template <typename TUPLE>
+common::crc_t CollectionsCrc(common::crc_t sharedCrc, TUPLE&& collections)
+{
+	std::apply([&](const auto&... cols)
+	{
+		((sharedCrc = (sharedCrc ^ SharedCollectionCrc(cols)) * common::kCrcMultiplier), ...);
+	}, collections);
+
+	return sharedCrc;
+}
+
+template <typename TUPLE>
+void CollectionsWrite(std::ostream& rStream, TUPLE&& collections)
+{
+	std::apply([&](const auto&... cols)
+	{
+		(CollectionWrite(rStream, cols, cols.Members()), ...);
+	}, collections);
+}
+
+template <typename TUPLE>
+void CollectionsRead(std::istream& rStream, TUPLE&& collections)
+{
+	std::apply([&](auto&... cols)
+	{
+		(CollectionRead(rStream, cols, cols.Members()), ...);
+	}, collections);
+}
+
+template <typename TUPLE>
+void SharedCollectionsRead(std::istream& rStream, TUPLE&& collections)
+{
+	std::apply([&](auto&... cols)
+	{
+		(SharedCollectionRead(rStream, cols), ...);
+	}, collections);
 }
 
 } // namespace engine

@@ -127,7 +127,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 
 	auto FindFleetIndexByGuid = [this](const FleetGuid& rGuid) -> int64_t
 	{
-		if (!rGuid.IsValid())
+		if (rGuid.IsEmpty())
 		{
 			return -1;
 		}

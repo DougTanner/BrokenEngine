@@ -86,27 +86,38 @@ inline constexpr int64_t kiMaxStatusChangesPerCell = 1024;
 // single-cell frame approaches 64 MiB.
 inline constexpr int64_t kiMaxUncompressedFrameBytes = 64 * 1024 * 1024;
 
-// 128-bit client GUID for persistent identity across save/load
-struct ClientGuid
+// Tag-distinct 128-bit identifier. TAG only separates instantiations at compile time and contributes no
+// storage, so every instantiation shares one layout; see engine::id_t in Frame/Collections/CollectionId.h.
+template <typename TAG>
+struct Guid128
 {
-	// On-disk ClientGuid.bin header version (persist/load route through WriteVersionedFile/ReadVersionedFile).
-	// v2 migrated off the legacy hand-rolled v1/size-0 header to the shared version+size convention; v1 files reset once.
-	static constexpr int64_t kiVersion = 2;
-
 	uint64_t uiHigh = 0;
 	uint64_t uiLow = 0;
 
 	bool IsEmpty() const { return uiHigh == 0 && uiLow == 0; }
-	bool operator==(const ClientGuid&) const = default;
+	bool operator==(const Guid128&) const = default;
 };
 
-struct ClientGuidHash
+template <typename TAG>
+struct Guid128Hash
 {
-	size_t operator()(const ClientGuid& rGuid) const
+	size_t operator()(const Guid128<TAG>& rGuid) const
 	{
 		return std::hash<uint64_t>{}(rGuid.uiHigh) ^ (std::hash<uint64_t>{}(rGuid.uiLow) << 1);
 	}
 };
+
+// 128-bit client GUID for persistent identity across save/load
+struct ClientGuidTag;
+using ClientGuid = Guid128<ClientGuidTag>;
+using ClientGuidHash = Guid128Hash<ClientGuidTag>;
+
+static_assert(sizeof(ClientGuid) == 16, "ClientGuid size changed — ClientGuid.bin and the fleet save owner records are 16 raw bytes");
+static_assert(alignof(ClientGuid) == alignof(uint64_t), "ClientGuid alignment changed — PlayersPostRender::pClientGuids column stride shifts");
+static_assert(BT_OFFSETOF(ClientGuid, uiHigh) == 0, "ClientGuid::uiHigh offset changed — existing ClientGuid.bin and saves read uiHigh first");
+static_assert(BT_OFFSETOF(ClientGuid, uiLow) == 8, "ClientGuid::uiLow offset changed — existing ClientGuid.bin and saves read uiLow second");
+static_assert(std::is_trivially_copyable_v<ClientGuid>, "ClientGuid must stay trivially copyable — WriteVersionedFile stamps sizeof only for trivially copyable types");
+static_assert(std::is_standard_layout_v<ClientGuid>, "ClientGuid must stay standard-layout — BT_OFFSETOF above is only well-defined for standard-layout types");
 
 } // namespace engine
 

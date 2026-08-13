@@ -146,6 +146,7 @@ Same source, two executables: client (graphics, audio, input) defines `BT_CLIENT
 - DirectX Math: Prefer aligned versions (`Float4A` not `Float4`)
 	- XMVECTOR W invariant: Positions W=1.0; directions / velocities / normals / offsets W=0.0; color alpha defaults 1.0 (opaque)
 	- Function form, not operators: `XMVectorAdd`/`Subtract`/`Multiply`/`Divide`/`Scale`/`Negate` — never `vec + vec`, `f * vec`, `-vec`.
+	- Rotating a vector uses `XMVector3RotateSafe`/`XMVector3InverseRotateSafe`: the SDK versions leave a rounding residue in W that breaks the invariant above, so `Common/ExternalHeaders.h` re-zeroes W and makes the raw names fail to compile.
 - Base classes: Include/use game versions, not Base versions — `Camera.h` not `CameraBase.h`, `game::gpGame` not `GameBase` directly
 - Workbuffer: Use `gpThreadLocal->mWorkbuffer` for temp allocations instead of local `std::vector`/`std::string`.
 - Allocation tracking: Heap allocations in the main loop trigger `DEBUG_BREAK()`. When unavoidable, wrap with `ScopedSuppressAllocationTracking` + `// Heap:` comment. See `Engine/Source/Memory/AGENTS.md`

@@ -5,6 +5,10 @@ namespace engine
 
 inline constexpr int64_t kiTickRate = 32;
 
+// Set tick rate to 32/64/128 tps (kfDeltaTime: 0.03125f/0.015625f/0.0078125f)
+inline constexpr std::chrono::nanoseconds kTickNs = 1'000'000'000ns / kiTickRate;
+inline constexpr float kfDeltaTime = common::NanosecondsToFloatSeconds<float>(kTickNs);
+
 // Manages fixed timestep accumulator and time scaling for Frame updates
 class TimeStep
 {

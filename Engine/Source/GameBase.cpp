@@ -104,10 +104,10 @@ void GameBase::ClientUpdate()
 	// iteration (kept in lockstep with miTickCounter / mfCurrentTime below). No client-side consumer
 	// reads mfLastDeltaTime from inside PrepareActiveSet today; if one is added, move this earlier
 	// and accept that it represents pre-clamp intent rather than executed work.
-	mfLastDeltaTime = static_cast<float>(iFullTicks) * game::kfDeltaTime;
+	mfLastDeltaTime = static_cast<float>(iFullTicks) * kfDeltaTime;
 
 	miTickCounter += iFullTicks;
-	mfCurrentTime += static_cast<float>(iFullTicks) * game::kfDeltaTime;
+	mfCurrentTime += static_cast<float>(iFullTicks) * kfDeltaTime;
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameUpdate);
 	game::gpClientSession->Reconcile();
@@ -176,7 +176,7 @@ void GameBase::ServerUpdate()
 		iUnusedTicks = iFullTicks - 1;
 		iFullTicks = 1;
 	}
-	mfLastDeltaTime = static_cast<float>(iFullTicks) * game::kfDeltaTime;
+	mfLastDeltaTime = static_cast<float>(iFullTicks) * kfDeltaTime;
 
 	PrepareActiveSet();
 
@@ -190,11 +190,19 @@ void GameBase::ServerUpdate()
 		const int64_t iPreviousTickCounter = miTickCounter;
 		const float fPreviousCurrentTime = mfCurrentTime;
 		++miTickCounter;
-		mfCurrentTime += game::kfDeltaTime;
+		mfCurrentTime += kfDeltaTime;
 
 		common::LogTickScope perTickScope(miTickCounter);
 
 		game::gpServerSession->PrepareTick();
+
+		if (game::gpGame->mGameSaveLoad.IsReplaying()) [[unlikely]]
+		{
+			// Pick up readers activated by the previous iteration's SyncReplayTick, which the pre-loop PrepareActiveSet
+			// only sees once per update. Must run before this iteration's SyncReplayTick: the recording never simulated
+			// a coord at its activation tick E, so it may not enter E's dispatch list — its first dispatch is E + 1.
+			RefreshReplayActiveSet();
+		}
 
 		if (game::gpGame->mGameSaveLoad.IsRecording() || game::gpGame->mGameSaveLoad.IsReplaying() || (mGameFlags & GameFlags::kSaveReplay)) [[unlikely]]
 		{
@@ -215,7 +223,7 @@ void GameBase::ServerUpdate()
 					miTickCounter = iPreviousTickCounter;
 					mfCurrentTime = fPreviousCurrentTime;
 					iFullTicks = iFinalizedTicks;
-					mfLastDeltaTime = static_cast<float>(iFinalizedTicks) * game::kfDeltaTime;
+					mfLastDeltaTime = static_cast<float>(iFinalizedTicks) * kfDeltaTime;
 					// Rebuild only active frames; normal input/manager progression resumes on the next server update.
 					game::gpGame->ComputeActiveSet();
 					game::gpGame->EnsureNextFrames();
@@ -237,7 +245,7 @@ void GameBase::ServerUpdate()
 		{
 			mTimeStep.ClearAccumulator();
 			iFullTicks = iFinalizedTicks;
-			mfLastDeltaTime = static_cast<float>(iFinalizedTicks) * game::kfDeltaTime;
+			mfLastDeltaTime = static_cast<float>(iFinalizedTicks) * kfDeltaTime;
 			break;
 		}
 	}
@@ -379,7 +387,7 @@ float GameBase::AdvanceRenderClock(double dT, bool bPaused, bool bHaveInterpolat
 	if (bPaused)
 	{
 		// Freeze. Don't advance mfRenderTime; rendered scene stays static until unpause.
-		fDeltaTime = static_cast<float>(std::clamp(mfRenderTime - dT, 0.0, static_cast<double>(game::kfDeltaTime)));
+		fDeltaTime = static_cast<float>(std::clamp(mfRenderTime - dT, 0.0, static_cast<double>(kfDeltaTime)));
 	}
 	else if (!bHaveInterpolationWindow)
 	{
@@ -398,23 +406,23 @@ float GameBase::AdvanceRenderClock(double dT, bool bPaused, bool bHaveInterpolat
 		if (!mbRenderClockSeeded)
 		{
 			mbRenderClockSeeded = true;
-			mfRenderTime = dT + 0.5 * game::kfDeltaTime;
+			mfRenderTime = dT + 0.5 * kfDeltaTime;
 		}
 
 		// Rebase only on multi-tick T regression (reconcile snap, full-state seed). Tolerance
 		// widens to [T - kfDt, T + 2*kfDt] so a single-tick commit — which leaves mfRenderTime
 		// anywhere from slightly below new T to slightly below new T+kfDt — never triggers a
 		// rebase. Rebasing on every commit was the 32 Hz vibration signature.
-		if (mfRenderTime < dT - game::kfDeltaTime || mfRenderTime > dT + 2.0 * game::kfDeltaTime)
+		if (mfRenderTime < dT - kfDeltaTime || mfRenderTime > dT + 2.0 * kfDeltaTime)
 		{
 			// A rebase is a discontinuous visual time jump — should be rare outside loss bursts
-			LOG(kNetwork, kVerbose, "Render clock rebase JumpTicks: {} RenderTime: {} WindowStart: {}", common::Wb(static_cast<float>((dT - mfRenderTime) / game::kfDeltaTime), 2), common::Wb(static_cast<float>(mfRenderTime), 4), common::Wb(static_cast<float>(dT), 4));
-			mfRenderTime = dT + 0.5 * game::kfDeltaTime;
+			LOG(kNetwork, kVerbose, "Render clock rebase JumpTicks: {} RenderTime: {} WindowStart: {}", common::Wb(static_cast<float>((dT - mfRenderTime) / kfDeltaTime), 2), common::Wb(static_cast<float>(mfRenderTime), 4), common::Wb(static_cast<float>(dT), 4));
+			mfRenderTime = dT + 0.5 * kfDeltaTime;
 		}
 
 		mfRenderTime += dSimDeltaSeconds;
 		double dUnclampedRenderTime = mfRenderTime;
-		mfRenderTime = std::clamp(mfRenderTime, dT, dT + static_cast<double>(game::kfDeltaTime));
+		mfRenderTime = std::clamp(mfRenderTime, dT, dT + static_cast<double>(kfDeltaTime));
 		fDeltaTime = static_cast<float>(mfRenderTime - dT);
 
 		// Top-clamp = renderer starved of committed ticks (scene freezes); bottom-clamp = commits
@@ -433,9 +441,9 @@ float GameBase::AdvanceRenderClock(double dT, bool bPaused, bool bHaveInterpolat
 			}
 			else if (siStarvedFrames > 0)
 			{
-				if (sdStarvedSeconds > 0.25 * game::kfDeltaTime)
+				if (sdStarvedSeconds > 0.25 * kfDeltaTime)
 				{
-					LOG(kNetwork, kVerbose, "Render clock starved Frames: {} LostTicks: {}", siStarvedFrames, common::Wb(static_cast<float>(sdStarvedSeconds / game::kfDeltaTime), 2));
+					LOG(kNetwork, kVerbose, "Render clock starved Frames: {} LostTicks: {}", siStarvedFrames, common::Wb(static_cast<float>(sdStarvedSeconds / kfDeltaTime), 2));
 				}
 				siStarvedFrames = 0;
 				sdStarvedSeconds = 0.0;
@@ -447,9 +455,9 @@ float GameBase::AdvanceRenderClock(double dT, bool bPaused, bool bHaveInterpolat
 			}
 			else if (siSkippedFrames > 0)
 			{
-				if (sdSkippedSeconds > 0.25 * game::kfDeltaTime)
+				if (sdSkippedSeconds > 0.25 * kfDeltaTime)
 				{
-					LOG(kNetwork, kVerbose, "Render clock skipped Frames: {} SkippedTicks: {}", siSkippedFrames, common::Wb(static_cast<float>(sdSkippedSeconds / game::kfDeltaTime), 2));
+					LOG(kNetwork, kVerbose, "Render clock skipped Frames: {} SkippedTicks: {}", siSkippedFrames, common::Wb(static_cast<float>(sdSkippedSeconds / kfDeltaTime), 2));
 				}
 				siSkippedFrames = 0;
 				sdSkippedSeconds = 0.0;
@@ -603,9 +611,9 @@ void GameBase::Render()
 			game::gpCamera->Update(mRenderInterpolates.at(cameraCoord));
 		}
 
-		// Decay visual error offset for smooth reconciliation corrections. Drive off the wall-clock render
-		// delta (like the camera / player interpolation) rather than a fixed 1/refreshRate, so a vsync miss
-		// decays it in step with the interpolated player instead of lagging and stuttering at high zoom.
+		// Decay visual error offset for smooth reconciliation corrections using the sim-scaled render delta
+		// (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0), matching the
+		// camera and player interpolation rather than a fixed 1/refreshRate.
 		{
 			float fDisplayDeltaTime = static_cast<float>(mfLastRenderFrameSeconds);
 			float fDecay = std::exp(-game::Game::kfVisualErrorDecayRate * fDisplayDeltaTime);
@@ -641,7 +649,7 @@ void GameBase::Render()
 		else
 		{
 			// Still deferred (minimized / off-screen): this branch loops every frame with no vkQueuePresentKHR to
-			// throttle it, so pace it to the sim tick's remaining time (game::kTickNs minus this iteration's elapsed
+			// throttle it, so pace it to the sim tick's remaining time (kTickNs minus this iteration's elapsed
 			// wall time) — the minimized loop holds ~32 Hz instead of busy-spinning a core and re-issuing a
 			// vkGetPhysicalDeviceSurfaceCapabilitiesKHR per spin. Mirrors ServerSessionRuntime::WaitForTick's high-resolution
 			// waitable timer minus its precision spin (nothing minimized needs sub-ms accuracy).
@@ -653,7 +661,7 @@ void GameBase::Render()
 			if (mMinimizedThrottleLast.has_value())
 			{
 				std::chrono::nanoseconds elapsedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - *mMinimizedThrottleLast);
-				std::chrono::nanoseconds remainingNs = game::kTickNs - elapsedNs;
+				std::chrono::nanoseconds remainingNs = kTickNs - elapsedNs;
 				static constexpr std::chrono::nanoseconds kMinThrottleNs = 1'000'000ns; // ~1 ms floor: skip sub-ms / non-positive remainders.
 				if (remainingNs >= kMinThrottleNs)
 				{
@@ -688,24 +696,31 @@ void GameBase::Render()
 }
 #endif // BT_CLIENT
 
+#if defined(BT_SERVER)
+void GameBase::RefreshReplayActiveSet()
+{
+	// During replay, all coords with live readers are active; SyncReplayTick retires ended readers before dispatch.
+	// Heap: vector clear/push_back, unordered_map insertion + make_unique<Frame>
+	ScopedSuppressAllocationTracking suppress;
+	game::gpGame->mActiveCoords.clear();
+	for (const auto& [rCoord, rpReader] : game::gpGame->mGameSaveLoad.GetReplayReaders())
+	{
+		game::gpGame->mActiveCoords.push_back(rCoord);
+		CoordFrames& rSub = mCoordFrames.try_emplace(rCoord).first->second;
+		if (rSub.pNext == nullptr)
+		{
+			rSub.pNext = std::make_unique<game::Frame>();
+		}
+	}
+}
+#endif // BT_SERVER
+
 void GameBase::PrepareActiveSet()
 {
 #if defined(BT_SERVER)
 	if (game::gpGame->mGameSaveLoad.IsReplaying())
 	{
-		// During replay, all coords with live readers are active; SyncReplayTick retires ended readers before dispatch.
-		// Heap: vector clear/push_back, unordered_map insertion + make_unique<Frame>
-		ScopedSuppressAllocationTracking suppress;
-		game::gpGame->mActiveCoords.clear();
-		for (const auto& [rCoord, rpReader] : game::gpGame->mGameSaveLoad.GetReplayReaders())
-		{
-			game::gpGame->mActiveCoords.push_back(rCoord);
-			CoordFrames& rSub = mCoordFrames.try_emplace(rCoord).first->second;
-			if (rSub.pNext == nullptr)
-			{
-				rSub.pNext = std::make_unique<game::Frame>();
-			}
-		}
+		RefreshReplayActiveSet();
 		// SyncReplayTick creates and overwrites each recorded FrameInput. Do not advance normal server managers here.
 		return;
 	}

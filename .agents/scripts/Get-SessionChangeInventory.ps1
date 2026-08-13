@@ -26,7 +26,8 @@ $script:MaximumOutputBytes = 131072
 
 # GLSL source extensions, matching the list in .agents/skills/glsl-review/SKILL.md.
 $script:ShaderExtensions = @('.vert', '.frag', '.comp', '.geom', '.tesc', '.tese', '.glsl', '.mesh', '.task', '.rgen', '.rmiss', '.rchit', '.rahit', '.rint', '.rcall')
-$script:DualLanguageHeaders = @('shaderlayouts.h', 'shaderlayoutsbase.h')
+# C++ reachability follows PCH -> project ShaderLayouts.h -> engine ShaderLayoutsBase.h -> nested layout headers; ShaderLayoutsBase.h's branch-specific bridge setup precedes those includes, which are outside its BT_ENGINE branch.
+$script:DualLanguageHeaders = @('shaderlayouts.h', 'shaderlayoutsbase.h', 'shadergloballayout.h', 'shadermainlayout.h')
 $script:CppClasses = @('cpp', 'dual-language-header')
 $script:ClassNames = @('dual-language-header', 'glsl', 'cpp', 'skill', 'plan', 'script', 'vcxproj', 'doc', 'binary', 'other')
 $script:ManifestModes = @('100644', '100755')

@@ -98,11 +98,11 @@ void ClientSession::ApplyReceivedFullStates()
 			// not produce a negative sim tick.
 			if (bInitialSetup && gpGame->TickCounter() < iTick)
 			{
-				static constexpr int64_t kiTickTimeMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(kTickNs).count();
+				static constexpr int64_t kiTickTimeMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(engine::kTickNs).count();
 				static constexpr int64_t kiInitialTargetBehind = (engine::kiJitterSafetyUs + kiTickTimeMicroseconds - 1) / kiTickTimeMicroseconds;
 				const int64_t iAppliedBehind = std::min<int64_t>(kiInitialTargetBehind, iTick);
 				gpGame->SetTickCounter(iTick - iAppliedBehind);
-				gpGame->SetCurrentTime(fFullStateTime - static_cast<float>(iAppliedBehind) * kfDeltaTime);
+				gpGame->SetCurrentTime(fFullStateTime - static_cast<float>(iAppliedBehind) * engine::kfDeltaTime);
 				gpGame->ResetRenderClock();
 			}
 		}
@@ -162,11 +162,19 @@ bool ClientSession::ApplyReceivedUpdates()
 
 			if (static_cast<int64_t>(rCoordFrames.serverUpdates.size()) >= engine::kiMaxBufferedFrames)
 			{
-				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full Coord: ({},{}) Size: {} Tick: {}", coord.x, coord.y, rCoordFrames.serverUpdates.size(), rUpdate.iTick);
-				// Recoverable (slow client / server burst): drop the update and keep the session alive
-				DEBUG_BREAK();
-				bHasNewData = true;
-				continue;
+				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full, requesting full-state resync Coord: ({},{}) Size: {} Tick: {}", coord.x, coord.y, rCoordFrames.serverUpdates.size(), rUpdate.iTick);
+
+				// The engine already acked these ticks, so a dropped update would never be resent: abandon the
+				// whole drain and take authoritative state instead. Returning here sends exactly one request even
+				// when several coords are over budget, and the reset plus the discard below empties every
+				// serverUpdates map, so this branch cannot arm again for at least kiMaxBufferedFrames ticks.
+				mpRuntime->mpClient->SendResyncRequest();
+				mpDesyncManager->ResetCoordStatesForResync();
+				for (std::vector<engine::ReceivedCoordUpdate>& rDrainedUpdates : rAllUpdates)
+				{
+					rDrainedUpdates.clear();
+				}
+				return false;
 			}
 
 			bool bInserted = rCoordFrames.serverUpdates.try_emplace(rUpdate.iTick, engine::CoordFrames::CoordServerUpdate {

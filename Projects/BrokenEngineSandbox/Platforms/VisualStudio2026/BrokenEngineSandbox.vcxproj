@@ -504,7 +504,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Ui\WindDepositsWrappers.h" />
     <ClInclude Include="$(GameDataDirectory)\Audio.h" />
     <ClInclude Include="$(GameDataDirectory)\Data.h" />
-    <ClInclude Include="$(GameDataDirectory)\Font.h" />
     <ClInclude Include="$(GameDataDirectory)\Scene.h" />
     <ClInclude Include="$(GameDataDirectory)\Islands.h" />
     <ClInclude Include="$(GameDataDirectory)\Model.h" />

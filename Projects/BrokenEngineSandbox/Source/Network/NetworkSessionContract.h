@@ -21,7 +21,7 @@ struct NetworkSessionContract
 	{
 		return Frame::kiVersion;
 	}
-	static constexpr std::chrono::nanoseconds kTickDuration = kTickNs;
+	static constexpr std::chrono::nanoseconds kTickDuration = engine::kTickNs;
 	static constexpr int64_t kiCoordSlots = kiDesiredCoordSlots;
 	static constexpr bool kbDebugFrames = kbDesyncDebugFrames;
 

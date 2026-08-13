@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-11T00:00:13.000Z","dependsOn":["Documents/Plans/Network/ClientAckAdoptionOverflowGap.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-11T00:00:13.000Z","dependsOn":[]} -->
 # Move received full-state and update adoption into ClientSessionRuntime
 
 ## Context

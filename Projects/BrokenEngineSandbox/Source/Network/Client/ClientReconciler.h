@@ -64,6 +64,9 @@ struct CoordScratch
 	int64_t iReplayWriteHead = 0;
 	int64_t iReplayWriteCount = 0;
 	int64_t iLastValidatedIndex = -1;
+	// Physical slot of a full state injected during this reconcile, or -1. It is the authoritative
+	// output-ring base until a later validated replay frame supersedes it.
+	int64_t iInjectedBaseSlot = -1;
 	int64_t iNewConfirmedTick = -1;
 	RingLayout outputLayout;
 	common::Flags<ReconcileScratchFlags> flags;
@@ -83,6 +86,7 @@ struct CoordScratch
 		iReplayWriteHead = 0;
 		iReplayWriteCount = 0;
 		iLastValidatedIndex = -1;
+		iInjectedBaseSlot = -1;
 		iNewConfirmedTick = -1;
 		outputLayout = {};
 		flags.ClearAll();

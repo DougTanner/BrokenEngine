@@ -174,7 +174,7 @@ function Test-PromptBinaryContent([string] $RelativePath) {
 function Get-PromptContributor() {
 	$contributors = [Collections.Generic.List[object]]::new()
 	if ($script:DiffPath.Count -gt 0) {
-		$arguments = @('diff', '--numstat', '-M', '--no-color', '--no-ext-diff') + $script:DiffRange + @('--') + $script:DiffPath
+		$arguments = @('diff', '--numstat', '-M', '--no-color', '--no-ext-diff') + $script:DiffRange + @('--') + @($script:DiffPath | ForEach-Object { ":(literal)$($_)" })
 		$run = Invoke-PromptGit $arguments $true
 		foreach ($line in ($run.Stdout -split "`n")) {
 			if ([string]::IsNullOrWhiteSpace($line)) { continue }
@@ -414,7 +414,7 @@ function Test-PromptReviewedTreeClean() {
 function Write-DiffEvidence() {
 	if ($script:DiffPath.Count -gt 0) {
 		Add-PromptText "## Diff`n`n"
-		$arguments = @('diff', '-M', '--no-color', '--no-ext-diff') + $script:DiffRange + @('--') + $script:DiffPath
+		$arguments = @('diff', '-M', '--no-color', '--no-ext-diff') + $script:DiffRange + @('--') + @($script:DiffPath | ForEach-Object { ":(literal)$($_)" })
 		$start = [Diagnostics.ProcessStartInfo]::new()
 		$start.FileName = 'git'
 		$start.WorkingDirectory = $script:Root

@@ -19,7 +19,7 @@
 - Playback readers retire independently at recorded endpoints. Loop only after the last reader retires, and stop the current fixed-tick iteration before loading the next loop.
 - Successfully applying replay state starts a fresh fixed-step wall-clock interval. Replay validation and file I/O are outside simulation time; never carry their elapsed time or accumulated tick debt into the restored loop, or a batch of extra ticks can break replay CRCs.
 - Replay compares recorded checksums with resimulation each tick. Transfer harvest remains disabled during playback so the deterministic stream matches recording.
-- Replay coord lists are deterministic and manifest counts are bounded before allocation.
+- Replay manifest records are written in canonical activation-tick-then-coord order and manifest counts are bounded before allocation. The in-memory replay active-coord list is not order-significant: coords dispatch in parallel and every consumer is coord-keyed.
 
 ## Affinity
 

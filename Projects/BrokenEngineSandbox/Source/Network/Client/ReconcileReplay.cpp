@@ -27,6 +27,7 @@ void ReconcileInjectPendingFullState(CoordWork& rWork)
 	rScratch.iReplayStackCount = 1;
 	rScratch.iReplayWriteHead = SnapshotIndex(iSlot, 1);
 	rScratch.iReplayWriteCount = 0;
+	rScratch.iInjectedBaseSlot = iSlot;
 	// Full state replaces the timeline; a prior higher high-water mark was against a discarded timeline.
 	rFrames.iHighWaterValidatedTick = rPending.iTick;
 	rFrames.iLastFullStateTick = rPending.iTick;
@@ -256,7 +257,7 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 		return true;
 	}
 
-	ReconcileReplayCoord(rWork, iReplayStart, iRollbackOffset, iMaxConsecutive, fTime);
+	ReconcileReplayCoord(rWork, iReplayStart, iMaxConsecutive, fTime);
 	return false;
 }
 
@@ -292,6 +293,15 @@ static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 			.iCount = rScratch.iReplayWriteCount + 1,
 			.iConfirmedInner = 0,
 		};
+	}
+
+	// An injected full state stays the ring base: a validated index of zero is the injected frame
+	// itself and a negative index validated nothing after it, while index one or higher is a later
+	// replayed frame that supersedes the injection.
+	if (rScratch.iInjectedBaseSlot >= 0 && rScratch.iLastValidatedIndex <= 0)
+	{
+		rScratch.outputLayout.iHead = rScratch.iInjectedBaseSlot;
+		rScratch.outputLayout.iConfirmedInner = 0;
 	}
 
 	rScratch.outputLayout.iCount = std::min(rScratch.outputLayout.iCount, static_cast<int64_t>(engine::kiNetworkBufferSize));

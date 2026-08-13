@@ -334,7 +334,7 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	const FrameBounds bounds = ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{
@@ -367,7 +367,7 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 			},
 			.iPushedTick = rFrame.interpolate.iTick,
 		};
-		ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
+		engine::ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
 
 		// Heap realloc warning: capacity exceeded during burst transfers. Expected max ~1-2/tick
 		// per source frame — anything higher suggests entities are re-flagging kTransfer across
@@ -393,20 +393,20 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
-	{
-		bool bSilentDespawn = rCurrentPostRender.pFlags[i] & kSilentDespawn;
-		bool bExplosionFinished = (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
-		if (!bSilentDespawn && !bExplosionFinished) [[likely]]
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender,
+		[&](int64_t i)
 		{
-			continue;
-		}
+			bool bSilentDespawn = rCurrentPostRender.pFlags[i] & kSilentDespawn;
+			bool bExplosionFinished = (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
+			return bSilentDespawn || bExplosionFinished;
+		},
+		[&](int64_t& ri)
+		{
+			// Owned effects and target may already be released by Fall() or Explode()
+			RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, ri);
 
-		// Owned effects and target may already be released by Fall() or Explode()
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-	}
+			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, ri, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+		});
 }
 
 void MissilesPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const SpawnInfo& rInfo)

@@ -33,7 +33,7 @@ void ServerBroadcaster::BuildFrameInputs()
 	{
 		std::erase_if(gpServerSession->mpClientManager->mClientsWaitingForSpawn, [&](const ClientSpawnInfo& rClientSpawnInformation)
 		{
-			if (!rClientSpawnInformation.fleetGuid.IsValid())
+			if (rClientSpawnInformation.fleetGuid.IsEmpty())
 			{
 				return false;
 			}
@@ -56,7 +56,7 @@ void ServerBroadcaster::BuildFrameInputs()
 			bool bIsFlagship = false;
 			engine::GridCoord spawnFleetWantedCoord {};
 			uint8_t uiSpawnPendingFleetTicks = 0;
-			if (rClientSpawnInformation.fleetGuid.IsValid())
+			if (!rClientSpawnInformation.fleetGuid.IsEmpty())
 			{
 				ServerFleetManager::FleetLookupResult result = gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.iMemberIndex);
 				bIsFlagship = result.flags & ServerFleetManager::FleetLookupFlags::kIsFlagship;

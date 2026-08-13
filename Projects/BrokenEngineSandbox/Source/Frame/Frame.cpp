@@ -8,28 +8,6 @@ namespace game
 
 using enum GameFlags;
 
-template <typename INTERPOLATE, typename POST_RENDER>
-static void ValidateCollectionPair(const INTERPOLATE& rInterpolate, const POST_RENDER& rPostRender)
-{
-	if (rInterpolate.iCount != rPostRender.iCount || rInterpolate.iCapacity != rPostRender.iCapacity)
-	{
-		throw common::CorruptStreamException("Frame collection pair count/capacity mismatch");
-	}
-}
-
-template <typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE, size_t... INDICES>
-static void ValidateCollectionPairs(const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections, std::index_sequence<INDICES...>)
-{
-	(ValidateCollectionPair(std::get<INDICES>(rInterpolateCollections), std::get<INDICES>(rPostRenderCollections)), ...);
-}
-
-template <typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
-static void ValidateCollectionPairs(const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections)
-{
-	static_assert(std::tuple_size_v<INTERPOLATE_TUPLE> == std::tuple_size_v<POST_RENDER_TUPLE>);
-	ValidateCollectionPairs(rInterpolateCollections, rPostRenderCollections, std::make_index_sequence<std::tuple_size_v<INTERPOLATE_TUPLE>> {});
-}
-
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
@@ -57,7 +35,7 @@ FramePostRender::FramePostRender()
 , pSpaceships(std::make_unique<SpaceshipsPostRender>())
 , pTargets(std::make_unique<TargetsPostRender>())
 {
-	transferRequests.reserve(kuiInitialTransferCapacity);
+	transferRequests.reserve(engine::kuiInitialTransferCapacity);
 }
 
 FramePostRender::~FramePostRender() = default;
@@ -571,10 +549,7 @@ common::crc_t FrameInterpolate::Crcs(const FrameInterpolate& rCurrent)
 	ASSERT(engine::IsMemberTupleSubset(rCurrent.pPlayers->SharedCrcMembers(), rCurrent.pPlayers->SharedMembers()));
 	sharedCrc = (sharedCrc ^ engine::CollectionCrc(*rCurrent.pPlayers, rCurrent.pPlayers->SharedCrcMembers())) * common::kCrcMultiplier;
 
-	std::apply([&](const auto&... cols)
-	{
-		((sharedCrc = (sharedCrc ^ engine::SharedCollectionCrc(cols)) * common::kCrcMultiplier), ...);
-	}, GameInterpolateCollections(rCurrent));
+	sharedCrc = engine::CollectionsCrc(sharedCrc, GameInterpolateCollections(rCurrent));
 
 	return sharedCrc;
 }
@@ -601,10 +576,7 @@ void FrameInterpolate::Write(std::ostream& rStream) const
 
 	engine::CollectionWrite(rStream, *pPlayers, pPlayers->Members());
 
-	std::apply([&](const auto&... cols)
-	{
-		(engine::CollectionWrite(rStream, cols, cols.Members()), ...);
-	}, GameInterpolateCollections(*this));
+	engine::CollectionsWrite(rStream, GameInterpolateCollections(*this));
 }
 
 void FrameInterpolate::Read(std::istream& rStream)
@@ -617,10 +589,7 @@ void FrameInterpolate::Read(std::istream& rStream)
 
 	engine::CollectionRead(rStream, *pPlayers, pPlayers->Members());
 
-	std::apply([&](auto&... cols)
-	{
-		(engine::CollectionRead(rStream, cols, cols.Members()), ...);
-	}, GameInterpolateCollections(*this));
+	engine::CollectionsRead(rStream, GameInterpolateCollections(*this));
 }
 
 void FrameInterpolate::ServerRead(std::istream& rStream)
@@ -633,10 +602,7 @@ void FrameInterpolate::ServerRead(std::istream& rStream)
 
 	engine::SharedCollectionRead(rStream, *pPlayers);
 
-	std::apply([&](auto&... cols)
-	{
-		(engine::SharedCollectionRead(rStream, cols), ...);
-	}, GameInterpolateCollections(*this));
+	engine::SharedCollectionsRead(rStream, GameInterpolateCollections(*this));
 }
 
 common::crc_t FramePostRender::Crcs(const FramePostRender& rCurrent)
@@ -650,10 +616,7 @@ common::crc_t FramePostRender::Crcs(const FramePostRender& rCurrent)
 	ASSERT(engine::IsMemberTupleSubset(rCurrent.pPlayers->SharedCrcMembers(), rCurrent.pPlayers->SharedMembers()));
 	sharedCrc = (sharedCrc ^ engine::CollectionCrc(*rCurrent.pPlayers, rCurrent.pPlayers->SharedCrcMembers())) * common::kCrcMultiplier;
 
-	std::apply([&](const auto&... cols)
-	{
-		((sharedCrc = (sharedCrc ^ engine::SharedCollectionCrc(cols)) * common::kCrcMultiplier), ...);
-	}, GamePostRenderCollections(rCurrent));
+	sharedCrc = engine::CollectionsCrc(sharedCrc, GamePostRenderCollections(rCurrent));
 
 	return sharedCrc;
 }
@@ -680,10 +643,7 @@ void FramePostRender::Write(std::ostream& rStream) const
 
 	engine::CollectionWrite(rStream, *pPlayers, pPlayers->Members());
 
-	std::apply([&](const auto&... cols)
-	{
-		(engine::CollectionWrite(rStream, cols, cols.Members()), ...);
-	}, GamePostRenderCollections(*this));
+	engine::CollectionsWrite(rStream, GamePostRenderCollections(*this));
 }
 
 void FramePostRender::Read(std::istream& rStream)
@@ -695,10 +655,7 @@ void FramePostRender::Read(std::istream& rStream)
 
 	engine::CollectionRead(rStream, *pPlayers, pPlayers->Members());
 
-	std::apply([&](auto&... cols)
-	{
-		(engine::CollectionRead(rStream, cols, cols.Members()), ...);
-	}, GamePostRenderCollections(*this));
+	engine::CollectionsRead(rStream, GamePostRenderCollections(*this));
 }
 
 void FramePostRender::ServerRead(std::istream& rStream)
@@ -710,10 +667,7 @@ void FramePostRender::ServerRead(std::istream& rStream)
 
 	engine::SharedCollectionRead(rStream, *pPlayers);
 
-	std::apply([&](auto&... cols)
-	{
-		(engine::SharedCollectionRead(rStream, cols), ...);
-	}, GamePostRenderCollections(*this));
+	engine::SharedCollectionsRead(rStream, GamePostRenderCollections(*this));
 }
 
 common::crc_t Frame::Crcs() const
@@ -743,9 +697,9 @@ void Frame::ServerRead(std::istream& rStream)
 
 	engine::FrameInterpolateBase& rInterpolateBase = interpolate;
 	engine::FramePostRenderBase& rPostRenderBase = postRender;
-	ValidateCollectionPairs(rInterpolateBase.ServerCollections(), rPostRenderBase.ServerCollections());
-	ValidateCollectionPair(*interpolate.pPlayers, *postRender.pPlayers);
-	ValidateCollectionPairs(GameInterpolateCollections(interpolate), GamePostRenderCollections(postRender));
+	engine::ValidateCollectionPairs(rInterpolateBase.ServerCollections(), rPostRenderBase.ServerCollections());
+	engine::ValidateCollectionPair(*interpolate.pPlayers, *postRender.pPlayers);
+	engine::ValidateCollectionPairs(GameInterpolateCollections(interpolate), GamePostRenderCollections(postRender));
 }
 
 std::ostream& operator<<(std::ostream& rStream, const Frame& rCurrent)
@@ -763,9 +717,9 @@ std::istream& operator>>(std::istream& rStream, Frame& rCurrent)
 
 	engine::FrameInterpolateBase& rInterpolateBase = loadedFrame.interpolate;
 	engine::FramePostRenderBase& rPostRenderBase = loadedFrame.postRender;
-	ValidateCollectionPairs(rInterpolateBase.Collections(), rPostRenderBase.Collections());
-	ValidateCollectionPair(*loadedFrame.interpolate.pPlayers, *loadedFrame.postRender.pPlayers);
-	ValidateCollectionPairs(GameInterpolateCollections(loadedFrame.interpolate), GamePostRenderCollections(loadedFrame.postRender));
+	engine::ValidateCollectionPairs(rInterpolateBase.Collections(), rPostRenderBase.Collections());
+	engine::ValidateCollectionPair(*loadedFrame.interpolate.pPlayers, *loadedFrame.postRender.pPlayers);
+	engine::ValidateCollectionPairs(GameInterpolateCollections(loadedFrame.interpolate), GamePostRenderCollections(loadedFrame.postRender));
 	rCurrent = std::move(loadedFrame);
 	return rStream;
 }

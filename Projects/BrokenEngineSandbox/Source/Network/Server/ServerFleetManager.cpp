@@ -292,7 +292,7 @@ void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::
 
 void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInfo& rSpawnInfo, engine::global_id_t globalPlayerId)
 {
-	if (!rSpawnInfo.fleetGuid.IsValid())
+	if (rSpawnInfo.fleetGuid.IsEmpty())
 	{
 		return;
 	}

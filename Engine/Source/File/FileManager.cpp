@@ -58,6 +58,7 @@ public:
 	bool Update(std::span<const std::byte> bytes)
 	{
 		return mbValid && bytes.size() <= std::numeric_limits<ULONG>::max() &&
+#pragma warning(suppress: 26492) // CNG pbInput is SAL input-only and documented not modified.
 			(bytes.empty() || ::BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())), static_cast<ULONG>(bytes.size()), 0) >= 0);
 	}
 
@@ -293,7 +294,8 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	}
 
 	Sha256Hasher hasher;
-	std::array<std::byte, 64 * 1024> buffer {};
+	auto bufferAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(64 * 1024);
+	std::span<std::byte> buffer(static_cast<std::byte*>(bufferAllocation), 64 * 1024);
 	int64_t iByteCount = 0;
 	for (;;)
 	{

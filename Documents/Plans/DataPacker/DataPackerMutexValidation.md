@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-06T22:03:20.159Z","dependsOn":["Documents/Plans/DataPacker/MainOrchestrationDecomposition.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-06T22:03:20.159Z","dependsOn":[]} -->
 # Validate the single-instance mutex before running commands
 
 ## Context

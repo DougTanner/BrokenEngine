@@ -32,10 +32,6 @@ enum class GameFlags : uint64_t
 };
 using GameFlags_t = common::Flags<GameFlags>;
 
-// Set tick rate to 32/64/128 tps (kfDeltaTime: 0.03125f/0.015625f/0.0078125f)
-inline constexpr std::chrono::nanoseconds kTickNs = 1'000'000'000ns / engine::kiTickRate;
-inline constexpr float kfDeltaTime = common::NanosecondsToFloatSeconds<float>(kTickNs);
-
 struct FrameInterpolate : public engine::FrameInterpolateBase
 {
 	// Called on Game creation
@@ -91,53 +87,6 @@ struct TransferRequest
 	int64_t iPushedTick = 0;
 };
 
-struct FrameBounds
-{
-	float fMinX {};
-	float fMinY {};
-	float fMaxX {};
-	float fMaxY {};
-};
-
-inline FrameBounds XM_CALLCONV ComputeFrameBounds(FXMVECTOR vecArea)
-{
-	// vecArea: x=minX, y=maxY, z=maxX, w=minY
-	return {
-		.fMinX = XMVectorGetX(vecArea),
-		.fMinY = XMVectorGetW(vecArea),
-		.fMaxX = XMVectorGetZ(vecArea),
-		.fMaxY = XMVectorGetY(vecArea),
-	};
-}
-
-// Compute world-space frame bounds for a given grid coordinate
-inline XMVECTOR XM_CALLCONV ComputeFrameArea(FXMVECTOR vecBaseArea, engine::GridCoord coord)
-{
-	float fWidth = XMVectorGetZ(vecBaseArea) - XMVectorGetX(vecBaseArea);
-	float fHeight = XMVectorGetY(vecBaseArea) - XMVectorGetW(vecBaseArea);
-	XMVECTOR vecOffset = XMVectorSet(static_cast<float>(coord.x) * fWidth, static_cast<float>(coord.y) * fHeight, static_cast<float>(coord.x) * fWidth, static_cast<float>(coord.y) * fHeight);
-	return XMVectorAdd(vecBaseArea, vecOffset);
-}
-
-inline constexpr size_t kuiInitialTransferCapacity = 32;
-
-inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecPosition)
-{
-	float fPositionX = XMVectorGetX(vecPosition);
-	float fPositionY = XMVectorGetY(vecPosition);
-
-	return !(fPositionX > rBounds.fMinX && fPositionX < rBounds.fMaxX &&
-	         fPositionY > rBounds.fMinY && fPositionY < rBounds.fMaxY);
-}
-
-inline void XM_CALLCONV ComputeTransferDelta(const FrameBounds& rBounds, FXMVECTOR vecPosition, int8_t& rDeltaX, int8_t& rDeltaY)
-{
-	float fPositionX = XMVectorGetX(vecPosition);
-	float fPositionY = XMVectorGetY(vecPosition);
-	rDeltaX = static_cast<int8_t>((fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX <= rBounds.fMinX) ? -1 : 0);
-	rDeltaY = static_cast<int8_t>((fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY <= rBounds.fMinY) ? -1 : 0);
-}
-
 struct FramePostRender : public engine::FramePostRenderBase
 {
 	FramePostRender();
@@ -184,19 +133,6 @@ struct Frame
 
 	static const int64_t kiVersion;
 
-	static constexpr float kfCellWidth = 900.0f;
-	static constexpr float kfCellHeight = 900.0f;
-
-	// Per-cell elevation grid resolution. 1024 × 1024 floats = 4 MB/cell at ~0.88-unit
-	// spacing across kfCellWidth — sub-meter, fine enough that quantizing FrameElevation
-	// queries to grid-cell centers is gameplay-invisible. See IslandTerrain::BuildElevationGrid.
-	static constexpr int64_t kiElevationGridDim = 1024;
-
-	static constexpr float kfBaseAreaMinX = -kfCellWidth / 2.0f;
-	static constexpr float kfBaseAreaMaxY = kfCellHeight / 2.0f;
-	static constexpr float kfBaseAreaMaxX = kfCellWidth / 2.0f;
-	static constexpr float kfBaseAreaMinY = -kfCellHeight / 2.0f;
-
 	[[nodiscard]] static target_t XM_CALLCONV GetMissileTarget(Frame& __restrict rFrame, FXMVECTOR vecPosition, FXMVECTOR vecDirection, engine::alignment_t alignment);
 
 	FrameInterpolate interpolate;
@@ -210,15 +146,5 @@ struct Frame
 
 std::ostream& operator<<(std::ostream& rStream, const Frame& rCurrent);
 std::istream& operator>>(std::istream& rStream, Frame& rCurrent);
-
-// Pre-mix coord.ToKey() into a 32-bit seed where both x and y bits influence the result.
-// Required because ToKey() packs x into bits 32-63: a naive `static_cast<uint32_t>(key)` would
-// drop x entirely. The 64-bit multiply spreads every input bit through the upper half of the
-// product, and the distinct multiplier per use case decorrelates offset and rotation streams.
-// RandomEngine's constructor then runs full splitmix64 on the 32-bit seed to produce its state.
-inline constexpr uint32_t SeedFromGridCoord(engine::GridCoord coord, uint64_t uiMultiplier)
-{
-	return static_cast<uint32_t>((coord.ToKey() * uiMultiplier) >> 32);
-}
 
 } // namespace game

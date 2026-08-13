@@ -170,7 +170,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
-	const FrameBounds bounds = ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{
@@ -194,7 +194,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 			},
 			.iPushedTick = rFrame.interpolate.iTick,
 		};
-		ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
+		engine::ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
 
 		// Heap realloc warning: capacity exceeded during burst transfers. Expected max ~1-2/tick
 		// per source frame — anything higher suggests entities are re-flagging kTransfer across
@@ -220,17 +220,17 @@ void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
-	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
-	{
-		if (!(rCurrentPostRender.pFlags[i] & kDestroy)) [[likely]]
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender,
+		[&](int64_t i)
 		{
-			continue;
-		}
+			return rCurrentPostRender.pFlags[i] & kDestroy;
+		},
+		[&](int64_t& ri)
+		{
+			RemoveOwnedObjects(rFrame, rCurrentInterpolate, ri);
 
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-	}
+			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, ri, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+		});
 }
 
 bool BlastersInterpolate::LogDifferences(const BlastersInterpolate& rOther) const

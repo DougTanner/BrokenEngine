@@ -50,7 +50,7 @@ struct FrameStaticData
 	// the same deterministic placements), refreshed when the network resends staticData,
 	// so it lives outside the persisted save format. mutable lets RunFrameTick fill it
 	// through the const FrameStaticData& it gets from ActiveFrameRef. Sized
-	// game::Frame::kiElevationGridDim^2 when populated.
+	// kiElevationGridDim^2 when populated.
 	mutable std::vector<float> elevationGrid;
 
 	// Render-only per-placement query cache, index-parallel to islands. Consumed by the client's

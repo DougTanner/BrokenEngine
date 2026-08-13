@@ -16,15 +16,29 @@ namespace engine
 namespace
 {
 
+// The on-disk header version describes this one file, not the shared identifier type, so it lives on a
+// wrapper rather than on Guid128. v2 migrated off the legacy hand-rolled v1/size-0 header to the shared
+// version+size convention; v1 files reset once.
+struct ClientGuidFile
+{
+	static constexpr int64_t kiVersion = 2;
+
+	ClientGuid guid {};
+};
+
+static_assert(sizeof(ClientGuidFile) == sizeof(ClientGuid), "ClientGuidFile must stay a pure 16-byte body — existing ClientGuid.bin files carry no extra field");
+static_assert(alignof(ClientGuidFile) == alignof(ClientGuid), "ClientGuidFile alignment diverged from ClientGuid");
+static_assert(BT_OFFSETOF(ClientGuidFile, guid) == 0, "ClientGuidFile::guid must start at offset 0 — the file body is the bare GUID");
+
 ClientGuid LoadClientGuidFromDisk()
 {
 	// Heap: filesystem path and file stream operations for GUID persistence
 	ScopedSuppressAllocationTracking suppress;
-	ClientGuid loadedGuid {};
-	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, std::filesystem::path("ClientGuid.bin"), loadedGuid) && !loadedGuid.IsEmpty())
+	ClientGuidFile loadedFile {};
+	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, std::filesystem::path("ClientGuid.bin"), loadedFile) && !loadedFile.guid.IsEmpty())
 	{
-		LOG(kNetwork, kInfo, "ClientSessionRuntime loaded GUID from disk: {} {}", loadedGuid.uiHigh, loadedGuid.uiLow);
-		return loadedGuid;
+		LOG(kNetwork, kInfo, "ClientSessionRuntime loaded GUID from disk: {} {}", loadedFile.guid.uiHigh, loadedFile.guid.uiLow);
+		return loadedFile.guid;
 	}
 	return {};
 }
@@ -33,7 +47,8 @@ void PersistClientGuidToDisk(const ClientGuid& rGuid)
 {
 	// Heap: filesystem path and file stream operations for GUID persistence
 	ScopedSuppressAllocationTracking suppress;
-	if (!WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path("ClientGuid.bin"), rGuid))
+	const ClientGuidFile guidFile {rGuid};
+	if (!WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path("ClientGuid.bin"), guidFile))
 	{
 		LOG(kNetwork, kError, "Failed to persist ClientGuid.bin (next session will re-handshake as a new client)");
 	}

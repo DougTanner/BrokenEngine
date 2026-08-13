@@ -100,7 +100,9 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 		DEBUG_BREAK();
 	}
 
-	if (rScratch.iReplayWriteCount >= engine::kiNetworkBufferSize)
+	// The slot before the write head holds the ring base the output layout keeps (rollback base,
+	// injected full state, or fast-path tail), so writes must never wrap onto it.
+	if (rScratch.iReplayWriteCount >= engine::kiNetworkBufferSize - 1)
 	{
 		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord Ring buffer full WriteCount: {} ForTick: {}", rScratch.iReplayWriteCount, iTick);
 		return false;
@@ -220,7 +222,7 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 	return true;
 }
 
-void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iRollbackOffset, int64_t iMaxConsecutive, float& rfTime)
+void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxConsecutive, float& rfTime)
 {
 	engine::CoordFrames& rFrames = *rWork.pFrames;
 	CoordScratch& rScratch = rWork.scratch;
@@ -233,7 +235,7 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iRollb
 			break;
 		}
 
-		rfTime += kfDeltaTime;
+		rfTime += engine::kfDeltaTime;
 
 		if (iTick <= rScratch.iPreReconcileTailTick)
 		{
@@ -278,17 +280,11 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iRollb
 		}
 	}
 
-	// Record the replay output layout with the confirmed frame at its head.
-	if (rScratch.iLastValidatedIndex >= 0)
+	// Record the replay output layout with the confirmed frame at its head. Index zero belongs to an
+	// injected full state, whose slot ComputeOutputLayout selects instead.
+	if (rScratch.iLastValidatedIndex > 0)
 	{
-		if (rScratch.iLastValidatedIndex == 0)
-		{
-			rScratch.outputLayout.iHead = SnapshotIndex(rFrames.iSnapshotHead, iRollbackOffset);
-		}
-		else
-		{
-			rScratch.outputLayout.iHead = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iLastValidatedIndex - 1);
-		}
+		rScratch.outputLayout.iHead = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iLastValidatedIndex - 1);
 		rScratch.outputLayout.iConfirmedInner = 0;
 	}
 }
@@ -302,7 +298,7 @@ static bool ReconcileForwardStepCoord(CoordWork& rWork, int64_t iTick, float& rf
 	engine::CoordFrames& rFrames = *rWork.pFrames;
 	CoordScratch& rScratch = rWork.scratch;
 
-	rfTime += kfDeltaTime;
+	rfTime += engine::kfDeltaTime;
 
 	FrameInput frameInput;
 	auto updateIt = rFrames.serverUpdates.find(iTick);
@@ -328,7 +324,7 @@ void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick, float& rfTime)
 	int64_t iStartWriteCount = rScratch.iReplayWriteCount;
 	int64_t iCurrentTick = rScratch.replayStack[rScratch.iReplayStackCount - 1]->interpolate.iTick;
 
-	int64_t iBudget = engine::kiNetworkBufferSize - rScratch.iReplayWriteCount;
+	int64_t iBudget = engine::kiNetworkBufferSize - 1 - rScratch.iReplayWriteCount;
 	int64_t iCappedTarget = std::min(iTargetTick, iCurrentTick + iBudget);
 
 	while (iCurrentTick < iCappedTarget)
