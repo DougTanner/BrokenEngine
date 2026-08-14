@@ -63,7 +63,7 @@ Inspect available depth and concurrency. Dispatch one `reviewer` role per lens b
 
 - Read `ThirdParty/AGENTS.md`, list existing ThirdParty packages, and avoid proposing an already-covered dependency unless extending it removes separate in-house code.
 - Find cohesive, reusable in-house clusters with no engine-specific reason to exist. Skip engine pipelines, gameplay, collections, managers, and Vulkan/shader glue.
-- Consider only replacements likely to remove more than 500 `bt-token-v1`; measure the inclusive candidate range with `.agents/scripts/Measure-Tokens.ps1`.
+- Consider only replacements likely to remove more than 500 `bt-token-v1`; measure the inclusive candidate range with `pwsh -NoProfile -File .agents/scripts/Measure-Tokens.ps1 -Path <path> -StartLine <first> -EndLine <last>`.
 - For each candidate, name the library, removable paths/ranges, integration and dependency risks, and the license proposition requiring verification. The local license allow list in `ThirdParty/AGENTS.md` remains controlling authority.
 
 ## Finding and Claim Contracts

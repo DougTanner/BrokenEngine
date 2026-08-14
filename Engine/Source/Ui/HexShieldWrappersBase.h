@@ -4,7 +4,7 @@
 
 #include "Ui/WrapperBase.h"
 
-namespace game
+namespace engine
 {
 
 // Hex shield
@@ -22,6 +22,6 @@ extern engine::Wrapper gHexShieldWaveFalloffPower;
 extern engine::Wrapper gHexShieldDirectionFalloffPower;
 extern engine::Wrapper gHexShieldDirectionMultiplier;
 
-} // namespace game
+} // namespace engine
 
 #endif // defined(BT_CLIENT)

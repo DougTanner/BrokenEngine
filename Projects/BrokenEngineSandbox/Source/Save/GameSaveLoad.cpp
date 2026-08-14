@@ -687,8 +687,19 @@ void GameSaveLoad::SaveLoadReplay()
 					staged.pendingReader.iActivationTick = rRecord.iActivationTick;
 					staged.pendingReader.pSavedStart = std::make_unique<game::Frame>();
 					std::filesystem::path coordReplayPath = std::filesystem::path("F7.replay." + std::to_string(rRecord.coord.ToKey()));
-					staged.pendingReader.pReader = std::make_unique<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>(engine::FileFlags_t {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, coordReplayPath, *staged.pendingReader.pSavedStart, staged.pendingReader.initialInput, rRecord.iActivationTick == iInitialTick);
-					if (!staged.pendingReader.pReader->Loaded() || staged.pendingReader.pReader->GetStartTick() != rRecord.iActivationTick ||
+					bool bLoaded = false;
+					bool bVersionMismatch = false;
+					int64_t iFileVersion = 0;
+					int64_t iExpectedVersion = 0;
+					staged.pendingReader.pReader = std::make_unique<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>(engine::FileFlags_t {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, coordReplayPath, *staged.pendingReader.pSavedStart, staged.pendingReader.initialInput, bLoaded, bVersionMismatch, iFileVersion, iExpectedVersion, rRecord.iActivationTick == iInitialTick);
+					if (bVersionMismatch)
+					{
+						// An older build recorded this replay: an expected refusal, not damaged data.
+						LOG(kDefault, kError, "SaveLoadReplay aborted: replay version {} != expected version {}", iFileVersion, iExpectedVersion);
+						mReplayTransferCaptureInfo = {};
+						return;
+					}
+					if (!bLoaded || staged.pendingReader.pReader->GetStartTick() != rRecord.iActivationTick ||
 						staged.pendingReader.pReader->GetSavedEnd().interpolate.iTick < rRecord.iActivationTick)
 					{
 						throw common::CorruptStreamException("ReplayManifest stream bounds");

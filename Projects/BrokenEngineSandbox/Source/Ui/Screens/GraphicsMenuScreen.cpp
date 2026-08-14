@@ -4,7 +4,7 @@
 
 #include "Game.h"
 #include "MenuUtils.h"
-#include "Ui/GraphicsQualityWrappers.h"
+#include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/Localization.h"
@@ -159,30 +159,30 @@ void GraphicsMenuScreen::Render()
 		// Right column: Effects & UI
 		ImGui::TableNextColumn();
 
-		if (RadioRow("Water", &gWaterLevel, gWaterLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (RadioRow("Water", &engine::gWaterLevel, engine::gWaterLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
-			ApplyWaterLevel();
+			engine::ApplyWaterLevel();
 		}
 
 		ImGui::Separator();
 
-		if (RadioRow("Terrain Shadows", &gTerrainShadowsLevel, gTerrainShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (RadioRow("Terrain Shadows", &engine::gTerrainShadowsLevel, engine::gTerrainShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
-			ApplyTerrainShadowsLevel();
+			engine::ApplyTerrainShadowsLevel();
 		}
 
 		ImGui::Separator();
 
-		if (RadioRow("Object Shadows", &gObjectShadowsLevel, gObjectShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (RadioRow("Object Shadows", &engine::gObjectShadowsLevel, engine::gObjectShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
-			ApplyObjectShadowsLevel();
+			engine::ApplyObjectShadowsLevel();
 		}
 
 		ImGui::Separator();
 
-		if (RadioRow("Lighting", &gLightingLevel, gLightingLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (RadioRow("Lighting", &engine::gLightingLevel, engine::gLightingLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
-			ApplyLightingLevel();
+			engine::ApplyLightingLevel();
 		}
 
 		ImGui::Separator();
@@ -190,9 +190,9 @@ void GraphicsMenuScreen::Render()
 		WrapperToggle("Smoke", &engine::gSmokeEnabled);
 		if (engine::gSmokeEnabled.Get<bool>())
 		{
-			if (RadioRow("Smoke Detail", &gSmokeDetailLevel, gSmokeDetailLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+			if (RadioRow("Smoke Detail", &engine::gSmokeDetailLevel, engine::gSmokeDetailLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 			{
-				ApplySmokeDetailLevel();
+				engine::ApplySmokeDetailLevel();
 			}
 
 			ColumnSlider("Smoke Area", &engine::gSmokeSimulationArea);

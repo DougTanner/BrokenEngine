@@ -27,18 +27,10 @@ Target the project the latest `/compile` result built, unless the user or plan n
 
 Provision the checkout and use only its provisioned primary AgentHarness output. Wrapper sessions use their existing WorktreeCli session owner; a non-worktree checkout may let the provisioner create a transient provisioning session.
 
-Claim through `scripts/Invoke-HarnessClaim.ps1`. It requires the selected project's server and client executables (reading their names and `Output` directory from the project harness doc's launch block), provisions the checkout, requires the resolved `AgentHarness.exe`, mints the owner token, and claims the lock, printing one compact `broken-engine-harness-claim/v1` JSON object. Add `-Configuration <name>` only for a build other than `Debug`. In Codex's PowerShell 7 terminal:
+Claim through `scripts/Invoke-HarnessClaim.ps1`. It requires the selected project's server and client executables (reading their names and `Output` directory from the project harness doc's launch block), provisions the checkout, requires the resolved `AgentHarness.exe`, mints the owner token, and claims the lock, printing one compact `broken-engine-harness-claim/v1` JSON object. Add `-Configuration <name>` only for a build other than `Debug`. Run this from the session worktree root:
 
 ```powershell
-$Script = Join-Path $ROOT '.agents\skills\agent-harness\scripts\Invoke-HarnessClaim.ps1'
-pwsh -NoProfile -ExecutionPolicy Bypass -File $Script -RepositoryRoot $ROOT -Session '<short task label>'
-```
-
-In Claude Code's Git Bash terminal, convert the script path first — do the same for every script invocation below:
-
-```bash
-script="$(cygpath -w "$ROOT/.agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1")"
-pwsh -NoProfile -ExecutionPolicy Bypass -File "$script" -RepositoryRoot "$(cygpath -w "$ROOT")" -Session '<short task label>'
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot $ROOT -Session '<short task label>'
 ```
 
 Exit `0` (`status` `pass`) supplies the `owner` token, the resolved `agentHarness` path, and the `claim` record; hold that token in `$Owner`, keep that path in `$AgentHarness`, and report the claim metadata verbatim. Exit `2` (`status` `blocked`) carries one of two codes. `claim.executable-missing` means a required project executable is absent for the requested configuration: no provisioning ran and no lock was taken, so route `/compile` for the named executables and re-enter. `claim.foreign-owner` means another session holds the lock: the payload's `currentOwner` carries its `claimedAt` and the derived `holdSeconds` — heartbeat never advances `claimedAt` — so decide between waiting and reordering non-harness work instead of polling blind. The script never steals, never waits for the lock, and never touches a foreign owner's processes. Exit `1` is a failure naming its step (`claim.repository-missing`, `claim.provisioner-missing`, `claim.launch-doc-unreadable`, `claim.provision-failed`, `claim.harness-missing`, `claim.token-failed`, `claim.metadata-unreadable`, `claim.failed`, or `internal.error`); stop and report it. Never reconstruct provisioning, harness-path resolution, token minting, or the claim inline.
@@ -66,7 +58,13 @@ Old-owner cleanup may refresh its heartbeat; that does not invalidate staleness 
 
 ## Launch
 
-Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, normalized `GameDataDirectory`, fixed data baseline, and the path and SHA-256 of the selected `broken-engine-data-oracle/v1` receipt — the record file proving exactly which data files the build used. Before each launch and after verification, invoke the compile package's `scripts/Test-DataOracleReceipt.ps1` with that exact receipt/path/mode/baseline tuple and require its typed passing result. In Local mode, do the same for the independent primary Shared receipt. Stop on any receipt, path, mode, baseline, inventory, or byte mismatch. Never infer an identity, compare Shared and Local receipts for equality, switch data mode, fall back to Shared data, or run DataPacker/Gaea/texture export.
+Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, normalized `GameDataDirectory`, fixed data baseline, and the path and SHA-256 of the selected `broken-engine-data-oracle/v1` receipt — the record file proving exactly which data files the build used. Before each launch and after verification, invoke the compile package's `scripts/Test-DataOracleReceipt.ps1` with that exact receipt/path/mode/baseline tuple and require its typed passing result:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/compile/scripts/Test-DataOracleReceipt.ps1 -ReceiptPath '<receipt path>' -ReceiptSha256 '<receipt SHA-256>' -ExpectedDataRoot '<normalized Data path>' -ExpectedMode '<Shared|Local>' -ExpectedBaseline '<40-hex baseline>'
+```
+
+In Local mode, do the same for the independent primary Shared receipt. Stop on any receipt, path, mode, baseline, inventory, or byte mismatch. Never infer an identity, compare Shared and Local receipts for equality, switch data mode, fall back to Shared data, or run DataPacker/Gaea/texture export.
 
 Use the compiled configuration suffix. Ordinary same-machine runs pass `--loopback-only`. Create log parents under `$ROOT\Temp`. Do not change process working directories; `--data-directory` is the only override selecting packed assets, and `--app-data-directory` is the only override selecting where saves, settings, caches, and replays are written.
 
@@ -79,13 +77,17 @@ Agent-mode executables start minimized without activation. Capture commands temp
 After launching either executable, wait for readiness with `scripts/Wait-HarnessPing.ps1` before the first real command. It handles one port per call, so launch order stays with you:
 
 ```powershell
-$Script = Join-Path $ROOT '.agents\skills\agent-harness\scripts\Wait-HarnessPing.ps1'
-pwsh -NoProfile -ExecutionPolicy Bypass -File $Script -AgentHarness $AgentHarness -Owner $Owner -Port 27100 -TimeoutSeconds 120
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-HarnessPing.ps1 -AgentHarness $AgentHarness -Owner $Owner -Port 27100 -TimeoutSeconds 120
 ```
 
 The script polls until the port answers `ok:true`, tolerating the individual timeouts long client startup (terrain elevation and priority-texture waits) produces after connect already succeeded. Exit `0` (`status` `pass`) reports the observed `tick`; `tick` of `-1` means the listener is up but the game is not yet created (see the command reference `references/command-reference.md` for `ping`). Exit `2` (`status` `blocked`, code `ping.timeout`) reports the attempt count and elapsed time, and blocks the first real command. Exit `1` is a setup failure. Never hand-write a ping loop or invent a sleep window in its place.
 
-Invoke `scripts/Wait-IslandSceneReady.ps1` only after launch and only when an approved criterion depends on island footprints or rendered islands. Supply the exact `-AgentHarness`, harness-lock `-Owner`, client `-ClientPort`, bounded `-TimeoutSeconds`, and absolute ignored `-ArtifactPath`; do not rename or replace the retained `$ServerPid`/`$ClientPid` lifecycle variables. The helper requires client `ping` with `tick >= 0`, restores the client with `window_state {minimized:false}`, and requires the complete `clientGridCoord` plus nonempty island footprints to be byte-stable across two consecutive normalized samples. Exit `0` is usable only with a `broken-engine-island-scene-readiness/v1` artifact reporting `Status:success`, `Code:ready`, and `Ready:true`; missing, malformed, or failed evidence blocks the criterion. The selected project document owns the concrete invocation.
+Invoke `scripts/Wait-IslandSceneReady.ps1` only after launch and only when an approved criterion depends on island footprints or rendered islands. Supply the exact `-AgentHarness`, harness-lock `-Owner`, client `-ClientPort`, bounded `-TimeoutSeconds`, and absolute ignored `-ArtifactPath`; do not rename or replace the retained `$ServerPid`/`$ClientPid` lifecycle variables.
+
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1 -AgentHarness $AgentHarness -Owner $Owner -ClientPort 27101 -TimeoutSeconds 120 -ArtifactPath '<absolute artifact path>'
+```
+ The helper requires client `ping` with `tick >= 0`, restores the client with `window_state {minimized:false}`, and requires the complete `clientGridCoord` plus nonempty island footprints to be byte-stable across two consecutive normalized samples. Exit `0` is usable only with a `broken-engine-island-scene-readiness/v1` artifact reporting `Status:success`, `Code:ready`, and `Ready:true`; missing, malformed, or failed evidence blocks the criterion. The selected project document owns the concrete argument values and the evidence check around this call.
 
 Before relinking or relaunching, send `quit` and wait for the retained exact PID. A live executable locks its image. Do not launch a duplicate to displace it — with `SO_REUSEADDR`, a duplicate on the same port binds alongside the live listener instead of failing fast, and connection routing between the two becomes nondeterministic. The engine listener sets `SO_REUSEADDR` and briefly retries address-in-use binds, so relaunch immediately once the exact PID has exited and rely on the ping poll for readiness — never invent a sleep window.
 
@@ -117,8 +119,7 @@ The selected project's harness doc owns the concrete setup recipe (which command
 After every successful, failed, crashed, or abandoned launch attempt, release through `scripts/Invoke-HarnessRelease.ps1`. One call performs the whole sequence, and it is safe after a crashed run whose PIDs are already gone:
 
 ```powershell
-$Script = Join-Path $ROOT '.agents\skills\agent-harness\scripts\Invoke-HarnessRelease.ps1'
-pwsh -NoProfile -ExecutionPolicy Bypass -File $Script -AgentHarness $AgentHarness -Owner $Owner -ServerPid $ServerPid -ClientPid $ClientPid
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessRelease.ps1 -AgentHarness $AgentHarness -Owner $Owner -ServerPid $ServerPid -ClientPid $ClientPid
 ```
 
 Pass only the retained exact `$ServerPid`/`$ClientPid`, and omit either one that was never assigned. The script quits both ports with the owner (server quit autosaves), waits for those exact PIDs, stops only a supplied exact PID that survived the quit, and runs `lock release` only once every supplied PID is confirmed absent. It never searches by process name and never stops a PID you did not supply.

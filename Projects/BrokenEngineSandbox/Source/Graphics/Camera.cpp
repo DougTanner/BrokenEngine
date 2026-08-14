@@ -234,7 +234,6 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 
 	mVecPreviousTargetPosition = vecTargetPosition;
 
-	const float fEyeHeightBeforeZoom = mfCameraEyeHeight;
 	int iScrollDelta = gpInput->mCameraInput.iScrollDelta;
 	if (iScrollDelta != 0)
 	{
@@ -276,14 +275,6 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 			float fDH01 = -6.0f * fT2 + 6.0f * fT;
 			mfEyeVelocity = (fDH00 * mfEyeStartHeight + fDH10 * mfEyeStartVelocity * kfEyeBlendDuration + fDH01 * mfCameraEyeHeightTarget) / kfEyeBlendDuration;
 		}
-	}
-
-	// Lighting temporal history has no prior-valid-window bounds, so every frame with actual outward eye movement
-	// uses pure-current lighting and re-seeds history after the enlarged world area is rendered. Compare the live
-	// Hermite result rather than its target so carried velocity and direction reversals follow visible motion.
-	if (mfCameraEyeHeight > fEyeHeightBeforeZoom)
-	{
-		engine::gbLightingTemporalReset = true;
 	}
 
 	// Keep each world-texel reference at or above the live eye height: zero initialization and outward zoom snap

@@ -7,6 +7,7 @@
 #include "Network/NetworkDiscoveryResponder.h"
 #include "Network/Server/Server.h"
 
+#include "Game.h"
 #include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerSession.h"
 
@@ -38,6 +39,23 @@ ServerSessionRuntime::~ServerSessionRuntime()
 	timeEndPeriod(1);
 }
 
+void ServerSessionRuntime::ResetOnLastClientLeave()
+{
+	// Runtime-owned reset after each post-poll sample: clear network-driven pause and timescale when the
+	// engine client set transitions from non-empty to empty. Sampling after the complete game hook catches
+	// every removal path, while an already-empty server retains its commanded pause and timescale.
+	bool bHasClients = !mpServer->mClients.empty();
+	if (mbHadClients && !bHasClients)
+	{
+		game::gpGame->mGameFlags.Clear(engine::GameFlags::kPaused);
+		if (game::gpGame->mTimeStep.miTimeMultiply != 1 || game::gpGame->mTimeStep.miTimeDivide != 1)
+		{
+			game::gpGame->mTimeStep.SetTimeScale(1, 1);
+		}
+	}
+	mbHadClients = bHasClients;
+}
+
 void ServerSessionRuntime::Poll(const NetworkTimeState& rTimeState)
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
@@ -47,6 +65,7 @@ void ServerSessionRuntime::Poll(const NetworkTimeState& rTimeState)
 	mpServer->Poll(rTimeState, ServerPollMode::kUpdateStart);
 	mpDiscoveryResponder->Poll();
 	mrSession.AfterNetworkPoll();
+	ResetOnLastClientLeave();
 }
 
 // Second poll of the update, run after WaitForTick so commands that arrived during the wait enter the
@@ -60,6 +79,7 @@ void ServerSessionRuntime::PollTickBoundary(const NetworkTimeState& rTimeState)
 	ScopedSuppressAllocationTracking suppress;
 	mpServer->Poll(rTimeState, ServerPollMode::kTickBoundary);
 	mrSession.AfterNetworkPoll();
+	ResetOnLastClientLeave();
 }
 
 void ServerSessionRuntime::WaitForTick(TimeStep& rTimeStep)

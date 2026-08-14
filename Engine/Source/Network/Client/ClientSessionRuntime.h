@@ -41,6 +41,31 @@ public:
 	// user command depart immediately instead of waiting for the next tick-cadence ack flush.
 	void FlushOutgoing();
 
+	template <typename TPACKETTYPE, typename TLOGFUNCTION, typename... TARGS>
+	void SendGameRequest(TPACKETTYPE ePacketType, const TLOGFUNCTION& rLogFunction, const TARGS&... rArgs)
+	{
+		if (mpClient == nullptr || !(mpClient->mStateFlags & Client::ClientStateFlags::kConnected) || mpClient->mpServerPeer == nullptr)
+		{
+			return;
+		}
+
+		std::optional<common::LogTickScope> optionalTickScope;
+		if (common::gpThreadLocal->miLogTickCounter < 0)
+		{
+			optionalTickScope.emplace(CurrentGameTick());
+		}
+
+		rLogFunction();
+		mpClient->SendSimplePacket(ePacketType, NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, rArgs...);
+
+		{
+			// Send the user command now instead of waiting for the tick-cadence ack flush.
+			// Heap: ENet may allocate while flushing outgoing commands
+			ScopedSuppressAllocationTracking suppress;
+			FlushOutgoing();
+		}
+	}
+
 	void SetDesiredCoords(const GridCoord* pDesiredCoords, int64_t iDesiredCount, std::string_view reason, int64_t iTick);
 	void SynchronizeSubscriptions();
 	void ClearSubscriptionState();
@@ -70,6 +95,8 @@ private:
 	void BuildSubscriptionQueue(const GridCoord* pDesiredCoords, int64_t iDesiredCount);
 	void TrySubscribeNext();
 	void SendAckAndFlush();
+	// Exception: this one-line bridge keeps the game-only gpGame definition out of the engine header.
+	int64_t CurrentGameTick() const;
 
 	int64_t miLastLoggedClockTargetBehind = -1;
 	int64_t miLastPeriodicClockLogTick = -1;

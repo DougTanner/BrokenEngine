@@ -107,6 +107,13 @@ function Get-AgentWorktreeSessionContext {
 	# on the primary tip's history, and otherwise recover the true fork point from the primary branch's
 	# reflog. --fork-point can still answer with an older ancestor once the pre-rewrite tip has expired
 	# from that reflog, so the plain merge-base stays as the last resort rather than failing closed.
+	# Rebasing the session onto an advanced primary is the second way the recorded baseline goes
+	# stale: it stays on the primary tip's history, so it is still accepted, but it now sits
+	# before commits the rebase already put under the session, and the diff would claim them.
+	# The same holds once the primary tip reaches or passes the session HEAD, as after this
+	# session's own landing, which then resolves the baseline to the landed commit and leaves
+	# only the open stage in the diff. Substituting the merge base directly instead of falling
+	# back to --fork-point keeps the answer deterministic and reflog-independent.
 	$baseline = $null
 	$configured = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_BASELINE', 'Process')
 	if (-not [string]::IsNullOrWhiteSpace($configured)) {
@@ -114,7 +121,17 @@ function Get-AgentWorktreeSessionContext {
 		if ($LASTEXITCODE -eq 0 -and $resolved.Count -eq 1) {
 			$candidate = $resolved[0].Trim()
 			& git -C $top merge-base --is-ancestor $candidate $primaryTip
-			if ($LASTEXITCODE -eq 0) { $baseline = $candidate }
+			if ($LASTEXITCODE -eq 0) {
+				$baseline = $candidate
+				$divergence = @(& git -C $top merge-base HEAD $primaryTip 2>$null)
+				if ($LASTEXITCODE -eq 0 -and $divergence.Count -eq 1) {
+					$divergencePoint = $divergence[0].Trim()
+					if ($divergencePoint -cne $candidate) {
+						& git -C $top merge-base --is-ancestor $candidate $divergencePoint
+						if ($LASTEXITCODE -eq 0) { $baseline = $divergencePoint }
+					}
+				}
+			}
 		}
 	}
 	if ([string]::IsNullOrWhiteSpace($baseline)) {

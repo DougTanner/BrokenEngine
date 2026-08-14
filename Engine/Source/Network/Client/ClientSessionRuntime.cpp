@@ -7,6 +7,7 @@
 #include "Network/Client/Client.h"
 #include "Network/NetworkDiscoveryScanner.h"
 
+#include "Game.h"
 #include "Network/Client/ClientSession.h"
 #include "Profile/ProfileManager.h"
 
@@ -86,6 +87,11 @@ ClientSessionRuntime::ClientSessionRuntime(game::ClientSession& rSession)
 }
 
 ClientSessionRuntime::~ClientSessionRuntime() = default;
+
+int64_t ClientSessionRuntime::CurrentGameTick() const
+{
+	return game::gpGame->TickCounter();
+}
 
 void ClientSessionRuntime::ResetClock()
 {

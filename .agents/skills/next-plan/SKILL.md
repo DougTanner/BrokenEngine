@@ -123,9 +123,15 @@ requires an explicit user instruction given in the current session, recorded in
 the handoff; nothing else unlocks it.
 `/finalize-changes` deletes the claim after primary advances. Run
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Test-NextPlanWorkflowScripts.ps1 -Executable '<worktree-cli-path>'`
-only when one of those scripts changes; substitute the provisioned `WorktreeCli`
-path resolved by `Get-NextPlanContext` during Preconditions and selection for
-`<worktree-cli-path>` and never pass the placeholder literally.
+only when `Complete-NextPlan.ps1`, `Defer-NextPlan.ps1`, `Get-NextPlanList.ps1`,
+`Invoke-NextPlanClaim.ps1`, `NextPlanWorkflowCommon.psm1`, or
+`Test-NextPlanWorkflowScripts.ps1` itself changes; substitute the provisioned
+`WorktreeCli` path that `Get-NextPlanContext` returns for `<worktree-cli-path>`
+and never pass the placeholder literally. That function is exported by
+`.agents/skills/next-plan/scripts/NextPlanWorkflowCommon.psm1`; import it from
+the session worktree root the same way
+`../../references/subagent-reporting.md` imports its module, leading `./`
+included.
 
 ## Tooling friction follow-ups
 
@@ -139,8 +145,9 @@ the change, user-driven iteration, and documented normal stops such as
 the claimed Plan itself changes — that is a blocker of the active change. The
 review covers friction observed at any point, including a stop before or
 without a claim, and the claim-exit scripts
-above are themselves in scope: review once before running them and again after
-they run, before `/finalize-changes`.
+above are themselves in scope: review once before running them, and again inside
+`/finalize-changes` once the landing commit is prepared and before the landing
+`/verify-changes` acceptance review is dispatched.
 
 For each distinct issue, an `implementer` routes it through
 `/create-follow-up-plans` as a tooling-friction proposal, supplying the observed
@@ -152,10 +159,19 @@ selection, or from `git branch --show-current` and `git rev-parse --show-topleve
 Never record a transcript file path or transcript text; reference the session by
 client and id only.
 
-On completion or rejection, the friction Plan file joins the landing commit
-alongside the `changedPaths` the claim-exit script reported. On deferral, or when
-the run ends without a claim, the friction Plan is itself the landed content and
-the landing gate applies to it.
+On completion or rejection, a friction Plan authored at that second checkpoint
+joins the landing commit alongside the `changedPaths` the claim-exit script
+reported: one further candidate commit for that Plan path and one further
+approval-preparation run carrying `-CommitMessageFile` so the rebuilt commit's
+message describes the enlarged content, both invoked exactly as
+`/finalize-changes` documents them and with no hand-run Git, then re-review of
+the affected regions and a re-run of the landing `/verify-changes` acceptance
+review on the new final diff. That rerun happens at most once per landing, so
+friction first observed during it never joins this landing commit: an
+`implementer` records it through `/create-follow-up-plans` and it lands at a
+later gate as its own content, exactly as the deferral case does. On deferral, or
+when the run ends without a claim, the friction Plan is itself the landed content
+and the landing gate applies to it.
 
 ## Preparation handoff
 

@@ -4,7 +4,7 @@ Shared logging, formatting, diagnostic-file, and difference-reporting implementa
 
 ## Contracts
 
-- `LOG` first applies each project's minimum log level per category, fixed at compile time, then the atomic runtime threshold. Runtime levels default to `kInfo` (`kVerbose` in DataPacker); `kTemp` is the one exception and defaults to `kVerbose` in every build, so its messages always emit. The agent command may raise or lower them only within the compiled range.
+- `LOG` first applies each project's minimum log level per category, fixed at compile time, then the atomic runtime threshold. Runtime levels default to `kInfo` (`kVerbose` in DataPacker); `kTemp` is the one exception and defaults to `kVerbose` in every build, so its messages always emit. `kReplay` instead pairs a `kVerbose` compile floor with the ordinary `kInfo` runtime default, so its per-tick checksum lines are compiled in but silent until an agent lowers that category's runtime level. The agent command may raise or lower them only within the compiled range.
 - Threads format into their `ThreadLocal` buffer or a thread-local fallback. Emission is serialized; the crash snapshot ring does not wrap, while the ring that agent queries read — one shared ring buffer spanning all categories — does. Keep formatting allocation-free before entering either ring.
 - Tick scopes, and scopes that set their indent level directly rather than by nesting, propagate simulation context across worker dispatch. `ScopedLogIndent` is the separate delta-based scope for ordinary nesting.
 - `LogFormatters.h` owns formatters for Common-visible types. Paths, wide strings, vectors, and precision-sensitive floats use workbuffer-backed wrappers; higher-layer types stay with their owning aggregation hub.

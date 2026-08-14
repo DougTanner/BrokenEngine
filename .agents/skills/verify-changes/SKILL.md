@@ -10,8 +10,9 @@ allowed-tools: [Read, Grep, Glob, "Bash(git diff *)", "Bash(git status *)", "Bas
 
 Run only at a root [AGENTS.md](../../../AGENTS.md) landing gate. Main dispatches
 one fresh read-only `reviewer`; it never edits, delegates, builds, launches
-runtime work, changes claims or the tree, or fixes/waives findings.
-`plan validate` may perform only its established stale local-claim healing.
+runtime work, changes claims or the tree, or fixes/waives findings — the
+`plan validate` run required by `## Executable Plan check` uses `--lint-only`,
+so it heals nothing and changes no scheduler state.
 
 ## Required inputs
 
@@ -21,10 +22,14 @@ Require the task brief from `../../references/subagent-reporting.md`, plus:
   `primary-commit`);
 - the final approved Plan or user instruction, plus any changes the user
   approved after it;
-- tier/triggers, role assignments, acceptance table, and invariants; and
+- tier/triggers, role assignments, acceptance table, and invariants;
 - caller-owned paths and concise ordered handoffs for implementation,
   propagation, checks, reviews, fixes, hygiene, builds, external claims, and
-  residuals.
+  residuals; and
+- the typed artifacts this change set triggers: on a change set including a game
+  build, the passing `broken-engine-data-oracle-verifier-result/v1` result
+  `../compile/references/runtime-data-mode.md` states; on a changed `SKILL.md`,
+  the complete `/validate-skill` PASS handoff.
 
 Do not accept an unapproved delta or pasted full logs. For a completed claimed
 Plan whose file the change deletes, the manager supplies its approved text or
@@ -56,8 +61,7 @@ its Git-history path.
    uncommitted candidate and classifies as `intentionally persisted`.
 
 The run writes no file. `-Landing` requires a commit-valued `-Head` and excludes
-the other modes; in Claude Code's Git Bash terminal convert the script path and
-root with `cygpath -w` exactly as `../cleanup-worktrees/SKILL.md` shows. Only
+the other modes. Only
 `status` `pass` (exit 0) is usable; `blocked` (exit 2) or `error` (exit 1) means
 the reviewed diff is unavailable, which is a `BLOCKED` verification, never a
 diff rebuilt inline. Each `landing` array is capped at 500 rows: check
@@ -104,30 +108,26 @@ finding.
 
 ## Executable Plan check
 
-When the reviewed diff touches `Documents/Plans/**`, require a valid WorktreeCli
-`plan validate` result for the session worktree. Record notices and healing.
-Otherwise record `not triggered — no executable-Plan change`. Primary
-post-commit validation belongs to finalization.
+When the reviewed diff touches `Documents/Plans/**`, run
+`Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe plan
+validate --lint-only --repo <absolute Git common directory> --worktree
+<adopted checkout>` and require a valid result for the
+session worktree. Record notices. Otherwise record `not triggered — no
+executable-Plan change`. Primary post-commit validation belongs to
+finalization.
 
-Under `/codex-review` the read-only sandbox cannot run `plan validate` — its
-scheduler guard reports `guard-unavailable` there — so `/codex-review` supplies
-a host-side verbatim result in the scope file with the worktree path and the
-baseline and head SHAs it ran against. Validate that supplied evidence instead
-of running the tool — match its worktree and SHAs to the reviewed checkout and
-diff, and leave the row `BLOCKED` when that identity is missing or mismatched.
-When this verification does run `plan validate` itself, `code: busy` is genuine
-contention: re-run it up to twice more within this verification, and record a
-third `busy` as `BLOCKED`. `code: guard-unavailable` means the guard's lock file
-or its storage is unusable, so re-running cannot help: record it as `BLOCKED`
-without a re-run.
+`--lint-only` takes no scheduler guard, creates no storage, and heals nothing,
+so it reports `healedClaims` as an empty array and the `/codex-review`
+read-only sandbox can run it. A run that fails to execute the tool at all is a
+blocker: record the row `BLOCKED` with the exact failure, and never substitute
+other evidence for the missing run.
 
 ## Output
 
 Return `Verification: PASS` only when ownership, authorization, and every row
 pass. Otherwise return `Verification: BLOCKED` once with all decisive items; do
-not retry any judgment check, the bounded `plan validate` re-runs above being
-the only exception. A PASS binds the reviewed diff; if that diff later changes
-meaningfully, re-review only the changed regions.
+not retry any judgment check. A PASS binds the reviewed diff; if that diff
+later changes meaningfully, re-review only the changed regions.
 
 A later pass may resume a `BLOCKED` result only when its sole blocking rows are
 missing typed artifacts and the baseline and head SHAs are unchanged. That pass

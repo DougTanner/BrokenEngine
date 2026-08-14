@@ -81,6 +81,8 @@ try {
 	# Session identity is derived from the Git branch, so the session branch must be codex/<guid>.
 	$sessionBranch = "codex/$([guid]::NewGuid().ToString())"
 	Invoke-Git $primary @('worktree','add','-b',$sessionBranch,$script:session,'HEAD') | Out-Null
+	# The session module resolves the landing target through this sidecar, which the wrapper scripts write.
+	Set-Utf8File (Join-Path $script:session 'Temp/session-sidecar.json') "{`"schemaVersion`":`"broken-engine-session-sidecar/v1`",`"targetBranch`":`"main`"}"
 	[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($sessionOutput)) | Out-Null
 	New-Item -ItemType Junction -Path $sessionOutput -Target $primaryOutput | Out-Null
 

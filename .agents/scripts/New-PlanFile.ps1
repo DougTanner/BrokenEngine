@@ -195,6 +195,13 @@ try {
 		} else {
 			Write-PlanFileDiagnostic "plan validate returned status '$validationStatus' and code '$validationCode', expected 'valid' and 'ok': $detail"
 		}
+		# A scheduler guard outcome is a lock problem, not a metadata one, so it never sends the caller to edit a correct body.
+		if ($validate.ExitCode -eq 2 -and $validationCode -ceq 'busy') {
+			Complete-PlanFile 2 'blocked' 'scheduler.busy' 'Another session held the plan scheduler for the full wait; the Plan file was written and left staged, and its body is not the problem. Tell the user and retry validation later.'
+		}
+		if ($validate.ExitCode -eq 1 -and $validationCode -ceq 'guard-unavailable') {
+			Complete-PlanFile 1 'error' 'scheduler.guard-unavailable' 'The plan scheduler lock storage is unusable; the Plan file was written and left staged. Tell the user - this is not a Plan metadata problem and re-running will not help.'
+		}
 		# The written Plan stays staged and in place so the caller can fix its body instead of retyping the plan.
 		$exit = if ($validate.ExitCode -eq 2) { 2 } else { 1 }
 		Complete-PlanFile $exit $(if ($exit -eq 2) { 'blocked' } else { 'error' }) 'plan.validation-failed' "Plan file was written but 'plan validate' rejected the tree; fix the body and revalidate."

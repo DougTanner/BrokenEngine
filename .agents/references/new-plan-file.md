@@ -12,10 +12,10 @@ staging, or validation operations inline.
 
 ## Invocation
 
+From the session worktree root:
+
 ```powershell
-$RepositoryRoot = (git rev-parse --show-toplevel).Trim()
-$Script = Join-Path $RepositoryRoot '.agents/scripts/New-PlanFile.ps1'
-pwsh -NoProfile -File $Script -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
+pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
 ```
 
 - `-Area` — an existing directory beneath `Documents/Plans`; the script creates
@@ -44,6 +44,13 @@ validation failure leaves the written Plan staged and in place, so correct the
 body and revalidate instead of recreating the Plan or rewriting the file by
 hand. Staging affects only the exact new Plan path; existing staged and
 worktree changes remain untouched.
+
+Two codes report a plan scheduler lock outcome rather than a body problem, and
+both also leave the written Plan staged and in place: `scheduler.busy` (exit
+`2`, `blocked`) means another session held the scheduler for the full wait, so
+tell the user and retry validation later; `scheduler.guard-unavailable` (exit
+`1`, `error`) means the scheduler's lock storage is unusable, so re-running will
+not help. Editing the Plan body changes neither outcome.
 
 `truncated` `true` means a cap applied — 64 `dependsOn` entries, 16 diagnostics
 or notices, a 256-character message, or a `validation` projection dropped from

@@ -23,9 +23,7 @@ Classify into `Documents/Plans/` for executable engine debt or `Documents/Featur
 Write the plan body to a file, then create the Plan with the repository-owned `.agents/scripts/New-PlanFile.ps1`.
 
 ```powershell
-$RepositoryRoot = (git rev-parse --show-toplevel).Trim()
-$Script = Join-Path $RepositoryRoot '.agents/scripts/New-PlanFile.ps1'
-pwsh -NoProfile -File $Script -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
+pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
 ```
 
 Its parameters, the `-DependsOn` single-token rule, its result shape, and its exit handling are in `../../references/new-plan-file.md`; only the created outcome there permits reporting the plan as saved.

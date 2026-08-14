@@ -15,6 +15,7 @@
 ## Replay
 
 - The replay manifest is the marker that commits one replay generation — a single recording instance, named in code by `kReplayManifestGenerationDomain` and `ComputeReplayGenerationDigest` — plus the checksummed list of that generation's files. Recording start invalidates it before replacing any component; recording stop publishes it only after writers and metadata succeed. Playback validates its authoritative component identities, byte counts, SHA-256 digests, and replay generation root before reading components or applying staged state.
+- A staged replay reader whose file records a version different from this build's is an expected refusal, not corrupt data: report it and abandon playback. Every other reader failure, including a truncated or damaged header, stays on the corrupt-data path.
 - Writer state persists across frames. A writer's first coord eviction is terminal: retain that coord's last complete frame and never resume the writer. Missing retained terminal state invalidates that coord's replay files without skipping attempts for other writers or metadata.
 - Playback readers retire independently at recorded endpoints. Loop only after the last reader retires, and stop the current fixed-tick iteration before loading the next loop.
 - Successfully applying replay state starts a fresh fixed-step wall-clock interval. Replay validation and file I/O are outside simulation time; never carry their elapsed time or accumulated tick debt into the restored loop, or a batch of extra ticks can break replay CRCs.

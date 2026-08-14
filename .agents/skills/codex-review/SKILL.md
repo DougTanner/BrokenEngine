@@ -39,29 +39,30 @@ role already resolves to Sol.
    [references/prompt-template.md](references/prompt-template.md) and is changed
    only there. The manager runs the script before dispatch; the reviewer, inside
    the Codex `--sandbox read-only` environment, only reads the prompt file it
-   wrote. In Codex's PowerShell 7 terminal:
+   wrote. From the session worktree root:
 
    ```powershell
-   pwsh -NoProfile -ExecutionPolicy Bypass -File <worktree>/.agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot <worktree> -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole]
-   ```
-
-   In Claude Code's Git Bash terminal, convert the script path first:
-
-   ```bash
-   repository_root="$(git rev-parse --show-toplevel)"
-   script="$(cygpath -w "$repository_root/.agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1")"
-   pwsh -NoProfile -ExecutionPolicy Bypass -File "$script" -RepositoryRoot "$repository_root" -Baseline <baseline> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path>
+   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot <worktree> -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole]
    ```
 
    Write the judgment content yourself into `-ScopeFile`: the exact scope, the
    files and regions authorized for review, focus notes, and current residuals.
    The script copies that text verbatim and never authors, summarizes, or edits
    it, and never decides which files are in scope. When a verification dispatch
-   needs a mechanical tool check the read-only sandbox cannot run — WorktreeCli
-   `plan validate`, for one — run only that non-judgment check host-side first
-   and put its verbatim result and identity binding in `-ScopeFile` for the
-   reviewer to validate, leaving every evaluation of that result to the
-   reviewer alone. For a reviewer role with no
+   needs a mechanical tool check the read-only sandbox cannot run, run only that
+   non-judgment check host-side first and put its verbatim result and identity
+   binding in `-ScopeFile` for the reviewer to validate, leaving every
+   evaluation of that result to the reviewer alone. Include the assigned
+   skill's own required evidence in that
+   same file before dispatching: `plan-audit`'s draft execution card
+   (`../plan-audit/SKILL.md`), the host-run `code-quality-metrics` Compare digest
+   for `repo-code-review` alongside the baseline and head identity values it ran
+   against, as `../repo-code-review/references/metrics-protocol.md` requires
+   (`../code-quality-metrics/SKILL.md`), and, for
+   `verify-changes`, the reviewed change set's baseline and head SHAs plus each
+   typed artifact its `## Required inputs` conditions name
+   (`../verify-changes/SKILL.md`). The script blocks the dispatch when one is
+   absent. For a reviewer role with no
    skill file — the Tier-2 coherence review, for one — pass a descriptive role
    name as `-AssignedSkill` together with `-AdHocRole`, and put that role's full
    review contract in `-ScopeFile`. `-RiskTier` adds one
@@ -82,10 +83,16 @@ role already resolves to Sol.
    commit-valued head has no untracked side; `prompt.assigned-skill-unknown` —
    `-AssignedSkill` names no skill file, so fix the name or pass `-AdHocRole`;
    `prompt.head-required` — `verify-changes` needs a commit-valued `-Head` whose
-   reviewed paths' working-tree bytes match that commit's tree. Exit `1` is a
+   reviewed paths' working-tree bytes match that commit's tree;
+   `prompt.execution-card-required` — a `plan-audit` scope carries no
+   `execution card` marker; `prompt.metrics-digest-required` — a
+   `repo-code-review` scope carries no `broken-engine-code-quality-evidence/v2`
+   digest; `prompt.typed-artifacts-required` — a `verify-changes` scope is
+   missing the baseline or head SHA, or a typed artifact the reviewed diff
+   triggers, and the message names each one. Exit `1` is a
    script error: stop and report its `code` and `message` rather than
    hand-assembling a prompt.
-3. Run `pwsh -File <worktree>/.codex/codex-review.ps1 -Worktree <worktree>
+3. Run `pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree>
    -PromptFile <the receipt's promptPath> -OutFile <out>` with the maximum tool timeout (10
    minutes). For a large diff or Tier-3 scope, run in background and wait for
    completion rather than truncating.

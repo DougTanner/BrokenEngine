@@ -1,13 +1,13 @@
 #if defined(BT_CLIENT)
 
-#include "GraphicsQualityWrappers.h"
+#include "GraphicsQualityWrappersBase.h"
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WaterWrappersBase.h"
 
-namespace game
+namespace engine
 {
 
 // int64_t 0/1/2 == GraphicsQualityLevel kLow/kMedium/kHigh
@@ -109,6 +109,6 @@ void ApplyAllGraphicsQualityLevels()
 	ApplyWaterLevel();
 }
 
-} // namespace game
+} // namespace engine
 
 #endif // defined(BT_CLIENT)

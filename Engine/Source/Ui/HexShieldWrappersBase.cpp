@@ -1,8 +1,8 @@
 #if defined(BT_CLIENT)
 
-#include "HexShieldWrappers.h"
+#include "Ui/HexShieldWrappersBase.h"
 
-namespace game
+namespace engine
 {
 
 // Hex shield
@@ -20,6 +20,6 @@ engine::Wrapper gHexShieldWaveFalloffPower(2.1f, 0.25f, 4.0f);
 engine::Wrapper gHexShieldDirectionFalloffPower(4.35f, 2.0f, 10.0f);
 engine::Wrapper gHexShieldDirectionMultiplier(4.5f, 0.5f, 8.0f);
 
-} // namespace game
+} // namespace engine
 
 #endif // defined(BT_CLIENT)

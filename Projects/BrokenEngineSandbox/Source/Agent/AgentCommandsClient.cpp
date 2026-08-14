@@ -1335,8 +1335,12 @@ void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 		script.iWheelNotches = rParams.contains("notches") ? static_cast<int32_t>(rParams.at("notches").get<int64_t>()) : 1;
 
 		// Optional target coords: both present routes the ImGui wheel to the window under (x,y); neither supplies a new
-		// ImGui target or preserves a pin from an earlier script. Either way the camera also zooms unless that hovered
-		// window can actually scroll.
+		// ImGui target or preserves a pin from an earlier script. Camera zoom is suppressed when the hovered window can
+		// actually scroll, ImGui's wheeling lock holds an earlier target, or a widget owns ImGuiKey_MouseWheelY (for
+		// example, an ImPlot). ImPlot ownership remains visible for the first two input polls after leaving a plot; a
+		// coordinate mouse move runs two active frames and, once complete, establishes its new target. A direct
+		// coordinate-bearing background wheel immediately after plot hover may remain UI-owned; a subsequent notch after
+		// that command completes reaches the camera.
 		bool bHasX = rParams.contains("x");
 		bool bHasY = rParams.contains("y");
 		if (bHasX != bHasY)

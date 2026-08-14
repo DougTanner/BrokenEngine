@@ -28,8 +28,12 @@ Builds through the current checkout's WorktreeCli executable. `WorktreeCli build
 The authoritative executables are `$ROOT\Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe` and `$ROOT\Tools\AgentHarness\Platforms\VisualStudio2026\Output\AgentHarness.exe`. Routine work consumes these immutable primary Outputs and never builds into or writes through them:
 
 ```powershell
-& "$ROOT\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot $ROOT
-if ($LASTEXITCODE -ne 0) { throw "Worktree provisioning failed: $LASTEXITCODE" }
+pwsh -NoProfile -File .agents/scripts/Provision-WorktreeThirdParty.ps1 -RepositoryRoot $ROOT
+```
+
+Provisioning must exit `0`; any other exit stops the build. Then resolve and require both executables in a separate call:
+
+```powershell
 $WorktreeCli = Join-Path $ROOT 'Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe'
 $AgentHarness = Join-Path $ROOT 'Tools\AgentHarness\Platforms\VisualStudio2026\Output\AgentHarness.exe'
 if (-not (Test-Path -LiteralPath $WorktreeCli -PathType Leaf) -or -not (Test-Path -LiteralPath $AgentHarness -PathType Leaf)) { throw 'AgentTools output is incomplete.' }
@@ -46,31 +50,16 @@ cause problems for other live worktrees.
 
 ## Determine what to build
 
-Resolve identities, the changed-path set, and the data-mode directories once, before selecting data mode or targets, by running the repository-owned read-only script. In Codex's PowerShell 7 terminal, from the caller-supplied/current checkout:
+Resolve identities, the changed-path set, and the data-mode directories once, before selecting data mode or targets, by running the repository-owned read-only script from the caller-supplied/current checkout's root. Append `-RepositoryRoot`/`-PrimaryCheckout`/`-Baseline` only when the caller explicitly supplied that input, and `-IncludeDevEnvDir` only for an authorized Local generation build. An empty or unset value counts as not supplied: omit the parameter so the env-hint/derived-default fallback applies.
 
 ```powershell
-$Script = Join-Path (git rev-parse --show-toplevel).Trim() '.agents/skills/compile/scripts/Resolve-CompileContext.ps1'
-# Append -RepositoryRoot/-PrimaryCheckout/-Baseline only when the caller explicitly supplied that
-# input, and -IncludeDevEnvDir only for an authorized Local generation build. An empty or unset
-# value counts as not supplied: omit the parameter so the env-hint/derived-default fallback applies.
-$ScriptArguments = @()
-if ($SuppliedBaseline) { $ScriptArguments += @('-Baseline', $SuppliedBaseline) }
-$Context = pwsh -NoProfile -ExecutionPolicy Bypass -File $Script @ScriptArguments | ConvertFrom-Json
+$Context = pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1 | ConvertFrom-Json
 ```
 
-In Claude Code's Git Bash terminal, convert the script path first:
-
-```bash
-script="$(cygpath -w "$(git rev-parse --show-toplevel)/.agents/skills/compile/scripts/Resolve-CompileContext.ps1")"
-# Same rule: append -Baseline "$supplied_baseline" (and -RepositoryRoot/-PrimaryCheckout) only when
-# that input was explicitly supplied.
-pwsh -NoProfile -ExecutionPolicy Bypass -File "$script"
-```
-
-The script writes exactly one `broken-engine-compile-context/v1` JSON object to stdout; human diagnostics go to stderr. Each input takes an explicitly supplied parameter first, then the wrapper environment hint (`BROKEN_ENGINE_WORKTREE_PATH`, `BROKEN_ENGINE_PRIMARY_CHECKOUT`, `BROKEN_ENGINE_BASELINE`), then the derived default. Environment values are wrapper-provided identity hints, not permission to move a supplied baseline. Read from the result:
+The script writes exactly one `broken-engine-compile-context/v1` JSON object to stdout; human diagnostics go to stderr. Each input takes an explicitly supplied parameter first, then the wrapper environment hint (`BROKEN_ENGINE_WORKTREE_PATH`, `BROKEN_ENGINE_PRIMARY_CHECKOUT`, `BROKEN_ENGINE_BASELINE`), then the derived default. Environment values are wrapper-provided identity hints, so the `BROKEN_ENGINE_BASELINE` hint resolves through the session context and may advance to the session's real divergence point, while an explicitly supplied baseline never moves. Read from the result:
 
 - `status`/`code`/`message` with exit `0` pass, `2` structured blocked, `1` internal error. Any nonzero exit stops the build: report the exact `code` and `message`.
-- `repositoryRoot` (`$ROOT`), `primaryCheckout` (`$PRIMARY`), and `baseline` (`$BASELINE`, the resolved commit) — a supplied session baseline is authoritative and is never advanced to a later `HEAD`.
+- `repositoryRoot` (`$ROOT`), `primaryCheckout` (`$PRIMARY`), and `baseline` (`$BASELINE`, the resolved commit) — an explicitly supplied baseline is authoritative and is used exactly as given; a `BROKEN_ENGINE_BASELINE` hint in a session worktree resolves through the session context, which may advance it to the session's real divergence point, and falls back to the hint itself whenever that resolution fails.
 - `changedPaths`/`changedPathCount` — the complete changed-path set: the single baseline diff (committed, staged, and unstaged tracked changes) plus untracked files, separator-normalized. `changedPathsTruncated`, `triggerMatchesTruncated`, `deletionOnlyCandidatesTruncated`, and code `output.capacity-exceeded` are blocking conditions, never a partial answer to work from.
 - `triggerMatches` — each changed path with the Local path trigger it matched.
 - `deletionOnlyCandidates` — trigger-matching changed paths whose baseline diff status is a deletion, with rename sides excluded. Evidence for the deletion-only exception in [references/runtime-data-mode.md](references/runtime-data-mode.md), never its decision.
@@ -85,7 +74,7 @@ Never reconstruct these operations inline: no hand-typed changed-path `git diff`
 - ThirdParty builds only on explicit request in agent-driven `/compile`; missing source or library links are provisioning failures and a routine `/compile` never rebuilds ThirdParty itself. Wrapper bootstrap does incremental-rebuild ThirdParty at every session start (see Bootstrap AgentTools), so a routine `/compile` normally finds it already current.
 - DataPacker builds Release only. WorktreeCli still supplies the normal worktree-local target serialization. Worktree session start seeds the worktree's DataPacker Release Output by verified copy from the primary bootstrap prebuild when the worktree's clean `DataPacker/`/`Common/`/`ThirdParty/` trees match the stamp, and otherwise builds it locally (`.agents/scripts/Build-WorktreeDataPacker.ps1`), so `DataPacker.exe` is already present at session start; a session that changes DataPacker-relevant sources performs a full local rebuild on its first DataPacker build. When that prebuild is stamped and no `BrokenEngineSandbox*` process is running, bootstrap also runs the primary's DataPacker over the primary checkout's current asset inputs into the primary `Output\Data`, refreshing the data Shared-mode worktrees consume; those inputs are not checked against HEAD, and a nonzero exit fails session start. DataPacker's `"BrokenEngineDataPacker"` mutex and the AgentTools bootstrap mutex are the two PC-global build coordination points; add no others (the seed copy reuses the bootstrap mutex for its prebuild). They now nest: bootstrap holds its own mutex while that run waits for `"BrokenEngineDataPacker"`, and that wait is deliberately unbounded, so a peer DataPacker run or a rare island bake can block session start long enough to time other session starts out.
 
-Before any DataPacker, client, or server build, invoke `$ROOT\.agents\scripts\Provision-WorktreeThirdParty.ps1 -RepositoryRoot $ROOT` and stop on failure. Validated stable primary submodule trees plus shared immutable ThirdParty, WorktreeCli, and AgentHarness Output directories are the only exceptions to worktree-local build artifacts. When this session holds the harness lock, send `quit` with its own owner token and wait for its own retained exact PIDs before building — a live executable locks its image. When a target executable is live under a process this session cannot prove it owns, stop and report contention; never quit or stop it (`/agent-harness`, Ownership and takeover). Do not discover this as a link error.
+Before any DataPacker, client, or server build, invoke `pwsh -NoProfile -File .agents/scripts/Provision-WorktreeThirdParty.ps1 -RepositoryRoot $ROOT` and stop on failure. Validated stable primary submodule trees plus shared immutable ThirdParty, WorktreeCli, and AgentHarness Output directories are the only exceptions to worktree-local build artifacts. When this session holds the harness lock, send `quit` with its own owner token and wait for its own retained exact PIDs before building — a live executable locks its image. When a target executable is live under a process this session cannot prove it owns, stop and report contention; never quit or stop it (`/agent-harness`, Ownership and takeover). Do not discover this as a link error.
 
 For routine work, build the checkout supplied by the caller. An isolated session worktree remains appropriate for queue operations, concurrent work, or a landing gate, but is not a prerequisite for a targeted build. Keep existing build serialization and the gated AgentTools promotion path; do not share mutable build output between checkouts (the session-start DataPacker seed is a one-time verified copy the worktree then owns and may rebuild over, not shared output).
 

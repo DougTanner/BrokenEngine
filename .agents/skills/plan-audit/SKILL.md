@@ -28,6 +28,9 @@ contract (`../next-plan/SKILL.md`, "Implementation approval").
 - Draft execution card for every Tier-2 and Tier-3 plan: proposed
   tier and triggers, roles, and each acceptance criterion with its decisive
   check, expected result, and independent signal when a check is duplicated.
+  Head it with the words `execution card`, in any casing, which
+  `/codex-review`'s prompt assembly requires in the scope file before it will
+  dispatch this audit.
 - Execution card and session baseline only when root `AGENTS.md` triggers
   them (Tier 3, queue, reconciliation, or landing work).
 - User intent and applicable repository instructions
@@ -57,9 +60,7 @@ mandatory reviewer is unavailable, the manager reports a blocker.
    `scripts/Test-PlanCitations.ps1`; never reconstruct its lookups inline:
 
    ```powershell
-   $RepositoryRoot = (git rev-parse --show-toplevel).Trim()
-   $Script = Join-Path $RepositoryRoot '.agents/skills/plan-audit/scripts/Test-PlanCitations.ps1'
-   pwsh -NoProfile -File $Script <plan path>
+   pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <plan path>
    ```
 
    It writes nothing and returns one `broken-engine-plan-citations/v1` JSON

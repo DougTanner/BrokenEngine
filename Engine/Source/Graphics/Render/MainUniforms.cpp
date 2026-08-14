@@ -4,6 +4,7 @@
 
 #include "Game.h"
 #include "Graphics/Debug/DebugRender.h"
+#include "Ui/HexShieldWrappersBase.h"
 #include "Ui/WaterWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
@@ -423,19 +424,19 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, shaders::Glo
 // Hex shield
 static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 {
-	rMainLayout.fHexShieldGrow = game::gHexShieldGrow.Get();
-	rMainLayout.fHexShieldEdgeDistance = game::gHexShieldEdgeDistance.Get();
-	rMainLayout.fHexShieldEdgePower = game::gHexShieldEdgePower.Get();
-	rMainLayout.fHexShieldEdgeMultiplier = game::gHexShieldEdgeMultiplier.Get();
+	rMainLayout.fHexShieldGrow = engine::gHexShieldGrow.Get();
+	rMainLayout.fHexShieldEdgeDistance = engine::gHexShieldEdgeDistance.Get();
+	rMainLayout.fHexShieldEdgePower = engine::gHexShieldEdgePower.Get();
+	rMainLayout.fHexShieldEdgeMultiplier = engine::gHexShieldEdgeMultiplier.Get();
 
-	rMainLayout.fHexShieldWaveMultiplier = game::gHexShieldWaveMultiplier.Get();
-	rMainLayout.fHexShieldWaveDotMultiplier = game::gHexShieldWaveDotMultiplier.Get();
-	rMainLayout.fHexShieldWaveIntensityMultiplier = game::gHexShieldWaveIntensityMultiplier.Get();
-	rMainLayout.fHexShieldWaveIntensityPower = game::gHexShieldWaveIntensityPower.Get();
-	rMainLayout.fHexShieldWaveFalloffPower = game::gHexShieldWaveFalloffPower.Get();
+	rMainLayout.fHexShieldWaveMultiplier = engine::gHexShieldWaveMultiplier.Get();
+	rMainLayout.fHexShieldWaveDotMultiplier = engine::gHexShieldWaveDotMultiplier.Get();
+	rMainLayout.fHexShieldWaveIntensityMultiplier = engine::gHexShieldWaveIntensityMultiplier.Get();
+	rMainLayout.fHexShieldWaveIntensityPower = engine::gHexShieldWaveIntensityPower.Get();
+	rMainLayout.fHexShieldWaveFalloffPower = engine::gHexShieldWaveFalloffPower.Get();
 
-	rMainLayout.fHexShieldDirectionFalloffPower = game::gHexShieldDirectionFalloffPower.Get();
-	rMainLayout.fHexShieldDirectionMultiplier = game::gHexShieldDirectionMultiplier.Get();
+	rMainLayout.fHexShieldDirectionFalloffPower = engine::gHexShieldDirectionFalloffPower.Get();
+	rMainLayout.fHexShieldDirectionMultiplier = engine::gHexShieldDirectionMultiplier.Get();
 }
 
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)

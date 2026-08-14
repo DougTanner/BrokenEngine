@@ -20,7 +20,9 @@ worktrees, or disturbs unrelated changes. Keep history linear: reconcile with
 Require the approved objective, its stage decisions, and the caller-owned
 changed paths. Main dispatches the single landing `/verify-changes` pass, which
 runs inside the workflow below, after final preparation and reconciliation have
-produced the final diff — do not require or reuse an earlier PASS. Resolve
+produced the final diff — do not require or reuse an earlier PASS. Main supplies
+that pass with every caller-supplied input `/verify-changes` `## Required inputs`
+names. Resolve
 checkout, primary, and session identity from `Get-AgentWorktreeSessionContext`.
 
 This skill owns final Plan preparation, landing-commit creation, reconciliation,
@@ -34,7 +36,11 @@ trigger.
 ## Bundled scripts
 
 Every script this skill runs lives under `scripts/`; load `references/scripts.md`
-for their contracts, result handling, and lease rules.
+for their exact commands, contracts, result handling, and lease rules.
+
+Use the root AGENTS.md canonical invocation form, one script invocation per shell
+call — never sequenced with another command through `;`, `&&`, `||`, or a
+newline, and never followed by an exit-code echo.
 
 Invoke them directly, exactly as documented; never write a wrapper,
 orchestrator, or replacement around them, and never reconstruct their steps by
@@ -71,7 +77,10 @@ every other lease is foreign.
 2. Create the authorized landing commit, then squash and rebase it onto the current
    primary tip. Reconciliation never advances primary. Inspect dependency
    overlap and any place the rebase merged cleanly but changed the code's
-   meaning.
+   meaning. When the landing content changed after the commit was first created,
+   pass approval preparation the `-CommitMessageFile` override
+   `references/scripts.md` documents so the prepared commit's message describes
+   what it now contains.
 3. Main dispatches `/verify-changes` on the resulting diff, only once every
    hygiene handoff the session-change inventory's `triggers` object reports
    true already exists — `/code-style-review` for changed C++,

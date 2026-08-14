@@ -73,9 +73,10 @@ Before adding or retyping any node, read `../gaea2-shared/references/node-conven
 
 Run the validator on the edited file before reporting done. It is required, not optional, and it reads only — it never edits the Markdown or the sidecar:
 
+From the session worktree root:
+
 ```powershell
-$Wrapper = Join-Path (git rev-parse --show-toplevel) '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1'
-pwsh -NoProfile -ExecutionPolicy Bypass -Command "& '$Wrapper' -Script validate_markdown.py -Arguments '<Temp/name.md>'"
+pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script validate_markdown.py -Arguments '<Temp/name.md>'"
 ```
 
 Use `-Command`, not `-File`: that is the form that passes the `-Arguments` list through intact. The wrapper resolves relative paths and `Temp/` against the repository root whatever the current directory is, and prints one `broken-engine-gaea2-python/v1` envelope. On `python.missing` / `python.stale` (exit 2) nothing ran: tell the user Python is missing or too old and never install it yourself — for `python.missing` pass on the envelope's `installCommand` as the suggested command for them to run, and for `python.stale` quote its `message`/`probeLine` instead (`installCommand` is null there; the user resolves it by upgrading). Otherwise the validator's own `broken-engine-gaea2-markdown/v1` envelope is the string in the wrapper's `stdout` field — read its `code`, not the exit code. That holds for `python.script-failed` too: the validator exits 2 on its own blocked codes, so parse the inner envelope out of `stdout` for the diagnostic code first, and fall back to the wrapper's `stderr` only when `stdout` carries no envelope. The inner codes:

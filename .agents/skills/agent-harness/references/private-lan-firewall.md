@@ -16,10 +16,10 @@ New-NetFirewallRule -PolicyStore PersistentStore -Name $RuleName -DisplayName $D
 
 Windows-generated per-executable `Query User` inbound block rules override this allow rule. Before a cross-machine launch, run the bundled read-only, non-elevated check with every exact executable path:
 
+`-ExecutablePath` binds an array, so this call uses the canonical form's array-argument exception (`-Command`, not `-File`); under `-File` the comma list would arrive as one literal path and fail before any check runs. Run it from the session worktree root and read the readiness verdict from the exit code below:
+
 ```powershell
-& "$ROOT\.agents\skills\agent-harness\scripts\Test-PrivateLanFirewallReadiness.ps1" `
-	-ExecutablePath '<exact client executable path>','<exact server executable path>'
-$ReadinessExit = $LASTEXITCODE
+pwsh -NoProfile -Command "& '.agents/skills/agent-harness/scripts/Test-PrivateLanFirewallReadiness.ps1' -ExecutablePath '<exact client executable path>','<exact server executable path>'"
 ```
 
 The JSON result includes resolved executables and blockers, local `PersistentStore` and traced resultant `ActiveStore` shapes, Private profile/connections, `Ready`, and `ReadinessReason`. `ActiveStore` presence or `PrimaryStatus` alone does not prove enforcement. Exit `0` means the exact local rule is fully enforced and no supplied executable has an enabled inbound `Query User` blocker; `2` means absent, mismatched, overridden, unenforced, or blocked; `1` means invocation or query failure. Blocker output is diagnostic, not removal authority. Use `-RuleName` only for a deliberately different exact name.

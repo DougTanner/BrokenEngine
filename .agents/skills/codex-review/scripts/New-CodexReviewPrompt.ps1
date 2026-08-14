@@ -50,6 +50,7 @@ $script:DiffRange = @()
 $script:DiffPath = @()
 $script:HeadSha = $null
 $script:Untracked = @()
+$script:ScopeText = $null
 
 $result = [ordered]@{
 	schemaVersion = 'broken-engine-codex-review-prompt/v1'
@@ -411,6 +412,53 @@ function Test-PromptReviewedTreeClean() {
 	}
 }
 
+function Test-PromptScopeEvidence([object] $ChangeSet) {
+	# Three assigned skills each need one piece of evidence only the manager can produce, because the
+	# reviewer runs under a read-only sandbox and cannot produce it itself. Without this check a scope
+	# that omits it costs a whole review round. The scope text is only read here: section (b) still
+	# copies the caller's bytes verbatim.
+	# Case-insensitively, because the producing skills head the card differently — 'Draft execution card'
+	# and 'Execution card:' — and both carry the same marker words.
+	if ($AssignedSkill -eq 'plan-audit' -and -not $script:ScopeText.Contains('execution card', [StringComparison]::OrdinalIgnoreCase)) {
+		Complete-CodexReviewPrompt 2 'blocked' 'prompt.execution-card-required' "/plan-audit needs the draft execution card in -ScopeFile, which carries no 'execution card' marker."
+	}
+	if ($AssignedSkill -eq 'repo-code-review' -and -not $script:ScopeText.Contains('broken-engine-code-quality-evidence/v2')) {
+		Complete-CodexReviewPrompt 2 'blocked' 'prompt.metrics-digest-required' "/repo-code-review needs the host-run Compare digest in -ScopeFile, which carries no 'broken-engine-code-quality-evidence/v2' marker."
+	}
+	if ($AssignedSkill -ne 'verify-changes') { return }
+	$plansTouched = $false
+	$skillTouched = $false
+	foreach ($entry in @($ChangeSet.entries)) {
+		foreach ($path in @($entry.path, $entry.oldPath)) {
+			if ([string]::IsNullOrEmpty($path)) { continue }
+			if ($path.StartsWith('Documents/Plans/', [StringComparison]::OrdinalIgnoreCase)) { $plansTouched = $true }
+			if ([IO.Path]::GetFileName($path) -eq 'SKILL.md') { $skillTouched = $true }
+		}
+	}
+	# Applicability of the data-oracle verifier result is not derivable from the changed paths — any code
+	# change may or may not have been built — so the build envelopes the scope quotes decide. Each
+	# envelope is one compact JSON line whose own 'target' identity names what was built, so prose
+	# elsewhere in the scope naming the game project is not a game build.
+	$gameBuildClaimed = $false
+	foreach ($line in ($script:ScopeText -split "`n")) {
+		if (-not $line.Contains('broken-engine-build-result/v1')) { continue }
+		foreach ($target in [Regex]::Matches($line, '"target"\s*:\s*\{[^}]*\}')) {
+			if ($target.Value.Contains('BrokenEngineSandbox')) { $gameBuildClaimed = $true }
+		}
+	}
+	$missing = [Collections.Generic.List[string]]::new()
+	if ($plansTouched -and -not $script:ScopeText.Contains('"operation":"validate"')) { $missing.Add('"operation":"validate"') }
+	if ($gameBuildClaimed -and -not $script:ScopeText.Contains('broken-engine-data-oracle-verifier-result/v1')) { $missing.Add('broken-engine-data-oracle-verifier-result/v1') }
+	if ($skillTouched -and -not $script:ScopeText.Contains('Validation: PASS')) { $missing.Add('Validation: PASS') }
+	# The identity values bind every supplied artifact to the reviewed revision, so a scope that names
+	# neither leaves the reviewer validating evidence against an unknown change set.
+	if (-not $script:ScopeText.Contains($ChangeSet.baselineSha)) { $missing.Add('the baseline SHA') }
+	if (-not [string]::IsNullOrEmpty($ChangeSet.headSha) -and -not $script:ScopeText.Contains($ChangeSet.headSha)) { $missing.Add('the head SHA') }
+	if ($missing.Count -gt 0) {
+		Complete-CodexReviewPrompt 2 'blocked' 'prompt.typed-artifacts-required' "/verify-changes needs evidence -ScopeFile does not carry: $($missing -join ', ')."
+	}
+}
+
 function Write-DiffEvidence() {
 	if ($script:DiffPath.Count -gt 0) {
 		Add-PromptText "## Diff`n`n"
@@ -500,7 +548,7 @@ try {
 	$roleInstruction = (Get-PromptFragment $templateText 'role-instruction').Replace('{{ASSIGNED_SKILL}}', $AssignedSkill)
 	$guardrails = Get-PromptFragment $templateText 'guardrails'
 	$outputContract = Get-PromptFragment $templateText 'output-contract'
-	$scopeText = [IO.File]::ReadAllText($ScopeFile)
+	$script:ScopeText = [IO.File]::ReadAllText($ScopeFile)
 
 	# Not $inventory: a script-scope local by that name would overwrite the $script:Inventory script
 	# path, which the targets run below still needs.
@@ -541,6 +589,7 @@ try {
 	$script:HeadSha = $changeSet.headSha
 	$script:DiffRange = if ([string]::IsNullOrEmpty($changeSet.headSha)) { @($changeSet.baselineSha) } else { @($changeSet.baselineSha, $changeSet.headSha) }
 	if ($AssignedSkill -eq 'verify-changes') { Test-PromptReviewedTreeClean }
+	Test-PromptScopeEvidence $changeSet
 	if ($null -ne $script:TargetsFile) { Write-PromptTargets $listed.ToArray() }
 
 	$script:PromptStream = [IO.File]::Open($script:PromptFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
@@ -551,7 +600,7 @@ try {
 
 	$scopeBody = ''
 	if ($RiskTier -ne 0) { $scopeBody += "Risk tier: $RiskTier`n`n" }
-	$scopeBody += $scopeText
+	$scopeBody += $script:ScopeText
 	if (-not $scopeBody.EndsWith("`n")) { $scopeBody += "`n" }
 	Write-PromptSection '(b) Scope' $scopeBody
 

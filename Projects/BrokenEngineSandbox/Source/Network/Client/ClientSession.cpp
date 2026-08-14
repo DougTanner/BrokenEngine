@@ -1,7 +1,6 @@
 #include "Network/Client/ClientSession.h"
 
 #include "Fleet.h"
-#include "Frame/Collections/Players/Players.h"
 #include "Game.h"
 #include "Network/GamePacketType.h"
 #include "Network/PlayerEvents.h"
@@ -45,31 +44,6 @@ ClientSession::~ClientSession()
 	if (gpClientSession == this)
 	{
 		gpClientSession = nullptr;
-	}
-}
-
-template <typename TLogFunction, typename... TArgs>
-void ClientSession::SendGameRequest(GamePacketType ePacketType, const TLogFunction& rLogFunction, const TArgs&... rArgs)
-{
-	if (mpRuntime->mpClient == nullptr || !(mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnected) || mpRuntime->mpClient->mpServerPeer == nullptr)
-	{
-		return;
-	}
-
-	std::optional<common::LogTickScope> optionalTickScope;
-	if (common::gpThreadLocal->miLogTickCounter < 0)
-	{
-		optionalTickScope.emplace(gpGame->TickCounter());
-	}
-
-	rLogFunction();
-	engine::gpClient->SendSimplePacket(ePacketType, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, rArgs...);
-
-	{
-		// Send the user command now instead of waiting for the tick-cadence ack flush.
-		// Heap: ENet may allocate while flushing outgoing commands
-		ScopedSuppressAllocationTracking suppress;
-		mpRuntime->FlushOutgoing();
 	}
 }
 
@@ -340,7 +314,7 @@ void ClientSession::OnCoordReleased(engine::GridCoord coord)
 }
 void ClientSession::SendUpdatePlayerRequest(int64_t iGlobalPlayerId, bool bUseMissiles, float fNavigationDelay)
 {
-	SendGameRequest(GamePacketType::kClientUpdatePlayerRequest, [&]
+	mpRuntime->SendGameRequest(GamePacketType::kClientUpdatePlayerRequest, [&]
 	{
 		LOG(kNetwork, kVerbose, "ClientSession::SendUpdatePlayerRequest GlobalPlayer: {} Missiles: {} NavDelay: {}", iGlobalPlayerId, bUseMissiles, common::Wb(fNavigationDelay, 3));
 	}, iGlobalPlayerId, static_cast<uint8_t>(bUseMissiles ? 1 : 0), fNavigationDelay);
@@ -348,7 +322,7 @@ void ClientSession::SendUpdatePlayerRequest(int64_t iGlobalPlayerId, bool bUseMi
 
 void ClientSession::SendCreateFleetRequest()
 {
-	SendGameRequest(GamePacketType::kClientCreateFleetRequest, []
+	mpRuntime->SendGameRequest(GamePacketType::kClientCreateFleetRequest, []
 	{
 		LOG(kNetwork, kDebug, "ClientSession::SendCreateFleetRequest");
 	});
@@ -356,7 +330,7 @@ void ClientSession::SendCreateFleetRequest()
 
 void ClientSession::SendDeleteFleetRequest(const FleetGuid& rFleetGuid)
 {
-	SendGameRequest(GamePacketType::kClientDeleteFleetRequest, [&]
+	mpRuntime->SendGameRequest(GamePacketType::kClientDeleteFleetRequest, [&]
 	{
 		LOG(kNetwork, kDebug, "ClientSession::SendDeleteFleetRequest Fleet: ({},{})", rFleetGuid.uiHigh, rFleetGuid.uiLow);
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow);
@@ -364,7 +338,7 @@ void ClientSession::SendDeleteFleetRequest(const FleetGuid& rFleetGuid)
 
 void ClientSession::SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid)
 {
-	SendGameRequest(GamePacketType::kClientSpawnIntoFleetRequest, [&]
+	mpRuntime->SendGameRequest(GamePacketType::kClientSpawnIntoFleetRequest, [&]
 	{
 		LOG(kNetwork, kDebug, "ClientSession::SendSpawnIntoFleetRequest Fleet: ({},{})", rFleetGuid.uiHigh, rFleetGuid.uiLow);
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow);
@@ -372,7 +346,7 @@ void ClientSession::SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid)
 
 void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, int64_t iMemberIndex)
 {
-	SendGameRequest(GamePacketType::kClientRespawnInFleetRequest, [&]
+	mpRuntime->SendGameRequest(GamePacketType::kClientRespawnInFleetRequest, [&]
 	{
 		LOG(kNetwork, kDebug, "ClientSession::SendRespawnInFleetRequest Fleet: ({},{}) Member: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, iMemberIndex);
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, iMemberIndex);
@@ -380,7 +354,7 @@ void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, int64
 
 void ClientSession::SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay)
 {
-	SendGameRequest(GamePacketType::kClientFleetNavigationDelay, [&]
+	mpRuntime->SendGameRequest(GamePacketType::kClientFleetNavigationDelay, [&]
 	{
 		LOG(kNetwork, kDebug, "ClientSession::SendFleetNavigationDelayRequest Fleet: ({},{}) Delay: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, common::Wb(fDelay, 3));
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, fDelay);

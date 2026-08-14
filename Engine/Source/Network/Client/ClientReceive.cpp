@@ -203,13 +203,6 @@ void Client::ServerCoordFullState(std::span<const uint8_t> packetData)
 
 	ScopedSuppressAllocationTracking suppress;
 
-	std::unique_ptr<game::Frame> pFrame = DecompressAndReadFrame(message.iUncompressedSize, message.compressedPayload);
-	if (pFrame == nullptr)
-	{
-		LOG(kNetwork, kWarning, "Client::ServerCoordFullState LZ4 decompression or frame read failed Coord: ({},{}) Frame: {}", coord.x, coord.y, iTick);
-		return;
-	}
-
 	ClientCoordSlot& rSlot = mCoordSlots.at(uiSlotIndex);
 	FullStateFlags_t actions = ClassifyFullState(uiSlotIndex, uiEpoch, coord);
 
@@ -230,15 +223,16 @@ void Client::ServerCoordFullState(std::span<const uint8_t> packetData)
 		return;
 	}
 
-	if (actions & FullStateFlags::kClearPlaceholder)
-	{
-		ClearSubscribingPlaceholder(coord);
-		rSlot.coord = coord;
-	}
-
 	// Late cancellation: the kSubscribing slot was dropped between subscribe and full-state arrival
-	if (RemoveCancelledSubscription(coord))
+	const bool bCancelled = RemoveCancelledSubscription(coord);
+	if (bCancelled)
 	{
+		if (actions & FullStateFlags::kClearPlaceholder)
+		{
+			ClearSubscribingPlaceholder(coord);
+			rSlot.coord = coord;
+		}
+
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch};
@@ -249,6 +243,19 @@ void Client::ServerCoordFullState(std::span<const uint8_t> packetData)
 		rSlot.ackState.uiEpoch = uiEpoch;
 		FreeSlot(uiSlotIndex);
 		return;
+	}
+
+	std::unique_ptr<game::Frame> pFrame = DecompressAndReadFrame(message.iUncompressedSize, message.compressedPayload);
+	if (pFrame == nullptr)
+	{
+		LOG(kNetwork, kWarning, "Client::ServerCoordFullState LZ4 decompression or frame read failed Coord: ({},{}) Frame: {}", coord.x, coord.y, iTick);
+		return;
+	}
+
+	if (actions & FullStateFlags::kClearPlaceholder)
+	{
+		ClearSubscribingPlaceholder(coord);
+		rSlot.coord = coord;
 	}
 
 	ReceivedCoordFullState fullState {};
@@ -603,6 +610,7 @@ void Client::ServerLoadNotification(std::span<const uint8_t> packetData)
 	NetworkMessages::ServerLoadNotificationMessage message {};
 	if (NetworkMessages::Read(packetData, message))
 	{
+		mReceivedGamePackets.clear();
 		mStateFlags.Set(ClientStateFlags::kLoadNotificationReceived);
 	}
 }

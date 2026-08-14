@@ -17,20 +17,10 @@ header text. Never reconstruct these operations inline.
 
 ## Invocation
 
-In Codex's PowerShell 7 terminal:
+From the session worktree root:
 
 ```powershell
-$RepositoryRoot = (git rev-parse --show-toplevel).Trim()
-$Script = Join-Path $RepositoryRoot '.agents/scripts/Test-CollectionLayout.ps1'
-pwsh -NoProfile -ExecutionPolicy Bypass -File $Script
-```
-
-In Claude Code's Git Bash terminal, convert the script path first:
-
-```bash
-repository_root="$(git rev-parse --show-toplevel)"
-script="$(cygpath -w "$repository_root/.agents/scripts/Test-CollectionLayout.ps1")"
-pwsh -NoProfile -ExecutionPolicy Bypass -File "$script"
+pwsh -NoProfile -File .agents/scripts/Test-CollectionLayout.ps1
 ```
 
 Pass `-Path` to narrow the sweep to specific headers or directories,

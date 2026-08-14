@@ -132,16 +132,20 @@ void Input::UpdateCameraInput()
 		miPreviousScrollWheelValue = iScrollNow;
 		mStateFlags.Set(InputStateFlags::kScrollWheelInitialized);
 	}
-	// The UI owns the wheel only while the cursor is over a window that can actually scroll; a non-scrolling panel,
-	// modal, or empty background leaves the notch with the camera, menus open or not. This mirrors the routing
-	// ImGui::UpdateMouseWheel performs, so a notch is never both scrolled and zoomed: for a root window its scroll
-	// target is the hovered window (its bubble loop only walks child windows, and this UI creates none), and
-	// WheelingWindow covers the lock during which ImGui keeps feeding an earlier target regardless of current hover.
+	// The UI owns the wheel when ImGui's MouseWheelY owner test fails, when the cursor is over a window that can
+	// actually scroll, or while WheelingWindow holds an earlier target. A non-scrolling panel, modal, or empty
+	// background leaves the notch with the camera, menus open or not. This mirrors the routing ImGui::UpdateMouseWheel
+	// performs, so a notch is never both scrolled and zoomed: for a root window its scroll target is the hovered window
+	// (its bubble loop only walks child windows, and this UI creates none), and WheelingWindow covers the lock during
+	// which ImGui keeps feeding an earlier target regardless of current hover. ImPlot's owner remains visible for the
+	// first two input polls after leaving a plot; those owner-visible polls conservatively suppress background notches,
+	// while the following poll first sees no owner and is camera-eligible.
 	// Hover is one frame old — ImGui resolves it in NewFrame, after this poll — so a notch arriving on the frame the
 	// cursor crosses a panel edge is judged against the previous hover.
 	const ImGuiContext* pImGuiContext = ImGui::GetCurrentContext();
 	const ImGuiWindow* pHoveredWindow = pImGuiContext != nullptr ? pImGuiContext->HoveredWindow : nullptr;
 	bool bUserInterfaceOwnsScroll = (pImGuiContext != nullptr && pImGuiContext->WheelingWindow != nullptr) ||
+		(pImGuiContext != nullptr && !ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner)) ||
 		(pHoveredWindow != nullptr && pHoveredWindow->ScrollMax.y != 0.0f && !(pHoveredWindow->Flags & (ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMouseInputs)));
 	mCameraInput.iScrollDelta = bUserInterfaceOwnsScroll ? 0 : iScrollNow - miPreviousScrollWheelValue;
 	miPreviousScrollWheelValue = iScrollNow;

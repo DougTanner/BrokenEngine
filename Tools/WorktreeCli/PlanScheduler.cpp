@@ -27,6 +27,7 @@ namespace toolcli
 			std::wstring session;
 			std::wstring plan;
 			bool bUserAuthorizedRejection = false;
+			bool bLintOnly = false;
 		};
 
 		struct Claim
@@ -81,6 +82,11 @@ namespace toolcli
 				if (option == L"--user-authorized-rejection")
 				{
 					rArguments.bUserAuthorizedRejection = true;
+					continue;
+				}
+				if (option == L"--lint-only")
+				{
+					rArguments.bLintOnly = true;
 					continue;
 				}
 				std::wstring* destination = nullptr;
@@ -503,32 +509,37 @@ namespace toolcli
 			{
 				return Failure("scan-failed");
 			}
-			const std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repo);
-			if (!schedulerRoot)
-			{
-				return Failure("local-app-data-unavailable");
-			}
-			const std::filesystem::path guardPath = *schedulerRoot / L"scheduler.guard";
-			if (!coordination::EnsureParentDirectory(guardPath))
-			{
-				return Failure("storage-failed");
-			}
-			coordination::Guard guard(guardPath, kiSchedulerGuardWaitSeconds * 1'000, 10'000);
-			if (!guard.IsValid())
-			{
-				// Only contention is a state conflict; anything else means the lock file itself is unusable.
-				return guard.ContentionObserved() ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
-			}
 			if (!requestedPlan.empty() && plans.find(requestedPlan) == plans.end())
 			{
 				return Failure("plan-not-found", kiExitStateConflict);
 			}
 			MarkCycles(plans, diagnostics);
+			// The lint result is complete above; only the heal below needs scheduler storage and the guard, so
+			// --lint-only skips that block entirely and reports an empty healedClaims to keep one output shape.
 			nlohmann::json healed = nlohmann::json::array();
-			std::map<std::wstring, Plan> primaryPlans;
-			if (BuildPrimaryTipPlans(repo, worktree, primaryPlans))
+			if (!rArguments.bLintOnly)
 			{
-				HealClaims(*schedulerRoot, repo, primaryPlans, healed);
+				const std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repo);
+				if (!schedulerRoot)
+				{
+					return Failure("local-app-data-unavailable");
+				}
+				const std::filesystem::path guardPath = *schedulerRoot / L"scheduler.guard";
+				if (!coordination::EnsureParentDirectory(guardPath))
+				{
+					return Failure("storage-failed");
+				}
+				coordination::Guard guard(guardPath, kiSchedulerGuardWaitSeconds * 1'000, 10'000);
+				if (!guard.IsValid())
+				{
+					// Only contention is a state conflict; anything else means the lock file itself is unusable.
+					return guard.ContentionObserved() ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
+				}
+				std::map<std::wstring, Plan> primaryPlans;
+				if (BuildPrimaryTipPlans(repo, worktree, primaryPlans))
+				{
+					HealClaims(*schedulerRoot, repo, primaryPlans, healed);
+				}
 			}
 			nlohmann::json output = { { "operation", "validate" }, { "status", diagnostics.empty() ? "valid" : "invalid" }, { "code", diagnostics.empty() ? "ok" : "invalid-plans" }, { "message", diagnostics.empty() ? "plan metadata is valid" : "some plans are quarantined" }, { "diagnostics", diagnostics }, { "notices", nlohmann::json::array() }, { "healedClaims", healed }, { "plans", nlohmann::json::array() } };
 			for (const auto& [path, plan] : plans)
@@ -1001,6 +1012,10 @@ namespace toolcli
 		const std::wstring operation = ToLowerInvariant(pArgumentValues[2]);
 		Arguments arguments {};
 		if (!ParseArguments(iArgumentCount, pArgumentValues, 3, arguments))
+		{
+			return Failure("usage");
+		}
+		if (arguments.bLintOnly && operation != L"validate")
 		{
 			return Failure("usage");
 		}

@@ -33,8 +33,8 @@ skill dispatches its required fresh reviewer.
    Treat legacy commit-keyed artifacts as optional corroboration, never required
    or authoritative evidence.
 2. For Codex, run exactly
-   `& "$RepositoryRoot\.agents\skills\next-plan-review\scripts\Find-AgentSessionTranscript.ps1" -RepositoryRoot $RepositoryRoot -Commit $RequestedCommit`
-   where `$RequestedCommit` is the requested commit-ish (default `HEAD`), adding
+   `pwsh -NoProfile -File .agents/skills/next-plan-review/scripts/Find-AgentSessionTranscript.ps1 -RepositoryRoot <absolute repository root> -Commit <requested commit>`
+   where `<requested commit>` is the requested commit-ish (default `HEAD`), adding
    `-SessionId <exact-id>` when one was supplied. Do not use `rg`, a
    home-directory sweep, or any broader discovery fallback when this exact
    helper is missing, blocked, or returns no result; a transcript the default

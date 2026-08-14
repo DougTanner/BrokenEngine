@@ -26,6 +26,7 @@ enum class LogCategory : int8_t
 	kNavData  = 5,
 	kNetwork  = 6,
 	kInput    = 7,
+	kReplay   = 8,
 
 	kCount, // index-only sentinel — no call-site alias, no name/level table entry
 };
@@ -50,6 +51,7 @@ inline constexpr common::LogCategory kLoading  = common::LogCategory::kLoading;
 inline constexpr common::LogCategory kNavData  = common::LogCategory::kNavData;
 inline constexpr common::LogCategory kNetwork  = common::LogCategory::kNetwork;
 inline constexpr common::LogCategory kInput    = common::LogCategory::kInput;
+inline constexpr common::LogCategory kReplay   = common::LogCategory::kReplay;
 
 using common::LogLevel;
 using common::LogCategory;

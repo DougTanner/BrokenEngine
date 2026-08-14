@@ -180,9 +180,27 @@ try {
 	}
 	$script:Result.primaryCheckout = $primary
 
-	# A supplied baseline is authoritative and is never advanced to a later HEAD.
+	# An explicitly supplied baseline is authoritative and is never advanced. The wrapper environment
+	# hint is only an identity hint, so it resolves through the session context, which may advance it to
+	# the session's real divergence point after a mid-session rebase. Baseline resolution never fails
+	# closed: any module, session, or resolution failure keeps the environment value.
+	$baselineSupplied = -not [string]::IsNullOrWhiteSpace($Baseline)
 	$baselineInput = Select-ContextInput $Baseline 'BROKEN_ENGINE_BASELINE'
 	if ($null -eq $baselineInput) { $baselineInput = 'HEAD' }
+	elseif (-not $baselineSupplied) {
+		try {
+			Import-Module (Join-Path $sharedScripts 'AgentWorktreeSession.psm1') -Force -DisableNameChecking
+			$sessionContext = Get-AgentWorktreeSessionContext -Worktree $root
+			if (-not [string]::IsNullOrWhiteSpace($sessionContext.SessionId) -and -not [string]::IsNullOrWhiteSpace($sessionContext.Baseline)) {
+				$sessionResponse = Invoke-ContextGit @('-C', $root, 'rev-parse', '--verify', '--quiet', '--end-of-options', "$($sessionContext.Baseline)^{commit}")
+				$sessionBaseline = $sessionResponse.Stdout.Trim()
+				if ($sessionResponse.ExitCode -eq 0 -and $sessionBaseline -cmatch '^[0-9a-f]{40}$') { $baselineInput = $sessionBaseline }
+			}
+		}
+		catch {
+			[Console]::Error.WriteLine("compile-context: session baseline resolution failed; keeping the BROKEN_ENGINE_BASELINE value '$baselineInput': $($_.Exception.Message)")
+		}
+	}
 	$baselineResponse = Invoke-ContextGit @('-C', $root, 'rev-parse', '--verify', '--quiet', '--end-of-options', "$baselineInput^{commit}")
 	$resolvedBaseline = $baselineResponse.Stdout.Trim()
 	if ($baselineResponse.ExitCode -ne 0 -or $resolvedBaseline -cnotmatch '^[0-9a-f]{40}$') {

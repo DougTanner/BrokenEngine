@@ -55,9 +55,8 @@ Require a self-contained, immutable brief containing:
 
 The inventory run is `pwsh -NoProfile -File
 .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute adopted
-worktree> -Baseline <full 40-character SHA> -Regions` (in Claude Code's Git Bash
-terminal convert the script path and root with `cygpath -w` exactly as
-`../cleanup-worktrees/SKILL.md` shows). It writes no file and prints one
+worktree> -Baseline <full 40-character SHA> -Regions`. It writes no file and
+prints one
 `broken-engine-session-change-inventory/v1` object with `entries` and their
 `class` values, `counts`, `triggers`, and the per-hunk `regions` table. Only
 `status` `pass` (exit 0) is usable; `blocked` (exit 2) or `error` (exit 1) means

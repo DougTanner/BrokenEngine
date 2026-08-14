@@ -20,8 +20,7 @@ report; read [Remediation.md](references/Remediation.md) only when explaining ad
 Capture one current scope:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 `
-  -Mode Snapshot -Target Engine/Source -Scope Recursive -RepositoryRoot (Get-Location).Path
+pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 -Mode Snapshot -Target Engine/Source -Scope Recursive -RepositoryRoot <absolute repository root>
 ```
 
 Use `Exact` for one file, `Directory` for direct files, and `Recursive` for descendants. `.h` files
@@ -34,9 +33,7 @@ advisory coverage, not failures.
 Compare only the paths listed in a UTF-8 targets file against a full-SHA baseline:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 `
-  -Mode Compare -Targets Temp/targets.json -Baseline <full-commit-sha> `
-  -RepositoryRoot (Get-Location).Path
+pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 -Mode Compare -Targets Temp/targets.json -Baseline <full-commit-sha> -RepositoryRoot <absolute repository root>
 ```
 
 The analyzer derives pairing itself: a listed path in both corpora pairs with itself, a current-only

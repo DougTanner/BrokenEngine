@@ -25,9 +25,7 @@ Whenever a session baseline exists, the complete changed-artifact list is the
 `entries` rows and their `class` values from the read-only inventory: `pwsh
 -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot
 <absolute repository toplevel> -Baseline <full 40-character SHA>` (add `-Head
-<commit>` for a committed head; in Claude Code's Git Bash terminal convert the
-script path and root with `cygpath -w` exactly as
-`../cleanup-worktrees/SKILL.md` shows). It writes no file and prints one
+<commit>` for a committed head). It writes no file and prints one
 `broken-engine-session-change-inventory/v1` object with `entries`, `counts`, and
 `triggers`. Only `status` `pass` (exit 0) is usable; `blocked` (exit 2) or
 `error` (exit 1) means the changed-artifact list is unavailable, so return

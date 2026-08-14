@@ -45,9 +45,7 @@ read-only run to a file:
 `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
 -RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character SHA>
 -EmitTargets`, adding `-IncludeUntracked <comma-separated paths>` for
-authorized untracked additions and `-Head <commit>` for a committed head. In Claude Code's
-Git Bash terminal convert the script path and root with `cygpath -w` exactly as
-`../cleanup-worktrees/SKILL.md` shows. On `status` `pass` (exit 0) stdout carries
+authorized untracked additions and `-Head <commit>` for a committed head. On `status` `pass` (exit 0) stdout carries
 only the targets bytes; `blocked` (exit 2) or `error` (exit 1) leaves stdout
 empty and reports the envelope on stderr, which counts as a missing targets file
 below. Never rebuild the targets file or restate the class decision inline.
@@ -61,14 +59,16 @@ another round.
 
 ## Workflow
 
-1. Run `code-quality-metrics` Compare early with the supplied targets file,
-   session baseline, and absolute checkout root. Call `pwsh -NoProfile -File
-   .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 -Mode
-   Compare -Targets <supplied-targets-file> -Baseline <fixed-full-sha>
-   -RepositoryRoot <absolute-checkout-root> -Digest` exactly as
-   [metrics-protocol.md](references/metrics-protocol.md) requires. Metrics are
-   advisory and never become a finding; an operational failure leaves the review
-   incomplete with `NEEDS_ACTION` rather than producing one.
+1. Settle `code-quality-metrics` Compare early against the supplied targets file
+   and session baseline, exactly as
+   [metrics-protocol.md](references/metrics-protocol.md) requires. Under
+   `/codex-review` the read-only sandbox denies the Compare cache write, so the
+   scope file carries the host-run digest: validate that digest against the
+   reviewed change set instead of running Compare. Run Compare yourself only
+   outside that sandbox. Metrics are advisory and never become a finding; an
+   operational failure, an absent digest, or a digest bound to another change set
+   leaves the review incomplete with `NEEDS_ACTION` rather than producing one,
+   and never licenses skipping metrics.
 2. Read the changed regions in full-function context, their applicable
    `AGENTS.md`, and the producers, consumers, callers, and mirrored paths needed
    to trace the declared contracts. Diff-only inspection is insufficient.
@@ -85,7 +85,7 @@ another round.
    finding that depends on a non-obvious external API, language,
    specification, OS, or library fact. Do not browse or present that fact as confirmed.
 7. Measure the changed `.cpp` files in one batched run:
-   `pwsh -NoProfile -Command "& '<absolute path to Measure-Tokens.ps1>' -Path
+   `pwsh -NoProfile -Command "& '.agents/scripts/Measure-Tokens.ps1' -Path
    'a','b','c' -Json"`. Use `-Command`, not `-File`: under `-File` the
    comma-separated list binds as one filename and the run fails. Record a size
    observation only when the changed region exposes a concrete cohesive split. Return it as a manager follow-up candidate; never reduce the

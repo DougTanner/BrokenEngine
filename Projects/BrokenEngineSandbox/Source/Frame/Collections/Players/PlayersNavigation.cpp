@@ -110,9 +110,9 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		request.data.uiClientGuidLow = rCurrentPostRender.pClientGuids[i].uiLow;
 		engine::ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
 
-		// Heap realloc warning: capacity exceeded during burst transfers. Expected max ~1-2/tick
-		// per source frame — anything higher suggests entities are re-flagging kTransfer across
-		// iterations, DestroyElement isn't removing them, or there's an unexpected push path.
+		// Heap realloc warning: capacity exceeded during a shared per-tick burst. Producers are
+		// unbounded, so investigate entities re-flagging kTransfer across iterations or an
+		// unexpected push path.
 		if (rFrame.postRender.transferRequests.size() == rFrame.postRender.transferRequests.capacity()) [[unlikely]]
 		{
 			LOG(kDefault, kError,
@@ -133,7 +133,12 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		common::ValidateVector<true >(request.data.vecPosition);
 		common::ValidateVector<false>(request.data.vecDirection);
 		common::ValidateVector<false>(request.data.vecVelocity);
-		rFrame.postRender.transferRequests.push_back(request);
+		{
+			// Heap: no finite reserve can be proven sufficient because engine::GrowPairedCollections
+			// grows collections unbounded
+			ScopedSuppressAllocationTracking suppress;
+			rFrame.postRender.transferRequests.push_back(request);
+		}
 
 		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
 #if defined(BT_CLIENT)

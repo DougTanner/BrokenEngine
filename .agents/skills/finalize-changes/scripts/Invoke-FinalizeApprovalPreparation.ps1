@@ -8,7 +8,10 @@
 # session range to one deterministic tree-identical commit with the current primary
 # tip as its sole parent, atomically replaces only the expected session ref, rolls
 # back a replacement whose postconditions fail, and reruns the structural sanity
-# check against the final tip. Callers never reconstruct its Git commands
+# check against the final tip. The replacement commit inherits the oldest session
+# commit's message unless -CommitMessageFile supplies one, which also forces a
+# replacement commit for a single-commit range so the new message is carried.
+# Callers never reconstruct its Git commands
 # inline. The review window opens later: Show-FinalizeApprovalReview.ps1 owns the
 # SmartGit launch and workflow step 4 calls it last, once the returned tip is bound
 # into a fully staged landing.
@@ -32,6 +35,7 @@ param(
 	[Parameter(Mandatory)][string] $ExpectedPrimaryTip,
 	[string] $VerifiedCandidateCommit,
 	[string] $VerifiedCandidateTree,
+	[string] $CommitMessageFile,
 	[ValidateSet('none', 'compare-and-swap', 'postcondition', 'final-dirty', 'bounded-diagnostic')][string] $FixtureFailure = 'none'
 )
 
@@ -39,6 +43,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $verifiedCandidateCommitBound = $PSBoundParameters.ContainsKey('VerifiedCandidateCommit')
 $verifiedCandidateTreeBound = $PSBoundParameters.ContainsKey('VerifiedCandidateTree')
+$commitMessageFileBound = $PSBoundParameters.ContainsKey('CommitMessageFile')
 $workflowModule = Join-Path $PSScriptRoot '..\..\..\scripts\FinalizeWorkflowCommon.psm1'
 if (-not (Test-Path -LiteralPath $workflowModule)) {
 	$workflowModule = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts\FinalizeWorkflowCommon.psm1'
@@ -78,6 +83,7 @@ $script:SessionRef = $null
 $script:OriginalTip = $ExpectedCurrentTip
 $script:ReplacementTip = $null
 $script:RefUpdated = $false
+$script:OverrideMessage = $null
 
 function Complete-Preparation([int] $ExitCode, [string] $Status, [string] $Code, [string] $Message)
 {
@@ -163,9 +169,9 @@ function Get-CommitField([string] $Commit, [string] $Format)
 	return Get-GitText @('show', '--no-show-signature', '-s', "--format=$Format", $Commit)
 }
 
-function New-ReplacementCommit([string] $Tree, [string] $Parent, [string] $SourceCommit)
+function New-ReplacementCommit([string] $Tree, [string] $Parent, [string] $SourceCommit, [string] $OverrideMessage)
 {
-	$message = Get-CommitField $SourceCommit '%B'
+	$message = if ([string]::IsNullOrEmpty($OverrideMessage)) { Get-CommitField $SourceCommit '%B' } else { $OverrideMessage }
 	$authorName = Get-CommitField $SourceCommit '%an'
 	$authorEmail = Get-CommitField $SourceCommit '%ae'
 	$authorDate = Get-CommitField $SourceCommit '%aI'
@@ -270,6 +276,12 @@ try
 		Assert-Input (Test-FinalizeGitSuccess $CurrentWorktree @('rev-parse', '--verify', "$VerifiedCandidateCommit^{commit}")) 'Verified candidate commit does not exist.'
 		Assert-Input ((Invoke-FinalizeGit $CurrentWorktree @('rev-parse', "$VerifiedCandidateCommit^{tree}")).Trim() -ceq $VerifiedCandidateTree) 'Verified candidate tree does not match its commit.'
 	}
+	if ($commitMessageFileBound)
+	{
+		Assert-Input (Test-Path -LiteralPath $CommitMessageFile -PathType Leaf) 'CommitMessageFile must be an existing ordinary file.'
+		$script:OverrideMessage = [IO.File]::ReadAllText($CommitMessageFile)
+		Assert-Input (-not [string]::IsNullOrWhiteSpace($script:OverrideMessage)) 'CommitMessageFile must not be empty.'
+	}
 	if ($FixtureFailure -cne 'none')
 	{
 		Assert-Input ($env:BROKEN_ENGINE_FINALIZE_APPROVAL_PREPARATION_FIXTURE -ceq '1') 'Fixture-only inputs require the finalization preparation fixture environment.'
@@ -325,7 +337,9 @@ try
 	if ($verifiedCandidateCommitBound) { $result.verifiedCandidate.matched = $true }
 	$result.squash.originalTree = $originalTree
 
-	if ($range.Count -eq 1)
+	# A single session commit already satisfies the landing shape, so it is replaced only to
+	# carry a supplied message.
+	if ($range.Count -eq 1 -and -not $commitMessageFileBound)
 	{
 		$result.squash.disposition = 'one-commit-no-op'
 		$result.squash.approvedTree = $originalTree
@@ -334,7 +348,7 @@ try
 	}
 	else
 	{
-		$replacementTip = New-ReplacementCommit $originalTree $ExpectedPrimaryTip $range[0]
+		$replacementTip = New-ReplacementCommit $originalTree $ExpectedPrimaryTip $range[0] $script:OverrideMessage
 		$script:ReplacementTip = $replacementTip
 		$result.squash.replacementCommit = $replacementTip
 		$expectedOld = if ($FixtureFailure -ceq 'compare-and-swap') { '0000000000000000000000000000000000000000' } else { $actualTip }
@@ -345,7 +359,7 @@ try
 		}
 		$script:RefUpdated = $true
 		$result.squash.refUpdated = $true
-		$result.squash.disposition = 'squashed'
+		$result.squash.disposition = if ($range.Count -eq 1) { 'message-replaced' } else { 'squashed' }
 		$result.tips.approvedSession = $replacementTip
 		if ($FixtureFailure -ceq 'postcondition')
 		{

@@ -3,7 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Game.h"
-#include "Ui/GraphicsQualityWrappers.h"
+#include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/Localization.h"
@@ -187,11 +187,11 @@ void SaveGraphicsSettings()
 		.fSmokeSimulationArea = engine::gSmokeSimulationArea.Get(),
 		.fMinimumAmbient = engine::gSunMoonMinimumAmbient.Get(),
 		.fLightingUpdateCadence = engine::gLightingUpdateCadence.Get(),
-		.uiTerrainShadowsLevel = gTerrainShadowsLevel.Get<uint8_t>(),
-		.uiObjectShadowsLevel = gObjectShadowsLevel.Get<uint8_t>(),
-		.uiLightingLevel = gLightingLevel.Get<uint8_t>(),
-		.uiSmokeDetailLevel = gSmokeDetailLevel.Get<uint8_t>(),
-		.uiWaterLevel = gWaterLevel.Get<uint8_t>(),
+		.uiTerrainShadowsLevel = engine::gTerrainShadowsLevel.Get<uint8_t>(),
+		.uiObjectShadowsLevel = engine::gObjectShadowsLevel.Get<uint8_t>(),
+		.uiLightingLevel = engine::gLightingLevel.Get<uint8_t>(),
+		.uiSmokeDetailLevel = engine::gSmokeDetailLevel.Get<uint8_t>(),
+		.uiWaterLevel = engine::gWaterLevel.Get<uint8_t>(),
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, engine::gFullscreen.Get<bool>());
@@ -211,7 +211,7 @@ namespace
 void LoadGraphicsQualityLevel(engine::Wrapper& rLevel, uint8_t uiLevel)
 {
 	// Reset, not Set: loading is initialization, so no consumer should see this as a pending change.
-	rLevel.Reset<int64_t>(std::min<int64_t>(uiLevel, static_cast<int64_t>(GraphicsQualityLevel::kCount) - 1));
+	rLevel.Reset<int64_t>(std::min<int64_t>(uiLevel, static_cast<int64_t>(engine::GraphicsQualityLevel::kCount) - 1));
 }
 
 } // namespace
@@ -244,16 +244,16 @@ bool LoadGraphicsSettings()
 			engine::gLightingUpdateCadence.ResetToDefault();
 		}
 		engine::gWindEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kWind);
-		LoadGraphicsQualityLevel(gTerrainShadowsLevel, graphicsSettings.uiTerrainShadowsLevel);
-		LoadGraphicsQualityLevel(gObjectShadowsLevel, graphicsSettings.uiObjectShadowsLevel);
-		LoadGraphicsQualityLevel(gLightingLevel, graphicsSettings.uiLightingLevel);
-		LoadGraphicsQualityLevel(gSmokeDetailLevel, graphicsSettings.uiSmokeDetailLevel);
-		LoadGraphicsQualityLevel(gWaterLevel, graphicsSettings.uiWaterLevel);
+		LoadGraphicsQualityLevel(engine::gTerrainShadowsLevel, graphicsSettings.uiTerrainShadowsLevel);
+		LoadGraphicsQualityLevel(engine::gObjectShadowsLevel, graphicsSettings.uiObjectShadowsLevel);
+		LoadGraphicsQualityLevel(engine::gLightingLevel, graphicsSettings.uiLightingLevel);
+		LoadGraphicsQualityLevel(engine::gSmokeDetailLevel, graphicsSettings.uiSmokeDetailLevel);
+		LoadGraphicsQualityLevel(engine::gWaterLevel, graphicsSettings.uiWaterLevel);
 	}
 
 	// Also on a failed read: the default levels still have to drive their underlying wrappers, otherwise a fresh
 	// install shows a level the rendering values do not match.
-	ApplyAllGraphicsQualityLevels();
+	engine::ApplyAllGraphicsQualityLevels();
 
 	return bRead;
 }
@@ -275,12 +275,12 @@ void ResetGraphicsSettings()
 	engine::gLightingUpdateCadence.ResetToDefault();
 	engine::gWindEnabled.ResetToDefault();
 
-	gTerrainShadowsLevel.ResetToDefault();
-	gObjectShadowsLevel.ResetToDefault();
-	gLightingLevel.ResetToDefault();
-	gSmokeDetailLevel.ResetToDefault();
-	gWaterLevel.ResetToDefault();
-	ApplyAllGraphicsQualityLevels();
+	engine::gTerrainShadowsLevel.ResetToDefault();
+	engine::gObjectShadowsLevel.ResetToDefault();
+	engine::gLightingLevel.ResetToDefault();
+	engine::gSmokeDetailLevel.ResetToDefault();
+	engine::gWaterLevel.ResetToDefault();
+	engine::ApplyAllGraphicsQualityLevels();
 
 	SaveGraphicsSettings();
 }

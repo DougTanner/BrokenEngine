@@ -50,14 +50,16 @@ if ($WindowStateResponse.ok -ne $true -or $WindowStateResponse.result.minimized 
 
 Keep the client visible for the scenario. Release requires `click "LOCAL SERVER"`. The server loads its exit autosave, so use `reset` when the scenario needs fresh state.
 
-For an approved island-footprint or island-render criterion only, run the readiness helper after both processes launch, preserving the `$ServerPid` and `$ClientPid` variables above:
+For an approved island-footprint or island-render criterion only, run the readiness helper after both processes launch, preserving the `$ServerPid` and `$ClientPid` variables above. Run the helper from the session worktree root as its own call:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1 -AgentHarness $AgentHarness -Owner $Owner -ClientPort 27101 -TimeoutSeconds 120 -ArtifactPath (Join-Path $TempDir 'island-scene-readiness.json')
+```
+
+Require exit `0` from that call; on any other exit the readiness gate failed — inspect `island-scene-readiness.json` under `$TempDir` and report the criterion blocked. Then require the artifact evidence itself:
 
 ```powershell
 $IslandReadinessArtifact = Join-Path $TempDir 'island-scene-readiness.json'
-& "$ROOT\.agents\skills\agent-harness\scripts\Wait-IslandSceneReady.ps1" `
-	-AgentHarness $AgentHarness -Owner $Owner -ClientPort 27101 `
-	-TimeoutSeconds 120 -ArtifactPath $IslandReadinessArtifact
-if ($LASTEXITCODE -ne 0) { throw "Island scene readiness failed; inspect '$IslandReadinessArtifact'." }
 $IslandReadiness = Get-Content -Raw -LiteralPath $IslandReadinessArtifact | ConvertFrom-Json -Depth 100
 if ($IslandReadiness.SchemaVersion -cne 'broken-engine-island-scene-readiness/v1' -or
 	$IslandReadiness.Status -cne 'success' -or $IslandReadiness.Code -cne 'ready' -or
@@ -81,12 +83,13 @@ Set up server and client state with the recipe below, then verify and release pe
 Run replay acceptance only on a `kbDebugInput` build. It must prove transitions and a completed playback loop, not merely the absence of old errors:
 
 1. Set the server `Default` log level to `Debug`. Capture server and client relevant-log baselines with `get_logs {"count":512,"pattern":"[Rr]eplay|CRC|[Cc]hecksum|[Dd]esync"}`. Preserve the ordered arrays so later checks can identify only appended lines.
-2. Send `pause {"paused":false}` and require `status.paused:false`, `recording:false`, and `replaying:false`.
-3. Send `replay_record {"start":true}` and require a later status with `recording:true` and `paused:false`. Let multiple ticks complete.
-4. Send `replay_record {"start":false}` and require a later status with `recording:false` and `paused:false`.
-5. Send `replay_play`; require `replaying:true` and `paused:false`. Wait for a newly appended server line matching `End replay [0-9]+, looping`. This current runtime marker proves every reader reached its recorded endpoint and the first playback loop completed.
-6. Compare post-run relevant logs with both ordered baselines. Require no newly appended replay-persistence/read failure, `LogDifferences CRC Client`, checksum-mismatch, `CONFIRMED DESYNC`, or unresolved-CRC error line. Do not count pre-baseline lines as new evidence, and do not treat speculative reconciliation messages alone as a replay failure.
-7. Send `replay_play` again to cancel. Require a later status with `replaying:false`, `recording:false`, and `paused:false`.
+2. To compare literal per-tick CRC values instead of only the absence of failures, also send `set_log_level {"category":"Replay","level":"Verbose"}` and run a single-coordinate replay: a freshly `reset` server with `status.activeCoords` length 1 and no `replay_transfer_fixture`. Scrape `get_logs {"category":"Replay"}` incrementally through recording and playback — that category ring holds 128 lines — then diff the `Checksum DifferenceStreamWriter Update` sequence against the `Checksum DifferenceStreamReader` sequence tick by tick. More than one coordinate invalidates the diff: the line text carries no coordinate, and emission order across coordinates is not stable between record and playback.
+3. Send `pause {"paused":false}` and require `status.paused:false`, `recording:false`, and `replaying:false`.
+4. Send `replay_record {"start":true}` and require a later status with `recording:true` and `paused:false`. Let multiple ticks complete.
+5. Send `replay_record {"start":false}` and require a later status with `recording:false` and `paused:false`.
+6. Send `replay_play`; require `replaying:true` and `paused:false`. Wait for a newly appended server line matching `End replay [0-9]+, looping`. This current runtime marker proves every reader reached its recorded endpoint and the first playback loop completed.
+7. Compare post-run relevant logs with both ordered baselines. Require no newly appended replay-persistence/read failure, `LogDifferences CRC Client`, checksum-mismatch, `CONFIRMED DESYNC`, or unresolved-CRC error line. Do not count pre-baseline lines as new evidence, and do not treat speculative reconciliation messages alone as a replay failure.
+8. Send `replay_play` again to cancel. Require a later status with `replaying:false`, `recording:false`, and `paused:false`.
 
 If the 512-line relevant-log window cannot retain the baseline through this bounded scenario, rerun with file-offset evidence from the configured per-process logs; never downgrade to “silence = pass.”
 
@@ -183,7 +186,7 @@ Frame-read schemas/extractors (`query_frame`, `query_players`, `query_collection
 - `hover`: `{"label","window"?,"holdFrames"?:2}`. Returns found/enabled plus UI.
 - `set_slider`: `{"label","window"?,"value":number}`. Uses Ctrl+Click, typing, Enter. Returns found/enabled.
 - `key`: `{"key":name,"holdFrames"?:1}`. `holdFrames` is an integer in `0..1798` (default `1`); signed negative values normalize to `0`. The limit counts client drains/frames rather than wall-clock time, so duration varies with the client drain rate. Supports case-insensitive single letters/digits; `ESC`/`ESCAPE`, `SPACE`, `TAB`, `ENTER`/`RETURN`, `UP`/`DOWN`/`LEFT`/`RIGHT`, and `F1`–`F24`. Returns `{"ok":true}`.
-- `mouse`: `{"action"?:"move"|"down"|"up"|"click"|"wheel","x"?,"y"?,"button"?:"left"|"right"|"middle","notches"?:1}`. Non-wheel actions require x/y. Wheel accepts both coordinates or neither; it always feeds the ImGui wheel event, and it also feeds camera zoom unless the hovered ImGui window can actually scroll, or ImGui's wheeling lock still holds an earlier scroll target from a recent scroll (menus that do not scroll still zoom the camera). Returns `{"ok":true}`.
+- `mouse`: `{"action"?:"move"|"down"|"up"|"click"|"wheel","x"?,"y"?,"button"?:"left"|"right"|"middle","notches"?:1}`. Non-wheel actions require x/y. Wheel accepts both coordinates or neither and always feeds the ImGui wheel event. It also feeds camera zoom unless the hovered ImGui window can actually scroll, ImGui's wheeling lock holds an earlier scroll target, or an ImGui key owner claims `ImGuiKey_MouseWheelY` (including ImPlot); menus that do not scroll still zoom the camera. ImPlot ownership remains visible for the first two input polls after leaving a plot; the following poll first sees no owner. A coordinate mouse move runs two active frames and, once complete, establishes the new target. A direct coordinate-bearing background wheel immediately after plot hover may remain UI-owned; a subsequent notch after that command completes reaches the camera. Returns `{"ok":true}`.
 - `describe_scene`: `{"includeUnits"?:true,"maxUnits"?:200}`. Returns `camera{eye,visibleArea,lod}`, `uiState`, `gameFlags`, `tick`, `clientGridCoord`, `subscribedCoords`, `fleets[{index,focused,members?}]`, `units[{type,globalId?,world,screen,armor?,shield?,health?,alignment,flags}]`, cell-wide `counts{players,spaceships,missiles,blasters,targets}`, `islands[{coord,center,rotation,footprint?}]`, and `truncated`. Unit positions come from the committed snapshot and trail rendered pixels.
 - `query_profile`: no params (only an empty object is accepted). Client-only GPU profile query; returns `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for every timer row, including zeros, and frame-coherent `shadowSample{sequence,currentUs}`. The sample is published after the matching framebuffer fence; sequence advances only when a new available Shadow result is latched.
 

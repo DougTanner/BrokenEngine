@@ -141,7 +141,7 @@ so settle them before finishing:
 Run from the repository root:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .agents/scripts/Test-CollectionLayout.ps1
+pwsh -NoProfile -File .agents/scripts/Test-CollectionLayout.ps1
 ```
 
 Sweeps, shell-specific invocation, exit codes, truncation, JSON shape, and the

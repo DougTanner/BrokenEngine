@@ -39,7 +39,7 @@ public:
 		if (mbRecordsInitialChecksum)
 		{
 			mChecksums.push_back(mSavedStart.Crc());
-			LOG(kDefault, kVerbose, "Checksum DifferenceStreamWriter {}: {}", iStartTick, *std::prev(mChecksums.end()));
+			LOG(kReplay, kVerbose, "Checksum DifferenceStreamWriter {}: {}", iStartTick, *std::prev(mChecksums.end()));
 		}
 
 		if constexpr (kbReplayFullFrames)
@@ -55,7 +55,7 @@ public:
 	{
 		// Record checksum for this frame
 		mChecksums.push_back(rSavedCurrent.Crc());
-		LOG(kDefault, kVerbose, "Checksum DifferenceStreamWriter Update {}: {}", rSavedCurrent.interpolate.iTick, *std::prev(mChecksums.end()));
+		LOG(kReplay, kVerbose, "Checksum DifferenceStreamWriter Update {}: {}", rSavedCurrent.interpolate.iTick, *std::prev(mChecksums.end()));
 
 		if constexpr (kbReplayFullFrames)
 		{
@@ -96,7 +96,7 @@ public:
 			common::Write(rHeaderStream, iDifferenceCount);
 			rHeaderStream << rSavedEnd;
 		});
-		LOG(kDefault, kVerbose, "DifferenceStreamWriter save at frame {}: Count {} Checksum {}", rSavedEnd.interpolate.iTick, iDifferenceCount, rSavedEnd.Crc());
+		LOG(kReplay, kVerbose, "DifferenceStreamWriter save at frame {}: Count {} Checksum {}", rSavedEnd.interpolate.iTick, iDifferenceCount, rSavedEnd.Crc());
 
 		// Write difference records
 		const std::filesystem::path framesFilename = std::filesystem::path(rFilename).concat(".frames");
@@ -210,8 +210,13 @@ public:
 
 	using difference_t = std::tuple<int64_t, DIFFERENCE_TYPE>;
 
-	DifferenceStreamReader(const FileFlags_t& rFileFlags, const std::filesystem::path& rFilename, SAVED_TYPE& rSavedStart, DIFFERENCE_TYPE& rInitialDifference, bool bRecordsInitialChecksum = true)
+	DifferenceStreamReader(const FileFlags_t& rFileFlags, const std::filesystem::path& rFilename, SAVED_TYPE& rSavedStart, DIFFERENCE_TYPE& rInitialDifference, bool& rbLoaded, bool& rbVersionMismatch, int64_t& riMismatchFileVersion, int64_t& riMismatchExpectedVersion, bool bRecordsInitialChecksum = true)
 	{
+		rbLoaded = false;
+		rbVersionMismatch = false;
+		riMismatchFileVersion = 0;
+		riMismatchExpectedVersion = 0;
+
 		// Read header with version info, start/end states and metadata
 		std::fstream headerStream = gpFileManager->OpenFile(rFileFlags, rFilename);
 		if (!headerStream)
@@ -225,6 +230,14 @@ public:
 		if (!ReadAndValidateVersionHeader<SAVED_TYPE>(headerStream, iSavedVersion, iSavedSize))
 		{
 			LOG(kDefault, kWarning, "DifferenceStreamReader SAVED_TYPE version mismatch: file {} {}, expected {} {}", iSavedVersion, iSavedSize, SAVED_TYPE::kiVersion, sizeof(SAVED_TYPE));
+			// Only a fully read header naming a different version is a version mismatch; a short read leaves the
+			// values meaningless, and a matching version that failed the size check is a damaged header.
+			if (headerStream && iSavedVersion != SAVED_TYPE::kiVersion)
+			{
+				rbVersionMismatch = true;
+				riMismatchFileVersion = iSavedVersion;
+				riMismatchExpectedVersion = SAVED_TYPE::kiVersion;
+			}
 			return;
 		}
 
@@ -233,6 +246,12 @@ public:
 		if (!ReadAndValidateVersionHeader<DIFFERENCE_TYPE>(headerStream, iDifferenceVersion, iDifferenceSize))
 		{
 			LOG(kDefault, kWarning, "DifferenceStreamReader DIFFERENCE_TYPE version mismatch: file {} {}, expected {} {}", iDifferenceVersion, iDifferenceSize, DIFFERENCE_TYPE::kiVersion, sizeof(DIFFERENCE_TYPE));
+			if (headerStream && iDifferenceVersion != DIFFERENCE_TYPE::kiVersion)
+			{
+				rbVersionMismatch = true;
+				riMismatchFileVersion = iDifferenceVersion;
+				riMismatchExpectedVersion = DIFFERENCE_TYPE::kiVersion;
+			}
 			return;
 		}
 
@@ -396,7 +415,7 @@ public:
 			}
 		}
 
-		mbLoaded = true;
+		rbLoaded = true;
 	}
 
 	int64_t GetRecordedFrameCount()
@@ -437,7 +456,7 @@ public:
 			return;
 		}
 
-		LOG(kDefault, kVerbose, "Checksum DifferenceStreamReader {}: {}", rSavedCurrent.interpolate.iTick, rSavedCurrent.Crc());
+		LOG(kReplay, kVerbose, "Checksum DifferenceStreamReader {}: {}", rSavedCurrent.interpolate.iTick, rSavedCurrent.Crc());
 
 		[[maybe_unused]] SAVED_TYPE savedFrame {};
 		[[maybe_unused]] bool bSavedFrameValid = false;
@@ -506,11 +525,6 @@ public:
 		return LoadDifference(iTick, rDifference);
 	}
 
-	bool Loaded()
-	{
-		return mbLoaded;
-	}
-
 private:
 
 	enum class ReaderFlags : uint8_t
@@ -560,8 +574,6 @@ private:
 			LOG(kDefault, kWarning, "Full frames file read failed, discarding");
 		}
 	}
-
-	bool mbLoaded = false;
 
 	SAVED_TYPE mSavedEnd {};
 	int64_t mDifferenceCount = 0;

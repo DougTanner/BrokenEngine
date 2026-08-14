@@ -100,9 +100,6 @@ private:
 	void ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent);
 	void UpdatePlayerCoord(engine::global_id_t globalPlayerId, engine::GridCoord coord);
 
-	template <typename TLogFunction, typename... TArgs>
-	void SendGameRequest(GamePacketType ePacketType, const TLogFunction& rLogFunction, const TArgs&... rArgs);
-
 };
 
 inline ClientSession* gpClientSession = nullptr;

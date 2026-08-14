@@ -40,9 +40,7 @@ regions receive a focused scope re-review.
    hunks: `pwsh -NoProfile -File
    .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
    repository toplevel> -Baseline <full 40-character SHA> -Regions` (add `-Head
-   <commit>` for a committed head; in Claude Code's Git Bash terminal convert
-   the script path and root with `cygpath -w` exactly as
-   `../cleanup-worktrees/SKILL.md` shows). It writes no file and prints one
+   <commit>` for a committed head). It writes no file and prints one
    `broken-engine-session-change-inventory/v1` object whose `regions` table
    holds one row per hunk with `path`, `kind`, new and old line ranges, and the
    enclosing `symbol`, alongside `entries` and their `class` values. Only

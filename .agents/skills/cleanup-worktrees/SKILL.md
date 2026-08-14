@@ -24,23 +24,15 @@ Temp files instead of deleting them.
 2. Start in the primary checkout, never a session worktree. Resolve that root
    with `git rev-parse --show-toplevel`. The script blocks if the checkout's Git
    directory differs from its common Git directory; do not work around it.
-3. Run the repository-owned script with no switch for cleanup or `-Preview` for
-   preview. In Codex's PowerShell 7 terminal:
+3. Run the repository-owned script from that primary checkout root with no switch
+   for cleanup, or `-Preview` for preview:
 
    ```powershell
-   $RepositoryRoot = (git rev-parse --show-toplevel).Trim()
-   $Script = Join-Path $RepositoryRoot '.agents/skills/cleanup-worktrees/scripts/cleanup-worktrees.ps1'
-   $CleanupMode = @() # Use @('-Preview') for preview.
-   pwsh -NoProfile -ExecutionPolicy Bypass -File $Script @CleanupMode
+   pwsh -NoProfile -File .agents/skills/cleanup-worktrees/scripts/cleanup-worktrees.ps1
    ```
 
-   In Claude Code's Git Bash terminal, convert the script path first:
-
-   ```bash
-   repository_root="$(git rev-parse --show-toplevel)"
-   script="$(cygpath -w "$repository_root/.agents/skills/cleanup-worktrees/scripts/cleanup-worktrees.ps1")"
-   cleanup_mode=() # Use cleanup_mode=(-Preview) for preview.
-   pwsh -NoProfile -ExecutionPolicy Bypass -File "$script" "${cleanup_mode[@]}"
+   ```powershell
+   pwsh -NoProfile -File .agents/skills/cleanup-worktrees/scripts/cleanup-worktrees.ps1 -Preview
    ```
 
 Do not recreate failed commands with broader Git or filesystem operations. The

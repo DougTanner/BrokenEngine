@@ -32,19 +32,13 @@ Confusable locations:
 
 ### Step 1: Set up the Python dispatch
 
-Every Python script below runs through the shared wrapper, which resolves the interpreter itself (via the shared `.agents/scripts/Detect-Python.ps1` probe) and reports it as data. Never run that probe and parse its `OK`/`MISSING`/`STALE` line yourself, and never call a script with a bare `python` or a captured interpreter path. In Claude Code's Git Bash terminal, convert the wrapper path once:
+Every Python script below runs through the shared wrapper, which resolves the interpreter itself (via the shared `.agents/scripts/Detect-Python.ps1` probe) and reports it as data. Never run that probe and parse its `OK`/`MISSING`/`STALE` line yourself, and never call a script with a bare `python` or a captured interpreter path. From the session worktree root, each call takes the form:
 
-```bash
-wrapper="$(cygpath -w "${CLAUDE_SKILL_DIR}/../gaea2-shared/scripts/Invoke-Gaea2Python.ps1")"
+```powershell
+pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script <script.py> -Arguments '<arg>','<arg>'"
 ```
 
-In a PowerShell 7 terminal use the path directly. Each call then takes the form:
-
-```bash
-pwsh -NoProfile -ExecutionPolicy Bypass -Command "& '$wrapper' -Script <script.py> -Arguments '<arg>','<arg>'" 2>/dev/null
-```
-
-A shell variable does not survive between separate tool calls, so repeat the `wrapper=` assignment in the same command as each call below. Use `-Command`, not `-File`: under `-File` an `-Arguments` list of more than one value collapses into a single token. The wrapper runs the script from the repository root whatever the current directory is, also passes the child's stderr through to yours (`2>/dev/null` when you only want the JSON), and prints one JSON object, `schemaVersion` `broken-engine-gaea2-python/v1`, carrying `interpreter`, `pythonVersion`, the child's `exitCode`, its `stdout` and `stderr` (each capped at 8192 characters, with `truncated` set when cut), plus `status`, `code`, `message`:
+Use `-Command`, not `-File`: under `-File` an `-Arguments` list of more than one value collapses into a single token. The wrapper runs the script from the repository root whatever the current directory is, also passes the child's stderr through to yours (append your shell's stderr redirect — `2>$null` in PowerShell, `2>/dev/null` in Bash — when you only want the JSON), and prints one JSON object, `schemaVersion` `broken-engine-gaea2-python/v1`, carrying `interpreter`, `pythonVersion`, the child's `exitCode`, its `stdout` and `stderr` (each capped at 8192 characters, with `truncated` set when cut), plus `status`, `code`, `message`:
 
 - `ok` (exit 0) — read the script's output from `stdout`.
 - `python.missing` / `python.stale` (exit 2) — no usable x64 CPython 3.12+ interpreter, and nothing ran. Do not install anything: report to the user that Python is missing or too old, quoting `message`/`probeLine`, and — for `python.missing` — the `installCommand` the envelope carries as the suggested command for them to run (`installCommand` is null for a stale interpreter, which the user resolves by upgrading). Stop until they say it's installed.
@@ -55,9 +49,8 @@ A shell variable does not survive between separate tool calls, so repeat the `wr
 
 For the QuadSpinner log streams:
 
-```bash
-wrapper="$(cygpath -w "${CLAUDE_SKILL_DIR}/../gaea2-shared/scripts/Invoke-Gaea2Python.ps1")"
-pwsh -NoProfile -ExecutionPolicy Bypass -Command "& '$wrapper' -Script decode_gaea_err.py -Arguments '--latest'" 2>/dev/null
+```powershell
+pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script decode_gaea_err.py -Arguments '--latest'"
 ```
 
 The decoder's output arrives in the envelope's `stdout` field: each ERR with its timestamp, trimmed to the exception line by default. Add `'--full'` to `-Arguments` only when the stack trace would actually help — Newtonsoft stack traces are noisy and the first two lines almost always name the problem. If `--latest` reports no ERR lines, the error may have come from an earlier session — list `*.txt` in the log dir by mtime and try the previous one.
@@ -88,17 +81,15 @@ The shipping examples under `C:\Program Files\QuadSpinner\Gaea 2\Examples\` are 
 
 Use `inspect_samples.py`, dispatched through the same wrapper, to ask three kinds of questions (its answer is in the envelope's `stdout`):
 
-```bash
-wrapper="$(cygpath -w "${CLAUDE_SKILL_DIR}/../gaea2-shared/scripts/Invoke-Gaea2Python.ps1")"
-
+```powershell
 # What values does this enum actually accept?
-pwsh -NoProfile -ExecutionPolicy Bypass -Command "& '$wrapper' -Script inspect_samples.py -Arguments '--enum','SatMap.Library'" 2>/dev/null
+pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--enum','SatMap.Library'"
 
 # What does a working node of this type look like?
-pwsh -NoProfile -ExecutionPolicy Bypass -Command "& '$wrapper' -Script inspect_samples.py -Arguments '--type','Erosion2'" 2>/dev/null
+pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--type','Erosion2'"
 
 # What ports does this node have? (for wiring questions)
-pwsh -NoProfile -ExecutionPolicy Bypass -Command "& '$wrapper' -Script inspect_samples.py -Arguments '--ports','Combine'" 2>/dev/null
+pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--ports','Combine'"
 ```
 
 Other useful queries when the error is less specific — same command, different `-Arguments`:

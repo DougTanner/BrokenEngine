@@ -22,7 +22,7 @@ scratch space.
 From repository root, run:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .agents/skills/analyze-diagsession/scripts/Invoke-DiagSessionSymbolization.ps1 -EtlPath <etl> -RepositoryRoot <repo> -OutputPath <profile.txt>
+pwsh -NoProfile -File .agents/skills/analyze-diagsession/scripts/Invoke-DiagSessionSymbolization.ps1 -EtlPath <etl> -RepositoryRoot <repo> -OutputPath <profile.txt>
 ```
 
 Use `-SymbolCacheRoot <short-path>` only when `%TEMP%` is unsuitable. The
@@ -76,7 +76,7 @@ share remains investigable as excess copying, clearing, or data movement.
 Locate host Python first, from repository root:
 
 ```text
-pwsh -ExecutionPolicy Bypass -File .agents/scripts/Detect-Python.ps1
+pwsh -NoProfile -File .agents/scripts/Detect-Python.ps1
 ```
 
 Exit 0 prints `OK <python-exe-path> Python X.Y`; capture `<python-exe-path>`

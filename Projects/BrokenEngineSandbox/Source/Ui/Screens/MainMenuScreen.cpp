@@ -23,9 +23,28 @@ void CenterMenuItem(float fContentStartX, float fContentWidth, float fItemWidth)
 
 void MainMenuScreen::Render()
 {
+	enum class AutoConnectState
+	{
+		kReady,
+		kAttempted,
+		kSucceeded,
+	};
+	static AutoConnectState seAutoConnectState = AutoConnectState::kReady;
+
+	if (gpClientSession->mpRuntime->mpClient != nullptr &&
+	    (gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted))
+	{
+		seAutoConnectState = AutoConnectState::kSucceeded;
+	}
+
 	if (gpGame->meUiState != UiState::kPause || !gpGame->InMainMenu())
 	{
 		return;
+	}
+
+	if (seAutoConnectState == AutoConnectState::kAttempted && gpClientSession->mpRuntime->mpClient == nullptr)
+	{
+		seAutoConnectState = AutoConnectState::kReady;
 	}
 
 	ImGuiIO& rIo = ImGui::GetIO();
@@ -61,7 +80,7 @@ void MainMenuScreen::Render()
 	MenuHeading("BROKEN ENGINE", kfMainMenuHeadingScale);
 
 	// Auto-start discovery when main menu is shown
-	if (gpClientSession->mpRuntime->mpDiscoveryScanner == nullptr && !(gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered))
+	if (gpClientSession->mpRuntime->mpClient == nullptr && gpClientSession->mpRuntime->mpDiscoveryScanner == nullptr && !(gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered))
 	{
 		gpClientSession->mpRuntime->StartDiscovery();
 	}
@@ -94,10 +113,9 @@ void MainMenuScreen::Render()
 	// Auto-connect
 	if constexpr (kbAutoConnect)
 	{
-		static bool sbConnected = false;
-		if (!sbConnected && (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered))
+		if (seAutoConnectState == AutoConnectState::kReady && gpClientSession->mpRuntime->mpClient == nullptr && (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered))
 		{
-			sbConnected = true;
+			seAutoConnectState = AutoConnectState::kAttempted;
 			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots);
 		}
 	}

@@ -1,4 +1,5 @@
 #include "TweaksScreen.h"
+#include "Ui/HexShieldWrappersBase.h"
 
 #if defined(BT_CLIENT)
 
@@ -10,19 +11,19 @@ namespace
 const engine::TweaksSliderMapRegistrar gHexShieldRegistrar
 {
 	// Edge
-	{"Grow", &gHexShieldGrow},
-	{"Edge Distance", &gHexShieldEdgeDistance},
-	{"Edge Power", &gHexShieldEdgePower},
-	{"Edge Multiplier", &gHexShieldEdgeMultiplier},
+	{"Grow", &engine::gHexShieldGrow},
+	{"Edge Distance", &engine::gHexShieldEdgeDistance},
+	{"Edge Power", &engine::gHexShieldEdgePower},
+	{"Edge Multiplier", &engine::gHexShieldEdgeMultiplier},
 	// Wave
-	{"Wave Multiplier", &gHexShieldWaveMultiplier},
-	{"Wave Dot", &gHexShieldWaveDotMultiplier},
-	{"Wave Intensity", &gHexShieldWaveIntensityMultiplier},
-	{"Wave Intensity Power", &gHexShieldWaveIntensityPower},
-	{"Wave Falloff Power", &gHexShieldWaveFalloffPower},
+	{"Wave Multiplier", &engine::gHexShieldWaveMultiplier},
+	{"Wave Dot", &engine::gHexShieldWaveDotMultiplier},
+	{"Wave Intensity", &engine::gHexShieldWaveIntensityMultiplier},
+	{"Wave Intensity Power", &engine::gHexShieldWaveIntensityPower},
+	{"Wave Falloff Power", &engine::gHexShieldWaveFalloffPower},
 	// Direction
-	{"Direction Falloff Power", &gHexShieldDirectionFalloffPower},
-	{"Direction Multiplier", &gHexShieldDirectionMultiplier},
+	{"Direction Falloff Power", &engine::gHexShieldDirectionFalloffPower},
+	{"Direction Multiplier", &engine::gHexShieldDirectionMultiplier},
 };
 }
 

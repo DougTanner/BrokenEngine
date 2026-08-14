@@ -6,16 +6,47 @@ message, next-stage state, short counts/paths, and retry or authority
 outcome when applicable. Never return a nested tool response or
 file/XML/log body. Exit/result/schema mismatches block.
 
-- `../scripts/Invoke-FinalizeCandidateCommit.ps1` stages only the authorized caller
-  paths, preserves disjoint state, and blocks mixed owned paths. `pwsh -File`
+## Invocation
+
+Use the root AGENTS.md canonical form — from the session worktree root, one
+script invocation per shell call, repo-relative path, no `-ExecutionPolicy`.
+Angle-bracket values are placeholders; quote every one.
+
+```text
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route session-landing -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeApprovalPreparation.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -OwnerToken '<owner-token>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
+```
+
+Add `-ReleasePlanClaim` to the landing command when a claimed Plan reached final
+preparation, `-CommitMessageFile '<message-file>'` to the approval-preparation
+command when the rules below call for the message override, and `-LeaseSeconds`,
+`-CooperatingSessionOwner`, or `-WaitSeconds`
+only where the rules below call for a non-default value.
+
+## Contracts
+
+- `Invoke-FinalizeCandidateCommit.ps1` stages only the authorized caller
+  paths, preserves disjoint state, and blocks mixed owned paths with a message
+  naming the remedy — stage the named path with `git add -- <path>`, or restore
+  it, so its index and worktree agree, then re-invoke. `pwsh -File`
   hands every argument over as one literal string, so several owned paths can
   only travel as one comma-separated `-OwnedPaths` token.
-- `../scripts/Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
+- `Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
   one commit on the current primary tip, and blocks with
   `git.primary-not-ancestor` when the session tip does not already contain that
   primary tip; the caller rebases and re-invokes. It returns the only
-  landing commit sent to verification.
-- `../scripts/Invoke-FinalizeLockClaim.ps1` makes one blocking lease claim —
+  landing commit sent to verification. That commit inherits the oldest session
+  commit's message unless the optional `-CommitMessageFile` supplies an existing
+  non-empty file whose text replaces it; the override also rebuilds the commit
+  when the session range holds a single commit, so a candidate that gained
+  content after creation can be re-messaged to describe it.
+- `Invoke-FinalizeLockClaim.ps1` makes one blocking lease claim —
   WorktreeCli owns the bounded wait and the guarded expiry recovery — and
   separately performs standalone release through `-Release` with the held
   lease's owner token.
@@ -31,7 +62,7 @@ file/XML/log body. Exit/result/schema mismatches block.
   compare-and-swap against the recorded owner, run only when no registered
   worktree has a Git operation in progress; unverifiable state requires user
   authority and is never overridden.
-- `../scripts/Invoke-FinalizeLanding.ps1` exclusively advances primary by
+- `Invoke-FinalizeLanding.ps1` exclusively advances primary by
   compare-and-swap under the landing lock, rolls back on postcondition failure,
   and releases the lock. Pass the post-confirmation claim's owner token as
   `-OwnerToken` so landing continues under that same lease, which it accepts only
@@ -68,7 +99,7 @@ file/XML/log body. Exit/result/schema mismatches block.
   script then deletes the claim best-effort. Without the switch it invokes no
   `plan` command at all.
 
-Release every caller-owned lease with `../scripts/Invoke-FinalizeLockClaim.ps1 -Release`
+Release every caller-owned lease with `Invoke-FinalizeLockClaim.ps1 -Release`
 before an open-ended user wait. After a failed landing the lock is released once
 every registered worktree is inspectable and provably free of Git operation
 markers, on both the supplied-token and omitted-token routes. When that cannot be

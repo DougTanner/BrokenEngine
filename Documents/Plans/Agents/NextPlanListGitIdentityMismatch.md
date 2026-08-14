@@ -90,6 +90,17 @@ the canonical session/primary identity checks. Never embed transcript paths or
 home paths. No determinism/CRC, serialization, replay, wire, runtime
 allocation, shader, or live-verification state is exposed.
 
+## Coordination
+
+- `Documents/Plans/Agents/NextPlanClaimStaleWorktreeInvisibility.md` covers a
+  different symptom — a Plan present at the primary tip reported absent, with no
+  staleness signal, while the session worktree is behind primary — but may edit
+  the same `Get-NextPlanList.ps1` listing path and the same `Get-NextPlanContext`
+  session/primary identity boundary in `NextPlanWorkflowCommon.psm1`. Whichever
+  lands second rebases onto the first and re-reads those regions before editing,
+  and the session-versus-primary identity handling ends up stated once rather
+  than as two parallel mechanisms.
+
 ## Acceptance criteria
 
 - The recorded `Get-NextPlanList.ps1` invocation no longer reproduces exit `1`

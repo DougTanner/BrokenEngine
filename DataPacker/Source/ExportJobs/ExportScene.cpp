@@ -381,6 +381,35 @@ void ExportScene::ProcessTextures(tinygltf::Model& rGltfModel)
 	}
 
 	std::string intermediatePrefix = mInputPath.filename().string() + ".Texture";
+	auto isSceneTextureIntermediate = [&intermediatePrefix](std::string_view name)
+	{
+		if (!name.starts_with(intermediatePrefix))
+		{
+			return false;
+		}
+
+		std::string_view indexAndSuffix(name);
+		indexAndSuffix.remove_prefix(intermediatePrefix.size());
+		size_t uiSuffixStart = indexAndSuffix.find('.');
+		if (uiSuffixStart == std::string_view::npos)
+		{
+			return false;
+		}
+		if (uiSuffixStart == 0)
+		{
+			return false;
+		}
+		for (char c : indexAndSuffix.substr(0, uiSuffixStart))
+		{
+			if (c < '0' || c > '9')
+			{
+				return false;
+			}
+		}
+
+		std::string_view suffix = indexAndSuffix.substr(uiSuffixStart);
+		return suffix == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK) || suffix == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK) || suffix == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK);
+	};
 	std::vector<std::filesystem::path> orphanedIntermediates;
 	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(mInputPath.parent_path()))
 	{
@@ -389,7 +418,7 @@ void ExportScene::ProcessTextures(tinygltf::Model& rGltfModel)
 			continue;
 		}
 		std::string name = rEntry.path().filename().string();
-		if (name.starts_with(intermediatePrefix) && !currentIntermediateNames.contains(name))
+		if (isSceneTextureIntermediate(name) && !currentIntermediateNames.contains(name))
 		{
 			orphanedIntermediates.push_back(rEntry.path());
 		}

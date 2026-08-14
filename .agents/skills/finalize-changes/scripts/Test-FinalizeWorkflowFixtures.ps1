@@ -369,6 +369,7 @@ Remove-Item -LiteralPath (Join-Path $session 'rollback-unrelated.txt'),(Join-Pat
 [IO.File]::WriteAllText((Join-Path $session 'mixed-owned.txt'), 'unstaged after staged', [Text.UTF8Encoding]::new($false))
 $run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$baseline,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','mixed-owned.txt','-CommitMessageFile',$candidateMessage)
 Assert-Outcome $run 'session-candidate-blocks-mixed-owned-state' 2 'blocked' 'git.owned-path-mixed-state'
+Assert-True ($null -ne $run.Json -and $run.Json.message -clike '*git add -- mixed-owned.txt*') 'mixed owned state blocker names the git add remedy for the mixed path'
 Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
 Remove-Item -LiteralPath (Join-Path $session 'mixed-owned.txt') -Force -ErrorAction SilentlyContinue
 $literalPrimaryDiskPath = Join-Path $primary ($literalBracketPath.Replace('/','\'))
@@ -589,6 +590,22 @@ if ($null -ne $run.Json) {
 	Assert-ExactProperties $approval.Json.verifiedCandidate @('supplied','matched') 'approval preparation verified candidate'
 	Assert-True ($approval.Json.schemaVersion -ceq 'broken-engine-finalize-approval-preparation/v2' -and $approval.Json.candidate.commit -ceq $run.Json.candidate.commit -and $approval.Json.candidate.tree -ceq $run.Json.candidate.tree -and $approval.Json.candidate.parent -ceq $baseline -and $approval.Json.sanity.initial -ceq 'pass' -and $approval.Json.sanity.final -ceq 'pass' -and $approval.Json.verifiedCandidate.supplied -and $approval.Json.verifiedCandidate.matched) 'approval preparation success projects exact identities and pass states'
 	Assert-True ($approval.Json.PSObject.Properties.Name -cnotcontains 'tips' -and $approval.Json.PSObject.Properties.Name -cnotcontains 'identities') 'approval preparation hides raw identities'
+	# The message override has to rebuild even this single-commit range, so the range is
+	# restored afterwards for the landing scenarios that follow.
+	$overrideMessagePath = Join-Path $scratchBase 'approval-override-message.txt'
+	[IO.File]::WriteAllText($overrideMessagePath, "fixture override message`n", [Text.UTF8Encoding]::new($false))
+	$approvalOverrideParameters = [ordered]@{}
+	foreach ($parameter in $approvalParameters.GetEnumerator()) { $approvalOverrideParameters[$parameter.Key] = $parameter.Value }
+	$approvalOverrideParameters.CommitMessageFile = $overrideMessagePath
+	$approvalOverride = Invoke-JsonScriptWithSplat $approvalPreparationScript $approvalOverrideParameters $scratchBase
+	Assert-Outcome $approvalOverride 'approval-preparation-message-override' 0 'pass' 'ok'
+	if ($null -ne $approvalOverride.Json) {
+		Assert-True ($approvalOverride.Json.squash.disposition -ceq 'message-replaced' -and $approvalOverride.Json.squash.commitCount -eq 1 -and $approvalOverride.Json.squash.refUpdated) 'single-commit message override replaces the commit'
+		Assert-True ($approvalOverride.Json.candidate.commit -cne $run.Json.candidate.commit -and $approvalOverride.Json.candidate.tree -ceq $run.Json.candidate.tree -and $approvalOverride.Json.candidate.parent -ceq $baseline) 'message override keeps the verified tree on a new commit'
+		$overrideCommitMessage = ((@(Invoke-ScratchGit $session @('show','--no-show-signature','-s','--format=%B',$approvalOverride.Json.candidate.commit)) -join "`n")).TrimEnd("`r","`n")
+		Assert-True ($overrideCommitMessage -ceq ([IO.File]::ReadAllText($overrideMessagePath, [Text.UTF8Encoding]::new($false,$true)).TrimEnd("`r","`n"))) 'message override commit carries the supplied message'
+	}
+	Invoke-ScratchGit $session @('reset','--hard',$run.Json.candidate.commit) | Out-Null
 	$landingParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$run.Json.candidate.commit; ExpectedPrimaryTip=$baseline; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$run.Json.candidate.commit; ApprovedCandidateTree=$run.Json.candidate.tree }
 	$landingInvalidIdentityParameters = [ordered]@{}
 	foreach ($parameter in $landingParameters.GetEnumerator()) { $landingInvalidIdentityParameters[$parameter.Key] = $parameter.Value }

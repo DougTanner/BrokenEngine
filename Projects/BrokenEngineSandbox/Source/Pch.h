@@ -85,6 +85,7 @@ inline constexpr bool kbShowProfileTextByDefault = false;
 #include "Log/LogTypes.h"
 
 inline constexpr LogLevel keLogLevelTemp = kVerbose;
+inline constexpr LogLevel keLogLevelReplay = kVerbose; // Keeps the per-tick replay checksum lines in the binary; their runtime level stays default-silent
 
 inline constexpr LogLevel keLogLevelDefault = kDebug; // Compile floor; runtime threshold (gLogRuntimeLevels, default kInfo) gates emission live via set_log_level
 inline constexpr LogLevel keLogLevelAudio = keLogLevelDefault;
@@ -98,9 +99,6 @@ inline constexpr LogLevel keLogLevelInput = keLogLevelDefault;
 // chain has no external includes of its own), and Shaders/ShaderLayouts.h must precede Engine.h — this is the repo's sole C++ include site for shaders:: constants; engine TUs consume them only via this PCH
 #include "Common.h"
 #include "Shaders/ShaderLayouts.h"
-#if defined(BT_CLIENT)
-#include "Ui/HexShieldWrappers.h"
-#endif
 #include "Ui/WindDepositsWrappers.h"
 #include "Frame/Frame.h"
 #include "Network/NetworkSessionContract.h"

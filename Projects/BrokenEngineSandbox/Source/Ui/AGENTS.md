@@ -1,6 +1,6 @@
-# Game UI - Localization and Wrapper Storage
+# Game UI - Localization and Settings Consumption
 
-Game-owned localization and wrapper storage. Engine wrapper semantics are defined by the Engine UI hub (`../../../../Engine/Source/Ui/AGENTS.md`); ImGui screens live in Screens (`Screens/AGENTS.md`).
+Game-owned localization, settings persistence, and menu consumption. Engine wrapper semantics are defined by the Engine UI hub (`../../../../Engine/Source/Ui/AGENTS.md`); ImGui screens live in Screens (`Screens/AGENTS.md`).
 
 ## Localization
 
@@ -14,10 +14,10 @@ Game-owned localization and wrapper storage. Engine wrapper semantics are define
 - Wrappers read by shared Frame code compile into both client and server projects even when only the client UI changes them.
 - Rendering-only settings and their consumers remain whole-file `BT_CLIENT`-guarded and client-project-only.
 - A new Frame dependency on a game wrapper must either stay on a client-only path or make that wrapper available to the server build.
-- Game wrapper storage that mirrors engine Tweaks sliders keeps its declaration order matching the `../../../../Engine/Source/Ui/Screens/TweaksScreen/AGENTS.md` slider registration order. Wrapper storage with no Tweaks counterpart, such as the player-facing quality levels, has no imposed order and keeps a stable local order of its own.
+- Game wrapper storage that mirrors engine Tweaks sliders keeps its declaration order matching the `../../../../Engine/Source/Ui/Screens/TweaksScreen/AGENTS.md` slider registration order. Wrapper storage with no Tweaks counterpart keeps a stable local order of its own.
 
-## Graphics Quality Levels
+## Graphics Quality Persistence
 
-- The Graphics menu's player-facing quality levels are client-only game wrappers, each holding one discrete level. A level is the persisted source of truth and the engine rendering wrappers it drives are derived, so those engine values are never written to the settings file and a saved file cannot hold a level that contradicts them.
-- A level writes its engine wrappers through `Set` on the change that selects it, and once at startup for both a successful and a failed settings load, so a fresh install renders what its default level claims. `Graphics::Refresh` remains the single consumer polling those engine wrappers; the apply path must not call `Changed<T>()`.
-- A level read back from the settings file is opaque input, so clamp it into range before it selects the values it applies.
+- `ClientSettings` persists the engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; the derived renderer wrapper values are not serialized.
+- Treat levels read from the settings file as opaque input: clamp each value before assigning it, then invoke the engine quality-level apply operation after both successful and failed graphics-settings loads so the defaults or loaded selections drive the renderer.
+- `GraphicsMenuScreen` consumes the engine-owned level wrappers and invokes the corresponding engine apply function when a selection changes. It does not own the wrapper definitions or renderer tables.

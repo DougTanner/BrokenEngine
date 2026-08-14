@@ -457,6 +457,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h" />
     <ClInclude Include="..\..\Data\Shaders\ShaderLayouts.h" />
@@ -499,8 +500,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Ui\LightingWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\SmokeWrappers.h" />
-    <ClInclude Include="..\..\Source\Ui\GraphicsQualityWrappers.h" />
-    <ClInclude Include="..\..\Source\Ui\HexShieldWrappers.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h" />
     <ClInclude Include="..\..\Source\Ui\SoundWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\WindDepositsWrappers.h" />
     <ClInclude Include="$(GameDataDirectory)\Audio.h" />
@@ -670,13 +670,13 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
     <ClCompile Include="..\..\Source\Ui\LightingWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\SmokeWrappers.cpp" />
-    <ClCompile Include="..\..\Source\Ui\GraphicsQualityWrappers.cpp" />
-    <ClCompile Include="..\..\Source\Ui\HexShieldWrappers.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp" />
     <ClCompile Include="..\..\Source\Ui\SoundWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp" />

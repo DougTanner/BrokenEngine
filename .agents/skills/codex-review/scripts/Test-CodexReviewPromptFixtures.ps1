@@ -132,11 +132,17 @@ function Invoke-PromptScript([string[]] $Arguments) {
 # --- Repository A: the assembled prompt ---------------------------------------------------------
 
 $script:BinaryMarker = 'BINARY-PAYLOAD-MARKER'
-$script:ScopeText = "Files and regions: Engine/Source/Keep.cpp lines 1-5.`nFocus: the changed bytes only.`nResiduals: none.`n"
+# The digest marker is part of the shared scope text because every `repo-code-review` case has to reach
+# the assembly the case is about rather than the missing-evidence guard.
+$script:ScopeText = "Files and regions: Engine/Source/Keep.cpp lines 1-5.`nFocus: the changed bytes only.`nMetrics digest: {`"schemaVersion`":`"broken-engine-code-quality-evidence/v2`"}`nResiduals: none.`n"
+
+function New-VerifyScopeText([string] $Baseline, [string] $Head) {
+	return ($script:ScopeText + "Baseline: $Baseline`nHead: $Head`n")
+}
 
 function New-RepositoryA() {
 	$root = New-FixtureRoot 'prompt'
-	Add-FixtureSkill $root @('repo-code-review', 'scope-review')
+	Add-FixtureSkill $root @('repo-code-review', 'scope-review', 'plan-audit')
 	Set-FixtureText $root 'Engine/Source/Keep.cpp' "1`n2`n3`n4`n5`n"
 	Set-FixtureText $root 'Engine/Source/Old.cpp' "int Old() { return 1; }`n"
 	Invoke-FixtureGit $root @('add', '--all')
@@ -356,6 +362,140 @@ function Test-MixedCaseAssignedSkill($Fixture) {
 	Assert-True (Test-Path -LiteralPath $targetsPath) 'mixed-case repo-code-review writes the targets file'
 }
 
+function Test-PlanAuditExecutionCard($Fixture) {
+	# The card is the one input only the manager can author, so a scope without it has to block at
+	# assembly rather than cost a whole review round.
+	$missingPath = New-ScratchPath 'nocard'
+	$missing = Invoke-PromptScript @(
+		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'plan-audit',
+		'-ScopeFile', (New-ScratchFile 'scope' $script:ScopeText), '-PromptPath', $missingPath,
+		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
+	Assert-Equal 2 $missing.ExitCode 'plan-audit without an execution card exit code'
+	if ($null -ne $missing.Json) {
+		Assert-Equal 'blocked' $missing.Json.status 'plan-audit without an execution card status'
+		Assert-Equal 'prompt.execution-card-required' $missing.Json.code 'plan-audit without an execution card code'
+	}
+	else { Assert-True $false 'plan-audit without an execution card emitted JSON' }
+	Assert-True (-not (Test-Path -LiteralPath $missingPath)) 'plan-audit without an execution card creates no prompt file'
+
+	$cardText = $script:ScopeText + "Draft execution card`n- Tier 3: determinism surface.`n- Acceptance: the fixture suite exits 0.`n"
+	$cardPath = New-ScratchPath 'card'
+	$card = Invoke-PromptScript @(
+		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'plan-audit',
+		'-ScopeFile', (New-ScratchFile 'scope' $cardText), '-PromptPath', $cardPath,
+		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
+	Assert-Equal 0 $card.ExitCode 'plan-audit with an execution card exit code'
+	Assert-True (Test-Path -LiteralPath $cardPath) 'plan-audit with an execution card writes the prompt'
+	if (-not (Test-Path -LiteralPath $cardPath)) { return }
+	$prompt = $script:Utf8.GetString([IO.File]::ReadAllBytes($cardPath))
+	Assert-True ((Get-PromptSectionBody $prompt '(b) Scope' "`n---`n`n# (c) Evidence`n`n") -ceq $cardText) 'plan-audit with an execution card still copies the scope text byte-identically'
+}
+
+function Test-RepoCodeReviewMetricsDigest($Fixture) {
+	# The Compare cache write is denied inside the reviewer's read-only sandbox, so the host-produced
+	# digest has to be in the scope before the dispatch runs.
+	$withoutDigest = "Files and regions: Engine/Source/Keep.cpp lines 1-5.`nFocus: the changed bytes only.`nResiduals: none.`n"
+	$missingPath = New-ScratchPath 'nodigest'
+	$missing = Invoke-PromptScript @(
+		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
+		'-ScopeFile', (New-ScratchFile 'scope' $withoutDigest), '-PromptPath', $missingPath,
+		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
+	Assert-Equal 2 $missing.ExitCode 'repo-code-review without a metrics digest exit code'
+	if ($null -ne $missing.Json) {
+		Assert-Equal 'blocked' $missing.Json.status 'repo-code-review without a metrics digest status'
+		Assert-Equal 'prompt.metrics-digest-required' $missing.Json.code 'repo-code-review without a metrics digest code'
+	}
+	else { Assert-True $false 'repo-code-review without a metrics digest emitted JSON' }
+	Assert-True (-not (Test-Path -LiteralPath $missingPath)) 'repo-code-review without a metrics digest creates no prompt file'
+	Assert-True (-not (Test-Path -LiteralPath (Get-TargetsPath $missingPath))) 'repo-code-review without a metrics digest creates no targets file'
+
+	$digestPath = New-ScratchPath 'digest'
+	$digest = Invoke-PromptScript @(
+		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
+		'-ScopeFile', (New-ScratchFile 'scope' $script:ScopeText), '-PromptPath', $digestPath,
+		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
+	Assert-Equal 0 $digest.ExitCode 'repo-code-review with a metrics digest exit code'
+	Assert-True (Test-Path -LiteralPath $digestPath) 'repo-code-review with a metrics digest writes the prompt'
+	if (-not (Test-Path -LiteralPath $digestPath)) { return }
+	$prompt = $script:Utf8.GetString([IO.File]::ReadAllBytes($digestPath))
+	Assert-True ((Get-PromptSectionBody $prompt '(b) Scope' "`n---`n`n# (c) Evidence`n`n") -ceq $script:ScopeText) 'repo-code-review with a metrics digest still copies the scope text byte-identically'
+}
+
+function Test-VerifyChangesTypedArtifacts() {
+	# A landing diff that touches both an executable Plan and a skill file, so the conditional artifacts
+	# and the identity values are all required at once.
+	$root = New-FixtureRoot 'typedartifacts'
+	Add-FixtureSkill $root @('verify-changes')
+	Set-FixtureText $root 'Documents/Plans/Area/Thing.md' "baseline plan`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	Set-FixtureText $root 'Documents/Plans/Area/Thing.md' "landed plan`n"
+	Set-FixtureText $root '.agents/skills/verify-changes/SKILL.md' "# verify-changes`nlanded`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'landed')
+	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+
+	# One compact build envelope line, the shape `WorktreeCli build` emits, whose own target names the
+	# game project — the claim that makes the data-oracle verifier result required.
+	$gameBuildLine = "Client build: {`"schemaVersion`":`"broken-engine-build-result/v1`",`"status`":`"success`",`"target`":{`"requested`":`"C:\\repo\\Projects\\BrokenEngineSandbox\\Platforms\\VisualStudio2026\\BrokenEngineSandbox.vcxproj`",`"normalized`":`"c:/repo/projects/brokenenginesandbox/platforms/visualstudio2026/brokenenginesandbox.vcxproj`"}}`n"
+	$missingText = (New-VerifyScopeText $baseline $head) + $gameBuildLine
+	$missingPath = New-ScratchPath 'noartifacts'
+	$missing = Invoke-PromptScript @(
+		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
+		'-ScopeFile', (New-ScratchFile 'scope' $missingText), '-PromptPath', $missingPath, '-Head', $head)
+	Assert-Equal 2 $missing.ExitCode 'verify-changes without typed artifacts exit code'
+	if ($null -ne $missing.Json) {
+		Assert-Equal 'blocked' $missing.Json.status 'verify-changes without typed artifacts status'
+		Assert-Equal 'prompt.typed-artifacts-required' $missing.Json.code 'verify-changes without typed artifacts code'
+		Assert-True ($missing.Json.message.Contains('"operation":"validate"')) 'verify-changes names the missing plan validate marker'
+		Assert-True ($missing.Json.message.Contains('broken-engine-data-oracle-verifier-result/v1')) 'verify-changes names the missing data-oracle verifier marker'
+		Assert-True ($missing.Json.message.Contains('Validation: PASS')) 'verify-changes names the missing /validate-skill marker'
+	}
+	else { Assert-True $false 'verify-changes without typed artifacts emitted JSON' }
+	Assert-True (-not (Test-Path -LiteralPath $missingPath)) 'verify-changes without typed artifacts creates no prompt file'
+
+	# A tool-only build envelope beside prose naming the game project is not a game build, so the
+	# data-oracle verifier result stays unrequired.
+	$toolBuildText = (New-VerifyScopeText $baseline $head) +
+		"Tool build: {`"schemaVersion`":`"broken-engine-build-result/v1`",`"status`":`"success`",`"target`":{`"requested`":`"C:\\repo\\Tools\\WorktreeCli\\Platforms\\VisualStudio2026\\WorktreeCli.sln`",`"normalized`":`"c:/repo/tools/worktreecli/platforms/visualstudio2026/worktreecli.sln`"}}`n" +
+		"BrokenEngineSandbox: not built.`nPlan validate: {`"operation`":`"validate`",`"status`":`"valid`"}`nSkill validation: Validation: PASS`n"
+	$toolBuildPath = New-ScratchPath 'toolbuild'
+	$toolBuild = Invoke-PromptScript @(
+		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
+		'-ScopeFile', (New-ScratchFile 'scope' $toolBuildText), '-PromptPath', $toolBuildPath, '-Head', $head)
+	Assert-Equal 0 $toolBuild.ExitCode 'verify-changes tool-only build exit code'
+	Assert-True (Test-Path -LiteralPath $toolBuildPath) 'verify-changes tool-only build writes the prompt without a data-oracle verifier result'
+
+	$artifactText = $missingText + "Data oracle: {`"schemaVersion`":`"broken-engine-data-oracle-verifier-result/v1`",`"status`":`"pass`"}`nPlan validate: {`"operation`":`"validate`",`"status`":`"valid`"}`nSkill validation: Validation: PASS`n"
+	$presentPath = New-ScratchPath 'artifacts'
+	$present = Invoke-PromptScript @(
+		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
+		'-ScopeFile', (New-ScratchFile 'scope' $artifactText), '-PromptPath', $presentPath, '-Head', $head)
+	Assert-Equal 0 $present.ExitCode 'verify-changes with typed artifacts exit code'
+	Assert-True (Test-Path -LiteralPath $presentPath) 'verify-changes with typed artifacts writes the prompt'
+	if (Test-Path -LiteralPath $presentPath) {
+		$prompt = $script:Utf8.GetString([IO.File]::ReadAllBytes($presentPath))
+		Assert-True ((Get-PromptSectionBody $prompt '(b) Scope' "`n---`n`n# (c) Evidence`n`n") -ceq $artifactText) 'verify-changes with typed artifacts still copies the scope text byte-identically'
+	}
+
+	# The same complete artifacts bound to a revision that is not the reviewed one.
+	$mismatchText = $script:ScopeText + "Baseline: $('0' * 40)`nHead: $('1' * 40)`nPlan validate: {`"operation`":`"validate`"}`nSkill validation: Validation: PASS`n"
+	$mismatchPath = New-ScratchPath 'artifactidentity'
+	$mismatch = Invoke-PromptScript @(
+		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
+		'-ScopeFile', (New-ScratchFile 'scope' $mismatchText), '-PromptPath', $mismatchPath, '-Head', $head)
+	Assert-Equal 2 $mismatch.ExitCode 'verify-changes with mismatched identity exit code'
+	if ($null -ne $mismatch.Json) {
+		Assert-Equal 'blocked' $mismatch.Json.status 'verify-changes with mismatched identity status'
+		Assert-Equal 'prompt.typed-artifacts-required' $mismatch.Json.code 'verify-changes with mismatched identity code'
+		Assert-True ($mismatch.Json.message.Contains('the baseline SHA')) 'verify-changes names the unmatched baseline identity'
+		Assert-True ($mismatch.Json.message.Contains('the head SHA')) 'verify-changes names the unmatched head identity'
+	}
+	else { Assert-True $false 'verify-changes with mismatched identity emitted JSON' }
+	Assert-True (-not (Test-Path -LiteralPath $mismatchPath)) 'verify-changes with mismatched identity creates no prompt file'
+}
+
 # --- Repository B: a committed head over a dirty working tree ------------------------------------
 
 function Test-HeadHonoured() {
@@ -467,7 +607,7 @@ function Test-VerifyChangesHead() {
 	Invoke-FixtureGit $root @('add', '--all')
 	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'landed')
 	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
-	$scopeFile = New-ScratchFile 'scope' $script:ScopeText
+	$scopeFile = New-ScratchFile 'scope' (New-VerifyScopeText $baseline $head)
 
 	$noHeadPath = New-ScratchPath 'nohead'
 	$noHead = Invoke-PromptScript @(
@@ -559,7 +699,7 @@ function Test-VerifyChangesCandidateHead() {
 	$candidate = New-FixtureCandidateCommit $root $baseline
 	$branchTip = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
 	Assert-Equal $baseline $branchTip 'candidate head leaves the branch ref unmoved'
-	$scopeFile = New-ScratchFile 'scope' $script:ScopeText
+	$scopeFile = New-ScratchFile 'scope' (New-VerifyScopeText $baseline $candidate)
 
 	$matchPath = New-ScratchPath 'candidatematch'
 	$match = Invoke-PromptScript @(
@@ -643,7 +783,7 @@ function Test-VerifyChangesReviewedPathShapes() {
 	$treeText = Get-FixtureGitText $root @('ls-tree', '-r', '--name-only', $candidate)
 	Assert-True ($treeText.Contains('Engine/Source/casename.cpp')) 'candidate tree carries the new spelling'
 	Assert-True (-not $treeText.Contains('Engine/Source/CaseName.cpp')) 'candidate tree drops the old spelling'
-	$scopeFile = New-ScratchFile 'scope' $script:ScopeText
+	$scopeFile = New-ScratchFile 'scope' (New-VerifyScopeText $baseline $candidate)
 
 	$matchPath = New-ScratchPath 'pathshapes'
 	$match = Invoke-PromptScript @(
@@ -705,7 +845,7 @@ function Test-VerifyChangesGitlinkDirectory() {
 	}
 	$treeText = Get-FixtureGitText $root @('ls-tree', $candidate, '--', 'Vendor/Sub')
 	Assert-True ($treeText.Contains("160000 commit $branchTip")) 'candidate tree records the gitlink at the repository head'
-	$scopeFile = New-ScratchFile 'scope' $script:ScopeText
+	$scopeFile = New-ScratchFile 'scope' (New-VerifyScopeText $baseline $candidate)
 
 	$promptPath = New-ScratchPath 'gitlink'
 	$run = Invoke-PromptScript @(
@@ -766,6 +906,9 @@ try {
 	Test-TargetsSiblingExists $repositoryA
 	Test-AssignedSkillUnknown $repositoryA
 	Test-MixedCaseAssignedSkill $repositoryA
+	Test-PlanAuditExecutionCard $repositoryA
+	Test-RepoCodeReviewMetricsDigest $repositoryA
+	Test-VerifyChangesTypedArtifacts
 	Test-HeadHonoured
 	Test-ZeroTargets
 	Test-UntrackedRenameTargets

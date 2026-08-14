@@ -36,6 +36,14 @@ public:
 	std::unique_ptr<Server> mpServer;
 	std::unique_ptr<NetworkDiscoveryResponder> mpDiscoveryResponder;
 	HANDLE mTimerHandle = nullptr;
+
+private:
+
+	void ResetOnLastClientLeave();
+
+	// Tracks whether the engine client set was non-empty as of the previous post-poll sample so the
+	// network-driven pause/timescale reset fires on the non-empty -> empty transition.
+	bool mbHadClients = false;
 };
 
 } // namespace engine

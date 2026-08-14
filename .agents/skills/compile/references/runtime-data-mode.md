@@ -31,7 +31,19 @@ $GenerationDataProperties = @($DataProperties) + "/p:DevEnvDir=$($Context.devEnv
 
 Use `$GenerationDataProperties` only for the first `RunDataPacker=true` build. For every later build, set `$RunDataPacker = 'false'`, reconstruct `$DataProperties` from the four-property block above, and pass that array; `DevEnvDir` must not leak into subsequent calls.
 
-Every selected Data directory must be an absolute ordinary non-reparse directory containing exactly the 23 generated files: `Data.h`, `DataTypes.h`, and one nonempty header, manifest, and pack for each of `Audio`, `Scene`, `Islands`, `Model`, `Shader`, `Texture`, and `Raw`. Before the first game build, create an ignored receipt parent under `$ROOT\Temp`, invoke `scripts/New-DataOracleReceipt.ps1` with the exact normalized Data path, `Shared` or `Local` mode, fixed 40-hex baseline, and absolute receipt path, and require exit `0` plus `broken-engine-data-oracle-producer-result/v1` `status:pass`, `code:ok`. Retain its receipt path and SHA-256. Before and after every consuming build, invoke `scripts/Test-DataOracleReceipt.ps1` with that exact receipt path/hash, Data path, mode, and baseline; require exit `0` plus `broken-engine-data-oracle-verifier-result/v1` `status:pass`, `code:ok`. Missing, extra, empty, replaced, reparse, or changed entries fail closed.
+Every selected Data directory must be an absolute ordinary non-reparse directory containing exactly the 23 generated files: `Data.h`, `DataTypes.h`, and one nonempty header, manifest, and pack for each of `Audio`, `Scene`, `Islands`, `Model`, `Shader`, `Texture`, and `Raw`. Before the first game build, create an ignored receipt parent under `$ROOT\Temp`, invoke `scripts/New-DataOracleReceipt.ps1` with the exact normalized Data path, `Shared` or `Local` mode, fixed 40-hex baseline, and absolute receipt path, and require exit `0` plus `broken-engine-data-oracle-producer-result/v1` `status:pass`, `code:ok`:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/compile/scripts/New-DataOracleReceipt.ps1 -DataRoot $GameDataDirectory -Mode $DataBuildMode -Baseline $BASELINE -ReceiptPath '<absolute receipt path>'
+```
+
+Retain its receipt path and SHA-256. Before and after every consuming build, invoke `scripts/Test-DataOracleReceipt.ps1` with that exact receipt path/hash, Data path, mode, and baseline; require exit `0` plus `broken-engine-data-oracle-verifier-result/v1` `status:pass`, `code:ok`:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/compile/scripts/Test-DataOracleReceipt.ps1 -ReceiptPath '<absolute receipt path>' -ReceiptSha256 '<retained SHA-256>' -ExpectedDataRoot $GameDataDirectory -ExpectedMode $DataBuildMode -ExpectedBaseline $BASELINE
+```
+
+Missing, extra, empty, replaced, reparse, or changed entries fail closed.
 
 The wrapper bootstrap refreshes Shared data on a best-effort basis: at session start it runs the primary's DataPacker over the primary checkout's current asset inputs, which are not checked against HEAD, and it skips the run when the DataPacker prebuild was not stamped or a `BrokenEngineSandbox*` process is running. A peer session starting mid-session can therefore move primary Data under this session, failing a Shared receipt issued before that start, and a regenerated header can force a recompile here.
 

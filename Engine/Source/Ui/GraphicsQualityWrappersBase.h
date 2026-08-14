@@ -4,7 +4,7 @@
 
 #include "Ui/WrapperBase.h"
 
-namespace game
+namespace engine
 {
 
 enum class GraphicsQualityLevel : uint8_t
@@ -35,6 +35,6 @@ void ApplyWaterLevel();
 
 void ApplyAllGraphicsQualityLevels();
 
-} // namespace game
+} // namespace engine
 
 #endif // defined(BT_CLIENT)

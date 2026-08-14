@@ -47,7 +47,7 @@ Measure several files in one batched run instead of one call per file. Use
 filename and the run fails.
 
 ```powershell
-pwsh -NoProfile -Command "& '<absolute path to Measure-Tokens.ps1>' -Path 'a','b','c' -Json"
+pwsh -NoProfile -Command "& '.agents/scripts/Measure-Tokens.ps1' -Path 'a','b','c' -Json"
 ```
 
 `bt-token-v1` is normalized UTF-8 bytes divided by four, rounded up.

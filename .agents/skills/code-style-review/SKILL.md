@@ -17,10 +17,8 @@ landing gate (defined in root `AGENTS.md`).
   implementation handoff and conversation edits. Derive those ranges from the
   read-only inventory: `pwsh -NoProfile -File
   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
-  repository toplevel> -Baseline <full 40-character SHA> -Regions` (in Claude
-  Code's Git Bash terminal convert the script path and root with `cygpath -w`
-  exactly as `../cleanup-worktrees/SKILL.md` shows). It writes no file and
-  prints one `broken-engine-session-change-inventory/v1` object; the
+  repository toplevel> -Baseline <full 40-character SHA> -Regions`. It writes no
+  file and prints one `broken-engine-session-change-inventory/v1` object; the
   session-changed C++ ranges are its `regions` rows whose path carries the
   `class` `cpp` or `dual-language-header` in `entries`. Only `status` `pass`
   (exit 0) is usable; `blocked` (exit 2) or `error` (exit 1) means the ranges are
@@ -103,8 +101,8 @@ The scanner is `pwsh -NoProfile -File
 .agents/scripts/Find-SessionDebugResidue.ps1 -RepositoryRoot <absolute
 repository toplevel> -Baseline <full 40-character SHA>`, with optional `-Head
 <commit>` and the `-IncludeUntracked` switch, which makes the scanner enumerate
-every untracked file itself and include those files in the scan, and the same
-`cygpath -w` conversion in Git Bash. It scans added lines only and prints one
+every untracked file itself and include those files in the scan. It scans added
+lines only and prints one
 `broken-engine-session-debug-residue/v1` object with `hits` rows of `path`,
 `line`, `kind`, and `text`, plus `counts` and `truncated`. It reports candidates
 only: it never edits a file, never decides whether a hit is temporary or

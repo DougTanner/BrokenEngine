@@ -16,12 +16,11 @@ Convert a Gaea 2 `.terrain` JSON into:
 
 1. Resolve the input path. `$ARGUMENTS` holds the user-supplied path. If it's empty or doesn't end in `.terrain`, ask the user for the file path. If it's a bare filename (no directory), try `C:/Program Files/QuadSpinner/Gaea 2/Examples/<name>.terrain` — that's where Gaea ships its example library. The shared `.claude/skills/gaea2-shared/examples/` directory is intentionally empty (the example files are © QuadSpinner and aren't redistributed); see its `README.md` for the rationale and the 28-file working set.
 
-2. Run the load wrapper. One call resolves the input path, checks Python, probes Gaea version drift, and runs the loader — which writes `Temp/<basename>.md` and `Temp/<basename>.passthrough.json`. In Claude Code's Git Bash terminal, convert the script path first:
-   ```bash
-   script="$(cygpath -w "${CLAUDE_SKILL_DIR}/../gaea2-shared/scripts/Invoke-Gaea2Load.ps1")"
-   pwsh -NoProfile -ExecutionPolicy Bypass -File "$script" -InputPath "<input.terrain>" 2>/dev/null
+2. Run the load wrapper. One call resolves the input path, checks Python, probes Gaea version drift, and runs the loader — which writes `Temp/<basename>.md` and `Temp/<basename>.passthrough.json`. From the session worktree root:
+   ```powershell
+   pwsh -NoProfile -File .agents/skills/gaea2-shared/scripts/Invoke-Gaea2Load.ps1 -InputPath "<input.terrain>"
    ```
-   In a PowerShell 7 terminal pass the path directly, without the `cygpath` conversion. The wrapper resolves relative paths and `Temp/` against the repository root whatever the shell's current directory is, and passes the child processes' stderr through to yours — redirect it (`2>/dev/null` above) when you only want the JSON.
+   The wrapper resolves relative paths and `Temp/` against the repository root whatever the shell's current directory is, and passes the child processes' stderr through to yours — append your shell's stderr redirect (`2>$null` in PowerShell, `2>/dev/null` in Bash) when you only want the JSON.
 
    Stdout is one JSON object, `schemaVersion` `broken-engine-gaea2-load/v1`, with `status`, `code`, `message`:
    - `ok` (exit 0) — `markdownPath`, `passthroughPath`, and `versionDrift` are populated. Continue to step 3.

@@ -29,9 +29,8 @@ Build the manifest with:
 pwsh -NoProfile -File .agents/scripts/Get-AnalysisManifest.ps1 -Path <target> -Extension .h,.cpp
 ```
 
-Add `-Recurse` only when the caller explicitly requests recursion. In Claude
-Code's Git Bash terminal, convert the script path first with `cygpath -w`, as in
-`.agents/skills/cleanup-worktrees/SKILL.md`. The result gives every in-scope
+Add `-Recurse` only when the caller explicitly requests recursion. The result
+gives every in-scope
 file its repository-relative path, its ordered root-to-file `AGENTS.md`
 authority chain, its `bt-token-v1` size, and a `reduceFileCandidate` flag; never
 reconstruct that enumeration, authority walk, or per-file measurement inline. On

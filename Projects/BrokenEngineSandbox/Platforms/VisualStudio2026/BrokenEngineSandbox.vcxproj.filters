@@ -483,6 +483,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
@@ -543,11 +546,8 @@
     <ClInclude Include="..\..\Source\Ui\SmokeWrappers.h">
       <Filter>Game\Ui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Ui\GraphicsQualityWrappers.h">
-      <Filter>Game\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Ui\HexShieldWrappers.h">
-      <Filter>Game\Ui</Filter>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h">
+      <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Ui\WindDepositsWrappers.h">
       <Filter>Game\Ui</Filter>
@@ -1377,11 +1377,8 @@
     <ClCompile Include="..\..\Source\Ui\SmokeWrappers.cpp">
       <Filter>Game\Ui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\GraphicsQualityWrappers.cpp">
-      <Filter>Game\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\HexShieldWrappers.cpp">
-      <Filter>Game\Ui</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp">
       <Filter>Game\Ui</Filter>
@@ -1420,6 +1417,9 @@
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp">

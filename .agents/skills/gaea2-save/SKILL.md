@@ -18,23 +18,21 @@ Convert a `Temp/<name>.md` (plus its `.passthrough.json` sidecar) back to a Gaea
    - Otherwise use as given.
    - If `--output` is absent, default to `<input-base>.terrain` next to the .md file. If the user wants to overwrite the original, pull the original path from the `.passthrough.json`'s `original_file` field and offer that.
 
-2. Validate the Markdown before saving. Dispatch the validator through the shared Python wrapper. In Claude Code's Git Bash terminal, convert the script path first:
-   ```bash
-   wrapper="$(cygpath -w "${CLAUDE_SKILL_DIR}/../gaea2-shared/scripts/Invoke-Gaea2Python.ps1")"
-   pwsh -NoProfile -ExecutionPolicy Bypass -Command "& '$wrapper' -Script validate_markdown.py -Arguments '<Temp/name.md>'"
+2. Validate the Markdown before saving. Dispatch the validator through the shared Python wrapper, from the session worktree root:
+   ```powershell
+   pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script validate_markdown.py -Arguments '<Temp/name.md>'"
    ```
-   In a PowerShell 7 terminal pass the path directly, without the `cygpath` conversion. Use `-Command`, not `-File`, for this wrapper: that is the form that passes the `-Arguments` list through intact. The wrapper prints one `broken-engine-gaea2-python/v1` envelope; on `python.missing` / `python.stale` (exit 2) nothing ran — apply the missing-interpreter rule below. Otherwise the validator's own `broken-engine-gaea2-markdown/v1` envelope is the string in the wrapper's `stdout` field. Gate on that inner `code`, not on the exit code — including on `python.script-failed`, which is what the validator's own blocked codes (it exits 2) look like from outside: parse the inner envelope out of `stdout` for the diagnostic code first, and fall back to the wrapper's `stderr` only when `stdout` carries no envelope. The inner codes:
+   Use `-Command`, not `-File`, for this wrapper: that is the form that passes the `-Arguments` list through intact. The wrapper prints one `broken-engine-gaea2-python/v1` envelope; on `python.missing` / `python.stale` (exit 2) nothing ran — apply the missing-interpreter rule below. Otherwise the validator's own `broken-engine-gaea2-markdown/v1` envelope is the string in the wrapper's `stdout` field. Gate on that inner `code`, not on the exit code — including on `python.script-failed`, which is what the validator's own blocked codes (it exits 2) look like from outside: parse the inner envelope out of `stdout` for the diagnostic code first, and fall back to the wrapper's `stderr` only when `stdout` carries no envelope. The inner codes:
    - `ok` — no entries; proceed to step 3.
    - `markdown.entries-reported` — `payload.entries` lists `{nodeId, rule, message}` findings (`no-path-to-output`, `required-input-unwired`, `missing-version-2`, `duplicate-node-id`, and the rest). Every one of them is a defect Gaea would surface much later as a failed load or a silently deactivated node, so saving is blocked: fix them in `/gaea2-modify`, or get the user's explicit say-so to save anyway after showing them the entries.
    - `input.invalid`, `markdown.missing`, `markdown.unreadable`, `passthrough.missing`, `passthrough.unreadable`, `markdown.structure-unparsed` — the validator couldn't read or parse the input at all, so it proved nothing. Resolve that first; a missing sidecar means re-running `/gaea2-load` from the original `.terrain`.
    Report `payload.entriesTruncated` if set — more than 64 entries were found and the list is cut off.
 
 3. Run the save wrapper. One call resolves the input and output paths, checks Python, and runs the saver:
-   ```bash
-   script="$(cygpath -w "${CLAUDE_SKILL_DIR}/../gaea2-shared/scripts/Invoke-Gaea2Save.ps1")"
-   pwsh -NoProfile -ExecutionPolicy Bypass -File "$script" -InputPath "<name-or-Temp/path.md>" [-Output "<path.terrain>"] 2>/dev/null
+   ```powershell
+   pwsh -NoProfile -File .agents/skills/gaea2-shared/scripts/Invoke-Gaea2Save.ps1 -InputPath "<name-or-Temp/path.md>" [-Output "<path.terrain>"]
    ```
-   Both wrappers resolve relative paths and `Temp/` against the repository root whatever the shell's current directory is, and pass the child processes' stderr through to yours — redirect it (`2>/dev/null` above) when you only want the JSON. `-InputPath` accepts the same forms as step 1 (a bare name becomes `Temp/<name>.md`); omitting `-Output` defaults to `<input-base>.terrain` beside the `.md`, so pass the original path explicitly when the user chose to overwrite it.
+   Both wrappers resolve relative paths and `Temp/` against the repository root whatever the shell's current directory is, and pass the child processes' stderr through to yours — append your shell's stderr redirect (`2>$null` in PowerShell, `2>/dev/null` in Bash) when you only want the JSON. `-InputPath` accepts the same forms as step 1 (a bare name becomes `Temp/<name>.md`); omitting `-Output` defaults to `<input-base>.terrain` beside the `.md`, so pass the original path explicitly when the user chose to overwrite it.
 
    Stdout is one JSON object, `schemaVersion` `broken-engine-gaea2-save/v1`, with `status`, `code`, `message`:
    - `ok` (exit 0) — `outputPath` is the file written and `warnings` holds the saver's `WARNING:` lines (prefix stripped, at most 64; `truncated` flags a cut-off). Continue to step 4.
