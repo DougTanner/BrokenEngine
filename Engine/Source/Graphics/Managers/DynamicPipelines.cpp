@@ -17,12 +17,30 @@ DynamicPipelines::DynamicPipelines(std::unordered_map<common::crc_t, Shader>& rS
 {
 }
 
-// Resolves a model scene CRC to its mesh CRC + animation-aware vertex shader CRC (shared by the model + model-shadow pipeline creators).
-static void ResolveModelChunkShaders(common::crc_t sceneCrc, common::crc_t& rModelCrc, common::crc_t& rVertexShaderCrc)
+// Resolves a model scene CRC to its model buffer + animation-aware vertex shader CRC (shared by the model + model-shadow pipeline creators).
+static void ResolveModelChunkShaders(common::crc_t sceneCrc, Buffer*& rpModelBuffer, common::crc_t& rVertexShaderCrc)
 {
-	const EagerChunk& rChunk = gpFileManager->GetEagerChunkMap().at(sceneCrc);
-	rModelCrc = rChunk.pHeader->sceneHeader.modelCrc;
-	rVertexShaderCrc = rChunk.pHeader->sceneHeader.bHasAnimation ? data::kShadersModelModelSkinnedvertCrc : data::kShadersModelModelStaticvertCrc;
+	const std::unordered_map<common::crc_t, EagerChunk>& rChunkMap = gpFileManager->GetEagerChunkMap();
+	const auto sceneIt = rChunkMap.find(sceneCrc);
+	if (sceneIt == rChunkMap.end())
+	{
+		throw common::CorruptStreamException("DynamicPipelines scene");
+	}
+
+	if (!(sceneIt->second.pHeader->flags & common::ChunkFlags::kScene))
+	{
+		throw common::CorruptStreamException("DynamicPipelines scene");
+	}
+
+	const common::SceneHeader& rSceneHeader = sceneIt->second.pHeader->sceneHeader;
+	const auto modelIt = gpBufferManager->mModelMap.find(rSceneHeader.modelCrc);
+	if (modelIt == gpBufferManager->mModelMap.end())
+	{
+		throw common::CorruptStreamException("DynamicPipelines scene");
+	}
+
+	rpModelBuffer = &modelIt->second;
+	rVertexShaderCrc = rSceneHeader.bHasAnimation ? data::kShadersModelModelSkinnedvertCrc : data::kShadersModelModelStaticvertCrc;
 }
 
 // Allocates a Pipeline, runs Create with the supplied info, and registers it under eType/crc — the boilerplate tail shared by every CreatePipeline* below.
@@ -37,20 +55,7 @@ void DynamicPipelines::AddPipeline(DynamicPipelineType eType, common::crc_t crc,
 ModelPipeline* DynamicPipelines::CreateModelPipeline(const ModelPipelineSpec& rModelPipelineSpec)
 {
 	std::unique_ptr<ModelPipeline> pModelPipeline = std::make_unique<ModelPipeline>();
-
-	// Trust boundary: ModelPipeline::Create parses on-disk scene-header counts. A corrupt count throws;
-	// boot-required model pipeline, so log kError and let it propagate to MainThread's try/catch
-	// (HandleException — crash report + exit), matching the boot hard-fail tier.
-	try
-	{
-		pModelPipeline->Create(rModelPipelineSpec.sceneCrc, rModelPipelineSpec.pipelineInfo, rModelPipelineSpec.bIsPipelineShadow);
-	}
-	catch (const common::CorruptStreamException& rException)
-	{
-		char pcHex[20] {};
-		LOG(kLoading, kError, "Corrupt scene chunk for {}model pipeline \"{}\" (scene CRC {}): {}", rModelPipelineSpec.bIsPipelineShadow ? "shadow " : "", rModelPipelineSpec.pipelineInfo.name, common::ToHex(std::span(pcHex), rModelPipelineSpec.sceneCrc), rException.what());
-		throw;
-	}
+	pModelPipeline->Create(rModelPipelineSpec.sceneCrc, rModelPipelineSpec.pipelineInfo, rModelPipelineSpec.bIsPipelineShadow);
 
 	ModelPipeline* pResult = pModelPipeline.get();
 	mModelPipelines.push_back(std::move(pModelPipeline));
@@ -66,31 +71,44 @@ void DynamicPipelines::CreateModelPipeline(common::crc_t crc, std::string_view n
 		return;
 	}
 
-	// Look up the model CRC and animation-aware vertex shader from the glTF header
-	common::crc_t modelCrc = 0;
-	common::crc_t vertexShaderCrc = 0;
-	ResolveModelChunkShaders(sceneCrc, modelCrc, vertexShaderCrc);
-
-	ModelPipeline* pPipeline = CreateModelPipeline(
+	// Trust boundary: ResolveModelChunkShaders validates the pack-derived scene kind and model reference before
+	// PipelineInfo consumes them; ModelPipeline::Create validates scene-header counts and material ranges. This
+	// boot-required model pipeline logs kError and propagates to MainThread's try/catch (HandleException — crash
+	// report + exit), matching the boot hard-fail tier.
+	try
 	{
-		.sceneCrc = sceneCrc,
-		.pipelineInfo =
-		{
-			.name = name,
-			.flags = {kIndirectHostVisible, kPushConstants, kDepthTest, kDepthWrite, kCullBack, kSampleShading, kUpdateAfterBind, kMultiSet},
-			.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(data::kShadersModelModelfragCrc)},
-			.pVertexBuffer = &gpBufferManager->mModelMap.at(modelCrc),
-			.pDescriptorInfos =
-			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kMainLayoutUniformBuffers},
-				{.flags = kPerCommandBufferStorageBuffers, .pBuffers = pStorageBuffers},
-			},
-		},
-		.bIsPipelineShadow = false,
-	});
+		// Look up the model buffer and animation-aware vertex shader from the scene header
+		Buffer* pModelBuffer = nullptr;
+		common::crc_t vertexShaderCrc = 0;
+		ResolveModelChunkShaders(sceneCrc, pModelBuffer, vertexShaderCrc);
 
-	mModelPipelineMaps[kDynamicModelPipelineModel].insert_or_assign(crc, pPipeline);
+		ModelPipeline* pPipeline = CreateModelPipeline(
+		{
+			.sceneCrc = sceneCrc,
+			.pipelineInfo =
+			{
+				.name = name,
+				.flags = {kIndirectHostVisible, kPushConstants, kDepthTest, kDepthWrite, kCullBack, kSampleShading, kUpdateAfterBind, kMultiSet},
+				.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(data::kShadersModelModelfragCrc)},
+				.pVertexBuffer = pModelBuffer,
+				.pDescriptorInfos =
+				{
+					{.flags = kGlobalLayoutUniformBuffers},
+					{.flags = kMainLayoutUniformBuffers},
+					{.flags = kPerCommandBufferStorageBuffers, .pBuffers = pStorageBuffers},
+				},
+			},
+			.bIsPipelineShadow = false,
+		});
+
+		mModelPipelineMaps[kDynamicModelPipelineModel].insert_or_assign(crc, pPipeline);
+	}
+	catch (const common::CorruptStreamException& rException)
+	{
+		char pcHex[20] {};
+		LOG(kLoading, kError, "Corrupt scene chunk for {}model pipeline \"{}\" (scene CRC {}): {}", "", name, common::ToHex(std::span(pcHex), sceneCrc), rException.what());
+		throw;
+	}
 }
 
 void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
@@ -101,37 +119,52 @@ void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_
 		return;
 	}
 
-	// Look up the model CRC and animation-aware vertex shader from the glTF header
-	common::crc_t modelCrc = 0;
-	common::crc_t vertexShaderCrc = 0;
-	ResolveModelChunkShaders(sceneCrc, modelCrc, vertexShaderCrc);
-
-	// Create shadow variant of pipeline name (stored in map to outlive this function)
-	std::string& rShadowName = mShadowPipelineNames.insert_or_assign(crc, std::string(name) + "Shadow").first->second;
-
-	// Create shadow pipeline with minimal descriptor sets
-	ModelPipeline* pPipelineShadow = CreateModelPipeline(
+	// Trust boundary: ResolveModelChunkShaders validates the pack-derived scene kind and model reference before
+	// PipelineInfo consumes them; ModelPipeline::Create validates scene-header counts and material ranges. This
+	// boot-required model pipeline logs kError and propagates to MainThread's try/catch (HandleException — crash
+	// report + exit), matching the boot hard-fail tier.
+	std::string_view pipelineName = name;
+	try
 	{
-		.sceneCrc = sceneCrc,
-		.pipelineInfo =
-		{
-			.name = rShadowName,
-			.flags = {kRenderTarget, kIndirectHostVisible, kPushConstants, kUpdateAfterBind},
-			.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(data::kShadersModelModelShadowfragCrc)},
-			.pVertexBuffer = &gpBufferManager->mModelMap.at(modelCrc),
-			.vkRenderPass = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mVkRenderPass,
-			.vkExtent3D = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mInfo.extent,
-			.pDescriptorInfos =
-			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kMainLayoutUniformBuffers},
-				{.flags = kPerCommandBufferStorageBuffers, .pBuffers = pStorageBuffers},
-			},
-		},
-		.bIsPipelineShadow = true,
-	});
+		// Look up the model buffer and animation-aware vertex shader from the scene header
+		Buffer* pModelBuffer = nullptr;
+		common::crc_t vertexShaderCrc = 0;
+		ResolveModelChunkShaders(sceneCrc, pModelBuffer, vertexShaderCrc);
 
-	mModelPipelineMaps[kDynamicModelPipelineModelShadow].insert_or_assign(crc, pPipelineShadow);
+		// Create shadow variant of pipeline name (stored in map to outlive this function)
+		std::string& rShadowName = mShadowPipelineNames.insert_or_assign(crc, std::string(name) + "Shadow").first->second;
+		pipelineName = rShadowName;
+
+		// Create shadow pipeline with minimal descriptor sets
+		ModelPipeline* pPipelineShadow = CreateModelPipeline(
+		{
+			.sceneCrc = sceneCrc,
+			.pipelineInfo =
+			{
+				.name = rShadowName,
+				.flags = {kRenderTarget, kIndirectHostVisible, kPushConstants, kUpdateAfterBind},
+				.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(data::kShadersModelModelShadowfragCrc)},
+				.pVertexBuffer = pModelBuffer,
+				.vkRenderPass = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mVkRenderPass,
+				.vkExtent3D = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mInfo.extent,
+				.pDescriptorInfos =
+				{
+					{.flags = kGlobalLayoutUniformBuffers},
+					{.flags = kMainLayoutUniformBuffers},
+					{.flags = kPerCommandBufferStorageBuffers, .pBuffers = pStorageBuffers},
+				},
+			},
+			.bIsPipelineShadow = true,
+		});
+
+		mModelPipelineMaps[kDynamicModelPipelineModelShadow].insert_or_assign(crc, pPipelineShadow);
+	}
+	catch (const common::CorruptStreamException& rException)
+	{
+		char pcHex[20] {};
+		LOG(kLoading, kError, "Corrupt scene chunk for {}model pipeline \"{}\" (scene CRC {}): {}", "shadow ", pipelineName, common::ToHex(std::span(pcHex), sceneCrc), rException.what());
+		throw;
+	}
 }
 
 void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag)
