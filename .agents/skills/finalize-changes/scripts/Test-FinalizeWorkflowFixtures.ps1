@@ -936,6 +936,63 @@ $reclaim = Invoke-JsonScript $lockClaimScript (@('-WorktreeCliExecutable', (Join
 Assert-Outcome $reclaim 'landing-lock-free-after-conflict-abort' 0 'pass' 'ok'
 Invoke-WorktreeCli @('lock', 'release', '--repo', $commonDirectory, '--owner', $reclaimOwner) | Out-Null
 
+# The sanity gate re-reads a dirty primary before blocking. The landing registers its WorktreeCli
+# session immediately before that gate, so waiting for this child's own ledger claim orders the
+# removal after the first dirty read, and the captured retry warning proves that read was dirty.
+function Test-LandingSessionRegistered([int] $ProcessId) {
+	foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $localAppData 'BrokenEngineLocks') -Filter 'worktreecli-sessions-*.json' -File -Force -ErrorAction SilentlyContinue)) {
+		try {
+			$ledger = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json -Depth 16 -ErrorAction Stop
+			if (@($ledger.sessions | Where-Object { [int]$_.pid -eq $ProcessId }).Count -ne 0) { return $true }
+		}
+		catch { }
+	}
+	return $false
+}
+function Measure-PrimaryDirtyRetry([string] $Text) {
+	return @([regex]::Matches($Text, 'FinalizeLandingSanity: primary read dirty; re-reading \(attempt \d of 4\)\.')).Count
+}
+
+$transientCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'transient dirty tail') 'transient-primary-dirty'
+$transientDirtyPath = Join-Path $primary 'transient-primary-dirty.txt'
+[IO.File]::WriteAllText($transientDirtyPath, 'transient dirty', [Text.UTF8Encoding]::new($false))
+$transientStarted = Start-JsonScriptWithSplat $landingScript (New-RetryLandingParameters $transientCandidate) $scratchBase
+$transientExitCode = $null
+$transientStdout = ''
+$transientStderr = ''
+try {
+	$transientDeadline = [DateTime]::UtcNow.AddSeconds(60)
+	while ([DateTime]::UtcNow -lt $transientDeadline -and -not $transientStarted.Process.WaitForExit(0) -and -not (Test-LandingSessionRegistered $transientStarted.Process.Id)) {
+		Start-Sleep -Milliseconds 25
+	}
+	Start-Sleep -Seconds 1
+	Remove-Item -LiteralPath $transientDirtyPath -Force -ErrorAction SilentlyContinue
+	if ($transientStarted.Process.WaitForExit(120000)) { $transientExitCode = $transientStarted.Process.ExitCode }
+	$transientStdout = $transientStarted.StdoutTask.GetAwaiter().GetResult()
+	$transientStderr = $transientStarted.StderrTask.GetAwaiter().GetResult()
+}
+finally { Stop-JsonScript $transientStarted }
+Remove-Item -LiteralPath $transientDirtyPath -Force -ErrorAction SilentlyContinue
+$transientJson = $null
+try { if (-not [string]::IsNullOrWhiteSpace($transientStdout)) { $transientJson = $transientStdout.Trim() | ConvertFrom-Json -Depth 100 -ErrorAction Stop } } catch { }
+$transient = [pscustomobject]@{ ExitCode = $transientExitCode; Json = $transientJson; Text = $transientStdout.Trim(); Stderr = $transientStderr }
+Assert-Outcome $transient 'landing-proceeds-after-transient-primary-dirty' 0 'landed' 'ok'
+Assert-True ((Measure-PrimaryDirtyRetry $transientStderr) -ge 1) 'a transient dirty primary is diagnosed and re-read instead of blocking'
+if ($null -ne $transient.Json) {
+	Assert-True ($transient.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $transientCandidate.Commit) 'the retried landing advances primary to the confirmed candidate'
+}
+
+$persistentCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'persistent dirty tail') 'persistent-primary-dirty'
+$persistentDirtyPath = Join-Path $primary 'persistent-primary-dirty.txt'
+[IO.File]::WriteAllText($persistentDirtyPath, 'persistent dirty', [Text.UTF8Encoding]::new($false))
+$persistent = Invoke-JsonScriptWithSplat $landingScript (New-RetryLandingParameters $persistentCandidate) $scratchBase
+Assert-Outcome $persistent 'landing-blocks-persistent-primary-dirty' 2 'blocked' 'sanity.git.primary-dirty'
+Assert-True ((Measure-PrimaryDirtyRetry $persistent.Stderr) -eq 3) 'a persistently dirty primary exhausts the full retry bound before blocking'
+if ($null -ne $persistent.Json) {
+	Assert-True (-not $persistent.Json.lock.claimed -and -not $persistent.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $persistentCandidate.PrimaryTip) 'a persistently dirty primary blocks before the landing lock and leaves primary unchanged'
+}
+Remove-Item -LiteralPath $persistentDirtyPath -Force -ErrorAction SilentlyContinue
+
 Write-Host ''
 if ($script:Failures.Count -gt 0) {
 	Write-Host "Finalize workflow fixtures FAILED ($($script:Failures.Count) assertion(s))."

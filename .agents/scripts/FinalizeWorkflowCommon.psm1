@@ -234,7 +234,23 @@ function Test-FinalizeLandingSanity {
 				}
 			}
 		}
-		if ((Invoke-FinalizeGit $primary.Worktree @('status', '--porcelain', '-z', '--untracked-files=all')).Length -ne 0) {
+		# A dirty primary reading that does not persist has been observed while primary was clean,
+		# most likely a background index refresh from an external Git client, so it is re-read a
+		# bounded number of times instead of blocking landing. A primary still dirty on the last
+		# attempt is genuinely dirty and blocks exactly as before.
+		$primaryDirty = $true
+		for ($attempt = 1; $attempt -le 4; $attempt++) {
+			if ((Invoke-FinalizeGit $primary.Worktree @('status', '--porcelain', '-z', '--untracked-files=all')).Length -eq 0) {
+				$primaryDirty = $false
+				break
+			}
+			if ($attempt -lt 4) {
+				# Callers parse stdout as JSON, so this diagnostic goes to stderr like every other one.
+				[Console]::Error.WriteLine("FinalizeLandingSanity: primary read dirty; re-reading (attempt $attempt of 4).")
+				Start-Sleep -Seconds 1
+			}
+		}
+		if ($primaryDirty) {
 			return New-FinalizeLandingSanityResult $false 'git.primary-dirty' 'Primary worktree is not clean.' $session $primary $null
 		}
 		if ((Invoke-FinalizeGit $session.Worktree @('status', '--porcelain', '-z', '--untracked-files=all')).Length -ne 0) {
