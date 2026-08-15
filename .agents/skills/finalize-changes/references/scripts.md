@@ -50,6 +50,19 @@ only where the rules below call for a non-default value.
   WorktreeCli owns the bounded wait and the guarded expiry recovery — and
   separately performs standalone release through `-Release` with the held
   lease's owner token.
+  A claim emits its single result only when that wait resolves, so under
+  contention it legitimately blocks for the full `-WaitSeconds` bound — 300
+  seconds by default. Run every claim invocation, with or without
+  `-LandingOwner`, under a host command timeout comfortably above that bound:
+  at least 360,000 ms for the default, scaled up correspondingly for a longer
+  `-WaitSeconds`. `-Release` never enters the wait and is exempt. That timeout
+  is a setting on the shell tool or runner, never text appended to the
+  canonical command, which stays byte-identical. A host kill returns no
+  structured result while the surviving child can still claim the lease:
+  without `-LandingOwner` the minted owner token dies with that result,
+  orphaning the lease under a token nobody holds and blocking every later
+  claim until natural expiry, while a claim that supplied `-LandingOwner`
+  still knows its token and releases the orphaned lease with `-Release`.
   Invoke it successfully before approval preparation begins
   reconciliation, retain or refresh the lease throughout agent-driven
   reconciliation, and release it with `-Release` before any user wait, in the
