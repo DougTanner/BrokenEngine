@@ -84,7 +84,13 @@ whose authoritative workflow reference owns its iterative preparation. Missing a
 mandatory reviewer blocks.
 
 Invoke the claim script idempotently immediately before the final preparation
-handoff. Every delegation uses the single task brief in
+handoff. Every preparation dispatch carries that claim run's most recent result
+verbatim — the exact JSON it printed, its exit code, top-level `status` and
+`code`, and the whole nested `validation` object including `validation.status`,
+`validation.code`, and `validation.notices` — never retyped or summarized,
+because the preparation worker must never run the mutation-capable claim script
+and `/external-grill-plan` blocks without that evidence. Every delegation uses
+the single task brief in
 `../../references/subagent-reporting.md` and states that Plan and card statements are
 hypotheses: return contradictions to main.
 

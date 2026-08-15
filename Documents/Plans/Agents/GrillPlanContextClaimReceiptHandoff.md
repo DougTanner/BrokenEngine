@@ -30,6 +30,20 @@ never produce. No rework resulted in this session — the manager supplied the
 receipt from its own earlier run — but the written contract has no route that
 satisfies it.
 
+The same contradictory sentence pair has a second observed face, recorded when
+`Documents/Plans/Agents/NextPlanClaimResultForwarding.md` landed; that Plan's
+root-cause review returned verdict "both-contributing" and named this
+contradiction as a co-cause its own `## In scope` excluded. The grill's required
+evidence also includes the read-only `plan list` listing from
+`Get-NextPlanList.ps1`, and the same "Never run the validation yourself"
+sentence forbids producing it, while `tier3-workflow.md:28-30` assigns the
+preparation worker "every repository read, search, and WorktreeCli validation
+`/external-grill-plan` requires". In that session the worker read the assignment
+as a licence and ran the read-only listing itself instead of hard stopping and
+returning the diagnostic the grill demands. The pair therefore leaves two
+opposite behaviors both defensible for the same missing evidence: self-serve, or
+block.
+
 The claimed Plan's `## In scope` covered only the `OwnedEntity` registry move
 into `engine::OwnedEntityRegistry` and its call sites, so both skill files are
 outside the active change's boundary.
@@ -60,8 +74,14 @@ below. The fix direction the observation already points at is to make the claim
 receipt an explicitly manager-supplied hand-off: `/external-grill-plan`'s
 `## Plan Context` accepts the claim result as evidence relayed into the brief by
 whoever holds it, and `tier3-workflow.md` states that hand-off so the preparation
-worker's assignment no longer implies producing it. The fix chooses one owning
-side rather than restating the requirement in both. If root-causing shows the fix
+worker's assignment no longer implies producing it. The read-only
+`Get-NextPlanList.ps1` listing is relayed the same way: the manager runs it and
+forwards its exact output into the brief, and the preparation worker runs no
+scheduler script at all. This mirrors the landed `/next-plan` forwarding
+contract (`.agents/skills/next-plan/SKILL.md:86-95`), where the manager forwards
+the claim script's result verbatim, so every piece of scheduler evidence takes
+one deterministic route. The fix chooses one
+owning side rather than restating the requirement in both. If root-causing shows the fix
 lies outside that boundary, surface it for re-planning instead of expanding
 scope.
 
@@ -101,11 +121,18 @@ Never embed transcript paths or home paths.
 - Reading the two files in sequence yields exactly one route by which the
   preparation worker's brief carries the passing claim receipt, with no
   instruction that requires the worker to run a scheduler-mutating command
+- The same reading yields one determinate behavior for the read-only
+  `Get-NextPlanList.ps1` listing: the manager runs it and relays its exact
+  output to the preparation worker, so no instruction leaves self-serving
+  defensible
 - The grill still blocks on missing or non-passing claim evidence
 - /validate-skill passes for the changed SKILL.md; plan validate exits 0
 
 ## Notes
-This Plan is keyed to the pair (external-grill-plan `## Plan Context`,
-preparation worker cannot produce the required `Invoke-NextPlanClaim.ps1`
-receipt). A later observation of the same pair is a duplicate, not a new
-residual.
+This Plan is keyed to the contradiction between external-grill-plan
+`## Plan Context` and `tier3-workflow.md` `## Plan review` over who supplies the
+grill's scheduler evidence — both faces of it: the preparation worker cannot
+produce the required `Invoke-NextPlanClaim.ps1` receipt, and the worker is
+equally licensed to self-serve the read-only `Get-NextPlanList.ps1` listing
+instead of blocking. A later observation of either face is a duplicate, not a
+new residual.
