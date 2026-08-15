@@ -102,8 +102,34 @@ iterated in simulation-critical paths:
 
   - Collision::sResults: accessed only by direct key lookup
     (GetCollisions(layerIndex, entityIndex)), never iterated.
-  - mCoordFrames: iterated only for rendering (BeginRender), with a
-    deterministic rActiveCoords vector providing the iteration order.
+  - mCoordFrames: rendering (BeginRender) does not iterate the map at
+    all; it walks the deterministic rActiveCoords vector, which
+    supplies the iteration order. Server active-set computation does
+    iterate the map itself, in unspecified hash order, in two places:
+    the erase pass in ServerSessionRuntime::SyncActiveFrames
+    (Engine/Source/Network/Server/ServerSessionRuntime.cpp:299) and
+    the AddGameRequiredCoords game hook
+    (Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp:320).
+    Hash order is safe at both because they decide set membership
+    rather than compute a value: the erase pass removes exactly the
+    entries whose coord is absent from mActiveCoords, and the hook
+    appends the same deduplicated coords whatever the visit order.
+    The resulting order of mActiveCoords sets the dispatch order of
+    per-cell ticks, which are independent by construction: simulation
+    code samples only its own cell's FrameStaticData and never
+    mCoordFrames (Engine/Source/Frame/AGENTS.md:28). It also sets the
+    order in which ServerTransferManager::CollectTransfers
+    (Projects/BrokenEngineSandbox/Source/Network/Server/ServerTransferManager.cpp:52)
+    appends each source cell's transfer requests to its destination
+    list, so when several active cells transfer into the same
+    destination, hash order decides their relative order there
+    (SortTransfersByType groups by type but does not order within a
+    type). That is safe because the server is the sole authority for
+    that order: it applies the transfers itself and ships the same
+    sequence to clients and replay as serialized StatusChanges in
+    server-produced order, with the destination Frame CRC recomputed
+    after they land. The order may differ between runs, never between
+    the participants of one run.
   - mFrameInputs: each coord's data is independent; iteration order
     does not affect per-coord simulation results.
 
