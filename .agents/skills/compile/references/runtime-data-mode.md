@@ -45,7 +45,7 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Test-DataOracleReceipt.ps1 
 
 Missing, extra, empty, replaced, reparse, or changed entries fail closed.
 
-The wrapper bootstrap refreshes Shared data on a best-effort basis: at session start it runs the primary's DataPacker over the primary checkout's current asset inputs, which are not checked against HEAD, and it skips the run when the DataPacker prebuild was not stamped or a `BrokenEngineSandbox*` process is running. A peer session starting mid-session can therefore move primary Data under this session, failing a Shared receipt issued before that start, and a regenerated header can force a recompile here.
+The wrapper bootstrap refreshes Shared data on a best-effort basis: at session start it runs the primary's DataPacker over the primary checkout's current asset inputs, which are not checked against HEAD, and it skips the run when the DataPacker prebuild was not stamped. It first waits up to its `-WaitSeconds` budget for any `BrokenEngineSandbox*` process to exit, and skips the run with a warning only if one is still alive when that budget expires. A peer session starting mid-session can therefore move primary Data under this session, failing a Shared receipt issued before that start, and a regenerated header can force a recompile here.
 
 Ordinary Shared work otherwise remains unchanged: use primary Data, keep `RunDataPacker=false`, and perform no materialization or export. A Local receipt and a Shared receipt are independent identities; never require their aggregate or entry digests to equal. For Local work, also issue and verify a separate Shared receipt for primary Data before and after each game build so a change to primary data fails closed.
 

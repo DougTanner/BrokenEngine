@@ -153,16 +153,31 @@ try {
 		# clean-snapshot stamp so the data is only ever produced by an exe just built and hash-verified from
 		# committed sources. Deliberately outside the best-effort prebuild try above: a run failure must
 		# abort session start rather than be swallowed by that warn-only catch. This can block for a long
-		# time - on DataPacker's own PC-global "BrokenEngineDataPacker" mutex, or on a rare full island bake -
-		# while this bootstrap mutex is held, timing out peer session starts; that cost is accepted and
-		# deliberately not bounded.
+		# time - on DataPacker's own PC-global "BrokenEngineDataPacker" mutex, on a rare full island bake, or
+		# on the bounded wait below for an open client or server - while this bootstrap mutex is held, timing
+		# out peer session starts; that cost is accepted. A peer whose own $WaitSeconds bootstrap-mutex
+		# deadline expires during that wait fails with the existing mutex-timeout error, which is the
+		# expected outcome there rather than a defect.
 		$refreshedDataDirectory = $null
 		if ($dataPackerPrebuiltClean) {
-			# A pack locked by a running game now auto-cancels the export instead of prompting, which would
-			# hard-fail session start, so an open client or server skips the run instead.
+			# A pack locked by a running game auto-cancels the export instead of prompting, which would hard-fail
+			# session start, so wait the game out and skip the run only if it outlives the wait budget.
 			$gameProcesses = @(Get-Process -Name 'BrokenEngineSandbox*' -ErrorAction SilentlyContinue)
 			if ($gameProcesses.Count -ne 0) {
-				Write-Warning "Skipped the primary DataPacker run, so parent data was left as-is: $(($gameProcesses | ForEach-Object { "$($_.ProcessName) ($($_.Id))" } | Sort-Object -Unique) -join '; ') is running."
+				Write-Host "Pausing the primary data refresh for up to $WaitSeconds seconds until the game exits: $(($gameProcesses | ForEach-Object { "$($_.ProcessName) ($($_.Id))" } | Sort-Object -Unique) -join '; ') is running."
+				$gameStopwatch = [Diagnostics.Stopwatch]::StartNew()
+				$gameDeadlineMilliseconds = $WaitSeconds * 1000
+				while ($gameProcesses.Count -ne 0 -and $gameStopwatch.ElapsedMilliseconds -lt $gameDeadlineMilliseconds) {
+					# Sleeping a full interval past the deadline would exceed the bounded wait.
+					$remainingMilliseconds = $gameDeadlineMilliseconds - [int]$gameStopwatch.ElapsedMilliseconds
+					Start-Sleep -Milliseconds ([Math]::Min(5000, $remainingMilliseconds))
+					# A full re-snapshot, so a game started mid-wait also blocks the refresh.
+					$gameProcesses = @(Get-Process -Name 'BrokenEngineSandbox*' -ErrorAction SilentlyContinue)
+				}
+				if ($gameProcesses.Count -eq 0) { Write-Host "The game closed after $([int]$gameStopwatch.Elapsed.TotalSeconds) seconds, so the primary data refresh is proceeding." }
+			}
+			if ($gameProcesses.Count -ne 0) {
+				Write-Warning "The $WaitSeconds second wait for the game to exit was exhausted, so the primary DataPacker run was skipped and parent data was left as-is: $(($gameProcesses | ForEach-Object { "$($_.ProcessName) ($($_.Id))" } | Sort-Object -Unique) -join '; ') is still running."
 			}
 			else {
 				$gameDataDirectory = Join-Path $root 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data'
