@@ -248,6 +248,7 @@ struct MaterialShaderData
 	uint8_t uiNormalTextureIndex = 0;
 	uint8_t uiOcclusionTextureIndex = 0;
 	uint8_t uiEmissiveTextureIndex = 0;
+	uint8_t uiPad[3] {};
 
 	// Shader material (must exactly match PbrMaterialLayout in engine)
 	// PBR material properties per glTF 2.0 metallic-roughness specification
@@ -428,7 +429,7 @@ struct DataHeader
 	// separate — payload-struct SIZE changes auto-dirty them via the sizeof folds in each job's
 	// GetVersion (ExportScene/ExportModel); same-size reorders still need that raw version
 	// bumped by hand (the static_assert message beside each struct names the owning job).
-	static constexpr int64_t kiVersion = 50 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 51 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;
