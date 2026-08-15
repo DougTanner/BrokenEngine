@@ -86,7 +86,7 @@ std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMetadata(c
 
 }
 
-static std::vector<std::filesystem::path> ParseDependencyFile(const std::filesystem::path& rDependencyFilePath)
+static std::string ReadAndValidateDependencyFile(const std::filesystem::path& rDependencyFilePath)
 {
 	std::fstream fileStream(rDependencyFilePath, std::ios::in);
 	std::string content((std::istreambuf_iterator<char>(fileStream)), std::istreambuf_iterator<char>());
@@ -111,9 +111,11 @@ static std::vector<std::filesystem::path> ParseDependencyFile(const std::filesys
 	{
 		throw std::runtime_error(std::format("Shader dependency file \"{}\" is empty or contains an unsupported continuation", rDependencyFilePath.string()));
 	}
+	return content;
+}
 
-	// shaderc writes dependency names verbatim with spaces between entries; it does not escape spaces
-	// inside filenames. Known canonical input-root prefixes are therefore the only lossless delimiters.
+static std::vector<std::string> BuildDependencyRootPrefixes()
+{
 	std::vector<std::string> rootPrefixes;
 	for (const std::filesystem::path& rInputRoot : gpFileManager->mpInputDirectories)
 	{
@@ -133,70 +135,90 @@ static std::vector<std::filesystem::path> ParseDependencyFile(const std::filesys
 	{
 		return rLeft.size() > rRight.size();
 	});
-	std::string lowerContent = common::ToLower(content);
-	std::function<const std::string*(size_t)> findMatchingRoot = [&rootPrefixes, &lowerContent](size_t uiOffset) -> const std::string*
+	return rootPrefixes;
+}
+
+static const std::string* FindMatchingDependencyRoot(const std::vector<std::string>& rRootPrefixes, const std::string& rLowerContent, size_t uiOffset)
+{
+	for (const std::string& rRootPrefix : rRootPrefixes)
 	{
-		for (const std::string& rRootPrefix : rootPrefixes)
+		std::string lowerPrefix = common::ToLower(rRootPrefix);
+		if (uiOffset + lowerPrefix.size() <= rLowerContent.size()
+			&& rLowerContent.compare(uiOffset, lowerPrefix.size(), lowerPrefix) == 0
+			&& (uiOffset + lowerPrefix.size() == rLowerContent.size()
+				|| rLowerContent[uiOffset + lowerPrefix.size()] == '\\'
+				|| rLowerContent[uiOffset + lowerPrefix.size()] == '/'))
 		{
-			std::string lowerPrefix = common::ToLower(rRootPrefix);
-			if (uiOffset + lowerPrefix.size() <= lowerContent.size()
-				&& lowerContent.compare(uiOffset, lowerPrefix.size(), lowerPrefix) == 0
-				&& (uiOffset + lowerPrefix.size() == lowerContent.size()
-					|| lowerContent[uiOffset + lowerPrefix.size()] == '\\'
-					|| lowerContent[uiOffset + lowerPrefix.size()] == '/'))
-			{
-				return &rRootPrefix;
-			}
+			return &rRootPrefix;
 		}
-		return nullptr;
-	};
-
-	std::vector<std::filesystem::path> dependencies;
-	if (findMatchingRoot(0) != nullptr)
-	{
-		size_t uiDependencyStart = 0;
-		while (uiDependencyStart < content.size())
-		{
-			if (findMatchingRoot(uiDependencyStart) == nullptr)
-			{
-				throw std::runtime_error(std::format("Shader dependency file \"{}\" contains an ambiguous or outside-root entry near \"{}\"", rDependencyFilePath.string(), content.substr(uiDependencyStart)));
-			}
-
-			size_t uiDependencyEnd = content.size();
-			for (size_t uiSpace = content.find(' ', uiDependencyStart); uiSpace != std::string::npos; uiSpace = content.find(' ', uiSpace + 1))
-			{
-				if (findMatchingRoot(uiSpace + 1) != nullptr)
-				{
-					uiDependencyEnd = uiSpace;
-					break;
-				}
-			}
-
-			std::filesystem::path dependency(content.substr(uiDependencyStart, uiDependencyEnd - uiDependencyStart));
-			if (!IsDependencyInInputRoot(dependency))
-			{
-				throw std::runtime_error(std::format("Shader dependency \"{}\" is ambiguous, missing, or outside DataPacker input roots", dependency.string()));
-			}
-			dependencies.push_back(std::move(dependency));
-			uiDependencyStart = uiDependencyEnd == content.size() ? content.size() : uiDependencyEnd + 1;
-		}
-		return dependencies;
 	}
+	return nullptr;
+}
 
+static std::vector<std::filesystem::path> ParseRootDelimitedDependencies(const std::filesystem::path& rDependencyFilePath, const std::string& rContent, const std::vector<std::string>& rRootPrefixes, const std::string& rLowerContent)
+{
+	std::vector<std::filesystem::path> dependencies;
+	size_t uiDependencyStart = 0;
+	while (uiDependencyStart < rContent.size())
+	{
+		if (FindMatchingDependencyRoot(rRootPrefixes, rLowerContent, uiDependencyStart) == nullptr)
+		{
+			throw std::runtime_error(std::format("Shader dependency file \"{}\" contains an ambiguous or outside-root entry near \"{}\"", rDependencyFilePath.string(), rContent.substr(uiDependencyStart)));
+		}
+
+		size_t uiDependencyEnd = rContent.size();
+		for (size_t uiSpace = rContent.find(' ', uiDependencyStart); uiSpace != std::string::npos; uiSpace = rContent.find(' ', uiSpace + 1))
+		{
+			if (FindMatchingDependencyRoot(rRootPrefixes, rLowerContent, uiSpace + 1) != nullptr)
+			{
+				uiDependencyEnd = uiSpace;
+				break;
+			}
+		}
+
+		std::filesystem::path dependency(rContent.substr(uiDependencyStart, uiDependencyEnd - uiDependencyStart));
+		if (!IsDependencyInInputRoot(dependency))
+		{
+			throw std::runtime_error(std::format("Shader dependency \"{}\" is ambiguous, missing, or outside DataPacker input roots", dependency.string()));
+		}
+		dependencies.push_back(std::move(dependency));
+		uiDependencyStart = uiDependencyEnd == rContent.size() ? rContent.size() : uiDependencyEnd + 1;
+	}
+	return dependencies;
+}
+
+static std::vector<std::filesystem::path> ParseWhitespaceDependencies(const std::filesystem::path& rDependencyFilePath, const std::string& rContent)
+{
 	// Retain the old whitespace parser only when every resulting token independently names an
 	// existing dependency under an input root. A filename containing spaces fails this proof loudly.
-	std::istringstream stream(content);
+	std::vector<std::filesystem::path> dependencies;
+	std::istringstream stream(rContent);
 	std::string token;
 	while (stream >> token)
 	{
 		std::filesystem::path dependency(token);
 		if (!IsDependencyInInputRoot(dependency))
 		{
-			throw std::runtime_error(std::format("Shader dependency file \"{}\" cannot unambiguously delimit \"{}\" using DataPacker input roots", rDependencyFilePath.string(), content));
+			throw std::runtime_error(std::format("Shader dependency file \"{}\" cannot unambiguously delimit \"{}\" using DataPacker input roots", rDependencyFilePath.string(), rContent));
 		}
 		dependencies.push_back(std::move(dependency));
 	}
 	return dependencies;
+}
+
+static std::vector<std::filesystem::path> ParseDependencyFile(const std::filesystem::path& rDependencyFilePath)
+{
+	std::string content = ReadAndValidateDependencyFile(rDependencyFilePath);
+
+	// shaderc writes dependency names verbatim with spaces between entries; it does not escape spaces
+	// inside filenames. Known canonical input-root prefixes are therefore the only lossless delimiters.
+	std::vector<std::string> rootPrefixes = BuildDependencyRootPrefixes();
+	std::string lowerContent = common::ToLower(content);
+	if (FindMatchingDependencyRoot(rootPrefixes, lowerContent, 0) != nullptr)
+	{
+		return ParseRootDelimitedDependencies(rDependencyFilePath, content, rootPrefixes, lowerContent);
+	}
+	return ParseWhitespaceDependencies(rDependencyFilePath, content);
 }
 
 bool ExportShader::CheckDirty(const std::filesystem::path& rPackFile)

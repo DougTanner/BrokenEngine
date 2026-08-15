@@ -12,6 +12,116 @@ const float* AccessorFloats(const tinygltf::Model& rModel, int iAccessor)
 	return reinterpret_cast<const float*>(&(rModel.buffers[rBufferView.buffer].data[rAccessor.byteOffset + rBufferView.byteOffset]));
 }
 
+bool KeepAnimationChannel(const tinygltf::Model& rModel, const tinygltf::AnimationChannel& rGltfChannel)
+{
+	// Skip channels targeting an invalid / out-of-range node
+	if (rGltfChannel.target_node < 0 || rGltfChannel.target_node >= static_cast<int>(rModel.nodes.size()))
+	{
+		LOG(kDefault, kVerbose, "  FILTERED: channel targeting node {} out of range (node count {})", rGltfChannel.target_node, rModel.nodes.size());
+		return false;
+	}
+	LOG(kDefault, kVerbose, "  KEPT: channel targeting node {} (\"{}\") -> node index {}", rGltfChannel.target_node, rModel.nodes.at(rGltfChannel.target_node).name, rGltfChannel.target_node);
+	return true;
+}
+
+bool MapAnimationChannel(const tinygltf::AnimationChannel& rGltfChannel, const tinygltf::AnimationSampler& rSampler, common::AnimationChannel& rChannel)
+{
+	rChannel.uiNodeIndex = static_cast<uint16_t>(rGltfChannel.target_node);
+
+	// Target path
+	if (rGltfChannel.target_path == "translation")
+	{
+		rChannel.uiTargetPath = common::AnimationChannel::kTargetPathTranslation;
+	}
+	else if (rGltfChannel.target_path == "rotation")
+	{
+		rChannel.uiTargetPath = common::AnimationChannel::kTargetPathRotation;
+	}
+	else if (rGltfChannel.target_path == "scale")
+	{
+		rChannel.uiTargetPath = common::AnimationChannel::kTargetPathScale;
+	}
+	else
+	{
+		return false; // Skip unknown paths
+	}
+
+	// Interpolation
+	if (rSampler.interpolation == "STEP")
+	{
+		rChannel.uiInterpolation = common::AnimationChannel::kInterpolationStep;
+	}
+	else if (rSampler.interpolation == "CUBICSPLINE")
+	{
+		rChannel.uiInterpolation = common::AnimationChannel::kInterpolationCubicSpline;
+	}
+	else
+	{
+		rChannel.uiInterpolation = common::AnimationChannel::kInterpolationLinear;
+	}
+	return true;
+}
+
+void EmitCubicKeyframes(const float* pfTimes, const float* pfValues, int64_t iKeyframeCount, int iValueStride, common::AnimationChannel& rChannel, float& rfDuration, std::vector<common::AnimationKeyframeCubic>& rCubicKeyframes)
+{
+	rChannel.uiKeyframeStart = static_cast<uint32_t>(rCubicKeyframes.size());
+
+	for (int64_t j = 0; j < iKeyframeCount; ++j)
+	{
+		common::AnimationKeyframeCubic keyframe {};
+		keyframe.fTime = pfTimes[j];
+
+		// CUBICSPLINE has 3 values per keyframe: in-tangent, value, out-tangent
+		int64_t iBaseIndex = j * 3 * iValueStride;
+
+		if (rChannel.uiTargetPath == common::AnimationChannel::kTargetPathRotation) // Rotation (vec4)
+		{
+			keyframe.f4InTangent = XMFLOAT4(pfValues[iBaseIndex + 0], pfValues[iBaseIndex + 1], pfValues[iBaseIndex + 2], pfValues[iBaseIndex + 3]);
+			keyframe.f4Value = XMFLOAT4(pfValues[iBaseIndex + iValueStride + 0], pfValues[iBaseIndex + iValueStride + 1], pfValues[iBaseIndex + iValueStride + 2], pfValues[iBaseIndex + iValueStride + 3]);
+			keyframe.f4OutTangent = XMFLOAT4(pfValues[iBaseIndex + 2 * iValueStride + 0], pfValues[iBaseIndex + 2 * iValueStride + 1], pfValues[iBaseIndex + 2 * iValueStride + 2], pfValues[iBaseIndex + 2 * iValueStride + 3]);
+		}
+		else // Translation/Scale (vec3)
+		{
+			keyframe.f4InTangent = XMFLOAT4(pfValues[iBaseIndex + 0], pfValues[iBaseIndex + 1], pfValues[iBaseIndex + 2], 0.0f);
+			keyframe.f4Value = XMFLOAT4(pfValues[iBaseIndex + iValueStride + 0], pfValues[iBaseIndex + iValueStride + 1], pfValues[iBaseIndex + iValueStride + 2], 0.0f);
+			keyframe.f4OutTangent = XMFLOAT4(pfValues[iBaseIndex + 2 * iValueStride + 0], pfValues[iBaseIndex + 2 * iValueStride + 1], pfValues[iBaseIndex + 2 * iValueStride + 2], 0.0f);
+		}
+
+		rfDuration = std::max(rfDuration, keyframe.fTime);
+		rCubicKeyframes.push_back(keyframe);
+	}
+}
+
+void EmitKeyframes(const float* pfTimes, const float* pfValues, int64_t iKeyframeCount, int iValueStride, common::AnimationChannel& rChannel, float& rfDuration, std::vector<common::AnimationKeyframe>& rKeyframes)
+{
+	rChannel.uiKeyframeStart = static_cast<uint32_t>(rKeyframes.size());
+
+	for (int64_t j = 0; j < iKeyframeCount; ++j)
+	{
+		common::AnimationKeyframe keyframe {};
+		keyframe.fTime = pfTimes[j];
+
+		if (rChannel.uiTargetPath == common::AnimationChannel::kTargetPathRotation)
+		{
+			// Rotation (quaternion)
+			keyframe.f4Value = XMFLOAT4(pfValues[j * iValueStride + 0], pfValues[j * iValueStride + 1], pfValues[j * iValueStride + 2], pfValues[j * iValueStride + 3]);
+		}
+		else if (rChannel.uiTargetPath == common::AnimationChannel::kTargetPathTranslation)
+		{
+			// Translation
+			keyframe.f4Value = XMFLOAT4(pfValues[j * iValueStride + 0], pfValues[j * iValueStride + 1], pfValues[j * iValueStride + 2], 0.0f);
+		}
+		else
+		{
+			// Scale
+			keyframe.f4Value = XMFLOAT4(pfValues[j * iValueStride + 0], pfValues[j * iValueStride + 1], pfValues[j * iValueStride + 2], 0.0f);
+		}
+
+		rfDuration = std::max(rfDuration, keyframe.fTime);
+		rKeyframes.push_back(keyframe);
+	}
+}
+
 }
 
 bool DetermineAnimationPath(const tinygltf::Model& rGltfModel)
@@ -61,49 +171,17 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOut)
 
 		for (const tinygltf::AnimationChannel& rGltfChannel : rAnim.channels)
 		{
-			// Skip channels targeting an invalid / out-of-range node
-			if (rGltfChannel.target_node < 0 || rGltfChannel.target_node >= static_cast<int>(rModel.nodes.size()))
+			if (!KeepAnimationChannel(rModel, rGltfChannel))
 			{
-				LOG(kDefault, kVerbose, "  FILTERED: channel targeting node {} out of range (node count {})", rGltfChannel.target_node, rModel.nodes.size());
 				continue;
 			}
-			LOG(kDefault, kVerbose, "  KEPT: channel targeting node {} (\"{}\") -> node index {}", rGltfChannel.target_node, rModel.nodes.at(rGltfChannel.target_node).name, rGltfChannel.target_node);
 
 			const tinygltf::AnimationSampler& rSampler = rAnim.samplers[rGltfChannel.sampler];
 
 			common::AnimationChannel channel {};
-			channel.uiNodeIndex = static_cast<uint16_t>(rGltfChannel.target_node);
-
-			// Target path
-			if (rGltfChannel.target_path == "translation")
+			if (!MapAnimationChannel(rGltfChannel, rSampler, channel))
 			{
-				channel.uiTargetPath = common::AnimationChannel::kTargetPathTranslation;
-			}
-			else if (rGltfChannel.target_path == "rotation")
-			{
-				channel.uiTargetPath = common::AnimationChannel::kTargetPathRotation;
-			}
-			else if (rGltfChannel.target_path == "scale")
-			{
-				channel.uiTargetPath = common::AnimationChannel::kTargetPathScale;
-			}
-			else
-			{
-				continue; // Skip unknown paths
-			}
-
-			// Interpolation
-			if (rSampler.interpolation == "STEP")
-			{
-				channel.uiInterpolation = common::AnimationChannel::kInterpolationStep;
-			}
-			else if (rSampler.interpolation == "CUBICSPLINE")
-			{
-				channel.uiInterpolation = common::AnimationChannel::kInterpolationCubicSpline;
-			}
-			else
-			{
-				channel.uiInterpolation = common::AnimationChannel::kInterpolationLinear;
+				continue;
 			}
 
 			// Keyframe times come from the input accessor (which also supplies the keyframe count); values from the output accessor
@@ -126,61 +204,11 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOut)
 
 			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline) // CUBICSPLINE
 			{
-				channel.uiKeyframeStart = static_cast<uint32_t>(rCubicKeyframes.size());
-
-				for (int64_t j = 0; j < static_cast<int64_t>(rInputAccessor.count); ++j)
-				{
-					common::AnimationKeyframeCubic keyframe {};
-					keyframe.fTime = pfTimes[j];
-
-					// CUBICSPLINE has 3 values per keyframe: in-tangent, value, out-tangent
-					int64_t iBaseIdx = j * 3 * iValueStride;
-
-					if (channel.uiTargetPath == common::AnimationChannel::kTargetPathRotation) // Rotation (vec4)
-					{
-						keyframe.f4InTangent = XMFLOAT4(pfValues[iBaseIdx + 0], pfValues[iBaseIdx + 1], pfValues[iBaseIdx + 2], pfValues[iBaseIdx + 3]);
-						keyframe.f4Value = XMFLOAT4(pfValues[iBaseIdx + iValueStride + 0], pfValues[iBaseIdx + iValueStride + 1], pfValues[iBaseIdx + iValueStride + 2], pfValues[iBaseIdx + iValueStride + 3]);
-						keyframe.f4OutTangent = XMFLOAT4(pfValues[iBaseIdx + 2 * iValueStride + 0], pfValues[iBaseIdx + 2 * iValueStride + 1], pfValues[iBaseIdx + 2 * iValueStride + 2], pfValues[iBaseIdx + 2 * iValueStride + 3]);
-					}
-					else // Translation/Scale (vec3)
-					{
-						keyframe.f4InTangent = XMFLOAT4(pfValues[iBaseIdx + 0], pfValues[iBaseIdx + 1], pfValues[iBaseIdx + 2], 0.0f);
-						keyframe.f4Value = XMFLOAT4(pfValues[iBaseIdx + iValueStride + 0], pfValues[iBaseIdx + iValueStride + 1], pfValues[iBaseIdx + iValueStride + 2], 0.0f);
-						keyframe.f4OutTangent = XMFLOAT4(pfValues[iBaseIdx + 2 * iValueStride + 0], pfValues[iBaseIdx + 2 * iValueStride + 1], pfValues[iBaseIdx + 2 * iValueStride + 2], 0.0f);
-					}
-
-					animation.fDuration = std::max(animation.fDuration, keyframe.fTime);
-					rCubicKeyframes.push_back(keyframe);
-				}
+				EmitCubicKeyframes(pfTimes, pfValues, static_cast<int64_t>(rInputAccessor.count), iValueStride, channel, animation.fDuration, rCubicKeyframes);
 			}
 			else // STEP or LINEAR
 			{
-				channel.uiKeyframeStart = static_cast<uint32_t>(rKeyframes.size());
-
-				for (int64_t j = 0; j < static_cast<int64_t>(rInputAccessor.count); ++j)
-				{
-					common::AnimationKeyframe keyframe {};
-					keyframe.fTime = pfTimes[j];
-
-					if (channel.uiTargetPath == common::AnimationChannel::kTargetPathRotation)
-					{
-						// Rotation (quaternion)
-						keyframe.f4Value = XMFLOAT4(pfValues[j * iValueStride + 0], pfValues[j * iValueStride + 1], pfValues[j * iValueStride + 2], pfValues[j * iValueStride + 3]);
-					}
-					else if (channel.uiTargetPath == common::AnimationChannel::kTargetPathTranslation)
-					{
-						// Translation
-						keyframe.f4Value = XMFLOAT4(pfValues[j * iValueStride + 0], pfValues[j * iValueStride + 1], pfValues[j * iValueStride + 2], 0.0f);
-					}
-					else
-					{
-						// Scale
-						keyframe.f4Value = XMFLOAT4(pfValues[j * iValueStride + 0], pfValues[j * iValueStride + 1], pfValues[j * iValueStride + 2], 0.0f);
-					}
-
-					animation.fDuration = std::max(animation.fDuration, keyframe.fTime);
-					rKeyframes.push_back(keyframe);
-				}
+				EmitKeyframes(pfTimes, pfValues, static_cast<int64_t>(rInputAccessor.count), iValueStride, channel, animation.fDuration, rKeyframes);
 			}
 
 			rChannels.push_back(channel);

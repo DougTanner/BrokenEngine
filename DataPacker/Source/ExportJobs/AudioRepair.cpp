@@ -120,15 +120,18 @@ double EvaluateCubicSpline(const double* pXs, const double* pYs, const double* p
 		+ (pYs[iInterval + 1] / dH - pSecondDerivatives[iInterval + 1] * dH / 6.0) * dB;
 }
 
-// Detects flat-top runs and (when bAllowDeclip) reconstructs short ones with a natural cubic
-// spline through the nearest clean samples each side. The clipped mask is computed once and never
-// updated, so every run reconstructs from original clean samples — order-independent.
-void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iChannel, bool bAllowDeclip, std::string_view relativeFile)
+struct ClipRunAnalysis
 {
-	int64_t iFrames = static_cast<int64_t>(rfSamples.size()) / iChannels;
-	auto Sample = [&](int64_t iFrame) -> float&
+	std::vector<uint8_t> clippedMask;
+	std::vector<ClipRun> runs;
+};
+
+ClipRunAnalysis DetectClipRuns(const std::vector<float>& rSamples, int64_t iFrames, int64_t iChannels, int64_t iChannel)
+{
+	ClipRunAnalysis analysis {};
+	auto Sample = [&](int64_t iFrame) -> const float&
 	{
-		return rfSamples[iFrame * iChannels + iChannel];
+		return rSamples[iFrame * iChannels + iChannel];
 	};
 
 	// Rails detect independently: an asymmetric source (e.g. clipped then DC-shifted) can have one
@@ -145,23 +148,22 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 	bool bDetectNegative = fNegativePeak >= kfClipDetectMinPeak;
 	if (!bDetectPositive && !bDetectNegative)
 	{
-		return;
+		return analysis;
 	}
 
 	// Clipped mask + maximal same-sign runs
 	float fPositiveClipLevel = kfClipRunLevelFraction * fPositivePeak;
 	float fNegativeClipLevel = kfClipRunLevelFraction * fNegativePeak;
-	std::vector<uint8_t> clippedMask(iFrames, 0);
+	analysis.clippedMask.assign(iFrames, 0);
 	for (int64_t i = 0; i < iFrames; ++i)
 	{
 		float fSample = Sample(i);
-		clippedMask[i] = ((bDetectPositive && fSample >= fPositiveClipLevel) || (bDetectNegative && fSample <= -fNegativeClipLevel)) ? 1 : 0;
+		analysis.clippedMask[i] = ((bDetectPositive && fSample >= fPositiveClipLevel) || (bDetectNegative && fSample <= -fNegativeClipLevel)) ? 1 : 0;
 	}
 
-	std::vector<ClipRun> runs;
 	for (int64_t i = 0; i < iFrames;)
 	{
-		if (clippedMask[i] == 0)
+		if (analysis.clippedMask[i] == 0)
 		{
 			++i;
 			continue;
@@ -169,7 +171,7 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 		bool bPositive = Sample(i) >= 0.0f;
 		int64_t iStart = i;
 		double dRailSum = 0.0;
-		while (i < iFrames && clippedMask[i] != 0 && (Sample(i) >= 0.0f) == bPositive)
+		while (i < iFrames && analysis.clippedMask[i] != 0 && (Sample(i) >= 0.0f) == bPositive)
 		{
 			dRailSum += Sample(i);
 			++i;
@@ -177,45 +179,69 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 		int64_t iLength = i - iStart;
 		if (iLength >= kiClipRunMinSamples)
 		{
-			runs.push_back({iStart, i - 1, static_cast<float>(dRailSum / static_cast<double>(iLength))});
+			analysis.runs.push_back(ClipRun { .iStart = iStart, .iEnd = i - 1, .fRailValue = static_cast<float>(dRailSum / static_cast<double>(iLength)), });
 		}
 	}
+	return analysis;
+}
 
-	if (runs.empty())
-	{
-		return;
-	}
+enum class DeclipPolicy
+{
+	kPervasiveWarning,
+	kDisabledWarning,
+	kRepair
+};
 
+struct DeclipPolicyClassification
+{
+	DeclipPolicy ePolicy = DeclipPolicy::kRepair;
 	int64_t iLongestRun = 0;
-	for (const ClipRun& rRun : runs)
+};
+
+DeclipPolicyClassification ClassifyDeclipPolicy(const std::vector<ClipRun>& rRuns, bool bAllowDeclip)
+{
+	int64_t iLongestRun = 0;
+	for (const ClipRun& rRun : rRuns)
 	{
 		iLongestRun = std::max(iLongestRun, rRun.iEnd - rRun.iStart + 1);
 	}
 
-	if (static_cast<int64_t>(runs.size()) > kiDeclipWarnOnlyRunCount)
+	if (static_cast<int64_t>(rRuns.size()) > kiDeclipWarnOnlyRunCount)
 	{
-		LOG(kDefault, kWarning, "{}: pervasive clipping, {} runs (longest {}) on channel {} - left as-is (mastering-style limiting)", relativeFile, runs.size(), iLongestRun, iChannel);
-		return;
+		return { .ePolicy = DeclipPolicy::kPervasiveWarning, .iLongestRun = iLongestRun, };
 	}
 	if (!bAllowDeclip)
 	{
-		LOG(kDefault, kWarning, "{}: clipping detected, {} runs (longest {}) on channel {} - declip disabled for this asset", relativeFile, runs.size(), iLongestRun, iChannel);
-		return;
+		return { .ePolicy = DeclipPolicy::kDisabledWarning, .iLongestRun = iLongestRun, };
 	}
+	return { .ePolicy = DeclipPolicy::kRepair, .iLongestRun = iLongestRun, };
+}
 
+struct DeclipStatistics
+{
 	int64_t iRunsFixed = 0;
 	int64_t iLongestFixed = 0;
 	int64_t iRunsSkipped = 0;
 	float fMaxReconstruction = 0.0f;
+};
+
+DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64_t iFrames, int64_t iChannels, int64_t iChannel, const std::vector<uint8_t>& rClippedMask, const std::vector<ClipRun>& rRuns)
+{
+	DeclipStatistics statistics {};
+	auto Sample = [&](int64_t iFrame) -> float&
+	{
+		return rfSamples[iFrame * iChannels + iChannel];
+	};
+
 	std::vector<double> dXs;
 	std::vector<double> dYs;
 	std::vector<double> dSecondDerivatives;
-	for (const ClipRun& rRun : runs)
+	for (const ClipRun& rRun : rRuns)
 	{
 		int64_t iLength = rRun.iEnd - rRun.iStart + 1;
 		if (iLength > kiClipRunMaxFixSamples || rRun.iStart == 0 || rRun.iEnd == iFrames - 1)
 		{
-			++iRunsSkipped;
+			++statistics.iRunsSkipped;
 			continue;
 		}
 
@@ -225,7 +251,7 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 		int64_t iLeftCount = 0;
 		for (int64_t i = rRun.iStart - 1; i >= 0 && iLeftCount < kiClipSupportSamplesPerSide; --i)
 		{
-			if (clippedMask[i] == 0)
+			if (rClippedMask[i] == 0)
 			{
 				dXs.push_back(static_cast<double>(i));
 				dYs.push_back(Sample(i));
@@ -234,7 +260,7 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 		}
 		if (iLeftCount < kiClipSupportMinSamplesPerSide)
 		{
-			++iRunsSkipped;
+			++statistics.iRunsSkipped;
 			continue;
 		}
 		std::reverse(dXs.begin(), dXs.end());
@@ -243,7 +269,7 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 		int64_t iRightCount = 0;
 		for (int64_t i = rRun.iEnd + 1; i < iFrames && iRightCount < kiClipSupportSamplesPerSide; ++i)
 		{
-			if (clippedMask[i] == 0)
+			if (rClippedMask[i] == 0)
 			{
 				dXs.push_back(static_cast<double>(i));
 				dYs.push_back(Sample(i));
@@ -252,7 +278,7 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 		}
 		if (iRightCount < kiClipSupportMinSamplesPerSide)
 		{
-			++iRunsSkipped;
+			++statistics.iRunsSkipped;
 			continue;
 		}
 
@@ -277,19 +303,46 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 				fReconstructed = std::max(std::min(fReconstructed, rRun.fRailValue), -kfDeclipMaxReconstruction);
 			}
 			Sample(i) = fReconstructed;
-			fMaxReconstruction = std::max(fMaxReconstruction, std::abs(fReconstructed));
+			statistics.fMaxReconstruction = std::max(statistics.fMaxReconstruction, std::abs(fReconstructed));
 		}
-		++iRunsFixed;
-		iLongestFixed = std::max(iLongestFixed, iLength);
+		++statistics.iRunsFixed;
+		statistics.iLongestFixed = std::max(statistics.iLongestFixed, iLength);
+	}
+	return statistics;
+}
+
+// Detects flat-top runs and (when bAllowDeclip) reconstructs short ones with a natural cubic
+// spline through the nearest clean samples each side. The clipped mask is computed once and never
+// updated, so every run reconstructs from original clean samples — order-independent.
+void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iChannel, bool bAllowDeclip, std::string_view relativeFile)
+{
+	int64_t iFrames = static_cast<int64_t>(rfSamples.size()) / iChannels;
+	ClipRunAnalysis analysis = DetectClipRuns(rfSamples, iFrames, iChannels, iChannel);
+	if (analysis.runs.empty())
+	{
+		return;
 	}
 
-	if (iRunsFixed > 0)
+	DeclipPolicyClassification classification = ClassifyDeclipPolicy(analysis.runs, bAllowDeclip);
+	if (classification.ePolicy == DeclipPolicy::kPervasiveWarning)
 	{
-		LOG(kDefault, kWarning, "{}: declipped {} runs (longest {}, max reconstruction {:.3f}) on channel {}", relativeFile, iRunsFixed, iLongestFixed, fMaxReconstruction, iChannel);
+		LOG(kDefault, kWarning, "{}: pervasive clipping, {} runs (longest {}) on channel {} - left as-is (mastering-style limiting)", relativeFile, analysis.runs.size(), classification.iLongestRun, iChannel);
+		return;
 	}
-	if (iRunsSkipped > 0)
+	if (classification.ePolicy == DeclipPolicy::kDisabledWarning)
 	{
-		LOG(kDefault, kWarning, "{}: {} clip runs unfixable (too long, at file edge, or insufficient clean support) on channel {}", relativeFile, iRunsSkipped, iChannel);
+		LOG(kDefault, kWarning, "{}: clipping detected, {} runs (longest {}) on channel {} - declip disabled for this asset", relativeFile, analysis.runs.size(), classification.iLongestRun, iChannel);
+		return;
+	}
+
+	DeclipStatistics statistics = ReconstructClipRuns(rfSamples, iFrames, iChannels, iChannel, analysis.clippedMask, analysis.runs);
+	if (statistics.iRunsFixed > 0)
+	{
+		LOG(kDefault, kWarning, "{}: declipped {} runs (longest {}, max reconstruction {:.3f}) on channel {}", relativeFile, statistics.iRunsFixed, statistics.iLongestFixed, statistics.fMaxReconstruction, iChannel);
+	}
+	if (statistics.iRunsSkipped > 0)
+	{
+		LOG(kDefault, kWarning, "{}: {} clip runs unfixable (too long, at file edge, or insufficient clean support) on channel {}", relativeFile, statistics.iRunsSkipped, iChannel);
 	}
 }
 
