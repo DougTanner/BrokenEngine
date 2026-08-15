@@ -108,3 +108,45 @@ stays the caller's lease, released the same way once the worktrees are provably
 clear; an omitted-token claim is discoverable by a later invocation only when
 its derived session and canonical worktree match, and every foreign or
 unverifiable claim stays untouched until its normal expiry or external repair.
+
+## Fixture suites
+
+Three bundled suites cover the scripts above against disposable scratch
+repositories. Run one only when its trigger list below changes; each uses the
+same canonical invocation form as the commands above.
+
+```text
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Test-FinalizeWorkflowFixtures.ps1 -WorktreeCliExecutable '<worktreecli-exe>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Test-LandingLockStatusFixtures.ps1 -WorktreeCliExecutable '<worktreecli-exe>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Test-AgentToolsPromotionFixtures.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -AgentHarnessExecutable '<agentharness-exe>'
+```
+
+Substitute the session worktree's provisioned tool binaries that `/compile`
+documents — `Tools/WorktreeCli/Platforms/VisualStudio2026/Output/WorktreeCli.exe`
+for `<worktreecli-exe>` and
+`Tools/AgentHarness/Platforms/VisualStudio2026/Output/AgentHarness.exe` for
+`<agentharness-exe>` — and never pass a placeholder literally.
+
+- `Test-FinalizeWorkflowFixtures.ps1` runs when
+  `Invoke-FinalizeCandidateCommit.ps1`,
+  `Invoke-FinalizeApprovalPreparation.ps1`, `Invoke-FinalizeLockClaim.ps1`,
+  `Invoke-FinalizeLanding.ps1`, `Show-FinalizeApprovalReview.ps1`,
+  `.agents/scripts/AgentScriptCommon.psm1`,
+  `.agents/scripts/AgentWorktreeSession.psm1`,
+  `.agents/scripts/FinalizeWorkflowCommon.psm1`,
+  `.agents/scripts/WorktreeCliSessionExclusion.psm1`, or the suite itself
+  changes.
+- `Test-LandingLockStatusFixtures.ps1` exercises WorktreeCli's `lock` CLI
+  directly rather than a bundled script, so it runs when WorktreeCli's
+  landing-lock implementation, `.agents/scripts/FinalizeWorkflowCommon.psm1`, or
+  the suite itself changes.
+- `Test-AgentToolsPromotionFixtures.ps1` runs when
+  `Invoke-AgentToolsPromotion.ps1`,
+  `.agents/scripts/Test-AgentToolsCapabilities.ps1`,
+  `.agents/scripts/AgentScriptCommon.psm1`,
+  `.agents/scripts/AgentWorktreeSession.psm1`,
+  `.agents/scripts/FinalizeWorkflowCommon.psm1`,
+  `.agents/scripts/WorktreeCliSessionExclusion.psm1`, the AgentTools promotion
+  contract in `agenttools.md`, or the suite itself changes. Both supplied
+  executables must pass the capability pre-flight the suite runs before it
+  allocates any scratch repository.
