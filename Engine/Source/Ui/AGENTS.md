@@ -20,6 +20,7 @@ Shared runtime settings, renderer quality levels, network-pending controls, and 
 
 ## Shared Types
 
+- `engine::UiState` and the unguarded `engine::GameBase` members `meUiState`, `mModalMessage`, and `mbShowImGui` form the shared engine/game UI-state contract. The engine owns their public vocabulary and storage for both client and server; game screens retain state transitions, gating, and rendering semantics.
 - Height-dependent wrapper groups resolve camera-height-conditioned render values; Render (`../Graphics/Render/AGENTS.md`) owns how those resolved values reach the per-frame GPU buffers.
 - Client-only curves use bounded monotone cubic interpolation and an ImPlot editor. Endpoints remain X-locked and interior control points ordered.
 - The Lighting tab deliberately keeps two combine curves, `gCombineCurveOld` and `gCombineCurveNew`, behind the `gbUseCombineCurveNew` toggle so tuning can be compared live against the shipping baseline. They currently hold identical control points; that is the A/B setup, not dead duplication. Collapse to a single curve once tuning settles.

@@ -127,17 +127,17 @@ nlohmann::json BuildFleets()
 
 } // namespace
 
-const char* UiStateName(UiState eState)
+const char* UiStateName(engine::UiState eState)
 {
 	switch (eState)
 	{
-		case UiState::kNone: return "kNone";
-		case UiState::kGameSettings: return "kGameSettings";
-		case UiState::kGraphicsSettings: return "kGraphicsSettings";
-		case UiState::kModal: return "kModal";
-		case UiState::kPause: return "kPause";
-		case UiState::kSound: return "kSound";
-		case UiState::kTweaks: return "kTweaks";
+		case engine::UiState::kNone: return "kNone";
+		case engine::UiState::kGameSettings: return "kGameSettings";
+		case engine::UiState::kGraphicsSettings: return "kGraphicsSettings";
+		case engine::UiState::kModal: return "kModal";
+		case engine::UiState::kPause: return "kPause";
+		case engine::UiState::kSound: return "kSound";
+		case engine::UiState::kTweaks: return "kTweaks";
 	}
 	return "kNone";
 }

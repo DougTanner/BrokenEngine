@@ -26,6 +26,19 @@ enum class MenuFlags : uint64_t
 };
 using MenuFlags_t = common::Flags<MenuFlags>;
 
+enum class UiState
+{
+	kNone,
+
+	kGameSettings,
+	kGraphicsSettings,
+	kModal,
+	kPause,
+	kSound,
+
+	kTweaks,
+};
+
 enum class GameFlags : uint64_t
 {
 	kQuit                 = 0x01,
@@ -182,6 +195,9 @@ public:
 #endif // BT_SERVER
 
 	GameFlags_t mGameFlags;
+	UiState meUiState = UiState::kPause;
+	char mModalMessage[256] = {};
+	bool mbShowImGui = false;
 
 	TimeStep mTimeStep;
 	// Sim-clock delta covered by the most recent ServerUpdate / ClientUpdate iteration.

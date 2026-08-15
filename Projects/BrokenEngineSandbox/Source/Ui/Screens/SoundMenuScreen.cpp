@@ -19,7 +19,7 @@ constexpr float kfSoundSliderWidthPixels = 640.0f;
 
 void SoundMenuScreen::Render()
 {
-	if (gpGame->meUiState != UiState::kSound)
+	if (gpGame->meUiState != engine::UiState::kSound)
 	{
 		return;
 	}
@@ -68,7 +68,7 @@ void SoundMenuScreen::Render()
 	// Back button
 	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnim))
 	{
-		gpGame->meUiState = UiState::kPause;
+		gpGame->meUiState = engine::UiState::kPause;
 	}
 
 	ImGui::End();

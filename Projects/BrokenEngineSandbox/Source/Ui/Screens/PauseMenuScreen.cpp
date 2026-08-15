@@ -11,7 +11,7 @@ namespace game
 
 void PauseMenuScreen::Render()
 {
-	if (gpGame->meUiState != UiState::kPause || gpGame->InMainMenu())
+	if (gpGame->meUiState != engine::UiState::kPause || gpGame->InMainMenu())
 	{
 		return;
 	}
@@ -49,28 +49,28 @@ void PauseMenuScreen::Render()
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringResume)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
 	{
-		gpGame->meUiState = UiState::kNone;
+		gpGame->meUiState = engine::UiState::kNone;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]))
 	{
-		gpGame->meUiState = UiState::kGraphicsSettings;
+		gpGame->meUiState = engine::UiState::kGraphicsSettings;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
 	{
-		gpGame->meUiState = UiState::kSound;
+		gpGame->meUiState = engine::UiState::kSound;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
 	{
-		gpGame->meUiState = UiState::kGameSettings;
+		gpGame->meUiState = engine::UiState::kGameSettings;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringMainMenu)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
 	{
 		gpGame->ChangeFrame(GameFlags::kMainMenu);
-		gpGame->meUiState = UiState::kPause;
+		gpGame->meUiState = engine::UiState::kPause;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))

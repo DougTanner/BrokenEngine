@@ -68,7 +68,7 @@ void HudScreen::Render()
 		optionalTickScope.emplace(gpGame->TickCounter());
 	}
 
-	if (gpGame->meUiState != UiState::kNone)
+	if (gpGame->meUiState != engine::UiState::kNone)
 	{
 		return;
 	}

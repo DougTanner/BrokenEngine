@@ -19,7 +19,7 @@ constexpr float kfUiOpacitySliderWidthPixels = 640.0f;
 
 void GameSettingsScreen::Render()
 {
-	if (gpGame->meUiState != UiState::kGameSettings)
+	if (gpGame->meUiState != engine::UiState::kGameSettings)
 	{
 		return;
 	}
@@ -111,7 +111,7 @@ void GameSettingsScreen::Render()
 	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnim))
 	{
 		SaveGameSettings();
-		gpGame->meUiState = UiState::kPause;
+		gpGame->meUiState = engine::UiState::kPause;
 	}
 
 	ImGui::End();

@@ -226,13 +226,13 @@ void ClientSession::ConnectToServer(std::string_view serverAddress)
 void ClientSession::OnConnectionRejected(const char* pcReason)
 {
 	std::snprintf(gpGame->mModalMessage, sizeof(gpGame->mModalMessage), "%s", pcReason);
-	gpGame->meUiState = UiState::kModal;
+	gpGame->meUiState = engine::UiState::kModal;
 }
 
 void ClientSession::OnConnectionFailed()
 {
 	std::snprintf(gpGame->mModalMessage, sizeof(gpGame->mModalMessage), "Connection failed");
-	gpGame->meUiState = UiState::kModal;
+	gpGame->meUiState = engine::UiState::kModal;
 }
 
 void ClientSession::OnConnectionAccepted()
@@ -243,7 +243,7 @@ void ClientSession::OnConnectionAccepted()
 		gpGame->CreateNewFrame(GameFlags::kGame);
 		gpGame->mGameFlags.Clear(engine::GameFlags::kMainMenu);
 		gpGame->Reset();
-		gpGame->meUiState = UiState::kNone;
+		gpGame->meUiState = engine::UiState::kNone;
 	}
 }
 
@@ -260,7 +260,7 @@ void ClientSession::OnConnectionLost()
 	{
 		std::snprintf(gpGame->mModalMessage, sizeof(gpGame->mModalMessage), "Connection lost");
 	}
-	gpGame->meUiState = UiState::kModal;
+	gpGame->meUiState = engine::UiState::kModal;
 }
 
 void ClientSession::OnServerLoad()

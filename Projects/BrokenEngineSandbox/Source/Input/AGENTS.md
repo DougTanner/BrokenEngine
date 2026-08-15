@@ -14,7 +14,7 @@ Global: `gpInput` — constructed in `Engine/Source/Main.cpp` under `BT_CLIENT`;
 - Debug-gated bindings: debug/profile/screenshot/debug-render keys compile in via `if constexpr` on `kbDebugInput` / `kbProfiling` / `kbScreenshots` / `kbDebugRender`; free-camera WASD gates on `kbFreeCamera`. New debug-only keys belong inside those blocks.
 - Mode auto-switch: gamepad engages when either thumbstick's `|x| + |y|` exceeds the threshold; mouse movement or a key in the KBM whitelist (WASD, arrows, numpad 1/2/3/5, LMB/RMB) flips back. New movement keys must extend the whitelist or mode detection misses them.
 - Toggle-detect ordering: previous-frame menu input is captured after all `*Pressed()` edge-detection calls for the frame; moving that assignment earlier silently breaks edge detection for the rest of the function.
-- ImGui gamepad feed: while a menu is up (`gpGame->meUiState != UiState::kNone`), gamepad buttons / d-pad / left stick are pushed into ImGui's IO so menus are pad-navigable.
+- ImGui gamepad feed: while a menu is up (`gpGame->meUiState != engine::UiState::kNone`), gamepad buttons / d-pad / left stick are pushed into ImGui's IO so menus are pad-navigable.
 
 ## See Also
 

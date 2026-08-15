@@ -19,7 +19,7 @@ constexpr float kfModalMessageActionGapPixels = 36.0f;
 
 void ModalScreen::Render()
 {
-	if (gpGame->meUiState != UiState::kModal)
+	if (gpGame->meUiState != engine::UiState::kModal)
 	{
 		return;
 	}
@@ -54,7 +54,7 @@ void ModalScreen::Render()
 	ImGui::SetCursorPosX((fWindowWidth - fButtonWidth) / 2.0f);
 	if (MenuButton("OK", ImVec2(fButtonWidth, 0.0f), mfOkHoverAnim))
 	{
-		gpGame->meUiState = UiState::kPause;
+		gpGame->meUiState = engine::UiState::kPause;
 		gpGame->mModalMessage[0] = '\0';
 	}
 

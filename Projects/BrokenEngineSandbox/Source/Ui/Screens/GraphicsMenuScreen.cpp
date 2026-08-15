@@ -44,7 +44,7 @@ void ColumnSlider(const char* pcLabel, engine::Wrapper* pWrapper)
 
 void GraphicsMenuScreen::Render()
 {
-	if (gpGame->meUiState != UiState::kGraphicsSettings)
+	if (gpGame->meUiState != engine::UiState::kGraphicsSettings)
 	{
 		return;
 	}
@@ -210,7 +210,7 @@ void GraphicsMenuScreen::Render()
 	if (bBackPressed)
 	{
 		SaveGraphicsSettings();
-		gpGame->meUiState = UiState::kPause;
+		gpGame->meUiState = engine::UiState::kPause;
 	}
 
 	ImGui::End();

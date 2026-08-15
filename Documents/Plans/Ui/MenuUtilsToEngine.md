@@ -42,7 +42,7 @@ Nine TUs include `MenuUtils.h` today (`MenuUtils.cpp` plus the eight screens lis
 - Any change to a chrome colour, scale factor, pixel constant, or layout formula
 - Renaming any control or header label — those are the harness automation API per `Ui/Screens/AGENTS.md`
 - Moving the graphics quality wrappers — owned by `Documents/Plans/Ui/GraphicsQualityWrappersToEngine.md`
-- Moving `UiState` — owned by `Documents/Plans/Engine/UiStateHoistToGameBase.md`
+- Moving `UiState` — the hoist to `GameBase` is complete; further changes remain out of scope.
 - Retiring any helper for RmlUi. `Documents/Features/Engine/RmlUiPlayerFacingUi.md` may later replace some of these for player-facing screens; that does not change where they belong today, and this plan neither anticipates nor blocks it.
 
 ## Risk tier and invariants

@@ -67,6 +67,23 @@ reclassify from the actual changed surface. Never embed transcript paths or
 home paths. Preserve the contract that `target.requested` identifies the exact
 argument and `target.normalized` is the normalized identity of that same target.
 
+## Coordination
+
+- `Documents/Plans/Agents/CompileAbsoluteTargetPathResolution.md` records a
+  different pre-MSBuild symptom: the documented absolute solution target is
+  rejected as nonexistent while an equivalent repository-relative target
+  builds. The Plans are order-independent but can touch the same
+  `BuildCommand.cpp` target/result region and compile-skill target contract;
+  whichever lands second must re-read the first Plan's changed region and
+  preserve both the pre-MSBuild existence behavior and this Plan's normalized
+  target-identity contract.
+- `Documents/Plans/Agents/CompileSharedDataVersionDrift.md` records a separate
+  runtime-data/source-version mismatch that shares the compile skill's
+  structured-result guidance but not this Plan's WorktreeCli implementation
+  boundary. Whichever lands second must preserve this Plan's target identity
+  contract and must not treat a successful build result as proof of runtime
+  data compatibility.
+
 ## Acceptance criteria
 - A documented full Debug server build reports the existing
   `BrokenEngineSandboxServer.sln` consistently in `target.requested` and

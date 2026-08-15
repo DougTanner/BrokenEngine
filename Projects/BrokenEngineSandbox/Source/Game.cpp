@@ -12,7 +12,7 @@
 namespace game
 {
 
-using enum UiState;
+using enum engine::UiState;
 
 // Camera shake
 static constexpr float kfCameraShakeAdd = 0.25f;
@@ -591,12 +591,12 @@ void Game::ChangeFrame(GameFlags_t gameFlags)
 void Game::ProcessMenuInput(const MenuInput& rMenuInput)
 {
 	// Escape quits only from the basic main menu; with a settings sub-menu open it backs out to the menu below instead
-	if (rMenuInput.flags & MenuInputFlags::kQuit || (rMenuInput.flags & MenuInputFlags::kPauseMenu && InMainMenu() && meUiState == UiState::kPause))
+	if (rMenuInput.flags & MenuInputFlags::kQuit || (rMenuInput.flags & MenuInputFlags::kPauseMenu && InMainMenu() && meUiState == engine::UiState::kPause))
 	{
 		mGameFlags.Set(engine::GameFlags::kQuit);
 	}
 
-	if (meUiState == UiState::kModal)
+	if (meUiState == engine::UiState::kModal)
 	{
 		return;
 	}

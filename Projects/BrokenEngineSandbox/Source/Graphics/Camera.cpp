@@ -304,7 +304,7 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 float Camera::SunAngle() const
 {
 	// Apply time of day slider override when in Graphics or Tweaks UI
-	bool bUseOverride = (game::gpGame->meUiState == game::UiState::kGraphicsSettings);
+	bool bUseOverride = (game::gpGame->meUiState == engine::UiState::kGraphicsSettings);
 	if constexpr (kbDebugInput)
 	{
 		bUseOverride = bUseOverride || game::gpGame->mbShowImGui;

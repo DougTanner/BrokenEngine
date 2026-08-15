@@ -2,8 +2,6 @@
 
 #if defined(BT_CLIENT)
 
-#include "Game.h"
-
 namespace game
 {
 
@@ -15,8 +13,8 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 
 // Shared enum-name helpers for the agent JSON surface — k-prefixed vocabulary matching the in-code enum names.
 // Used by both describe_scene (AgentScene.cpp) and describe_ui (AgentCommandsClient.cpp). nlohmann::json arrives
-// via the game Pch; UiState needs the explicit Game.h include above.
-const char* UiStateName(UiState eState);
+// via the game Pch; engine::UiState is declared by the aggregated Engine.h.
+const char* UiStateName(engine::UiState eState);
 nlohmann::json GameFlagNames(engine::GameFlags_t flags);
 
 } // namespace game

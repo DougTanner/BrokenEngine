@@ -37,7 +37,7 @@ void MainMenuScreen::Render()
 		seAutoConnectState = AutoConnectState::kSucceeded;
 	}
 
-	if (gpGame->meUiState != UiState::kPause || !gpGame->InMainMenu())
+	if (gpGame->meUiState != engine::UiState::kPause || !gpGame->InMainMenu())
 	{
 		return;
 	}
@@ -147,7 +147,7 @@ void MainMenuScreen::Render()
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
 	{
-		gpGame->meUiState = UiState::kGraphicsSettings;
+		gpGame->meUiState = engine::UiState::kGraphicsSettings;
 		engine::gSunAngleOverride.Set(gpCamera->RawSunAngle());
 	}
 
@@ -155,14 +155,14 @@ void MainMenuScreen::Render()
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
 	{
-		gpGame->meUiState = UiState::kSound;
+		gpGame->meUiState = engine::UiState::kSound;
 	}
 
 	// Game Settings button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
 	{
-		gpGame->meUiState = UiState::kGameSettings;
+		gpGame->meUiState = engine::UiState::kGameSettings;
 	}
 
 	// Quit button

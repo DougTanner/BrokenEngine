@@ -24,19 +24,6 @@ inline constexpr std::string_view kGameName = "Broken Engine Sandbox";
 inline constexpr std::string_view kGameName = "Broken Engine Sandbox Server";
 #endif
 
-enum class UiState
-{
-	kNone,
-
-	kGameSettings,
-	kGraphicsSettings,
-	kModal,
-	kPause,
-	kSound,
-
-	kTweaks,
-};
-
 struct ReplayMeta
 {
 	static constexpr int64_t kiVersion = 2;
@@ -150,11 +137,6 @@ public:
 	static constexpr float kfVisualErrorMaxDistance = 5.0f;
 	static constexpr float kfVisualErrorMinDistance = 0.001f;
 #endif
-
-	UiState meUiState = UiState::kPause;
-	char mModalMessage[256] = {};
-
-	bool mbShowImGui = false;
 
 	// Debug-only main-menu island browser index into engine::gpIslandTerrain->mIslandCrcsByArea
 	// (largest footprint first); advanced by 'E'.
