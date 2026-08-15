@@ -113,6 +113,18 @@ private:
 	engine::CpuTimer mGameCpuTimers[static_cast<int64_t>(kGameCpuTimerCount) - static_cast<int64_t>(engine::kEngineCpuTimerCount)];
 
 #if defined(BT_CLIENT)
+	void FormatFramesScreen(common::Workbuffer& rWorkbuffer);
+	void FormatFramesMap(common::Workbuffer& rWorkbuffer);
+	void FormatFramesTick(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkScreen(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkTransport(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENetPeer& rPeer);
+	void FormatNetworkTraffic(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkSync(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkPrediction(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkClock(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkReconciliation(common::Workbuffer& rWorkbuffer);
+
 	common::Smoothed<int64_t> mSmoothedRtt;
 	common::Smoothed<int64_t> mSmoothedJitter;
 	common::Smoothed<int64_t> mSmoothedClockOffset;
