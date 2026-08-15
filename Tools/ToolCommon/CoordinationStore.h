@@ -24,25 +24,19 @@ namespace toolcli::coordination
 	class Guard
 	{
 	public:
-		explicit Guard(const std::filesystem::path& rPath, int64_t iMaximumWaitMilliseconds = 10'000, int64_t iMaximumDeniedAccessMilliseconds = kiUnboundedDeniedAccessMilliseconds);
+		// rbContentionObserved: a live holder was proven at any point during acquisition; the final error can be a delete-pending flicker instead.
+		// rFailureReason: "timed out" for contention, otherwise the acquisition's Windows error.
+		explicit Guard(const std::filesystem::path& rPath, bool& rbContentionObserved, std::string& rFailureReason, int64_t iMaximumWaitMilliseconds = 10'000, int64_t iMaximumDeniedAccessMilliseconds = kiUnboundedDeniedAccessMilliseconds);
 		~Guard();
 
 		Guard(const Guard&) = delete;
 		Guard& operator=(const Guard&) = delete;
 
 		[[nodiscard]] bool IsValid() const;
-		[[nodiscard]] bool TimedOut() const;
-		// A live holder was proven at any point during acquisition; the final error can be a delete-pending flicker instead.
-		[[nodiscard]] bool ContentionObserved() const;
-		[[nodiscard]] DWORD LastError() const;
-		// "timed out" for contention, otherwise the acquisition's Windows error.
-		[[nodiscard]] std::string FailureReason() const;
 
 	private:
 		Handle mhFile;
 		std::filesystem::path mPath;
-		DWORD muiLastError = ERROR_SUCCESS;
-		bool mbContentionObserved = false;
 	};
 
 	std::string CurrentUtcTimestamp();

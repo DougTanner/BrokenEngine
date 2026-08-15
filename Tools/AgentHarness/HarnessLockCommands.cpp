@@ -147,10 +147,12 @@ namespace toolcli
 			Fail("could not create lock directory");
 			return kiExitFailure;
 		}
-		Guard guard(locator->path.wstring() + L".guard");
+		bool bContentionObserved = false;
+		std::string failureReason;
+		Guard guard(locator->path.wstring() + L".guard", bContentionObserved, failureReason);
 		if (!guard.IsValid())
 		{
-			Fail("could not acquire lock transition guard (" + guard.FailureReason() + ")");
+			Fail("could not acquire lock transition guard (" + failureReason + ")");
 			return kiExitFailure;
 		}
 
@@ -248,7 +250,9 @@ namespace toolcli
 		{
 			return false;
 		}
-		Guard guard(locator->path.wstring() + L".guard", iMaximumWaitMilliseconds);
+		bool bContentionObserved = false;
+		std::string failureReason;
+		Guard guard(locator->path.wstring() + L".guard", bContentionObserved, failureReason, iMaximumWaitMilliseconds);
 		if (!guard.IsValid())
 		{
 			return false;

@@ -17,9 +17,19 @@
 
 namespace toolcli::coordination
 {
-	Guard::Guard(const std::filesystem::path& rPath, int64_t iMaximumWaitMilliseconds, int64_t iMaximumDeniedAccessMilliseconds) :
+	namespace
+	{
+		std::string FailureReasonFor(DWORD uiError)
+		{
+			return uiError == ERROR_SHARING_VIOLATION || uiError == ERROR_LOCK_VIOLATION ? "timed out" : "Windows error " + std::to_string(uiError);
+		}
+	}
+
+	Guard::Guard(const std::filesystem::path& rPath, bool& rbContentionObserved, std::string& rFailureReason, int64_t iMaximumWaitMilliseconds, int64_t iMaximumDeniedAccessMilliseconds) :
 		mPath(ExtendedLengthPath(rPath))
 	{
+		rbContentionObserved = false;
+		rFailureReason = FailureReasonFor(ERROR_SUCCESS);
 		const std::chrono::milliseconds maximumWait = std::chrono::milliseconds((std::max)(static_cast<int64_t>(0), iMaximumWaitMilliseconds));
 		if (maximumWait == std::chrono::milliseconds::zero())
 		{
@@ -34,16 +44,17 @@ namespace toolcli::coordination
 			{
 				return;
 			}
-			muiLastError = ::GetLastError();
+			const DWORD uiLastError = ::GetLastError();
+			rFailureReason = FailureReasonFor(uiLastError);
 			// ERROR_ACCESS_DENIED covers the delete-pending window while a releasing holder unlinks the guard file.
-			if (muiLastError != ERROR_SHARING_VIOLATION && muiLastError != ERROR_LOCK_VIOLATION && muiLastError != ERROR_ACCESS_DENIED)
+			if (uiLastError != ERROR_SHARING_VIOLATION && uiLastError != ERROR_LOCK_VIOLATION && uiLastError != ERROR_ACCESS_DENIED)
 			{
 				return;
 			}
-			mbContentionObserved = mbContentionObserved || muiLastError == ERROR_SHARING_VIOLATION || muiLastError == ERROR_LOCK_VIOLATION;
+			rbContentionObserved = rbContentionObserved || uiLastError == ERROR_SHARING_VIOLATION || uiLastError == ERROR_LOCK_VIOLATION;
 			const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 			// The denied-access budget covers the current consecutive run only: a sharing or lock violation proves a live holder rather than a stuck delete-pending window, so the next denied observation starts a fresh budget.
-			if (muiLastError == ERROR_ACCESS_DENIED)
+			if (uiLastError == ERROR_ACCESS_DENIED)
 			{
 				if (!deniedRunStart)
 				{
@@ -81,26 +92,6 @@ namespace toolcli::coordination
 	bool Guard::IsValid() const
 	{
 		return mhFile.IsValid();
-	}
-
-	bool Guard::TimedOut() const
-	{
-		return muiLastError == ERROR_SHARING_VIOLATION || muiLastError == ERROR_LOCK_VIOLATION;
-	}
-
-	bool Guard::ContentionObserved() const
-	{
-		return mbContentionObserved;
-	}
-
-	DWORD Guard::LastError() const
-	{
-		return muiLastError;
-	}
-
-	std::string Guard::FailureReason() const
-	{
-		return TimedOut() ? "timed out" : "Windows error " + std::to_string(muiLastError);
 	}
 
 	std::string CurrentUtcTimestamp()

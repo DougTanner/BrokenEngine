@@ -253,10 +253,12 @@ namespace toolcli
 				nlohmann::json metadata;
 				int64_t iSleepMilliseconds = iPollMilliseconds;
 				{
-					Guard guard(rLocator.path.wstring() + L".guard");
+					bool bContentionObserved = false;
+					std::string failureReason;
+					Guard guard(rLocator.path.wstring() + L".guard", bContentionObserved, failureReason);
 					if (!guard.IsValid())
 					{
-						Fail("could not acquire lock transition guard (" + guard.FailureReason() + ")");
+						Fail("could not acquire lock transition guard (" + failureReason + ")");
 						return kiExitFailure;
 					}
 
@@ -391,10 +393,12 @@ namespace toolcli
 		{
 			return WaitForLandingClaim(*locator, owner, session, worktree, iLeaseSeconds, iWaitSeconds, iPollMilliseconds);
 		}
-		Guard guard(locator->path.wstring() + L".guard");
+		bool bContentionObserved = false;
+		std::string failureReason;
+		Guard guard(locator->path.wstring() + L".guard", bContentionObserved, failureReason);
 		if (!guard.IsValid())
 		{
-			Fail("could not acquire lock transition guard (" + guard.FailureReason() + ")");
+			Fail("could not acquire lock transition guard (" + failureReason + ")");
 			return kiExitFailure;
 		}
 
