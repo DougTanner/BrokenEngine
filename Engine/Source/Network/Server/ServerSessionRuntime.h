@@ -29,6 +29,7 @@ public:
 	void WaitForTick(TimeStep& rTimeStep);
 	void CompleteTick(int64_t iTick);
 	void CompleteUpdate(int64_t iFullTicks, int64_t iTick);
+	void SendNewSubscriptionFullStates();
 	void ResetTransportForLoad();
 	void PublishTick(int64_t iTick, const std::pair<GridCoord, GridUpdateData>* pGridUpdates, int64_t iGridUpdateCount, const std::pair<GridCoord, const game::Frame*>* pFullFrames, int64_t iFullFrameCount);
 
@@ -39,6 +40,8 @@ public:
 
 private:
 
+	void PreparePausedSubscriptions();
+	void HandleResyncRequests();
 	void ResetOnLastClientLeave();
 
 	// Tracks whether the engine client set was non-empty as of the previous post-poll sample so the

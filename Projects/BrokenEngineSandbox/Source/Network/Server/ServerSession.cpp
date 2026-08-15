@@ -315,27 +315,6 @@ void ServerSession::FinalizeTickClients()
 	mpFleetManager->DetectDisconnectedPlayerDeaths();
 }
 
-void ServerSession::PreparePausedSubscriptions()
-{
-	for (const engine::PendingNewSubscription& rSub : mpRuntime->mpServer->mPendingNewSubscriptions)
-	{
-		auto it = gpGame->mCoordFrames.find(rSub.coord);
-		if (it == gpGame->mCoordFrames.end())
-		{
-			continue;
-		}
-		engine::FrameStaticData& rStaticData = it->second.staticData;
-		if (!rStaticData.bNavDataBuilt && !rStaticData.islands.empty())
-		{
-			// Heap: BuildCellNavData grows the navData vertex, polygon, and visibility-edge vectors, and
-			// this path runs on the main thread inside the armed main loop
-			ScopedSuppressAllocationTracking suppress;
-			engine::BuildCellNavData(rStaticData.navData, rStaticData.islands);
-			rStaticData.bNavDataBuilt = true;
-		}
-	}
-}
-
 void ServerSession::AddSubscribedCoords()
 {
 	const std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
@@ -496,7 +475,7 @@ void ServerSession::SendTimespeedToNewClient(ENetPeer* pPeer)
 
 void ServerSession::SubscriptionUpdates()
 {
-	SendNewSubscriptionFullStates();
+	mpRuntime->SendNewSubscriptionFullStates();
 
 	std::vector<SubscriptionUpdate>& rPendingUpdates = mpTransferManager->mPendingSubscriptionUpdates;
 	if (rPendingUpdates.empty())
@@ -512,80 +491,6 @@ void ServerSession::SubscriptionUpdates()
 	}
 
 	rPendingUpdates.clear();
-}
-
-void ServerSession::SendNewSubscriptionFullStates()
-{
-	std::vector<engine::PendingNewSubscription>& rNewSubscriptions = mpRuntime->mpServer->mPendingNewSubscriptions;
-	for (const engine::PendingNewSubscription& rSubscription : rNewSubscriptions)
-	{
-		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rSubscription.iClientId);
-		bool bSlotStillValid = (pClient != nullptr
-			&& rSubscription.iSlot < std::ssize(pClient->slots)
-			&& (pClient->slots.at(rSubscription.iSlot).subscription.flags & engine::SubscriptionFlags::kActive)
-			&& pClient->slots.at(rSubscription.iSlot).subscription.coord == rSubscription.coord);
-		if (!bSlotStillValid)
-		{
-			continue;
-		}
-
-		auto it = gpGame->mCoordFrames.find(rSubscription.coord);
-		if (it != gpGame->mCoordFrames.end())
-		{
-			mpRuntime->mpServer->SendCoordStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coord, it->second.staticData);
-			mpRuntime->mpServer->SendCoordFullState(rSubscription.iClientId, rSubscription.iSlot, gpGame->TickCounter(), rSubscription.coord, it->second.pCurrent.get());
-		}
-	}
-
-	// Persist-until-served: Server::Poll leaves this queue intact, so clear it here once serviced. A subscribe
-	// accepted while the server is paused (iFullTicks == 0) stays queued across polls until it is serviced —
-	// either by the next tick's ServerSessionRuntime::CompleteTick or, while still paused, by
-	// ServerSessionRuntime::CompleteUpdate from GameBase::ServerUpdate — and its full state is sent.
-	rNewSubscriptions.clear();
-}
-
-void ServerSession::HandleResyncRequests()
-{
-	std::vector<int64_t>& rResyncClientIds = mpRuntime->mpServer->mPendingResyncClientIds;
-	if (rResyncClientIds.empty())
-	{
-		return;
-	}
-
-	// Heap: per-resync per-slot SendCoordFullState allocates serialization buffers
-	ScopedSuppressAllocationTracking suppress;
-
-	for (int64_t iClientId : rResyncClientIds)
-	{
-		engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
-		if (pClient == nullptr)
-		{
-			continue;
-		}
-
-		LOG(kNetwork, kWarning, "ServerSession::HandleResyncRequests Client: {}", iClientId);
-
-		for (int64_t iSlot = 0; iSlot < std::ssize(pClient->slots); ++iSlot)
-		{
-			if (!(pClient->slots.at(iSlot).subscription.flags & engine::SubscriptionFlags::kActive))
-			{
-				continue;
-			}
-
-			engine::GridCoord coord = pClient->slots.at(iSlot).subscription.coord;
-			auto frameIt = gpGame->mCoordFrames.find(coord);
-			if (frameIt == gpGame->mCoordFrames.end())
-			{
-				continue;
-			}
-
-			mpRuntime->mpServer->SendCoordFullState(iClientId, iSlot, gpGame->TickCounter(), coord, frameIt->second.pCurrent.get());
-		}
-	}
-
-	// Persist-until-served: this queue is cleared here (not in Server::Poll) once the resync requests
-	// are serviced so a request received while the server is paused survives across polls until the next tick.
-	rResyncClientIds.clear();
 }
 
 void ServerSession::ResetClientsForLoad()

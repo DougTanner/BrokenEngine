@@ -45,8 +45,6 @@ public:
 
 	void SendTimespeedToNewClient(ENetPeer* pPeer);
 	void SubscriptionUpdates();
-	void SendNewSubscriptionFullStates();
-	void HandleResyncRequests();
 	void ResetClientsForLoad();
 	void WriteFleetData(std::fstream& rFileStream) const;
 
@@ -64,7 +62,6 @@ private:
 	void BeforeNetworkPoll();
 	void AfterNetworkPoll();
 	void FinalizeTickClients();
-	void PreparePausedSubscriptions();
 
 	// ComputeActiveSet helpers
 	void AddSubscribedCoords();
