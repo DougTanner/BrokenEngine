@@ -810,9 +810,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\AnimationData.h">
       <Filter>Engine\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainUtils.h">
-      <Filter>Engine\Frame</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">

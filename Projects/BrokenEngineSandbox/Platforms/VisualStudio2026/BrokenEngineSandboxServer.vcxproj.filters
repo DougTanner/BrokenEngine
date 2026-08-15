@@ -546,9 +546,6 @@
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainUtils.h">
-      <Filter>Engine\Frame</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Server\ServerDisplay.h">
       <Filter>Game\Server</Filter>
     </ClInclude>

@@ -361,7 +361,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuildInternal.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavQuery.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\GridCoord.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\TimeStep.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\CrashReport.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Engine.h" />
