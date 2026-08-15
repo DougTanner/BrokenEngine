@@ -170,7 +170,7 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 		for (engine::ClientConnection& rClient : rClients)
 		{
 			// Find the client that owns this global ID
-			for (const OwnedPlayer& rOwnedPlayer : gpServerSession->mClientPlayers.Owned(rClient.iClientId))
+			for (const engine::OwnedEntity& rOwnedPlayer : gpServerSession->mClientPlayers.Owned(rClient.iClientId))
 			{
 				if (rOwnedPlayer.globalId == rClientTransfer.globalPlayerId)
 				{

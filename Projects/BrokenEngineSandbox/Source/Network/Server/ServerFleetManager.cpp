@@ -372,7 +372,7 @@ void ServerFleetManager::OnClientConnected(int64_t iClientId, const engine::Clie
 	ScopedSuppressAllocationTracking suppress;
 
 	mGuidToClientId.insert_or_assign(rClientGuid, iClientId);
-	std::span<const OwnedPlayer> ownedPlayers = gpServerSession->mClientPlayers.Owned(iClientId);
+	std::span<const engine::OwnedEntity> ownedPlayers = gpServerSession->mClientPlayers.Owned(iClientId);
 
 	auto fleetIt = mFleets.find(rClientGuid);
 	if (fleetIt != mFleets.end())
@@ -418,12 +418,12 @@ void ServerFleetManager::OnResetForLoad(int64_t iClientId, const engine::ClientG
 	SendFleetSyncToClient(iClientId, rClientGuid);
 }
 
-void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const OwnedPlayer> ownedPlayers)
+void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const engine::OwnedEntity> ownedPlayers)
 {
 	for (FleetMember& rMember : rFleet.members)
 	{
 		rMember.bAlive = false;
-		for (const OwnedPlayer& rOwnedPlayer : ownedPlayers)
+		for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
 		{
 			if (rOwnedPlayer.globalId == rMember.globalPlayerId)
 			{

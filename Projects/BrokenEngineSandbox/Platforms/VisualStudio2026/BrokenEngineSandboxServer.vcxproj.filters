@@ -180,9 +180,6 @@
     <ClInclude Include="..\..\Source\Network\PlayerEvents.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Network\Server\ClientPlayerRegistry.h">
-      <Filter>Game\Network\Server</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Network\GameMessages.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
@@ -241,6 +238,9 @@
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.h">
+      <Filter>Engine\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.h">
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTypes.h">
@@ -569,9 +569,6 @@
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp">
       <Filter>Game\Network</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Server\ClientPlayerRegistry.cpp">
-      <Filter>Game\Network\Server</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Network\Server\ServerSession.cpp">
       <Filter>Game\Network\Server</Filter>
     </ClCompile>
@@ -609,6 +606,9 @@
       <Filter>Engine\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.cpp">
+      <Filter>Engine\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.cpp">
       <Filter>Engine\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerReceive.cpp">

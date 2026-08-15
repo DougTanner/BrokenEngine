@@ -383,6 +383,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\Server.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTypes.h" />
     <ClInclude Include="..\..\Source\Server\ServerDisplay.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.h" />
@@ -414,7 +415,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Game.h" />
     <ClInclude Include="..\..\Source\SpawnTransfer.h" />
     <ClInclude Include="..\..\Source\Network\PlayerEvents.h" />
-    <ClInclude Include="..\..\Source\Network\Server\ClientPlayerRegistry.h" />
     <ClInclude Include="..\..\Source\Network\GameMessages.h" />
     <ClInclude Include="..\..\Source\Network\Server\ServerSession.h" />
     <ClInclude Include="..\..\Source\Network\Server\ServerFleetManager.h" />
@@ -496,6 +496,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Network\NetworkSerialization.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\Server.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerReceive.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSend.cpp" />
     <ClCompile Include="..\..\Source\Server\ServerDisplay.cpp" />
@@ -534,7 +535,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Game.cpp" />
     <ClCompile Include="..\..\Source\SpawnTransfer.cpp" />
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp" />
-    <ClCompile Include="..\..\Source\Network\Server\ClientPlayerRegistry.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerSession.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerFleetManager.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerFleetSerialization.cpp" />

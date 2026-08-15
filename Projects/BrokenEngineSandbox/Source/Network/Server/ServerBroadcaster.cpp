@@ -202,7 +202,7 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 		{
 			continue;
 		}
-		std::span<const OwnedPlayer> ownedPlayers = gpServerSession->mClientPlayers.Owned(pClient->iClientId);
+		std::span<const engine::OwnedEntity> ownedPlayers = gpServerSession->mClientPlayers.Owned(pClient->iClientId);
 		if (ownedPlayers.empty())
 		{
 			continue;
@@ -211,7 +211,7 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 		// Find the coord for this global player ID in the client's owned list
 		engine::GridCoord updateCoord {};
 		bool bFound = false;
-		for (const OwnedPlayer& rOwnedPlayer : ownedPlayers)
+		for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
 		{
 			if (rOwnedPlayer.globalId == rRequest.globalId)
 			{

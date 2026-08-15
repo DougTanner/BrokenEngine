@@ -3,7 +3,6 @@
 #if defined(BT_SERVER)
 
 #include "Network/PlayerEvents.h"
-#include "Network/Server/ClientPlayerRegistry.h"
 
 namespace engine
 {
@@ -32,6 +31,12 @@ class ServerSession
 {
 public:
 
+	enum class RelinkContext
+	{
+		kConnect,
+		kLoad,
+	};
+
 	ServerSession();
 	~ServerSession();
 
@@ -45,9 +50,10 @@ public:
 	void SendTimespeedToNewClient(ENetPeer* pPeer);
 	void SubscriptionUpdates();
 	void ResetClientsForLoad();
+	int64_t RelinkFromFrames(int64_t iClientId, const engine::ClientGuid& rGuid, RelinkContext eContext);
 	void WriteFleetData(std::fstream& rFileStream) const;
 
-	ClientPlayerRegistry mClientPlayers;
+	engine::OwnedEntityRegistry mClientPlayers;
 
 	std::unique_ptr<ServerFleetManager> mpFleetManager;
 	std::unique_ptr<ServerTransferManager> mpTransferManager;

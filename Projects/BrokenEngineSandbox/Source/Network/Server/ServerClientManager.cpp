@@ -67,7 +67,7 @@ void ServerClientManager::NewClients()
 
 		LogConnectingClientDiagnostic(rClient);
 
-		if (gpServerSession->mClientPlayers.RelinkFromFrames(rClient.iClientId, rClient.clientGuid, ClientPlayerRegistry::RelinkContext::kConnect) > 0)
+		if (gpServerSession->RelinkFromFrames(rClient.iClientId, rClient.clientGuid, ServerSession::RelinkContext::kConnect) > 0)
 		{
 			gpServerSession->mpFleetManager->OnClientConnected(rClient.iClientId, rClient.clientGuid);
 			continue;
@@ -197,7 +197,7 @@ void ServerClientManager::DetectPlayerDeaths()
 	std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
 	for (engine::ClientConnection& rClient : rClients)
 	{
-		std::span<const OwnedPlayer> ownedPlayers = gpServerSession->mClientPlayers.Owned(rClient.iClientId);
+		std::span<const engine::OwnedEntity> ownedPlayers = gpServerSession->mClientPlayers.Owned(rClient.iClientId);
 
 		if (ownedPlayers.empty())
 		{
@@ -221,7 +221,7 @@ void ServerClientManager::DetectPlayerDeaths()
 		// Check each owned player for death (reverse iterate for safe removal)
 		for (int64_t i = std::ssize(ownedPlayers) - 1; i >= 0; --i)
 		{
-			const OwnedPlayer& rOwnedPlayer = ownedPlayers[i];
+			const engine::OwnedEntity& rOwnedPlayer = ownedPlayers[i];
 			engine::global_id_t globalId = rOwnedPlayer.globalId;
 			engine::GridCoord coord = rOwnedPlayer.coord;
 

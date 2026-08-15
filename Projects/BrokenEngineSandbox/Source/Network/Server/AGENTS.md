@@ -4,7 +4,7 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 
 ## State Ownership
 
-- `ServerSession` owns per-client player records containing global ID and coordinate. Registry mutations mirror `authorizedCoords` while the connection exists; game code uses the records, not `authorizedCoords`, for owned-player lookup.
+- `ServerSession` holds the engine-owned `engine::OwnedEntityRegistry` that stores the per-client records of global ID and coordinate, and owns the game relink policy that rebuilds them from Frame state. Registry mutations mirror `authorizedCoords` while the connection exists; game code uses the records, not `authorizedCoords`, for owned-player lookup.
 - `authorizedCoords` remains the engine authority for subscription adjacency and server display.
 - Fleets are keyed by persistent `ClientGuid` so they survive disconnect and reconnect: disconnect only clears that GUID's client id, it never erases the fleet, and the fleet's ships keep running on the server. A separate reap pass therefore handles deaths in fleets whose owner is gone — marking members dead and shifting the flagship — because the connected-client death path skips those fleets by design.
 - Fleet RNG is seeded once, serialized with fleet state, and consumes exactly two 64-bit draws when generating a fleet identifier.

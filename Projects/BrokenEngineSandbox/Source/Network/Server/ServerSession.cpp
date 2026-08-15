@@ -462,7 +462,7 @@ void ServerSession::ResetClientsForLoad()
 
 		// Clear owned players and rebuild from loaded frames.
 		mClientPlayers.Clear(rClient.iClientId);
-		if (mClientPlayers.RelinkFromFrames(rClient.iClientId, rClient.clientGuid, ClientPlayerRegistry::RelinkContext::kLoad) == 0)
+		if (RelinkFromFrames(rClient.iClientId, rClient.clientGuid, RelinkContext::kLoad) == 0)
 		{
 			LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad Client: {} no GUID match, will respawn", rClient.iClientId);
 		}
@@ -481,6 +481,52 @@ void ServerSession::ResetClientsForLoad()
 	// Pending flagship updates were cleared at the start of this function via mNavigation.ClearPendingFlagshipUpdates(); fleet restoration above re-queued entries — do NOT clear again here.
 
 	mpRuntime->ResetTransportForLoad();
+}
+
+int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientGuid& rGuid, RelinkContext eContext)
+{
+	if (rGuid.IsEmpty())
+	{
+		return 0;
+	}
+
+	std::vector<engine::OwnedEntity> relinkEntries;
+	relinkEntries.reserve(gpGame->mCoordFrames.size());
+	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
+	{
+		const PlayersPostRender& rPlayers = *rFrames.pCurrent->postRender.pPlayers;
+		for (int64_t i = 0; i < rPlayers.iCount; ++i)
+		{
+			if (rPlayers.pClientGuids[i] == rGuid)
+			{
+				relinkEntries.push_back({.globalId = rPlayers.pGlobalPlayerIds[i], .coord = rCoord});
+			}
+		}
+	}
+
+	std::ranges::sort(relinkEntries, [](const engine::OwnedEntity& rLeft, const engine::OwnedEntity& rRight)
+	{
+		return rLeft.globalId.iValue < rRight.globalId.iValue;
+	});
+
+	mClientPlayers.Reserve(iClientId, std::ssize(relinkEntries));
+
+	for (const engine::OwnedEntity& rEntry : relinkEntries)
+	{
+		mClientPlayers.Add(iClientId, rEntry.globalId, rEntry.coord);
+		SendAssignPlayer(iClientId, rEntry.globalId, rEntry.coord);
+		SendPlayerState(iClientId, PlayerStateWireType::kSpawned, rEntry.globalId.iValue, rEntry.coord);
+		if (eContext == RelinkContext::kConnect)
+		{
+			LOG(kNetwork, kVerbose, "ServerClientManager::NewClients Re-linked Client: {} GlobalPlayer: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.x, rEntry.coord.y);
+		}
+		else
+		{
+			LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad Re-linked Client: {} GlobalPlayer: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.x, rEntry.coord.y);
+		}
+	}
+
+	return static_cast<int64_t>(relinkEntries.size());
 }
 
 void ServerSession::WriteFleetData(std::fstream& rFileStream) const
