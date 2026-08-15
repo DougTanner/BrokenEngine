@@ -24,8 +24,8 @@ struct MissileCollisionIntervalScratch
 	std::vector<float> startTimes;
 	std::vector<float> endTimes;
 	std::vector<float> maxTimes;
-	std::vector<SegmentHit> terrainHits;
-	std::vector<SegmentHit> boundaryHits;
+	std::vector<engine::SegmentHit> terrainHits;
+	std::vector<engine::SegmentHit> boundaryHits;
 };
 
 static MissileCollisionIntervalScratch& GetMissileCollisionIntervalScratch()
@@ -293,8 +293,8 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		sCollisionDamages.at(uiIndex) = 0.0f;  // Damage via area damage system
 		rCollisionScratch.startTimes.at(uiIndex) = 0.0f;
 		rCollisionScratch.endTimes.at(uiIndex) = 1.0f;
-		rCollisionScratch.terrainHits.at(uiIndex) = TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.boundaryHits.at(uiIndex) = TracePointToFrameExit(rStaticData.vecArea, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.terrainHits.at(uiIndex) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.boundaryHits.at(uiIndex) = engine::TracePointToFrameExit(rStaticData.vecArea, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		float fMaxTime = std::numeric_limits<float>::max();
 		if (rCollisionScratch.terrainHits.at(uiIndex).bHit)
 		{
@@ -358,8 +358,8 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 			continue;
 		}
 
-		const SegmentHit& rTerrainHit = rCollisionScratch.terrainHits.at(uiIndex);
-		const SegmentHit& rBoundaryHit = rCollisionScratch.boundaryHits.at(uiIndex);
+		const engine::SegmentHit& rTerrainHit = rCollisionScratch.terrainHits.at(uiIndex);
+		const engine::SegmentHit& rBoundaryHit = rCollisionScratch.boundaryHits.at(uiIndex);
 		if (rTerrainHit.bHit && (!rBoundaryHit.bHit || rTerrainHit.fTime <= rBoundaryHit.fTime))
 		{
 			rCurrentInterpolate.pVecPositions[i] = rTerrainHit.vecPosition;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Frame/FrameUtils.h"
 #include "Frame/GridCoord.h"
 #include "Frame/NavBuild.h"
 #if defined(BT_CLIENT)
@@ -259,5 +260,7 @@ private:
 };
 
 inline IslandTerrain* gpIslandTerrain = nullptr;
+
+SegmentHit XM_CALLCONV TracePointAgainstTerrain(const FrameStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime);
 
 } // namespace engine

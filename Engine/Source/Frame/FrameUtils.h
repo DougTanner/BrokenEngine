@@ -46,6 +46,13 @@ struct FrameBounds
 	float fMaxY {};
 };
 
+struct SegmentHit
+{
+	bool bHit = false;
+	float fTime = 0.0f;
+	XMVECTOR vecPosition {};
+};
+
 inline FrameBounds XM_CALLCONV ComputeFrameBounds(FXMVECTOR vecArea)
 {
 	// vecArea: x=minX, y=maxY, z=maxX, w=minY
@@ -54,6 +61,60 @@ inline FrameBounds XM_CALLCONV ComputeFrameBounds(FXMVECTOR vecArea)
 		.fMinY = XMVectorGetW(vecArea),
 		.fMaxX = XMVectorGetZ(vecArea),
 		.fMaxY = XMVectorGetY(vecArea),
+	};
+}
+
+inline SegmentHit XM_CALLCONV TracePointToFrameExit(FXMVECTOR vecArea, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime)
+{
+	FrameBounds bounds = ComputeFrameBounds(vecArea);
+	XMFLOAT4A f4Start {};
+	XMFLOAT4A f4End {};
+	XMStoreFloat4A(&f4Start, vecStartPosition);
+	XMStoreFloat4A(&f4End, vecEndPosition);
+	float fDeltaX = f4End.x - f4Start.x;
+	float fDeltaY = f4End.y - f4Start.y;
+	float fPercent = std::numeric_limits<float>::max();
+
+	bool bStartsOutside = f4Start.x < bounds.fMinX || f4Start.x > bounds.fMaxX || f4Start.y < bounds.fMinY || f4Start.y > bounds.fMaxY;
+	bool bStartsOnNonInwardBoundary =
+		(f4Start.x == bounds.fMinX && fDeltaX <= 0.0f) ||
+		(f4Start.x == bounds.fMaxX && fDeltaX >= 0.0f) ||
+		(f4Start.y == bounds.fMinY && fDeltaY <= 0.0f) ||
+		(f4Start.y == bounds.fMaxY && fDeltaY >= 0.0f);
+	if (bStartsOutside || bStartsOnNonInwardBoundary)
+	{
+		fPercent = 0.0f;
+	}
+	else
+	{
+		if (fDeltaX > 0.0f && f4End.x >= bounds.fMaxX)
+		{
+			fPercent = std::min(fPercent, (bounds.fMaxX - f4Start.x) / fDeltaX);
+		}
+		else if (fDeltaX < 0.0f && f4End.x <= bounds.fMinX)
+		{
+			fPercent = std::min(fPercent, (bounds.fMinX - f4Start.x) / fDeltaX);
+		}
+		if (fDeltaY > 0.0f && f4End.y >= bounds.fMaxY)
+		{
+			fPercent = std::min(fPercent, (bounds.fMaxY - f4Start.y) / fDeltaY);
+		}
+		else if (fDeltaY < 0.0f && f4End.y <= bounds.fMinY)
+		{
+			fPercent = std::min(fPercent, (bounds.fMinY - f4Start.y) / fDeltaY);
+		}
+	}
+
+	if (fPercent == std::numeric_limits<float>::max())
+	{
+		return {};
+	}
+
+	return
+	{
+		.bHit = true,
+		.fTime = fStartTime + fPercent * (fEndTime - fStartTime),
+		.vecPosition = XMVectorLerp(vecStartPosition, vecEndPosition, fPercent),
 	};
 }
 
