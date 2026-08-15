@@ -169,7 +169,7 @@ XMVECTOR Game::GetClientPlayerPosition() const
 void Game::ComputeActiveSet()
 {
 #if defined(BT_SERVER)
-	gpServerSession->ComputeActiveSet();
+	gpServerSession->mpRuntime->ComputeActiveSet();
 #else
 	// Heap: mActiveCoords vector clear/push_back may allocate. Persists as Game member across frame updates
 	ScopedSuppressAllocationTracking suppress;

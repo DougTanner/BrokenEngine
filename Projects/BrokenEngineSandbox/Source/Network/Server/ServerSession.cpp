@@ -49,7 +49,7 @@ void ServerSession::PrepareTick()
 	// Heap: ComputeActiveSet/EnsureNextFrames may grow mActiveCoords and CoordFrames maps
 	ScopedSuppressAllocationTracking suppress;
 
-	ComputeActiveSet();
+	mpRuntime->ComputeActiveSet();
 	gpGame->EnsureNextFrames();
 
 	// Add empty frame inputs for any newly active coords
@@ -315,26 +315,7 @@ void ServerSession::FinalizeTickClients()
 	mpFleetManager->DetectDisconnectedPlayerDeaths();
 }
 
-void ServerSession::AddSubscribedCoords()
-{
-	const std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
-	for (const engine::ClientConnection& rClient : rClients)
-	{
-		for (int64_t i = 0; i < std::ssize(rClient.slots); ++i)
-		{
-			if (rClient.slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive)
-			{
-				engine::GridCoord coord = rClient.slots.at(i).subscription.coord;
-				if (!std::ranges::contains(gpGame->mActiveCoords, coord))
-				{
-					gpGame->mActiveCoords.push_back(coord);
-				}
-			}
-		}
-	}
-}
-
-void ServerSession::EnsurePlayerCoords()
+void ServerSession::AddGameRequiredCoords()
 {
 	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
 	{
@@ -348,46 +329,9 @@ void ServerSession::EnsurePlayerCoords()
 	}
 }
 
-void ServerSession::SyncActiveFrames()
+void ServerSession::OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame>& rpFrame)
 {
-	// Create frames at missing coordinates
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
-	{
-		if (!gpGame->mCoordFrames.contains(rCoord))
-		{
-			gpGame->CreateFrameAtCoord(rCoord);
-		}
-	}
-
-	// Delete frames outside the active set, handing a recording writer its final complete current frame first.
-	for (auto it = gpGame->mCoordFrames.begin(); it != gpGame->mCoordFrames.end();)
-	{
-		if (std::ranges::contains(gpGame->mActiveCoords, it->first))
-		{
-			++it;
-			continue;
-		}
-
-		gpGame->mGameSaveLoad.RetainReplayEndFrame(it->first, it->second.pCurrent);
-		it = gpGame->mCoordFrames.erase(it);
-	}
-}
-
-void ServerSession::ComputeActiveSet()
-{
-	// Heap: mActiveCoords vector clear/push_back may allocate. Persists as Game member across frame updates
-	ScopedSuppressAllocationTracking suppress;
-
-	gpGame->mActiveCoords.clear();
-	AddSubscribedCoords();
-	EnsurePlayerCoords();
-
-	if (!std::ranges::contains(gpGame->mActiveCoords, engine::kOriginCoord))
-	{
-		gpGame->mActiveCoords.push_back(engine::kOriginCoord);
-	}
-
-	SyncActiveFrames();
+	gpGame->mGameSaveLoad.RetainReplayEndFrame(coord, rpFrame);
 }
 
 void ServerSession::SendAssignPlayer(int64_t iClientId, engine::global_id_t globalId, engine::GridCoord coord)

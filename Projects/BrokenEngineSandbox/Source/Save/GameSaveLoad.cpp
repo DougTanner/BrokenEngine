@@ -451,7 +451,7 @@ bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 	mrGameBase.SetCurrentTime(fLoadedTime);
 	game::gpGame->SetClientGridCoord(loadedClientGridCoord);
 	game::gpServerSession->ResetClientsForLoad();
-	game::gpServerSession->ComputeActiveSet();
+	game::gpServerSession->mpRuntime->ComputeActiveSet();
 
 	return true;
 }
@@ -468,7 +468,7 @@ void GameSaveLoad::ServerReset()
 	// fresh-game has no save to restore from, so explicitly clear before ResetClientsForLoad runs.
 	game::gpServerSession->mpFleetManager->ResetState();
 	game::gpServerSession->ResetClientsForLoad();
-	game::gpServerSession->ComputeActiveSet();
+	game::gpServerSession->mpRuntime->ComputeActiveSet();
 }
 
 void GameSaveLoad::Autosave()

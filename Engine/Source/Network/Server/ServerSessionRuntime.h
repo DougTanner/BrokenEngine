@@ -32,6 +32,7 @@ public:
 	void SendNewSubscriptionFullStates();
 	void ResetTransportForLoad();
 	void PublishTick(int64_t iTick, const std::pair<GridCoord, GridUpdateData>* pGridUpdates, int64_t iGridUpdateCount, const std::pair<GridCoord, const game::Frame*>* pFullFrames, int64_t iFullFrameCount);
+	void ComputeActiveSet();
 
 	game::ServerSession& mrSession;
 	std::unique_ptr<Server> mpServer;
@@ -43,6 +44,10 @@ private:
 	void PreparePausedSubscriptions();
 	void HandleResyncRequests();
 	void ResetOnLastClientLeave();
+
+	// ComputeActiveSet helpers
+	void AddSubscribedCoords();
+	void SyncActiveFrames();
 
 	// Tracks whether the engine client set was non-empty as of the previous post-poll sample so the
 	// network-driven pause/timescale reset fires on the non-empty -> empty transition.

@@ -36,7 +36,6 @@ public:
 	~ServerSession();
 
 	void PrepareTick();
-	void ComputeActiveSet();
 	void ParseReceivedGamePackets();
 	void SendAssignPlayer(int64_t iClientId, engine::global_id_t globalId, engine::GridCoord coord);
 	void SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coord);
@@ -63,10 +62,9 @@ private:
 	void AfterNetworkPoll();
 	void FinalizeTickClients();
 
-	// ComputeActiveSet helpers
-	void AddSubscribedCoords();
-	void EnsurePlayerCoords();
-	void SyncActiveFrames();
+	// ServerSessionRuntime::ComputeActiveSet hooks
+	void AddGameRequiredCoords();
+	void OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame>& rpFrame);
 
 };
 

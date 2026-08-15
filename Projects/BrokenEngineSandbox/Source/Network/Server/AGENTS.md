@@ -20,7 +20,8 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 
 ## Deterministic Tick Contracts
 
-- The active set combines subscriptions and player coordinates, always including origin; replay uses coordinates with live readers.
+- The engine runtime owns the active set and calls two hooks here: this layer contributes every coordinate holding at least one Player, and hands each Frame leaving the set to `GameSaveLoad` for replay retention before the runtime erases it.
+- Replay uses coordinates with live readers.
 - Spawn assignment diffs origin player IDs across the tick and pairs new IDs with waiting clients in request order. The client GUID written into Frame state is the persistent relink key.
 - Fleet navigation defers flagship updates through `StatusChange`s. Within `BuildFrameInputs`, waiting-client spawn construction, queued player updates, fleet timers and pending flagship updates, plus broadcast and pre-spawn snapshot capture run only on advancing updates; this work remains deferred through paused and other zero-tick updates.
 - Agent-injected `StatusChange`s remain queued until a normal, advancing, frame-ready tick can consume them. Consumed changes use the same deterministic type grouping as broadcast serialization.

@@ -265,6 +265,67 @@ void ServerSessionRuntime::PublishTick(int64_t iTick, const std::pair<GridCoord,
 	}
 }
 
+void ServerSessionRuntime::AddSubscribedCoords()
+{
+	const std::vector<engine::ClientConnection>& rClients = mpServer->mClients;
+	for (const engine::ClientConnection& rClient : rClients)
+	{
+		for (int64_t i = 0; i < std::ssize(rClient.slots); ++i)
+		{
+			if (rClient.slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive)
+			{
+				engine::GridCoord coord = rClient.slots.at(i).subscription.coord;
+				if (!std::ranges::contains(game::gpGame->mActiveCoords, coord))
+				{
+					game::gpGame->mActiveCoords.push_back(coord);
+				}
+			}
+		}
+	}
+}
+
+void ServerSessionRuntime::SyncActiveFrames()
+{
+	// Create frames at missing coordinates
+	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
+	{
+		if (!game::gpGame->mCoordFrames.contains(rCoord))
+		{
+			game::gpGame->CreateFrameAtCoord(rCoord);
+		}
+	}
+
+	// Delete frames outside the active set, handing a recording writer its final complete current frame first.
+	for (auto it = game::gpGame->mCoordFrames.begin(); it != game::gpGame->mCoordFrames.end();)
+	{
+		if (std::ranges::contains(game::gpGame->mActiveCoords, it->first))
+		{
+			++it;
+			continue;
+		}
+
+		mrSession.OnFrameRetiring(it->first, it->second.pCurrent);
+		it = game::gpGame->mCoordFrames.erase(it);
+	}
+}
+
+void ServerSessionRuntime::ComputeActiveSet()
+{
+	// Heap: mActiveCoords vector clear/push_back may allocate. Persists as Game member across frame updates
+	ScopedSuppressAllocationTracking suppress;
+
+	game::gpGame->mActiveCoords.clear();
+	AddSubscribedCoords();
+	mrSession.AddGameRequiredCoords();
+
+	if (!std::ranges::contains(game::gpGame->mActiveCoords, engine::kOriginCoord))
+	{
+		game::gpGame->mActiveCoords.push_back(engine::kOriginCoord);
+	}
+
+	SyncActiveFrames();
+}
+
 } // namespace engine
 
 #endif // BT_SERVER
