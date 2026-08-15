@@ -516,9 +516,6 @@
     <ClInclude Include="..\..\Source\Frame\Frame.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Frame\FrameTick.h">
-      <Filter>Game\Frame</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Frame\TerrainUtils.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
@@ -1029,9 +1026,6 @@
       <Filter>Engine\Audio</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Frame.cpp">
-      <Filter>Game\Frame</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\FrameTick.cpp">
       <Filter>Game\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp">

@@ -7,7 +7,7 @@
 #if defined(BT_SERVER)
 #include "Network/Server/ServerSession.h"
 #endif
-#include "Frame/FrameTick.h"
+#include "Frame/FrameBase.h"
 #include "Input/Input.h"
 #include "Profile/ProfileManager.h"
 
@@ -299,14 +299,14 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 				rCoord.x, rCoord.y, rFrames.pCurrent != nullptr, rFrames.pNext != nullptr);
 			continue;
 		}
-		common::gpThreadLocal->mWorkbuffer.PushBack<game::ActiveFrameRef>({
+		common::gpThreadLocal->mWorkbuffer.PushBack<ActiveFrameRef>({
 			.pNext = &NextFrame(rCoord),
 			.pCurrent = &CurrentFrame(rCoord),
 			.pFrameInput = &game::gpGame->mFrameInputs.at(rCoord),
 			.pStaticData = &rFrames.staticData,
 		});
 	}
-	std::span<const game::ActiveFrameRef> activeFrameRefs = common::gpThreadLocal->mWorkbuffer.Span<game::ActiveFrameRef>();
+	std::span<const ActiveFrameRef> activeFrameRefs = common::gpThreadLocal->mWorkbuffer.Span<ActiveFrameRef>();
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameInterpolate);
 	gpProfileManager->CpuStart(game::kCpuTimerFramePostRender);
@@ -316,7 +316,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 	{
 		for (int64_t j = iBegin; j < iEnd; ++j)
 		{
-			game::RunFrameTick(activeFrameRefs[j], miTickCounter, mfCurrentTime);
+			RunFrameTick(activeFrameRefs[j], miTickCounter, mfCurrentTime);
 		}
 	};
 	if constexpr (kbFrameDispatch)

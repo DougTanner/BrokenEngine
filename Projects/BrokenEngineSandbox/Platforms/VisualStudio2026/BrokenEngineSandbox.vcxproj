@@ -466,7 +466,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Targets\Targets.h" />
     <ClInclude Include="..\..\Source\Frame\Frame.h" />
-    <ClInclude Include="..\..\Source\Frame\FrameTick.h" />
     <ClInclude Include="..\..\Source\Frame\TerrainUtils.h" />
     <ClInclude Include="..\..\Source\Frame\FrameCollections.h" />
     <ClInclude Include="..\..\Source\Frame\HealthDamage.h" />
@@ -700,7 +699,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Frame\Collections\Targets\Targets.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Targets\TargetsUpdate.cpp" />
     <ClCompile Include="..\..\Source\Frame\Frame.cpp" />
-    <ClCompile Include="..\..\Source\Frame\FrameTick.cpp" />
     <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Players\Players.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersNavigation.cpp" />

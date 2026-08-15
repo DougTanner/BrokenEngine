@@ -1,7 +1,7 @@
 #include "Network/Client/ReconcileReplay.h"
 
 #include "Game.h"
-#include "Frame/FrameTick.h"
+#include "Frame/FrameBase.h"
 #include "Frame/StatusChange.h"
 #include "Network/Client/ClientReconciler.h"
 #include "SpawnTransfer.h"
@@ -119,13 +119,13 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 
 	pNext->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated);
 
-	ActiveFrameRef ref {
+	engine::ActiveFrameRef ref {
 		.pNext = pNext,
 		.pCurrent = pCurrent,
 		.pFrameInput = &rFrameInput,
 		.pStaticData = &rFrames.staticData,
 	};
-	RunFrameTick(ref, iTick, fTime);
+	engine::RunFrameTick(ref, iTick, fTime);
 
 	// Apply transfer StatusChanges (runs after Destroy/Spawn to match server ordering)
 	bool bHadTransfers = false;

@@ -270,4 +270,15 @@ inline uuid_t uuid_t::GenerateVisual(FramePostRenderBase& rFramePostRender)
 }
 #endif
 
+struct ActiveFrameRef
+{
+	game::Frame* pNext = nullptr;
+	game::Frame* pCurrent = nullptr;
+	game::FrameInput* pFrameInput = nullptr;
+	const FrameStaticData* pStaticData = nullptr;
+};
+
+// Runs all tick phases for a single Frame (Interpolate, PostRender, Collision, Transfer, Destroy/Spawn)
+void RunFrameTick(const ActiveFrameRef& rRef, int64_t iTickCounter, float fCurrentTime);
+
 } // namespace engine

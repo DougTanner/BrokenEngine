@@ -150,7 +150,7 @@ public:
 	// precomputed FrameStaticData::elevationGrid. Out-of-cell positions return mfSeaFloorElevation.
 	// Honors the Frame Purity Constraint: the caller hands its own static data in, so this never
 	// touches gpGame->mCoordFrames and never reads a neighbor cell. Builds happen at the top of
-	// RunFrameTick (see FrameTick.cpp), before any sim phase that would query.
+	// RunFrameTick (see FrameBase.cpp), before any sim phase that would query.
 	[[nodiscard]] float XM_CALLCONV FrameElevation(const FrameStaticData& rStaticData, FXMVECTOR vecPosition) const;
 	[[nodiscard]] XMVECTOR XM_CALLCONV FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecPosition) const;
 

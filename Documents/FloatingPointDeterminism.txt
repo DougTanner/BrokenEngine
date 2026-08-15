@@ -53,7 +53,7 @@ File: Common/Determinism.cpp  (ConfigureThreadFloatingPoint(), called from the T
 A debug assertion in RunFrameTick verifies MXCSR has not been
 corrupted by external calls (audio, Vulkan, etc.) before each tick.
 
-File: Projects/BrokenEngineSandbox/Source/Frame/FrameTick.cpp
+File: Engine/Source/Frame/FrameBase.cpp
 
 
 4. Fixed Timestep
