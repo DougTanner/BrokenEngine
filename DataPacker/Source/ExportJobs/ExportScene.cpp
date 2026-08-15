@@ -132,7 +132,7 @@ void LogFilteredChannelDiagnostics(const tinygltf::Model& rGltfModel)
 	{
 		for (const tinygltf::AnimationChannel& rChannel : rAnim.channels)
 		{
-			LOG(kDefault, kWarning, "    Animation channel targets node {} (\"{}\")", rChannel.target_node, rChannel.target_node >= 0 ? rGltfModel.nodes.at(rChannel.target_node).name : "invalid");
+			LOG(kDefault, kWarning, "    Animation channel targets node {} (\"{}\")", rChannel.target_node, rChannel.target_node >= 0 && static_cast<size_t>(rChannel.target_node) < rGltfModel.nodes.size() ? rGltfModel.nodes.at(rChannel.target_node).name : "invalid");
 			if (++iCount >= 10)
 			{
 				break;

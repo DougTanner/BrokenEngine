@@ -108,6 +108,15 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOut)
 
 			// Keyframe times come from the input accessor (which also supplies the keyframe count); values from the output accessor
 			const tinygltf::Accessor& rInputAccessor = rModel.accessors[rSampler.input];
+			if (rInputAccessor.sparse.isSparse)
+			{
+				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) has sparse input accessor {}.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rSampler.input));
+			}
+			if (rModel.accessors[rSampler.output].sparse.isSparse)
+			{
+				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) has sparse output accessor {}.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rSampler.output));
+			}
+
 			const float* pfTimes = AccessorFloats(rModel, rSampler.input);
 			const float* pfValues = AccessorFloats(rModel, rSampler.output);
 

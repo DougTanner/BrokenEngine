@@ -319,6 +319,11 @@ void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& 
 	for (size_t i = 0; i < rMesh.primitives.size(); ++i)
 	{
 		const tinygltf::Primitive& rPrimitive = rMesh.primitives[i];
+		if (rPrimitive.indices <= -1)
+		{
+			throw std::runtime_error(std::format("Scene primitive {} is missing indices; non-indexed primitives are unsupported.", i));
+		}
+
 		ASSERT(rPrimitive.attributes.find("POSITION") != rPrimitive.attributes.end());
 		ASSERT(rPrimitive.attributes.find("COLOR_0") == rPrimitive.attributes.end());
 		if (rPrimitive.attributes.find("TEXCOORD_6") != rPrimitive.attributes.end())
