@@ -60,6 +60,7 @@ private:
 	};
 
 	void InitializeWorktreeOutputs(InitializationMode eMode);
+	void ReconcileWorktreeOutput(OutputRootInfo& rRoot);
 	EnsureLocalResult MaterializeOutput(OutputRootInfo& rRoot);
 	OutputRootInfo& GetOutputRoot(OutputRoot eRoot);
 
