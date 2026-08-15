@@ -136,7 +136,7 @@ try {
 	$powerShell = [Environment]::ProcessPath
 	if ([string]::IsNullOrWhiteSpace($powerShell)) { $powerShell = 'pwsh' }
 	$provision = Invoke-NativeCapture $powerShell @(
-		'-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $provisioner, '-RepositoryRoot', $root)
+		'-NoProfile', '-File', $provisioner, '-RepositoryRoot', $root)
 	$provisionOutput = Limit-TrailingText (($provision.Stdout, $provision.Stderr) -join [Environment]::NewLine) $MaximumOutputCharacters
 	$result.provision = [ordered]@{ exitCode = $provision.ExitCode; output = $provisionOutput }
 	if ($provision.ExitCode -ne 0) {
