@@ -278,7 +278,13 @@ void GenerateIrradianceCubemaps()
 
 			// Create CMFT source image and populate with float data
 			cmft::Image srcImage;
+			cmft::Image dstImage;
 			cmft::imageCreate(srcImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
+			common::ScopedLambda imageCleanup([&]()
+			{
+				cmft::imageUnload(srcImage);
+				cmft::imageUnload(dstImage);
+			});
 			std::memcpy(srcImage.m_data, cubemapData.floatData.data(), uiTotalPixels * 4 * sizeof(float));
 
 			// Generate 128x128 irradiance cubemap using spherical harmonics.
@@ -286,7 +292,6 @@ void GenerateIrradianceCubemaps()
 			// thread-count input), so it carries only generic FP-environment exposure (FMA contraction in
 			// the double-precision SH reduction; DataPacker is not /fp:strict) - low cross-host variance risk.
 			static constexpr uint32_t kuiIrradianceFaceSize = 128;
-			cmft::Image dstImage;
 			cmft::imageIrradianceFilterSh(dstImage, kuiIrradianceFaceSize, srcImage);
 
 			// Convert RGBA32F result back to RGBA16F
@@ -311,10 +316,6 @@ void GenerateIrradianceCubemaps()
 			fileStream.close();
 			VERIFY_SUCCESS(fileStream.good());
 			CompleteOutputUpdate(metadataPath, fingerprint);
-
-			// Clean up CMFT images
-			cmft::imageUnload(srcImage);
-			cmft::imageUnload(dstImage);
 		}
 	}
 
@@ -414,16 +415,18 @@ static void ProcessKtxCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext
 
 			cmft::Image srcImage;
 			cmft::imageCreate(srcImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
+			cmft::Image dstImage;
+			common::ScopedLambda imageCleanup([&]()
+			{
+				cmft::imageUnload(srcImage);
+				cmft::imageUnload(dstImage);
+			});
 			std::memcpy(srcImage.m_data, cubemapData.floatData.data(), uiTotalPixels * 4 * sizeof(float));
 
-			cmft::Image dstImage;
 			cmft::imageRadianceFilter(dstImage, kuiPreFilteredFaceSize, cmft::LightingModel::BlinnBrdf, false, kuiPreFilteredMipCount, 14, 4, srcImage, cmft::EdgeFixup::None, uiCpuThreads, pClContext);
 
 			WriteFilteredCubemap(dstImage, outputPath);
 			CompleteOutputUpdate(metadataPath, fingerprint);
-
-			cmft::imageUnload(srcImage);
-			cmft::imageUnload(dstImage);
 		}
 	}
 }
@@ -496,6 +499,17 @@ static void ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClC
 			LOG(kDefault, kDebug, "Generating pre-filtered cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
 
 			cmft::Image faceImages[6];
+			cmft::Image srcImage;
+			cmft::Image dstImage;
+			common::ScopedLambda imageCleanup([&]()
+			{
+				for (cmft::Image& rFaceImage : faceImages)
+				{
+					cmft::imageUnload(rFaceImage);
+				}
+				cmft::imageUnload(srcImage);
+				cmft::imageUnload(dstImage);
+			});
 			for (int64_t i = 0; i < 6; ++i)
 			{
 				// stb link-resolves to the shared first-party STBI_WINDOWS_UTF8 build (cmft's vendored stb is not compiled), so imageLoadStb decodes this UTF-8 path correctly.
@@ -503,21 +517,12 @@ static void ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClC
 				cmft::imageLoadStb(faceImages[i], reinterpret_cast<const char*>(facePath.c_str()), cmft::TextureFormat::RGBA32F);
 			}
 
-			cmft::Image srcImage;
 			cmft::imageCubemapFromFaceList(srcImage, faceImages);
 
-			cmft::Image dstImage;
 			cmft::imageRadianceFilter(dstImage, kuiPreFilteredFaceSize, cmft::LightingModel::BlinnBrdf, false, kuiPreFilteredMipCount, 14, 4, srcImage, cmft::EdgeFixup::None, uiCpuThreads, pClContext);
 
 			WriteFilteredCubemap(dstImage, outputPath);
 			CompleteOutputUpdate(metadataPath, fingerprint);
-
-			for (int64_t i = 0; i < 6; ++i)
-			{
-				cmft::imageUnload(faceImages[i]);
-			}
-			cmft::imageUnload(srcImage);
-			cmft::imageUnload(dstImage);
 		}
 	}
 }
@@ -532,18 +537,27 @@ void GeneratePreFilteredCubemaps()
 	// only per bake host. Acceptable under the single-canonical-bake-machine assumption;
 	// force a pinned-thread CPU path if CI / multi-machine
 	// bakes are introduced.
-	cmft::ClContext* pClContext = nullptr;
-	if (cmft::clLoad() != 0)
-	{
-		pClContext = cmft::clInit(CMFT_CL_VENDOR_ANY_GPU, CMFT_CL_DEVICE_TYPE_GPU);
-	}
-
 	ExpectedIblOutputs expectedOutputs;
-	ProcessKtxCubemaps(kuiCpuThreads, pClContext, expectedOutputs);
-	ProcessFaceImageCubemaps(kuiCpuThreads, pClContext, expectedOutputs);
+	cmft::ClContext* pClContext = nullptr;
+	const bool bClLoaded = cmft::clLoad() != 0;
+	{
+		common::ScopedLambda openClCleanup([&]()
+		{
+			if (bClLoaded)
+			{
+				cmft::clDestroy(pClContext);
+				cmft::clUnload();
+			}
+		});
 
-	cmft::clDestroy(pClContext);
-	cmft::clUnload();
+		if (bClLoaded)
+		{
+			pClContext = cmft::clInit(CMFT_CL_VENDOR_ANY_GPU, CMFT_CL_DEVICE_TYPE_GPU);
+		}
+
+		ProcessKtxCubemaps(kuiCpuThreads, pClContext, expectedOutputs);
+		ProcessFaceImageCubemaps(kuiCpuThreads, pClContext, expectedOutputs);
+	}
 
 	ReconcileIblOutputs(expectedOutputs, kPrefilteredOutputStem);
 }
