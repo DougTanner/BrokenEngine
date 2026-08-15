@@ -116,6 +116,36 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 		}
 	}
 
+	XMVECTOR vecTargetPosition = ResolveTargetPosition(rFrameInterpolate, bFreeCameraActive);
+
+	UpdateJump(vecTargetPosition, fDeltaTime);
+	UpdateEyeHeight();
+
+	// Keep each world-texel reference at or above the live eye height: zero initialization and outward zoom snap
+	// immediately for full viewport coverage, while inward zoom contracts at the existing independent rates so the
+	// density change remains gradual. At a settled height both references converge to the live height.
+	UpdateTexelEyeHeightReference(mfCameraEyeHeight, engine::gShadowTexelRampMetersPerSec.Get(), fDeltaTime, mfShadowTexelEyeHeight);
+	UpdateTexelEyeHeightReference(mfCameraEyeHeight, engine::gLightingTexelRampMetersPerSec.Get(), fDeltaTime, mfLightingTexelEyeHeight);
+
+	// Eye sits directly above target along +Z (straight-down view).
+	// W=0 — eye-local offset, not a homogeneous point; added to mVecPosition (W=1) preserves position.
+	auto vecEyePositionRelative = XMVectorSet(0.0f, 0.0f, mfCameraEyeHeight, 0.0f);
+	mVecToEyeNormal = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	mVecEyePosition = XMVectorAdd(mVecPosition, vecEyePositionRelative);
+
+	// Set controller vibration based on camera shake
+	float fVibration = std::pow(mfShake, 0.5f);
+	engine::gpRawInputManager->SetVibration(0, fVibration, fVibration);
+
+	// Calculate matrices and visible area
+	CalculateMatricesAndVisibleArea();
+
+	// Persist zoom-target changes (and any focus changes that came through unhooked paths). Diff-checked, so no-op on most frames.
+	gpGame->CaptureClientStateAndSaveIfChanged();
+}
+
+XMVECTOR Camera::ResolveTargetPosition(const FrameInterpolate& rFrameInterpolate, bool bFreeCameraActive)
+{
 	// Calculate target position based on menu or game mode
 	XMVECTOR vecTargetPosition {};
 	if (bFreeCameraActive)
@@ -155,25 +185,7 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 		}
 		else
 		{
-			static float sfLastLogTime = -1.0f;
-			if (mfTime - sfLastLogTime >= 1.0f)
-			{
-				sfLastLogTime = mfTime;
-				if (bHasCoord)
-				{
-					const PlayersPostRender& rPlayers = *gpGame->RenderFrame(gpGame->mClientGridCoord).postRender.pPlayers;
-					LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}",
-						gpGame->ClientPlayerId(), gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y, rPlayers.iCount, rFrameInterpolate.pPlayers->iCount);
-					for (int64_t i = 0; i < rPlayers.iCount; ++i)
-					{
-						LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalPlayerId: {}", i, rPlayers.pGlobalPlayerIds[i]);
-					}
-				}
-				else
-				{
-					LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientPlayerId(), gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y);
-				}
-			}
+			LogMissingPlayer(rFrameInterpolate, bHasCoord);
 
 			// Player not found — extrapolate from last known position and velocity
 			float fElapsedTime = std::clamp(mfTime - mfLastKnownPlayerTime, 0.0f, 2.0f);
@@ -187,6 +199,34 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 		vecTargetPosition = XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 0.0f));
 	}
 
+	return vecTargetPosition;
+}
+
+void Camera::LogMissingPlayer(const FrameInterpolate& rFrameInterpolate, bool bHasCoord)
+{
+	static float sfLastLogTime = -1.0f;
+	if (mfTime - sfLastLogTime >= 1.0f)
+	{
+		sfLastLogTime = mfTime;
+		if (bHasCoord)
+		{
+			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(gpGame->mClientGridCoord).postRender.pPlayers;
+			LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}",
+				gpGame->ClientPlayerId(), gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y, rPlayers.iCount, rFrameInterpolate.pPlayers->iCount);
+			for (int64_t i = 0; i < rPlayers.iCount; ++i)
+			{
+				LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalPlayerId: {}", i, rPlayers.pGlobalPlayerIds[i]);
+			}
+		}
+		else
+		{
+			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientPlayerId(), gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y);
+		}
+	}
+}
+
+void Camera::UpdateJump(FXMVECTOR vecTargetPosition, float fDeltaTime)
+{
 	// Detect target switch during jump: target jumped far from where it was last frame
 	float fDistanceToTarget = XMVectorGetX(XMVector2Length(XMVectorSubtract(vecTargetPosition, mVecPosition)));
 	float fTargetShift = XMVectorGetX(XMVector2Length(XMVectorSubtract(vecTargetPosition, mVecPreviousTargetPosition)));
@@ -233,7 +273,10 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 	}
 
 	mVecPreviousTargetPosition = vecTargetPosition;
+}
 
+void Camera::UpdateEyeHeight()
+{
 	int iScrollDelta = gpInput->mCameraInput.iScrollDelta;
 	if (iScrollDelta != 0)
 	{
@@ -276,28 +319,6 @@ void Camera::Update(const FrameInterpolate& rFrameInterpolate)
 			mfEyeVelocity = (fDH00 * mfEyeStartHeight + fDH10 * mfEyeStartVelocity * kfEyeBlendDuration + fDH01 * mfCameraEyeHeightTarget) / kfEyeBlendDuration;
 		}
 	}
-
-	// Keep each world-texel reference at or above the live eye height: zero initialization and outward zoom snap
-	// immediately for full viewport coverage, while inward zoom contracts at the existing independent rates so the
-	// density change remains gradual. At a settled height both references converge to the live height.
-	UpdateTexelEyeHeightReference(mfCameraEyeHeight, engine::gShadowTexelRampMetersPerSec.Get(), fDeltaTime, mfShadowTexelEyeHeight);
-	UpdateTexelEyeHeightReference(mfCameraEyeHeight, engine::gLightingTexelRampMetersPerSec.Get(), fDeltaTime, mfLightingTexelEyeHeight);
-
-	// Eye sits directly above target along +Z (straight-down view).
-	// W=0 — eye-local offset, not a homogeneous point; added to mVecPosition (W=1) preserves position.
-	auto vecEyePositionRelative = XMVectorSet(0.0f, 0.0f, mfCameraEyeHeight, 0.0f);
-	mVecToEyeNormal = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-	mVecEyePosition = XMVectorAdd(mVecPosition, vecEyePositionRelative);
-
-	// Set controller vibration based on camera shake
-	float fVibration = std::pow(mfShake, 0.5f);
-	engine::gpRawInputManager->SetVibration(0, fVibration, fVibration);
-
-	// Calculate matrices and visible area
-	CalculateMatricesAndVisibleArea();
-
-	// Persist zoom-target changes (and any focus changes that came through unhooked paths). Diff-checked, so no-op on most frames.
-	gpGame->CaptureClientStateAndSaveIfChanged();
 }
 
 // Return sun angle, applying UI slider override when in Graphics or ImGui mode

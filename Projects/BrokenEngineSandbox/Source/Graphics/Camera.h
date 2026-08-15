@@ -76,6 +76,13 @@ public:
 	// at the independent lighting rate inward. 0 = uninitialized (snap directly to live height on first frame).
 	float mfLightingTexelEyeHeight = 0.0f;
 
+private:
+
+	XMVECTOR ResolveTargetPosition(const FrameInterpolate& rFrameInterpolate, bool bFreeCameraActive);
+	void LogMissingPlayer(const FrameInterpolate& rFrameInterpolate, bool bHasCoord);
+	void UpdateJump(FXMVECTOR vecTargetPosition, float fDeltaTime);
+	void UpdateEyeHeight();
+
 };
 
 inline Camera* gpCamera = nullptr;
