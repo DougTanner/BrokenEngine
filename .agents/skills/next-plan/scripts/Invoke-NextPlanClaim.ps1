@@ -19,6 +19,18 @@ try {
  $context=Get-NextPlanContext
  $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','--untracked-files=all') $context.Worktree
  if($status.ExitCode -ne 0 -or -not [string]::IsNullOrWhiteSpace($status.Stdout)){throw (New-NextPlanStateBlocker 'Session worktree must be clean before a plan claim.')}
+ # The executable-Plan inventory below is read from the session tree, so a session behind primary hides
+ # Plans that already exist at the primary tip; fast-forward first so the inventory matches primary.
+ if($context.SessionHead -cne $context.PrimaryTip){
+  # WorktreeCli's claim path requires session HEAD to be an ancestor of the primary tip, so a session
+  # holding any commit the primary tip lacks stops here instead of reaching a confusing claim rejection.
+  $behind=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'merge-base','--is-ancestor',$context.SessionHead,$context.PrimaryTip) $context.Worktree
+  if($behind.ExitCode -gt 1){throw "git merge-base --is-ancestor failed. $($behind.Stderr.Trim())"}
+  if($behind.ExitCode -ne 0){Complete-Claim 2 'blocked' 'claim.session-diverged' "Session HEAD $($context.SessionHead) has commits the primary tip $($context.PrimaryTip) does not, so the session cannot be fast-forwarded; no Plan was claimed and the session branch was not moved."}
+  $merge=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'merge','--ff-only',$context.PrimaryTip) $context.Worktree
+  if($merge.ExitCode -ne 0){$mergeDetail=(($merge.Stdout,$merge.Stderr) -join "`n").Trim();Complete-Claim 1 'error' 'claim.session-sync-failed' "Fast-forwarding the session branch from $($context.SessionHead) to the primary tip $($context.PrimaryTip) failed; no Plan was claimed, and the worktree may be partially updated, so inspect it before retrying. git reported: $mergeDetail"}
+  $result.sync=[ordered]@{fastForwarded=$true;from=$context.SessionHead;to=$context.PrimaryTip}
+ }
  $validate=Invoke-NextPlanProcess $context.WorktreeCli @('plan','validate','--repo',$context.CommonDirectory,'--worktree',$context.Worktree) $context.Worktree
  $validation=ConvertFrom-NextPlanProcessJson $validate 'plan validate'; $projection=[ordered]@{}; foreach($name in @('status','code','message','diagnostics','notices','healedClaims')){if($validation.PSObject.Properties.Name -ccontains $name){$projection[$name]=$validation.$name}}; $result.validation=$projection
  if($validate.ExitCode -eq 2 -and [string]$projection['code'] -ceq 'busy'){Complete-Claim 2 'blocked' 'scheduler.busy' 'Another session held the plan scheduler for the full wait; no Plan was claimed. Tell the user and retry later.'}

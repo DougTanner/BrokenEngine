@@ -41,7 +41,7 @@ function Get-NextPlanContext {
 		$worktreeCli = Join-Path $sessionOutput 'WorktreeCli.exe'; $worktreeCliItem = Get-Item -LiteralPath $worktreeCli -Force -ErrorAction Stop
 		if ($worktreeCliItem.PSIsContainer -or ($worktreeCliItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $worktreeCliItem.Length -eq 0) { throw (New-NextPlanStateBlocker 'Provisioned WorktreeCli must be a nonempty ordinary file.') }
 
-		return [pscustomobject]@{ Worktree=$worktree.Worktree; Primary=$primary.Worktree; CommonDirectory=$worktree.CommonDirectory; SessionBranch=$session.Branch; TargetBranch=$session.PrimaryBranch; Baseline=$session.Baseline; Owner=$session.SessionId; Session=$session.SessionId; WorktreeCli=(Get-Item -LiteralPath $worktreeCli -Force).FullName }
+		return [pscustomobject]@{ Worktree=$worktree.Worktree; Primary=$primary.Worktree; CommonDirectory=$worktree.CommonDirectory; SessionBranch=$session.Branch; TargetBranch=$session.PrimaryBranch; SessionHead=$worktree.Head; PrimaryTip=$session.PrimaryTip; Baseline=$session.Baseline; Owner=$session.SessionId; Session=$session.SessionId; WorktreeCli=(Get-Item -LiteralPath $worktreeCli -Force).FullName }
 	} catch { if (Test-NextPlanStateBlocker $_) { throw $_.Exception }; throw (New-NextPlanStateBlocker $_.Exception.Message) }
 }
 function Invoke-NextPlanProcess([string] $Executable,[string[]] $Arguments,[string] $WorkingDirectory) { return Invoke-FinalizeNativeText -Executable $Executable -Arguments $Arguments -WorkingDirectory $WorkingDirectory }

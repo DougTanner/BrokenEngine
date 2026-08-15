@@ -33,7 +33,9 @@ a worktree or inspect machine-local claims directly.
 See the queue before selecting, whether the invocation is bare or names a Plan:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Get-NextPlanList.ps1`
 is read-only, takes no arguments, and reports every executable Plan with its
-state and creation order. For a tier-constrained request, read the `Risk tier`
+state and creation order. It deliberately reads the session worktree's own tree
+and never moves it, so a Plan landed on primary after this session started shows
+up only after the claim script below fast-forwards the session. For a tier-constrained request, read the `Risk tier`
 prose of the top eligible candidates in that order until one matches, then claim
 that path.
 
@@ -48,12 +50,21 @@ that value, for example:
 (`-Plan 'example.md'` forwards a partial pattern.) Run the bundled script as its
 own shell call, never combined with other commands, so its single JSON object
 stays parseable and the mutation-capable script is never re-run just to
-disambiguate its output. Do not reconstruct the script's transitions. On
+disambiguate its output. Do not reconstruct the script's transitions. Before it
+validates and claims, the script brings the session branch up to the primary tip
+by fast-forward only when the session is behind, reporting a `sync` object that
+names the old and new commits; a session holding any commit the primary tip lacks
+cannot be fast-forwarded, so it stops with `claim.session-diverged` and leaves the
+branch untouched. Because selection therefore reads a tree at the primary tip as
+of that invocation, `none-available` means the Plan is genuinely ineligible rather
+than merely absent from a stale worktree; a Plan that lands on primary afterwards
+is picked up by the next invocation. On
 `status: pass`, act on the code: `ok` and `reused` both mean this session holds
 the named claim. For a bare selection, `none-available` is a normal whole-skill
 stop with nothing to claim, and selection is not re-run to look again. For a
-`-Plan`-targeted invocation it means only that the requested Plan is ineligible,
-so the manager may select or claim a different candidate in the same turn. Any
+`-Plan`-targeted invocation it is the same whole-skill stop, reported to the
+user: the requested Plan is ineligible and the manager never selects or claims a
+different candidate in that run. Any
 other status stops the skill without repair, reordering, or retry.
 
 ## Preparation and execution card
