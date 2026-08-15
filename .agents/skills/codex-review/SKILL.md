@@ -92,12 +92,19 @@ role already resolves to Sol.
    triggers, and the message names each one. Exit `1` is a
    script error: stop and report its `code` and `message` rather than
    hand-assembling a prompt.
-3. Run `pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree>
-   -PromptFile <the receipt's promptPath> -OutFile <out>` with the maximum tool timeout (10
-   minutes). For a large diff or Tier-3 scope, run in background and wait for
-   completion rather than truncating.
-4. Read `<out>`; success requires a non-empty structured result — a skill-native
-   status line or a verdict token, either vocabulary counts. Benign CLI
+3. Launch and poll — two separate calls, because no call ever waits for Codex.
+   Launch with `pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree
+   <worktree> -PromptFile <the receipt's promptPath> -OutFile <out>`, which
+   returns in seconds with a single-line JSON launch receipt carrying `runId`
+   and the absolute `outFile`. Then re-invoke `pwsh -NoProfile -File
+   .codex/codex-review.ps1 -Poll <runId>`, which also returns immediately, until
+   its `status` is `completed` or `failed`; `running` means keep polling. Every
+   call is bounded far below the host's 10-minute command cap, so a long review
+   is never killed and never needs a background run or a truncated scope. Only a
+   `completed` status guarantees `<out>` is fully written.
+4. After a `completed` status, read `<out>`; success requires a non-empty
+   structured result — a skill-native status line or a verdict token, either
+   vocabulary counts. Benign CLI
    notices/deprecations are not failures. Return the handoff plus the `<out>`
    path; the output file is the retained full critique — do not paste
    extra narration beyond the concise handoff into the session.
@@ -115,8 +122,11 @@ those steps, and even then present the cost to the user before implementing.
 
 ## Fallback
 
-If the helper fails or returns unusable output, stop and report
-`CODEX-UNAVAILABLE: <short reason>` with the unchanged target. This is a
+Genuine failure means a `failed` poll status, a non-zero script exit, or
+malformed output. Duration alone is never a `CODEX-UNAVAILABLE` cause: a run
+that stays `running` across many polls is progressing normally, so keep polling.
+On a genuine failure, stop and report `CODEX-UNAVAILABLE: <short reason>` with
+the unchanged target. This is a
 blocking failure: never dispatch a substitute reviewer automatically. Only
 explicit user authorization in the current session unblocks it, by routing the
 same unchanged assignment to the normal Opus `reviewer` subagent — or, if that
