@@ -1,13 +1,17 @@
 # Require the project executables, provision the checkout, resolve AgentHarness, mint an owner
 # token, and claim the harness lock.
-# The script never steals, never waits for a lock, and never touches a foreign owner's processes:
-# a blocked claim returns immediately with the holder record the claim itself printed.
+# A foreign owner is waited out, not stolen from: provisioning runs once and only the claim attempt
+# repeats until the wait budget expires, and nothing touches the holder's processes, heartbeat, or
+# claim. An expired wait reports the holder record the last claim attempt itself printed.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[Parameter(Mandatory)][string] $Session,
 	[string] $Key = 'default',
-	[string] $Configuration = 'Debug'
+	[string] $Configuration = 'Debug',
+	# Agents use the default; a short budget exists only so a test or scenario can reach the
+	# expired-wait outcome without waiting out the standard budget.
+	[ValidateRange(1, 500)][int] $WaitSeconds = 500
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +19,7 @@ Set-StrictMode -Version Latest
 
 $MaximumMessageLength = 256
 $MaximumOutputCharacters = 2048
+$PollMilliseconds = 5000
 
 $result = [ordered]@{
 	schemaVersion = 'broken-engine-harness-claim/v1'
@@ -151,49 +156,64 @@ try {
 	}
 	$result.owner = $owner
 
-	$claim = Invoke-NativeCapture $agentHarness @(
-		'lock', 'claim', '--key', $Key, '--owner', $owner, '--session', $Session, '--worktree', $root)
-	$record = ConvertFrom-LockOutput $claim.Stdout
-	if ($claim.ExitCode -eq 0) {
-		if ($null -eq $record) {
-			Complete-HarnessClaim 1 'error' 'claim.metadata-unreadable' 'AgentHarness claimed the lock but did not print a readable lock record.'
-		}
-		$result.claim = $record
-		Complete-HarnessClaim 0 'pass' 'ok' "Harness lock '$Key' claimed by owner $owner."
-	}
-	if ($claim.ExitCode -eq 2) {
-		# lock claim prints the held record itself, so the holder needs no second lock status call.
-		$claimedAt = Get-LockField $record 'claimedAt'
-		# ConvertFrom-Json turns an ISO-8601 timestamp into [datetime], so both forms are normalized here.
-		$claimedUtc = $null
-		if ($claimedAt -is [datetime]) {
-			$claimedUtc = ([datetime]$claimedAt).ToUniversalTime()
-		}
-		elseif ($claimedAt -is [string]) {
-			try {
-				$claimedUtc = [datetime]::Parse($claimedAt, [cultureinfo]::InvariantCulture,
-					[Globalization.DateTimeStyles]::AdjustToUniversal -bor [Globalization.DateTimeStyles]::AssumeUniversal)
+	# Only the claim attempt repeats: provisioning, the harness path, and the owner token above stay
+	# valid for the whole wait, and the same owner token reclaims after each foreign-owner refusal.
+	$stopwatch = [Diagnostics.Stopwatch]::StartNew()
+	$deadlineMilliseconds = $WaitSeconds * 1000
+	$attempts = 0
+	while ($true) {
+		$attempts++
+		$claim = Invoke-NativeCapture $agentHarness @(
+			'lock', 'claim', '--key', $Key, '--owner', $owner, '--session', $Session, '--worktree', $root)
+		$record = ConvertFrom-LockOutput $claim.Stdout
+		if ($claim.ExitCode -eq 0) {
+			if ($null -eq $record) {
+				Complete-HarnessClaim 1 'error' 'claim.metadata-unreadable' 'AgentHarness claimed the lock but did not print a readable lock record.'
 			}
-			catch { $claimedUtc = $null }
+			$result.claim = $record
+			Complete-HarnessClaim 0 'pass' 'ok' "Harness lock '$Key' claimed by owner $owner after $attempts attempt(s)."
 		}
-		$holdSeconds = $null
-		$claimedAtText = [string]$claimedAt
-		if ($null -ne $claimedUtc) {
-			$holdSeconds = [Math]::Round(([datetime]::UtcNow - $claimedUtc).TotalSeconds, 3)
-			$claimedAtText = $claimedUtc.ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [cultureinfo]::InvariantCulture)
+		if ($claim.ExitCode -ne 2) {
+			Complete-HarnessClaim 1 'error' 'claim.failed' "AgentHarness lock claim failed with exit $($claim.ExitCode): $($claim.Stderr)"
 		}
-		$result.currentOwner = [ordered]@{
-			owner = Get-LockField $record 'owner'
-			session = Get-LockField $record 'session'
-			worktree = Get-LockField $record 'worktree'
-			claimedAt = $claimedAtText
-			heartbeatAt = Get-LockField $record 'heartbeatAt'
-			holdSeconds = $holdSeconds
-			record = $record
-		}
-		Complete-HarnessClaim 2 'blocked' 'claim.foreign-owner' "Harness lock '$Key' is held by owner $(Get-LockField $record 'owner') since $claimedAtText ($holdSeconds seconds)."
+		# Sleeping a full interval past the deadline would wait longer than the promised budget.
+		$remainingMilliseconds = $deadlineMilliseconds - [int]$stopwatch.ElapsedMilliseconds
+		if ($remainingMilliseconds -le 0) { break }
+		Start-Sleep -Milliseconds ([Math]::Min($PollMilliseconds, $remainingMilliseconds))
 	}
-	Complete-HarnessClaim 1 'error' 'claim.failed' "AgentHarness lock claim failed with exit $($claim.ExitCode): $($claim.Stderr)"
+
+	# The wait expired with the lock still held, so the last attempt's record describes the holder.
+	# lock claim prints the held record itself, so the holder needs no second lock status call.
+	$claimedAt = Get-LockField $record 'claimedAt'
+	# ConvertFrom-Json turns an ISO-8601 timestamp into [datetime], so both forms are normalized here.
+	$claimedUtc = $null
+	if ($claimedAt -is [datetime]) {
+		$claimedUtc = ([datetime]$claimedAt).ToUniversalTime()
+	}
+	elseif ($claimedAt -is [string]) {
+		try {
+			$claimedUtc = [datetime]::Parse($claimedAt, [cultureinfo]::InvariantCulture,
+				[Globalization.DateTimeStyles]::AdjustToUniversal -bor [Globalization.DateTimeStyles]::AssumeUniversal)
+		}
+		catch { $claimedUtc = $null }
+	}
+	$holdSeconds = $null
+	$claimedAtText = [string]$claimedAt
+	if ($null -ne $claimedUtc) {
+		$holdSeconds = [Math]::Round(([datetime]::UtcNow - $claimedUtc).TotalSeconds, 3)
+		$claimedAtText = $claimedUtc.ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [cultureinfo]::InvariantCulture)
+	}
+	$result.currentOwner = [ordered]@{
+		owner = Get-LockField $record 'owner'
+		session = Get-LockField $record 'session'
+		worktree = Get-LockField $record 'worktree'
+		claimedAt = $claimedAtText
+		heartbeatAt = Get-LockField $record 'heartbeatAt'
+		holdSeconds = $holdSeconds
+		record = $record
+	}
+	Complete-HarnessClaim 2 'blocked' 'claim.foreign-owner' ("Harness lock '$Key' is still held by owner $(Get-LockField $record 'owner') " +
+		"since $claimedAtText ($holdSeconds seconds) after waiting $WaitSeconds seconds over $attempts attempt(s).")
 }
 catch {
 	Complete-HarnessClaim 1 'error' 'internal.error' $_.Exception.Message
