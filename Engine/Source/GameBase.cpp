@@ -467,46 +467,42 @@ float GameBase::AdvanceRenderClock(double dT, bool bPaused, bool bHaveInterpolat
 	return fDeltaTime;
 }
 
-void GameBase::Render()
+bool GameBase::IsCoordRenderable(GridCoord coord) const
 {
-	const std::vector<GridCoord>& rActiveCoords = game::gpGame->mActiveCoords;
-
-	// Interpolate elapsed time with the sub-step remainder for smooth rendering
-	float fCurrentTime = mfCurrentTime + std::max(0.0f, common::NanosecondsToFloatSeconds<float>(mTimeStep.mTickRemainderNs));
-
 	// A coord is renderable only when its snapshot ring is populated (iSnapshotCount > 0). This two-condition
 	// check is the render-side invariant's definition — single-sourced here, used at every site below.
-	auto coordRenderable = [&](const GridCoord& rCoord)
-	{
-		auto it = mCoordFrames.find(rCoord);
-		return it != mCoordFrames.end() && it->second.iSnapshotCount > 0;
-	};
+	auto it = mCoordFrames.find(coord);
+	return it != mCoordFrames.end() && it->second.iSnapshotCount > 0;
+}
 
+void GameBase::SelectRenderCamera(const std::vector<GridCoord>& rActiveCoords, GridCoord& rCameraCoord, bool& rbHaveRenderableCamera) const
+{
 	// Camera coord fallback: use client coord if its ring is populated, else the first active coord with
 	// a populated (iSnapshotCount > 0) ring. bHaveRenderableCamera == false is the failed-reconnect case
 	// where every active coord (including mClientGridCoord) has an empty ring — no coord is renderable
 	// this frame, so the camera-anchored render-clock / interpolate / RenderFrame work below is skipped.
-	GridCoord cameraCoord = game::gpGame->mClientGridCoord;
-	bool bHaveRenderableCamera = false;
 	{
-		if (coordRenderable(cameraCoord))
+		if (IsCoordRenderable(rCameraCoord))
 		{
-			bHaveRenderableCamera = true;
+			rbHaveRenderableCamera = true;
 		}
 		else
 		{
 			for (const GridCoord& rCoord : rActiveCoords)
 			{
-				if (coordRenderable(rCoord))
+				if (IsCoordRenderable(rCoord))
 				{
-					cameraCoord = rCoord;
-					bHaveRenderableCamera = true;
+					rCameraCoord = rCoord;
+					rbHaveRenderableCamera = true;
 					break;
 				}
 			}
 		}
 	}
+}
 
+void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, bool bHaveRenderableCamera)
+{
 	// Per-frame render interpolates and camera update before RenderGlobal so that
 	// f4RenderVisibleArea and lighting area are computed from the current camera position
 	if (!rActiveCoords.empty())
@@ -553,7 +549,7 @@ void GameBase::Render()
 			// into RenderFrameMain (whose RenderFrame(coord) asserts iSnapshotCount > 0).
 			std::erase_if(mRenderInterpolates, [&](const std::pair<const GridCoord, game::FrameInterpolate>& rPair)
 			{
-				return !std::ranges::contains(rActiveCoords, rPair.first) || !coordRenderable(rPair.first);
+				return !std::ranges::contains(rActiveCoords, rPair.first) || !IsCoordRenderable(rPair.first);
 			});
 
 			// AllocateAndCopy + Update each active frame's render interpolate (camera frame first).
@@ -589,7 +585,7 @@ void GameBase::Render()
 				}
 				// Skip empty-ring coords: RenderFrame(rCoord) inside interpolateFrame asserts iSnapshotCount > 0
 				// (mirrors Islands::UpdateActiveIslands' empty-ring skip).
-				if (!coordRenderable(rCoord))
+				if (!IsCoordRenderable(rCoord))
 				{
 					continue;
 				}
@@ -624,7 +620,10 @@ void GameBase::Render()
 			}
 		}
 	}
+}
 
+bool GameBase::HandleDeferredSwapchain()
+{
 	// A swapchain recreate is deferred (window minimized / off-screen; mbSwapchainRecreateDeferred), OR the previous
 	// frame's tail acquire/present failed OUT_OF_DATE and only escalated meDestroyType (>= kSwapchain) without deferring:
 	// in both cases the swapchain is retired (or already torn down by a post-Destroy defer), miFramebufferIndex is stale,
@@ -682,6 +681,25 @@ void GameBase::Render()
 			// Timestamp AFTER the wait so the next iteration's remainder measures one full loop.
 			mMinimizedThrottleLast = std::chrono::steady_clock::now();
 		}
+		return true;
+	}
+	return false;
+}
+
+void GameBase::Render()
+{
+	const std::vector<GridCoord>& rActiveCoords = game::gpGame->mActiveCoords;
+
+	// Interpolate elapsed time with the sub-step remainder for smooth rendering
+	float fCurrentTime = mfCurrentTime + std::max(0.0f, common::NanosecondsToFloatSeconds<float>(mTimeStep.mTickRemainderNs));
+
+	GridCoord cameraCoord = game::gpGame->mClientGridCoord;
+	bool bHaveRenderableCamera = false;
+	SelectRenderCamera(rActiveCoords, cameraCoord, bHaveRenderableCamera);
+	UpdateRenderInterpolation(rActiveCoords, cameraCoord, bHaveRenderableCamera);
+
+	if (HandleDeferredSwapchain())
+	{
 		return;
 	}
 

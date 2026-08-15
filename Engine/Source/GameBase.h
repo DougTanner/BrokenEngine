@@ -220,6 +220,13 @@ public:
 	// it by const ref into Graphics::RenderMainPresentAcquire (Graphics never touches it). Kept here so
 	// storage and lifecycle share one object; the Frame/Frame.h include above supplies the complete type.
 	std::unordered_map<GridCoord, game::FrameInterpolate> mRenderInterpolates;
+
+private:
+
+	bool IsCoordRenderable(GridCoord coord) const;
+	void SelectRenderCamera(const std::vector<GridCoord>& rActiveCoords, GridCoord& rCameraCoord, bool& rbHaveRenderableCamera) const;
+	void UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, bool bHaveRenderableCamera);
+	bool HandleDeferredSwapchain();
 #endif // BT_CLIENT
 
 protected:
