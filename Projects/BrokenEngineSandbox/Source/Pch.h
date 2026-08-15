@@ -15,7 +15,7 @@ inline constexpr bool kbRecording = false;
 inline constexpr bool kbRenderDoc = true; // Compile-time gate for RenderDoc in-app capture; runtime activation still requires --renderdoc
 inline constexpr bool kbScreenshots = true;
 inline constexpr bool kbAgent = true; // Compile-time gate for the agent command layer; runtime activation still requires --agent-port
-inline constexpr bool kbVulkanPipelineCache = false; // DT: TODO Need Crc and/or fallback if corrupt true;
+inline constexpr bool kbVulkanPipelineCache = true;
 inline constexpr bool kbVulkanWireframe = false;
 inline constexpr bool kbFramebufferClearColor = kbVulkanWireframe;
 

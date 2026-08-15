@@ -344,11 +344,15 @@ DeviceManager::~DeviceManager()
 			eVkResult = vkGetPipelineCacheData(mVkDevice, mVkPipelineCache, &uiDataSize, cacheData.data());
 			if (eVkResult == VK_SUCCESS)
 			{
-				static_cast<void>(gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, "pipeline.cache", [&](std::fstream& rStream)
+				common::crc_t uiCrc = common::Crc(cacheData.data(), static_cast<int64_t>(uiDataSize));
+				if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, "pipeline.cache", [&](std::fstream& rStream)
 				{
+					rStream.write(reinterpret_cast<const char*>(&uiCrc), static_cast<std::streamsize>(sizeof(uiCrc)));
 					rStream.write(reinterpret_cast<const char*>(cacheData.data()), static_cast<std::streamsize>(uiDataSize));
-				}));
-				LOG(kGraphics, kDebug, "Saved pipeline cache ({} bytes)", uiDataSize);
+				}))
+				{
+					LOG(kGraphics, kDebug, "Saved pipeline cache ({} bytes)", uiDataSize);
+				}
 			}
 			else
 			{
@@ -381,6 +385,8 @@ DeviceManager::~DeviceManager()
 
 void DeviceManager::LoadPipelineCache()
 {
+	static constexpr int64_t kiMaxPipelineCacheBytes = 64 * 1024 * 1024;
+
 	if constexpr (kbVulkanPipelineCache)
 	{
 		VkPipelineCacheCreateInfo vkPipelineCacheCreateInfo
@@ -392,38 +398,85 @@ void DeviceManager::LoadPipelineCache()
 			.pInitialData = nullptr,
 		};
 		std::vector<uint8_t> cacheData;
-		if (gpFileManager->Exists({FileFlags::kAppDataDirectory}, "pipeline.cache"))
+		bool bFileExists = false;
+		try
+		{
+			bFileExists = gpFileManager->Exists({FileFlags::kAppDataDirectory}, "pipeline.cache");
+		}
+		catch (const std::filesystem::filesystem_error&)
+		{
+			LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
+		}
+
+		if (bFileExists)
 		{
 			std::fstream fileStream = gpFileManager->OpenFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, "pipeline.cache");
-			fileStream.seekg(0, std::ios::end);
-			int64_t iSize = fileStream.tellg();
-			fileStream.seekg(0, std::ios::beg);
-			cacheData.resize(iSize);
-			fileStream.read(reinterpret_cast<char*>(cacheData.data()), iSize);
-
-			// Pre-validate header — NVIDIA logs a warning instead of silently discarding incompatible entries
-			bool bCompatible = false;
-			if (cacheData.size() >= sizeof(VkPipelineCacheHeaderVersionOne))
+			if (!fileStream.is_open())
 			{
-				VkPipelineCacheHeaderVersionOne header;
-				std::memcpy(&header, cacheData.data(), sizeof(header));
-				const VkPhysicalDeviceProperties& rProps = gpInstanceManager->mVkPhysicalDeviceProperties;
-				bCompatible = header.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
-					&& header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
-					&& header.vendorID == rProps.vendorID
-					&& header.deviceID == rProps.deviceID
-					&& std::memcmp(header.pipelineCacheUUID, rProps.pipelineCacheUUID, VK_UUID_SIZE) == 0;
-			}
-
-			if (bCompatible)
-			{
-				vkPipelineCacheCreateInfo.initialDataSize = cacheData.size();
-				vkPipelineCacheCreateInfo.pInitialData = cacheData.data();
-				LOG(kGraphics, kDebug, "Loaded pipeline cache ({} bytes)", iSize);
+				LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
 			}
 			else
 			{
-				LOG(kGraphics, kDebug, "Discarded incompatible pipeline cache ({} bytes)", iSize);
+				fileStream.seekg(0, std::ios::end);
+				int64_t iSize = fileStream.tellg();
+				if (!fileStream || iSize < 0)
+				{
+					LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
+				}
+				else if (iSize < static_cast<int64_t>(sizeof(common::crc_t) + sizeof(VkPipelineCacheHeaderVersionOne)) || iSize > kiMaxPipelineCacheBytes)
+				{
+					LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
+				}
+				else
+				{
+					fileStream.seekg(0, std::ios::beg);
+					if (!fileStream)
+					{
+						LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
+					}
+					else
+					{
+						cacheData.resize(static_cast<size_t>(iSize));
+						fileStream.read(reinterpret_cast<char*>(cacheData.data()), static_cast<std::streamsize>(iSize));
+						if (fileStream.gcount() != static_cast<std::streamsize>(iSize) || !fileStream)
+						{
+							LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
+						}
+						else
+						{
+							common::crc_t uiStoredCrc = 0;
+							std::memcpy(&uiStoredCrc, cacheData.data(), sizeof(uiStoredCrc));
+							const common::crc_t uiCrc = common::Crc(cacheData.data() + sizeof(uiStoredCrc), iSize - static_cast<int64_t>(sizeof(uiStoredCrc)));
+							if (uiCrc != uiStoredCrc)
+							{
+								LOG(kGraphics, kDebug, "Discarded pipeline cache with CRC mismatch ({} bytes)", iSize);
+							}
+							else
+							{
+								// Pre-validate header — NVIDIA logs a warning instead of silently discarding incompatible entries
+								VkPipelineCacheHeaderVersionOne header {};
+								std::memcpy(&header, cacheData.data() + sizeof(uiStoredCrc), sizeof(header));
+								const VkPhysicalDeviceProperties& rProps = gpInstanceManager->mVkPhysicalDeviceProperties;
+								const bool bCompatible = header.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
+									&& header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
+									&& header.vendorID == rProps.vendorID
+									&& header.deviceID == rProps.deviceID
+									&& std::memcmp(header.pipelineCacheUUID, rProps.pipelineCacheUUID, VK_UUID_SIZE) == 0;
+
+								if (bCompatible)
+								{
+									vkPipelineCacheCreateInfo.initialDataSize = static_cast<VkDeviceSize>(cacheData.size() - sizeof(uiStoredCrc));
+									vkPipelineCacheCreateInfo.pInitialData = cacheData.data() + sizeof(uiStoredCrc);
+									LOG(kGraphics, kDebug, "Loaded pipeline cache ({} bytes)", iSize);
+								}
+								else
+								{
+									LOG(kGraphics, kDebug, "Discarded incompatible pipeline cache ({} bytes)", iSize);
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 		CHECK_VK(vkCreatePipelineCache(mVkDevice, &vkPipelineCacheCreateInfo, nullptr, &mVkPipelineCache));
