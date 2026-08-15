@@ -57,20 +57,33 @@ output/behavior, what was repeated or worked around. No transcript text.>
 
 Session provenance (machine-local; not reproducible after cleanup):
 - Client: claude | codex
-- Session: <lowercase uuid>
+- Conversation session ID: <lowercase uuid on Claude, read from
+  CLAUDE_CODE_SESSION_ID in main's own session shell — a subagent shell reports
+  that subagent's own ID; none on Codex, whose transcripts /next-plan-review
+  discovers by bounded commit window>
+- Worktree/branch UUID: <lowercase uuid, the same one the Session branch and
+  Worktree lines carry — selection evidence only, never production proof>
 - Session branch: <claude|codex>/<uuid>
 - Worktree: <profile-relative locator, e.g. .claude\worktrees\<repo>\<uuid> —
   never an absolute path, so no home prefix enters the public repo>
-- Landing commit: `git log --diff-filter=A --format=%H -- <this plan path>`
+- Landing ref: the session branch above, whose tip is the session's final
+  commit and which survives exactly as long as the worktree recorded above.
+  Fallback once that branch is gone:
+  `git log --diff-filter=A --format=%H -- <this plan path>`, but a periodic
+  Plan-history squash can make it return an unrelated aggregate commit, so
+  review its result only when the commit is attributable to this session alone
+  (its diff limited to this session's files); never review an aggregate or
+  multi-session squash commit.
 - Run the review before /cleanup-worktrees removes this worktree: Codex
   transcript discovery requires the producing worktree to remain registered,
-  and Claude review requires the exact session id above.
+  and Claude review requires the exact conversation session ID above.
 
 ## Design
-In a new session, run `/next-plan-review <landing commit>` supplying the
-recorded client and session id, root-cause the friction from the proven
-transcript, then make the smallest fix inside the `## In scope` boundary below.
-If root-causing shows the fix lies outside that boundary, surface it for
+In a new session, run `/next-plan-review <landing ref>` supplying the recorded
+client and, on Claude, the recorded conversation session ID; a Codex review
+supplies the client and landing ref only. Root-cause the friction from the
+proven transcript, then make the smallest fix inside the `## In scope` boundary
+below. If root-causing shows the fix lies outside that boundary, surface it for
 re-planning instead of expanding scope.
 
 ## Critical files
@@ -78,7 +91,9 @@ re-planning instead of expanding scope.
   authorized fix boundary>
 
 ## In scope
-- Root-cause investigation via /next-plan-review with the recorded provenance
+- Root-cause investigation via /next-plan-review, run with the recorded
+  landing ref and client, plus, on Claude, the recorded conversation session
+  ID; a Codex review supplies the client and landing ref only
 - The smallest resulting fix, confined to <the files named above, naming
   sections/functions when the observed symptom already identifies them>
 
