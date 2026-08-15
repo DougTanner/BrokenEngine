@@ -18,10 +18,10 @@ and the landing confirmation belongs to `/finalize-changes`.
 ## Preconditions and selection
 
 Require a clean wrapper-created session worktree and derive the authoritative
-primary, baseline, owner, and provisioned WorktreeCli from
-`Get-AgentWorktreeSessionContext`. Missing tooling requires explicitly
-authorized primary maintenance through `/compile`. Never create/adopt a
-worktree or inspect machine-local claims directly.
+primary, baseline, and owner from `Get-AgentWorktreeSessionContext`, and the
+provisioned WorktreeCli from `Get-NextPlanContext`. Missing tooling requires
+explicitly authorized primary maintenance through `/compile`. Never create/adopt
+a worktree or inspect machine-local claims directly.
 
 - Bare invocation selects the oldest eligible Plan by immutable `createdUtc`,
   then normalized UTF-8 path.
@@ -152,12 +152,22 @@ above are themselves in scope: review once before running them, and again inside
 For each distinct issue, an `implementer` routes it through
 `/create-follow-up-plans` as a tooling-friction proposal, supplying the observed
 symptom with its citation plus the provenance block: client (the session-branch
-`claude`/`codex` prefix), session UUID, session branch, and a profile-relative
-worktree locator with the user-profile prefix stripped. Take those values from
-the `Get-NextPlanContext` result already resolved in Preconditions and
-selection, or from `git branch --show-current` and `git rev-parse --show-toplevel`.
-Never record a transcript file path or transcript text; reference the session by
-client and id only.
+`claude`/`codex` prefix), worktree/branch UUID, session branch, a
+profile-relative worktree locator with the user-profile prefix stripped, and, on
+Claude, the conversation session ID. Take the client, worktree/branch UUID,
+session branch, and worktree locator from the `Get-NextPlanContext` result
+already resolved in Preconditions and selection, or from
+`git branch --show-current` and `git rev-parse --show-toplevel`; those sources
+name the worktree only, so none of them yields the conversation session ID
+`/next-plan-review` needs to find a transcript. On Claude, main reads that
+conversation session ID from the `CLAUDE_CODE_SESSION_ID` environment variable
+in its own session shell when the friction is recorded — the value differs per
+conversation and resume, and a subagent shell reports that subagent's own ID —
+and passes it to the `implementer`. Codex sessions record no conversation
+session ID, because `/next-plan-review` discovers Codex transcripts by bounded
+commit window. Never record a transcript file path or transcript text; reference
+the session by client, worktree/branch UUID, and, on Claude, conversation
+session ID only.
 
 On completion or rejection, a friction Plan authored at that second checkpoint
 joins the landing commit alongside the `changedPaths` the claim-exit script
