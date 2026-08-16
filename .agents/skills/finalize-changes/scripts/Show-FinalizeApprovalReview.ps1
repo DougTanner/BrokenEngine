@@ -9,7 +9,8 @@
 # The landing route always passes -LaunchSmartGit, so a session landing always
 # attempts the launch and the window opens whenever SmartGit is available.
 # Without the switch it only previews the canonical command.
-# It never runs Git, mutates a ref, or claims a lock.
+# It runs Git only to expand an abbreviated supplied tip to its full commit ID,
+# and never mutates a ref or claims a lock.
 #
 # Contract: schema broken-engine-finalize-approval-review/v1. Unlike the mutating
 # scripts, every preview/launch outcome exits 0 and none report status pass — the
@@ -17,8 +18,9 @@
 # opened is the launch success path; unavailable/failed are non-blocking,
 # and the caller copies message and the exact manualCommand into the approval response while keeping the landing gate in
 # force. Only invalid input exits 1, with status error and a code naming the cause
-# (input.invalid for a malformed tip or fixture gate; internal.error for a primary
-# worktree that will not resolve). A clean identical post-confirmation rebase that
+# (input.invalid for a malformed tip, a tip that resolves to no commit, or a
+# fixture gate; internal.error for a primary worktree that will not resolve).
+# A clean identical post-confirmation rebase that
 # preserves the existing confirmation must not reopen the review tool the user
 # already saw: that path does not invoke this script at all. A material change
 # requiring a refreshed confirmation does invoke it again, against the newly
@@ -146,12 +148,22 @@ function Invoke-SmartGit
 
 try
 {
-	Assert-Input ($ApprovedTip -cmatch '^[0-9a-f]{40}$') 'ApprovedTip must be exactly 40 lowercase hexadecimal characters.'
+	# \z rather than $: .NET's $ also matches before a trailing newline, so a hex value carrying one would pass.
+	Assert-Input ($ApprovedTip -cmatch '^[0-9a-f]{8,40}\z') 'ApprovedTip must be 8 to 40 lowercase hexadecimal characters.'
 	if ($FixtureFailure -cne 'none' -or $script:HasFixtureSmartGitExecutable)
 	{
 		Assert-Input ($env:BROKEN_ENGINE_FINALIZE_APPROVAL_PREPARATION_FIXTURE -ceq '1') 'Fixture-only inputs require the finalization preparation fixture environment.'
 	}
 	$script:PrimaryIdentity = Get-FinalizeExistingWindowsIdentity $PrimaryWorktree 'Primary worktree'
+	# Only an abbreviated tip is expanded, here, so the SmartGit anchor always carries the full ID; a full
+	# 40-character tip keeps the unchanged path that never resolved it.
+	if ($ApprovedTip.Length -ne 40)
+	{
+		$expansion = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity, 'rev-parse', '--verify', '--quiet', "$ApprovedTip^{commit}") $script:PrimaryIdentity
+		$expandedTip = $expansion.Stdout.Trim()
+		Assert-Input ($expansion.ExitCode -eq 0 -and $expandedTip -cmatch '^[0-9a-f]{40}\z') "ApprovedTip '$ApprovedTip' does not resolve to exactly one commit."
+		$ApprovedTip = $expandedTip
+	}
 
 	Invoke-SmartGit
 }

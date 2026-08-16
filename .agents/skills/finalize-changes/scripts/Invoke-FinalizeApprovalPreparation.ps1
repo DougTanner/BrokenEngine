@@ -103,7 +103,7 @@ function Get-BoundedApprovalText([AllowNull()] $Value, [int] $Limit)
 
 function Get-ApprovalGitObjectId([AllowNull()] $Value)
 {
-	if ($null -ne $Value -and [string]$Value -cmatch '^[0-9a-f]{40}$') { return [string]$Value }
+	if ($null -ne $Value -and [string]$Value -cmatch '^[0-9a-f]{40}\z') { return [string]$Value }
 	return $null
 }
 
@@ -268,7 +268,8 @@ try
 {
 	foreach ($hash in @($ExpectedCurrentTip, $ExpectedPrimaryTip))
 	{
-		Assert-Input ($hash -cmatch '^[0-9a-f]{40}$') 'Commit inputs must be exactly 40 lowercase hexadecimal characters.'
+		# \z rather than $: .NET's $ also matches before a trailing newline, so a hex value carrying one would pass.
+		Assert-Input ($hash -cmatch '^[0-9a-f]{8,40}\z') 'Commit inputs must be 8 to 40 lowercase hexadecimal characters.'
 	}
 	Assert-Input ($verifiedCandidateCommitBound -eq $verifiedCandidateTreeBound) 'Verified candidate commit and tree must be supplied together.'
 	if ($verifiedCandidateCommitBound) {
@@ -290,6 +291,26 @@ try
 
 	$script:CurrentIdentity = Get-FinalizeExistingWindowsIdentity $CurrentWorktree 'Current worktree'
 	$script:PrimaryIdentity = Get-FinalizeExistingWindowsIdentity $PrimaryWorktree 'Primary worktree'
+	# Only abbreviated inputs are expanded, here, so every later comparison against Git output reads a full ID;
+	# a full 40-character input keeps the unchanged path that never resolved it.
+	$expandedTips = @()
+	foreach ($tip in @($ExpectedCurrentTip, $ExpectedPrimaryTip))
+	{
+		if ($tip.Length -eq 40)
+		{
+			$expandedTips += $tip
+			continue
+		}
+		$expansion = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity, 'rev-parse', '--verify', '--quiet', "$tip^{commit}") $script:CurrentIdentity
+		$expandedTip = $expansion.Stdout.Trim()
+		Assert-Input ($expansion.ExitCode -eq 0 -and $expandedTip -cmatch '^[0-9a-f]{40}\z') "Commit input '$tip' does not resolve to exactly one commit."
+		$expandedTips += $expandedTip
+	}
+	$ExpectedCurrentTip = $expandedTips[0]
+	$ExpectedPrimaryTip = $expandedTips[1]
+	$result.tips.originalSession = $ExpectedCurrentTip
+	$result.tips.primary = $ExpectedPrimaryTip
+	$script:OriginalTip = $ExpectedCurrentTip
 	Assert-Input (-not $script:CurrentIdentity.Equals($script:PrimaryIdentity, [StringComparison]::OrdinalIgnoreCase)) 'Approval preparation requires distinct session and primary worktrees.'
 	Assert-Input (Test-FinalizeGitSuccess $script:CurrentIdentity @('check-ref-format', '--branch', $CurrentBranch)) 'CurrentBranch is malformed.'
 	$script:SessionRef = "refs/heads/$CurrentBranch"

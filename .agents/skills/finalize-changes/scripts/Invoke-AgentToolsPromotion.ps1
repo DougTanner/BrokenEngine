@@ -101,7 +101,17 @@ try {
 		throw "PrimaryRoot must be the primary checkout with an ordinary .git directory: '$primaryRoot'."
 	}
 
-	if ($LandedCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'LandedCommit must be a full lowercase commit hash.' }
+	# \z rather than $: .NET's $ also matches before a trailing newline, so a hex value carrying one would pass.
+	if ($LandedCommit -cnotmatch '^[0-9a-f]{8,40}\z') { throw 'LandedCommit must be 8 to 40 lowercase hexadecimal characters.' }
+	# Only an abbreviated input is expanded, here, so the ancestry check, the stamp, and the receipt all carry the
+	# full ID; a full 40-character input keeps the unchanged path that never resolved it.
+	if ($LandedCommit.Length -ne 40) {
+		$expanded = @(& git -C $primaryRoot rev-parse --verify --quiet "$LandedCommit^{commit}")
+		if ($LASTEXITCODE -ne 0 -or $expanded.Count -ne 1 -or $expanded[0] -cnotmatch '^[0-9a-f]{40}\z') {
+			throw "LandedCommit '$LandedCommit' does not resolve to exactly one commit."
+		}
+		$LandedCommit = $expanded[0]
+	}
 	& git -C $primaryRoot merge-base --is-ancestor $LandedCommit HEAD
 	if ($LASTEXITCODE -ne 0) {
 		Complete-Promotion 2 'blocked' 'promotion.not-landed' "Landed commit '$LandedCommit' is not contained in the primary branch; promotion is impossible from an unlanded tree."

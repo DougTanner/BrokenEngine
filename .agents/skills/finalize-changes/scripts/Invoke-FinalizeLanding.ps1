@@ -97,7 +97,7 @@ function Get-BoundedLandingText([AllowNull()] $Value, [int] $Limit) {
 }
 
 function Get-LandingGitObjectId([AllowNull()] $Value) {
-	if ($null -ne $Value -and [string]$Value -cmatch '^[0-9a-f]{40}$') { return [string]$Value }
+	if ($null -ne $Value -and [string]$Value -cmatch '^[0-9a-f]{40}\z') { return [string]$Value }
 	return $null
 }
 
@@ -517,8 +517,9 @@ function Complete-LandedState {
 try {
 	if ($FixtureFailure -cne 'none' -and $env:BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE -cne '1') { Throw-Landing 1 'input.fixture-forbidden' 'Fixture-only inputs require the finalization workflow fixture environment.' }
 	if ($FixtureFailure -ceq 'bounded-diagnostic') { Throw-Landing 1 (('c' * 140)) (('m' * 600)) }
-	if ($ApprovedSessionCommit -cnotmatch '^[0-9a-f]{40}$' -or $ExpectedCurrentTip -cnotmatch '^[0-9a-f]{40}$' -or $ExpectedPrimaryTip -cnotmatch '^[0-9a-f]{40}$') {
-		Throw-Landing 1 'input.commit-invalid' 'Approved and expected commits must be lowercase 40-character object IDs.'
+	# \z rather than $: .NET's $ also matches before a trailing newline, so a hex value carrying one would pass.
+	if ($ApprovedSessionCommit -cnotmatch '^[0-9a-f]{8,40}\z' -or $ExpectedCurrentTip -cnotmatch '^[0-9a-f]{8,40}\z' -or $ExpectedPrimaryTip -cnotmatch '^[0-9a-f]{8,40}\z') {
+		Throw-Landing 1 'input.commit-invalid' 'Approved and expected commits must be 8 to 40 lowercase hexadecimal object ID characters.'
 	}
 	if ($ApprovedCandidateTree -cnotmatch '^[0-9a-f]{40}$') { Throw-Landing 1 'input.candidate-tree-invalid' 'ApprovedCandidateTree must be a lowercase 40-character object ID.' }
 	if (-not [string]::IsNullOrWhiteSpace($OwnerToken) -and $OwnerToken -cnotmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
@@ -530,6 +531,30 @@ try {
 	if (-not $script:CurrentIdentity.CommonDirectory.Equals($script:PrimaryIdentity.CommonDirectory, [StringComparison]::OrdinalIgnoreCase)) {
 		Throw-Landing 1 'identity.repository-mismatch' 'Session and primary worktrees do not share one Git common directory.'
 	}
+	# Only abbreviated inputs are expanded, here, so every later comparison against Git output reads a full ID;
+	# a full 40-character input keeps the unchanged path that never resolved it.
+	$expandedCommits = @()
+	foreach ($commit in @($ApprovedSessionCommit, $ExpectedCurrentTip, $ExpectedPrimaryTip)) {
+		if ($commit.Length -eq 40) {
+			$expandedCommits += $commit
+			continue
+		}
+		$expansion = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity.Worktree, 'rev-parse', '--verify', '--quiet', "$commit^{commit}") $script:CurrentIdentity.Worktree
+		$expandedCommit = $expansion.Stdout.Trim()
+		if ($expansion.ExitCode -ne 0 -or $expandedCommit -cnotmatch '^[0-9a-f]{40}\z') {
+			Throw-Landing 1 'input.commit-invalid' "Commit input '$commit' does not resolve to exactly one commit."
+		}
+		$expandedCommits += $expandedCommit
+	}
+	$ApprovedSessionCommit = $expandedCommits[0]
+	$ExpectedCurrentTip = $expandedCommits[1]
+	$ExpectedPrimaryTip = $expandedCommits[2]
+	$result.tips.approvedSession = $ApprovedSessionCommit
+	$result.tips.expectedCurrent = $ExpectedCurrentTip
+	$result.tips.expectedPrimary = $ExpectedPrimaryTip
+	$result.candidate.commit = $ApprovedSessionCommit
+	$script:LandingPrimaryTip = $ExpectedPrimaryTip
+	$script:LandingCommit = $ApprovedSessionCommit
 	$result.identities.currentWorktree = $script:CurrentIdentity.Worktree
 	$result.identities.primaryWorktree = $script:PrimaryIdentity.Worktree
 	$result.identities.gitCommonDirectory = $script:CurrentIdentity.CommonDirectory
