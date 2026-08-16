@@ -345,7 +345,7 @@ try {
 	Assert-True ($allConflictReturns.Count -eq 1 -and $emitterConflictReturns.Count -eq 1) 'LandingLockCommands centralizes conflict exits in emitter'
 	$revalidatedMetadataRouting = [regex]::IsMatch($recoverSource, '(?s)if\s*\(\s*revalidatedMetadata\s*!=\s*rMetadata\s*\)\s*\{\s*return\s+EmitLandingConflict\s*\(\s*rLocator\s*,\s*revalidatedMetadata\s*,\s*LandingRecordState::kReadable\s*\)\s*;\s*\}')
 	Assert-True $revalidatedMetadataRouting 'recover revalidation mismatch emits revalidated metadata'
-	$failedRereadPolicy = [regex]::IsMatch($recoverSource, '(?s)if\s*\(\s*!ReadMetadata\s*\(\s*rLocator\.path\s*,\s*revalidatedMetadata\s*\)\s*\)\s*\{\s*std::error_code\s+error\s*;\s*const\s+bool\s+bRevalidatedExists\s*=\s*std::filesystem::exists\s*\(\s*rLocator\.path\s*,\s*error\s*\)\s*;\s*return\s+EmitLandingConflict\s*\(\s*rLocator\s*,\s*rMetadata\s*,\s*!error\s*&&\s*!bRevalidatedExists\s*\?\s*LandingRecordState::kAbsent\s*:\s*LandingRecordState::kUnverifiable\s*\)\s*;\s*\}')
+	$failedRereadPolicy = [regex]::IsMatch($recoverSource, '(?s)if\s*\(\s*!ReadMetadata\s*\(\s*rLocator\.path\s*,\s*revalidatedMetadata\s*\)\s*\)\s*\{\s*std::error_code\s+error\s*;\s*const\s+bool\s+bRevalidatedExists\s*=\s*std::filesystem::exists\s*\(\s*(?:ExtendedLengthPath\s*\(\s*rLocator\.path\s*\)|rLocator\.path)\s*,\s*error\s*\)\s*;\s*return\s+EmitLandingConflict\s*\(\s*rLocator\s*,\s*rMetadata\s*,\s*!error\s*&&\s*!bRevalidatedExists\s*\?\s*LandingRecordState::kAbsent\s*:\s*LandingRecordState::kUnverifiable\s*\)\s*;\s*\}')
 	Assert-True $failedRereadPolicy 'recover failed re-read routes through absent or unverifiable policy'
 }
 catch {
