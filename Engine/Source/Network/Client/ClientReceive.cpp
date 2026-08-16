@@ -357,12 +357,19 @@ void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool
 				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 				if (mStateFlags & ClientStateFlags::kHasLastUpdateArrival)
 				{
-					int64_t iIntervalUs = std::chrono::duration_cast<std::chrono::microseconds>(now - mLastUpdateArrival).count();
-					// Server broadcast cadence is wall-scaled by the debug timescale; expect the scaled wall interval, not the fixed sim tick period
-					int64_t iExpectedMicroseconds = mTimeState.iExpectedUpdateIntervalMicroseconds;
-					int64_t iDeviation = std::abs(iIntervalUs - iExpectedMicroseconds);
-					mSmoothedJitterUs = iDeviation;
-					mSmoothedJitterUs.Update();
+					if (mStateFlags & ClientStateFlags::kSkipNextJitterInterval)
+					{
+						mStateFlags.Clear(ClientStateFlags::kSkipNextJitterInterval);
+					}
+					else
+					{
+						int64_t iIntervalUs = std::chrono::duration_cast<std::chrono::microseconds>(now - mLastUpdateArrival).count();
+						// Server broadcast cadence is wall-scaled by the debug timescale; expect the scaled wall interval, not the fixed sim tick period
+						int64_t iExpectedMicroseconds = mTimeState.iExpectedUpdateIntervalMicroseconds;
+						int64_t iDeviation = std::abs(iIntervalUs - iExpectedMicroseconds);
+						mSmoothedJitterUs = iDeviation;
+						mSmoothedJitterUs.Update();
+					}
 				}
 				mLastUpdateArrival = now;
 				mStateFlags.Set(ClientStateFlags::kHasLastUpdateArrival);

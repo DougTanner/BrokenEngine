@@ -27,6 +27,8 @@ Most receive handlers (full-state, coord-update, subscribe-accept) classify into
 
 The transport seeds pipeline RTT from the handshake wall-clock delta, then refines it from a client timestamp echoed in each coord update; a monotonic guard prevents duplicate processing during multi-frame ticks. Resends skip RTT/jitter processing because off-cadence arrivals would corrupt the interarrival jitter estimate. The game session consumes these measurements for clock correction; formulas live in `../../../../Documents/Architecture/Network.md`.
 
+Server-load reset starts a new timing-measurement epoch: clear the jitter history and arrival baseline, then discard the first interval after that baseline is re-established so pre-load wall time cannot affect post-load clock correction. Keep this reset at the load boundary; otherwise the new full-state tick seed can be paired with stale pacing data.
+
 When the clock check finds no `kActive` slot at all, it resets the latest-server-tick baseline to "no clock yet" and returns no correction. Keep that reset with the active-slot check: the baseline feeds the ceiling on how far the client may simulate, so a stale value left behind after the last subscription drops would clamp the simulation and freeze it until a new subscription catches up.
 
 ## Other

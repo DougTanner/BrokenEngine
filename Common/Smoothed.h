@@ -37,6 +37,11 @@ public:
 		miCount = std::min(miCount + 1, COUNT);
 	}
 
+	void Reset()
+	{
+		*this = Smoothed {};
+	}
+
 	VALUE_TYPE Get()
 	{
 		return mSmoothedValue;

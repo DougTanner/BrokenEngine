@@ -102,6 +102,7 @@ public:
 		kHasLastUpdateArrival     = 1 << 3,
 		kDesyncDebugMode          = 1 << 4,
 		kLoadNotificationReceived = 1 << 5,
+		kSkipNextJitterInterval   = 1 << 6,
 	};
 
 	ENetPeer* mpServerPeer = nullptr;

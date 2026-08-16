@@ -211,7 +211,7 @@ void ClientSession::Reconcile()
 		}
 		else
 		{
-			gpGame->mTimeStep.mTickRemainderNs += clockCorrectionNs;
+			gpGame->mTimeStep.mTickRemainderNs = std::max(0ns, gpGame->mTimeStep.mTickRemainderNs + clockCorrectionNs);
 		}
 	}
 	gpProfileManager->CpuStop(engine::kCpuTimerNetworkPollReconcile, engine::CpuStopFlags::kSmoothNow);

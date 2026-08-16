@@ -179,6 +179,9 @@ void ClientSessionRuntime::PollDiscovery()
 void ClientSessionRuntime::ResetForServerLoad()
 {
 	ResetClock();
+	mpClient->mSmoothedJitterUs.Reset();
+	mpClient->mStateFlags.Clear(Client::ClientStateFlags::kHasLastUpdateArrival);
+	mpClient->mStateFlags.Set(Client::ClientStateFlags::kSkipNextJitterInterval);
 	ClearSubscriptionState();
 	mpClient->ResetAllSlots();
 	mpClient->mReceivedFullStates.clear();
