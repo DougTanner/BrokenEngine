@@ -545,6 +545,49 @@ void Server::RecordContractViolation(int64_t iClientId, const char* pcReason, ui
 	}
 }
 
+bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPacketContract& rContract)
+{
+	ClientConnection* pClient = FindClient(rPacket.iClientId);
+	if (pClient == nullptr)
+	{
+		// Client removed mid-drain (an earlier violation disconnect purged it) — skip silently.
+		return false;
+	}
+
+	int64_t iFullSize = static_cast<int64_t>(rPacket.payload.size()) + 1; // + type byte (already stripped from payload)
+	if (rContract.iMaxSize == 0)
+	{
+		// Sentinel: not client-sendable (server->client, unknown, or debug-control on a non-debug server).
+		// RecordContractViolation may remove the client — do not touch pClient afterward.
+		RecordContractViolation(rPacket.iClientId, "game type not client-sendable", rPacket.uiPacketType, iFullSize);
+		return false;
+	}
+	if (iFullSize < rContract.iMinSize || iFullSize > rContract.iMaxSize)
+	{
+		RecordContractViolation(rPacket.iClientId, "game packet size out of range", rPacket.uiPacketType, iFullSize);
+		return false;
+	}
+	// Per-type per-tick cap. tickTypeCounts is reset once per update by the engine (both of the update's polls
+	// share the window); engine and game types occupy disjoint type-byte ranges, so sharing one array across
+	// both dispatch points is coherent within that window.
+	if (++pClient->tickTypeCounts[rPacket.uiPacketType] > rContract.iMaxPerTick)
+	{
+		if (rContract.bOverCapCountsViolation)
+		{
+			RecordContractViolation(rPacket.iClientId, "game packet per-tick cap exceeded", rPacket.uiPacketType, iFullSize);
+		}
+		return false; // drop
+	}
+
+	return true;
+}
+
+void Server::RecordGamePacketHandlerThrow(const ReceivedGamePacket& rPacket)
+{
+	// Count the throw as a contract violation (drop -> count -> escalate). Do not touch any client pointer afterward.
+	RecordContractViolation(rPacket.iClientId, "game packet handler threw", rPacket.uiPacketType, static_cast<int64_t>(rPacket.payload.size()) + 1);
+}
+
 } // namespace engine
 
 #endif // BT_SERVER

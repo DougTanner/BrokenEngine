@@ -103,6 +103,114 @@ void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::jso
 	rResult["pendingFlagshipUpdateCount"] = std::ssize(gpServerSession->mpFleetManager->mNavigation.mPendingFlagshipUpdates);
 }
 
+void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
+{
+	if (!rParams.is_object())
+	{
+		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
+	}
+	if (rParams.size() != 1)
+	{
+		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
+	}
+	if (!rParams.contains("case"))
+	{
+		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
+	}
+	if (!rParams.at("case").is_string())
+	{
+		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
+	}
+
+	const std::string caseName = rParams.at("case").get<std::string>();
+	if (caseName != "server_only" && caseName != "undersized" && caseName != "oversized" && caseName != "over_cap")
+	{
+		throw std::runtime_error("game_packet_fault_fixture 'case' must be server_only|undersized|oversized|over_cap");
+	}
+
+	int64_t iClientId = 0;
+	int64_t iHandshakenClientCount = 0;
+	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
+	{
+		if (rClient.bHandshakeComplete)
+		{
+			iClientId = rClient.iClientId;
+			++iHandshakenClientCount;
+		}
+	}
+	if (iHandshakenClientCount != 1)
+	{
+		throw std::runtime_error("game_packet_fault_fixture requires exactly one handshaken client");
+	}
+
+	GamePacketType eType = GamePacketType::kClientUpdatePlayerRequest;
+	int64_t iPayloadSize = 0;
+	int64_t iFullSize = 1;
+	int64_t iEntryCount = 1;
+	if (caseName == "server_only")
+	{
+		eType = GamePacketType::kServerAssignPlayer;
+	}
+	else if (caseName == "undersized")
+	{
+		iPayloadSize = 12;
+		iFullSize = 13;
+	}
+	else if (caseName == "oversized")
+	{
+		iPayloadSize = 14;
+		iFullSize = 15;
+	}
+	else
+	{
+		iPayloadSize = 13;
+		iEntryCount = 9;
+		iFullSize = 14;
+	}
+
+	// AfterNetworkPoll has consumed real disconnects from the first poll. The agent drain admits only one command
+	// before the next poll, so clear the retained range before the fixture parser can append its own notification.
+	engine::gpServer->mPendingDisconnects.clear();
+	engine::gpServer->mReceivedGamePackets.clear();
+	engine::gpServer->mReceivedGamePackets.reserve(static_cast<size_t>(iEntryCount));
+	if (caseName == "over_cap")
+	{
+		// Start the fixed burst at zero for its raw packet type; all other client counters remain unchanged.
+		engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
+		pClient->tickTypeCounts[static_cast<uint8_t>(GamePacketType::kClientUpdatePlayerRequest)] = 0;
+	}
+	if (caseName == "server_only")
+	{
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(0, 0)});
+	}
+	else if (caseName == "undersized")
+	{
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(12, 0)});
+	}
+	else if (caseName == "oversized")
+	{
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(14, 0)});
+	}
+	else
+	{
+		for (int64_t i = 0; i < 9; ++i)
+		{
+			engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(13, 0)});
+		}
+	}
+
+	gpServerSession->ParseReceivedGamePackets();
+	// Consume the fixture's game-layer disconnect bookkeeping before the next poll clears it.
+	gpServerSession->mpClientManager->Disconnects();
+
+	rResult["clientId"] = iClientId;
+	rResult["case"] = caseName;
+	rResult["type"] = static_cast<uint8_t>(eType);
+	rResult["payloadSize"] = iPayloadSize;
+	rResult["fullSize"] = iFullSize;
+	rResult["entryCount"] = iEntryCount;
+}
+
 void CommandPause(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!rParams.contains("paused") || !rParams.at("paused").is_boolean())
@@ -892,6 +1000,11 @@ bool ExecuteAgentCommandServer(std::string_view cmd, const nlohmann::json& rPara
 	if (cmd == "status")
 	{
 		CommandStatus(rParams, rResult);
+		return true;
+	}
+	if (cmd == "game_packet_fault_fixture")
+	{
+		CommandGamePacketFaultFixture(rParams, rResult);
 		return true;
 	}
 	if (cmd == "pause")

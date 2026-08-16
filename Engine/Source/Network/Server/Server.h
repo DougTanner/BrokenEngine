@@ -186,6 +186,9 @@ public:
 	std::vector<int64_t> mPendingResyncClientIds;
 	std::vector<ReceivedGamePacket> mReceivedGamePackets;
 
+	bool AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPacketContract& rContract);
+	void RecordGamePacketHandlerThrow(const ReceivedGamePacket& rPacket);
+
 	// Records a client->server contract violation; escalates to disconnect at kiContractViolationDisconnectCount.
 	// Callers MUST NOT touch their ClientConnection* afterward -- the client may have been removed.
 	void RecordContractViolation(int64_t iClientId, const char* pcReason, uint8_t uiPacketType, int64_t iSize);

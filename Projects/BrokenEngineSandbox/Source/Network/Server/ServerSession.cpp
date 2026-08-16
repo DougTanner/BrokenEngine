@@ -78,38 +78,10 @@ void ServerSession::ParseReceivedGamePackets()
 
 		// Contract gate (trust boundary): validate every game-range packet once before dispatch (drop -> count -> escalate).
 		// The per-case size checks and ValidateNavigationDelay clamps below remain as backstops.
-		engine::ClientConnection* pGateClient = engine::gpServer->FindClient(rPacket.iClientId);
-		if (pGateClient == nullptr)
+		const engine::ClientPacketContract contract = NetworkSessionContract::GetClientPacketContract(eType);
+		if (!engine::gpServer->AdmitGamePacket(rPacket, contract))
 		{
-			// Client removed mid-drain (an earlier violation disconnect purged it) — skip silently.
 			continue;
-		}
-
-		engine::ClientPacketContract contract = NetworkSessionContract::GetClientPacketContract(eType);
-		int64_t iFullSize = static_cast<int64_t>(rPacket.payload.size()) + 1; // + type byte (already stripped from payload)
-
-		if (contract.iMaxSize == 0)
-		{
-			// Sentinel: not client-sendable (server->client, unknown, or debug-control on a non-debug server).
-			// RecordContractViolation may remove the client — do not touch pClient afterward.
-			engine::gpServer->RecordContractViolation(rPacket.iClientId, "game type not client-sendable", rPacket.uiPacketType, iFullSize);
-			continue;
-		}
-		if (iFullSize < contract.iMinSize || iFullSize > contract.iMaxSize)
-		{
-			engine::gpServer->RecordContractViolation(rPacket.iClientId, "game packet size out of range", rPacket.uiPacketType, iFullSize);
-			continue;
-		}
-		// Per-type per-tick cap. tickTypeCounts is reset once per update by the engine (both of the update's polls
-		// share the window); engine and game types occupy disjoint type-byte ranges, so sharing one array across
-		// both dispatch points is coherent within that window.
-		if (++pGateClient->tickTypeCounts[rPacket.uiPacketType] > contract.iMaxPerTick)
-		{
-			if (contract.bOverCapCountsViolation)
-			{
-				engine::gpServer->RecordContractViolation(rPacket.iClientId, "game packet per-tick cap exceeded", rPacket.uiPacketType, iFullSize);
-			}
-			continue; // drop
 		}
 
 		try
@@ -274,8 +246,7 @@ void ServerSession::ParseReceivedGamePackets()
 			// engine Server::Receive — so an uncaught throw would tear down ServerUpdate. Drop the single
 			// packet and continue, parity with Server::Receive/Client::Receive.
 			LOG(kNetwork, kDebug, "ServerSession::ParseReceivedGamePackets dropped corrupt packet (type {}) Client: {}: {}", static_cast<uint8_t>(eType), rPacket.iClientId, rException.what());
-			// Count the throw as a contract violation (drop -> count -> escalate). Do not touch any client pointer afterward.
-			engine::gpServer->RecordContractViolation(rPacket.iClientId, "game packet handler threw", rPacket.uiPacketType, static_cast<int64_t>(rPacket.payload.size()) + 1);
+			engine::gpServer->RecordGamePacketHandlerThrow(rPacket);
 		}
 	}
 }
