@@ -68,7 +68,10 @@ work. A focused correction/retest also uses an independent context.
 A worker ends its turn with the handoff as its final answer and never enters an
 open-ended wait after delivering it; continuation goes through the host's resume
 path. Any wait a worker issues mid-task carries a bounded timeout well under the
-host tool cap.
+host tool cap. Ending a turn to await one's own background child is that
+prohibited open-ended wait: a completion notification cannot resume a worker
+whose turn has ended, so capture the child's result in-turn before delivering
+the handoff.
 
 ## Whether a worker is still running, and interruption
 
