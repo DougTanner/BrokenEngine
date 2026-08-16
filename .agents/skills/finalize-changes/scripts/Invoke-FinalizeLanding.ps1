@@ -20,6 +20,8 @@ param(
 	# lease instead of minting one; omitted, a matching retained landing claim may be adopted.
 	[string] $OwnerToken,
 	[switch] $ReleasePlanClaim,
+	# Total seconds this landing may spend waiting out foreign primary index.lock contention.
+	[ValidateRange(1, 3600)][int] $IndexLockWaitSeconds = 500,
 	[ValidateSet('none', 'compare-and-swap', 'post-reset', 'bounded-diagnostic', 'retry-patch-mismatch')][string] $FixtureFailure = 'none'
 )
 
@@ -82,6 +84,11 @@ $script:FailureExitCode = 0
 $script:FailureCode = $null
 $script:FailureMessage = $null
 $script:LandingTransientOwner = $null
+# Waiting is accumulated across the whole invocation, not per operation: the guarded checkout runs up
+# to four times in one landing (advance and rollback restore, before and after the internal rebase),
+# so a per-call budget would let one run wait four times the bound its caller sized a timeout for.
+# The stopwatch is also the retry-path evidence: the projection emits a diagnostic when it ever ran.
+$script:IndexLockWait = [Diagnostics.Stopwatch]::new()
 
 function Get-BoundedLandingText([AllowNull()] $Value, [int] $Limit) {
 	if ($null -eq $Value) { return [pscustomobject]@{ Text = $null; Length = 0; Truncated = $false } }
@@ -111,6 +118,7 @@ function New-LandingProjection {
 	$code = Get-BoundedLandingText ([string]$result.code) 128
 	$diagnosticValues = [Collections.Generic.List[object]]::new()
 	if ($result.status -cne 'landed') { $diagnosticValues.Add([pscustomobject]@{ source = 'Invoke-FinalizeLanding'; code = $result.code; message = $result.message }) }
+	if ($script:IndexLockWait.Elapsed.TotalMilliseconds -gt 0) { $diagnosticValues.Add([pscustomobject]@{ source = 'Invoke-FinalizeLanding'; code = 'git.index-lock-wait'; message = "Foreign primary index.lock contention was waited out for $([int]$script:IndexLockWait.Elapsed.TotalSeconds) seconds." }) }
 	$diagnostics = New-LandingCollection $diagnosticValues.ToArray() {
 		param($entry)
 		$sourceValue = if ($entry.PSObject.Properties.Name -ccontains 'source') { [string]$entry.source } else { 'WorktreeCli' }
@@ -249,6 +257,40 @@ function Assert-PrimaryAdvanceState {
 	}
 }
 
+# git reports index.lock contention as a generic fatal with no distinct exit status, and probing for
+# the lock file cannot replace that text: the competing process normally releases the lock between
+# the failure and the probe, so the probe reads false for exactly the case worth retrying. On Git for
+# Windows this diagnostic is byte-stable English under any locale — no gettext catalogs ship and the
+# suffix comes from the CRT errno table — so an ordinal match is the reliable signal, and a false
+# negative only restores today's terminal result.
+function Test-LandingIndexLockContention($Response) {
+	$text = "$($Response.Stderr)$($Response.Stdout)"
+	return $text.Contains('index.lock', [StringComparison]::Ordinal) -and $text.Contains('File exists', [StringComparison]::Ordinal)
+}
+
+# The primary checkout update is idempotent, so a foreign process briefly holding the primary
+# index.lock is waited out rather than turned into a failed landing. Git's own response is returned
+# unchanged once the budget is spent, so an exhausted wait fails exactly as it does today.
+function Invoke-LandingPrimaryCheckout([string] $Commit) {
+	$arguments = @('-C', $script:PrimaryIdentity.Worktree, 'reset', '--hard', $Commit)
+	$response = Invoke-FinalizeNativeText 'git.exe' $arguments $script:PrimaryIdentity.Worktree
+	if ($response.ExitCode -eq 0 -or -not (Test-LandingIndexLockContention $response)) { return $response }
+	$budgetMilliseconds = $IndexLockWaitSeconds * 1000
+	$script:IndexLockWait.Start()
+	try {
+		while ($script:IndexLockWait.Elapsed.TotalMilliseconds -lt $budgetMilliseconds) {
+			# The last sleep is clamped to what the budget still allows, so the accumulated wait lands on
+			# the bound instead of one poll interval past it, and the attempt it pays for still runs.
+			$remaining = $budgetMilliseconds - $script:IndexLockWait.Elapsed.TotalMilliseconds
+			Start-Sleep -Milliseconds ([int][Math]::Min(500, [Math]::Ceiling($remaining)))
+			$response = Invoke-FinalizeNativeText 'git.exe' $arguments $script:PrimaryIdentity.Worktree
+			if ($response.ExitCode -eq 0 -or -not (Test-LandingIndexLockContention $response)) { return $response }
+		}
+	}
+	finally { $script:IndexLockWait.Stop() }
+	return $response
+}
+
 # Returns $false only for a lost compare-and-swap, which means primary moved under the held lease
 # and the caller may rebase once; every other failure is terminal for this landing.
 function Advance-PrimaryExactCandidate {
@@ -261,7 +303,7 @@ function Advance-PrimaryExactCandidate {
 	$result.tips.current = $script:LandingCommit
 	$result.tips.primary = $script:LandingCommit
 	try {
-		$reset = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'reset', '--hard', $script:LandingCommit) $script:PrimaryIdentity.Worktree
+		$reset = Invoke-LandingPrimaryCheckout $script:LandingCommit
 		if ($reset.ExitCode -ne 0) { throw "Primary checkout did not update to the exact candidate: $($reset.Stderr.Trim())" }
 		if ($FixtureFailure -ceq 'post-reset') { throw 'Fixture forced post-reset failure.' }
 		$actual = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim()
@@ -272,7 +314,7 @@ function Advance-PrimaryExactCandidate {
 		$reason = $_.Exception.Message
 		$rollback = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $script:LandingPrimaryTip, $script:LandingCommit) $script:PrimaryIdentity.Worktree
 		if ($rollback.ExitCode -ne 0) { Throw-Landing 1 'git.rollback-failed' "Exact candidate advance postcondition failed and guarded rollback failed: $reason" }
-		$restore = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'reset', '--hard', $expectedCheckout) $script:PrimaryIdentity.Worktree
+		$restore = Invoke-LandingPrimaryCheckout $expectedCheckout
 		if ($restore.ExitCode -ne 0 -or (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim() -cne $script:LandingPrimaryTip -or (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', 'HEAD')).Trim() -cne $expectedCheckout -or (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('status', '--porcelain=v1', '-z', '--untracked-files=all')) -cne $expectedStatus) { Throw-Landing 1 'git.rollback-failed' "Exact candidate advance rollback did not restore the expected primary checkout: $reason" }
 		$result.primaryAdvanced = $false
 		Throw-Landing 2 'candidate.postcondition-failed' $reason

@@ -993,6 +993,76 @@ if ($null -ne $persistent.Json) {
 }
 Remove-Item -LiteralPath $persistentDirtyPath -Force -ErrorAction SilentlyContinue
 
+# A foreign process holding the primary index.lock only briefly must be waited out instead of ending
+# the landing. The lock is released only after the compare-and-swap advanced primary, which is the
+# statement immediately before the guarded checkout, so the checkout provably failed at least once.
+function Get-IndexLockWaitDiagnosticCount($Json) {
+	if ($null -eq $Json) { return -1 }
+	return @($Json.diagnostics.items | Where-Object { $_.code -ceq 'git.index-lock-wait' }).Count
+}
+
+$primaryIndexLockPath = Join-Path $primary '.git\index.lock'
+$transientLockCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'transient index lock tail') 'transient-index-lock'
+[IO.File]::WriteAllText($primaryIndexLockPath, '', [Text.UTF8Encoding]::new($false))
+$transientLockStarted = Start-JsonScriptWithSplat $landingScript (New-RetryLandingParameters $transientLockCandidate) $scratchBase
+$transientLockExitCode = $null
+$transientLockStdout = ''
+$transientLockStderr = ''
+try {
+	$transientLockDeadline = [DateTime]::UtcNow.AddSeconds(120)
+	while ([DateTime]::UtcNow -lt $transientLockDeadline -and -not $transientLockStarted.Process.WaitForExit(0) -and
+		((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -cne $transientLockCandidate.Commit) {
+		Start-Sleep -Milliseconds 25
+	}
+	Start-Sleep -Milliseconds 1200
+	Remove-Item -LiteralPath $primaryIndexLockPath -Force -ErrorAction SilentlyContinue
+	if ($transientLockStarted.Process.WaitForExit(120000)) { $transientLockExitCode = $transientLockStarted.Process.ExitCode }
+	$transientLockStdout = $transientLockStarted.StdoutTask.GetAwaiter().GetResult()
+	$transientLockStderr = $transientLockStarted.StderrTask.GetAwaiter().GetResult()
+}
+finally { Stop-JsonScript $transientLockStarted }
+Remove-Item -LiteralPath $primaryIndexLockPath -Force -ErrorAction SilentlyContinue
+$transientLockJson = $null
+try { if (-not [string]::IsNullOrWhiteSpace($transientLockStdout)) { $transientLockJson = $transientLockStdout.Trim() | ConvertFrom-Json -Depth 100 -ErrorAction Stop } } catch { }
+$transientLock = [pscustomobject]@{ ExitCode = $transientLockExitCode; Json = $transientLockJson; Text = $transientLockStdout.Trim(); Stderr = $transientLockStderr }
+Assert-Outcome $transientLock 'landing-waits-out-transient-primary-index-lock' 0 'landed' 'ok'
+if ($null -ne $transientLock.Json) {
+	Assert-True ($transientLock.Json.landed.commit -ceq $transientLockCandidate.Commit -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $transientLockCandidate.Commit) 'a waited-out index lock still lands the confirmed candidate on primary'
+	Assert-True ((Get-IndexLockWaitDiagnosticCount $transientLock.Json) -eq 1 -and $transientLock.Json.diagnostics.totalCount -eq 1) 'a landed run that waited reports exactly one index-lock-wait diagnostic'
+}
+
+# Contention outliving the budget must still fail truthfully: the rollback restore is refused by the
+# same lock, so the terminal result reports the unrestored checkout and lands nothing.
+$persistentLockCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'persistent index lock tail') 'persistent-index-lock'
+$persistentLockPrimaryBefore = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+[IO.File]::WriteAllText($primaryIndexLockPath, '', [Text.UTF8Encoding]::new($false))
+$persistentLockParameters = New-RetryLandingParameters $persistentLockCandidate
+$persistentLockParameters.IndexLockWaitSeconds = 1
+$persistentLock = Invoke-JsonScriptWithSplat $landingScript $persistentLockParameters $scratchBase
+Remove-Item -LiteralPath $primaryIndexLockPath -Force -ErrorAction SilentlyContinue
+Assert-Outcome $persistentLock 'landing-fails-truthfully-on-persistent-primary-index-lock' 1 'error' 'git.rollback-failed'
+if ($null -ne $persistentLock.Json) {
+	Assert-True ($persistentLock.Json.primaryAdvanced -and $null -eq $persistentLock.Json.landed.commit -and $null -eq $persistentLock.Json.landed.tree) 'an exhausted index-lock wait reports the advance truthfully and lands nothing'
+	Assert-True ((Get-IndexLockWaitDiagnosticCount $persistentLock.Json) -eq 1) 'an exhausted index-lock wait reports its one index-lock-wait diagnostic'
+}
+Invoke-ScratchGit $primary @('reset','--hard',$persistentLockPrimaryBefore) | Out-Null
+Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
+
+# The wait is for index.lock contention alone: a checkout git refuses for any other reason stays a
+# first-attempt failure, so an unwritable tracked file is never retried.
+$openFileCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'open file tail') 'open-file-checkout'
+$openFilePrimaryBefore = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+$openFileHandle = [IO.FileStream]::new((Join-Path $primary 'retry-file.txt'), [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+try { $openFile = Invoke-JsonScriptWithSplat $landingScript (New-RetryLandingParameters $openFileCandidate) $scratchBase }
+finally { $openFileHandle.Dispose() }
+Assert-True ($null -ne $openFile.Json) 'open-file checkout failure emitted JSON'
+if ($null -ne $openFile.Json) {
+	Assert-True ($openFile.ExitCode -ne 0 -and @('error','blocked') -ccontains $openFile.Json.status) 'a checkout failure git does not attribute to index.lock still fails the landing'
+	Assert-True ((Get-IndexLockWaitDiagnosticCount $openFile.Json) -eq 0) 'a non-lock checkout failure reports no index-lock-wait diagnostic'
+}
+Invoke-ScratchGit $primary @('reset','--hard',$openFilePrimaryBefore) | Out-Null
+Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
+
 Write-Host ''
 if ($script:Failures.Count -gt 0) {
 	Write-Host "Finalize workflow fixtures FAILED ($($script:Failures.Count) assertion(s))."
