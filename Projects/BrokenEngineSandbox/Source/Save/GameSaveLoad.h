@@ -16,10 +16,6 @@ class GameSaveLoad
 {
 public:
 
-	static constexpr int64_t kiReplayCrcRecordUpdates = 64;
-	static constexpr int64_t kiReplayCrcMaxSamples = 65;
-	static constexpr int64_t kiReplayCrcReadPageLimit = 256;
-
 	enum class ReplayPersistenceFailurePoint : uint8_t
 	{
 		kNone,
@@ -44,42 +40,6 @@ public:
 		int64_t iBlasterCount = 0;
 		int64_t iMissileCount = 0;
 		int64_t iPauseAfterWriterInputCount = -1;
-	};
-
-	// Server-only diagnostic samples; these never enter the replay stream, Frame CRC, or persisted state.
-	enum class ReplayCrcCapturePhase : uint8_t
-	{
-		kIdle,
-		kArmed,
-		kWriter,
-		kWriterComplete,
-		kReader,
-		kReaderComplete,
-	};
-
-	enum class ReplayCrcCaptureFlags : uint8_t
-	{
-		kComplete      = 1 << 0,
-		kOverflow      = 1 << 1,
-		kAppendEnabled = 1 << 2,
-	};
-	using ReplayCrcCaptureFlags_t = common::Flags<ReplayCrcCaptureFlags>;
-
-	struct ReplayCrcCaptureSample
-	{
-		int64_t iTick = 0;
-		common::crc_t uiCrc = 0;
-	};
-
-	struct ReplayCrcCaptureInfo
-	{
-		ReplayCrcCapturePhase ePhase = ReplayCrcCapturePhase::kIdle;
-		ReplayCrcCaptureFlags_t flags {};
-		int64_t iCapacity = kiReplayCrcMaxSamples;
-		int64_t iSampleCount = 0;
-		int64_t iNormalSampleCount = 0;
-		engine::GridCoord coord {};
-		std::array<ReplayCrcCaptureSample, kiReplayCrcMaxSamples> samples {};
 	};
 
 	ReplayTransferCaptureInfo mReplayTransferCaptureInfo;
@@ -107,9 +67,6 @@ public:
 	void RetainReplayEndFrame(engine::GridCoord coord, std::unique_ptr<game::Frame>& rpFrame);
 	bool DropRetainedReplayEndFrame(engine::GridCoord coord);
 	bool ArmReplayPersistenceFailure(ReplayPersistenceFailurePoint eFailurePoint, engine::GridCoord coord = {});
-	void ArmReplayCrcCapture(engine::GridCoord coord);
-	void ClearReplayCrcCapture();
-	const ReplayCrcCaptureInfo& GetReplayCrcCaptureInfo() const { return mReplayCrcCaptureInfo; }
 
 	const std::unordered_map<engine::GridCoord, std::unique_ptr<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>>& GetReplayReaders() const { return mReplayReaders; }
 
@@ -147,7 +104,6 @@ private:
 	std::unordered_map<engine::GridCoord, ReplayWriterState> mReplayWriters;
 	std::unordered_map<engine::GridCoord, std::unique_ptr<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>> mReplayReaders;
 	std::unordered_map<engine::GridCoord, PendingReplayReader> mPendingReplayReaders;
-	ReplayCrcCaptureInfo mReplayCrcCaptureInfo;
 	int64_t miReplayInitialTick = 0;
 	ReplayPersistenceFailurePoint meReplayPersistenceFailurePoint = ReplayPersistenceFailurePoint::kNone;
 	engine::GridCoord mReplayPersistenceFailureCoord {};
@@ -156,9 +112,6 @@ private:
 	game::FrameInput ComposeReplayInput(const game::FrameInput& rLiveInput, ReplayWriterState& rWriterState);
 	bool UpdateTerminalReplayWriter(engine::GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame);
 	void ActivateReplayReader(engine::GridCoord coord, PendingReplayReader&& rPendingReader);
-	void AppendReplayCrcSample(engine::GridCoord coord, int64_t iTick, common::crc_t uiCrc, bool bTerminal);
-	void BeginReplayCrcReaderCapture();
-	void CompleteReplayCrcReader(engine::GridCoord coord);
 };
 
 } // namespace game
