@@ -457,6 +457,10 @@ try {
 		$result.status = 'needs-selection'
 		$result.code = 'transcript.needs-selection'
 		$result.message = 'Multiple root transcripts matched; select one from the reported evidence and prove production.'
+		# A multi-candidate listing must stay under host tool-output limits, because truncation there
+		# destroys candidate boundaries, so only the count is reported; the full descendant list
+		# appears only on a single-candidate pass.
+		foreach ($candidate in $orderedCandidates) { $candidate.descendants = $null }
 		Write-Result $result 2
 	}
 	$result.status = 'pass'

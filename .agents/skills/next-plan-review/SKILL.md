@@ -40,7 +40,14 @@ skill dispatches its required fresh reviewer.
    helper is missing, blocked, or returns no result; a transcript the default
    commit-window search cannot reach requires an exact session ID from the user.
 
-   Act only on the finder's result. `status: pass` and `status: needs-selection`
+   Act only on the finder's result: assign that single documented invocation's
+   parsed output to a variable
+   (`$finder = pwsh -NoProfile -File ... | ConvertFrom-Json`), read the finder's
+   native exit code from that same invocation before any further processing, and
+   take `status`, the candidates, and every other field from the parsed object —
+   never from formatted or raw console text, so candidate boundaries survive host
+   output limits.
+   `status: pass` and `status: needs-selection`
    proceed; anything else — `transcript.not-found`, a structured read error, or
    a result that disagrees with the exit code — is `BLOCKED`, and never a reason
    to broaden into a home-directory content search. `needs-selection` is not
@@ -62,7 +69,9 @@ skill dispatches its required fresh reviewer.
    parent delegation event and fixed return window. Do not use the finder or
    its `descendants` list as inventory authority: it is discovery metadata
    recording a *claimed* relationship, while the parent delegation event this
-   step requires lives in the parent's own `sub_agent_activity` records.
+   step requires lives in the parent's own `sub_agent_activity` records. A
+   `needs-selection` listing reports `descendantCount` only; the full
+   `descendants` list appears only on a single-candidate `pass` result.
    Ambiguous parentage blocks transcript conclusions.
 
 When a tooling-friction follow-up Plan records session provenance, its client and

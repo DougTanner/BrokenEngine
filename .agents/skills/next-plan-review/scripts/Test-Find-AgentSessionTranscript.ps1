@@ -13,14 +13,20 @@ function Invoke-Git([string] $Repository, [string[]] $Arguments) {
 	return $output
 }
 
-function New-Transcript([string] $Path, [string] $SessionId, [string] $Cwd, [DateTimeOffset] $Start, [DateTimeOffset] $End, [DateTimeOffset] $LastWrite) {
+function New-Transcript([string] $Path, [string] $SessionId, [string] $Cwd, [DateTimeOffset] $Start, [DateTimeOffset] $End, [DateTimeOffset] $LastWrite, [string] $TranscriptId, [string] $AgentPath, [int] $Depth) {
 	$directory = Split-Path -Parent $Path
 	[void] (New-Item -ItemType Directory -Path $directory -Force)
+	# `session_id` is the root linkage; a descendant additionally carries its own `id` and spawn source.
+	$payload = [ordered]@{ cwd = $Cwd; session_id = $SessionId }
+	if (-not [string]::IsNullOrWhiteSpace($TranscriptId)) { $payload['id'] = $TranscriptId }
+	if (-not [string]::IsNullOrWhiteSpace($AgentPath)) {
+		$payload['source'] = [ordered]@{ subagent = [ordered]@{ thread_spawn = [ordered]@{ agent_path = $AgentPath; depth = $Depth } } }
+	}
 	$records = @(
 		[ordered]@{
 			timestamp = $Start.ToString('O')
 			type = 'session_meta'
-			payload = [ordered]@{ cwd = $Cwd; session_id = $SessionId }
+			payload = $payload
 		},
 		[ordered]@{
 			timestamp = $End.ToString('O')
@@ -152,6 +158,34 @@ try {
 	$response = Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions -SessionId $sessionId
 	Assert-Finder $response 0 'transcript.found'
 	Assert-True ($response.Result.candidate.sessionId -eq $sessionId) 'Exact SessionId lookup did not return the requested transcript.'
+	Assert-True ($null -eq $response.Result.candidate.descendants) 'Exact SessionId lookup unexpectedly reported descendants.'
+
+	$script:FixtureStage = 'descendant rollup on a single candidate'
+	$descendantEarlyStart = $commitTimestamp.AddMinutes(-20)
+	$descendantTiedStart = $commitTimestamp.AddMinutes(-10)
+	$descendantA = '0a0a0a0a-0a0a-0a0a-0a0a-0a0a0a0a0a0a'
+	$descendantB = '0b0b0b0b-0b0b-0b0b-0b0b-0b0b0b0b0b0b'
+	$descendantC = '0c0c0c0c-0c0c-0c0c-0c0c-0c0c0c0c0c0c'
+	foreach ($descendant in @(
+		@{ Id = $descendantA; AgentPath = '/root/child_a'; Start = $descendantTiedStart },
+		@{ Id = $descendantB; AgentPath = '/root/child_b'; Start = $descendantTiedStart },
+		@{ Id = $descendantC; AgentPath = '/root/child_c'; Start = $descendantEarlyStart }
+	)) {
+		$descendantPath = Join-Path $bucket "rollout-$($commitTimestamp.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-$($descendant.Id).jsonl"
+		New-Transcript -Path $descendantPath -SessionId $sessionId -Cwd $producing -Start $descendant.Start -End $coveringEnd -LastWrite $commitTimestamp -TranscriptId $descendant.Id -AgentPath $descendant.AgentPath -Depth 1
+	}
+	$response = Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions
+	Assert-Finder $response 0 'transcript.found'
+	Assert-True ($response.Result.candidate.sessionId -eq $sessionId) "[$script:FixtureStage] Descendant rollup did not return the root transcript."
+	Assert-True ($response.Result.candidate.descendantCount -eq 3) "[$script:FixtureStage] Expected three descendants, got $($response.Result.candidate.descendantCount)."
+	# Two descendants share a start, so this asserts sessionStartUtc primary ordering and the sessionId tiebreak.
+	$expectedDescendants = @(
+		"$descendantC`0/root/child_c`01",
+		"$descendantA`0/root/child_a`01",
+		"$descendantB`0/root/child_b`01"
+	)
+	$actualDescendants = @($response.Result.candidate.descendants | ForEach-Object { "$($_.sessionId)`0$($_.agentPath)`0$($_.depth)" })
+	Assert-True (($actualDescendants -join '|') -ceq ($expectedDescendants -join '|')) "[$script:FixtureStage] Descendant listing or ordering was wrong: $($actualDescendants -join '|')"
 
 	Clear-SessionStores @($sessions, $archivedSessions)
 	New-Transcript $transcript '23232323-2323-2323-2323-232323232323' $fixtureRoot $startBeforeCutoff $coveringEnd $commitTimestamp
@@ -194,6 +228,8 @@ try {
 	Clear-SessionStores @($sessions, $archivedSessions)
 	New-Transcript $transcript '66666666-6666-6666-6666-666666666666' $producing $startBeforeCutoff $coveringEnd $commitTimestamp
 	New-Transcript (Join-Path $bucket "rollout-$($commitTimestamp.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-77777777-7777-7777-7777-777777777777.jsonl") '77777777-7777-7777-7777-777777777777' $producing $startBeforeCutoff $coveringEnd $commitTimestamp
+	$listedDescendant = '0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d'
+	New-Transcript -Path (Join-Path $bucket "rollout-$($commitTimestamp.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-$($listedDescendant).jsonl") -SessionId '66666666-6666-6666-6666-666666666666' -Cwd $producing -Start $startBeforeCutoff -End $coveringEnd -LastWrite $commitTimestamp -TranscriptId $listedDescendant -AgentPath '/root/child_a' -Depth 1
 	$script:FixtureStage = 'multiple root candidates'
 	$response = Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions
 	Assert-Finder $response 2 'transcript.needs-selection'
@@ -208,6 +244,10 @@ try {
 		foreach ($evidenceField in @('startsBeforeAuthorUtc', 'commitHashMentions', 'descendantCount', 'descendants')) {
 			Assert-True ($null -ne $rootCandidate.PSObject.Properties[$evidenceField]) "[$script:FixtureStage] Root candidate is missing evidence field $evidenceField."
 		}
+		# A multi-candidate listing reports only the count, so the payload stays inside host output limits.
+		Assert-True ($null -eq $rootCandidate.descendants) "[$script:FixtureStage] Listed candidate $($rootCandidate.sessionId) unexpectedly carried a descendant list."
+		$expectedDescendantCount = if ($rootCandidate.sessionId -ceq '66666666-6666-6666-6666-666666666666') { 1 } else { 0 }
+		Assert-True ($rootCandidate.descendantCount -eq $expectedDescendantCount) "[$script:FixtureStage] Candidate $($rootCandidate.sessionId) reported descendantCount $($rootCandidate.descendantCount), expected $expectedDescendantCount."
 	}
 	Assert-True (-not [string]::IsNullOrWhiteSpace($response.Result.commit.authoredUtc)) 'Result did not report the commit author timestamp.'
 
