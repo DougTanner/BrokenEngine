@@ -72,8 +72,10 @@ every other lease is foreign.
 1. When a claimed Plan finished, run final preparation first: `plan complete`,
    or `plan reject --user-authorized-rejection` after explicit user-authorized
    rejection. It rewrites direct dependency-children markers and deletes the
-   target Plan in the worktree, and returns the `changedPaths` the landing commit must
-   contain. The claim stays held. Final preparation is not completion.
+   target Plan in the worktree, and returns the changed paths the landing commit
+   must contain, which the `/next-plan` claim-exit script reports as
+   `changes.items[].path`. The claim stays held. Final preparation is not
+   completion.
 2. Create the authorized landing commit, then squash and rebase it onto the current
    primary tip. Reconciliation never advances primary. Inspect dependency
    overlap and any place the rebase merged cleanly but changed the code's

@@ -129,9 +129,10 @@ Before landing-commit creation, an `implementer` runs
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Complete-NextPlan.ps1`
 with no arguments for completion or appends `-Reject` only after explicit
 user-authorized rejection. Success removes only direct-child dependency edges,
-deletes the selected Plan in the worktree, reports the `changedPaths` the
-landing commit must contain, and returns `nextAction: finalize-changes`. The
-claim stays held until landing succeeds.
+deletes the selected Plan in the worktree, reports the changed paths the landing
+commit must contain as `changes.items[].path` (counted by `changes.totalCount`,
+with `changes.truncated` flagging more paths than the listed items), and returns
+`nextAction: finalize-changes`. The claim stays held until landing succeeds.
 
 Deferral uses
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Defer-NextPlan.ps1`
@@ -187,14 +188,14 @@ the session by client, worktree/branch UUID, and, on Claude, conversation
 session ID only.
 
 On completion or rejection, a friction Plan authored at that second checkpoint
-joins the landing commit alongside the `changedPaths` the claim-exit script
-reported: one further candidate commit for that Plan path and one further
-approval-preparation run carrying `-CommitMessageFile` so the rebuilt commit's
-message describes the enlarged content, both invoked exactly as
-`/finalize-changes` documents them and with no hand-run Git, then re-review of
-the affected regions and a re-run of the landing `/verify-changes` acceptance
-review on the new final diff. That rerun happens at most once per landing, so
-friction first observed during it never joins this landing commit: an
+joins the landing commit alongside the changed paths the claim-exit script
+reported in `changes.items[].path`: one further candidate commit for that Plan
+path and one further approval-preparation run carrying `-CommitMessageFile` so
+the rebuilt commit's message describes the enlarged content, both invoked
+exactly as `/finalize-changes` documents them and with no hand-run Git, then
+re-review of the affected regions and a re-run of the landing `/verify-changes`
+acceptance review on the new final diff. That rerun happens at most once per
+landing, so friction first observed during it never joins this landing commit: an
 `implementer` records it through `/create-follow-up-plans` and it lands at a
 later gate as its own content, exactly as the deferral case does. On deferral, or
 when the run ends without a claim, the friction Plan is itself the landed content
