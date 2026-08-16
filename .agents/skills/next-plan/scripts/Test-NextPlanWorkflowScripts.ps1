@@ -104,8 +104,46 @@ try {
 	# A dirty session worktree is a deterministic claim blocker before any scheduler access.
 	Set-Utf8File (Join-Path $script:session 'Dirty.txt') "uncommitted claim blocker`n"
 	$dirtyClaim = Invoke-WorkflowScript 'Invoke-NextPlanClaim.ps1' @('-Plan',$plan) 2
-	Assert-True ($dirtyClaim.code -ceq 'claim.context-conflict') 'A dirty session worktree was not a deterministic claim blocker.'
+	Assert-True ($dirtyClaim.code -ceq 'claim.worktree-dirty' -and $dirtyClaim.message -clike '*Dirty.txt*') 'A dirty session worktree was not a deterministic claim blocker naming its dirty paths.'
+	$bareDirtyClaim = Invoke-WorkflowScript 'Invoke-NextPlanClaim.ps1' @() 2
+	Assert-True ($bareDirtyClaim.code -ceq 'claim.worktree-dirty') 'A bare invocation did not block on the dirty session worktree.'
 	Remove-Item -LiteralPath (Join-Path $script:session 'Dirty.txt') -Force
+
+	# Primary moves ahead so the retained-work resume exercises its fast-forward overlap guard.
+	Set-Utf8File (Join-Path $primary 'Source/Shared.txt') "primary moved`n"
+	Invoke-Git $primary @('add','--all') | Out-Null
+	Invoke-Git $primary @('commit','-m','primary movement') | Out-Null
+	$retainedFile = Join-Path $script:session 'Retained.txt'
+	Set-Utf8File $retainedFile "retained implementation`n"
+	$retainedContent = [Convert]::ToBase64String([IO.File]::ReadAllBytes($retainedFile))
+	# A retained path containing a space proves the reported paths are raw, not Git's quoted display form.
+	$spacedRetainedFile = Join-Path $script:session 'Retained Work.txt'
+	Set-Utf8File $spacedRetainedFile "retained implementation under a spaced path`n"
+	# A retained path the incoming fast-forward also changes is never safe to claim onto.
+	Set-Utf8File (Join-Path $script:session 'Source/Shared.txt') "session edit of an incoming path`n"
+	$overlapResume = Invoke-WorkflowScript 'Invoke-NextPlanClaim.ps1' @('-Plan',$plan,'-ResumeRetained') 2
+	Assert-True ($overlapResume.code -ceq 'claim.worktree-dirty' -and $overlapResume.message -clike '*Source/Shared.txt*') 'A fast-forward overlapping retained work was not a resume blocker.'
+	Remove-Item -LiteralPath (Join-Path $script:session 'Source/Shared.txt') -Force
+	# Uncommitted scheduler input blocks the resume even when the fast-forward would not touch it.
+	Set-Utf8File (Join-Path $script:session 'Documents/Plans/Scratch/Dirty.md') "uncommitted scheduler input`n"
+	$schedulerResume = Invoke-WorkflowScript 'Invoke-NextPlanClaim.ps1' @('-Plan',$plan,'-ResumeRetained') 2
+	Assert-True ($schedulerResume.code -ceq 'claim.worktree-dirty' -and $schedulerResume.message -clike '*Documents/Plans/Scratch/Dirty.md*') 'Uncommitted scheduler input was not a resume blocker.'
+	Remove-Item -LiteralPath (Join-Path $script:session 'Documents/Plans/Scratch/Dirty.md') -Force
+	# A scheduler path containing a space is quoted in Git's display output, so it must still be recognized as scheduler input.
+	Set-Utf8File (Join-Path $script:session 'Documents/Plans/Scratch/Dirty Path.md') "uncommitted scheduler input under a spaced path`n"
+	$spacedSchedulerResume = Invoke-WorkflowScript 'Invoke-NextPlanClaim.ps1' @('-Plan',$plan,'-ResumeRetained') 2
+	Assert-True ($spacedSchedulerResume.code -ceq 'claim.worktree-dirty' -and $spacedSchedulerResume.message -clike '*Documents/Plans/Scratch/Dirty Path.md*') 'A spaced uncommitted scheduler path was not a resume blocker.'
+	Remove-Item -LiteralPath (Join-Path $script:session 'Documents/Plans/Scratch/Dirty Path.md') -Force
+	# Non-overlapping retained work claims, fast-forwards, and stays byte-identical across claim and deferral.
+	$resumeClaim = Invoke-WorkflowScript 'Invoke-NextPlanClaim.ps1' @('-Plan',$plan,'-ResumeRetained') 0
+	Assert-True ($resumeClaim.status -ceq 'pass' -and $resumeClaim.claim.plan -ceq $plan -and $resumeClaim.sync.fastForwarded) 'A resume claim over non-overlapping retained work did not claim and fast-forward.'
+	Assert-True ($resumeClaim.retained.count -eq 2 -and (@($resumeClaim.retained.paths) -ccontains 'Retained.txt') -and (@($resumeClaim.retained.paths) -ccontains 'Retained Work.txt')) 'A resume claim did not report its retained paths.'
+	Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($retainedFile)) -ceq $retainedContent) 'A resume claim did not leave the retained file byte-identical.'
+	$retainedDeferral = Invoke-WorkflowScript 'Defer-NextPlan.ps1' @() 0
+	Assert-True ($retainedDeferral.code -ceq 'released' -and (@($retainedDeferral.retained.paths) -ccontains 'Retained.txt') -and (@($retainedDeferral.retained.paths) -ccontains 'Retained Work.txt')) 'Deferral did not report the retained work.'
+	Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($retainedFile)) -ceq $retainedContent) 'Deferral did not leave the retained file byte-identical.'
+	Remove-Item -LiteralPath $retainedFile -Force
+	Remove-Item -LiteralPath $spacedRetainedFile -Force
 
 	# Bare selection takes the oldest eligible Plan; deferral releases it.
 	$bareClaim = Invoke-WorkflowScript 'Invoke-NextPlanClaim.ps1' @() 0
@@ -152,7 +190,7 @@ try {
 	[pscustomobject]@{
 		schemaVersion = 'broken-engine-next-plan-workflow-fixtures/v1'
 		status = 'pass'
-		cases = @('no-claim deferral','no-claim completion','read-only eligible listing','dirty-tree claim rejection','bare oldest eligible selection','claim deferral release','unique filename-only claim','interior-substring partial claim','missing filename-only blocker','ambiguous partial blocker','explicit plan claim','idempotent claim reuse','claimed-state listing','terminal preparation changed paths','retained claim after terminal preparation')
+		cases = @('no-claim deferral','no-claim completion','read-only eligible listing','dirty-tree claim rejection','bare dirty-tree claim rejection','fast-forward overlap resume rejection','scheduler-input resume rejection','spaced scheduler-input resume rejection','retained-work resume claim','retained-work deferral report','bare oldest eligible selection','claim deferral release','unique filename-only claim','interior-substring partial claim','missing filename-only blocker','ambiguous partial blocker','explicit plan claim','idempotent claim reuse','claimed-state listing','terminal preparation changed paths','retained claim after terminal preparation')
 	} | ConvertTo-Json -Depth 5
 }
 finally {

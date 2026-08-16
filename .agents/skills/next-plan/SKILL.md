@@ -17,7 +17,8 @@ and the landing confirmation belongs to `/finalize-changes`.
 
 ## Preconditions and selection
 
-Require a clean wrapper-created session worktree and derive the authoritative
+Require a clean wrapper-created session worktree, except for the retained-work
+resume documented under Claim lifecycle below, and derive the authoritative
 primary, baseline, and owner from `Get-AgentWorktreeSessionContext`, and the
 provisioned WorktreeCli from `Get-NextPlanContext`. Missing tooling requires
 explicitly authorized primary maintenance through `/compile`. Never create/adopt
@@ -139,6 +140,22 @@ Deferral uses
 and only an ordinary live claim. After final preparation has run, deferral
 requires an explicit user instruction given in the current session, recorded in
 the handoff; nothing else unlocks it.
+
+Deferral never touches the worktree, so uncommitted implementation work stays
+exactly as it is; the deferral result reports those paths as `retained`
+(a bounded `paths` list with the full `count`). Any dirty session worktree
+otherwise blocks a claim with `claim.worktree-dirty`, naming the dirty paths and
+leaving the tree and the scheduler untouched. Resuming retained work needs an
+explicit user resume instruction given in the current session, recorded in the
+handoff, and then the targeted claim with `-ResumeRetained` appended:
+`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md' -ResumeRetained`
+That switch is valid only with `-Plan`, never stages, stashes, or reverts
+anything, leaves every retained file byte-identical, and reports those paths as
+`retained` on the pass result. It still blocks with `claim.worktree-dirty` when
+a dirty path is under `Documents/Plans/`, because selection reads that scheduler
+input from this tree, or when the fast-forward to the primary tip would touch a
+retained path.
+
 `/finalize-changes` deletes the claim after primary advances. Run
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Test-NextPlanWorkflowScripts.ps1 -Executable '<worktree-cli-path>'`
 only when `Complete-NextPlan.ps1`, `Defer-NextPlan.ps1`, `Get-NextPlanList.ps1`,

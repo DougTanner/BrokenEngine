@@ -1,10 +1,17 @@
 [CmdletBinding()]
-param([string] $Plan)
+param([string] $Plan,[switch] $ResumeRetained)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
 $result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v3';status='error';code='internal.error';message='Claim did not run.';claim=$null}
 function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message){$result.status=$Status;$result.code=$Code;$result.message=$Message;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
+# NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
+# a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
+# are worktree paths a fast-forward could touch.
+function Get-DirtyPath([string]$Porcelain){$paths=[Collections.Generic.List[string]]::new();$fields=@($Porcelain -split "`0");$index=0;while($index -lt $fields.Count){$record=$fields[$index];$index++;if($record.Length -lt 4){continue};$paths.Add($record.Substring(3));$state=$record.Substring(0,2);if($state.Contains('R') -or $state.Contains('C')){if($index -lt $fields.Count){$paths.Add($fields[$index]);$index++}}};return $paths}
+function Format-DirtyPath([string[]]$Paths){$text=@($Paths|Select-Object -First 10) -join ', ';if($Paths.Count -gt 10){$text+=" (+$($Paths.Count-10) more)"};return $text}
 try {
  Import-Module (Join-Path $PSScriptRoot 'NextPlanWorkflowCommon.psm1') -Force -DisableNameChecking
+ $targeted=-not [string]::IsNullOrWhiteSpace($Plan)
+ if($ResumeRetained -and -not $targeted){Complete-Claim 2 'blocked' 'claim.usage-error' '-ResumeRetained is valid only with -Plan, because only a named Plan can carry work retained by an earlier deferral; no Plan was claimed and the worktree was not touched.'}
  $pattern=$null
  if ($Plan) {
   $Plan=$Plan.Replace('\','/')
@@ -17,8 +24,25 @@ try {
   }
  }
  $context=Get-NextPlanContext
- $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','--untracked-files=all') $context.Worktree
- if($status.ExitCode -ne 0 -or -not [string]::IsNullOrWhiteSpace($status.Stdout)){throw (New-NextPlanStateBlocker 'Session worktree must be clean before a plan claim.')}
+ $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
+ if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
+ $dirty=@(Get-DirtyPath $status.Stdout)
+ if($dirty.Count -ne 0){
+  if(-not $ResumeRetained){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route"}
+  # Selection and validation read Documents/Plans from this tree, so uncommitted scheduler input is never safe to claim against.
+  $schedulerPaths=@($dirty|Where-Object{$_.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)})
+  if($schedulerPaths.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "-ResumeRetained cannot claim while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched."}
+  if($context.SessionHead -cne $context.PrimaryTip){
+   # The claim below fast-forwards the session, which would overwrite a retained path the primary movement also changed.
+   # NUL-delimited output keeps both sides of the comparison in the same raw path form.
+   $incoming=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'diff','--name-only','-z',$context.SessionHead,$context.PrimaryTip) $context.Worktree
+   if($incoming.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git diff --name-only could not compare the session head with the primary tip. $($incoming.Stderr.Trim())")}
+   $incomingPaths=@(($incoming.Stdout -split "`0")|Where-Object{-not [string]::IsNullOrEmpty($_)})
+   $overlap=@($dirty|Where-Object{$incomingPaths -ccontains $_})
+   if($overlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "-ResumeRetained cannot claim because fast-forwarding the session from $($context.SessionHead) to the primary tip $($context.PrimaryTip) would touch $($overlap.Count) retained path(s): $(Format-DirtyPath $overlap). No Plan was claimed and the worktree was not touched; commit or land that work first."}
+  }
+  $result.retained=[ordered]@{count=$dirty.Count;truncated=($dirty.Count -gt 10);paths=@($dirty|Select-Object -First 10)}
+ }
  # The executable-Plan inventory below is read from the session tree, so a session behind primary hides
  # Plans that already exist at the primary tip; fast-forward first so the inventory matches primary.
  if($context.SessionHead -cne $context.PrimaryTip){
