@@ -62,13 +62,11 @@ Session provenance (machine-local; not reproducible after cleanup):
 
 ## Design
 
-In a new session, present the exact command
-`/next-plan-review 04807415125611a53b199c20ddf36f1e70a42565` to the user and ask
-the user to run it, supplying the recorded Codex parent session and this Plan's
-provenance; that review is user-invoked because `/next-plan-review` is reserved
-for explicit user invocation. Root-cause the missing descendants from the proven
-transcripts, then make the smallest fix inside the `## In scope` boundary below.
-If root-causing shows the fix lies outside that boundary, surface it for
+In a new session, run
+`/next-plan-review 04807415125611a53b199c20ddf36f1e70a42565`, supplying the
+recorded Codex parent session and this Plan's provenance. Root-cause the missing
+descendants from the proven transcripts, then make the smallest fix inside the
+`## In scope` boundary below. If root-causing shows the fix lies outside that boundary, surface it for
 re-planning instead of expanding scope.
 
 ## Critical files
@@ -81,7 +79,7 @@ re-planning instead of expanding scope.
 
 ## In scope
 
-- Root-cause investigation via a user-run `/next-plan-review` with the recorded
+- Root-cause investigation via `/next-plan-review` with the recorded
   provenance.
 - The smallest resulting fix, confined to descendant discovery in
   `Find-AgentSessionTranscript.ps1` — the file gathering that supplies descendant

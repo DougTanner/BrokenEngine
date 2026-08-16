@@ -1,7 +1,6 @@
 ---
 name: next-plan-review
-description: Review a landed change from its Git commit and proven parent/child session transcripts. Use when the user wants prioritized process improvements for plan/objective conformance, solution minimality/overengineering, review/testing coverage, token efficiency, workflow friction, or landing speed.
-disable-model-invocation: true
+description: Review a landed change from its Git commit and proven parent/child session transcripts. Use when prioritized process improvements are wanted for plan/objective conformance, solution minimality/overengineering, review/testing coverage, token efficiency, workflow friction, or landing speed, including when a tooling-friction Plan directs this session to run `/next-plan-review <landing ref>`.
 user-invocable: true
 argument-hint: "[commit-ish]"
 allowed-tools: [Read, Grep, Glob, Agent, PowerShell]
@@ -14,7 +13,7 @@ Audit one completed landing read-only. Produce an evidence-based,
 priority-sorted improvement backlog; do not retry the change, edit files, alter
 Plan claims, or inspect unrelated sessions.
 
-Run only in the invoking parent/manager context when manually triggered. Never
+Run only in the invoking parent/manager context. Never
 route this skill through `/codex-review` or another delegated `reviewer`; this
 skill dispatches its required fresh reviewer.
 

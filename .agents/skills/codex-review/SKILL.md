@@ -13,8 +13,8 @@ Claude Code runs every delegated reviewer or auditor role (Sol on Codex, per the
 root [AGENTS.md](../../../AGENTS.md) role table) — `plan-audit`,
 `repo-code-review`, `glsl-review`, `scope-review`, `adversarial-review`,
 `session-audit`, and external review lenses — on Codex/Sol through this skill.
-Parent/manager orchestrators that dispatch their own child reviewer, including manually
-triggered `/next-plan-review`, are excluded. A `/codex-review` invocation of an assigned skill constitutes the
+Parent/manager orchestrators that dispatch their own child reviewer, including
+`/next-plan-review`, are excluded. A `/codex-review` invocation of an assigned skill constitutes the
 delegated-`reviewer` execution context; it is not an "inline run" in the assigned
 skills' vocabulary, and `/verify-changes` records it as the delegated reviewer
 execution. Codex callers must stop instead of invoking this skill recursively — their reviewer
