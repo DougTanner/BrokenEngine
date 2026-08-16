@@ -442,6 +442,8 @@ void Client::ServerDebugFrame(std::span<const uint8_t> packetData)
 	}
 
 	mpReceivedDebugFrame = std::make_unique<ReceivedDebugFrame>();
+	mpReceivedDebugFrame->iTick = iTick;
+	mpReceivedDebugFrame->coord = coord;
 	mpReceivedDebugFrame->pFrame = std::move(pFrame);
 }
 

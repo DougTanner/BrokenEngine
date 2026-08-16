@@ -62,6 +62,8 @@ struct ClientCoordSlot
 
 struct ReceivedDebugFrame
 {
+	int64_t iTick = 0;
+	GridCoord coord {};
 	std::unique_ptr<game::Frame> pFrame;
 };
 

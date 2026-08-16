@@ -40,6 +40,18 @@ void ClientDesyncManager::PollDebugFrameResponse()
 	std::unique_ptr<engine::ReceivedDebugFrame> pDebugFrame = std::move(gpClientSession->mpRuntime->mpClient->mpReceivedDebugFrame);
 	if (pDebugFrame != nullptr && mDesyncDebugState.pClientFrame != nullptr)
 	{
+		if (pDebugFrame->iTick != mDesyncDebugState.iTick)
+		{
+			LOG(kNetwork, kDebug, "ClientDesyncManager::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coord.x, pDebugFrame->coord.y, mDesyncDebugState.iTick, mDesyncDebugState.coord.x, mDesyncDebugState.coord.y);
+			return;
+		}
+
+		if (pDebugFrame->coord != mDesyncDebugState.coord)
+		{
+			LOG(kNetwork, kDebug, "ClientDesyncManager::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coord.x, pDebugFrame->coord.y, mDesyncDebugState.iTick, mDesyncDebugState.coord.x, mDesyncDebugState.coord.y);
+			return;
+		}
+
 		LOG(kNetwork, kError, "ClientDesyncManager::PollDebugFrameResponse Frame: {} Coord: ({},{}) matched, dumping diff", mDesyncDebugState.iTick, mDesyncDebugState.coord.x, mDesyncDebugState.coord.y);
 		mDesyncDebugState.pClientFrame->LogDifferences(*pDebugFrame->pFrame);
 		mDesyncDebugState = {};
