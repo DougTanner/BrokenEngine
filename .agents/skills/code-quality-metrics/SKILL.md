@@ -36,6 +36,11 @@ Compare only the paths listed in a UTF-8 targets file against a full-SHA baselin
 pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 -Mode Compare -Targets Temp/targets.json -Baseline <full-commit-sha> -RepositoryRoot <absolute repository root>
 ```
 
+Compare parses the full corpus on both the baseline and the current side, so it takes roughly 2 to
+3.5 minutes; issue it with a call timeout of at least `600000` ms, never an ordinary ~120 s call
+cap. Stdout is written only after the run completes, so a call killed at that cap yields nothing
+recoverable and must not be retried at the same cap.
+
 The analyzer derives pairing itself: a listed path in both corpora pairs with itself, a current-only
 path pairs with the first similar baseline-only path as a rename, and the rest become one-sided
 add or delete pairs. Do not broaden targets from checkout changes. Context changes remain visible

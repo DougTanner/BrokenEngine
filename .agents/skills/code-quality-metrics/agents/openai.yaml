@@ -3,4 +3,4 @@ interface:
   short_description: "Compare deterministic C++ quality snapshots"
   default_prompt: "Use $code-quality-metrics with -Mode Snapshot for Engine/Source recursively."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

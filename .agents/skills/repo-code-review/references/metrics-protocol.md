@@ -21,8 +21,9 @@ did not apply.
 Outside that sandbox, run Compare yourself: `pwsh -NoProfile -File
 .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 -Mode
 Compare -Targets <supplied-targets-file> -Baseline <fixed-full-sha>
--RepositoryRoot <absolute-checkout-root> -Digest`. Omit `-OutputPath` so this
-review retains no file.
+-RepositoryRoot <absolute-checkout-root> -Digest`. It takes roughly 2 to 3.5
+minutes, so invoke it with a call timeout of at least `600000` ms. Omit
+`-OutputPath` so this review retains no file.
 
 Record the digest's `profile`, `targetSelection`, `coverage`, and `comparison`
 evidence. Never reconstruct the digest's field selection or summarization
