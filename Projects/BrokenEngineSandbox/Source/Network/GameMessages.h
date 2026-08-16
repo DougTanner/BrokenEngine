@@ -82,116 +82,29 @@ struct FleetSyncMessage
 	static_assert(kiFleetHeaderSize == 36);
 	static_assert(kiFleetMemberSize == 9);
 
-	class FleetWriter
-	{
-	public:
-
-		explicit FleetWriter(common::Workbuffer& rWorkbuffer)
-		: mrWorkbuffer(rWorkbuffer)
-		{
-		}
-
-		void Field(const uint64_t& rValue) const
-		{
-			mrWorkbuffer.PushBack<uint64_t>(rValue);
-		}
-
-		void Field(const int64_t& rValue) const
-		{
-			mrWorkbuffer.PushBack<int64_t>(rValue);
-		}
-
-		void Field(const uint8_t& rValue) const
-		{
-			mrWorkbuffer.PushBack<uint8_t>(rValue);
-		}
-
-		void MemberCount(const int64_t& rValue) const
-		{
-			Field(rValue);
-		}
-
-		void Alive(const bool& bValue) const
-		{
-			Field(static_cast<uint8_t>(bValue ? 1 : 0));
-		}
-
-		void Float(const float& rValue) const
-		{
-			mrWorkbuffer.PushBack<float>(rValue);
-		}
-
-	private:
-
-		common::Workbuffer& mrWorkbuffer;
-	};
-
-	class FleetReader
-	{
-	public:
-
-		explicit FleetReader(engine::BoundedCursor& rCursor)
-		: mrCursor(rCursor)
-		{
-		}
-
-		void Field(uint64_t& rValue) const
-		{
-			rValue = engine::ReadUint64(mrCursor.pCursor);
-		}
-
-		void Field(int64_t& rValue) const
-		{
-			rValue = engine::ReadInt64(mrCursor.pCursor);
-		}
-
-		void Field(uint8_t& rValue) const
-		{
-			rValue = engine::ReadUint8(mrCursor.pCursor);
-		}
-
-		void MemberCount(int64_t& rValue) const
-		{
-			Field(rValue);
-		}
-
-		void Alive(bool& rValue) const
-		{
-			rValue = engine::ReadUint8(mrCursor.pCursor) != 0;
-		}
-
-		void Float(float& rValue) const
-		{
-			rValue = engine::ReadFloat(mrCursor.pCursor);
-		}
-
-	private:
-
-		engine::BoundedCursor& mrCursor;
-	};
-
 	template <typename TVisitor, typename TFleet>
 	static void VisitFleetHeader(TVisitor& rVisitor, TFleet& rFleet, int64_t& riMemberCount)
 	{
 		rVisitor.Field(rFleet.guid.uiHigh);
 		rVisitor.Field(rFleet.guid.uiLow);
-		rVisitor.MemberCount(riMemberCount);
+		rVisitor.BoundedCount(riMemberCount, kiFleetMemberSize, sizeof(int64_t) + sizeof(float));
 		rVisitor.Field(rFleet.iFlagshipIndex);
-		rVisitor.Float(rFleet.fNavigationDelay);
+		rVisitor.Field(rFleet.fNavigationDelay);
 	}
 
-	template <typename TVisitor, typename TFleetMember>
-	static void VisitFleetMember(TVisitor& rVisitor, TFleetMember& rMember)
+	template <typename TVisitor, typename TFleetMember, typename TAlive>
+	static void VisitFleetMember(TVisitor& rVisitor, TFleetMember& rMember, TAlive& rAlive)
 	{
 		rVisitor.Field(rMember.globalPlayerId.iValue);
-		rVisitor.Alive(rMember.bAlive);
+		rVisitor.Field(rAlive);
 	}
 
 	static void WritePayload(common::Workbuffer& rWorkbuffer, const std::vector<Fleet>& rFleets)
 	{
 		int64_t iExpectedSize = rWorkbuffer.Count<uint8_t>() + kiFleetCountSize;
-		rWorkbuffer.PushBack<int64_t>(std::ssize(rFleets));
-		FleetWriter writer(rWorkbuffer);
+		const int64_t iFleetCount = std::ssize(rFleets);
+		engine::NetworkMessages::MessageWriter writer {rWorkbuffer};
+		writer.BoundedCount(iFleetCount, kiFleetHeaderSize, 0);
 		for (const Fleet& rFleet : rFleets)
 		{
 			int64_t iHeaderStart = rWorkbuffer.Count<uint8_t>();
@@ -202,7 +115,8 @@ struct FleetSyncMessage
 			for (const FleetMember& rMember : rFleet.members)
 			{
 				int64_t iMemberStart = rWorkbuffer.Count<uint8_t>();
-				VisitFleetMember(writer, rMember);
+				uint8_t uiAlive = static_cast<uint8_t>(rMember.bAlive ? 1 : 0);
+				VisitFleetMember(writer, rMember, uiAlive);
 				ASSERT(rWorkbuffer.Count<uint8_t>() == iMemberStart + kiFleetMemberSize);
 				iExpectedSize += kiFleetMemberSize;
 			}
@@ -212,33 +126,21 @@ struct FleetSyncMessage
 
 	static bool ReadPayload(const std::vector<uint8_t>& rPayload, std::vector<Fleet>& rOutFleets)
 	{
-		engine::BoundedCursor cursor {rPayload.data(), rPayload.data() + rPayload.size()};
-		if (!cursor.Has(kiFleetCountSize))
-		{
-			return false;
-		}
-
-		int64_t iFleetCount = engine::ReadInt64(cursor.pCursor);
-		// Divide avoids hostile-count multiplication overflow.
-		if (iFleetCount < 0 || iFleetCount > cursor.Remaining() / kiFleetHeaderSize)
+		engine::NetworkMessages::MessageReader reader {std::span<const uint8_t>(rPayload.data(), rPayload.size())};
+		int64_t iFleetCount = 0;
+		reader.BoundedCount(iFleetCount, kiFleetHeaderSize, 0);
+		if (!reader.IsValid())
 		{
 			return false;
 		}
 
 		rOutFleets.resize(static_cast<size_t>(iFleetCount));
-		FleetReader reader(cursor);
 		for (int64_t i = 0; i < iFleetCount; ++i)
 		{
-			// Earlier fleets consume payload, so recheck before each header.
-			if (!cursor.Has(kiFleetHeaderSize))
-			{
-				return false;
-			}
-
 			Fleet& rFleet = rOutFleets[static_cast<size_t>(i)];
 			int64_t iMemberCount = 0;
 			VisitFleetHeader(reader, rFleet, iMemberCount);
-			if (iMemberCount < 0 || iMemberCount > cursor.Remaining() / kiFleetMemberSize)
+			if (!reader.IsValid())
 			{
 				return false;
 			}
@@ -252,11 +154,18 @@ struct FleetSyncMessage
 			rFleet.members.resize(static_cast<size_t>(iMemberCount));
 			for (int64_t j = 0; j < iMemberCount; ++j)
 			{
-				VisitFleetMember(reader, rFleet.members[static_cast<size_t>(j)]);
+				FleetMember& rMember = rFleet.members[static_cast<size_t>(j)];
+				uint8_t uiAlive = 0;
+				VisitFleetMember(reader, rMember, uiAlive);
+				rMember.bAlive = uiAlive != 0;
+				if (!reader.IsValid())
+				{
+					return false;
+				}
 			}
 		}
 
-		return cursor.Remaining() == 0;
+		return reader.IsValid() && reader.AtEnd();
 	}
 };
 

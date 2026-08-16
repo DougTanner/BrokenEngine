@@ -35,6 +35,15 @@ public:
 	void Field(const uint32_t& rValue) const { mrWorkbuffer.PushBack<uint32_t>(rValue); }
 	void Field(const int64_t& rValue) const { mrWorkbuffer.PushBack<int64_t>(rValue); }
 	void Field(const uint64_t& rValue) const { mrWorkbuffer.PushBack<uint64_t>(rValue); }
+	void Field(const float& rValue) const
+	{
+		mrWorkbuffer.PushBack<float>(rValue);
+	}
+
+	void BoundedCount(const int64_t& riCount, int64_t, int64_t) const
+	{
+		Field(riCount);
+	}
 
 	void Field(const GridCoord& rCoord) const
 	{
@@ -114,6 +123,25 @@ public:
 	void Field(uint32_t& rValue) { Read(rValue, sizeof(rValue), ReadUint32); }
 	void Field(int64_t& rValue) { Read(rValue, sizeof(rValue), ReadInt64); }
 	void Field(uint64_t& rValue) { Read(rValue, sizeof(rValue), ReadUint64); }
+	void Field(float& rValue)
+	{
+		Read(rValue, sizeof(rValue), ReadFloat);
+	}
+
+	void BoundedCount(int64_t& riCount, int64_t iItemMinSize, int64_t iTrailingBytes)
+	{
+		Field(riCount);
+		if (!mbValid || riCount < 0 || iTrailingBytes > mCursor.Remaining() ||
+			riCount > (mCursor.Remaining() - iTrailingBytes) / iItemMinSize)
+		{
+			mbValid = false;
+		}
+	}
+
+	bool AtEnd() const
+	{
+		return mCursor.Remaining() == 0;
+	}
 
 	void Field(GridCoord& rCoord)
 	{
