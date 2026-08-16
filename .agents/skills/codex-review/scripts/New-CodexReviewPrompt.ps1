@@ -14,7 +14,9 @@ param(
 	[ValidateRange(1, 3)][int] $RiskTier = 0,
 	[string[]] $UntrackedPath,
 	[string] $Head,
-	[switch] $AdHocRole
+	[switch] $AdHocRole,
+	[switch] $PreflightTargets,
+	[switch] $ReuseTargets
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,8 +44,9 @@ $script:PromptFile = $null
 $script:PromptStream = $null
 $script:PromptCreated = $false
 $script:TargetsFile = $null
-$script:TargetsText = $null
+$script:TargetsBytes = $null
 $script:TargetsCreated = $false
+$script:TargetsAvailable = $false
 $script:PromptBytes = 0
 $script:SectionCount = 0
 $script:DiffRange = @()
@@ -88,7 +91,7 @@ function Complete-CodexReviewPrompt([int] $ExitCode, [string] $Status, [string] 
 	$result.code = $Code
 	$result.message = if ($Message.Length -gt $script:MaximumMessageLength) { $Message.Substring(0, $script:MaximumMessageLength) } else { $Message }
 	$result.promptPath = if ($script:PromptCreated) { $script:PromptFile } else { $null }
-	$result.targetsPath = if ($script:TargetsCreated) { $script:TargetsFile } else { $null }
+	$result.targetsPath = if ($ExitCode -eq 0 -and $script:TargetsAvailable) { $script:TargetsFile } else { $null }
 	$result.promptBytes = if ($script:PromptCreated) { $script:PromptBytes } else { 0 }
 	$result.sectionsWritten = if ($script:PromptCreated) { $script:SectionCount } else { 0 }
 	[Console]::Out.Write(($result | ConvertTo-Json -Depth 32 -Compress))
@@ -206,8 +209,12 @@ function Complete-PromptOverBudget() {
 
 function Add-PromptText([string] $Text) {
 	$bytes = $script:Utf8.GetBytes($Text)
-	$script:PromptStream.Write($bytes, 0, $bytes.Length)
-	$script:PromptBytes += $bytes.Length
+	Add-PromptBytes $bytes
+}
+
+function Add-PromptBytes([byte[]] $Bytes) {
+	$script:PromptStream.Write($Bytes, 0, $Bytes.Length)
+	$script:PromptBytes += $Bytes.Length
 	if ($script:PromptBytes -gt $script:MaximumPromptBytes) { Complete-PromptOverBudget }
 }
 
@@ -283,9 +290,9 @@ function Get-ChangedFileSet([string[]] $Listed) {
 	return $inventory
 }
 
-function Write-PromptTargets([string[]] $Listed) {
-	# /repo-code-review requires a supplied targets file and must not rebuild one, so the same
-	# inventory that produced the evidence emits it here, next to the prompt.
+function Get-PromptTargetsText([string[]] $Listed) {
+	# /repo-code-review requires one canonical targets sequence. Preflight writes it, while reuse
+	# compares it in memory with the caller-owned sibling before embedding the captured bytes.
 	$arguments = @('-NoProfile', '-File', $script:Inventory, '-RepositoryRoot', $script:Root, '-Baseline', $Baseline, '-EmitTargets')
 	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) }
 	if ($Listed.Count -gt 0) { $arguments += @('-IncludeUntracked', ($Listed -join ',')) }
@@ -320,15 +327,38 @@ function Write-PromptTargets([string[]] $Listed) {
 		}
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.inventory-blocked' "The targets run blocked with $($envelope.code): $($envelope.message)"
 	}
+	return $stdout
+}
+
+function Write-PromptTargets([string] $Text) {
 	# A targets file with no path is a complete answer for a change that touches no C++ target.
-	$script:TargetsText = $stdout
+	$script:TargetsBytes = $script:Utf8.GetBytes($Text)
 	$stream = [IO.File]::Open($script:TargetsFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
 	$script:TargetsCreated = $true
 	try {
-		$bytes = $script:Utf8.GetBytes($script:TargetsText)
-		$stream.Write($bytes, 0, $bytes.Length)
+		$stream.Write($script:TargetsBytes, 0, $script:TargetsBytes.Length)
 	}
 	finally { $stream.Dispose() }
+	$script:TargetsAvailable = $true
+}
+
+function Test-PromptReuseTargets([string[]] $Listed) {
+	$expectedText = Get-PromptTargetsText $Listed
+	$expectedBytes = $script:Utf8.GetBytes($expectedText)
+	# Read the caller-owned preflight output once. A matching sequence is retained verbatim for prompt
+	# evidence; this path never writes or removes the file, including if later assembly fails.
+	$capturedBytes = [IO.File]::ReadAllBytes($script:TargetsFile)
+	$matches = $capturedBytes.Length -eq $expectedBytes.Length
+	if ($matches) {
+		for ($index = 0; $index -lt $expectedBytes.Length; $index++) {
+			if ($capturedBytes[$index] -ne $expectedBytes[$index]) { $matches = $false; break }
+		}
+	}
+	if (-not $matches) {
+		Complete-CodexReviewPrompt 2 'blocked' 'prompt.targets-mismatch' "The preflight targets file does not match the canonical targets for the supplied baseline, head, and change set: '$($script:TargetsFile)'."
+	}
+	$script:TargetsBytes = $capturedBytes
+	$script:TargetsAvailable = $true
 }
 
 function Get-PromptHeadEntry([string] $RelativePath) {
@@ -503,6 +533,12 @@ try {
 	if (-not [IO.Path]::IsPathRooted($RepositoryRoot) -or -not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.repository-root-invalid' "-RepositoryRoot must be an existing absolute directory: '$RepositoryRoot'."
 	}
+	$targetModeCount = 0
+	if ($PreflightTargets) { $targetModeCount++ }
+	if ($ReuseTargets) { $targetModeCount++ }
+	if ($targetModeCount -gt 1 -or ($targetModeCount -gt 0 -and $AssignedSkill -ine 'repo-code-review')) {
+		Complete-CodexReviewPrompt 2 'blocked' 'prompt.targets-mode-invalid' '-PreflightTargets and -ReuseTargets are mutually exclusive and valid only with -AssignedSkill repo-code-review.'
+	}
 	# An assigned skill that names no skill file leaves the reviewer with only the scope text as its
 	# contract, so an unknown name has to be the caller's deliberate choice.
 	if (-not $AdHocRole) {
@@ -525,7 +561,10 @@ try {
 	}
 	if ($AssignedSkill -eq 'repo-code-review') {
 		$script:TargetsFile = $script:PromptFile + '.targets.json'
-		if (Test-Path -LiteralPath $script:TargetsFile) {
+		if ($ReuseTargets -and -not (Test-Path -LiteralPath $script:TargetsFile -PathType Leaf)) {
+			Complete-CodexReviewPrompt 2 'blocked' 'prompt.targets-missing' "-ReuseTargets requires the preflight targets sibling: '$($script:TargetsFile)'."
+		}
+		if (-not $ReuseTargets -and (Test-Path -LiteralPath $script:TargetsFile)) {
 			Complete-CodexReviewPrompt 2 'blocked' 'prompt.path-exists' "The targets sibling of -PromptPath already exists and is never overwritten: '$($script:TargetsFile)'."
 		}
 	}
@@ -577,8 +616,20 @@ try {
 	$script:HeadSha = $changeSet.headSha
 	$script:DiffRange = if ([string]::IsNullOrEmpty($changeSet.headSha)) { @($changeSet.baselineSha) } else { @($changeSet.baselineSha, $changeSet.headSha) }
 	if ($AssignedSkill -eq 'verify-changes') { Test-PromptReviewedTreeClean }
-	Test-PromptScopeEvidence $changeSet
-	if ($null -ne $script:TargetsFile) { Write-PromptTargets $listed.ToArray() }
+	if (-not $PreflightTargets) { Test-PromptScopeEvidence $changeSet }
+	if ($null -ne $script:TargetsFile) {
+		if ($ReuseTargets) {
+			Test-PromptReuseTargets $listed.ToArray()
+		}
+		else {
+			Write-PromptTargets (Get-PromptTargetsText $listed.ToArray())
+		}
+	}
+	if ($PreflightTargets) {
+		$result.fileCount = $fileLine.Count
+		$result.binaryExcluded = $binaryExcluded
+		Complete-CodexReviewPrompt 0 'pass' 'ok' "Wrote the preflight targets file for $($fileLine.Count) changed file(s)."
+	}
 
 	$script:PromptStream = [IO.File]::Open($script:PromptFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
 	$script:PromptCreated = $true
@@ -596,10 +647,14 @@ try {
 	$evidence = "Baseline: $($changeSet.baselineSha)`nHead: $headText`nChanged files ($($fileLine.Count)):`n"
 	foreach ($line in $fileLine) { $evidence += "- $line`n" }
 	$evidence += "`n"
-	if ($script:TargetsCreated) {
-		$evidence += "Targets file: $($script:TargetsFile)`n`n$($script:TargetsText)`n"
+	if ($script:TargetsAvailable) {
+		$evidence += "Targets file: $($script:TargetsFile)`n`n"
 	}
 	Write-PromptSection '(c) Evidence' $evidence
+	if ($script:TargetsAvailable) {
+		Add-PromptBytes $script:TargetsBytes
+		Add-PromptText "`n"
+	}
 	Write-DiffEvidence
 
 	Write-PromptSection '(d) Output contract' ($outputContract + "`n")
