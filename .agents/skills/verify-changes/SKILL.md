@@ -26,10 +26,8 @@ Require the task brief from `../../references/subagent-reporting.md`, plus:
 - caller-owned paths and concise ordered handoffs for implementation,
   propagation, checks, reviews, fixes, hygiene, builds, external claims, and
   residuals; and
-- the typed artifacts this change set triggers: on a change set including a game
-  build, the passing `broken-engine-data-oracle-verifier-result/v1` result
-  `../compile/references/runtime-data-mode.md` states; on a changed `SKILL.md`,
-  the complete `/validate-skill` PASS handoff.
+- the typed artifacts this change set triggers: on a changed `SKILL.md`, the
+  complete `/validate-skill` PASS handoff.
 
 Do not accept an unapproved delta or pasted full logs. For a completed claimed
 Plan whose file the change deletes, the manager supplies its approved text or
@@ -97,9 +95,11 @@ undecided refutations are non-passing.
 For builds, require the authoritative `broken-engine-build-result/v1`: intended
 target/selection/arguments, status/exit/failure kind, complete retained log,
 decisive diagnostics, and all requested targets. Game builds additionally
-require data mode, generation authority, Gaea outcome, normalized paths, and
-current passing data-oracle verification — the typed receipt recording that the
-data files still match their expected contents. Do not accept
+require data mode, generation authority, Gaea outcome, and normalized paths;
+their data evidence is that same envelope reporting success with wrapper exit
+`0` — exit `4` is a failed build whose post-build oracle work (verification,
+receipt issuance, or state persistence) failed — plus the build-reported `"<mode> receipt verified: path=... sha256=...
+dataRoot=... baseline=... aggregate=..."` summary line. Do not accept
 schema/result/exit mismatches.
 
 Skill changes require a complete `/validate-skill` PASS handoff with mechanical

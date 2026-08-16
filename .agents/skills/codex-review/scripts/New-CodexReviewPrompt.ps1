@@ -435,20 +435,8 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 			if ([IO.Path]::GetFileName($path) -eq 'SKILL.md') { $skillTouched = $true }
 		}
 	}
-	# Applicability of the data-oracle verifier result is not derivable from the changed paths — any code
-	# change may or may not have been built — so the build envelopes the scope quotes decide. Each
-	# envelope is one compact JSON line whose own 'target' identity names what was built, so prose
-	# elsewhere in the scope naming the game project is not a game build.
-	$gameBuildClaimed = $false
-	foreach ($line in ($script:ScopeText -split "`n")) {
-		if (-not $line.Contains('broken-engine-build-result/v1')) { continue }
-		foreach ($target in [Regex]::Matches($line, '"target"\s*:\s*\{[^}]*\}')) {
-			if ($target.Value.Contains('BrokenEngineSandbox')) { $gameBuildClaimed = $true }
-		}
-	}
 	$missing = [Collections.Generic.List[string]]::new()
 	if ($plansTouched -and -not $script:ScopeText.Contains('"operation":"validate"')) { $missing.Add('"operation":"validate"') }
-	if ($gameBuildClaimed -and -not $script:ScopeText.Contains('broken-engine-data-oracle-verifier-result/v1')) { $missing.Add('broken-engine-data-oracle-verifier-result/v1') }
 	if ($skillTouched -and -not $script:ScopeText.Contains('Validation: PASS')) { $missing.Add('Validation: PASS') }
 	# The identity values bind every supplied artifact to the reviewed revision, so a scope that names
 	# neither leaves the reviewer validating evidence against an unknown change set.

@@ -437,7 +437,7 @@ function Test-VerifyChangesTypedArtifacts() {
 	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
 
 	# One compact build envelope line, the shape `WorktreeCli build` emits, whose own target names the
-	# game project — the claim that makes the data-oracle verifier result required.
+	# game project — present in every case below to hold that a game build requires no extra marker.
 	$gameBuildLine = "Client build: {`"schemaVersion`":`"broken-engine-build-result/v1`",`"status`":`"success`",`"target`":{`"requested`":`"C:\\repo\\Projects\\BrokenEngineSandbox\\Platforms\\VisualStudio2026\\BrokenEngineSandbox.vcxproj`",`"normalized`":`"c:/repo/projects/brokenenginesandbox/platforms/visualstudio2026/brokenenginesandbox.vcxproj`"}}`n"
 	$missingText = (New-VerifyScopeText $baseline $head) + $gameBuildLine
 	$missingPath = New-ScratchPath 'noartifacts'
@@ -449,25 +449,14 @@ function Test-VerifyChangesTypedArtifacts() {
 		Assert-Equal 'blocked' $missing.Json.status 'verify-changes without typed artifacts status'
 		Assert-Equal 'prompt.typed-artifacts-required' $missing.Json.code 'verify-changes without typed artifacts code'
 		Assert-True ($missing.Json.message.Contains('"operation":"validate"')) 'verify-changes names the missing plan validate marker'
-		Assert-True ($missing.Json.message.Contains('broken-engine-data-oracle-verifier-result/v1')) 'verify-changes names the missing data-oracle verifier marker'
 		Assert-True ($missing.Json.message.Contains('Validation: PASS')) 'verify-changes names the missing /validate-skill marker'
 	}
 	else { Assert-True $false 'verify-changes without typed artifacts emitted JSON' }
 	Assert-True (-not (Test-Path -LiteralPath $missingPath)) 'verify-changes without typed artifacts creates no prompt file'
 
-	# A tool-only build envelope beside prose naming the game project is not a game build, so the
-	# data-oracle verifier result stays unrequired.
-	$toolBuildText = (New-VerifyScopeText $baseline $head) +
-		"Tool build: {`"schemaVersion`":`"broken-engine-build-result/v1`",`"status`":`"success`",`"target`":{`"requested`":`"C:\\repo\\Tools\\WorktreeCli\\Platforms\\VisualStudio2026\\WorktreeCli.sln`",`"normalized`":`"c:/repo/tools/worktreecli/platforms/visualstudio2026/worktreecli.sln`"}}`n" +
-		"BrokenEngineSandbox: not built.`nPlan validate: {`"operation`":`"validate`",`"status`":`"valid`"}`nSkill validation: Validation: PASS`n"
-	$toolBuildPath = New-ScratchPath 'toolbuild'
-	$toolBuild = Invoke-PromptScript @(
-		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
-		'-ScopeFile', (New-ScratchFile 'scope' $toolBuildText), '-PromptPath', $toolBuildPath, '-Head', $head)
-	Assert-Equal 0 $toolBuild.ExitCode 'verify-changes tool-only build exit code'
-	Assert-True (Test-Path -LiteralPath $toolBuildPath) 'verify-changes tool-only build writes the prompt without a data-oracle verifier result'
-
-	$artifactText = $missingText + "Data oracle: {`"schemaVersion`":`"broken-engine-data-oracle-verifier-result/v1`",`"status`":`"pass`"}`nPlan validate: {`"operation`":`"validate`",`"status`":`"valid`"}`nSkill validation: Validation: PASS`n"
+	# The same game build envelope with both path-triggered artifacts present, so the game build itself
+	# demands nothing further.
+	$artifactText = $missingText + "Plan validate: {`"operation`":`"validate`",`"status`":`"valid`"}`nSkill validation: Validation: PASS`n"
 	$presentPath = New-ScratchPath 'artifacts'
 	$present = Invoke-PromptScript @(
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
