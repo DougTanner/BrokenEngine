@@ -100,3 +100,18 @@ can still run it. Never embed transcript paths or home paths.
   working `plan validate` invocation without trial and error; the recorded
   three-attempt symptom no longer reproduces.
 - /validate-skill passes for any changed SKILL.md; plan validate exits 0.
+
+## Coordination
+
+`Documents/Plans/Agents/CodexReviewVerifyChangesPlanValidateArtifact.md` is keyed
+to a different symptom of the same gate — the prompt assembly blocks on a
+host-run plan-validate receipt that no `## Required inputs` condition names — and
+it edits the same two skill files (`codex-review/SKILL.md` required-evidence and
+blocked-code wording, `verify-changes/SKILL.md` `## Executable Plan check`). The
+two are not directional: either may land first, and whichever lands second
+re-reads those sections as they then stand and keeps the other's text intact.
+This Plan owns making the required invocation discoverable at the point of use;
+that Plan owns whether the host receipt is required at all and where that
+requirement is stated. If that Plan's review drops the gate condition entirely,
+this Plan's remaining work may shrink to nothing — surface that for re-planning
+rather than deleting it from within that Plan.

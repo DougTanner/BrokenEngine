@@ -119,6 +119,17 @@ home paths.
 - `plan validate` exits `0` with `status: valid` and `code: ok`;
   `/validate-skill` runs only if a `SKILL.md` changes
 
+## Coordination
+
+`Documents/Plans/Agents/FinalizeLockClaimOwnerTokenFormat.md` is keyed to a
+different symptom (the landing-lock claim script accepts an owner token the
+landing script rejects) but, if its review selects the documentation-only shape,
+its fix edits the same `.agents/skills/finalize-changes/references/scripts.md`
+`## Invocation` region this Plan changes. The two are not directional: either may
+land first, and whichever lands second re-reads that section as it then stands
+and keeps the other's text intact. This Plan owns the commit-SHA format
+statement; that Plan owns the owner-token format.
+
 ## Notes
 
 This Plan is keyed to the concrete (script/reference, symptom) pair: the
