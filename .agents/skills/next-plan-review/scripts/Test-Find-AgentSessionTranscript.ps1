@@ -187,6 +187,49 @@ try {
 	$actualDescendants = @($response.Result.candidate.descendants | ForEach-Object { "$($_.sessionId)`0$($_.agentPath)`0$($_.depth)" })
 	Assert-True (($actualDescendants -join '|') -ceq ($expectedDescendants -join '|')) "[$script:FixtureStage] Descendant listing or ordering was wrong: $($actualDescendants -join '|')"
 
+	$coverageChild = '0e0e0e0e-0e0e-0e0e-0e0e-0e0e0e0e0e0e'
+	$coverageRoot = '2e2e2e2e-2e2e-2e2e-2e2e-2e2e2e2e2e2e'
+	$coverageRootStart = $commitTimestamp.AddMinutes(-30)
+	$coverageRootEnd = $commitTimestamp.AddMinutes(1)
+	$coveragePriorDate = $coverageRootStart.UtcDateTime.Date.AddDays(-1)
+	$coverageRootPath = Join-Path $bucket "rollout-$($commitTimestamp.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-$coverageRoot.jsonl"
+	$coverageChildStart = $commitTimestamp.AddMinutes(-20)
+	$coverageChildLastWrite = $commitTimestamp.AddDays(-2)
+
+	Clear-SessionStores @($sessions, $archivedSessions)
+	New-Transcript $coverageRootPath $coverageRoot $producing $coverageRootStart $coverageRootEnd $commitTimestamp
+	$priorDateBucket = Join-Path $sessions ($coveragePriorDate.ToString('yyyy\\MM\\dd', [Globalization.CultureInfo]::InvariantCulture))
+	$activePriorDateChildPath = Join-Path $priorDateBucket "rollout-$($coveragePriorDate.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-$coverageChild.jsonl"
+	New-Transcript $activePriorDateChildPath $coverageRoot $producing $coverageChildStart $coverageRootEnd $coverageChildLastWrite $coverageChild '/root/coverage_child' 1
+	$script:FixtureStage = 'active prior-local-date descendant outside last-write window'
+	$response = Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions
+	Assert-Finder $response 0 'transcript.found'
+	Assert-True ($response.Result.candidate.descendantCount -eq 1) "[$script:FixtureStage] Expected one descendant, got $($response.Result.candidate.descendantCount)."
+	Assert-True ($response.Result.candidate.descendants[0].sessionId -ceq $coverageChild) "[$script:FixtureStage] Prior-local-date child was not discovered."
+
+	Clear-SessionStores @($sessions, $archivedSessions)
+	New-Transcript $coverageRootPath $coverageRoot $producing $coverageRootStart $coverageRootEnd $commitTimestamp
+	$archivedChildPath = Join-Path $archivedSessions "rollout-$($coveragePriorDate.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-$coverageChild.jsonl"
+	New-Transcript $archivedChildPath $coverageRoot $producing $coverageChildStart $coverageRootEnd $coverageChildLastWrite $coverageChild '/root/coverage_child' 1
+	$script:FixtureStage = 'archived flat-layout descendant'
+	$response = Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions
+	Assert-Finder $response 0 'transcript.found'
+	Assert-True ($response.Result.candidate.descendantCount -eq 1) "[$script:FixtureStage] Expected one descendant, got $($response.Result.candidate.descendantCount)."
+	Assert-True ($response.Result.candidate.descendants[0].sessionId -ceq $coverageChild) "[$script:FixtureStage] Archived flat-layout child was not discovered."
+	Assert-True ($response.Result.candidate.descendants[0].locator -ceq "archived_sessions/rollout-$($coveragePriorDate.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-$coverageChild.jsonl") "[$script:FixtureStage] Descendant locator did not identify the archived flat-layout file."
+
+	Clear-SessionStores @($sessions, $archivedSessions)
+	New-Transcript $coverageRootPath $coverageRoot $producing $coverageRootStart $coverageRootEnd $commitTimestamp
+	$inRangeMalformedPath = Join-Path $priorDateBucket "rollout-$($coveragePriorDate.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-in-range-malformed.jsonl"
+	[void] (New-Item -ItemType Directory -Path $priorDateBucket -Force)
+	Set-Content -LiteralPath $inRangeMalformedPath -Value '{ malformed' -Encoding utf8
+	[IO.File]::SetLastWriteTimeUtc($inRangeMalformedPath, $coverageChildLastWrite.UtcDateTime)
+	$script:FixtureStage = 'selected root with in-range malformed descendant'
+	$response = Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions
+	Assert-Finder $response 2 'transcript.read-error'
+	$inRangeMalformedLocator = "sessions/$($coveragePriorDate.ToString('yyyy/MM/dd', [Globalization.CultureInfo]::InvariantCulture))/rollout-$($coveragePriorDate.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-in-range-malformed.jsonl"
+	Assert-True (@($response.Result.readErrors | Where-Object { $_.locator -ceq $inRangeMalformedLocator }).Count -eq 1) "[$script:FixtureStage] In-range malformed descendant did not produce its structured read error."
+
 	Clear-SessionStores @($sessions, $archivedSessions)
 	New-Transcript $transcript '23232323-2323-2323-2323-232323232323' $fixtureRoot $startBeforeCutoff $coveringEnd $commitTimestamp
 	$script:FixtureStage = 'single eligible root ancestor candidate'
@@ -273,6 +316,24 @@ try {
 	Assert-True (New-FileLink $reparseFile $outsideTranscript) 'Required selected-file reparse fixture could not be created.'
 	$script:FixtureStage = 'reparse candidate file'
 	Assert-Finder (Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions) 2 'transcript.read-error'
+
+	Clear-SessionStores @($sessions, $archivedSessions)
+	$inRangeReparseRoot = '8e8e8e8e-8e8e-8e8e-8e8e-8e8e8e8e8e8e'
+	$inRangeReparseChild = '8f8f8f8f-8f8f-8f8f-8f8f-8f8f8f8f8f8f'
+	$inRangeReparseTarget = Join-Path $fixtureRoot 'in-range-reparse-target'
+	$inRangeReparseChildPath = Join-Path $inRangeReparseTarget "rollout-$($coveragePriorDate.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-$inRangeReparseChild.jsonl"
+	New-Transcript $transcript $inRangeReparseRoot $producing $coverageRootStart $coverageRootEnd $commitTimestamp
+	New-Transcript $inRangeReparseChildPath $inRangeReparseRoot $producing $coverageChildStart $coverageRootEnd $commitTimestamp $inRangeReparseChild '/root/in-range_reparse_child' 1
+	$inRangeReparseParent = Join-Path $sessions ($coveragePriorDate.ToString('yyyy\\MM', [Globalization.CultureInfo]::InvariantCulture))
+	$inRangeReparse = Join-Path $inRangeReparseParent ($coveragePriorDate.ToString('dd', [Globalization.CultureInfo]::InvariantCulture))
+	if (New-Junction $inRangeReparse $inRangeReparseTarget) {
+		$script:FixtureStage = 'selected root with in-range reparse directory'
+		$response = Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions
+		Assert-Finder $response 2 'transcript.read-error'
+		$inRangeReparseLocator = "sessions/$($coveragePriorDate.ToString('yyyy/MM/dd', [Globalization.CultureInfo]::InvariantCulture))"
+		Assert-True (@($response.Result.readErrors | Where-Object { $_.locator -ceq $inRangeReparseLocator -and $_.code -ceq 'transcript.unsafe-path' }).Count -eq 1) "[$script:FixtureStage] In-range reparse directory did not produce its structured read error."
+		Remove-Item -LiteralPath $inRangeReparse -Force
+	}
 
 	Clear-SessionStores @($sessions, $archivedSessions)
 	$validSessionId = '99999999-9999-9999-9999-999999999999'

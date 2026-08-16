@@ -252,13 +252,40 @@ function Get-TranscriptMetadata([string] $Path, [string] $CommitHash) {
 	}
 }
 
+function Get-TranscriptSessionMeta([string] $Path) {
+	$stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+	$reader = [IO.StreamReader]::new($stream)
+	try {
+		while (($line = $reader.ReadLine()) -ne $null) {
+			if ([string]::IsNullOrWhiteSpace($line)) { continue }
+			$record = $line | ConvertFrom-Json -Depth 64 -DateKind String
+			if ($record.type -ne 'session_meta') { continue }
+			$transcriptId = Get-StringProperty $record.payload 'id'
+			$rootSessionId = Get-StringProperty $record.payload 'session_id'
+			$id = if ([string]::IsNullOrWhiteSpace($transcriptId)) { $rootSessionId } else { $transcriptId }
+			if ([string]::IsNullOrWhiteSpace($id)) { throw 'Required session metadata is missing.' }
+			return [pscustomobject]@{
+				SessionId = $id
+				RootSessionId = $rootSessionId
+				IsRoot = [string]::IsNullOrWhiteSpace($rootSessionId) -or $rootSessionId -ceq $id
+			}
+		}
+		throw 'Required session metadata is missing.'
+	}
+	finally {
+		$reader.Dispose()
+		$stream.Dispose()
+	}
+}
+
 function Add-Files(
 	[Collections.Generic.Dictionary[string, IO.FileInfo]] $Files,
 	[Collections.Generic.Dictionary[string, object]] $ReadErrors,
 	[string] $Root,
 	[string] $Filter,
 	[switch] $Recurse,
-	[scriptblock] $Include
+	[scriptblock] $Include,
+	[scriptblock] $IncludeReparseDirectory
 ) {
 	if ([string]::IsNullOrWhiteSpace($Root)) { return }
 	$rootSafety = Get-PathSafety $Root
@@ -281,7 +308,12 @@ function Add-Files(
 		foreach ($entry in $entries) {
 			$isReparse = (([IO.FileAttributes] $entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)
 			if ($entry.PSIsContainer) {
-				if (-not $isReparse -and $Recurse) { $directories.Push($entry.FullName) }
+				if ($isReparse) {
+					if ($null -ne $IncludeReparseDirectory -and (& $IncludeReparseDirectory $entry $Root)) {
+						Add-ReadError $ReadErrors (Get-Locator $entry.FullName) 'transcript.unsafe-path' 'Transcript store contents could not be safely read.'
+					}
+				}
+				elseif ($Recurse) { $directories.Push($entry.FullName) }
 				continue
 			}
 			if ($entry.Name -notlike $Filter) { continue }
@@ -371,8 +403,8 @@ try {
 		$records.Add([pscustomobject]@{ Locator = $locator; Metadata = $metadata })
 	}
 
-	# Descendants are discovery metadata drawn from the already-bounded file set, so they carry
-	# neither the eligible-worktree nor the commit-covering constraint that gates candidacy.
+	# The bounded set supplies the descendant count for a needs-selection result. A single candidate
+	# gets a separate finite store pass below so its complete list does not inherit the commit window.
 	$descendantsByRoot = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
 	if ($selection -eq 'bounded-commit-window') {
 		foreach ($record in $records) {
@@ -423,6 +455,91 @@ try {
 		})
 	}
 
+	if ($selection -eq 'bounded-commit-window' -and $candidates.Count -eq 1) {
+		$selectedCandidate = $candidates[0]
+		$selectedRootMetadata = $null
+		foreach ($record in $records) {
+			$metadata = $record.Metadata
+			$metadataRoot = Get-CanonicalMetadataCwd $metadata.Cwd
+			if (-not $metadata.IsRoot -or $metadata.SessionId -cne $selectedCandidate.sessionId -or
+				$null -eq $metadataRoot -or -not $eligibleWorktreeRoots.Contains($metadataRoot) -or
+				$metadata.Start -gt $commitTimestamp -or $metadata.End -lt $commitTimestamp) { continue }
+			$selectedRootMetadata = $metadata
+			break
+		}
+		if ($null -eq $selectedRootMetadata) { throw 'Selected root metadata is missing.' }
+
+		$descendantDateStart = $selectedRootMetadata.Start.UtcDateTime.Date.AddDays(-1)
+		$descendantDateEnd = $selectedRootMetadata.End.UtcDateTime.Date.AddDays(1)
+		$includeDescendantFilename = {
+			param($File)
+			$match = [Text.RegularExpressions.Regex]::Match(
+				$File.Name,
+				'^rollout-(?<date>\d{4}-\d{2}-\d{2})',
+				[Text.RegularExpressions.RegexOptions]::CultureInvariant)
+			if (-not $match.Success) { return $false }
+			try {
+				$fileDate = [DateTime]::ParseExact(
+					$match.Groups['date'].Value,
+					'yyyy-MM-dd',
+					[Globalization.CultureInfo]::InvariantCulture,
+					[Globalization.DateTimeStyles]::None
+				).Date
+			}
+			catch { return $false }
+			return $fileDate -ge $descendantDateStart -and $fileDate -le $descendantDateEnd
+		}
+		$includeDescendantReparseDirectory = {
+			param($Directory, $StoreRoot)
+			$relative = [IO.Path]::GetRelativePath($StoreRoot, $Directory.FullName)
+			$segments = @($relative.Split([char[]]@('\', '/'), [StringSplitOptions]::RemoveEmptyEntries))
+			$hasDateSegment = $false
+			for ($i = 0; $i -le $segments.Count - 3; $i++) {
+				$date = [DateTime]::MinValue
+				$dateText = "$($segments[$i])-$($segments[$i + 1])-$($segments[$i + 2])"
+				if (-not [DateTime]::TryParseExact(
+					$dateText,
+					'yyyy-MM-dd',
+					[Globalization.CultureInfo]::InvariantCulture,
+					[Globalization.DateTimeStyles]::None,
+					[ref] $date)) { continue }
+				$hasDateSegment = $true
+				if ($date.Date -ge $descendantDateStart -and $date.Date -le $descendantDateEnd) { return $true }
+			}
+			return -not $hasDateSegment
+		}
+		$descendantFiles = [Collections.Generic.Dictionary[string, IO.FileInfo]]::new([StringComparer]::OrdinalIgnoreCase)
+		Add-Files -Files $descendantFiles -ReadErrors $readErrors -Root $SessionStoreRoot -Filter 'rollout-*.jsonl' -Recurse -Include $includeDescendantFilename -IncludeReparseDirectory $includeDescendantReparseDirectory
+		Add-Files -Files $descendantFiles -ReadErrors $readErrors -Root $ArchivedSessionStoreRoot -Filter 'rollout-*.jsonl' -Recurse -Include $includeDescendantFilename -IncludeReparseDirectory $includeDescendantReparseDirectory
+
+		$descendantRecords = [Collections.Generic.List[object]]::new()
+		foreach ($file in @($descendantFiles.Values | Sort-Object FullName)) {
+			$locator = Get-Locator $file.FullName
+			try { $relationship = Get-TranscriptSessionMeta $file.FullName }
+			catch {
+				Add-ReadError $readErrors $locator 'transcript.read-failed' 'Transcript session metadata could not be read.'
+				continue
+			}
+			if ($relationship.IsRoot -or $relationship.RootSessionId -cne $selectedCandidate.sessionId) { continue }
+			try { $metadata = Get-TranscriptMetadata $file.FullName $commitHash }
+			catch {
+				Add-ReadError $readErrors $locator 'transcript.read-failed' 'Transcript metadata could not be read.'
+				continue
+			}
+			if ($metadata.IsRoot -or $metadata.RootSessionId -cne $selectedCandidate.sessionId) { continue }
+			$descendantRecords.Add([pscustomobject]@{
+				sessionId = $metadata.SessionId
+				locator = $locator
+				sessionStartUtc = $metadata.Start.ToString('O')
+				sessionEndUtc = $metadata.End.ToString('O')
+				agentPath = $metadata.AgentPath
+				depth = $metadata.Depth
+			})
+		}
+		$selectedCandidate.descendants = @($descendantRecords | Sort-Object sessionStartUtc, sessionId)
+		$selectedCandidate.descendantCount = $selectedCandidate.descendants.Count
+	}
+
 	$orderedReadErrors = @($readErrors.Values | Sort-Object locator, code)
 	# Ordering is presentational only. Round-trip 'O' formatting of a UTC-adjusted DateTimeOffset is
 	# fixed width, so the lexical sort is chronological; the evidence fields never order candidates.
@@ -445,7 +562,7 @@ try {
 	}
 	if ($orderedReadErrors.Count -ne 0) {
 		$result.code = 'transcript.read-error'
-		$result.message = 'One or more bounded transcript metadata reads failed.'
+		$result.message = 'One or more transcript metadata reads failed.'
 		Write-Result $result 2
 	}
 	if ($orderedCandidates.Count -eq 0) {
