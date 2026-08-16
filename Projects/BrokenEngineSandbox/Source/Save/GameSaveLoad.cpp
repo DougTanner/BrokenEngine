@@ -275,8 +275,108 @@ void GameSaveLoad::ResetStreams()
 	mPendingReplayReaders.clear();
 	miReplayInitialTick = 0;
 	mReplayTransferCaptureInfo = {};
+	mReplayCrcCaptureInfo = {};
 	meReplayPersistenceFailurePoint = ReplayPersistenceFailurePoint::kNone;
 	game::gpServerSession->mpTransferManager->mReplayTransferFixtures.clear();
+}
+
+void GameSaveLoad::ArmReplayCrcCapture(engine::GridCoord coord)
+{
+	mReplayCrcCaptureInfo = {};
+	mReplayCrcCaptureInfo.ePhase = ReplayCrcCapturePhase::kArmed;
+	mReplayCrcCaptureInfo.flags.Set(ReplayCrcCaptureFlags::kAppendEnabled);
+	mReplayCrcCaptureInfo.iCapacity = kiReplayCrcMaxSamples;
+	mReplayCrcCaptureInfo.coord = coord;
+}
+
+void GameSaveLoad::ClearReplayCrcCapture()
+{
+	mReplayCrcCaptureInfo = {};
+}
+
+void GameSaveLoad::AppendReplayCrcSample(engine::GridCoord coord, int64_t iTick, common::crc_t uiCrc, bool bTerminal)
+{
+	ReplayCrcCaptureInfo& rCaptureInfo = mReplayCrcCaptureInfo;
+	if (!(rCaptureInfo.flags & ReplayCrcCaptureFlags::kAppendEnabled))
+	{
+		return;
+	}
+	if (rCaptureInfo.coord != coord)
+	{
+		return;
+	}
+	if (rCaptureInfo.ePhase != ReplayCrcCapturePhase::kWriter && rCaptureInfo.ePhase != ReplayCrcCapturePhase::kReader)
+	{
+		return;
+	}
+
+	if (rCaptureInfo.iSampleCount >= rCaptureInfo.iCapacity || (!bTerminal && rCaptureInfo.iNormalSampleCount >= kiReplayCrcRecordUpdates) ||
+		(rCaptureInfo.iSampleCount > 0 && rCaptureInfo.samples.at(static_cast<size_t>(rCaptureInfo.iSampleCount - 1)).iTick >= iTick))
+	{
+		rCaptureInfo.flags.Set(ReplayCrcCaptureFlags::kOverflow);
+		rCaptureInfo.flags.Clear(ReplayCrcCaptureFlags::kAppendEnabled);
+		return;
+	}
+
+	rCaptureInfo.samples.at(static_cast<size_t>(rCaptureInfo.iSampleCount)) = {.iTick = iTick, .uiCrc = uiCrc};
+	++rCaptureInfo.iSampleCount;
+	if (bTerminal)
+	{
+		if (rCaptureInfo.iNormalSampleCount != kiReplayCrcRecordUpdates)
+		{
+			rCaptureInfo.flags.Set(ReplayCrcCaptureFlags::kOverflow);
+		}
+		rCaptureInfo.flags.Clear(ReplayCrcCaptureFlags::kAppendEnabled);
+	}
+	else
+	{
+		++rCaptureInfo.iNormalSampleCount;
+	}
+	if (rCaptureInfo.iSampleCount == rCaptureInfo.iCapacity)
+	{
+		rCaptureInfo.flags.Clear(ReplayCrcCaptureFlags::kAppendEnabled);
+	}
+}
+
+void GameSaveLoad::BeginReplayCrcReaderCapture()
+{
+	ReplayCrcCaptureInfo& rCaptureInfo = mReplayCrcCaptureInfo;
+	if (rCaptureInfo.ePhase != ReplayCrcCapturePhase::kArmed && rCaptureInfo.ePhase != ReplayCrcCapturePhase::kWriterComplete)
+	{
+		return;
+	}
+	if (!mReplayReaders.contains(rCaptureInfo.coord))
+	{
+		return;
+	}
+
+	rCaptureInfo.ePhase = ReplayCrcCapturePhase::kReader;
+	rCaptureInfo.flags.Clear({
+		ReplayCrcCaptureFlags::kComplete,
+		ReplayCrcCaptureFlags::kOverflow,
+	});
+	rCaptureInfo.flags.Set(ReplayCrcCaptureFlags::kAppendEnabled);
+	rCaptureInfo.iCapacity = kiReplayCrcMaxSamples;
+	rCaptureInfo.iSampleCount = 0;
+	rCaptureInfo.iNormalSampleCount = 0;
+	rCaptureInfo.samples = {};
+}
+
+void GameSaveLoad::CompleteReplayCrcReader(engine::GridCoord coord)
+{
+	ReplayCrcCaptureInfo& rCaptureInfo = mReplayCrcCaptureInfo;
+	if (rCaptureInfo.ePhase != ReplayCrcCapturePhase::kReader)
+	{
+		return;
+	}
+	if (rCaptureInfo.coord != coord)
+	{
+		return;
+	}
+
+	rCaptureInfo.ePhase = ReplayCrcCapturePhase::kReaderComplete;
+	rCaptureInfo.flags.Set(ReplayCrcCaptureFlags::kComplete);
+	rCaptureInfo.flags.Clear(ReplayCrcCaptureFlags::kAppendEnabled);
 }
 
 game::FrameInput GameSaveLoad::ComposeReplayInput(const game::FrameInput& rLiveInput, ReplayWriterState& rWriterState)
@@ -297,7 +397,9 @@ bool GameSaveLoad::UpdateTerminalReplayWriter(engine::GridCoord coord, ReplayWri
 	{
 		return IsTransferType(rStatusChange.eType);
 	});
-	rWriterState.pWriter->Update(rEndFrame.interpolate.iTick + 1, replayInput, rEndFrame);
+	const int64_t iTerminalTick = rEndFrame.interpolate.iTick + 1;
+	rWriterState.pWriter->Update(iTerminalTick, replayInput, rEndFrame);
+	AppendReplayCrcSample(coord, iTerminalTick, rEndFrame.Crc(), /*bTerminal=*/true);
 	return bHasTransfer;
 }
 
@@ -757,6 +859,7 @@ void GameSaveLoad::SaveLoadReplay()
 				}
 
 				const ReplayTransferCaptureInfo recordingCaptureInfo = mReplayTransferCaptureInfo;
+				const ReplayCrcCaptureInfo replayCrcCaptureInfo = mReplayCrcCaptureInfo;
 				game::gpGame->Reset();
 				AdoptGrid(std::move(stagedGrid));
 
@@ -785,6 +888,8 @@ void GameSaveLoad::SaveLoadReplay()
 				{
 					game::gpGame->mActiveCoords.push_back(rCoord);
 				}
+				mReplayCrcCaptureInfo = replayCrcCaptureInfo;
+				BeginReplayCrcReaderCapture();
 
 				// Game::Reset clears stream-owned diagnostic state. Restore recording evidence so each replay loop
 				// relatches playback.
@@ -887,6 +992,21 @@ bool GameSaveLoad::SyncReplayTick()
 			// A pending-start fixture arms before this branch; reset its observations without dropping that one-shot request.
 			const int64_t iPauseAfterWriterInputCount = mReplayTransferCaptureInfo.iPauseAfterWriterInputCount;
 			mReplayTransferCaptureInfo = {.iPauseAfterWriterInputCount = iPauseAfterWriterInputCount};
+			if (mReplayCrcCaptureInfo.ePhase == ReplayCrcCapturePhase::kArmed && mReplayWriters.contains(mReplayCrcCaptureInfo.coord))
+			{
+				mReplayCrcCaptureInfo.ePhase = ReplayCrcCapturePhase::kWriter;
+				mReplayCrcCaptureInfo.flags.Clear({
+					ReplayCrcCaptureFlags::kComplete,
+					ReplayCrcCaptureFlags::kOverflow,
+				});
+				mReplayCrcCaptureInfo.flags.Set(ReplayCrcCaptureFlags::kAppendEnabled);
+				mReplayCrcCaptureInfo.iCapacity = kiReplayCrcMaxSamples;
+				mReplayCrcCaptureInfo.iSampleCount = 0;
+				mReplayCrcCaptureInfo.iNormalSampleCount = 0;
+				mReplayCrcCaptureInfo.samples = {};
+				// Reuse the existing writer-input pause seam so a timescale burst cannot pass the fixed capture bound.
+				mReplayTransferCaptureInfo.iPauseAfterWriterInputCount = kiReplayCrcRecordUpdates;
+			}
 			LOG(kDefault, kDebug, "Recording started for {} coords", mReplayWriters.size());
 			return true;
 		}
@@ -989,10 +1109,20 @@ bool GameSaveLoad::SyncReplayTick()
 
 			if (bReplayWritten)
 			{
+				if (mReplayCrcCaptureInfo.ePhase == ReplayCrcCapturePhase::kWriter)
+				{
+					mReplayCrcCaptureInfo.ePhase = ReplayCrcCapturePhase::kWriterComplete;
+					mReplayCrcCaptureInfo.flags.Set(ReplayCrcCaptureFlags::kComplete);
+					mReplayCrcCaptureInfo.flags.Clear(ReplayCrcCaptureFlags::kAppendEnabled);
+				}
 				LOG(kDefault, kDebug, "Recording stopped");
 			}
 			else
 			{
+				if (mReplayCrcCaptureInfo.ePhase == ReplayCrcCapturePhase::kWriter)
+				{
+					mReplayCrcCaptureInfo.flags.Clear(ReplayCrcCaptureFlags::kAppendEnabled);
+				}
 				LOG(kDefault, kError, "Replay persistence failed; recording stopped without a complete replay");
 				mReplayTransferCaptureInfo = {};
 			}
@@ -1023,7 +1153,10 @@ bool GameSaveLoad::SyncReplayTick()
 				{
 					return IsTransferType(rStatusChange.eType);
 				}) || bWriterHasTransfer;
-				rWriterState.pWriter->Update(mrGameBase.TickCounter(), replayInput, mrGameBase.CurrentFrame(rCoord));
+				const int64_t iWriterTick = mrGameBase.TickCounter();
+				const game::Frame& rCurrentFrame = mrGameBase.CurrentFrame(rCoord);
+				rWriterState.pWriter->Update(iWriterTick, replayInput, rCurrentFrame);
+				AppendReplayCrcSample(rCoord, iWriterTick, rCurrentFrame.Crc(), /*bTerminal=*/false);
 				bWriterUpdated = true;
 			}
 			if (bWriterUpdated)
@@ -1095,7 +1228,16 @@ bool GameSaveLoad::SyncReplayTick()
 				{
 					mReplayTransferCaptureInfo.iPlaybackEventTick = mrGameBase.TickCounter();
 				}
-				rpReader->ValidateChecksum(mrGameBase.TickCounter(), mrGameBase.CurrentFrame(coord));
+				const int64_t iReaderTick = mrGameBase.TickCounter();
+				const bool bInitialChecksum = iReaderTick == rpReader->GetStartTick() + 1;
+				const bool bTerminalChecksum = rpReader->IsTerminalTick(iReaderTick);
+				const game::Frame& rCurrentFrame = mrGameBase.CurrentFrame(coord);
+				rpReader->ValidateChecksum(iReaderTick, rCurrentFrame);
+				// The first validation is the constructor/staging checksum; later validation ticks align with writer Update ticks.
+				if (!bInitialChecksum)
+				{
+					AppendReplayCrcSample(coord, iReaderTick, rCurrentFrame.Crc(), bTerminalChecksum);
+				}
 				if (bTerminalTick)
 				{
 					if (!rpReader->TerminalConsumed())
@@ -1106,6 +1248,7 @@ bool GameSaveLoad::SyncReplayTick()
 						mReplayTransferCaptureInfo = {};
 						return false;
 					}
+					CompleteReplayCrcReader(coord);
 					mrGameBase.mCoordFrames.erase(coord);
 					game::gpGame->mFrameInputs.erase(coord);
 					std::erase(game::gpGame->mActiveCoords, coord);
