@@ -16,10 +16,10 @@ locate evidence or verify a single checkable external claim, but never interview
 or choose for them.
 
 Execution splits by role: the preparation `implementer` performs every
-repository read, search, and WorktreeCli validation this skill requires and
-returns immutable decision briefs; the main session interviews the user,
-decides, and dispatches the `locator` for external-claim requests. Role
-contract: `../next-plan/references/tier3-workflow.md`.
+repository read and search this skill requires and returns immutable decision
+briefs; the main session interviews the user, decides, and dispatches the
+`locator` for external-claim requests. Role contract:
+`../next-plan/references/tier3-workflow.md`.
 
 ## Required Input and Boundary
 
@@ -128,19 +128,13 @@ revision and pass a fresh `/plan-audit` before re-entry.
 
 ## Plan Context
 
-The preparation `implementer` validates the scheduler once and supplies the
-result in its brief. Require that brief to carry the passing claim result from
-`Invoke-NextPlanClaim.ps1` — exit `0`, top-level `status: pass`, nested
-`validation.status: valid` and `validation.code: ok` — that same result's
-`validation.notices`, the tracked inventory from the `plan list` listing
-(`Get-NextPlanList.ps1`: `status: ok`, `code: ok`, and its `plans` array), and
-the text of every referenced Plan. Missing or non-passing evidence blocks
-this skill: stop and return the exact diagnostic to the manager. Never run
-the validation yourself, and never run a command that changes scheduler
-state.
+Require the preparation `implementer`'s brief to carry the text of every
+referenced Plan. The preparation `implementer` never runs a command that changes
+scheduler state; the idempotent claim invocation belongs to main, per
+`/next-plan`.
 
-Consult those tracked Plans only when the plan declares a dependency, shares
-files or symbols with another Plan, or the closing checks reveal likely overlap.
+Consult those Plans only when the plan declares a dependency, shares files or
+symbols with another Plan, or the closing checks reveal likely overlap.
 Never read machine-local scheduler claims. `Documents/Features` is manual and
 outside scheduler inventory.
 
