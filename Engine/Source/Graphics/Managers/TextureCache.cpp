@@ -269,13 +269,14 @@ void TextureCache::SaveTextureToCache(const std::filesystem::path& rCachePath, c
 	header.iDataSize = static_cast<int64_t>(data.size());
 
 	// Write cache file
-	static_cast<void>(gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, rCachePath, [&](std::fstream& rStream)
+	if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, rCachePath, [&](std::fstream& rStream)
 	{
 		common::Write(rStream, header);
 		common::Write(rStream, data);
-	}));
-
-	LOG(kGraphics, kDebug, "Saved texture cache to {}", rCachePath.string());
+	}))
+	{
+		LOG(kGraphics, kDebug, "Saved texture cache to {}", rCachePath.string());
+	}
 }
 
 } // namespace engine
