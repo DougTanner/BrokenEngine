@@ -378,6 +378,11 @@ function Invoke-WorktreeCliBuild([string[]] $DataProperties) {
 	}
 	foreach ($property in $DataProperties) { $arguments.Add($property) }
 	foreach ($argument in (Get-AnalysisArguments)) { $arguments.Add($argument) }
+	if ($Prefast -and $script:SelectedFiles.Count -eq 0) {
+		# RunNativeCodeAnalysis is incremental, so an up-to-date full build would report green without analyzing.
+		# The --files path reuses this argument list for its MSBuild evaluation query, so it stays incremental.
+		$arguments.Add('/t:Rebuild')
+	}
 	$script:Summary.Add("WorktreeCli build arguments: $($arguments -join ' ')")
 	# Stdout is not redirected: WorktreeCli's result envelope is the caller's stdout, byte-verbatim.
 	$script:BuildExitCode = (Start-CompileChild $script:WorktreeCliPath $arguments.ToArray() $false).ExitCode
