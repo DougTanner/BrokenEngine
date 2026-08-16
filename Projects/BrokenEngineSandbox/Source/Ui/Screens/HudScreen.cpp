@@ -6,58 +6,20 @@
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Game.h"
-#include "MenuUtils.h"
+#include "Ui/MenuUtils.h"
 
 namespace
 {
 
-constexpr float kfActivationDistancePixels = 350.0f;
-constexpr float kfSlideRate = 8.0f;
+constexpr float kfHudEdgeMarginFraction = 0.05f;
+constexpr float kfHudPanelTopFraction = 0.125f;
+constexpr float kfHudPanelMaxHeightFraction = 0.75f;
 constexpr float kfForceOpenGracePeriodSeconds = 2.0f;
 
 } // namespace
 
 namespace game
 {
-
-float HudScreen::ComputeMouseOpennessTarget(ImVec2 vFixedExtent, ImVec2 vAnchor, float fPivotX)
-{
-	const float fRectMinX = vAnchor.x - fPivotX * vFixedExtent.x;
-	const float fRectMaxX = fRectMinX + vFixedExtent.x;
-	const float fRectMinY = vAnchor.y;
-	const float fRectMaxY = vAnchor.y + vFixedExtent.y;
-
-	const ImVec2 vMouse = ImGui::GetIO().MousePos;
-	const float fDx = std::max({fRectMinX - vMouse.x, 0.0f, vMouse.x - fRectMaxX});
-	const float fDy = std::max({fRectMinY - vMouse.y, 0.0f, vMouse.y - fRectMaxY});
-	const float fDistance = std::sqrt(fDx * fDx + fDy * fDy);
-
-	return 1.0f - std::clamp(fDistance / (kfActivationDistancePixels * engine::UiScale()), 0.0f, 1.0f);
-}
-
-float HudScreen::UpdateSlideAndGetEdgeX(SlidePanelState& rState, ImVec2 vAnchor, float fSidePivotSign, float fTarget)
-{
-	ImGuiIO& rIo = ImGui::GetIO();
-
-	// Caller must set SetNextWindowPos pivot so the returned x IS the panel's off-screen edge:
-	//   right panel (fSidePivotSign > 0): pivot (0.0, 0) — returned x is the left edge
-	//   left  panel (fSidePivotSign < 0): pivot (1.0, 0) — returned x is the right edge
-	// At openness=0 the off-screen edge is fixed at exactly 1 pixel beyond the screen boundary,
-	// width-independent — keeps the panel fully offscreen regardless of its measured width.
-	const float fOffscreenX = (fSidePivotSign > 0.0f) ? rIo.DisplaySize.x + 1.0f : -1.0f;
-
-	if (rState.vLastSize.x <= 0.0f)
-	{
-		return fOffscreenX;
-	}
-
-	// rIo.DeltaTime is uncapped wall-clock time; a long UI hitch pushes the interpolant past 1 and overshoots.
-	rState.fOpenness += (fTarget - rState.fOpenness) * std::min(common::ExponentialInterpolant(kfSlideRate, rIo.DeltaTime), 1.0f);
-
-	// At openness=1 the on-screen anchor edge sits at vAnchor.x (offset by size to flip pivot side).
-	const float fOnscreenX = (fSidePivotSign > 0.0f) ? (vAnchor.x - rState.vLastSize.x) : (vAnchor.x + rState.vLastSize.x);
-	return std::lerp(fOffscreenX, fOnscreenX, rState.fOpenness);
-}
 
 void HudScreen::Render()
 {
@@ -169,12 +131,12 @@ void HudScreen::Render()
 	// PanelWidth() under the same scale+font scopes the panels render with so the strip width matches them exactly.
 	ImVec2 vHoverExtent {};
 	{
-		ScopedMenuScale menuScale;
-		ScopedMenuFont menuFont;
+		engine::ScopedMenuScale menuScale;
+		engine::ScopedMenuFont menuFont;
 		vHoverExtent = ImVec2(PanelWidth(), rIo.DisplaySize.y * kfHudPanelMaxHeightFraction);
 	}
-	const float fMouseLeft = ComputeMouseOpennessTarget(vHoverExtent, vLeftAnchor, 0.0f);
-	const float fMouseRight = ComputeMouseOpennessTarget(vHoverExtent, vRightAnchor, 1.0f);
+	const float fMouseLeft = engine::ComputeMouseOpennessTarget(vHoverExtent, vLeftAnchor, 0.0f);
+	const float fMouseRight = engine::ComputeMouseOpennessTarget(vHoverExtent, vRightAnchor, 1.0f);
 	const float fMouseTarget = std::max(fMouseLeft, fMouseRight);
 
 	// Final shared targets. When right has content: both panels see max(force, mouse) — strict sync.
@@ -211,12 +173,12 @@ float HudScreen::PanelWidth()
 void HudScreen::RenderFleetPanel(float fTarget)
 {
 	ImGuiIO& rIo = ImGui::GetIO();
-	ScopedMenuScale menuScale;
+	engine::ScopedMenuScale menuScale;
 
 	const ImVec2 vAnchor(rIo.DisplaySize.x * kfHudEdgeMarginFraction, rIo.DisplaySize.y * kfHudPanelTopFraction);
-	const float fEdgeX = UpdateSlideAndGetEdgeX(mFleetSlide, vAnchor, -1.0f, fTarget);
+	const float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFleetSlide, vAnchor, -1.0f, fTarget);
 	ImGuiWindowFlags eFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize;
-	ScopedMenuFont menuFont;
+	engine::ScopedMenuFont menuFont;
 	// Content-driven height: auto-resize to the fleet list, capped at kfHudPanelMaxHeightFraction (long lists scroll). Width
 	// pinned to PanelWidth() via the matching min/max constraint x.
 	const float fPanelWidth = PanelWidth();
@@ -231,7 +193,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRect occlusion
 	ImVec2 vPanelPos = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
-	DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
+	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
 
 	int64_t iFleetCount = gpGame->FleetCount();
 
@@ -395,7 +357,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 {
 	ImGuiIO& rIo = ImGui::GetIO();
-	ScopedMenuScale menuScale;
+	engine::ScopedMenuScale menuScale;
 
 	std::optional<int64_t> oPlayerIndex = std::nullopt;
 	{
@@ -407,9 +369,9 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 	}
 
 	const ImVec2 vAnchor(rIo.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rIo.DisplaySize.y * kfHudPanelTopFraction);
-	const float fEdgeX = UpdateSlideAndGetEdgeX(mFocusedPlayerSlide, vAnchor, 1.0f, fTarget);
+	const float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedPlayerSlide, vAnchor, 1.0f, fTarget);
 	ImGuiWindowFlags eFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-	ScopedMenuFont menuFont;
+	engine::ScopedMenuFont menuFont;
 	// Match the left FleetPanel's size exactly (symmetry): same PanelWidth(), height forced to the left panel's live height
 	// captured earlier this frame (RenderFleetPanel runs first). First frame (vLastSize.y still zero): fall back to the cap.
 	const float fLeftHeight = (mFleetSlide.vLastSize.y > 0.0f) ? mFleetSlide.vLastSize.y : (rIo.DisplaySize.y * kfHudPanelMaxHeightFraction);
@@ -422,7 +384,7 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRect occlusion
 	ImVec2 vPanelPos = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
-	DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
+	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
 
 	if (oPlayerIndex.has_value())
 	{

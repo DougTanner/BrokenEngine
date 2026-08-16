@@ -3,7 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Game.h"
-#include "MenuUtils.h"
+#include "Ui/MenuUtils.h"
 #include "Network/Client/ClientSession.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/Localization.h"
@@ -48,28 +48,28 @@ void MainMenuScreen::Render()
 	}
 
 	ImGuiIO& rIo = ImGui::GetIO();
-	ScopedMenuScale menuScale;
+	engine::ScopedMenuScale menuScale;
 
 	// Invisible windows let the menu compose directly over the live scene
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 	ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 
 	// Center the title/action group vertically and place it on the screen's first vertical third.
-	ImVec2 vMenuCenter(rIo.DisplaySize.x * kfMainMenuCenterFractionX, rIo.DisplaySize.y * kfMainMenuCenterFractionY);
-	vMenuCenter.y -= kfMainMenuOpticalOffsetYPixels * engine::UiScale() * ImGui::GetStyle().FontScaleMain;
+	ImVec2 vMenuCenter(rIo.DisplaySize.x * engine::kfMainMenuCenterFractionX, rIo.DisplaySize.y * engine::kfMainMenuCenterFractionY);
+	vMenuCenter.y -= engine::kfMainMenuOpticalOffsetYPixels * engine::UiScale() * ImGui::GetStyle().FontScaleMain;
 	ImGui::SetNextWindowPos(vMenuCenter, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
-	ScopedMenuFont menuFont;
+	engine::ScopedMenuFont menuFont;
 	ImGui::Begin("MainMenu", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
 	// Shared text-driven width over every button label (including the SCANNING... discovery state), floored to the
 	// primary-button minimum. Height auto-sizes per button (0.0f).
-	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(kStringLocalServer), TranslatedString(kStringRemoteServer), TranslatedString(kStringGraphics), TranslatedString(kStringAudio), TranslatedString(kStringGameSettings), TranslatedString(kStringQuit), U"SCANNING..."}), kfPrimaryButtonMinWidthPixels * engine::UiScale());
+	float fButtonWidth = std::max(engine::MenuButtonsWidth({TranslatedString(kStringLocalServer), TranslatedString(kStringRemoteServer), TranslatedString(kStringGraphics), TranslatedString(kStringAudio), TranslatedString(kStringGameSettings), TranslatedString(kStringQuit), U"SCANNING..."}), engine::kfPrimaryButtonMinWidthPixels * engine::UiScale());
 	float fHeadingWidth = 0.0f;
 	{
-		ScopedMenuFont headingFont(kfMenuUiScale * kfMainMenuHeadingScale);
+		engine::ScopedMenuFont headingFont(engine::kfMenuUiScale * engine::kfMainMenuHeadingScale);
 		fHeadingWidth = ImGui::CalcTextSize("BROKEN ENGINE").x;
 	}
 
@@ -77,7 +77,7 @@ void MainMenuScreen::Render()
 	float fContentStartX = ImGui::GetCursorPosX();
 	float fContentWidth = std::max(fHeadingWidth, fButtonWidth);
 	CenterMenuItem(fContentStartX, fContentWidth, fHeadingWidth);
-	MenuHeading("BROKEN ENGINE", kfMainMenuHeadingScale);
+	engine::MenuHeading("BROKEN ENGINE", engine::kfMainMenuHeadingScale);
 
 	// Auto-start discovery when main menu is shown
 	if (gpClientSession->mpRuntime->mpClient == nullptr && gpClientSession->mpRuntime->mpDiscoveryScanner == nullptr && !(gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered))
@@ -124,7 +124,7 @@ void MainMenuScreen::Render()
 	if (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered)
 	{
 		CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-		if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringLocalServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
+		if (engine::MenuButton(engine::AppendUtf8(rWorkbuffer, TranslatedString(kStringLocalServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
 		{
 			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots);
 		}
@@ -133,19 +133,19 @@ void MainMenuScreen::Render()
 	{
 		ImGui::BeginDisabled();
 		CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-		MenuButton("SCANNING...", ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]);
+		engine::MenuButton("SCANNING...", ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]);
 		ImGui::EndDisabled();
 	}
 
 	// Remote Server button (placeholder for future Internet servers)
 	ImGui::BeginDisabled();
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringRemoteServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]);
+	engine::MenuButton(engine::AppendUtf8(rWorkbuffer, TranslatedString(kStringRemoteServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]);
 	ImGui::EndDisabled();
 
 	// Graphics button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
+	if (engine::MenuButton(engine::AppendUtf8(rWorkbuffer, TranslatedString(kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
 	{
 		gpGame->meUiState = engine::UiState::kGraphicsSettings;
 		engine::gSunAngleOverride.Set(gpCamera->RawSunAngle());
@@ -153,21 +153,21 @@ void MainMenuScreen::Render()
 
 	// Audio button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
+	if (engine::MenuButton(engine::AppendUtf8(rWorkbuffer, TranslatedString(kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
 	{
 		gpGame->meUiState = engine::UiState::kSound;
 	}
 
 	// Game Settings button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
+	if (engine::MenuButton(engine::AppendUtf8(rWorkbuffer, TranslatedString(kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
 	{
 		gpGame->meUiState = engine::UiState::kGameSettings;
 	}
 
 	// Quit button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
+	if (engine::MenuButton(engine::AppendUtf8(rWorkbuffer, TranslatedString(kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
 	{
 		gpGame->mGameFlags.Set(engine::GameFlags::kQuit);
 	}

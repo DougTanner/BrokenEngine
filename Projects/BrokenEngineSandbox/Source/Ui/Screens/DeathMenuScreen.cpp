@@ -3,7 +3,7 @@
 #include "DeathMenuScreen.h"
 
 #include "Game.h"
-#include "MenuUtils.h"
+#include "Ui/MenuUtils.h"
 #include "Ui/Localization.h"
 
 namespace game

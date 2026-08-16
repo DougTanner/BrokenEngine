@@ -1,6 +1,6 @@
 #pragma once
 
-namespace game
+namespace engine
 {
 
 // UI scale factor for menu screens
@@ -22,9 +22,6 @@ inline constexpr float kfLanguageMenuGeometryScale = 0.5f;
 // Anchors / extents as DisplaySize fractions:
 inline constexpr float kfMainMenuCenterFractionX = 1.0f / 3.0f; // MainMenu group center on first vertical third
 inline constexpr float kfMainMenuCenterFractionY = 0.5f;        // MainMenu group anchored at semantic screen center
-inline constexpr float kfHudEdgeMarginFraction = 0.05f;        // HUD panel inset from the screen edge
-inline constexpr float kfHudPanelTopFraction = 0.125f;         // HUD panel top edge
-inline constexpr float kfHudPanelMaxHeightFraction = 0.75f;    // HUD panel height cap + fixed hover-zone extent
 inline constexpr float kfGraphicsMaxHeightFraction = 0.9f;     // Graphics settings-panel height cap
 inline constexpr float kfModalAnchorFractionY = 0.4f;          // Modal center Y, seated slightly above screen center
 // 4K-authored pixels (multiply by engine::UiScale() at use):
@@ -33,7 +30,6 @@ inline constexpr float kfMainMenuOpticalOffsetYPixels = 20.0f; // Screenshot-der
 inline constexpr float kfPrimaryButtonMinWidthPixels = 760.0f; // Menu primary-button minimum width
 inline constexpr float kfModalButtonMinWidthPixels = 380.0f;   // Modal button minimum width
 
-// RAII helper for scaling UI elements
 class ScopedMenuScale
 {
 public:
@@ -71,6 +67,15 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 
 #if defined(BT_CLIENT)
 
+struct SlidePanelState
+{
+	float fOpenness = 0.0f;
+	ImVec2 vLastSize {};
+};
+
+float ComputeMouseOpennessTarget(ImVec2 vFixedExtent, ImVec2 vAnchor, float fPivotX);
+float UpdateSlideAndGetEdgeX(SlidePanelState& rState, ImVec2 vAnchor, float fSidePivotSign, float fTarget);
+
 // RAII font push for menu text: sizes the default Latin/CJK font via the dynamic-font API
 // (SetWindowFontScale is obsolete). fScale multiplies the pre-global-scale base size, so the user's
 // gUiFontScale still applies exactly once on top. Construct either before Begin() (destructs after End()) or
@@ -106,4 +111,4 @@ bool MenuButton(const char* pcLabel, const ImVec2& vSize, float& rfHoverAnim, bo
 
 #endif // BT_CLIENT
 
-} // namespace game
+} // namespace engine

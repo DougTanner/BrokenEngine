@@ -1,8 +1,8 @@
-#include "MenuUtils.h"
+#include "Ui/MenuUtils.h"
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
-namespace game
+namespace engine
 {
 
 common::ScopedWorkbufferAllocation<char*> AppendUtf8(common::Workbuffer& rWorkbuffer, std::u32string_view u32String)
@@ -131,6 +131,8 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float f
 namespace
 {
 
+constexpr float kfActivationDistancePixels = 350.0f;
+constexpr float kfSlideRate = 8.0f;
 constexpr float kfPanelRounding = 8.0f;
 constexpr float kfButtonRounding = 6.0f;
 constexpr float kfPanelBorderThickness = 2.0f;
@@ -198,6 +200,45 @@ ImU32 ChromeColor(const ImVec4& rf4Color, float fAlphaScale = 1.0f)
 }
 
 } // namespace
+
+float ComputeMouseOpennessTarget(ImVec2 vFixedExtent, ImVec2 vAnchor, float fPivotX)
+{
+	const float fRectMinX = vAnchor.x - fPivotX * vFixedExtent.x;
+	const float fRectMaxX = fRectMinX + vFixedExtent.x;
+	const float fRectMinY = vAnchor.y;
+	const float fRectMaxY = vAnchor.y + vFixedExtent.y;
+
+	const ImVec2 vMouse = ImGui::GetIO().MousePos;
+	const float fDx = std::max({fRectMinX - vMouse.x, 0.0f, vMouse.x - fRectMaxX});
+	const float fDy = std::max({fRectMinY - vMouse.y, 0.0f, vMouse.y - fRectMaxY});
+	const float fDistance = std::sqrt(fDx * fDx + fDy * fDy);
+
+	return 1.0f - std::clamp(fDistance / (kfActivationDistancePixels * engine::UiScale()), 0.0f, 1.0f);
+}
+
+float UpdateSlideAndGetEdgeX(SlidePanelState& rState, ImVec2 vAnchor, float fSidePivotSign, float fTarget)
+{
+	ImGuiIO& rIo = ImGui::GetIO();
+
+	// Caller must set SetNextWindowPos pivot so the returned x IS the panel's off-screen edge:
+	//   right panel (fSidePivotSign > 0): pivot (0.0, 0) — returned x is the left edge
+	//   left  panel (fSidePivotSign < 0): pivot (1.0, 0) — returned x is the right edge
+	// At openness=0 the off-screen edge is fixed at exactly 1 pixel beyond the screen boundary,
+	// width-independent — keeps the panel fully offscreen regardless of its measured width.
+	const float fOffscreenX = (fSidePivotSign > 0.0f) ? rIo.DisplaySize.x + 1.0f : -1.0f;
+
+	if (rState.vLastSize.x <= 0.0f)
+	{
+		return fOffscreenX;
+	}
+
+	// rIo.DeltaTime is uncapped wall-clock time; a long UI hitch pushes the interpolant past 1 and overshoots.
+	rState.fOpenness += (fTarget - rState.fOpenness) * std::min(common::ExponentialInterpolant(kfSlideRate, rIo.DeltaTime), 1.0f);
+
+	// At openness=1 the on-screen anchor edge sits at vAnchor.x (offset by size to flip pivot side).
+	const float fOnscreenX = (fSidePivotSign > 0.0f) ? (vAnchor.x - rState.vLastSize.x) : (vAnchor.x + rState.vLastSize.x);
+	return std::lerp(fOffscreenX, fOnscreenX, rState.fOpenness);
+}
 
 ScopedMenuFont::ScopedMenuFont(float fScale)
 {
@@ -291,4 +332,4 @@ bool MenuButton(const char* pcLabel, const ImVec2& vSize, float& rfHoverAnim, bo
 
 #endif // BT_CLIENT
 
-} // namespace game
+} // namespace engine

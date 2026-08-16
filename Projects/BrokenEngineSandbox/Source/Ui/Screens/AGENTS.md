@@ -4,7 +4,7 @@ ImGui menus, HUD, modal surfaces, and the game extension of engine TweaksScreen.
 
 ## Shared Contracts
 
-- Screen bodies are client-only except the shared menu utilities and death-flow placeholder used by both projects. Headers must remain parseable in their project affinity.
+- Screen bodies are client-only except the death-flow placeholder used by both projects. Shared menu helpers are engine-owned; screen headers must remain parseable in their project affinity.
 - Screens gate themselves from authoritative game/UI state because `ImGuiManager` invokes main and modal surfaces independently of in-game screen gating.
 - Use the common 2160-height UI scale for fonts, style geometry, authored pixel dimensions, and anchors. Measure text under the active font and add style padding; do not rescale measured dimensions.
 - A screen registers its rendered rectangle for world-render occlusion only while its background is fully opaque. A screen that selects its own background alpha independently of the opaque-UI setting stays unregistered, even when that alpha is fully opaque.
@@ -20,7 +20,7 @@ ImGui menus, HUD, modal surfaces, and the game extension of engine TweaksScreen.
 
 - Rendered target-resolution output is authoritative for judging whether spacing looks centered, not just whether it measures centered; window bounds and text metrics are diagnostics.
 - Menu font pushes must be balanced within the owning ImGui window. Construct scoped font helpers before `Begin` or entirely inside the window so `End` sees the expected stack.
-- Shared helpers own scaling, localization conversion, wrapper bindings, common button sizing, and menu chrome. Screen-specific layout values stay local and named.
+- Shared menu helpers in [Engine UI](../../../../../Engine/Source/Ui/AGENTS.md) own scaling, localization conversion, wrapper bindings, common button sizing, menu chrome, slide-panel behavior, and player-facing layout-contract defaults, including single-screen MainMenu, Graphics, and Modal anchors/extents. The three HUD-specific fractions and each screen's composition stay game-local, named.
 - Panels take their fill from the window background; accent drawing adds border and strip geometry over it and never substitutes a fill.
 - Hover animation is caller-owned state and composes ImGui alpha, including disabled controls, without heap allocation.
 

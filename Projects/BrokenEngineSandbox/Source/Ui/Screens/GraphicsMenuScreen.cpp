@@ -3,7 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Game.h"
-#include "MenuUtils.h"
+#include "Ui/MenuUtils.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
@@ -37,7 +37,7 @@ void ColumnSlider(const char* pcLabel, engine::Wrapper* pWrapper)
 	char pcSliderId[64];
 	std::snprintf(pcSliderId, sizeof(pcSliderId), "##%s", pcLabel);
 	ImGui::SetNextItemWidth(-FLT_MIN);
-	WrapperSlider(pcSliderId, pWrapper);
+	engine::WrapperSlider(pcSliderId, pWrapper);
 }
 
 } // namespace
@@ -62,20 +62,20 @@ void GraphicsMenuScreen::Render()
 	ImGui::SetNextWindowSize(ImVec2(rIo.DisplaySize.x * fPanelWidthFraction, 0.0f));
 	// Window auto-resizes to its content (content can exceed a 4K screen); cap the height so the whole panel stays on
 	// screen.
-	ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(rIo.DisplaySize.x, rIo.DisplaySize.y * kfGraphicsMaxHeightFraction));
+	ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(rIo.DisplaySize.x, rIo.DisplaySize.y * engine::kfGraphicsMaxHeightFraction));
 
 	// Always transparent regardless of Opaque UI, so the FPS readout below reflects worst-case cost
 	ImVec4 f4WindowBg = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
 	f4WindowBg.w = engine::gUiOpacity.Get();
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, f4WindowBg);
 
-	ScopedMenuFont menuFont(fMenuFontScale);
+	engine::ScopedMenuFont menuFont(fMenuFontScale);
 	ImGui::Begin("GraphicsMenu", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
 
 	// Border + accent strip only — the themed WindowBg already fills the panel
 	ImVec2 vPanelPos = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
-	DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
+	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
 
 	bool bBackPressed = false;
 	if (ImGui::BeginTable("GraphicsHeader", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_NoSavedSettings))
@@ -88,9 +88,9 @@ void GraphicsMenuScreen::Render()
 		ImGui::TableNextColumn();
 		float fHeaderHeight = 0.0f;
 		{
-			ScopedMenuFont headingFont(fMenuFontScale * kfGraphicsHeadingScale);
+			engine::ScopedMenuFont headingFont(fMenuFontScale * kfGraphicsHeadingScale);
 			fHeaderHeight = ImGui::GetTextLineHeight();
-			ImGui::TextUnformatted(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(kStringGraphics)));
+			ImGui::TextUnformatted(engine::AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(kStringGraphics)));
 		}
 
 		ImGui::TableNextColumn();
@@ -98,10 +98,10 @@ void GraphicsMenuScreen::Render()
 		ImGui::Text("FPS: %lld", engine::gpGraphics->mRendersInTheLastSecond.Get());
 
 		ImGui::TableNextColumn();
-		float fBackWidth = MenuButtonsWidth({U"Back"});
+		float fBackWidth = engine::MenuButtonsWidth({U"Back"});
 		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - fBackWidth);
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + std::max(0.0f, (fHeaderHeight - ImGui::GetFrameHeight()) * 0.5f));
-		bBackPressed = MenuButton("Back", ImVec2(fBackWidth, 0.0f), mfBackHoverAnim);
+		bBackPressed = engine::MenuButton("Back", ImVec2(fBackWidth, 0.0f), mfBackHoverAnim);
 
 		ImGui::EndTable();
 	}
@@ -125,23 +125,23 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::Separator();
 
-		WrapperToggle("Fullscreen", &engine::gFullscreen);
+		engine::WrapperToggle("Fullscreen", &engine::gFullscreen);
 
-		RadioRow("Presentation Mode", &engine::gPresentMode, engine::gPresentMode.Get(),
+		engine::RadioRow("Presentation Mode", &engine::gPresentMode, engine::gPresentMode.Get(),
 			{{"Immediate", static_cast<float>(VK_PRESENT_MODE_IMMEDIATE_KHR)}, {"Mailbox", static_cast<float>(VK_PRESENT_MODE_MAILBOX_KHR)}, {"FIFO", static_cast<float>(VK_PRESENT_MODE_FIFO_KHR)}});
 
 		ImGui::Separator();
 
-		WrapperToggle("Multisampling", &engine::gMultisampling);
+		engine::WrapperToggle("Multisampling", &engine::gMultisampling);
 		if (engine::gMultisampling.Get<bool>())
 		{
-			RadioRow(nullptr, &engine::gSampleCount, engine::gSampleCount.Get(),
+			engine::RadioRow(nullptr, &engine::gSampleCount, engine::gSampleCount.Get(),
 				{{"2x", static_cast<float>(VK_SAMPLE_COUNT_2_BIT)}, {"4x", static_cast<float>(VK_SAMPLE_COUNT_4_BIT)}, {"8x", static_cast<float>(VK_SAMPLE_COUNT_8_BIT)}, {"16x", static_cast<float>(VK_SAMPLE_COUNT_16_BIT)}});
 		}
 
 		ImGui::Separator();
 
-		WrapperToggle("Sample Shading", &engine::gSampleShading);
+		engine::WrapperToggle("Sample Shading", &engine::gSampleShading);
 		if (engine::gSampleShading.Get<bool>())
 		{
 			ColumnSlider("Min Sample Shading", &engine::gMinSampleShading);
@@ -149,7 +149,7 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::Separator();
 
-		WrapperToggle("Anisotropy", &engine::gAnisotropy);
+		engine::WrapperToggle("Anisotropy", &engine::gAnisotropy);
 		if (engine::gAnisotropy.Get<bool>())
 		{
 			ColumnSlider("Max Anisotropy", &engine::gMaxAnisotropy);
@@ -159,38 +159,38 @@ void GraphicsMenuScreen::Render()
 		// Right column: Effects & UI
 		ImGui::TableNextColumn();
 
-		if (RadioRow("Water", &engine::gWaterLevel, engine::gWaterLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (engine::RadioRow("Water", &engine::gWaterLevel, engine::gWaterLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
 			engine::ApplyWaterLevel();
 		}
 
 		ImGui::Separator();
 
-		if (RadioRow("Terrain Shadows", &engine::gTerrainShadowsLevel, engine::gTerrainShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (engine::RadioRow("Terrain Shadows", &engine::gTerrainShadowsLevel, engine::gTerrainShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
 			engine::ApplyTerrainShadowsLevel();
 		}
 
 		ImGui::Separator();
 
-		if (RadioRow("Object Shadows", &engine::gObjectShadowsLevel, engine::gObjectShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (engine::RadioRow("Object Shadows", &engine::gObjectShadowsLevel, engine::gObjectShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
 			engine::ApplyObjectShadowsLevel();
 		}
 
 		ImGui::Separator();
 
-		if (RadioRow("Lighting", &engine::gLightingLevel, engine::gLightingLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (engine::RadioRow("Lighting", &engine::gLightingLevel, engine::gLightingLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
 			engine::ApplyLightingLevel();
 		}
 
 		ImGui::Separator();
 
-		WrapperToggle("Smoke", &engine::gSmokeEnabled);
+		engine::WrapperToggle("Smoke", &engine::gSmokeEnabled);
 		if (engine::gSmokeEnabled.Get<bool>())
 		{
-			if (RadioRow("Smoke Detail", &engine::gSmokeDetailLevel, engine::gSmokeDetailLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+			if (engine::RadioRow("Smoke Detail", &engine::gSmokeDetailLevel, engine::gSmokeDetailLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 			{
 				engine::ApplySmokeDetailLevel();
 			}
@@ -200,7 +200,7 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::Separator();
 
-		WrapperToggle("Wind", &engine::gWindEnabled);
+		engine::WrapperToggle("Wind", &engine::gWindEnabled);
 		ColumnSlider("Lighting Update Cadence", &engine::gLightingUpdateCadence);
 
 		ImGui::EndTable();

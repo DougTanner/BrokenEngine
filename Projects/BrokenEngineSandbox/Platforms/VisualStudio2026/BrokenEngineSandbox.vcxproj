@@ -491,7 +491,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Ui\Screens\GraphicsMenuScreen.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\MainMenuScreen.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\MenuUtils.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\ModalScreen.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\PauseMenuScreen.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\SoundMenuScreen.h" />
@@ -727,7 +727,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Ui\Screens\ModalScreen.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\PauseMenuScreen.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\SoundMenuScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\MenuUtils.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Objects\AlphaMesh.frag" />

@@ -1,6 +1,6 @@
 # Engine UI - Shared Wrapper and Screen Infrastructure
 
-Shared runtime settings, renderer quality levels, network-pending controls, and client-only curve/editor support. Engine Tweaks registration contracts live in TweaksScreen (`Screens/TweaksScreen/AGENTS.md`); game localization, quality-level persistence, and menu consumption live in game UI (`../../../Projects/BrokenEngineSandbox/Source/Ui/AGENTS.md`).
+Shared runtime settings, player-facing menu helpers, renderer quality levels, network-pending controls, and client-only curve/editor support. Engine Tweaks registration contracts live in TweaksScreen (`Screens/TweaksScreen/AGENTS.md`); game localization, quality-level persistence, and menu consumption live in game UI (`../../../Projects/BrokenEngineSandbox/Source/Ui/AGENTS.md`).
 
 ## Wrapper Contracts
 
@@ -10,6 +10,11 @@ Shared runtime settings, renderer quality levels, network-pending controls, and 
 - Wrapper bounds annotated with shader invariants are correctness constraints, not UI tuning.
 - Settings that alter baked render-target dimensions must participate in `Graphics::Refresh`; prefer per-frame uniforms when recreation is unnecessary.
 - Wrapper headers are intentionally consumed directly rather than aggregated into `Engine.h`, limiting recompilation from tuning edits.
+
+## Menu and Panel Helpers
+
+- Engine UI owns reusable player-facing menu layout and interaction helpers, including workbuffer-backed localized text conversion, wrapper controls, common sizing, menu chrome, and slide-panel behavior. Game UI owns screen-specific composition, game-state gating, labels, and interaction flows.
+- The shared menu-helper header remains parseable in both client and server projects because shared game UI code includes it on both sides. Its client-only panel state, font, and chrome declarations stay behind `BT_CLIENT`; game screen headers guard their client-only members without hiding shared declarations needed by server-side screens.
 
 ## Graphics Quality Levels
 
@@ -26,7 +31,7 @@ Shared runtime settings, renderer quality levels, network-pending controls, and 
 - The Lighting tab deliberately keeps two combine curves, `gCombineCurveOld` and `gCombineCurveNew`, behind the `gbUseCombineCurveNew` toggle so tuning can be compared live against the shipping baseline. They currently hold identical control points; that is the A/B setup, not dead duplication. Collapse to a single curve once tuning settles.
 - `NetworkUiControl` disables a control while authoritative state has not resolved its request; call `Update` every frame with that authoritative state.
 
-Most wrapper storage compiles into both builds so server-side simulation can read defaults. ImGui/ImPlot-dependent types remain `BT_CLIENT`-guarded.
+Most wrapper storage compiles into both builds so server-side simulation can read defaults. Client-only ImPlot types and menu panel, font, and chrome state remain `BT_CLIENT`-guarded; the shared menu helper's conversion and wrapper-control surface is available in both builds.
 
 ## See Also
 

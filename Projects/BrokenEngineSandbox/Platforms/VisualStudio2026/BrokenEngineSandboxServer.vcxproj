@@ -429,7 +429,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Ui\Localization.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\DeathMenuScreen.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\MenuUtils.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h" />
     <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\WindDepositsWrappers.h" />
     <ClInclude Include="$(GameDataDirectory)\Audio.h" />
@@ -543,7 +543,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Network\Server\ServerClientManager.cpp" />
     <ClCompile Include="..\..\Source\Input\Input.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\DeathMenuScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\MenuUtils.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
   </ItemGroup>
   <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />
