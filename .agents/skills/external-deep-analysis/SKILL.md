@@ -47,8 +47,10 @@ Snapshot -Target <resolved-relative-POSIX-path> -Scope <resolved-mode>
 <absolute-ignored-Temp-path>`, and consume the digest's `profile`,
 `targetSelection`, `coverage`, and `hints` fields. The digest carries no metric
 values, so also read the retained full report's `current.targetMetrics` and
-`current.corpusMetrics` `structuralErosion` and `verbosity` values and keep all
-four for the final summary.
+`current.corpusMetrics` `structuralErosion`, `verbosity`, and `excessDecisions`
+values and keep all six for the final summary. `excessDecisions` is net scope
+evidence; unchanged means only no net decision removal, never redistribution
+without source-diff evidence.
 
 An operational failure blocks the pipeline: it exits `2` with diagnostics on
 stderr and no digest on stdout. Treat
@@ -111,13 +113,18 @@ investigation paths as evidence to inspect, without expanding the original
 finding boundary.
 
 Treat every forwarded `hints.highComplexityFunctions` item whose `path` lies in
-the resolved target as a required checklist item with one of exactly two
-recorded outcomes: a source-verified finding whose acceptance criterion is that
-no function resulting from the decomposition exceeds cyclomatic complexity ten,
-or a named residual identifying that `owner`, `name`, and `signature` and
-stating why decomposition is not warranted — irreducibility included. Hints
-outside the resolved target stay evidence-only and never become checklist
-items.
+the resolved target as navigation evidence to inspect. Do not require a
+decomposition, a cyclomatic-complexity-ten outcome, or a threshold verdict from
+that hint. `CC > 10` remains navigation only. Hints outside the resolved target
+stay evidence-only and never become checklist items.
+
+For excess-decision evidence, prefer in-place deletion, merging, flattening, or
+existing dispatch. Extract only for independently meaningful responsibility,
+reuse, or a genuinely separate abstraction; one-shot sequential or
+threshold-driven extraction is metric-neutral. A target decrease proves
+simplification only when the diff shows decision removal and the corpus shows no
+attributable offset elsewhere, or a separately evidenced structural benefit
+independently justifies extraction. Structural erosion alone is navigation.
 
 Keep its file-size triage separate from ordinary findings. Every oversized file
 retains the explicit instruction `run /reduce-file <path>`; do not analyze it
@@ -163,7 +170,7 @@ report:
 
 - exact target, scope mode, file count, and applicable authorities;
 - metric profile, target and corpus coverage, the target's and corpus's
-  `structuralErosion` and `verbosity` values, scoped-hint total/emitted counts,
+  `structuralErosion`, `verbosity`, and `excessDecisions` values, scoped-hint total/emitted counts,
   and every metric residual, so successive runs over the same target show the
   trend;
 - architecture and refactor-clean finding counts;

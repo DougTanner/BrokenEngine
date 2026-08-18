@@ -428,13 +428,18 @@ try {
 	foreach ($record in $records) {
 		$metadata = $record.Metadata
 		if ($selection -eq 'explicit-session-id') {
-			# The caller named one exact transcript, so it is returned whether root or descendant.
+			# The caller named one exact transcript, so it is returned whether root or descendant, and
+			# the commit-derived gates below never discard it: the named session can predate the reviewed
+			# commit or run outside a worktree that still contains it. Its evidence fields carry that signal
+			# to the reviewer, who owns production proof.
 			if ($metadata.SessionId -cne $SessionId) { continue }
 		}
-		elseif (-not $metadata.IsRoot) { continue }
-		$metadataRoot = Get-CanonicalMetadataCwd $metadata.Cwd
-		if ($null -eq $metadataRoot -or -not $eligibleWorktreeRoots.Contains($metadataRoot)) { continue }
-		if ($metadata.Start -gt $commitTimestamp -or $metadata.End -lt $commitTimestamp) { continue }
+		else {
+			if (-not $metadata.IsRoot) { continue }
+			$metadataRoot = Get-CanonicalMetadataCwd $metadata.Cwd
+			if ($null -eq $metadataRoot -or -not $eligibleWorktreeRoots.Contains($metadataRoot)) { continue }
+			if ($metadata.Start -gt $commitTimestamp -or $metadata.End -lt $commitTimestamp) { continue }
+		}
 		$descendants = $null
 		if ($selection -eq 'bounded-commit-window') {
 			$descendants = @()
@@ -582,7 +587,7 @@ try {
 	}
 	$result.status = 'pass'
 	$result.code = 'transcript.found'
-	$result.message = 'One transcript matched the bounded metadata constraints.'
+	$result.message = if ($selection -eq 'explicit-session-id') { 'One transcript matched the requested session id.' } else { 'One transcript matched the bounded metadata constraints.' }
 	$result.candidate = $orderedCandidates[0]
 	$result.candidates = @()
 	Write-Result $result 0

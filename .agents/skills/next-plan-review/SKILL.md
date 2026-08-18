@@ -62,7 +62,19 @@ bullet in the root [AGENTS.md](../../../AGENTS.md).
 4. Prove the parent started before and covered the commit, used the eligible
    retained registered worktree selected by the finder, and recorded
    finalization producing the full hash. An exact ID or filename is selection
-   evidence, not production proof. Inventory every direct ordinary child and
+   evidence, not production proof. On a `selection.mode: explicit-session-id`
+   result the finder applies neither the worktree nor the commit-window gate, so
+   that ID together with the friction Plan's recorded provenance proves only
+   which transcript to read; judge the rest from the result's evidence fields
+   and the transcript. When the reviewed commit is a later landing the observing
+   session did not itself produce, that session can neither span nor select it,
+   so the required proof becomes attribution of the commit to that session: its
+   recorded landing ref, or the `git log --diff-filter=A` fallback commit only
+   when that commit is attributable to that session alone. Report
+   `Transcript provenance: BLOCKED` when the named transcript cannot be tied to
+   the recorded session, and when the commit is not so attributable; never
+   review an unrelated manual, aggregate, or multi-session squash commit.
+   Inventory every direct ordinary child and
    headless execution that the proven invoking parent/main attempted, including
    planning, attempts with no meaningful effect, failed, and aborted attempts; the invoking parent/main
    is not an inventory row. An ordinary child relationship requires both its

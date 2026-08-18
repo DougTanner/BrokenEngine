@@ -1,4 +1,4 @@
-# Integrate Deterministic Verbosity and Structural-Erosion Analysis
+# Integrate Deterministic Verbosity, Structural-Erosion, and Excess-Decision Analysis
 
 ## Summary
 
@@ -55,14 +55,15 @@ The following scope is both target and ceiling. Implement the smallest complete 
   - Function mass = `cyclomatic complexity × sqrt(function SLOC)`.
   - Structural erosion = high-complexity mass (`CC > 10`) divided by total mass.
   - C++ verbosity = the union of clone-flagged SLOC divided by total SLOC; at this pin, non-Python verbosity is clone-only.
-  - Higher values are worse. Zero denominators produce `applicable: false` with a null value and preserved numerator/denominator.
+  - Excess decisions = `sum(max(CC - 1, 0))` for functions in the scope. Its numerator and value are the total; its denominator is `1` when functions exist and `0` otherwise, with `applicable: false` and a null value for an empty function scope.
+  - Higher values are worse. Zero denominators produce `applicable: false` with a null value and preserved numerator/denominator. Excess decisions are net scope evidence, not redistribution evidence.
 
-- Analyze the complete owned corpus once so target files can detect clones outside their directory. Report aggregate weighted corpus/target metrics, coverage, exact clone instances, high-CC functions, absolute contributors, and the ten largest positive file/area outliers relative to the corpus average.
+- Analyze the complete owned corpus once so target files can detect clones outside their directory. Report aggregate corpus/target metrics (weighted structural-erosion/verbosity and total excess decisions), coverage, exact clone instances, high-CC functions, absolute contributors, and the ten largest positive structural-erosion/verbosity file/area outliers relative to the corpus average. Do not add excess decisions to outlier or Phase-0 hint buckets.
 - Use the prototype’s Broken Engine area grouping: Engine and project Source subsystems, Common/Tools children, and top-level fallback.
 - Compare mode archives the fixed baseline and separately captures current tracked plus untracked/nonignored source into an immutable temporary tree. Record path, mode, and SHA-256 identities before and after capture; exit `2` on capture-manifest or content drift.
 - Report whole-corpus, target, and common-parsed-cohort deltas; numerator/denominator changes; introduced/resolved clone groups and instances; unchanged clone counterparts; coverage changes; and function changes.
 - Match functions within baseline/current file pairs by undecorated owner, name, and signature only when unique on both sides. Report overloads or duplicate identities as ambiguous/unmatched without directional claims. Coverage/identity changes suppress total-score “improved/regressed” labels while retaining raw and common-cohort evidence.
-- Add mandatory Phase 0 to `$external-deep-analysis`: run corpus-plus-target Snapshot, then pass bounded target outliers, clones, and high-CC functions into architecture/refactor phases as investigation hints. They cannot expand scope, create findings or Plans, or alter Debt Score. Operational failure blocks the pipeline; parse skips remain explicit residuals.
+- Add mandatory Phase 0 to `$external-deep-analysis`: run corpus-plus-target Snapshot, retain `current.corpusMetrics.excessDecisions` and `current.targetMetrics.excessDecisions` alongside the four current structural-erosion/verbosity values, then pass bounded target outliers, clones, and high-CC functions into architecture/refactor phases as investigation hints. They cannot expand scope, create findings or Plans, or alter Debt Score. Operational failure blocks the pipeline; parse skips remain explicit residuals.
 - Add Compare to `$repo-code-review` using its fixed baseline and its authorized changed-file target list. Regression alone never changes PASS or becomes a finding. Only independent source inspection can promote a substantial new near-copy through the existing duplication rule or prove another existing correctness violation. Structural-erosion changes remain advisory/follow-up evidence. Operational failure makes the review incomplete, not a correctness finding.
 
 ## Remediation Guidance
@@ -70,7 +71,8 @@ The following scope is both target and ceiling. Implement the smallest complete 
 - Record that the paper’s anti-slop prompts lower initial scores in Python experiments but do not stop degradation slopes; it does not provide a validated post-hoc C++ remediation algorithm. [Paper v1](https://arxiv.org/html/2603.24755v1)
 - For clone evidence, inspect semantics and ownership, then prefer deleting dead duplication, reusing an existing helper, or extracting/parameterizing genuinely common logic while preserving deliberate client/server and collection mirrors.
 - For erosion evidence, identify cohesive responsibilities or branch families and apply minimal behavior-preserving decomposition or an existing dispatch pattern.
-- Warn against trivial wrappers, helper proliferation, removing valid checks, denominator gaming, or improving one metric by worsening the other.
+- For excess-decision evidence, prefer in-place deletion, merging, flattening, or existing dispatch. Extract only for independently meaningful responsibility, reuse, or a genuinely separate abstraction. One-shot sequential or threshold-driven extraction is metric-neutral. A target decrease proves simplification only when the diff shows decision removal and the corpus shows no attributable offset elsewhere, or a separately evidenced structural benefit independently justifies extraction; structural erosion alone is navigation.
+- Warn against trivial wrappers, helper proliferation, removing valid checks, denominator gaming, or improving one metric by worsening another metric.
 - Cite related primary work as supporting context—not proof of lowering Broken Engine’s metrics: [Microsoft RASE](https://www.microsoft.com/en-us/research/publication/does-automated-refactoring-obviate-systematic-editing/), [duplicate-aware refactoring](https://arxiv.org/abs/2502.04073), and [SBSRE method decomposition](https://arxiv.org/abs/2305.03428). Every recommendation still requires source inspection, normal verification, and remeasurement.
 
 ## Verification and Delivery
@@ -80,9 +82,10 @@ The following scope is both target and ceiling. Implement the smallest complete 
 
   - Exact URL, gitlink, tag peel, pristine status, license inventory, and lock hash.
   - Clean, incomplete-cache, and concurrent-first-run bootstraps.
-  - Two identical snapshots produce byte-identical JSON; emitted components independently recompute both scores.
+  - Two identical snapshots produce byte-identical JSON; emitted components independently recompute all three metrics.
+  - Same-scope relocation leaves `excessDecisions` unchanged; cross-target relocation can lower target `excessDecisions` while corpus `excessDecisions` stays unchanged and is neutral after diff inspection; deleting one decision lowers applicable target/corpus totals by exactly one.
   - C++ dispatch includes `.h`; an exact pure-GLSL `.h` target is rejected.
-  - Exact, nonrecursive, recursive, added/deleted/renamed, zero-denominator, parse-failure, and current-capture-drift cases.
+  - Exact, nonrecursive, recursive, added/deleted/renamed, zero-denominator (including an empty-function scope with denominator `0`, null value, and `applicable: false`), parse-failure, and current-capture-drift cases.
   - `HEAD` versus unchanged checkout yields zero comparable deltas and no clone/function changes.
   - Line insertion before overloaded functions leaves unique matches stable and reports ambiguous overloads conservatively.
   - Synthetic clone and high-CC changes produce the expected advisory evidence and unchanged correctness boundary.

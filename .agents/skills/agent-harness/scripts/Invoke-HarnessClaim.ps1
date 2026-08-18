@@ -210,7 +210,6 @@ try {
 	if ([string]::IsNullOrWhiteSpace($Session)) { throw 'Session must not be empty.' }
 	if ([string]::IsNullOrWhiteSpace($Key)) { throw 'Key must not be empty.' }
 	if ([string]::IsNullOrWhiteSpace($Configuration)) { throw 'Configuration must not be empty.' }
-	if (-not [IO.Path]::IsPathRooted($RepositoryRoot)) { throw "RepositoryRoot must be absolute: '$RepositoryRoot'." }
 	if (-not [IO.Path]::IsPathRooted($GameDataDirectory)) { throw "GameDataDirectory must be absolute: '$GameDataDirectory'." }
 
 	$sharedScripts = Join-Path $PSScriptRoot '..\..\..\scripts'

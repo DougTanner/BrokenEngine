@@ -789,9 +789,16 @@ function Test-BlockedArgument($Fixture) {
 	Assert-Equal 2 $head.ExitCode 'unresolvable head exit code'
 	if ($null -ne $head.Json) { Assert-Equal 'inventory.head-unresolved' $head.Json.code 'unresolvable head code' }
 
-	$relative = Invoke-Inventory @('-RepositoryRoot', 'relative/path', '-Baseline', $Fixture.Baseline)
-	Assert-Equal 2 $relative.ExitCode 'relative repository root exit code'
-	if ($null -ne $relative.Json) { Assert-Equal 'inventory.repository-root-invalid' $relative.Json.code 'relative repository root code' }
+	# Every fixture run works out of the temp directory the fixture roots are created in, so the
+	# root's leaf name is a relative path that has to resolve to that same canonical root.
+	$absolute = Invoke-Inventory @('-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline)
+	$relative = Invoke-Inventory @('-RepositoryRoot', (Split-Path -Leaf $Fixture.Root), '-Baseline', $Fixture.Baseline)
+	Assert-Equal 0 $relative.ExitCode 'relative repository root exit code'
+	Assert-True ($relative.Stdout -ceq $absolute.Stdout) 'relative repository root resolves to the same canonical root'
+
+	$missingRoot = Invoke-Inventory @('-RepositoryRoot', 'relative/path', '-Baseline', $Fixture.Baseline)
+	Assert-Equal 2 $missingRoot.ExitCode 'nonexistent repository root exit code'
+	if ($null -ne $missingRoot.Json) { Assert-Equal 'inventory.repository-root-invalid' $missingRoot.Json.code 'nonexistent repository root code' }
 
 	$subdirectory = Invoke-Inventory @('-RepositoryRoot', (Join-Path $Fixture.Root 'Engine'), '-Baseline', $Fixture.Baseline)
 	Assert-Equal 2 $subdirectory.ExitCode 'subdirectory repository root exit code'

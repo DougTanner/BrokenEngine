@@ -528,8 +528,8 @@ try {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.head-untracked-conflict' 'A commit-valued -Head has no untracked side, so -UntrackedPath cannot be classified; drop one of the two.'
 	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
-	if (-not [IO.Path]::IsPathRooted($RepositoryRoot) -or -not (Test-Path -LiteralPath $script:Root -PathType Container)) {
-		Complete-CodexReviewPrompt 2 'blocked' 'prompt.repository-root-invalid' "-RepositoryRoot must be an existing absolute directory: '$RepositoryRoot'."
+	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
+		Complete-CodexReviewPrompt 2 'blocked' 'prompt.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
 	$targetModeCount = 0
 	if ($PreflightTargets) { $targetModeCount++ }

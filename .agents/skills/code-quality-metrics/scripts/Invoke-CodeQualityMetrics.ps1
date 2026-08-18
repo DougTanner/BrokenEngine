@@ -291,13 +291,13 @@ $cacheRoot = $null
 $repository = $null
 try {
     if ($Mode -notin @('Snapshot', 'Compare')) { throw 'Mode must be Snapshot or Compare.' }
-    if (-not $RepositoryRoot) { throw 'RepositoryRoot must be an existing absolute directory.' }
+    if (-not $RepositoryRoot) { throw 'RepositoryRoot must be an existing directory.' }
     if ($Scope -and $Scope -notin @('Exact', 'Directory', 'Recursive')) { throw 'Scope must be Exact, Directory, or Recursive.' }
     if ($Baseline -and $Baseline -notmatch '^[0-9a-f]{40}$') { throw 'Baseline must be a 40-character lowercase hexadecimal commit SHA.' }
     if ($Mode -eq 'Snapshot' -and ((-not $Target) -or (-not $Scope) -or $Targets -or $Baseline)) { throw 'Snapshot requires only Target and Scope.' }
     if ($Mode -eq 'Compare' -and ((-not $Targets) -or (-not $Baseline) -or $Target -or $Scope)) { throw 'Compare requires only Targets and Baseline.' }
     $repository = Get-CanonicalPath $RepositoryRoot
-    if (-not [IO.Path]::IsPathFullyQualified($RepositoryRoot) -or -not (Test-Path -LiteralPath $repository -PathType Container)) { throw 'RepositoryRoot must be an existing absolute directory.' }
+    if (-not (Test-Path -LiteralPath $repository -PathType Container)) { throw 'RepositoryRoot must be an existing directory.' }
     $rootItem = Get-Item -LiteralPath $repository -Force
     if ($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'RepositoryRoot must not be a reparse point.' }
     $pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1

@@ -4,7 +4,8 @@
 
 `Invoke-CodeQualityMetrics.ps1` takes exactly one `-Mode Snapshot|Compare`. Snapshot requires
 `-Target <relative-POSIX-path> -Scope Exact|Directory|Recursive`; Compare requires `-Targets <UTF-8
-JSON file> -Baseline <full lowercase Git SHA>`. Both require an absolute `-RepositoryRoot` and accept
+JSON file> -Baseline <full lowercase Git SHA>`. Both require an existing `-RepositoryRoot`, absolute
+or resolved against the current directory, and accept
 `-OutputPath`, `-Digest`, and `-Phase0Hints` (which implies `-Digest`).
 
 The targets file is UTF-8 JSON with unique, ordinal-sorted, normalized relative POSIX paths:
@@ -44,16 +45,25 @@ each pair `{baseline,current}` of nullable `{path,mode,sha256}` identities.
 `outliers`, `targetOutliers`, `cloneGroups`, and `highComplexityFunctions`. A MetricValue is exactly
 `{applicable,value,numerator,denominator}`; counts are `{supported,parsed,omitted}`; skips are
 `{path,code:"upstream-omitted"}`; file and area rows are `{path,area,metrics}` and `{area,metrics}`.
-`outliers` are corpus-wide positive top-ten per metric and `targetOutliers` target-only positive
-top-ten file and area buckets measured against the corresponding corpus metric; both use `items`,
-`totalCount`, and `truncatedCount`, ordered delta-descending then key. Areas are
+`outliers` are corpus-wide positive top-ten `structuralErosion` and `verbosity` metrics, and
+`targetOutliers` are target-only positive top-ten file and area buckets measured against the
+corresponding corpus metric; excess decisions never enter outlier or Phase-0 hint buckets. Both use
+`items`, `totalCount`, and `truncatedCount`, ordered delta-descending then key. Areas are
 `Engine/Source/<child>`, `Projects/<project>/Source/<child>`, `Common/<child>`, `Tools/<child>`, a
 direct parent label, another nested first component, or `[root]`. Clone instances are complete,
 deduplicated by `(groupHash,path,startLine,endLine)`, and contain
 `groupHash,path,startLine,endLine,sloc,sourceSha256,occurrenceOrdinal`, where the source hash covers
 the exact LF-normalized inclusive span. `verbosity` is the union of emitted CloneBlock intervals
 intersected with parsed SLOC, divided by parsed SLOC; `structuralErosion` is mass of functions with
-CC above ten divided by total mass, mass being `CC * sqrt(SLOC)`.
+CC above ten divided by total mass, mass being `CC * sqrt(SLOC)`; `excessDecisions` is the total
+`sum(max(CC - 1, 0))` over functions in the scope. For `excessDecisions`, numerator and value are
+that total, and denominator is `1` when the scope contains at least one function, otherwise `0`
+with `applicable:false` and a null value. All three metrics appear in corpus, target, file, area,
+common-parsed-cohort, and comparison delta maps. Excess decisions are net scope evidence: unchanged
+means only no net decision removal, never redistribution without source-diff evidence. A target
+decrease proves simplification only when the diff shows decision removal and the corpus shows no
+attributable offset elsewhere, or a separately evidenced structural benefit independently justifies
+extraction.
 
 `comparison` contains `contextChanges` (`{path,change}` rows), `corpus`, `target`,
 `commonParsedCohort`, `coverage`, `cloneGroups`, `cloneInstances`, and `functions`. Delta families

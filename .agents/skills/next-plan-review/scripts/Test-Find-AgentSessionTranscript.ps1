@@ -268,6 +268,18 @@ try {
 	New-Transcript $transcript '55555555-5555-5555-5555-555555555555' $producing $commitTimestamp.AddMinutes(-2) $commitTimestamp.AddMinutes(-1) $commitTimestamp
 	Assert-Finder (Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions) 2 'transcript.not-found'
 
+	# A named session that ended before the commit and ran outside every eligible worktree defeats both
+	# commit-derived gates at once, so this stage fails unless neither gate applies to an exact ID.
+	Clear-SessionStores @($sessions, $archivedSessions)
+	$namedOutsideBothGates = '56565656-5656-5656-5656-565656565656'
+	$namedOutsideBothGatesPath = Join-Path $bucket "rollout-$($commitTimestamp.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-$namedOutsideBothGates.jsonl"
+	New-Transcript $namedOutsideBothGatesPath $namedOutsideBothGates $unrelated $commitTimestamp.AddMinutes(-2) $commitTimestamp.AddMinutes(-1) $commitTimestamp
+	$script:FixtureStage = 'exact SessionId outside both the commit window and every eligible worktree'
+	$response = Invoke-Finder -Finder $finder -Commit $commit -ReviewRoot $review -Sessions $sessions -ArchivedSessions $archivedSessions -SessionId $namedOutsideBothGates
+	Assert-Finder $response 0 'transcript.found'
+	Assert-True ($response.Result.status -eq 'pass') "[$script:FixtureStage] Exact SessionId lookup did not pass."
+	Assert-True ($response.Result.candidate.sessionId -ceq $namedOutsideBothGates) "[$script:FixtureStage] Exact SessionId lookup did not return the named transcript."
+
 	Clear-SessionStores @($sessions, $archivedSessions)
 	New-Transcript $transcript '66666666-6666-6666-6666-666666666666' $producing $startBeforeCutoff $coveringEnd $commitTimestamp
 	New-Transcript (Join-Path $bucket "rollout-$($commitTimestamp.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture))-77777777-7777-7777-7777-777777777777.jsonl") '77777777-7777-7777-7777-777777777777' $producing $startBeforeCutoff $coveringEnd $commitTimestamp

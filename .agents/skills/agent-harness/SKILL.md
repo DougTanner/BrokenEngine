@@ -73,13 +73,9 @@ ownership change.
 
 ## Launch
 
-Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, normalized `GameDataDirectory`, fixed data baseline, and the path and SHA-256 of the selected `broken-engine-data-oracle/v1` receipt — the record file proving exactly which data files the build used. Before each launch and after verification, invoke the compile package's `scripts/Test-DataOracleReceipt.ps1` with that exact receipt/path/mode/baseline tuple and require its typed passing result:
+Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, and normalized `GameDataDirectory`.
 
-```powershell
-pwsh -NoProfile -File .agents/skills/compile/scripts/Test-DataOracleReceipt.ps1 -ReceiptPath '<receipt path>' -ReceiptSha256 '<receipt SHA-256>' -ExpectedDataRoot '<normalized Data path>' -ExpectedMode '<Shared|Local>' -ExpectedBaseline '<40-hex baseline>'
-```
-
-In Local mode, do the same for the independent primary Shared receipt. Stop on any receipt, path, mode, baseline, inventory, or byte mismatch. Never infer an identity, compare Shared and Local receipts for equality, switch data mode, fall back to Shared data, or run DataPacker/Gaea/texture export.
+Never infer an identity, switch data mode, fall back to Shared data, or run DataPacker/Gaea/texture export.
 
 Use the compiled configuration suffix. Ordinary same-machine runs pass `--loopback-only`. Create log parents under `<absolute adopted worktree>\Temp`. Do not change process working directories; `--data-directory` is the only override selecting packed assets, and `--app-data-directory` is the only override selecting where saves, settings, caches, and replays are written.
 
@@ -140,8 +136,6 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessRelease
 Pass only exact non-null numeric `serverPid`/`clientPid` values retained from the latest launch snapshot; replace the numeric placeholders and omit either argument for a process that never started. The latest snapshot is authoritative, including after a partial launch failure. The script quits both ports with the owner (server quit autosaves), waits for those exact PIDs, stops only a supplied exact PID that survived the quit, and runs `lock release` only once every supplied PID is confirmed absent. It never searches by process name and never stops a PID you did not supply.
 
 Exit `0` (`status` `pass`) means every supplied PID is absent and the lock was released; report the payload's per-step outcomes verbatim. Exit `2` (`status` `blocked`, code `release.process-survived`) means a supplied PID is still alive: no release was attempted, the claim stays held, and you decide whether to retry the release or escalate to the user. Exit `1` is a failure naming its step, including `release.lock-owner-mismatch` and `release.lock-absent`, which are never a success. Never reconstruct the quit, wait, stop, or release steps inline.
-
-Then, in Local data mode, reverify the independent oracle for the primary Shared data.
 
 An owner mismatch is a hard stop. Never remove coordination state manually.
 

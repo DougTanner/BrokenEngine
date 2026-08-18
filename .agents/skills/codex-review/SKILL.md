@@ -31,7 +31,9 @@ resolves to Sol.
   or `session-audit`
 - Its normal inputs: plan/intent, changed files and regions, and current
   residuals or reviewer focus
-- Worktree (default to current repository root) and session baseline (a full 40-character commit SHA)
+- Repository root — the absolute toplevel of the session worktree, defaulting to
+  the current one; a relative path is accepted and resolves against the current
+  directory — and session baseline (a full 40-character commit SHA)
 
 ## Method
 
@@ -47,7 +49,7 @@ resolves to Sol.
    wrote. From the session worktree root:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot <worktree> -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole] [-PreflightTargets | -ReuseTargets]
+   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole] [-PreflightTargets | -ReuseTargets]
    ```
 
    `/repo-code-review` has an ordered path that only handles the targets file
@@ -83,8 +85,7 @@ resolves to Sol.
    `verify-changes`, the reviewed change set's baseline and head SHAs plus each
    typed artifact its `## Required inputs` conditions name
    (`../verify-changes/SKILL.md`). The script blocks the dispatch when a SHA or
-   a diff-triggered typed artifact is absent, and does not check the game-build
-   receipt lines, so supply those yourself. For a reviewer role with no
+   a diff-triggered typed artifact is absent. For a reviewer role with no
    skill file — the Tier-2 coherence review, for one — pass a descriptive role
    name as `-AssignedSkill` together with `-AdHocRole`, and put that role's full
    review contract in `-ScopeFile`. `-RiskTier` adds one

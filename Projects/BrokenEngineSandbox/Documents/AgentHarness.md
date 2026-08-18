@@ -4,7 +4,7 @@ Project-specific launch configuration, verification recipes, durable caveats, an
 
 ## Launch
 
-Follow the skill's generic launch requirements (data-oracle checks, `--loopback-only`, log parents under the absolute adopted worktree's `Temp`, and Codex `Start-Process -PassThru` PID retention), then launch these executables. This fence is one independent shell call; assign its path values locally.
+Follow the skill's generic launch requirements (`--loopback-only`, log parents under the absolute adopted worktree's `Temp`, and Codex `Start-Process -PassThru` PID retention), then launch these executables. This fence is one independent shell call; assign its path values locally.
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'

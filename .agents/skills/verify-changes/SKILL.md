@@ -27,10 +27,7 @@ Require the task brief from `../../references/subagent-reporting.md`, plus:
   propagation, checks, reviews, fixes, hygiene, builds, external claims, and
   residuals; and
 - the typed artifacts this change set triggers: on a changed `SKILL.md`, the
-  complete `/validate-skill` PASS handoff; and, when the acceptance checks
-  include a game build, the verbatim build-reported `"<mode> receipt verified:
-  path=... sha256=... dataRoot=... baseline=... aggregate=..."` summary line for
-  each built mode.
+  complete `/validate-skill` PASS handoff.
 
 Do not accept an unapproved delta or pasted full logs. For a completed claimed
 Plan whose file the change deletes, the manager supplies its approved text or
@@ -100,10 +97,7 @@ target/selection/arguments, status/exit/failure kind, complete retained log,
 decisive diagnostics, and all requested targets. Game builds additionally
 require data mode, generation authority, Gaea outcome, and normalized paths;
 their data evidence is that same envelope reporting success with wrapper exit
-`0` — exit `4` is a failed build whose post-build oracle work (verification,
-receipt issuance, or state persistence) failed — plus the build-reported `"<mode> receipt verified: path=... sha256=...
-dataRoot=... baseline=... aggregate=..."` summary line. Do not accept
-schema/result/exit mismatches.
+`0`. Do not accept schema/result/exit mismatches.
 
 Skill changes require a complete `/validate-skill` PASS handoff with mechanical
 self-check, target validator exit/output, semantic review, and no Critical

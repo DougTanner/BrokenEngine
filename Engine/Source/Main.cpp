@@ -72,7 +72,7 @@ void MainThread(HINSTANCE hinstance)
 {
 	common::ThreadLocal threadLocal(10 * 1024 * 1024);
 
-	// Tee the whole log stream to a file when requested (before allocation tracking enables, so the open is untracked).
+	// --log-file begins here, so earlier startup diagnostics remain debugger/ring-buffer only; the file opens before allocation tracking is enabled.
 	if (!gLaunchOptions.logFile.empty())
 	{
 		common::EnableLogFile(gLaunchOptions.logFile);

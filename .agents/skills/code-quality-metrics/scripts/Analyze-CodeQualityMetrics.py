@@ -118,14 +118,19 @@ def metrics(fs:Iterable[dict[str,Any]], lines:Iterable[tuple[str,int]], sloc:dic
  fs=list(fs); total=sum(len(x) for x in sloc.values()); mass=sum(x["mass"] for x in fs); high=sum(x["mass"] for x in fs if x["cc"]>10); union=defaultdict(set)
  for p,l in lines:
   if l in sloc.get(p,set()):union[p].add(l)
- return {"structuralErosion":metric(high,mass),"verbosity":metric(sum(map(len,union.values())),total)}
+ excess=sum(max(x["cc"]-1,0) for x in fs)
+ return {"structuralErosion":metric(high,mass),"verbosity":metric(sum(map(len,union.values())),total),"excessDecisions":metric(excess,1 if fs else 0)}
 def area(p:str)->str:
  x=p.split("/")[:-1]
  if x[:2]==["Engine","Source"]:return "/".join(x[:3]) if len(x)>2 else "Engine/Source"
  if len(x)>=3 and x[0]=="Projects" and x[2]=="Source":return "/".join(x[:4]) if len(x)>3 else "/".join(x[:3])
  if x and x[0] in {"Common","Tools"}:return "/".join(x[:2]) if len(x)>1 else x[0]
  return x[0] if x else "[root]"
-def aggregate(fs:list[dict[str,Any]])->dict[str,Any]:return {n:metric(sum(x["metrics"][n]["numerator"] for x in fs),sum(x["metrics"][n]["denominator"] for x in fs)) for n in ("structuralErosion","verbosity")}
+def aggregate(fs:list[dict[str,Any]])->dict[str,Any]:
+ out={n:metric(sum(x["metrics"][n]["numerator"] for x in fs),sum(x["metrics"][n]["denominator"] for x in fs)) for n in ("structuralErosion","verbosity")}
+ # Excess decisions is a scope total, so its denominator tracks function presence rather than file count.
+ out["excessDecisions"]=metric(sum(x["metrics"]["excessDecisions"]["numerator"] for x in fs),1 if any(x["metrics"]["excessDecisions"]["denominator"] for x in fs) else 0)
+ return out
 def area_rows(fs:list[dict[str,Any]])->list[dict[str,Any]]:
  grouped=defaultdict(list)
  for x in fs:grouped[x["area"]].append(x)
@@ -196,7 +201,7 @@ def typed_signatures(parsed:Any)->dict[tuple[int,str],str|None]:
   else:out[key]=value
  return out
 def capture(entries:dict[str,tuple[dict[str,str],bytes]],capture_root:Path,analyzer_source:Path)->dict[str,Any]:
- empty={"structuralErosion":metric(0,0,False),"verbosity":metric(0,0,False)}
+ empty={"structuralErosion":metric(0,0,False),"verbosity":metric(0,0,False),"excessDecisions":metric(0,0,False)}
  if not entries:return {"corpusManifest":[],"corpusCounts":{"supported":0,"parsed":0,"omitted":0},"skips":[],"corpusMetrics":empty,"files":[],"areas":[],"outliers":[],"cloneGroups":[],"highComplexityFunctions":[],"_functions":[],"_parsed":set(),"_instances":[],"_failures":[]}
  sys.path.insert(0,str(analyzer_source))
  try:
@@ -257,7 +262,7 @@ def capture_view(corpus:dict[str,Any],target:dict[str,Any])->dict[str,Any]:
  return {"corpusManifest":corpus["corpusManifest"],"targetManifest":target["targetManifest"],"corpusCounts":corpus["corpusCounts"],"targetCounts":target["targetCounts"],"skips":corpus["skips"],"corpusMetrics":corpus["corpusMetrics"],"targetMetrics":target["targetMetrics"],"files":corpus["files"],"areas":corpus["areas"],"outliers":corpus["outliers"],"targetOutliers":target["targetOutliers"],"cloneGroups":corpus["cloneGroups"],"highComplexityFunctions":corpus["highComplexityFunctions"],"_functions":corpus["_functions"],"_parsed":corpus["_parsed"],"_instances":corpus["_instances"],"_targetFailures":target["_failures"]}
 def deltas(b:dict[str,Any],c:dict[str,Any],reasons:list[str])->dict[str,Any]:
  out={}
- for n in ("structuralErosion","verbosity"):
+ for n in ("structuralErosion","verbosity","excessDecisions"):
   x,y=b[n],c[n]; rs=set(reasons)
   if not x["applicable"]:rs.add("baseline-inapplicable")
   if not y["applicable"]:rs.add("current-inapplicable")

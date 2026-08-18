@@ -485,8 +485,8 @@ try {
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' 'Supply at most one of -Regions, -Landing, and -EmitTargets.'
 	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
-	if (-not [IO.Path]::IsPathRooted($RepositoryRoot) -or -not (Test-Path -LiteralPath $script:Root -PathType Container)) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.repository-root-invalid' "-RepositoryRoot must be an existing absolute directory: '$RepositoryRoot'."
+	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
+		Complete-SessionChangeInventory 2 'blocked' 'inventory.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
 	$topLevel = Invoke-InventoryGit @('rev-parse', '--show-toplevel') $true
 	if ($topLevel.ExitCode -ne 0) {

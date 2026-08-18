@@ -63,4 +63,8 @@ advisory `upstream-omitted` rows, and the complete-parsing requirement for PASS.
 
 Report the result as advisory evidence. Name the scope, coverage omissions, suppression reasons, and
 comparison cohort before interpreting a delta. Do not turn a metric into a landing gate, person
-score, or automatic refactor instruction.
+score, or automatic refactor instruction. Interpret `excessDecisions` as net scope evidence:
+unchanged means only no net decision removal, never redistribution without source-diff evidence. A
+target decrease proves simplification only when the diff shows decision removal and the corpus shows
+no attributable offset elsewhere, or a separately evidenced structural benefit independently
+justifies extraction. It is not an outlier or Phase-0 hint metric.

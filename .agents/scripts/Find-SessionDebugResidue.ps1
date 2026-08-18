@@ -165,8 +165,8 @@ function Test-DebugResiduePattern([string] $Text) {
 
 try {
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
-	if (-not [IO.Path]::IsPathRooted($RepositoryRoot) -or -not (Test-Path -LiteralPath $script:Root -PathType Container)) {
-		Complete-SessionDebugResidue 2 'blocked' 'residue.repository-root-invalid' "-RepositoryRoot must be an existing absolute directory: '$RepositoryRoot'."
+	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
+		Complete-SessionDebugResidue 2 'blocked' 'residue.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
 	if (-not (Test-Path -LiteralPath $script:InventoryScript -PathType Leaf)) {
 		Complete-SessionDebugResidue 2 'blocked' 'residue.inventory-missing' "The session change inventory script is missing: '$($script:InventoryScript)'."
