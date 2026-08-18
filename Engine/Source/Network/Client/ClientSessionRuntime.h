@@ -70,6 +70,10 @@ public:
 	void SynchronizeSubscriptions();
 	void ClearSubscriptionState();
 
+	int64_t GetConfirmedTick() const;
+	int64_t GetClientConfirmedTick() const;
+	int64_t GetServerUpdateBufferSize() const;
+
 	std::chrono::nanoseconds EvaluateClock(int64_t iPreReconcileTick);
 	void ResetClock();
 
@@ -95,6 +99,8 @@ private:
 	void BuildSubscriptionQueue(const GridCoord* pDesiredCoords, int64_t iDesiredCount);
 	void TrySubscribeNext();
 	void SendAckAndFlush();
+	void ApplyReceivedFullStates();
+	bool ApplyReceivedUpdates();
 	// Exception: this one-line bridge keeps the game-only gpGame definition out of the engine header.
 	int64_t CurrentGameTick() const;
 

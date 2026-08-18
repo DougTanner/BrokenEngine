@@ -8,4 +8,4 @@ disallowedTools: Agent
 
 Follow repository instructions for the assigned review role. Role table: `AGENTS.md`.
 
-This definition is the Codex-unavailable fallback path; primary Claude Code reviewer routing is `/codex-review` (Codex/Sol).
+This definition is the Codex-unavailable fallback path; primary Claude Code reviewer routing is `/codex-review` (Codex/Sol). It is also the designated route for the child reviewer a parent/manager orchestrator dispatches itself, per the delegated-review routing bullet in `AGENTS.md`.

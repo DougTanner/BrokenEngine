@@ -13,9 +13,10 @@ Audit one completed landing read-only. Produce an evidence-based,
 priority-sorted improvement backlog; do not retry the change, edit files, alter
 Plan claims, or inspect unrelated sessions.
 
-Run only in the invoking parent/manager context. Never
-route this skill through `/codex-review` or another delegated `reviewer`; this
-skill dispatches its required fresh reviewer.
+Run only in the invoking parent/manager context. Never route this skill
+through `/codex-review` or another delegated `reviewer`; this skill dispatches
+its required fresh reviewer itself, routed per the delegated-review routing
+bullet in the root [AGENTS.md](../../../AGENTS.md).
 
 ## Prove provenance
 

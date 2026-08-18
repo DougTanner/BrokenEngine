@@ -18,7 +18,7 @@ Capture with `renderdoc_capture` (schema in the project harness doc, `Projects/<
 
 ```powershell
 '{"cmd":"renderdoc_capture","params":{"frames":1}}' |
-	& $AgentHarness --owner $Owner --port 27101 --timeout-ms 120000 -
+	& '<absolute AgentHarness path>' --owner '<owner token>' --port 27101 --timeout-ms 120000 -
 ```
 
 The result `paths` are absolute `.rdc` files (RenderDoc's template writes `%TEMP%\RenderDoc\agent_frameNNN.rdc`). Use the returned paths verbatim; never guess them. `Test-Path` each and sanity-check its size before analysis.
@@ -30,10 +30,14 @@ The embedded interpreter has two quirks the launch must work around:
 - No `sys.argv`. The script's own arguments (capture path and flags) cannot ride on the `qrenderdoc --python <script>` command line — the interpreter never sees them, and qrenderdoc rejects them as its own unknown options. Pass them through the `RDC_ARGS` environment variable instead: the launching shell sets it, the child qrenderdoc inherits it, and the scripts `shlex.split` it when `sys.argv` is absent (standalone runs still use the normal `sys.argv` path). Because `shlex` is POSIX-mode, it treats `\` as an escape; single-quote each Windows path inside `RDC_ARGS` so backslashes survive.
 - No `__file__`. The scripts fall back to the *working directory* to add themselves to `sys.path` (so `import rdc_common` resolves), so qrenderdoc must be launched with `-WorkingDirectory` set to the scripts directory; otherwise the import fails before any argument is read.
 
+Write the following **temporary-script contents** to
+`<absolute adopted worktree>\Temp\renderdoc-rdc-summary.ps1`, then run that file
+as its own shell call:
+
 ```powershell
 $RenderDocDir = if ($env:RENDERDOC_PATH) { $env:RENDERDOC_PATH } else { 'C:\Program Files\RenderDoc' }
 $QRenderDoc = Join-Path $RenderDocDir 'qrenderdoc.exe'
-$ScriptsDir = Join-Path $ROOT '.agents\skills\agent-harness\scripts'
+$ScriptsDir = Join-Path '<absolute adopted worktree>' '.agents\skills\agent-harness\scripts'
 $Script = Join-Path $ScriptsDir 'rdc_summary.py'
 $Capture = '<absolute .rdc path from renderdoc_capture>'
 $Out = "$Capture.summary.txt"
@@ -51,7 +55,11 @@ if (-not (Test-Path -LiteralPath $Out)) { throw "rdc_summary produced no output:
 Get-Content -LiteralPath $Out
 ```
 
-Other scripts differ only in `RDC_ARGS`: `rdc_pipeline.py` needs `"'$Capture' --event N --out '$Out'"`, `rdc_texture.py` needs `"'$Capture' --event N --out '$Out'"` (add `--target K` or `--depth` as needed). For `rdc_texture.py` the `--out` PNG is the completion file, so poll for the PNG rather than a `.txt`. Launch one qrenderdoc per script and stop it before the next, so a stale GUI never holds the capture.
+```powershell
+pwsh -NoProfile -File '<absolute adopted worktree>\Temp\renderdoc-rdc-summary.ps1'
+```
+
+Other scripts differ only in `RDC_ARGS`: `rdc_pipeline.py` needs `"'<absolute .rdc path>' --event N --out '<absolute output path>'"`, and `rdc_texture.py` needs `"'<absolute .rdc path>' --event N --out '<absolute output path>'"` (add `--target K` or `--depth` as needed). For `rdc_texture.py` the `--out` PNG is the completion file, so poll for the PNG rather than a `.txt`. Launch one qrenderdoc per script and stop it before the next, so a stale GUI never holds the capture.
 
 ## Scripts
 

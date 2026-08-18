@@ -27,7 +27,10 @@ Require the task brief from `../../references/subagent-reporting.md`, plus:
   propagation, checks, reviews, fixes, hygiene, builds, external claims, and
   residuals; and
 - the typed artifacts this change set triggers: on a changed `SKILL.md`, the
-  complete `/validate-skill` PASS handoff.
+  complete `/validate-skill` PASS handoff; and, when the acceptance checks
+  include a game build, the verbatim build-reported `"<mode> receipt verified:
+  path=... sha256=... dataRoot=... baseline=... aggregate=..."` summary line for
+  each built mode.
 
 Do not accept an unapproved delta or pasted full logs. For a completed claimed
 Plan whose file the change deletes, the manager supplies its approved text or

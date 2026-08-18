@@ -24,7 +24,8 @@ Server-only engine transport. `Server` (`gpServer`) owns the ENet host, client t
 
 ## Buffered State
 
-- Buffer exactly one delta entry per active coordinate per tick in monotonically increasing order; resend lookup depends on contiguous tick offsets. When game `kbDesyncDebugFrames` is enabled, also buffer the separate full-frame diagnostic ring. Clear both rings across save-load tick resets and prune coordinates that leave the active set.
+- Buffer exactly one delta entry per supplied coordinate per tick in monotonically increasing order; normal simulation supplies the active coordinates and replay may additionally supply a publication-only coordinate. Resend lookup depends on contiguous tick offsets. When game `kbDesyncDebugFrames` is enabled, also buffer the separate full-frame diagnostic ring. Clear both rings across save-load tick resets and prune coordinates that leave the active set.
+- Replay may publish a transfer-only coordinate at event tick `E` even though that coordinate is not in the simulation dispatch set until `E + 1`. Keep its per-coordinate buffer active for the supplied replay publication at `E`; prune from the coordinates actually supplied to `BufferFrame`, not from simulation membership. This is publication-only bookkeeping and does not add a wire type or change subscription starvation behavior.
 - Preserve ring contiguity even when an update payload cannot be encoded; the resulting client CRC mismatch drives resync.
 - Revalidate client, slot, epoch, and coordinate immediately before sending a deferred full state because an unsubscribe or disconnect may have invalidated it in the same poll batch.
 - Full-state resync and load notification are transport mechanisms; game state reconstruction remains game-owned.

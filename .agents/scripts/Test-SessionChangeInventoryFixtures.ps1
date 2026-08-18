@@ -623,6 +623,135 @@ function Test-GitlinkTypeChange() {
 	else { Assert-True $false 'gitlink type change targets emitted JSON' }
 }
 
+# --- Repository J: a detected rename whose destination OID was never written ---------------------
+
+function Get-FixtureRawRow([string] $Root, [string] $Baseline) {
+	# Exactly the inventory's own raw-diff invocation, because the pairing depends on those flags.
+	$tokens = (Get-FixtureGitText $Root @('diff', '--raw', '--abbrev=40', '-M', '-z', '--no-color', '--no-ext-diff', $Baseline, '--')) -split "`0"
+	$rows = [Collections.Generic.List[object]]::new()
+	$index = 0
+	while ($index -lt $tokens.Count) {
+		if ([string]::IsNullOrEmpty($tokens[$index])) { $index++; continue }
+		$fields = $tokens[$index].TrimStart(':') -split ' '
+		$status = $fields[4].Substring(0, 1)
+		$oldPath = $null
+		if ($status -ceq 'R' -or $status -ceq 'C') { $oldPath = $tokens[$index + 1]; $path = $tokens[$index + 2]; $index += 3 }
+		else { $path = $tokens[$index + 1]; $index += 2 }
+		$rows.Add([pscustomobject] @{ Status = $status; Path = $path; OldPath = $oldPath; DestinationMode = $fields[1]; DestinationOid = $fields[3] })
+	}
+	return , $rows
+}
+
+function Test-PairedDeletionWorkingTreeIdentity() {
+	$root = New-FixtureRoot 'paired'
+	$shared = ''
+	foreach ($index in 0..19) { $shared += ('int Line{0:D2}() {{ return {0}; }}' -f $index) + "`n" }
+	Set-FixtureText $root 'Engine/Source/Old.cpp' $shared
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	# The full trigger: the baseline file is deleted and a new file is staged, then the staged file's
+	# worktree bytes are corrected while staying similar enough for rename detection to pair the two.
+	Invoke-FixtureGit $root @('rm', '--quiet', 'Engine/Source/Old.cpp')
+	Set-FixtureText $root 'Engine/Source/New.cpp' ($shared + "int Typo() { return 1; }`n")
+	Invoke-FixtureGit $root @('add', 'Engine/Source/New.cpp')
+	$corrected = $shared + "int Fixed() { return 2; }`n"
+	Set-FixtureText $root 'Engine/Source/New.cpp' $corrected
+	$renames = @(Get-FixtureRawRow $root $baseline | Where-Object { $_.Status -ceq 'R' })
+	Assert-Equal 1 $renames.Count 'paired deletion raw diff reports one rename row'
+	if ($renames.Count -ne 1) { return }
+	Assert-Equal 'Engine/Source/Old.cpp' $renames[0].OldPath 'paired deletion rename pairs the deleted baseline path'
+	Assert-Equal 'Engine/Source/New.cpp' $renames[0].Path 'paired deletion rename destination path'
+	$destinationOid = $renames[0].DestinationOid
+	Assert-True ($destinationOid -cne ('0' * 40)) 'paired deletion raw diff reports a nonzero destination OID'
+	$null = @(& git -C $root cat-file -e $destinationOid 2>&1)
+	Assert-True ($LASTEXITCODE -ne 0) 'paired deletion destination OID names no object in the object database'
+	$run = Invoke-InventoryReadOnly $root @('-RepositoryRoot', $root, '-Baseline', $baseline, '-Regions', '-IncludeUntracked', 'Engine/Source/New.cpp') 'paired deletion run'
+	Assert-Equal 0 $run.ExitCode 'paired deletion exit code'
+	Assert-True ([string]::IsNullOrEmpty($run.Stderr)) 'paired deletion writes nothing to stderr'
+	if ($null -eq $run.Json) { Assert-True $false 'paired deletion emitted JSON'; return }
+	Assert-Equal 'broken-engine-session-change-inventory/v1' $run.Json.schemaVersion 'paired deletion schemaVersion'
+	Assert-Equal 'pass' $run.Json.status 'paired deletion status'
+	Assert-Equal 'ok' $run.Json.code 'paired deletion code'
+	$map = Get-EntryMap $run.Json
+	if (-not $map.ContainsKey('Engine/Source/New.cpp')) { Assert-True $false 'paired deletion has an entry for the destination path'; return }
+	$entry = $map['Engine/Source/New.cpp']
+	Assert-Equal 'R' $entry.status 'paired deletion entry status'
+	Assert-Equal 'Engine/Source/Old.cpp' $entry.oldPath 'paired deletion entry oldPath'
+	Assert-Equal '100644' $entry.current.mode 'paired deletion current identity mode'
+	Assert-Equal (Get-TextSha256 $corrected) $entry.current.sha256 'paired deletion hashes the raw worktree bytes'
+	Assert-Equal (Get-TextSha256 $shared) $entry.baseline.sha256 'paired deletion keeps the committed baseline identity'
+}
+
+# --- Repository K: the CRLF identity decision ----------------------------------------------------
+
+function Test-CrlfWorkingTreeIdentity() {
+	$root = New-FixtureRoot 'crlf'
+	# New-FixtureRoot pins core.autocrlf false, so this case opts back in: the staged blob is then the
+	# LF-normalized text while the clean worktree file keeps its CRLF bytes.
+	Invoke-FixtureGit $root @('config', 'core.autocrlf', 'true')
+	Set-FixtureText $root 'Notes.md' "notes`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	$crlfBytes = $script:Utf8.GetBytes("one`r`ntwo`r`n")
+	Set-FixtureBytes $root 'Tools/Crlf.ps1' $crlfBytes
+	Invoke-FixtureGit $root @('add', 'Tools/Crlf.ps1')
+	# The clean worktree makes the raw diff name the staged LF blob, so this case is only decisive
+	# because that readable nonzero OID is deliberately not the identity the inventory reports.
+	$rows = @(Get-FixtureRawRow $root $baseline | Where-Object { $_.Path -ceq 'Tools/Crlf.ps1' })
+	Assert-Equal 1 $rows.Count 'CRLF raw diff reports one row'
+	if ($rows.Count -ne 1) { return }
+	Assert-True ($rows[0].DestinationOid -cne ('0' * 40)) 'CRLF raw diff reports a nonzero destination OID'
+	$run = Invoke-Inventory @('-RepositoryRoot', $root, '-Baseline', $baseline)
+	Assert-Equal 0 $run.ExitCode 'CRLF exit code'
+	if ($null -eq $run.Json) { Assert-True $false 'CRLF emitted JSON'; return }
+	$map = Get-EntryMap $run.Json
+	if (-not $map.ContainsKey('Tools/Crlf.ps1')) { Assert-True $false 'CRLF has an entry for the staged path'; return }
+	Assert-Equal 'A' $map['Tools/Crlf.ps1'].status 'CRLF entry status'
+	Assert-Equal '100644' $map['Tools/Crlf.ps1'].current.mode 'CRLF current identity mode'
+	Assert-Equal (Get-ByteSha256 $crlfBytes) $map['Tools/Crlf.ps1'].current.sha256 'CRLF identity is the raw worktree bytes'
+	Assert-True ($map['Tools/Crlf.ps1'].current.sha256 -cne (Get-TextSha256 "one`ntwo`n")) 'CRLF identity is not the LF-normalized blob'
+}
+
+# --- Repository L: a working-tree symlink destination keeps blob identity -------------------------
+
+function Test-WorkingTreeSymlinkIdentity() {
+	$root = New-FixtureRoot 'worktreelink'
+	Invoke-FixtureGit $root @('config', 'core.symlinks', 'true')
+	Set-FixtureText $root 'Notes.md' "notes`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	$linkTarget = 'Engine/Source/Missing.h'
+	$linkPath = Join-Path $root ('Engine/Source/Link.h' -replace '/', [IO.Path]::DirectorySeparatorChar)
+	[void] (New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($linkPath)) -Force)
+	try { [void] (New-Item -ItemType SymbolicLink -Path $linkPath -Target $linkTarget -ErrorAction Stop) }
+	catch {
+		# Creating a symlink needs the Windows symlink privilege (Developer Mode); without it this
+		# machine cannot host the case at all. PowerShell reports exactly that denial with this error
+		# id, so every other failure is a real defect and must fail the suite instead of skipping it.
+		if ($_.FullyQualifiedErrorId -notlike 'NewItemSymbolicLinkElevationRequired,*') { throw }
+		Write-Host 'skip working-tree symlink identity (this machine cannot create a symlink)'
+		return
+	}
+	Invoke-FixtureGit $root @('add', 'Engine/Source/Link.h')
+	$rows = @(Get-FixtureRawRow $root $baseline | Where-Object { $_.Path -ceq 'Engine/Source/Link.h' })
+	Assert-Equal 1 $rows.Count 'working-tree symlink raw diff reports one row'
+	if ($rows.Count -ne 1) { return }
+	Assert-Equal '120000' $rows[0].DestinationMode 'working-tree symlink raw diff destination mode'
+	Assert-True ($rows[0].DestinationOid -cne ('0' * 40)) 'working-tree symlink raw diff reports a nonzero destination OID'
+	$run = Invoke-Inventory @('-RepositoryRoot', $root, '-Baseline', $baseline)
+	Assert-Equal 0 $run.ExitCode 'working-tree symlink exit code'
+	if ($null -eq $run.Json) { Assert-True $false 'working-tree symlink emitted JSON'; return }
+	$map = Get-EntryMap $run.Json
+	if (-not $map.ContainsKey('Engine/Source/Link.h')) { Assert-True $false 'working-tree symlink has an entry'; return }
+	Assert-Equal '120000' $map['Engine/Source/Link.h'].current.mode 'working-tree symlink current identity mode'
+	# The link target does not exist, so hashing the path instead of the blob could not even succeed:
+	# a nonordinary mode keeps blob hashing on the working-tree side too.
+	Assert-Equal (Get-TextSha256 $linkTarget) $map['Engine/Source/Link.h'].current.sha256 'working-tree symlink hashes the symlink blob'
+}
+
 # --- Argument-level blocked results -------------------------------------------------------------
 
 function Test-BlockedArgument($Fixture) {
@@ -689,6 +818,9 @@ try {
 	Test-LandingBudget
 	Test-TargetsCorpusExclusion
 	Test-GitlinkTypeChange
+	Test-PairedDeletionWorkingTreeIdentity
+	Test-CrlfWorkingTreeIdentity
+	Test-WorkingTreeSymlinkIdentity
 }
 finally {
 	foreach ($root in $script:Roots) {

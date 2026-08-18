@@ -343,8 +343,9 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 	bool bAdjacent = (coord == kOriginCoord);
 	for (const GridCoord& rOwnedCoord : pClient->authorizedCoords)
 	{
-		int32_t iDeltaX = std::abs(coord.x - rOwnedCoord.x);
-		int32_t iDeltaY = std::abs(coord.y - rOwnedCoord.y);
+		// 64-bit: the client-supplied coord is hostile input, so the difference can overflow int32 and std::abs(INT32_MIN) is undefined.
+		int64_t iDeltaX = std::abs(static_cast<int64_t>(coord.x) - static_cast<int64_t>(rOwnedCoord.x));
+		int64_t iDeltaY = std::abs(static_cast<int64_t>(coord.y) - static_cast<int64_t>(rOwnedCoord.y));
 		if (iDeltaX <= 1 && iDeltaY <= 1)
 		{
 			bAdjacent = true;

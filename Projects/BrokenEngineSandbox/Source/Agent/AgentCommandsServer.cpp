@@ -346,8 +346,6 @@ void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& rParams
 		const GameSaveLoad::ReplayTransferCaptureInfo& rCaptureInfo = gpGame->mGameSaveLoad.mReplayTransferCaptureInfo;
 		rResult["recordingEventTick"] = rCaptureInfo.iRecordingEventTick;
 		rResult["playbackEventTick"] = rCaptureInfo.iPlaybackEventTick;
-		rResult["writerInputTick"] = rCaptureInfo.iWriterInputTick;
-		rResult["followingEmptyInputTick"] = rCaptureInfo.iFollowingEmptyInputTick;
 		rResult["firstWriterInputTick"] = rCaptureInfo.iFirstWriterInputTick;
 		rResult["writerInputCount"] = rCaptureInfo.iWriterInputCount;
 		rResult["playerCount"] = rCaptureInfo.iPlayerCount;
@@ -728,7 +726,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 		if (bPauseAfterWriterInput)
 		{
 			gpGame->mGameSaveLoad.mReplayTransferCaptureInfo.iPauseAfterWriterInputCount = bPendingStart ? 1 :
-				gpGame->mGameSaveLoad.mReplayTransferCaptureInfo.iWriterInputCount + 2;
+				gpGame->mGameSaveLoad.mReplayTransferCaptureInfo.iWriterInputCount + 1;
 		}
 
 		rResult["type"] = type;

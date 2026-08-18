@@ -74,7 +74,7 @@ try {
 	}
 
 	# Equal createdUtc across Alpha/Zulu proves the (createdUtc, path) tiebreak; Dependent is blocked until
-	# Older completes; Self/CycleA/CycleB quarantine their own component only.
+	# Older completes; Self/CycleA/CycleB exclude their own component from selection only.
 	Set-Plan $primary 'Documents/Plans/Test/Older.md' '2024-01-01T00:00:00.000Z'
 	Set-Plan $primary 'Documents/Plans/Test/Alpha.md' '2024-01-02T00:00:00.000Z'
 	Set-Plan $primary 'Documents/Plans/Test/Zulu.md' '2024-01-02T00:00:00.000Z'
@@ -88,14 +88,14 @@ try {
 	$baseline = (& git.exe -C $primary rev-parse HEAD).Trim()
 	& git.exe -C $primary worktree add -b fixture-session $session $baseline | Out-Null
 
-	# Lint surface: the cycle component is quarantined by name, directory guidance is never executable, and a
+	# Lint surface: the cycle component is excluded from selection by name, directory guidance is never executable, and a
 	# marker-less plan document is loud on its own path without blocking anything else.
 	$markerless = 'Documents/Plans/Test/Markerless.md'
 	[IO.File]::WriteAllText((Join-Path $primary $markerless), '# Marker-less plan document', $utf8)
 	& git.exe -C $primary add --all -- Documents/Plans/Test | Out-Null
 	$validate = Invoke-Cli 0 @('plan', 'validate', '--repo', $repo, '--worktree', $primary)
 	Assert-Code $validate 'invalid' 'invalid-plans'
-	Assert-True (@($validate.diagnostics | Where-Object code -ceq 'dependency-cycle').Count -eq 2) 'Cycle component was not quarantined.'
+	Assert-True (@($validate.diagnostics | Where-Object code -ceq 'dependency-cycle').Count -eq 2) 'Cycle component was not excluded.'
 	Assert-True (@($validate.diagnostics | Where-Object { $_.plan -ceq $markerless -and $_.code -ceq 'invalid-metadata' }).Count -eq 1 -and @($validate.plans | Where-Object { $_.path -ceq $markerless }).Count -eq 0) 'Marker-less plan document was not reported once as non-executable.'
 	Assert-True (@($validate.plans | Where-Object { $_.path -clike '*AGENTS.md' }).Count -eq 0) 'Directory guidance became an executable Plan.'
 	Assert-True ($validate.plans[0].path -ceq 'Documents/Plans/Test/Older.md') 'Validation did not retain deterministic inventory order.'
@@ -108,9 +108,9 @@ try {
 	Commit $primary 'commit the marker-less document'
 	$listing = Invoke-Cli 0 @('plan', 'list', '--repo', $repo, '--worktree', $primary)
 	Assert-Code $listing 'ok' 'ok'; Assert-True ($listing.operation -ceq 'list') 'Listing did not report the list operation.'
-	# Validation drops a quarantined plan from its inventory while the listing keeps it as a row, so the shared order is
+	# Validation drops an excluded plan from its inventory while the listing keeps it as a row, so the shared order is
 	# compared over the rows validation also reports.
-	Assert-True ((@($listing.plans | Where-Object { $_.state -cne 'quarantined' } | ForEach-Object { $_.path }) -join '|') -ceq (@($validate.plans | ForEach-Object { $_.path }) -join '|')) 'Listing did not reuse the validated inventory order.'
+	Assert-True ((@($listing.plans | Where-Object { $_.state -cne 'excluded' } | ForEach-Object { $_.path }) -join '|') -ceq (@($validate.plans | ForEach-Object { $_.path }) -join '|')) 'Listing did not reuse the validated inventory order.'
 	Assert-True ((@($listing.plans | Where-Object { $_.state -ceq 'eligible' } | ForEach-Object { $_.path }) -join '|') -ceq 'Documents/Plans/Test/Older.md|Documents/Plans/Test/Alpha.md|Documents/Plans/Test/Zulu.md|Documents/Plans/Test/Transient.md|Documents/Plans/Test/LateBlocked.md') 'Listing did not report the eligible Plans in selection order.'
 	Assert-True (@($listing.plans | Where-Object { $_.path -ceq $markerless }).Count -eq 0 -and @($listing.diagnostics | Where-Object { $_.plan -ceq $markerless -and $_.code -ceq 'invalid-metadata' }).Count -eq 1) 'Listing did not report the committed marker-less document as a diagnostic instead of a row.'
 	$dependentRow = @($listing.plans | Where-Object { $_.path -ceq 'Documents/Plans/Test/Dependent.md' })[0]
@@ -150,7 +150,7 @@ try {
 	$reclaimable = Invoke-ClaimNext 0 $primary 'main' 'owner-b2' 'session-b2' 'Documents/Plans/Test/Alpha.md'
 	Assert-Code $reclaimable 'ok' 'claimed'; Invoke-ClaimOperation 0 'unclaim' $primary 'owner-b2' 'session-b2' | Out-Null
 
-	# A cycle-quarantined Plan is never claimable.
+	# A cycle-excluded Plan is never claimable.
 	$cycleTarget = Invoke-ClaimNext 0 $primary 'main' 'owner-cycle' 'session-cycle' 'Documents/Plans/Test/CycleA.md'
 	Assert-Code $cycleTarget 'ok' 'none'
 
@@ -251,14 +251,14 @@ try {
 	Assert-True ($heldAfterCompletion.code -cin @('claimed', 'existing')) 'Completion released the claim before landing.'
 
 	[pscustomobject]@{ schemaVersion = 'broken-engine-plan-scheduler-fixtures/v1'; status = 'pass'; code = 'ok'; cases = @(
-		'lint envelope, cycle quarantine, marker-less loudness, and directory-guidance exemption',
+		'lint envelope, cycle exclusion, marker-less loudness, and directory-guidance exemption',
 		'retired-option usage error and targeted validation',
 		'listing inventory order, eligible selection order, blocked prerequisites, and marker-less diagnostic',
 		'listing reports a live claim and leaves every scheduler byte unchanged',
 		'claim lease envelope, 48-hour expiry window, and deterministic (createdUtc, path) selection',
 		'idempotent re-claim and one claim per session',
 		'foreign live-claim refusal and unclaim released/already-absent',
-		'cycle-quarantined Plans are unclaimable',
+		'cycle-excluded Plans are unclaimable',
 		'expired lease healing',
 		'v1-schema and unreadable claim record heal-deletion',
 		'absent-at-primary healing and diverged-session refusal',

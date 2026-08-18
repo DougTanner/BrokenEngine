@@ -146,7 +146,7 @@ function Get-InventoryWorkingMode([string] $RelativePath) {
 	return '100644'
 }
 
-function Get-InventoryIdentity([string] $Mode, [string] $Oid, [string] $RelativePath) {
+function Get-InventoryIdentity([string] $Mode, [string] $Oid, [string] $RelativePath, [bool] $WorkingTreeSide = $false) {
 	if ($Mode -ceq '000000') { return $null }
 	if ($Mode -ceq '160000') {
 		# A gitlink's identity is the SHA-256 over the ASCII bytes of its 40-character commit hex.
@@ -158,7 +158,12 @@ function Get-InventoryIdentity([string] $Mode, [string] $Oid, [string] $Relative
 		$sha256 = if ($null -eq $commit) { $null } else { Get-InventoryHex ([Security.Cryptography.SHA256]::HashData([Text.Encoding]::ASCII.GetBytes($commit))) }
 		return [ordered]@{ mode = $Mode; sha256 = $sha256 }
 	}
-	$sha256 = if ($Oid -ceq $script:ZeroOid) { Get-InventoryFileSha256 $RelativePath } else { Get-InventoryBlobSha256 $Oid }
+	# On the working-tree side rename detection can print a destination OID that diffcore computed for the
+	# working-tree content but never wrote to the object database, so only the file bytes are a readable
+	# identity there. $script:ManifestModes is exactly the ordinary-file modes; any other mode (a symlink,
+	# for one) is not the file's own bytes and keeps blob hashing.
+	$fromFile = ($WorkingTreeSide -and $script:ManifestModes -ccontains $Mode) -or ($Oid -ceq $script:ZeroOid)
+	$sha256 = if ($fromFile) { Get-InventoryFileSha256 $RelativePath } else { Get-InventoryBlobSha256 $Oid }
 	return [ordered]@{ mode = $Mode; sha256 = $sha256 }
 }
 
@@ -187,7 +192,7 @@ function Get-PathClass([string] $Path, [string] $Mode, [bool] $IsBinary) {
 	return 'other'
 }
 
-function Get-InventoryEntry([hashtable] $Row, [hashtable] $BinaryPaths) {
+function Get-InventoryEntry([hashtable] $Row, [hashtable] $BinaryPaths, [bool] $WorkingTreeHead) {
 	# One raw-diff row becomes one entry: both sides' identities, and both sides' classes whenever the
 	# row has a baseline side, so a rename crossing a class boundary and a type change between an
 	# ordinary file and a gitlink both stay visible to routing and to target eligibility.
@@ -197,7 +202,7 @@ function Get-InventoryEntry([hashtable] $Row, [hashtable] $BinaryPaths) {
 	$baselinePath = if ($null -ne $oldPath) { $oldPath } else { $path }
 	$currentMode = if ($Row.DestinationMode -cne '000000') { $Row.DestinationMode } else { $Row.SourceMode }
 	$baseline = Get-InventoryIdentity $Row.SourceMode $Row.SourceOid $baselinePath
-	$current = Get-InventoryIdentity $Row.DestinationMode $Row.DestinationOid $path
+	$current = Get-InventoryIdentity $Row.DestinationMode $Row.DestinationOid $path $WorkingTreeHead
 	$class = Get-PathClass $path $currentMode $isBinary
 	$oldClass = if ($Row.SourceMode -ceq '000000') { $null } else { Get-PathClass $baselinePath $Row.SourceMode $isBinary }
 	return [pscustomobject] @{
@@ -531,7 +536,8 @@ try {
 
 	$binaryPaths = Get-InventoryBinaryPath $baselineSha $headSha
 	$entries = [Collections.Generic.List[object]]::new()
-	foreach ($row in (Get-InventoryRawRow $baselineSha $headSha)) { $entries.Add((Get-InventoryEntry $row $binaryPaths)) }
+	$workingTreeHead = [string]::IsNullOrEmpty($headSha)
+	foreach ($row in (Get-InventoryRawRow $baselineSha $headSha)) { $entries.Add((Get-InventoryEntry $row $binaryPaths $workingTreeHead)) }
 	$unlistedUntracked = 0
 	$untrackedEntries = @()
 	if ([string]::IsNullOrEmpty($headSha)) {

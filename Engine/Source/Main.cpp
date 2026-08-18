@@ -778,6 +778,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANC
 	{
 		return 0; // Fatal launch-option error (e.g. --agent-port out of range); already logged kError.
 	}
+	if (!engine::gLaunchOptions.appDataDirectory.empty())
+	{
+		engine::SetCrashReportAppDataDirectory(engine::gLaunchOptions.appDataDirectory.c_str());
+	}
 
 	// Prevent multiple instances from running simultaneously
 	std::unique_ptr<void, decltype(&CloseHandle)> pMutex(nullptr, &CloseHandle);

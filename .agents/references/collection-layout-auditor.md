@@ -11,7 +11,9 @@ header text. Never reconstruct these operations inline.
 - `SharedMembers()`/`ClientMembers()` partition that tuple;
 - `SharedCrcMembers()` and `PersistentMembers()` stay subsets;
 - no `BT_CLIENT`-guarded column sits in `SharedMembers()`;
-- declaration and accessor guards match; and
+- no build's accessor tuple drops a column that build declares while the other
+  build's tuple lists it, checked per build only where that build's tuple
+  membership resolves to declared columns; and
 - every collection `kiVersion` declaration and `Frame::kiVersion` term resolve
   to each other, in both directions.
 

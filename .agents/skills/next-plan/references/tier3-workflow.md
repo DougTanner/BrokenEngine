@@ -24,11 +24,13 @@ identity, semantics, layout, guard scope, or named invariant.
 
 ## Plan review
 
-Main dispatches `/plan-audit` to one `reviewer`, then returns its accepted
-findings to the preparation `implementer`. That worker performs every repository
-read and search `/external-grill-plan` requires and returns an immutable
-decision brief in that skill's question format, plus its external-claim
-requests and unresolved residuals; it never interviews, chooses, or delegates.
+Main dispatches `/plan-audit`, plus `/plan-simplicity-review` when the plan adds
+new code or modifies any non-documentation artifact, to one `reviewer` each,
+then returns their accepted findings to the preparation `implementer`. That
+worker performs every repository read and search `/external-grill-plan`
+requires and returns an immutable decision brief in that skill's question format,
+plus its external-claim requests and unresolved residuals; it never interviews,
+chooses, or delegates.
 Main routes external-claim requests to a `locator` through
 `/verify-external-claims`, resumes the same worker with the exact verdicts and
 with each answer that unlocks dependent repository-backed work, and receives the

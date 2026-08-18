@@ -5,7 +5,6 @@
 #include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerTransferManager.h"
 #include "Profile/ProfileManager.h"
-#include "SpawnTransfer.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/Localization.h"
 
@@ -394,26 +393,6 @@ void Game::CaptureHarvestedTransfers([[maybe_unused]] engine::GridCoord coord, [
 #if defined(BT_SERVER)
 	mGameSaveLoad.CaptureHarvestedTransfers(coord, transfers, rPreTransferFrame);
 #endif
-}
-
-void Game::ApplyTransferStatusChanges(Frame& rFrame, FrameInput& rFrameInput)
-{
-	// Heap: Spawns into frame may grow SOA buffers
-	ScopedSuppressAllocationTracking suppress;
-
-	for (const StatusChange& rStatusChange : rFrameInput.statusChanges)
-	{
-		if (IsTransferType(rStatusChange.eType))
-		{
-			SpawnTransfer(rFrame, rStatusChange.eType, std::get<TransferData>(rStatusChange.data), rFrame.postRender.playerAlignment);
-		}
-	}
-
-	// Remove transfer StatusChanges so Spawn phase doesn't see them
-	std::erase_if(rFrameInput.statusChanges, [](const StatusChange& rStatusChange)
-	{
-		return IsTransferType(rStatusChange.eType);
-	});
 }
 
 Game::~Game()

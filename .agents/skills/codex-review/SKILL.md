@@ -3,7 +3,8 @@ name: codex-review
 description: >-
   Primary Claude Code route running any delegated reviewer or auditor role on
   Codex/Sol headless. Codex callers stop because they are already the Sol
-  mapping (see the root AGENTS.md role table). Use for every Change Workflow review dispatch in Claude Code.
+  mapping (see the root AGENTS.md role table). Use for every Change Workflow review dispatch in Claude Code
+  except the child reviewer a parent/manager orchestrator (such as /next-plan-review) dispatches itself.
 allowed-tools: [Read, Bash]
 ---
 
@@ -11,14 +12,18 @@ allowed-tools: [Read, Bash]
 
 Claude Code runs every delegated reviewer or auditor role (Sol on Codex, per the
 root [AGENTS.md](../../../AGENTS.md) role table) — `plan-audit`,
+`plan-simplicity-review`,
 `repo-code-review`, `glsl-review`, `scope-review`, `adversarial-review`,
 `session-audit`, and external review lenses — on Codex/Sol through this skill.
 Parent/manager orchestrators that dispatch their own child reviewer, including
-`/next-plan-review`, are excluded. A `/codex-review` invocation of an assigned skill constitutes the
-delegated-`reviewer` execution context; it is not an "inline run" in the assigned
-skills' vocabulary, and `/verify-changes` records it as the delegated reviewer
-execution. Codex callers must stop instead of invoking this skill recursively — their reviewer
-role already resolves to Sol.
+`/next-plan-review`, are excluded, and so is the child reviewer they dispatch:
+that child routes per the delegated-review routing bullet in the root
+[AGENTS.md](../../../AGENTS.md). A `/codex-review` invocation of an assigned
+skill constitutes the delegated-`reviewer` execution context; it is not an
+"inline run" in the assigned skills' vocabulary, and `/verify-changes`
+records it as the delegated reviewer execution. Codex callers must stop
+instead of invoking this skill recursively — their reviewer role already
+resolves to Sol.
 
 ## Inputs
 
@@ -77,14 +82,23 @@ role already resolves to Sol.
    (`../code-quality-metrics/SKILL.md`), and, for
    `verify-changes`, the reviewed change set's baseline and head SHAs plus each
    typed artifact its `## Required inputs` conditions name
-   (`../verify-changes/SKILL.md`). The script blocks the dispatch when one is
-   absent. For a reviewer role with no
+   (`../verify-changes/SKILL.md`). The script blocks the dispatch when a SHA or
+   a diff-triggered typed artifact is absent, and does not check the game-build
+   receipt lines, so supply those yourself. For a reviewer role with no
    skill file — the Tier-2 coherence review, for one — pass a descriptive role
    name as `-AssignedSkill` together with `-AdHocRole`, and put that role's full
    review contract in `-ScopeFile`. `-RiskTier` adds one
    `Risk tier: <n>` line above that text. `-PromptPath` must not already exist;
    `-UntrackedPath` names every untracked file the review needs, and does not
-   combine with `-Head`. Ordinary assembly still requires the metrics digest;
+   combine with `-Head`. Every named value must be untracked *and not
+   gitignored*, because the inventory the script consults never reports an
+   ignored path: a file under `Temp/` can never be named, since `Temp` is
+   gitignored, even though `-ScopeFile` and `-PromptPath` may live there. Put
+   review-evidence files the reviewer must read at the session worktree root
+   instead — untracked and outside any ignored directory — and name each one in
+   `-UntrackedPath`; remove them once the review no longer needs them, because
+   any such file left behind stays a mandatory `-UntrackedPath` member.
+   Ordinary assembly still requires the metrics digest;
    only `-PreflightTargets` bypasses that guard.
 2. Read the receipt, one compact JSON object on stdout. Exit `0` carries
    `promptPath`, `promptBytes`, `fileCount`, `binaryExcluded`,
@@ -100,7 +114,8 @@ role already resolves to Sol.
    split the review into smaller authorized scopes and never truncate the
    evidence; `prompt.inventory-truncated` — name every untracked path or narrow
    the baseline until the evidence is complete; `prompt.untracked-path-unknown` —
-   a named path is not an untracked file; `prompt.head-untracked-conflict` — a
+   a named path is not an untracked file, which includes a gitignored path such
+   as one under `Temp/`; `prompt.head-untracked-conflict` — a
    commit-valued head has no untracked side; `prompt.assigned-skill-unknown` —
    `-AssignedSkill` names no skill file, so fix the name or pass `-AdHocRole`;
    `prompt.head-required` — `verify-changes` needs a commit-valued `-Head` whose
@@ -118,16 +133,42 @@ role already resolves to Sol.
    prompt absent; reuse blockers preserve the caller-owned targets file bytes. Exit `1` is a
    script error: stop and report its `code` and `message` rather than
    hand-assembling a prompt.
-3. Launch and poll — two separate calls, because no call ever waits for Codex.
+3. Launch and poll — two separate bare script calls, because no call ever waits
+   for Codex; neither is wrapped in a loop or chained with another command.
    Launch with `pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree
-   <worktree> -PromptFile <the receipt's promptPath> -OutFile <out>`, which
-   returns in seconds with a single-line JSON launch receipt carrying `runId`
-   and the absolute `outFile`. Then re-invoke `pwsh -NoProfile -File
-   .codex/codex-review.ps1 -Poll <runId>`, which also returns immediately, until
-   its `status` is `completed` or `failed`; `running` means keep polling. Every
-   call is bounded far below the host's 10-minute command cap, so a long review
-   is never killed and never needs a background run or a truncated scope. Only a
-   `completed` status guarantees `<out>` is fully written.
+   <worktree> -PromptFile <the receipt's promptPath> -OutFile <out>`, passing a
+   repo-relative `<out>` such as `Temp/<name>-out.md`. The launch tolerates an
+   existing out-file, and stale bytes would fire every bounded watch
+   immediately, so `<out>` must be a fresh path that does not yet exist. The
+   call returns in seconds with a single-line JSON launch receipt whose `runId`
+   is what `-Poll` needs. Between polls, wait with the host's own wait
+   mechanism by watching the same repo-relative `<out>` path the launch was
+   given, from the session worktree root, under a bounded deadline — for example
+   `deadline=$((SECONDS+540)); until [ -s "Temp/<name>-out.md" ] || [ $SECONDS
+   -ge $deadline ]; do sleep 5; done`. Watch that caller-supplied path rather
+   than the receipt's absolute `outFile`, which a POSIX shell cannot resolve.
+   The loop never invokes the bundled script, so it wraps nothing — the script
+   is still only ever run as its own bare call. Each wake — the watch firing or
+   its deadline passing — gets exactly one confirming `pwsh -NoProfile -File
+   .codex/codex-review.ps1 -Poll <runId>` as its own call, which also returns
+   immediately. `completed` or `failed` ends the wait. The out-file's presence
+   is the completion signal, and it can appear moments before the run's
+   completion record, so a confirming poll that reports `running` right after
+   the file appeared may be followed by one immediate race-closing re-poll,
+   which closes a milliseconds-wide publish window rather than standing in for
+   an open-ended wait. While `<out>` is present and the status is still
+   `running`, keep issuing single confirming `-Poll` calls until `completed`:
+   the run has already finished and only its completion record is mid-publish,
+   so this brief repetition is completion signaling, not polling as the wait
+   mechanism. Resume the bounded watch with a fresh deadline only when the
+   deadline passed and `<out>` is still absent; polling is never the wait
+   mechanism for a run whose out-file has not yet appeared. A failed run never
+   produces the out-file, so a watch that reaches its deadline is the
+   failure-signal path: the confirming poll then reports `failed`, or reports
+   `running` and watching resumes. Every script call is bounded far below the host's 10-minute command
+   cap, so a long review is never killed and never needs a background run or a
+   truncated scope. Only a `completed` status guarantees `<out>` is fully
+   written, so never read `<out>` before a poll reports `completed`.
 4. After a `completed` status, read `<out>`; success requires a non-empty
    structured result — a skill-native status line or a verdict token, either
    vocabulary counts. Benign CLI

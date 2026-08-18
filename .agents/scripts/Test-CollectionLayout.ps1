@@ -12,6 +12,10 @@
 # Recognized declaration form: `TYPE* __restrict pName` or the C-array-of-pointer column
 # `TYPE* pName[COUNT]`, each one tuple entry. Recognized guards: `#if defined(BT_CLIENT)` and
 # `#if defined(BT_SERVER)` with optional `#else`.
+#
+# Guard parity is per-build tuple membership, not literal guard text: a column is flagged only when
+# one build declares it and that build's entry set drops it while the other build's set lists it. A
+# two-branch accessor whose `#if defined(BT_CLIENT)` and `#else` bodies both list a column is regular.
 [CmdletBinding()]
 param(
 	# One or more collection headers or directories; `pwsh -File` cannot pass an array, so several
@@ -314,6 +318,7 @@ function Read-CollectionHeader
 					RawEntries = [Collections.Generic.List[object]]::new()
 					Shape = ''
 					Entries = @()
+					ServerEntries = @()
 				}
 				$accessorDepth = $depthBefore
 				$accessorOpened = $text.Contains('{')
@@ -372,7 +377,10 @@ function Resolve-AccessorShapes
 			}
 
 			$accessor.Shape = 'tie'
+			# Two entry sets from the same raw entries: every other rule reads the client set, and guard
+			# parity compares the two so a `#else` branch listing the same column is not read as a loss.
 			$accessor.Entries = @($accessor.RawEntries | Where-Object { $_.Active })
+			$accessor.ServerEntries = @($accessor.RawEntries | Where-Object { -not (Test-ClientOnlyGuard $_.Guard) })
 		}
 		elseif ($body -ceq 'return std::tuple_cat(rSelf.SharedMembers(), rSelf.ClientMembers());')
 		{
@@ -569,22 +577,37 @@ function Test-SharedClientGuard
 	}
 }
 
+# Parity is per-build tuple membership, not literal guard text: a column is flagged only when one
+# build declares it and that build's entry set drops it while the other build's set lists it. A column
+# both sets omit is a deliberate subset omission (PersistentMembers, SharedCrcMembers), not a defect.
 function Test-GuardParity
 {
 	param([object] $Struct)
 
+	$declaredNames = @($Struct.Declarations | ForEach-Object { $_.Member })
 	foreach ($accessor in $Struct.Accessors)
 	{
 		if ($accessor.Shape -cne 'tie') { continue }
-		foreach ($entry in $accessor.Entries)
+
+		# A build is compared only when the accessor exists for it and its whole entry set resolves to
+		# declared columns. A wholly guarded accessor yields an empty set for the other build, and a
+		# forwarding `#else` body such as `return rSelf.SharedMembers();` yields a token naming no
+		# column; neither is a membership set, so reading either as missing columns would be wrong.
+		$compareClient = (Test-ClientActiveGuard $accessor.Guard) -and (@($accessor.Entries | Where-Object { $declaredNames -cnotcontains $_.Member }).Count -eq 0)
+		$compareServer = (-not (Test-ClientOnlyGuard $accessor.Guard)) -and (@($accessor.ServerEntries | Where-Object { $declaredNames -cnotcontains $_.Member }).Count -eq 0)
+		if (-not $compareClient -and -not $compareServer) { continue }
+
+		foreach ($declaration in $Struct.Declarations)
 		{
-			foreach ($declaration in $Struct.Declarations)
+			$clientEntry = @($accessor.Entries | Where-Object { $_.Member -ceq $declaration.Member })
+			$serverEntry = @($accessor.ServerEntries | Where-Object { $_.Member -ceq $declaration.Member })
+			if ($compareClient -and $clientEntry.Count -eq 0 -and $serverEntry.Count -gt 0 -and (Test-ClientActiveGuard $declaration.Guard))
 			{
-				if ($declaration.Member -cne $entry.Member) { continue }
-				if ($declaration.Guard -cne $entry.Guard)
-				{
-					Add-LayoutViolation $Struct.Path $entry.Line $Struct.Name $entry.Member 'guard.parity-mismatch' $entry.Text
-				}
+				Add-LayoutViolation $Struct.Path $serverEntry[0].Line $Struct.Name $declaration.Member 'guard.parity-mismatch' $serverEntry[0].Text
+			}
+			elseif ($compareServer -and $serverEntry.Count -eq 0 -and $clientEntry.Count -gt 0 -and -not (Test-ClientOnlyGuard $declaration.Guard))
+			{
+				Add-LayoutViolation $Struct.Path $clientEntry[0].Line $Struct.Name $declaration.Member 'guard.parity-mismatch' $clientEntry[0].Text
 			}
 		}
 	}

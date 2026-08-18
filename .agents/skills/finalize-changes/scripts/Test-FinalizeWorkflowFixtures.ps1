@@ -294,6 +294,9 @@ foreach ($dotPath in @('./file.txt', 'dir/./file.txt', 'dir/.')) {
 	Assert-Outcome $run "candidate-rejects-dot-owned-path-$dotPath" 1 'error' 'input.path-invalid'
 	& $assertInvalidPathState "dot path '$dotPath' rejection"
 }
+$run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$sessionTip,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','never-tracked-anywhere.txt','-CommitMessageFile',$candidateMessage)
+Assert-Outcome $run 'candidate-rejects-owned-path-in-no-tree' 1 'error' 'input.path-not-single-entry'
+& $assertInvalidPathState 'unknown owned path rejection'
 $literalSessionDiskPath = Join-Path $session ($literalBracketPath.Replace('/','\'))
 New-Item -ItemType Directory -Force (Split-Path -Parent $literalSessionDiskPath) | Out-Null
 [IO.File]::WriteAllText($literalSessionDiskPath, 'literal session candidate', [Text.UTF8Encoding]::new($false))
@@ -438,6 +441,42 @@ if ($null -ne $run.Json) {
 Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
 Remove-Item -LiteralPath (Join-Path $primary 'primary-active-owned.txt'),(Join-Path $primary 'primary-staged-owned.txt'),(Join-Path $primary 'primary-disjoint-staged.txt'),(Join-Path $primary 'primary-disjoint-untracked.txt') -Force -ErrorAction SilentlyContinue
 
+# A resumed invocation carries the whole caller-owned landing set, so both routes must
+# accept an authorized path this session already committed as a deletion and still stage
+# the path that is genuinely dirty.
+[IO.File]::WriteAllText((Join-Path $session 'resumed-deleted.txt'), 'resumed deletion source', [Text.UTF8Encoding]::new($false))
+Invoke-ScratchGit $session @('add','resumed-deleted.txt') | Out-Null
+Invoke-ScratchGit $session @('commit','-m','fixture resumed baseline') | Out-Null
+$resumedBaseline = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+Invoke-ScratchGit $session @('rm','resumed-deleted.txt') | Out-Null
+Invoke-ScratchGit $session @('commit','-m','fixture resumed deletion') | Out-Null
+$resumedTip = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+[IO.File]::WriteAllText((Join-Path $session 'resumed-dirty.txt'), 'resumed dirty', [Text.UTF8Encoding]::new($false))
+$run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$resumedBaseline,'-ExpectedCurrentTip',$resumedTip,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','resumed-deleted.txt,resumed-dirty.txt','-CommitMessageFile',$candidateMessage)
+Assert-Outcome $run 'session-candidate-accepts-already-committed-deletion' 0 'pass' 'candidate.created'
+if ($null -ne $run.Json) {
+	$resumedChangedPaths = @(@(Invoke-ScratchGit $session @('diff-tree','--no-commit-id','--name-only','-r',$resumedTip,$run.Json.candidate.commit)) | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrEmpty($_) })
+	Assert-True ($resumedChangedPaths.Count -eq 1 -and $resumedChangedPaths[0] -ceq 'resumed-dirty.txt') 'resumed session candidate changes only the still-dirty authorized path'
+}
+Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
+Remove-Item -LiteralPath (Join-Path $session 'resumed-dirty.txt') -Force -ErrorAction SilentlyContinue
+[IO.File]::WriteAllText((Join-Path $primary 'resumed-primary-deleted.txt'), 'resumed deletion source', [Text.UTF8Encoding]::new($false))
+Invoke-ScratchGit $primary @('add','resumed-primary-deleted.txt') | Out-Null
+Invoke-ScratchGit $primary @('commit','-m','fixture resumed primary baseline') | Out-Null
+$resumedPrimaryBaseline = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+Invoke-ScratchGit $primary @('rm','resumed-primary-deleted.txt') | Out-Null
+Invoke-ScratchGit $primary @('commit','-m','fixture resumed primary deletion') | Out-Null
+$resumedPrimaryTip = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+[IO.File]::WriteAllText((Join-Path $primary 'resumed-primary-dirty.txt'), 'resumed dirty', [Text.UTF8Encoding]::new($false))
+$run = Invoke-JsonScript $candidateScript @('-Route','primary-commit','-CurrentWorktree',$primary,'-PrimaryWorktree',$primary,'-CurrentBranch','main','-PrimaryBranch','main','-Baseline',$resumedPrimaryBaseline,'-ExpectedCurrentTip',$resumedPrimaryTip,'-ExpectedPrimaryTip',$resumedPrimaryTip,'-OwnedPaths','resumed-primary-deleted.txt,resumed-primary-dirty.txt','-CommitMessageFile',$candidateMessage)
+Assert-Outcome $run 'primary-candidate-accepts-already-committed-deletion' 0 'pass' 'candidate.created'
+if ($null -ne $run.Json) {
+	$resumedPrimaryChangedPaths = @(@(Invoke-ScratchGit $primary @('diff-tree','--no-commit-id','--name-only','-r',$resumedPrimaryTip,$run.Json.candidate.commit)) | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrEmpty($_) })
+	Assert-True ($resumedPrimaryChangedPaths.Count -eq 1 -and $resumedPrimaryChangedPaths[0] -ceq 'resumed-primary-dirty.txt') 'resumed primary candidate changes only the still-dirty authorized path'
+}
+Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
+Remove-Item -LiteralPath (Join-Path $primary 'resumed-primary-dirty.txt') -Force -ErrorAction SilentlyContinue
+
 $fixtureEnvironment = [ordered]@{
 	LOCALAPPDATA = $localAppData
 	BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE = '1'
@@ -506,6 +545,14 @@ if ($null -ne $run.Json) {
 }
 $releasedStatus = (@(Invoke-WorktreeCli @('lock', 'status', '--repo', $commonDirectory) 2) -join '')
 Assert-True ((($releasedStatus | ConvertFrom-Json -Depth 16).held) -eq $false) 'blank-owner release mints no token and creates no lease'
+
+$run = Invoke-JsonScript $lockClaimScript ($lockReleaseArguments + @('-LandingOwner', 'not-a-canonical-guid'))
+Assert-Outcome $run 'reconcile-lock-claim-invalid-owner' 1 'error' 'landing-lock.owner-token-invalid'
+if ($null -ne $run.Json) {
+	Assert-True ($run.Json.attempts -eq 0) 'invalid-owner claim reports no WorktreeCli attempts'
+}
+$releasedStatus = (@(Invoke-WorktreeCli @('lock', 'status', '--repo', $commonDirectory) 2) -join '')
+Assert-True ((($releasedStatus | ConvertFrom-Json -Depth 16).held) -eq $false) 'invalid-owner claim creates no lease'
 
 $foreignLeaseOwner = [guid]::NewGuid().ToString()
 Invoke-WorktreeCli @('lock', 'claim', '--repo', $commonDirectory, '--owner', $foreignLeaseOwner, '--session', 'foreign-fixture', '--worktree', $session, '--lease-seconds', '60') | Out-Null

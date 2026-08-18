@@ -18,7 +18,9 @@ worktrees, or disturbs unrelated changes. Keep history linear: reconcile with
 ## Inputs and ownership
 
 Require the approved objective, its stage decisions, and the caller-owned
-changed paths. Main dispatches the single landing `/verify-changes` pass, which
+changed paths. That set is the session's full landing set, including paths
+already committed — a deletion among them included — so a resumed invocation
+passes it unchanged rather than trimming it to what is still dirty. Main dispatches the single landing `/verify-changes` pass, which
 runs inside the workflow below, after final preparation and reconciliation have
 produced the final diff — do not require or reuse an earlier PASS. Main supplies
 that pass with every caller-supplied input `/verify-changes` `## Required inputs`
@@ -136,7 +138,7 @@ every other lease is foreign.
 Main presents the self-contained summary immediately before the question:
 one-sentence change, changed-file count and kind, session branch and the
 primary branch resolved as `<primary-branch>` below,
-all objective-stage decisions, and the exact remaining operation, plus two lines
+all objective-stage decisions, and the exact remaining operation, plus three lines
 main answers itself from the whole session record (worker handoffs, rejected
 review findings, residuals) — the finalizer worker does not produce them:
 
@@ -145,8 +147,11 @@ review findings, residuals) — the finalizer worker does not produce them:
   decided it.
 - **Substituted approaches:** every place a delegated verdict ruled out the
   approach the user stated, giving the verdict and the substitute adopted.
+- **Size and complexity observations:** every size observation a reviewer recorded
+  on code this session changed, giving the file and its measured `bt-token-v1`
+  size, and how far it grew whenever the session record states that growth.
 
-Both lines need a real answer in plain words the user can act on, with no
+All three lines need a real answer in plain words the user can act on, with no
 repository jargon; each always appears and states `none` when the session record
 holds nothing to disclose. Then ask exactly:
 

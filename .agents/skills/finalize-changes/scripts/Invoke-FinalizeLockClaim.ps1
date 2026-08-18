@@ -75,6 +75,12 @@ try {
 		$result.blocker = [ordered]@{ disposition = 'terminal'; requiresUserAuthority = $false; retryAfterMilliseconds = 0 }
 		Complete-FinalizeLockClaim 1 'error' 'landing-lock.release-failed' "WorktreeCli lock release failed with exit $($releaseResult.ExitCode): $output"
 	}
+	# A claim keeps the supplied token verbatim, so a malformed one would create a lease that no
+	# owner-exact release or compare-and-swap could ever match. Reject it before claiming anything.
+	if (-not [string]::IsNullOrWhiteSpace($LandingOwner) -and $LandingOwner -cnotmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
+		$result.blocker = [ordered]@{ disposition = 'terminal'; requiresUserAuthority = $false; retryAfterMilliseconds = 0 }
+		Complete-FinalizeLockClaim 1 'error' 'landing-lock.owner-token-invalid' 'A supplied landing owner token must be a canonical lowercase GUID (8-4-4-4-12 lowercase hex digits). Omit -LandingOwner to mint one, or take one from WorktreeCli lock token.'
+	}
 	if ([string]::IsNullOrWhiteSpace($LandingOwner)) {
 		$token = Invoke-FinalizeNativeText $item.FullName @('lock', 'token') $Worktree
 		if ($token.ExitCode -ne 0 -or $token.Stdout.Trim() -cnotmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {

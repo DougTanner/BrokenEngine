@@ -254,10 +254,191 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	}
 	mrSession.ProcessReceivedGamePackets();
 	mrSession.ApplyReceivedStaticData();
-	mrSession.ApplyReceivedFullStates();
-	[[maybe_unused]] const bool bHasNewData = mrSession.ApplyReceivedUpdates();
+	ApplyReceivedFullStates();
+	ApplyReceivedUpdates();
 
 	SendAckAndFlush();
+}
+
+void ClientSessionRuntime::ApplyReceivedFullStates()
+{
+	// Heap: try_emplace may insert new CoordFrames; full state is moved directly into snapshot ring slot 0
+	ScopedSuppressAllocationTracking suppress;
+
+	std::vector<ReceivedCoordFullState>& rFullStates = mpClient->mReceivedFullStates;
+	if (rFullStates.empty())
+	{
+		return;
+	}
+
+	for (ReceivedCoordFullState& rFullState : rFullStates)
+	{
+		GridCoord coord = rFullState.coord;
+		int64_t iTick = rFullState.iTick;
+
+		CoordFrames& rCoordFrames = game::gpGame->mCoordFrames.try_emplace(coord).first->second;
+
+		const game::Frame* pRingTail = nullptr;
+		if (rCoordFrames.iSnapshotCount > 0)
+		{
+			int64_t iTailPhysical = SnapshotIndex(rCoordFrames.iSnapshotHead, rCoordFrames.iSnapshotCount - 1);
+			pRingTail = rCoordFrames.snapshots[iTailPhysical].get();
+		}
+		mrSession.HydrateReceivedFullState(*rFullState.pFrame, pRingTail);
+
+		if (rCoordFrames.iConfirmedTick < 0)
+		{
+			// Only advance tick counter during initial setup (no other coords have confirmed data yet)
+			bool bInitialSetup = (GetConfirmedTick() < 0);
+
+			// Move the received full state into the ring as the confirmed frame.
+			rCoordFrames.iSnapshotHead = 0;
+			rCoordFrames.snapshots[0] = std::move(rFullState.pFrame);
+			rCoordFrames.snapshots[0]->postRender.sharedCrc = rCoordFrames.snapshots[0]->Crcs();
+			rCoordFrames.iSnapshotCount = 1;
+			rCoordFrames.iConfirmedTick = iTick;
+			rCoordFrames.iLastFullStateTick = iTick;
+			rCoordFrames.iConfirmedOffset = 0;
+
+			float fFullStateTime = rCoordFrames.snapshots[0]->interpolate.fCurrentTime;
+
+			// Set frame counter from first received full state only (not from subsequent neighbor subscriptions).
+			// Offset sim tick back by the jitter-safety floor so sim starts BEHIND latestServerTick, matching
+			// the steady-state target computed by ComputeClockCorrectionNs. Avoids a ~150 ms freeze while the
+			// ceiling clamp waits for latest to catch up and drains the spurious +targetBehind error.
+			// Clamp the offset at iTick so a fresh post-load server (iTick < jitter-safety floor) does
+			// not produce a negative sim tick.
+			if (bInitialSetup && game::gpGame->TickCounter() < iTick)
+			{
+				static constexpr int64_t kiTickTimeMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(engine::kTickNs).count();
+				static constexpr int64_t kiInitialTargetBehind = (engine::kiJitterSafetyUs + kiTickTimeMicroseconds - 1) / kiTickTimeMicroseconds;
+				const int64_t iAppliedBehind = std::min<int64_t>(kiInitialTargetBehind, iTick);
+				game::gpGame->SetTickCounter(iTick - iAppliedBehind);
+				game::gpGame->SetCurrentTime(fFullStateTime - static_cast<float>(iAppliedBehind) * engine::kfDeltaTime);
+				game::gpGame->ResetRenderClock();
+			}
+		}
+		else
+		{
+			// Reject stale full states: tick must be after confirmed tick
+			if (iTick <= rCoordFrames.iConfirmedTick)
+			{
+				LOG(kNetwork, kVerbose, "ApplyReceivedFullStates Rejected stale full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", coord.x, coord.y, iTick, rCoordFrames.iConfirmedTick);
+				continue;
+			}
+
+			// Coord already has confirmed state: store as pending for reconcile injection
+			rCoordFrames.pendingFullState = CoordFrames::PendingFullState {
+				.iTick = iTick,
+				.pFrame = std::move(rFullState.pFrame),
+			};
+		}
+	}
+}
+
+bool ClientSessionRuntime::ApplyReceivedUpdates()
+{
+	// Heap: map insertion for per-frame server updates
+	ScopedSuppressAllocationTracking suppress;
+
+	bool bHasNewData = false;
+	const std::vector<ClientCoordSlot>& rCoordSlots = mpClient->mCoordSlots;
+	std::vector<std::vector<ReceivedCoordUpdate>>& rAllUpdates = mpClient->mReceivedCoordUpdates;
+
+	for (int64_t iSlot = 0; iSlot < std::ssize(rCoordSlots); ++iSlot)
+	{
+		std::vector<ReceivedCoordUpdate>& rSlotUpdates = rAllUpdates.at(iSlot);
+		if (rSlotUpdates.empty())
+		{
+			continue;
+		}
+
+		const ClientCoordSlot& rSlot = rCoordSlots.at(iSlot);
+		if (rSlot.eState != CoordSubscriptionState::kActive)
+		{
+			rSlotUpdates.clear();
+			continue;
+		}
+
+		GridCoord coord = rSlot.coord;
+		CoordFrames& rCoordFrames = game::gpGame->mCoordFrames.at(coord);
+
+		for (ReceivedCoordUpdate& rUpdate : rSlotUpdates)
+		{
+			if (rUpdate.iTick <= rCoordFrames.iConfirmedTick)
+			{
+				continue;
+			}
+
+			miLatestServerTick = std::max(miLatestServerTick, rUpdate.iTick);
+
+			if (static_cast<int64_t>(rCoordFrames.serverUpdates.size()) >= engine::kiMaxBufferedFrames)
+			{
+				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full, requesting full-state resync Coord: ({},{}) Size: {} Tick: {}", coord.x, coord.y, rCoordFrames.serverUpdates.size(), rUpdate.iTick);
+
+				// The engine already acked these ticks, so a dropped update would never be resent: abandon the
+				// whole drain and take authoritative state instead. Returning here sends exactly one request even
+				// when several coords are over budget, and the reset plus the discard below empties every
+				// serverUpdates map, so this branch cannot arm again for at least kiMaxBufferedFrames ticks.
+				mpClient->SendResyncRequest();
+				mrSession.ResetCoordStatesForResync();
+				for (std::vector<ReceivedCoordUpdate>& rDrainedUpdates : rAllUpdates)
+				{
+					rDrainedUpdates.clear();
+				}
+				return false;
+			}
+
+			bool bInserted = rCoordFrames.serverUpdates.try_emplace(rUpdate.iTick, CoordFrames::CoordServerUpdate {
+				.sharedCrc = rUpdate.sharedCrc,
+				.statusChanges = std::move(rUpdate.statusChanges),
+			}).second;
+			if (bInserted)
+			{
+				bHasNewData = true;
+			}
+		}
+
+		rSlotUpdates.clear();
+	}
+
+	return bHasNewData;
+}
+
+int64_t ClientSessionRuntime::GetConfirmedTick() const
+{
+	int64_t iMinimumTick = -1;
+	for (const auto& [rCoord, rCoordFrames] : game::gpGame->mCoordFrames)
+	{
+		if (rCoordFrames.iConfirmedTick >= 0 && (iMinimumTick < 0 || rCoordFrames.iConfirmedTick < iMinimumTick))
+		{
+			iMinimumTick = rCoordFrames.iConfirmedTick;
+		}
+	}
+	return iMinimumTick;
+}
+
+int64_t ClientSessionRuntime::GetClientConfirmedTick() const
+{
+	auto it = game::gpGame->mCoordFrames.find(game::gpGame->mClientGridCoord);
+	if (it == game::gpGame->mCoordFrames.end() || it->second.iConfirmedTick < 0)
+	{
+		return -1;
+	}
+	return it->second.iConfirmedTick;
+}
+
+int64_t ClientSessionRuntime::GetServerUpdateBufferSize() const
+{
+	int64_t iTotal = 0;
+	for (const auto& [rCoord, rCoordFrames] : game::gpGame->mCoordFrames)
+	{
+		if (rCoordFrames.iConfirmedTick >= 0)
+		{
+			iTotal += static_cast<int64_t>(rCoordFrames.serverUpdates.size());
+		}
+	}
+	return iTotal;
 }
 
 void ClientSessionRuntime::FlushOutgoing()

@@ -135,17 +135,47 @@ void ServerBroadcaster::BuildFrameInputs()
 
 void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, common::ScopedWorkbufferArena& rPublicationArena)
 {
-	(void)rPublicationArena;
 	const std::unordered_map<engine::GridCoord, std::vector<StatusChange>>& rTransfers = gpServerSession->mpTransferManager->mTransfers;
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-	int64_t iActiveCoordCount = std::ssize(gpGame->mActiveCoords);
+	const bool bReplaying = gpGame->mGameSaveLoad.IsReplaying();
+	if (bReplaying)
+	{
+		auto appendCoord = [&](engine::GridCoord coord)
+		{
+			if (!std::ranges::contains(rPublicationArena.Span<const engine::GridCoord>(), coord))
+			{
+				rPublicationArena.PushBack(coord);
+			}
+		};
+		for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
+		{
+			appendCoord(rCoord);
+		}
+		for ([[maybe_unused]] const auto& [rCoord, rStatusChanges] : mBroadcastStatusChanges)
+		{
+			appendCoord(rCoord);
+		}
+		for ([[maybe_unused]] const auto& [rCoord, rStatusChanges] : rTransfers)
+		{
+			appendCoord(rCoord);
+		}
+	}
+	else
+	{
+		for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
+		{
+			rPublicationArena.PushBack(rCoord);
+		}
+	}
+	std::span<const engine::GridCoord> publicationCoords = rPublicationArena.Span<const engine::GridCoord>();
+	int64_t iPublicationCoordCount = std::ssize(publicationCoords);
 
-	auto gridUpdatesAlloc = rWorkbuffer.PushBuffer<std::pair<engine::GridCoord, engine::GridUpdateData>*>(iActiveCoordCount * static_cast<int64_t>(sizeof(std::pair<engine::GridCoord, engine::GridUpdateData>)));
+	auto gridUpdatesAlloc = rWorkbuffer.PushBuffer<std::pair<engine::GridCoord, engine::GridUpdateData>*>(iPublicationCoordCount * static_cast<int64_t>(sizeof(std::pair<engine::GridCoord, engine::GridUpdateData>)));
 	std::pair<engine::GridCoord, engine::GridUpdateData>* pGridUpdates = gridUpdatesAlloc;
 	int64_t iGridUpdateCount = 0;
 	common::ScopedWorkbufferArena statusChanges = rWorkbuffer.Push();
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
+	for (const engine::GridCoord& rCoord : publicationCoords)
 	{
 		engine::GridUpdateData updateData {};
 		updateData.sharedCrc = gpGame->CurrentFrame(rCoord).postRender.sharedCrc;
@@ -175,10 +205,10 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 
 	if constexpr (kbDesyncDebugFrames)
 	{
-		auto fullFramesAlloc = rWorkbuffer.PushBuffer<std::pair<engine::GridCoord, const game::Frame*>*>(iActiveCoordCount * static_cast<int64_t>(sizeof(std::pair<engine::GridCoord, const game::Frame*>)));
+		auto fullFramesAlloc = rWorkbuffer.PushBuffer<std::pair<engine::GridCoord, const game::Frame*>*>(iPublicationCoordCount * static_cast<int64_t>(sizeof(std::pair<engine::GridCoord, const game::Frame*>)));
 		std::pair<engine::GridCoord, const game::Frame*>* pFullFrames = fullFramesAlloc;
 		int64_t iFullFrameCount = 0;
-		for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
+		for (const engine::GridCoord& rCoord : publicationCoords)
 		{
 			pFullFrames[iFullFrameCount++] = {rCoord, &gpGame->CurrentFrame(rCoord)};
 		}
@@ -188,6 +218,10 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	{
 		rRuntime.PublishTick(iTick, pGridUpdates, iGridUpdateCount, nullptr, 0);
 	}
+
+	// Keep replay/live transfer state alive through PublishTick so the publication can consume it, then retire
+	// this tick's transfer batch before the next replay peek or live harvest builds a new one.
+	gpServerSession->mpTransferManager->mTransfers.clear();
 }
 
 void ServerBroadcaster::ProcessUpdatePlayerRequests()

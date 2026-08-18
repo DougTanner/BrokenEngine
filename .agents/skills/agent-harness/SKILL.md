@@ -11,7 +11,17 @@ allowed-tools: [PowerShell]
 
 # Agent Interaction Harness
 
-Drive the local headless server and rendered client through loopback, length-prefixed JSON. Use server port `27100`, client port `27101`, and the absolute adopted worktree as `$ROOT`. A local server is a development instance, not an Azure production server.
+Drive the local headless server and rendered client through loopback, length-prefixed JSON. Use server port `27100`, client port `27101`, and the absolute adopted worktree. A local server is a development instance, not an Azure production server.
+
+Each fenced PowerShell block is an independent shell call unless it is explicitly labeled
+as temporary-script contents. Variables and functions are fence-local and do not survive
+into another shell-call block. Retain claim, takeover, launch, and artifact outputs as
+literal values in agent context, then substitute quoted string/path placeholders or
+numeric PID placeholders into later calls. A variable in a code fence is valid only when
+that fence assigns it, or when it is an automatic/environment variable. A temporary-script
+contents block is written under `<absolute adopted worktree>\Temp` and then run by a
+separate self-contained `pwsh -NoProfile -File '<absolute adopted worktree>\Temp\<driver filename>.ps1'`
+shell call.
 
 Read the focused references only when applicable:
 
@@ -30,12 +40,12 @@ Provision the checkout and use only its provisioned primary AgentHarness output.
 Claim through `scripts/Invoke-HarnessClaim.ps1`. It requires the selected project's server and client executables (reading their names and `Output` directory from the project harness doc's launch block), proves that the pack version this worktree's source expects matches the version the supplied data directory's `.manifest` files carry, provisions the checkout, requires the resolved `AgentHarness.exe`, mints the owner token, and claims the lock, printing one compact `broken-engine-harness-claim/v1` JSON object. When another session holds the lock, it provisions once and then retries only the claim until it succeeds or its 500-second wait budget expires, so the invocation below is itself the wait — never hand-write a poll loop, invent a sleep window, or pass a wait budget of your own. Pass the latest `/compile` result's normalized `GameDataDirectory` verbatim as `-GameDataDirectory` — the same packed data the launch below selects with `--data-directory`. Add `-Configuration <name>` only for a build other than `Debug`. Run this from the session worktree root:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot $ROOT -Session '<short task label>' -GameDataDirectory '<normalized Data path>'
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session '<short task label>' -GameDataDirectory '<normalized Data path>'
 ```
 
-Exit `0` (`status` `pass`) supplies the `owner` token, the resolved `agentHarness` path, and the `claim` record; hold that token in `$Owner`, keep that path in `$AgentHarness`, and report the claim metadata verbatim. Every result — pass, blocked, or error — echoes the supplied data path as `gameDataDirectory`, canonicalized once the pack-version check resolves it, and carries a `packVersion` field that is `null` except on the `claim.pack-version-mismatch` block below. Exit `2` (`status` `blocked`) carries one of three codes, and any of them ends the attempt here: the script never launches the game, so the Launch and ping-wait steps below are not performed and their absence is not a further failure to diagnose. `claim.executable-missing` means a required project executable is absent for the requested configuration: no provisioning ran and no lock was taken, so route `/compile` for the named executables and re-enter. `claim.pack-version-mismatch` means the pack version derived from this worktree's source is not the version the data carries, so a launch would die at the runtime manifest check as a hidden modal dialog instead of a diagnosable failure; nothing was provisioned and no lock was taken, and the payload's `packVersion` carries `expected`, `found`, `mismatchedManifests`, and `manifestCount`, so rebuild or re-export to pair them rather than relaunching. `claim.foreign-owner` means the wait expired and another session still holds the lock: the payload's `currentOwner` carries the last attempt's `claimedAt` and the derived `holdSeconds` — heartbeat never advances `claimedAt` — so reorder non-harness work or escalate rather than re-running the wait blind. The script never steals and never touches a foreign owner's processes, heartbeat, or claim, whether it acquires the lock or waits the budget out. Exit `1` is a failure naming its step (`claim.repository-missing`, `claim.provisioner-missing`, `claim.launch-doc-unreadable`, `claim.pack-version-underivable`, `claim.game-data-unreadable`, `claim.provision-failed`, `claim.harness-missing`, `claim.token-failed`, `claim.metadata-unreadable`, `claim.failed`, or `internal.error`); stop and report it. Never reconstruct provisioning, harness-path resolution, token minting, the pack version check, or the claim inline.
+Exit `0` (`status` `pass`) supplies the `owner` token, the resolved `agentHarness` path, and the `claim` record; retain those values outside shell state and substitute them as literal `<owner token>` and `<absolute AgentHarness path>` values in later calls, then report the claim metadata verbatim. Every result — pass, blocked, or error — echoes the supplied data path as `gameDataDirectory`, canonicalized once the pack-version check resolves it, and carries a `packVersion` field that is `null` except on the `claim.pack-version-mismatch` block below. Exit `2` (`status` `blocked`) carries one of three codes, and any of them ends the attempt here: the script never launches the game, so the Launch and ping-wait steps below are not performed and their absence is not a further failure to diagnose. `claim.executable-missing` means a required project executable is absent for the requested configuration: no provisioning ran and no lock was taken, so route `/compile` for the named executables and re-enter. `claim.pack-version-mismatch` means the pack version derived from this worktree's source is not the version the data carries, so a launch would die at the runtime manifest check as a hidden modal dialog instead of a diagnosable failure; nothing was provisioned and no lock was taken, and the payload's `packVersion` carries `expected`, `found`, `mismatchedManifests`, and `manifestCount`, so rebuild or re-export to pair them rather than relaunching. `claim.foreign-owner` means the wait expired and another session still holds the lock: the payload's `currentOwner` carries the last attempt's `claimedAt` and the derived `holdSeconds` — heartbeat never advances `claimedAt` — so reorder non-harness work or escalate rather than re-running the wait blind. The script never steals and never touches a foreign owner's processes, heartbeat, or claim, whether it acquires the lock or waits the budget out. Exit `1` is a failure naming its step (`claim.repository-missing`, `claim.provisioner-missing`, `claim.launch-doc-unreadable`, `claim.pack-version-underivable`, `claim.game-data-unreadable`, `claim.provision-failed`, `claim.harness-missing`, `claim.token-failed`, `claim.metadata-unreadable`, `claim.failed`, or `internal.error`); stop and report it. Never reconstruct provisioning, harness-path resolution, token minting, the pack version check, or the claim inline.
 
-Hold one owner token across relaunches. Every socket command requires `--owner $Owner`: after request acquisition, AgentHarness proves ownership before Winsock/connect, refreshes it when the 60-second interval becomes due while transport remains active, and refreshes it once more before response output. Ownership loss stops local response handling with exit `1`; game work already dispatched cannot be retracted. After the first command, compare `lock status` before/after and require `heartbeatAt` to advance. `lock status` prints ordinary pretty-printed JSON; the backslashes in its `worktree` field are standard JSON escaping of the Windows path, not nested or stringified JSON. During a non-harness phase that may exceed five minutes, run `lock heartbeat --key default --owner $Owner`; otherwise quit and release before the phase, then reclaim afterward.
+Hold one owner token across relaunches. Every socket command requires `--owner '<owner token>'`: after request acquisition, AgentHarness proves ownership before Winsock/connect, refreshes it when the 60-second interval becomes due while transport remains active, and refreshes it once more before response output. Ownership loss stops local response handling with exit `1`; game work already dispatched cannot be retracted. After the first command, compare `lock status` before/after and require `heartbeatAt` to advance. `lock status` prints ordinary pretty-printed JSON; the backslashes in its `worktree` field are standard JSON escaping of the Windows path, not nested or stringified JSON. During a non-harness phase that may exceed five minutes, run `lock heartbeat --key default --owner '<owner token>'`; otherwise quit and release before the phase, then reclaim afterward.
 
 Never build AgentHarness or write through shared Output links during routine harness work; `/compile` owns AgentTools newly-built-binary production and promotion. The claim step itself verifies that the selected project's server and client executables exist, so a missing one blocks the claim instead of surfacing later.
 
@@ -45,16 +55,21 @@ A claim is stale only when its reported heartbeat is older than five minutes. Ne
 
 1. Record the old owner and resolve listeners on ports `27100` and `27101` with `Get-NetTCPConnection -State Listen`.
 2. Resolve each `OwningProcess` through `Get-CimInstance Win32_Process`. Require its normalized `ExecutablePath` to equal the active project's expected server/client executable (per its harness doc) beneath the reported owner worktree and its `CommandLine` to contain the matching `--agent-port`. If listener identity, command line, or worktree cannot be proved, return `BLOCKED`; do not stop it.
-3. Send `quit` to both ports with `--owner $OldOwner`. Wait only on the exact validated listener PIDs. If a validated PID remains and the command could not connect, stop only that exact PID with `Stop-Process -Id`; never use a process-name search or broad kill.
+3. Send `quit` to both ports with `--owner '<old owner token>'`. Wait only on the exact validated listener PIDs. If a validated PID remains and the command could not connect, stop only that exact PID with `Stop-Process -Id`; never use a process-name search or broad kill.
 4. Generate a new token and conditionally steal with the recorded owner:
 
 ```powershell
-$Owner = & $AgentHarness lock token
-& $AgentHarness lock steal --key default --expect $OldOwner --owner $Owner --session $Session --worktree $ROOT
+$NewOwner = (& '<absolute AgentHarness path>' lock token).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($NewOwner)) { throw 'Harness token generation failed' }
+$StealResponse = & '<absolute AgentHarness path>' lock steal --key default --expect '<old owner token>' --owner $NewOwner --session '<session label>' --worktree '<absolute adopted worktree>'
 if ($LASTEXITCODE -ne 0) { throw 'Harness ownership changed during takeover' }
+$StealResponse
 ```
 
-Old-owner cleanup may refresh its heartbeat; that does not invalidate staleness established before cleanup. `--expect` still protects against an ownership change.
+Retain the returned lock metadata's `owner` value outside shell state as the new literal
+owner token for later calls. Old-owner cleanup may refresh its heartbeat; that does not
+invalidate staleness established before cleanup. `--expect` still protects against an
+ownership change.
 
 ## Launch
 
@@ -66,9 +81,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Test-DataOracleReceipt.ps1 
 
 In Local mode, do the same for the independent primary Shared receipt. Stop on any receipt, path, mode, baseline, inventory, or byte mismatch. Never infer an identity, compare Shared and Local receipts for equality, switch data mode, fall back to Shared data, or run DataPacker/Gaea/texture export.
 
-Use the compiled configuration suffix. Ordinary same-machine runs pass `--loopback-only`. Create log parents under `$ROOT\Temp`. Do not change process working directories; `--data-directory` is the only override selecting packed assets, and `--app-data-directory` is the only override selecting where saves, settings, caches, and replays are written.
+Use the compiled configuration suffix. Ordinary same-machine runs pass `--loopback-only`. Create log parents under `<absolute adopted worktree>\Temp`. Do not change process working directories; `--data-directory` is the only override selecting packed assets, and `--app-data-directory` is the only override selecting where saves, settings, caches, and replays are written.
 
-On Codex for Windows, launch with hidden `Start-Process -PassThru`, retain the returned exact PIDs, and use only those PIDs for lifecycle checks. Quote path-valued arguments because `Start-Process` joins `ArgumentList` items.
+On Codex for Windows, launch with hidden `Start-Process -PassThru`, retain the returned exact non-null numeric PIDs in the launch snapshot, and use only those PIDs for lifecycle checks. Quote path-valued arguments because `Start-Process` joins `ArgumentList` items.
 
 The selected project's harness doc owns the concrete launch block — the server/client executable paths beneath its `Output` directory and any extra project launch arguments — plus its game-specific connect and fresh-state notes. A server-side reset command resets server state only, so a comparison requiring fresh client state must launch under an app-data directory that did not exist before that launch; the project doc owns the concrete recipe. The `--agent-port` values are fixed by this skill (server `27100`, client `27101`) and embedded in that launch block.
 
@@ -77,26 +92,26 @@ Agent-mode executables start minimized without activation. Capture commands temp
 After launching either executable, wait for readiness with `scripts/Wait-HarnessPing.ps1` before the first real command. It handles one port per call, so launch order stays with you:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-HarnessPing.ps1 -AgentHarness $AgentHarness -Owner $Owner -Port 27100 -TimeoutSeconds 120
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-HarnessPing.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -Port 27100 -TimeoutSeconds 120
 ```
 
 The script polls until the port answers `ok:true`, tolerating the individual timeouts long client startup (terrain elevation and priority-texture waits) produces after connect already succeeded. Exit `0` (`status` `pass`) reports the observed `tick`; `tick` of `-1` means the listener is up but the game is not yet created (see the command reference `references/command-reference.md` for `ping`). Exit `2` (`status` `blocked`, code `ping.timeout`) reports the attempt count and elapsed time, and blocks the first real command. Exit `1` is a setup failure. Never hand-write a ping loop or invent a sleep window in its place.
 
-Invoke `scripts/Wait-IslandSceneReady.ps1` only after launch and only when an approved criterion depends on island footprints or rendered islands. Supply the exact `-AgentHarness`, harness-lock `-Owner`, client `-ClientPort`, bounded `-TimeoutSeconds`, and absolute ignored `-ArtifactPath`; do not rename or replace the retained `$ServerPid`/`$ClientPid` lifecycle variables.
+Invoke `scripts/Wait-IslandSceneReady.ps1` only after launch and only when an approved criterion depends on island footprints or rendered islands. Supply the exact literal `-AgentHarness '<absolute AgentHarness path>'`, harness-lock `-Owner '<owner token>'`, client `-ClientPort`, bounded `-TimeoutSeconds`, and absolute ignored `-ArtifactPath '<absolute artifact path>'`.
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1 -AgentHarness $AgentHarness -Owner $Owner -ClientPort 27101 -TimeoutSeconds 120 -ArtifactPath '<absolute artifact path>'
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ClientPort 27101 -TimeoutSeconds 120 -ArtifactPath '<absolute artifact path>'
 ```
  The helper requires client `ping` with `tick >= 0`, restores the client with `window_state {minimized:false}`, and requires the complete `clientGridCoord` plus nonempty island footprints to be byte-stable across two consecutive normalized samples. Exit `0` is usable only with a `broken-engine-island-scene-readiness/v1` artifact reporting `Status:success`, `Code:ready`, and `Ready:true`; missing, malformed, or failed evidence blocks the criterion. The selected project document owns the concrete argument values and the evidence check around this call.
 
-Before relinking or relaunching, send `quit` and wait for the retained exact PID. A live executable locks its image. Do not launch a duplicate to displace it — with `SO_REUSEADDR`, a duplicate on the same port binds alongside the live listener instead of failing fast, and connection routing between the two becomes nondeterministic. The engine listener sets `SO_REUSEADDR` and briefly retries address-in-use binds, so relaunch immediately once the exact PID has exited and rely on the ping poll for readiness — never invent a sleep window.
+Before relinking or relaunching, send `quit` and wait for the exact numeric PID from the latest launch snapshot. A live executable locks its image. Do not launch a duplicate to displace it — with `SO_REUSEADDR`, a duplicate on the same port binds alongside the live listener instead of failing fast, and connection routing between the two becomes nondeterministic. The engine listener sets `SO_REUSEADDR` and briefly retries address-in-use binds, so relaunch immediately once the exact PID has exited and rely on the ping poll for readiness — never invent a sleep window.
 
 ## Invoke commands
 
 Prefer stdin JSON and always capture stdout even when exit is nonzero:
 
 ```powershell
-'{"cmd":"ping"}' | & $AgentHarness --owner $Owner --port 27100 -
+'{"cmd":"ping"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port 27100 -
 ```
 
 Use `--timeout-ms N` for a deferred client command; default is 15000 and maximum is 600000. The CLI retries the loopback connect until this same deadline rather than making a single short attempt, so a probe against a dead port consumes the full budget — give a quick negative probe a small `--timeout-ms` (e.g. `1000`). Exit `0` means parsed `ok:true`, exit `2` means parsed `ok:false`, and exit `1` means transport, usage, or OS failure.
@@ -105,7 +120,7 @@ Request envelope: `{"cmd":"<name>","params":{...},"id":<optional JSON>}`. Omit `
 
 The channel permits one request still in progress. Client deferred commands occupy it until completion; another AgentHarness call waits rather than bypassing it. Do not overlap calls.
 
-Write any multi-line PowerShell driver — anything with `function` definitions, loops, or more than a few statements — to a script file (e.g. under `$ROOT\Temp`) and run it with `pwsh -File`. Never compact such a driver into a semicolon-joined one-liner; compaction corrupts function definitions (observed: `function Snap([string]$p)` mangled into an unrecognized `Snap$d` token).
+Write any multi-line PowerShell driver — anything with `function` definitions, loops, or more than a few statements — to a script file under `<absolute adopted worktree>\Temp` and run it with `pwsh -File`. Never compact such a driver into a semicolon-joined one-liner; compaction corrupts function definitions (observed: `function Snap([string]$p)` mangled into an unrecognized `Snap$d` token).
 
 ## Authoritative verification
 
@@ -119,10 +134,10 @@ The selected project's harness doc owns the concrete setup recipe (which command
 After every successful, failed, crashed, or abandoned launch attempt, release through `scripts/Invoke-HarnessRelease.ps1`. One call performs the whole sequence, and it is safe after a crashed run whose PIDs are already gone:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessRelease.ps1 -AgentHarness $AgentHarness -Owner $Owner -ServerPid $ServerPid -ClientPid $ClientPid
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessRelease.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ServerPid <server PID> -ClientPid <client PID>
 ```
 
-Pass only the retained exact `$ServerPid`/`$ClientPid`, and omit either one that was never assigned. The script quits both ports with the owner (server quit autosaves), waits for those exact PIDs, stops only a supplied exact PID that survived the quit, and runs `lock release` only once every supplied PID is confirmed absent. It never searches by process name and never stops a PID you did not supply.
+Pass only exact non-null numeric `serverPid`/`clientPid` values retained from the latest launch snapshot; replace the numeric placeholders and omit either argument for a process that never started. The latest snapshot is authoritative, including after a partial launch failure. The script quits both ports with the owner (server quit autosaves), waits for those exact PIDs, stops only a supplied exact PID that survived the quit, and runs `lock release` only once every supplied PID is confirmed absent. It never searches by process name and never stops a PID you did not supply.
 
 Exit `0` (`status` `pass`) means every supplied PID is absent and the lock was released; report the payload's per-step outcomes verbatim. Exit `2` (`status` `blocked`, code `release.process-survived`) means a supplied PID is still alive: no release was attempted, the claim stays held, and you decide whether to retry the release or escalate to the user. Exit `1` is a failure naming its step, including `release.lock-owner-mismatch` and `release.lock-absent`, which are never a success. Never reconstruct the quit, wait, stop, or release steps inline.
 
@@ -136,7 +151,7 @@ Run plan-provided runtime steps when present; otherwise derive the smallest live
 
 Captures stay on disk. The `screenshot` result `{path, width, height}` is the evidence — cite it by path. Loading an image into context is a deliberate act for a check that genuinely needs pixels, and the report names which check and why.
 
-- Prefer a script over the image. Most visual criteria — frame non-black, region matches an expected color, two captures differ, pixel count past a threshold — are assertions a few lines of code settle more precisely than an eye on a downscaled JPEG. Write the driver under `$ROOT\Temp` and run it with `pwsh -File` as above; its stdout is a few bytes of decisive text instead of megabytes of image. The same holds for a large driver result file: query it targeted first, and read the whole record only after a targeted read provably misses.
+- Prefer a script over the image. Most visual criteria — frame non-black, region matches an expected color, two captures differ, pixel count past a threshold — are assertions a few lines of code settle more precisely than an eye on a downscaled JPEG. Write the driver under `<absolute adopted worktree>\Temp` and run it with `pwsh -File` as above; its stdout is a few bytes of decisive text instead of megabytes of image. The same holds for a large driver result file: query it targeted first, and read the whole record only after a targeted read provably misses.
 - Request only the resolution the check needs. `screenshot` downscales through `maxWidth` (default 1568) and `quality` (default 80), and those defaults are sized for UI readability. A "did terrain render at all" check does not need them; pass a `maxWidth` and `quality` matched to the assertion as part of designing the check.
 
 If a required command, parameter, result field, query, or input primitive is missing, return that criterion `BLOCKED`. Name the missing capability and the narrowest harness extension that would expose it. The main agent decides whether the authorized change includes that extension or whether user authority/criterion revision is required. Never fake state with pixel guessing or log scraping, create an out-of-scope runtime edit, waive the gate with a follow-up plan, or silently skip the criterion.

@@ -543,7 +543,7 @@ namespace toolcli
 					HealClaims(*schedulerRoot, repo, primaryPlans, healed);
 				}
 			}
-			nlohmann::json output = { { "operation", "validate" }, { "status", diagnostics.empty() ? "valid" : "invalid" }, { "code", diagnostics.empty() ? "ok" : "invalid-plans" }, { "message", diagnostics.empty() ? "plan metadata is valid" : "some plans are quarantined" }, { "diagnostics", diagnostics }, { "notices", nlohmann::json::array() }, { "healedClaims", healed }, { "plans", nlohmann::json::array() } };
+			nlohmann::json output = { { "operation", "validate" }, { "status", diagnostics.empty() ? "valid" : "invalid" }, { "code", diagnostics.empty() ? "ok" : "invalid-plans" }, { "message", diagnostics.empty() ? "plan metadata is valid" : "some plans are excluded from selection" }, { "diagnostics", diagnostics }, { "notices", nlohmann::json::array() }, { "healedClaims", healed }, { "plans", nlohmann::json::array() } };
 			for (const auto& [path, plan] : plans)
 			{
 				if (!plan.bValid || (!requestedPlan.empty() && path != requestedPlan))
@@ -580,8 +580,8 @@ namespace toolcli
 			return kiExitOk;
 		}
 
-		// A read-only preview of what claim-next would decide at this tree state.  It heals nothing, takes no guard, and
-		// creates no scheduler storage, so a claim record it cannot use is ignored here rather than deleted.
+		// A read-only preview of the scheduler row states from the session tree.  It heals nothing, takes no scheduler
+		// guard, and creates no scheduler storage, so a claim record it cannot use is ignored here rather than deleted.
 		int RunList(const Arguments& rArguments)
 		{
 			std::wstring repo; std::filesystem::path worktree;
@@ -595,8 +595,10 @@ namespace toolcli
 			{
 				return Failure("primary-revision-failed");
 			}
+			// Listing reads only committed trees, so any session on the primary line is a legitimate view: behind the
+			// primary tip, or ahead of it after landing preparation rebased the session onto the current tip.
 			const std::optional<std::string> sessionCommit = ResolveCommit(worktree, L"HEAD");
-			if (!sessionCommit || !RunGit({ L"--git-dir", repo, L"merge-base", L"--is-ancestor", Utf8ToWide(*sessionCommit), Utf8ToWide(*primaryCommit) }))
+			if (!sessionCommit || (!RunGit({ L"--git-dir", repo, L"merge-base", L"--is-ancestor", Utf8ToWide(*sessionCommit), Utf8ToWide(*primaryCommit) }) && !RunGit({ L"--git-dir", repo, L"merge-base", L"--is-ancestor", Utf8ToWide(*primaryCommit), Utf8ToWide(*sessionCommit) })))
 			{
 				return Failure("git-identity-mismatch");
 			}
@@ -643,8 +645,8 @@ namespace toolcli
 				if (primary == primaryPlans.end() || !primary->second.bValid)
 				{
 					// Excluded from selection for a reason that is not a dependency edge: a peer landing already removed
-					// the plan, or the primary tip quarantines it.
-					row["state"] = "quarantined";
+					// the plan, or the primary tip invalidates it.
+					row["state"] = "excluded";
 					row["diagnostic"] = primary == primaryPlans.end() ? "absent at the primary tip" : primary->second.diagnostic;
 				}
 				else if (IsBlockedByDependencies(*pPlan, sessionPlans) || IsBlockedByDependencies(primary->second, primaryPlans))

@@ -443,10 +443,11 @@ function Test-PromptReviewedTreeClean() {
 }
 
 function Test-PromptScopeEvidence([object] $ChangeSet) {
-	# Three assigned skills each need one piece of evidence only the manager can produce, because the
-	# reviewer runs under a read-only sandbox and cannot produce it itself. Without this check a scope
-	# that omits it costs a whole review round. The scope text is only read here: section (b) still
-	# copies the caller's bytes verbatim.
+	# Three assigned skills each need evidence produced earlier in the workflow that the reviewer cannot
+	# recover from the diff: the draft execution card, the host-run metrics digest, and — for
+	# /verify-changes — another reviewer's /validate-skill result plus the reviewed revision's identity
+	# values. Without this check a scope that omits it costs a whole review round. The scope text is only
+	# read here: section (b) still copies the caller's bytes verbatim.
 	# Case-insensitively, because the producing skills head the card differently — 'Draft execution card'
 	# and 'Execution card:' — and both carry the same marker words.
 	if ($AssignedSkill -eq 'plan-audit' -and -not $script:ScopeText.Contains('execution card', [StringComparison]::OrdinalIgnoreCase)) {
@@ -456,17 +457,14 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.metrics-digest-required' "/repo-code-review needs the host-run Compare digest in -ScopeFile, which carries no 'broken-engine-code-quality-evidence/v2' marker."
 	}
 	if ($AssignedSkill -ne 'verify-changes') { return }
-	$plansTouched = $false
 	$skillTouched = $false
 	foreach ($entry in @($ChangeSet.entries)) {
 		foreach ($path in @($entry.path, $entry.oldPath)) {
 			if ([string]::IsNullOrEmpty($path)) { continue }
-			if ($path.StartsWith('Documents/Plans/', [StringComparison]::OrdinalIgnoreCase)) { $plansTouched = $true }
 			if ([IO.Path]::GetFileName($path) -eq 'SKILL.md') { $skillTouched = $true }
 		}
 	}
 	$missing = [Collections.Generic.List[string]]::new()
-	if ($plansTouched -and -not $script:ScopeText.Contains('"operation":"validate"')) { $missing.Add('"operation":"validate"') }
 	if ($skillTouched -and -not $script:ScopeText.Contains('Validation: PASS')) { $missing.Add('Validation: PASS') }
 	# The identity values bind every supplied artifact to the reviewed revision, so a scope that names
 	# neither leaves the reviewer validating evidence against an unknown change set.

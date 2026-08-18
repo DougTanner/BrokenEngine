@@ -152,11 +152,7 @@ CONSTEXPR int kiWaterSpecAAMipTableSize = 10;
 
 // Island bindless-slot ceiling: shared by C++ and the terrain shaders, it sizes the bindless
 // sampler arrays (Terrain.frag / TerrainElevation.frag), their descriptor counts (PipelineManager),
-// and the TextureManager render-target pointer vectors. Raised 64 -> 128 so island 01's 10 routes
-// (65 kIsland chunks) fit. Bumping this only grows descriptor-array capacity + pointer vectors, not
-// resident GPU textures (LRU-managed). Every kIsland template stays permanently resident (mesh +
-// heightmap) regardless of this cap or LRU; that memory scaling is tracked in
-// Documents/Investigations/Graphics/IslandResidentMemoryScaling_Overview.md.
+// and the TextureManager render-target pointer vectors.
 CONSTEXPR int kiMaxIslands = 128;
 
 CONSTEXPR int kiMaxSpreadPasses = 40;

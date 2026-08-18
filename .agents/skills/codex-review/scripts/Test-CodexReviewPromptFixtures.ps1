@@ -543,8 +543,9 @@ function Test-RepoCodeReviewTargetModes($Fixture) {
 }
 
 function Test-VerifyChangesTypedArtifacts() {
-	# A landing diff that touches both an executable Plan and a skill file, so the conditional artifacts
-	# and the identity values are all required at once.
+	# A landing diff that touches both an executable Plan and a skill file. The Plan side is deliberately
+	# present in every case: the reviewer runs the Plan lint itself, so a touched Plan must never make the
+	# gate demand a validate receipt.
 	$root = New-FixtureRoot 'typedartifacts'
 	Add-FixtureSkill $root @('verify-changes')
 	Set-FixtureText $root 'Documents/Plans/Area/Thing.md' "baseline plan`n"
@@ -569,20 +570,22 @@ function Test-VerifyChangesTypedArtifacts() {
 	if ($null -ne $missing.Json) {
 		Assert-Equal 'blocked' $missing.Json.status 'verify-changes without typed artifacts status'
 		Assert-Equal 'prompt.typed-artifacts-required' $missing.Json.code 'verify-changes without typed artifacts code'
-		Assert-True ($missing.Json.message.Contains('"operation":"validate"')) 'verify-changes names the missing plan validate marker'
 		Assert-True ($missing.Json.message.Contains('Validation: PASS')) 'verify-changes names the missing /validate-skill marker'
+		Assert-True (-not $missing.Json.message.Contains('"operation":"validate"')) 'verify-changes never demands a plan validate receipt'
 	}
 	else { Assert-True $false 'verify-changes without typed artifacts emitted JSON' }
 	Assert-True (-not (Test-Path -LiteralPath $missingPath)) 'verify-changes without typed artifacts creates no prompt file'
 
-	# The same game build envelope with both path-triggered artifacts present, so the game build itself
-	# demands nothing further.
-	$artifactText = $missingText + "Plan validate: {`"operation`":`"validate`",`"status`":`"valid`"}`nSkill validation: Validation: PASS`n"
+	# The same game build envelope with the /validate-skill artifact present and no plan validate receipt,
+	# so a touched Plan assembles on the identity values alone and the game build demands nothing further.
+	$artifactText = $missingText + "Skill validation: Validation: PASS`n"
 	$presentPath = New-ScratchPath 'artifacts'
 	$present = Invoke-PromptScript @(
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
 		'-ScopeFile', (New-ScratchFile 'scope' $artifactText), '-PromptPath', $presentPath, '-Head', $head)
 	Assert-Equal 0 $present.ExitCode 'verify-changes with typed artifacts exit code'
+	if ($null -ne $present.Json) { Assert-Equal 'pass' $present.Json.status 'verify-changes with typed artifacts status' }
+	else { Assert-True $false 'verify-changes with typed artifacts emitted JSON' }
 	Assert-True (Test-Path -LiteralPath $presentPath) 'verify-changes with typed artifacts writes the prompt'
 	if (Test-Path -LiteralPath $presentPath) {
 		$prompt = $script:Utf8.GetString([IO.File]::ReadAllBytes($presentPath))
@@ -590,7 +593,7 @@ function Test-VerifyChangesTypedArtifacts() {
 	}
 
 	# The same complete artifacts bound to a revision that is not the reviewed one.
-	$mismatchText = $script:ScopeText + "Baseline: $('0' * 40)`nHead: $('1' * 40)`nPlan validate: {`"operation`":`"validate`"}`nSkill validation: Validation: PASS`n"
+	$mismatchText = $script:ScopeText + "Baseline: $('0' * 40)`nHead: $('1' * 40)`nSkill validation: Validation: PASS`n"
 	$mismatchPath = New-ScratchPath 'artifactidentity'
 	$mismatch = Invoke-PromptScript @(
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',

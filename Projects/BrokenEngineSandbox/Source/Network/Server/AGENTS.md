@@ -21,12 +21,14 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 ## Deterministic Tick Contracts
 
 - The engine runtime owns the active set and calls two hooks here: this layer contributes every coordinate holding at least one Player, and hands each Frame leaving the set to `GameSaveLoad` for replay retention before the runtime erases it.
-- Replay uses coordinates with live readers.
+- Replay uses coordinates with live readers. Normal live inputs and transfer batches are sorted into the deterministic type order before recording and publication; replay consumes the recorded `FrameInput` order exactly and does not sort it again.
+- Apply transfer ownership relinks before death detection: a transferred Player updates its client/GUID ownership record before the tick's death pass, so a live handoff cannot be treated as a death. A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
 - Spawn assignment diffs origin player IDs across the tick and pairs new IDs with waiting clients in request order. The client GUID written into Frame state is the persistent relink key.
 - Fleet navigation defers flagship updates through `StatusChange`s. Within `BuildFrameInputs`, waiting-client spawn construction, queued player updates, fleet timers and pending flagship updates, plus broadcast and pre-spawn snapshot capture run only on advancing updates; this work remains deferred through paused and other zero-tick updates.
 - Agent-injected `StatusChange`s remain queued until a normal, advancing, frame-ready tick can consume them. Consumed changes use the same deterministic type grouping as broadcast serialization.
 - Transfer destinations must be adjacent. Non-player transfers require a live destination; player transfer makes the destination live itself. Recompute the destination Frame CRC after applying arrived transfers: the frame tick computes each frame's `sharedCrc` before transfers land, so the harvest step re-runs `Frame::Crcs()` on every destination frame and logs the before and after values. Clients check their own simulated frame against the CRC the server broadcast for that tick, so skipping this recompute desyncs every client on the receiving end of a transfer. It is not defensive recomputation and must not be optimized away as redundant.
 - `ServerSessionRuntime::CompleteTick` invokes `ServerBroadcaster::BuildTickPublication`, which passes each tick to `ServerSessionRuntime::PublishTick` to maintain the delta resend ring. The publication includes complete per-coordinate Frames for the separate diagnostic ring only when `kbDesyncDebugFrames` is enabled. This manual flag is disabled by default and must match the client build.
+- Replay transfer publication may include a coordinate that is publication-only at `E` and simulation-active at `E + 1`; it is still sent through the existing per-coordinate update publication and does not alter wire layout or starvation rules.
 
 ## Trust and Lifecycle Boundaries
 

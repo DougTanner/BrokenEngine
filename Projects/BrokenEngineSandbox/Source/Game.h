@@ -107,7 +107,6 @@ public:
 	int64_t FocusedPlayerInFleetIndex() const { return mFleetSelection.FocusedPlayerInFleetIndex(); }
 	void SyncFleets(std::vector<Fleet>&& fleets) { mFleetSelection.SyncFleets(std::move(fleets)); }
 #endif
-	void ApplyTransferStatusChanges(Frame& rFrame, FrameInput& rFrameInput);
 
 #if defined(BT_CLIENT)
 	XMVECTOR GetClientPlayerPosition() const;

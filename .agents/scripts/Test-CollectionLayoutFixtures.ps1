@@ -1,7 +1,8 @@
-# Deterministic fixtures for Test-CollectionLayout.ps1: one clean collection, one failing case
-# per audited rule, three unparseable cases asserting the blocked outcome, one empty-input case
-# asserting the error outcome, and one over-cap case asserting output truncation. Every case
-# asserts status, code, exit code, and the complete emitted rule sequence with its total count.
+# Deterministic fixtures for Test-CollectionLayout.ps1: one clean collection, two two-branch guard
+# collections asserting the passing outcome, one failing case per audited rule, three unparseable
+# cases asserting the blocked outcome, one empty-input case asserting the error outcome, and one
+# over-cap case asserting output truncation. Every case asserts status, code, exit code, and the
+# complete emitted rule sequence with its total count.
 # Every fixture is a self-contained temporary header plus a substitute Frame::kiVersion sum,
 # created and removed by this runner. Run whenever Test-CollectionLayout.ps1 changes.
 [CmdletBinding()]
@@ -53,7 +54,7 @@ function Invoke-Case([string] $Name, [string] $Body, [string[]] $SumTerms, [stri
 	[IO.File]::WriteAllText($framePath, "namespace game`n{`n`nconst int64_t Frame::kiVersion = 122 + engine::kiNavDataVersion$terms;`n`n}`n")
 
 	$pathValue = $(if ([string]::IsNullOrEmpty($PathArgument)) { $headerPath } else { $PathArgument })
-	$stdout = @(& pwsh -NoProfile -ExecutionPolicy Bypass -File $script:AuditorScript -Path $pathValue -FrameSource $framePath 2>$null)
+	$stdout = @(& pwsh -NoProfile -File $script:AuditorScript -Path $pathValue -FrameSource $framePath 2>$null)
 	$exitCode = $LASTEXITCODE
 	$text = ($stdout -join '').Trim()
 	$json = $null
@@ -217,6 +218,42 @@ $parityBody = @'
 	}
 '@
 
+# The established two-branch form: both branches list the same unguarded columns, so no build loses
+# one and parity holds even though the client entries sit under a BT_CLIENT guard.
+$guardBranchBody = @'
+	XMVECTOR* __restrict pVecPositions = nullptr;
+	float* __restrict pfIntensities = nullptr;
+#if defined(BT_CLIENT)
+	float* __restrict pfClientOnly = nullptr;
+#endif
+
+	auto Members(this auto&& rSelf)
+	{
+#if defined(BT_CLIENT)
+		return std::tie(rSelf.pVecPositions, rSelf.pfIntensities, rSelf.pfClientOnly);
+#else
+		return std::tie(rSelf.pVecPositions, rSelf.pfIntensities);
+#endif
+	}
+'@
+
+# A client tie against a forwarding #else body: the server branch harvests only `SharedMembers`, which
+# names no declared column, so that build has no membership set to compare and is skipped.
+$guardBranchForwardBody = @'
+	XMVECTOR* __restrict pVecPositions = nullptr;
+	float* __restrict pfIntensities = nullptr;
+
+	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pVecPositions, rSelf.pfIntensities); }
+	auto Members(this auto&& rSelf)
+	{
+#if defined(BT_CLIENT)
+		return std::tie(rSelf.pVecPositions, rSelf.pfIntensities);
+#else
+		return rSelf.SharedMembers();
+#endif
+	}
+'@
+
 # An accessor shape the parser cannot resolve.
 $unparseableShapeBody = @'
 	XMVECTOR* __restrict pVecPositions = nullptr;
@@ -258,6 +295,8 @@ try
 	Assert-Case (Invoke-Case 'persistent-not-subset' $persistentBody @('FixtureInterpolate::kiVersion')) 'failed' 1 'layout.violations' @('persistent.not-subset')
 	Assert-Case (Invoke-Case 'shared-client-guarded' $clientGuardedBody @('FixtureInterpolate::kiVersion')) 'failed' 1 'layout.violations' @('shared.client-guarded')
 	Assert-Case (Invoke-Case 'guard-parity' $parityBody @('FixtureInterpolate::kiVersion')) 'failed' 1 'layout.violations' @('guard.parity-mismatch')
+	Assert-Case (Invoke-Case 'guard-branch-parity' $guardBranchBody @('FixtureInterpolate::kiVersion')) 'pass' 0 'ok' @()
+	Assert-Case (Invoke-Case 'guard-branch-forward' $guardBranchForwardBody @('FixtureInterpolate::kiVersion')) 'pass' 0 'ok' @()
 	Assert-Case (Invoke-Case 'version-term-missing' $cleanBody @()) 'failed' 1 'layout.violations' @('version.term-missing')
 	Assert-Case (Invoke-Case 'version-term-unresolved' $cleanBody @('FixtureInterpolate::kiVersion', 'GhostPostRender::kiVersion')) 'failed' 1 'layout.violations' @('version.term-unresolved')
 	Assert-Case (Invoke-Case 'unparseable-shape' $unparseableShapeBody @('FixtureInterpolate::kiVersion')) 'blocked' 2 'parse.blocked' @('parse.unrecognized-shape')

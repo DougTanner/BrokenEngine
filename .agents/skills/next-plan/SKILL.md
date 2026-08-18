@@ -80,8 +80,12 @@ The execution card begins with `### What does this plan do?` and `### Why this
 is good for the codebase`, each 2-4 plain sentences, then records goal, out of
 scope, tier trigger, interfaces/invariants, acceptance checks with expected
 observations, and required/conditional roles. Tier 1 skips plan audit. Tier 2
-uses one fresh `/plan-audit` reviewer. Tier 3 follows `/external-grill-plan`,
-whose authoritative workflow reference owns its iterative preparation. Missing a
+uses one fresh `/plan-audit` reviewer. At every tier, a plan that adds new code
+or modifies any non-documentation artifact (Step 2's trigger in root
+`AGENTS.md`) also gets one fresh `/plan-simplicity-review` reviewer on the same
+snapshot, parallel to `/plan-audit` where that runs. Tier 3 follows
+`/external-grill-plan`, whose authoritative workflow reference owns its
+iterative preparation. Missing a
 mandatory reviewer blocks.
 
 Invoke the claim script idempotently immediately before the final preparation
@@ -195,9 +199,15 @@ in its own session shell when the friction is recorded — the value differs per
 conversation and resume, and a subagent shell reports that subagent's own ID —
 and passes it to the `implementer`. Codex sessions record no conversation
 session ID, because `/next-plan-review` discovers Codex transcripts by bounded
-commit window. Never record a transcript file path or transcript text; reference
-the session by client, worktree/branch UUID, and, on Claude, conversation
-session ID only.
+commit window. When the friction was observed in a different session than the
+one recording it — the shape a `/next-plan-review`-driven follow-up takes — main
+supplies that observing session's identity fields in place of the current
+session's, including its landed commit or branch, labelled as the observing
+session's per the provenance block in `/create-follow-up-plans`, which owns how
+the recording session's own landing ref is stated. Never record a transcript
+file path or transcript text; reference the session by client, worktree/branch
+UUID, on Claude the conversation session ID, and, for an earlier observing
+session, its landed commit or branch only.
 
 On completion or rejection, a friction Plan authored at that second checkpoint
 joins the landing commit alongside the changed paths the claim-exit script

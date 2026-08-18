@@ -2,7 +2,7 @@
 name: save-plan
 description: Save an explicitly supplied complete plan-mode proposal into the correct Broken Engine planning tree. Documents/Plans receives Git-backed metadata; Documents/Features remains manual.
 argument-hint: [PascalCase.md]
-allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
+allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell, Bash]
 disable-model-invocation: true
 ---
 
@@ -15,6 +15,10 @@ Read `Documents/AGENTS.md` and the selected tree's guidance. The saved plan is a
 The body must carry an explicit scope contract: in-scope entries under a required `## In scope` heading, the boundary under a required `## Out of scope` heading, and the listed scope is both target and ceiling: the implementer makes the smallest complete change and adds no abstractions, configuration, refactors, or fixes to adjacent code it encounters. Scope is limited inside files, not only across them — in-scope entries name the specific functions, members, or regions to change, and naming a file grants no permission to touch anything in it beyond the named regions plus the mechanical necessities (includes, declarations) the named change requires. Every file a `## Coordination` clause obliges the implementer to edit must itself appear in the in-scope list with its named regions; a coordination obligation is not a substitute for scope.
 
 Ask the user for a meaningfully missing decision — including ambiguity, a missing scope ceiling, or file-granularity-only scope — rather than invent or patch it.
+
+Once the body is final, and before classifying and writing it, dispatch one fresh `reviewer` for `/plan-simplicity-review` on that final body snapshot whenever the body adds new code or modifies any non-documentation artifact — the same trigger Change Workflow Step 2 owns in root `AGENTS.md`. In Claude Code that dispatch goes through `/codex-review`; a Codex caller is already the Sol mapping and dispatches the `reviewer` directly, per that skill's own rule. Route the findings by disposition, not by finding class: accepted `simplify` findings revise the body, and every `user-judgment` finding goes to the user, whatever class it carries. Rejecting speculative findings remains the default.
+
+Because this skill persists exactly the client-supplied proposal and invoking it pre-approves landing the saved file, present the complete revised body for explicit user approval before saving whenever accepted findings change its meaning; a clean review, or accepted findings that change only sub-semantic wording, keeps that pre-approval in force. This save-time review does not waive the prep-time `/plan-simplicity-review` that `/next-plan` runs when the plan is later prepared for implementation.
 
 Classify into `Documents/Plans/` for executable engine debt or `Documents/Features/` for manual capability planning. Select an existing area and a concise PascalCase filename matching `^[A-Z][A-Za-z0-9]*\.md$`. Search live Plans for duplicate root cause and implementation boundary before writing.
 

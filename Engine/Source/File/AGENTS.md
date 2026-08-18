@@ -28,6 +28,7 @@
 ## Replay Streams
 
 `DifferenceStream` writes full boundaries, per-frame deltas, and checksums. Publishing succeeds only when every sibling file succeeds; any failure removes the complete sibling set. Replay manifests authenticate their expected component bytes and sizes with SHA-256; hash only ordinary, non-reparse files, and treat a hash/read failure as an invalid replay generation. Optional full-frame diagnostics remain gated by `kbReplayFullFrames`; malformed or stale `.fullframes` data permanently disables those diagnostics for that reader without changing authoritative replay or checksum validation, and mismatch reporting follows the operand labeling owned by Log ([`Common/Log/AGENTS.md`](../../../Common/Log/AGENTS.md)).
+- The coord base header carries a post-dispatch channel separate from the carry-forward difference records: each entry is one tick's post-dispatch payload, keyed by exact tick. Recorded ticks are strictly increasing and lie within `[start tick, savedEnd tick]`; the start tick is allowed. A record is returned only on an exact tick match and is never carried forward to a later tick, because these entries are one-shot events rather than persisting state.
 
 ## See Also
 

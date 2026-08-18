@@ -6,6 +6,34 @@ namespace engine
 {
 
 static std::string sDxDiag;
+static wchar_t spcAppDataOverride[MAX_PATH + 1] {};
+
+void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
+{
+	spcAppDataOverride[0] = L'\0';
+
+	wchar_t pcGameName[64] {};
+	swprintf_s(pcGameName, std::size(pcGameName), L"%hs", game::kGameName.data());
+	wchar_t pcCrashReportFile[128] {};
+	swprintf_s(pcCrashReportFile, std::size(pcCrashReportFile), L"\\%s-Crash-Report.txt", pcGameName);
+
+	const size_t uiDirectoryLength = wcsnlen_s(pcDirectory, std::size(spcAppDataOverride));
+	const size_t uiSuffixLength = 1 + wcslen(pcGameName) + wcslen(pcCrashReportFile);
+	if (uiDirectoryLength >= std::size(spcAppDataOverride))
+	{
+		return;
+	}
+
+	if (uiSuffixLength >= std::size(spcAppDataOverride) - uiDirectoryLength)
+	{
+		return;
+	}
+
+	if (wcscpy_s(spcAppDataOverride, std::size(spcAppDataOverride), pcDirectory) != 0)
+	{
+		spcAppDataOverride[0] = L'\0';
+	}
+}
 
 void HandleException(std::optional<const std::exception*> pException)
 {
@@ -24,19 +52,26 @@ void HandleException(std::optional<const std::exception*> pException)
 	}
 	else
 	{
-		PWSTR pWideChar = nullptr;
-		HRESULT hresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
-		if (SUCCEEDED(hresult) && pWideChar != nullptr)
+		if (spcAppDataOverride[0] != L'\0')
 		{
-			wcscpy_s(spcPath, std::size(spcPath), pWideChar);
+			wcscpy_s(spcPath, std::size(spcPath), spcAppDataOverride);
 		}
 		else
 		{
-			// OS failure on the SIGABRT-reachable crash path (allocator-free): never copy from null. Fall back to the Desktop (fixed-buffer, like the IDYES branch) so the report still lands somewhere writable; if that also fails spcPath stays zero-initialized.
-			LOG(kDefault, kError, "SHGetKnownFolderPath(FOLDERID_RoamingAppData) failed (hresult {}); writing crash report to Desktop", static_cast<int32_t>(hresult));
-			SHGetSpecialFolderPathW(HWND_DESKTOP, spcPath, CSIDL_DESKTOP, FALSE);
+			PWSTR pWideChar = nullptr;
+			HRESULT hresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
+			if (SUCCEEDED(hresult) && pWideChar != nullptr)
+			{
+				wcscpy_s(spcPath, std::size(spcPath), pWideChar);
+			}
+			else
+			{
+				// OS failure on the SIGABRT-reachable crash path (allocator-free): never copy from null. Fall back to the Desktop (fixed-buffer, like the IDYES branch) so the report still lands somewhere writable; if that also fails spcPath stays zero-initialized.
+				LOG(kDefault, kError, "SHGetKnownFolderPath(FOLDERID_RoamingAppData) failed (hresult {}); writing crash report to Desktop", static_cast<int32_t>(hresult));
+				SHGetSpecialFolderPathW(HWND_DESKTOP, spcPath, CSIDL_DESKTOP, FALSE);
+			}
+			CoTaskMemFree(pWideChar);
 		}
-		CoTaskMemFree(pWideChar);
 
 		wcscat_s(spcPath, std::size(spcPath), L"\\");
 		wcscat_s(spcPath, std::size(spcPath), pcGameName);

@@ -36,7 +36,12 @@ only where the rules below call for a non-default value.
   naming the remedy — stage the named path with `git add -- <path>`, or restore
   it, so its index and worktree agree, then re-invoke. `pwsh -File`
   hands every argument over as one literal string, so several owned paths can
-  only travel as one comma-separated `-OwnedPaths` token.
+  only travel as one comma-separated `-OwnedPaths` token. `-OwnedPaths` carries
+  the session's full caller-owned landing set, never a hand-trimmed subset: an
+  entry already committed as a deletion is a satisfied no-op, so a resumed
+  invocation passes the same set unchanged. A path found in neither the baseline
+  tree nor the expected-tip tree nor the worktree still blocks with
+  `input.path-not-single-entry`.
 - `Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
   one commit on the current primary tip, and blocks with
   `git.primary-not-ancestor` when the session tip does not already contain that

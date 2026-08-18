@@ -33,6 +33,22 @@ flowchart LR
     completion --> display["ServerUpdateDisplayStats"]
 ```
 
+## Replay Transfer Publication
+
+Replay transfers are recorded on the exact tick that harvested them, in the difference stream's post-dispatch channel rather than inside any `FrameInput`; the authoritative state and network publication stay on that same harvest tick. For an event at `E`, the recording path calls `RecordPostDispatch(E)` with the harvested transfers. The channel is named for when its transfers are applied, not for when its record is read: during playback, `SyncReplayTick` loads the record for exactly `E` and stages the transfer before the frame dispatch for `E`, and `FinalizeFrameTick` then applies the staged transfer after that dispatch and publishes the destination for `E`. A reader that remains live is added to the simulation set for its first dispatch at `E + 1`. A terminal reader validates its terminal input/end frame before retirement, and the next replay loop starts in a later fixed-tick iteration.
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+flowchart TB
+    subgraph recording["Recording"]
+        recordE["Dispatch E"] --> harvestE["Post-dispatch harvest E"] --> channelE["RecordPostDispatch E"]
+    end
+    subgraph playback["Playback"]
+        loadE["LoadPostDispatch E + stage transfers"] --> dispatchE["Dispatch active set E"]
+        dispatchE --> publishE["Apply replay transfers + publish coord E"] --> activateE1["Activate destination for simulation"] --> dispatchE1["Dispatch destination E + 1"]
+    end
+```
+
 ## Frame Lifecycle
 
 [`CoordFrames`](../../Engine/Source/GameBase.h) is server/client-affine: server state has `pCurrent` and `pNext`, with the shared tick writing the destination before the buffers swap. Client state uses a `snapshots[]` ring; reconciliation replay/catch-up populates snapshots and rendering interpolates from the ring. Frame ownership is declared by [`FrameBase.h`](../../Engine/Source/Frame/FrameBase.h) and the game [`Frame.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Frame.h).

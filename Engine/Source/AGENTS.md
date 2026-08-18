@@ -33,7 +33,7 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 ## Crash Reporting
 
-The exception path writes from fixed buffers because it is reachable during heap corruption. Do not add allocator-dependent formatting or path construction there.
+The exception path writes from fixed buffers because it is reachable during heap corruption. Do not add allocator-dependent formatting or path construction there. `--app-data-directory` reaches crash handling through a fixed buffer populated during startup, never by reading the heap-owned launch-option object on the crash path. The override is used only when the complete report path fits the fixed path buffer; otherwise the existing per-user report location remains.
 
 ## Subsystems
 

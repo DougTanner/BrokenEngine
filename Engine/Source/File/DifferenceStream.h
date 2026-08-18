@@ -73,9 +73,17 @@ public:
 		mCurrentDifference = rDifference;
 	}
 
+	// Records an event that happens after iTick's dispatch. Appends are strictly increasing by construction,
+	// because the caller harvests at most one batch per tick.
+	void RecordPostDispatch(int64_t iTick, const DIFFERENCE_TYPE& rPostDispatch)
+	{
+		mPostDispatchRecords.emplace_back(iTick, rPostDispatch);
+	}
+
 	bool Save(FileFlags_t fileFlags, const std::filesystem::path& rFilename, const SAVED_TYPE& rSavedEnd)
 	{
 		int64_t iDifferenceCount = mDifferences.size();
+		int64_t iPostDispatchCount = mPostDispatchRecords.size();
 
 		// Write header with version info, start/end states and metadata
 		const bool bHeaderWritten = gpFileManager->WriteFileAtomically(fileFlags, rFilename, [&](std::fstream& rHeaderStream)
@@ -95,6 +103,19 @@ public:
 			}
 			common::Write(rHeaderStream, iDifferenceCount);
 			rHeaderStream << rSavedEnd;
+			common::Write(rHeaderStream, iPostDispatchCount);
+			for (const auto& [iTick, postDispatch] : mPostDispatchRecords)
+			{
+				common::Write(rHeaderStream, iTick);
+				if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
+				{
+					common::Write(rHeaderStream, postDispatch);
+				}
+				else
+				{
+					rHeaderStream << postDispatch;
+				}
+			}
 		});
 		LOG(kReplay, kVerbose, "DifferenceStreamWriter save at frame {}: Count {} Checksum {}", rSavedEnd.interpolate.iTick, iDifferenceCount, rSavedEnd.Crc());
 
@@ -117,7 +138,8 @@ public:
 		});
 
 		// The caller records the terminal input and its saved end frame before Save. Do not duplicate
-		// either boundary here: the reader consumes that terminal input before retiring the coord.
+		// either boundary here: the reader consumes that terminal input before retiring the coord. That
+		// input carries no post-dispatch events; those are exact-tick one-shots outside carry-forward.
 		const std::filesystem::path checksumsFilename = std::filesystem::path(rFilename).concat(".checksums");
 		const bool bChecksumsWritten = gpFileManager->WriteFileAtomically(fileFlags, checksumsFilename, [&](std::fstream& rChecksumStream)
 		{
@@ -197,6 +219,8 @@ private:
 	std::vector<difference_t> mDifferences;
 	DIFFERENCE_TYPE mCurrentDifference {};
 
+	std::vector<difference_t> mPostDispatchRecords;
+
 	std::vector<common::crc_t> mChecksums;
 	bool mbRecordsInitialChecksum = false;
 
@@ -273,6 +297,62 @@ public:
 			LOG(kDefault, kWarning, "DifferenceStreamReader header is invalid");
 			return;
 		}
+
+		miStartTick = rSavedStart.interpolate.iTick;
+
+		int64_t iPostDispatchCount = 0;
+		common::Read(headerStream, iPostDispatchCount);
+		if (!headerStream)
+		{
+			LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch count is missing");
+			return;
+		}
+		// Trust boundary (replay header): bound the record count against the stream before allocating;
+		// each record serializes an int64 tick plus at least the payload's own int64 count prefix.
+		common::ValidateDeserializedCount(iPostDispatchCount, 2 * sizeof(int64_t), headerStream, "DifferenceStreamReader post-dispatch records");
+
+		mPostDispatchRecords.reserve(iPostDispatchCount);
+		for (int64_t i = 0; i < iPostDispatchCount; ++i)
+		{
+			int64_t iTick = 0;
+			common::Read(headerStream, iTick);
+			if (headerStream.gcount() != static_cast<std::streamsize>(sizeof(iTick)))
+			{
+				LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section doesn't match its count");
+				return;
+			}
+			DIFFERENCE_TYPE postDispatch {};
+			if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
+			{
+				common::Read(headerStream, postDispatch);
+				if (headerStream.gcount() != static_cast<std::streamsize>(sizeof(DIFFERENCE_TYPE)))
+				{
+					LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section doesn't match its count");
+					return;
+				}
+			}
+			else
+			{
+				headerStream >> postDispatch;
+				if (!headerStream)
+				{
+					LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section doesn't match its count");
+					return;
+				}
+			}
+			// A coord activated by a transfer records that transfer at its own start tick, so unlike a
+			// difference record the start tick is in range. The terminal tick is not: recording stops
+			// before it is dispatched, so no post-dispatch event can exist there.
+			if (iTick < miStartTick || iTick > mSavedEnd.interpolate.iTick ||
+				(!mPostDispatchRecords.empty() && iTick <= std::get<0>(mPostDispatchRecords.back())))
+			{
+				LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section has non-canonical tick data");
+				return;
+			}
+			mPostDispatchRecords.emplace_back(iTick, std::move(postDispatch));
+		}
+		mPostDispatchRecordsIterator = mPostDispatchRecords.begin();
+
 		if (headerStream.peek() != std::char_traits<char>::eof())
 		{
 			LOG(kDefault, kWarning, "DifferenceStreamReader header has trailing data");
@@ -287,7 +367,6 @@ public:
 			return;
 		}
 
-		miStartTick = rSavedStart.interpolate.iTick;
 		LOG(kDefault, kVerbose, "DifferenceStreamReader at frame {}: Saved start: {} Initial difference: {}", miStartTick, rSavedStart.Crc(), rInitialDifference.Crc());
 
 		// Every writer publishes an empty .frames sibling when no input changes. Require and fully consume it
@@ -492,6 +571,23 @@ public:
 		mReaderFlags.Set(ReaderFlags::kTerminalChecksumValidated, IsTerminalTick(iTick));
 	}
 
+	// Post-dispatch records are one-shot events, so an exact tick match is the only hit: a record is never
+	// carried forward the way a difference is.
+	bool LoadPostDispatch(int64_t iTick, DIFFERENCE_TYPE& rPostDispatch)
+	{
+		if (mPostDispatchRecordsIterator == mPostDispatchRecords.end() || iTick != std::get<0>(*mPostDispatchRecordsIterator))
+		{
+			return false;
+		}
+
+		rPostDispatch = std::get<1>(*mPostDispatchRecordsIterator);
+		++mPostDispatchRecordsIterator;
+
+		LOG(kDefault, kVerbose, "Loaded post-dispatch record {}: {}", iTick, rPostDispatch.Crc());
+
+		return true;
+	}
+
 	bool LoadDifference(int64_t iTick, DIFFERENCE_TYPE& rDifference)
 	{
 		// The terminal tick applies its final input to the retained saved end frame, validates it,
@@ -581,6 +677,9 @@ private:
 	std::vector<difference_t> mDifferences;
 	typename std::vector<difference_t>::iterator mDifferencesIterator = mDifferences.end();
 	DIFFERENCE_TYPE mCurrentDifference {};
+
+	std::vector<difference_t> mPostDispatchRecords;
+	typename std::vector<difference_t>::iterator mPostDispatchRecordsIterator = mPostDispatchRecords.end();
 
 	std::vector<common::crc_t> mChecksums;
 	int64_t miStartTick = 0;

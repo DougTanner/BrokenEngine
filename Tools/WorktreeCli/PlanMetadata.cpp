@@ -308,8 +308,8 @@ namespace toolcli
 					if (found != rPlans.end() && !found->second.bValid)
 					{
 						plan.bValid = false;
-						plan.diagnostic = "dependency is quarantined";
-						rDiagnostics.push_back({ { "plan", WideToUtf8(path) }, { "code", "dependency-quarantined" }, { "message", plan.diagnostic } });
+						plan.diagnostic = "dependency is excluded from selection";
+						rDiagnostics.push_back({ { "plan", WideToUtf8(path) }, { "code", "dependency-excluded" }, { "message", plan.diagnostic } });
 						bChanged = true;
 						break;
 					}

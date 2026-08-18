@@ -6,6 +6,7 @@
 
 #include "GameBase.h"
 #include "Game.h"
+#include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerFleetSerialization.h"
 #include "Network/Server/ServerSession.h"
@@ -268,37 +269,37 @@ GameSaveLoad::GameSaveLoad(engine::GameBase& rGameBase)
 {
 }
 
-void GameSaveLoad::ResetStreams()
+void GameSaveLoad::ClearReplayTransientState()
 {
-	mReplayWriters.clear();
+	// Manifest validation can fail while the live game is still running; only discard state owned exclusively by replay.
 	mReplayReaders.clear();
 	mPendingReplayReaders.clear();
-	miReplayInitialTick = 0;
-	mReplayTransferCaptureInfo = {};
-	meReplayPersistenceFailurePoint = ReplayPersistenceFailurePoint::kNone;
 	game::gpServerSession->mpTransferManager->mReplayTransferFixtures.clear();
 }
 
-game::FrameInput GameSaveLoad::ComposeReplayInput(const game::FrameInput& rLiveInput, ReplayWriterState& rWriterState)
+void GameSaveLoad::ClearReplayAbortState()
 {
-	game::FrameInput replayInput = rLiveInput;
-	replayInput.statusChanges.insert(replayInput.statusChanges.end(), std::make_move_iterator(rWriterState.pendingTransfers.begin()), std::make_move_iterator(rWriterState.pendingTransfers.end()));
-	rWriterState.pendingTransfers.clear();
-	return replayInput;
+	// Keep the current frames, inputs, and active set intact so an aborted playback resumes live simulation.
+	ClearReplayTransientState();
+	game::gpServerSession->mpTransferManager->mTransfers.clear();
+	game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
 }
 
-bool GameSaveLoad::UpdateTerminalReplayWriter(engine::GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame)
+void GameSaveLoad::ResetStreams()
+{
+	mReplayWriters.clear();
+	ClearReplayTransientState();
+	miReplayInitialTick = 0;
+	mReplayTransferCaptureInfo = {};
+	meReplayPersistenceFailurePoint = ReplayPersistenceFailurePoint::kNone;
+}
+
+void GameSaveLoad::UpdateTerminalReplayWriter(engine::GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame)
 {
 	game::FrameInput emptyInput {};
 	const auto inputIt = game::gpGame->mFrameInputs.find(coord);
 	const game::FrameInput& rLiveInput = inputIt != game::gpGame->mFrameInputs.end() ? inputIt->second : emptyInput;
-	game::FrameInput replayInput = ComposeReplayInput(rLiveInput, rWriterState);
-	const bool bHasTransfer = std::ranges::any_of(replayInput.statusChanges, [](const StatusChange& rStatusChange)
-	{
-		return IsTransferType(rStatusChange.eType);
-	});
-	rWriterState.pWriter->Update(rEndFrame.interpolate.iTick + 1, replayInput, rEndFrame);
-	return bHasTransfer;
+	rWriterState.pWriter->Update(rEndFrame.interpolate.iTick + 1, rLiveInput, rEndFrame);
 }
 
 void GameSaveLoad::CaptureHarvestedTransfers(engine::GridCoord coord, std::span<const StatusChange> transfers, const game::Frame& rPreTransferFrame)
@@ -321,13 +322,13 @@ void GameSaveLoad::CaptureHarvestedTransfers(engine::GridCoord coord, std::span<
 		return;
 	}
 
-	rWriterState.pendingTransfers.insert(rWriterState.pendingTransfers.end(), transfers.begin(), transfers.end());
+	game::FrameInput postDispatchInput {};
+	postDispatchInput.statusChanges.assign(transfers.begin(), transfers.end());
+	rWriterState.pWriter->RecordPostDispatch(rPreTransferFrame.interpolate.iTick, postDispatchInput);
 	if (mReplayTransferCaptureInfo.iRecordingEventTick != rPreTransferFrame.interpolate.iTick)
 	{
 		mReplayTransferCaptureInfo.iRecordingEventTick = rPreTransferFrame.interpolate.iTick;
 		mReplayTransferCaptureInfo.iPlaybackEventTick = -1;
-		mReplayTransferCaptureInfo.iWriterInputTick = rPreTransferFrame.interpolate.iTick + 1;
-		mReplayTransferCaptureInfo.iFollowingEmptyInputTick = -1;
 		mReplayTransferCaptureInfo.iPlayerCount = 0;
 		mReplayTransferCaptureInfo.iSpaceshipCount = 0;
 		mReplayTransferCaptureInfo.iBlasterCount = 0;
@@ -517,17 +518,16 @@ void GameSaveLoad::SaveLoadReplay()
 			gpProfileManager->LatchRawCpuTimers(false, mrGameBase.TickCounter());
 
 			mrGameBase.mGameFlags.Clear(engine::GameFlags::kLoadReplay);
-			game::gpServerSession->mpTransferManager->mReplayTransferFixtures.clear();
 
 			try
 			{
 				if (!mReplayReaders.empty() || !mPendingReplayReaders.empty())
 				{
-					mReplayReaders.clear();
-					mPendingReplayReaders.clear();
+					ClearReplayAbortState();
 					mReplayTransferCaptureInfo = {};
 					return;
 				}
+				ClearReplayTransientState();
 
 				// The valid manifest is the generation commit marker. Validate it before reading any component.
 				std::fstream manifestStream = engine::gpFileManager->OpenFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("F7.replay.manifest"));
@@ -791,8 +791,6 @@ void GameSaveLoad::SaveLoadReplay()
 				mReplayTransferCaptureInfo = {
 					.iRecordingEventTick = recordingCaptureInfo.iRecordingEventTick,
 					.iPlaybackEventTick = recordingCaptureInfo.iPlaybackEventTick,
-					.iWriterInputTick = recordingCaptureInfo.iWriterInputTick,
-					.iFollowingEmptyInputTick = recordingCaptureInfo.iFollowingEmptyInputTick,
 					.iFirstWriterInputTick = recordingCaptureInfo.iFirstWriterInputTick,
 					.iWriterInputCount = recordingCaptureInfo.iWriterInputCount,
 					.iPlayerCount = recordingCaptureInfo.iPlayerCount,
@@ -808,8 +806,14 @@ void GameSaveLoad::SaveLoadReplay()
 			catch (const std::exception& rException)
 			{
 				LOG(kDefault, kError, "SaveLoadReplay aborted: corrupt replay data: {}", rException.what());
-				mReplayReaders.clear();
-				mPendingReplayReaders.clear();
+				if (IsReplaying())
+				{
+					ClearReplayAbortState();
+				}
+				else
+				{
+					ClearReplayTransientState();
+				}
 				mReplayTransferCaptureInfo = {};
 				return;
 			}
@@ -907,9 +911,6 @@ bool GameSaveLoad::SyncReplayTick()
 			std::ranges::sort(recordedRecords, ReplayManifestRecordLess);
 
 			bool bReplayWritten = true;
-			bool bTerminalInputUpdated = false;
-			bool bTerminalInputHasTransfer = false;
-			bool bTerminalInputMissing = false;
 
 			for (auto& [rCoord, rWriterState] : mReplayWriters)
 			{
@@ -934,8 +935,7 @@ bool GameSaveLoad::SyncReplayTick()
 				{
 					if (!rWriterState.bTerminal)
 					{
-						bTerminalInputHasTransfer = UpdateTerminalReplayWriter(rCoord, rWriterState, *pEndFrame) || bTerminalInputHasTransfer;
-						bTerminalInputUpdated = true;
+						UpdateTerminalReplayWriter(rCoord, rWriterState, *pEndFrame);
 					}
 					bWriterSaved = rWriterState.pWriter->Save(fileFlags, coordReplayPath, *pEndFrame);
 					if (ConsumeReplayPersistenceFailure(ReplayPersistenceFailurePoint::kCoordinateWriter, rCoord))
@@ -947,16 +947,10 @@ bool GameSaveLoad::SyncReplayTick()
 				}
 				else
 				{
-					bTerminalInputMissing = true;
 					LOG(kDefault, kError, "Replay writer for coord ({},{}) has no terminal frame; deleting partial replay set", rCoord.x, rCoord.y);
 					rWriterState.pWriter->CleanupFiles(fileFlags, coordReplayPath);
 				}
 				bReplayWritten = bWriterSaved && bReplayWritten;
-			}
-			if (bReplayWritten && bTerminalInputUpdated && !bTerminalInputHasTransfer && !bTerminalInputMissing &&
-				mrGameBase.TickCounter() == mReplayTransferCaptureInfo.iWriterInputTick + 1)
-			{
-				mReplayTransferCaptureInfo.iFollowingEmptyInputTick = mrGameBase.TickCounter();
 			}
 
 			mReplayTransferCaptureInfo.iPauseAfterWriterInputCount = -1;
@@ -1003,8 +997,6 @@ bool GameSaveLoad::SyncReplayTick()
 		if (!mReplayWriters.empty()) [[unlikely]]
 		{
 			bool bWriterUpdated = false;
-			bool bWriterHasTransfer = false;
-			bool bWriterMissing = false;
 			for (auto& [rCoord, rWriterState] : mReplayWriters)
 			{
 				if (rWriterState.bTerminal)
@@ -1013,17 +1005,11 @@ bool GameSaveLoad::SyncReplayTick()
 				}
 				if (!mrGameBase.mCoordFrames.contains(rCoord))
 				{
-					bWriterMissing = true;
 					continue;
 				}
 
 				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(rCoord).first->second;
-				game::FrameInput replayInput = ComposeReplayInput(rFrameInput, rWriterState);
-				bWriterHasTransfer = std::ranges::any_of(replayInput.statusChanges, [](const StatusChange& rStatusChange)
-				{
-					return IsTransferType(rStatusChange.eType);
-				}) || bWriterHasTransfer;
-				rWriterState.pWriter->Update(mrGameBase.TickCounter(), replayInput, mrGameBase.CurrentFrame(rCoord));
+				rWriterState.pWriter->Update(mrGameBase.TickCounter(), rFrameInput, mrGameBase.CurrentFrame(rCoord));
 				bWriterUpdated = true;
 			}
 			if (bWriterUpdated)
@@ -1039,12 +1025,22 @@ bool GameSaveLoad::SyncReplayTick()
 					mReplayTransferCaptureInfo.iPauseAfterWriterInputCount = -1;
 				}
 			}
-			if (bWriterUpdated && !bWriterHasTransfer && !bWriterMissing &&
-				mrGameBase.TickCounter() == mReplayTransferCaptureInfo.iWriterInputTick + 1)
-			{
-				mReplayTransferCaptureInfo.iFollowingEmptyInputTick = mrGameBase.TickCounter();
-			}
 		}
+
+		// Replay publication state belongs to one fixed tick. HarvestTransfers is intentionally disabled during
+		// playback, so clear the staged maps here before this tick's post-dispatch records are loaded below.
+		if (IsReplaying())
+		{
+			game::gpServerSession->mpTransferManager->mTransfers.clear();
+			game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
+		}
+
+		auto abortReplay = [&]()
+		{
+			ClearReplayAbortState();
+			mReplayTransferCaptureInfo = {};
+			return false;
+		};
 
 		for (auto it = mPendingReplayReaders.begin(); it != mPendingReplayReaders.end();)
 		{
@@ -1056,10 +1052,7 @@ bool GameSaveLoad::SyncReplayTick()
 			if (it->second.iActivationTick < mrGameBase.TickCounter())
 			{
 				LOG(kDefault, kError, "Replay reader activation tick was skipped for coord ({},{})", it->first.x, it->first.y);
-				mReplayReaders.clear();
-				mPendingReplayReaders.clear();
-				mReplayTransferCaptureInfo = {};
-				return false;
+				return abortReplay();
 			}
 
 			const engine::GridCoord coord = it->first;
@@ -1068,56 +1061,90 @@ bool GameSaveLoad::SyncReplayTick()
 			ActivateReplayReader(coord, std::move(pendingReader));
 		}
 
-		// Playback tick: load differences for all readers
+		// Terminal readers retire first. Their terminal input is consumed and its saved end frame is checksum
+		// validated before the coord is removed; the terminal input is not dispatched or published a second time.
 		if (!mReplayReaders.empty()) [[unlikely]]
 		{
 			for (auto it = mReplayReaders.begin(); it != mReplayReaders.end();)
 			{
 				const engine::GridCoord coord = it->first;
 				std::unique_ptr<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>& rpReader = it->second;
-				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(coord).first->second;
 				const bool bTerminalTick = rpReader->IsTerminalTick(mrGameBase.TickCounter());
+				if (!bTerminalTick)
+				{
+					++it;
+					continue;
+				}
+
+				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(coord).first->second;
 				if (!rpReader->LoadDifference(mrGameBase.TickCounter(), rFrameInput))
 				{
 					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", coord.x, coord.y);
-					mReplayReaders.clear();
-					mPendingReplayReaders.clear();
-					mReplayTransferCaptureInfo = {};
-					return false;
-				}
-
-				const bool bHasTransfer = std::ranges::any_of(rFrameInput.statusChanges, [](const StatusChange& rStatusChange)
-				{
-					return IsTransferType(rStatusChange.eType);
-				});
-				game::gpGame->ApplyTransferStatusChanges(mrGameBase.CurrentFrame(coord), rFrameInput);
-				if (bHasTransfer)
-				{
-					mReplayTransferCaptureInfo.iPlaybackEventTick = mrGameBase.TickCounter();
+					return abortReplay();
 				}
 				rpReader->ValidateChecksum(mrGameBase.TickCounter(), mrGameBase.CurrentFrame(coord));
-				if (bTerminalTick)
+				if (!rpReader->TerminalConsumed())
 				{
-					if (!rpReader->TerminalConsumed())
-					{
-						LOG(kDefault, kError, "Replay reader terminal data was not fully consumed for coord ({},{})", coord.x, coord.y);
-						mReplayReaders.clear();
-						mPendingReplayReaders.clear();
-						mReplayTransferCaptureInfo = {};
-						return false;
-					}
-					mrGameBase.mCoordFrames.erase(coord);
-					game::gpGame->mFrameInputs.erase(coord);
-					std::erase(game::gpGame->mActiveCoords, coord);
-					it = mReplayReaders.erase(it);
-					continue;
+					LOG(kDefault, kError, "Replay reader terminal data was not fully consumed for coord ({},{})", coord.x, coord.y);
+					return abortReplay();
 				}
-				++it;
+				rFrameInput.statusChanges.clear();
+				mrGameBase.mCoordFrames.erase(coord);
+				game::gpGame->mFrameInputs.erase(coord);
+				std::erase(game::gpGame->mActiveCoords, coord);
+				it = mReplayReaders.erase(it);
+			}
+
+			// Load each current difference, then the post-dispatch channel record for this exact tick. A transfer
+			// harvested after dispatch at event tick E is recorded at E and staged here for publication at E.
+			for (auto& [coord, rpReader] : mReplayReaders)
+			{
+				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(coord).first->second;
+				if (!rpReader->LoadDifference(mrGameBase.TickCounter(), rFrameInput))
+				{
+					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", coord.x, coord.y);
+					return abortReplay();
+				}
+
+				// Replay files are a trust boundary: transfers belong only to the post-dispatch channel, so a recorded
+				// input carrying one would publish an entry a connected client applies against authoritative state.
+				if (std::ranges::any_of(rFrameInput.statusChanges, [](const StatusChange& rStatusChange)
+				{
+					return IsTransferType(rStatusChange.eType);
+				}))
+				{
+					LOG(kDefault, kError, "Replay input carries a transfer status change for coord ({},{})", coord.x, coord.y);
+					return abortReplay();
+				}
+
+				game::FrameInput postDispatchInput {};
+				if (rpReader->LoadPostDispatch(mrGameBase.TickCounter(), postDispatchInput))
+				{
+					// Replay files are a trust boundary: the generic channel cannot know StatusChange semantics, and a
+					// valid non-transfer entry would reach std::get<TransferData> in the spawn path.
+					if (postDispatchInput.statusChanges.empty() || !std::ranges::all_of(postDispatchInput.statusChanges, [](const StatusChange& rStatusChange)
+					{
+						return IsTransferType(rStatusChange.eType);
+					}))
+					{
+						LOG(kDefault, kError, "Replay post-dispatch record is not a transfer batch for coord ({},{})", coord.x, coord.y);
+						return abortReplay();
+					}
+					game::gpServerSession->mpTransferManager->PrepareReplayTransfers(coord, postDispatchInput.statusChanges);
+					mReplayTransferCaptureInfo.iPlaybackEventTick = mrGameBase.TickCounter();
+				}
+
+				if (!rFrameInput.statusChanges.empty())
+				{
+					game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.insert_or_assign(coord, rFrameInput.statusChanges);
+				}
+				rpReader->ValidateChecksum(mrGameBase.TickCounter(), mrGameBase.CurrentFrame(coord));
 			}
 
 			if (mReplayReaders.empty() && mPendingReplayReaders.empty())
 			{
 				LOG(kDefault, kDebug, "End replay {}, looping", mrGameBase.TickCounter());
+				ClearReplayTransientState();
 				mrGameBase.mGameFlags.Set(engine::GameFlags::kLoadReplay);
 				return false;
 			}

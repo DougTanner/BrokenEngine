@@ -19,6 +19,8 @@ class ServerTransferManager
 public:
 
 	void HarvestTransfers();
+	void PrepareReplayTransfers(engine::GridCoord coord, std::span<const StatusChange> recordedTransfers);
+	void ApplyReplayTransfers();
 	void ResetState();
 	bool QueueReplayTransferFixture(engine::GridCoord destination, StatusChange transfer);
 
@@ -32,7 +34,8 @@ private:
 
 	void CollectTransfers(common::ScopedWorkbufferArena& rTransfersArena);
 	void SortTransfersByType();
-	void SpawnTransfers();
+	void SpawnTransfers(bool bFilterDestinationLiveness);
+	void ApplyPreparedTransfers(std::span<const ClientTransferInfo> clientTransfers, bool bFilterDestinationLiveness);
 	void TrackClientTransfers(std::span<const ClientTransferInfo> clientTransfers);
 };
 

@@ -16,7 +16,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 ## Architecture
 
 - Client subscriptions cover the current cell plus visible neighbors within the authorized 3x3 ring. Change the client's cell through `Game::SetClientGridCoord()` so the visible-neighbor cache is invalidated.
-- Cross-cell transfers are serialized `StatusChange`s carrying spawn state. They are removed from `FrameInput` before normal Spawn processing.
+- Cross-cell transfers are serialized `StatusChange`s carrying spawn state. The client removes them from `FrameInput` before normal Spawn processing; server replay records them in the difference stream's post-dispatch channel, never inside `FrameInput`.
 - Player/enemy alignments are copied into each new `FramePostRender`; frame code reads the snapshot, not `gpGame`.
 - Persisted client settings are versioned POD written through the engine versioned-file helpers. Bump the owning version on layout change.
 - Save/replay compatibility is gated by `Frame::kiVersion`; `Version.h::kiGameVersion` is informational.

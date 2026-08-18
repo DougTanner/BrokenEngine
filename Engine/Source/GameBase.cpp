@@ -6,6 +6,7 @@
 #endif
 #if defined(BT_SERVER)
 #include "Network/Server/ServerSession.h"
+#include "Network/Server/ServerTransferManager.h"
 #endif
 #include "Frame/FrameBase.h"
 #include "Input/Input.h"
@@ -338,6 +339,10 @@ void GameBase::FinalizeFrameTick()
 	if (!game::gpGame->mGameSaveLoad.IsReplaying())
 	{
 		game::gpGame->HarvestTransfers();
+	}
+	else
+	{
+		game::gpServerSession->mpTransferManager->ApplyReplayTransfers();
 	}
 
 	SwapFrames();

@@ -58,13 +58,6 @@ public:
 
 	// Update buffering
 	void ApplyReceivedStaticData();
-	void ApplyReceivedFullStates();
-	bool ApplyReceivedUpdates();
-
-	// Queries
-	int64_t GetConfirmedTick() const;
-	int64_t GetClientConfirmedTick() const;
-	int64_t GetServerUpdateBufferSize() const;
 
 	// Clock correction
 	// Game packet sends
@@ -95,6 +88,8 @@ private:
 	void OnRuntimeDisconnected();
 	void ProcessReceivedGamePackets();
 	void OnCoordReleased(engine::GridCoord coord);
+	void HydrateReceivedFullState(Frame& rReceived, const Frame* pRingTail);
+	void ResetCoordStatesForResync();
 
 	// Game packet helpers
 	void ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent);

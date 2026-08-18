@@ -31,8 +31,6 @@ public:
 	{
 		int64_t iRecordingEventTick = -1;
 		int64_t iPlaybackEventTick = -1;
-		int64_t iWriterInputTick = -1;
-		int64_t iFollowingEmptyInputTick = -1;
 		int64_t iFirstWriterInputTick = -1;
 		int64_t iWriterInputCount = 0;
 		int64_t iPlayerCount = 0;
@@ -78,6 +76,8 @@ private:
 	bool ReadGrid(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename, engine::GridCoord& rClientGridCoord);
 	bool ReadGrid(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename, StagedGrid& rStagedGrid);
 	void AdoptGrid(StagedGrid&& rStagedGrid);
+	void ClearReplayTransientState();
+	void ClearReplayAbortState();
 
 	engine::GameBase& mrGameBase;
 
@@ -88,7 +88,6 @@ private:
 	{
 		std::unique_ptr<engine::DifferenceStreamWriter<game::Frame, game::FrameInput>> pWriter;
 		std::unique_ptr<game::Frame> pRetainedEndFrame;
-		std::vector<StatusChange> pendingTransfers;
 		int64_t iActivationTick = 0;
 		bool bTerminal = false;
 	};
@@ -109,8 +108,7 @@ private:
 	engine::GridCoord mReplayPersistenceFailureCoord {};
 
 	bool ConsumeReplayPersistenceFailure(ReplayPersistenceFailurePoint eFailurePoint, engine::GridCoord coord = {});
-	game::FrameInput ComposeReplayInput(const game::FrameInput& rLiveInput, ReplayWriterState& rWriterState);
-	bool UpdateTerminalReplayWriter(engine::GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame);
+	void UpdateTerminalReplayWriter(engine::GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame);
 	void ActivateReplayReader(engine::GridCoord coord, PendingReplayReader&& rPendingReader);
 };
 

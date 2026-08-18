@@ -311,7 +311,7 @@ void ProfileManager::FormatNetworkSync(common::Workbuffer& rWorkbuffer)
 		rWorkbuffer.Append("Ack: ");
 		rWorkbuffer.Append(iMinAckFloor);
 		rWorkbuffer.Append("  Conf: ");
-		rWorkbuffer.Append(gpClientSession->GetConfirmedTick());
+		rWorkbuffer.Append(gpClientSession->mpRuntime->GetConfirmedTick());
 		mSmoothedRecv = iTotalRecv;
 	}
 	mSmoothedRecv.Update();
@@ -327,10 +327,10 @@ void ProfileManager::FormatNetworkPrediction(common::Workbuffer& rWorkbuffer)
 	auto predCoordIt = gpGame->mCoordFrames.find(gpGame->mClientGridCoord);
 	if (predCoordIt != gpGame->mCoordFrames.end() && predCoordIt->second.iSnapshotCount > 0)
 	{
-		mSmoothedRollback = gpGame->RenderFrame(gpGame->mClientGridCoord).interpolate.iTick - gpClientSession->GetClientConfirmedTick();
+		mSmoothedRollback = gpGame->RenderFrame(gpGame->mClientGridCoord).interpolate.iTick - gpClientSession->mpRuntime->GetClientConfirmedTick();
 	}
 	mSmoothedRollback.Update();
-	mSmoothedBuffer = gpClientSession->GetServerUpdateBufferSize();
+	mSmoothedBuffer = gpClientSession->mpRuntime->GetServerUpdateBufferSize();
 	mSmoothedBuffer.Update();
 	int64_t iRollbackValue = mSmoothedRollback.Get();
 	rWorkbuffer.Append("Rollback: ");
