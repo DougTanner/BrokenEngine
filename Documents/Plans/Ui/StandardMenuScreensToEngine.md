@@ -97,6 +97,7 @@ enum class StandardMenuAction
 	kConnectToDiscoveredServer,
 	kChangeFrameToMainMenu,
 	kSaveGraphicsSettings,
+	kResetGraphicsSettings,
 	kResetSoundSettings,
 	kResetGameSettings,
 	kSaveGameSettings,
@@ -144,6 +145,7 @@ features enabled, and a state mask populated from the current client runtime:
 | `kConnectToDiscoveredServer` | `ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots)` |
 | `kChangeFrameToMainMenu` | Existing `ChangeFrame(GameFlags::kMainMenu)` |
 | `kSaveGraphicsSettings` | `SaveGraphicsSettings()` |
+| `kResetGraphicsSettings` | `ResetGraphicsSettings()` |
 | `kResetSoundSettings` | `ResetSoundSettings()` |
 | `kResetGameSettings` | `ResetGameSettings()` |
 | `kSaveGameSettings` | `SaveGameSettings()` |
@@ -198,11 +200,19 @@ and transitions. The game-specific direct calls become these mappings:
   - Continue reading `mModalMessage` directly.
   - OK directly sets `UiState::kPause` and clears the message.
 - Graphics:
-  - Keep every engine wrapper control and quality apply operation unchanged.
+  - Keep every engine wrapper control and quality apply operation unchanged,
+    including three-decimal Water Detail, four-decimal Minimum Ambient, and
+    whole-number Lighting Update Cadence display formats.
+  - Defaults invokes `kResetGraphicsSettings` and stays in Graphics.
   - Back invokes `kSaveGraphicsSettings`, then returns to pause.
 - Sound:
   - Keep the `SoundMenu` window, `UiState::kSound`, internal Sound naming,
-    `SoundSettings.bin`, and visible `AUDIO` label.
+    `SoundSettings.bin`, and this exact visible/automation label list:
+    `AUDIO`, `Master Volume`, `Music Volume`, `Sound Volume`,
+    `Mute in background`, localized Defaults, and `Back`.
+  - `Mute in background` is checked by default; when checked, background audio
+    is completely suspended. Reset/save/load preserve the setting, and agents
+    still boot silent.
   - Defaults invokes `kResetSoundSettings`; Back returns to pause directly.
 - Game Settings:
   - Consume D7 `engine::kLanguageOptions`, `engine::geLanguage`, and
@@ -232,7 +242,7 @@ Preserve the relative render order:
 8. Tweaks
 
 `ImGuiManager` is constructed by Graphics before `Main.cpp` constructs
-`game::Game` (`Engine/Source/Main.cpp:256-266`). The six screen constructors
+`game::Game` (`Engine/Source/Main.cpp:261-271`). The six screen constructors
 must remain implicit/inert: no constructor body, game dereference, filesystem
 operation, or heap allocation. `Render(GameBase&)` is not called until after
 the game exists.
@@ -333,7 +343,10 @@ Invariants:
 10. Standard screens do not directly access game globals or game session types; all game-owned actions use the `GameBase` contract.
 11. `NetworkSessionContract::kiCoordSlots` remains in the game action implementation.
 12. The server-launch action preserves `ScopedSuppressAllocationTracking` over all filesystem/format/launch work.
-13. Main Menu, Pause, Graphics, Sound, Game Settings, and Modal window names, labels, layout, and relative render order remain unchanged.
+13. Main Menu, Pause, Graphics, Sound, Game Settings, and Modal window names,
+    labels, layout, and relative render order remain unchanged; Sound includes
+    the exact `Mute in background` checkbox, checked by default and fully
+    suspending background audio when checked.
 14. Existing auto-connect and automatic server-launch statics retain their lifetime and transition behavior.
 15. D7 language labels and D8 `RawSunAngle()` are consumed through the prerequisite engine symbols.
 16. No standard screen source, member, or project entry remains for Death.
@@ -401,8 +414,8 @@ dispatch case for each action and no direct game-only call from an engine screen
 | --- | --- |
 | `MainMenu` | `BROKEN ENGINE`, `SCANNING...`, `LOCAL SERVER`, `REMOTE SERVER`, `GRAPHICS`, `AUDIO`, `GAME SETTINGS`, `QUIT`; local discovery/launch/connect actions; settings state transitions; direct quit and D8 sun seed. |
 | `PauseMenu` | `PAUSED`, `RESUME`, `GRAPHICS`, `AUDIO`, `GAME SETTINGS`, `MAIN MENU`, `QUIT`; direct UI transitions; synchronous Main Menu frame action. |
-| `GraphicsMenu` | `GRAPHICS`, `Back`, `Time of Day`, `Minimum Ambient`, `Fullscreen`, `Presentation Mode`, `Immediate`, `Mailbox`, `FIFO`, `Multisampling`, `2x`, `4x`, `8x`, `16x`, `Sample Shading`, `Min Sample Shading`, `Anisotropy`, `Max Anisotropy`, `Mip Lod Bias`, `Water`, `Terrain Shadows`, `Object Shadows`, `Lighting`, `Smoke`, `Smoke Detail`, `Smoke Area`, `Wind`, `Lighting Update Cadence`; Back calls `SaveGraphicsSettings`. |
-| `SoundMenu` | `AUDIO`, `Master Volume`, `Music Volume`, `Sound Volume`, localized Defaults, `Back`; Defaults calls `ResetSoundSettings`. |
+| `GraphicsMenu` | `GRAPHICS`, localized Defaults, `Back`, `Time of Day`, `Minimum Ambient`, `Fullscreen`, `Presentation Mode`, `Immediate`, `Mailbox`, `FIFO`, `Multisampling`, `2x`, `4x`, `8x`, `16x`, `Sample Shading`, `Min Sample Shading`, `Anisotropy`, `Max Anisotropy`, `Mip Lod Bias`, `Water Detail`, `Terrain Shadows`, `Object Shadows`, `Lighting`, `Lighting Detail`, `Lighting Update Cadence`, `Smoke`, `Smoke Detail`, `Smoke Area`, `Wind`; dependent controls remain visible and disabled when their parent is off, Defaults calls `ResetGraphicsSettings`, and Back calls `SaveGraphicsSettings`. |
+| `SoundMenu` | Exact labels: `AUDIO`, `Master Volume`, `Music Volume`, `Sound Volume`, `Mute in background`, localized Defaults, `Back`; `Mute in background` is checked by default and checked means complete background audio suspension; reset/save/load preserve the setting; agents still boot silent; Defaults calls `ResetSoundSettings`. |
 | `GameSettingsMenu` | localized Game Settings heading, `ENGLISH`, `中文`, `ESPANOL`, `PORTUGUES`, `FRANCAIS`, `DEUTSCH`, `Font Size`, `Opaque UI`, `UI Opacity`, `Theme`, `Naval Steel`, `Dark Amber`, `Midnight Mauve`, localized Defaults, `Back`; Defaults calls `ResetGameSettings`, Back calls `SaveGameSettings`. |
 | `ModalDialog` | existing dynamic message and `OK`; OK returns to pause and clears the modal buffer. |
 
@@ -433,7 +446,8 @@ Using a fresh app-data root and the project AgentHarness recipe:
 2. Verify Main Menu labels and click Local Server; confirm discovery/connection
    progresses without new errors.
 3. Open Graphics, verify the settings window and `Time of Day` behavior from
-   the main menu, click Back, and confirm return to pause.
+   both the main menu and in-game pause entry, exercise Defaults without leaving
+   Graphics, click Back, and confirm return to pause.
 4. Open Sound and Game Settings from the menu flow; exercise Defaults, Back,
    and one language option, confirming the expected windows/labels and settings
    transitions.

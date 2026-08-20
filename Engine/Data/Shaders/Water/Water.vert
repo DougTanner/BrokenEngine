@@ -53,12 +53,16 @@ void main()
 		return;
 	}
 
-	// Look up the pre-computed Gerstner displacement and normal at the matching texel. The active LOD's
-	// quad count determines the texel-vertex scaling: vertex (i, j) lives at UV (i/QX, j/QY) where
-	// QX = iWaterActiveQuadX = iMeshX - 1, mirroring CreateVisibleAreaMesh's per-LOD spacing.
-	ivec2 i2Grid = ivec2(round(f2InTexcoord * vec2(globalLayout.iWaterActiveQuadX, globalLayout.iWaterActiveQuadY)));
-	vec3 f3Displacement = texelFetch(displacementTextureSampler,       i2Grid, 0).xyz;
-	vec3 f3WaveNormal   = texelFetch(displacementNormalTextureSampler, i2Grid, 0).xyz;
+	// Low quality leaves both counts at zero and issues no compute work, so keep the surface flat without reading
+	// stale displacement textures. Otherwise, the active LOD's quad count maps each vertex to its matching texel.
+	vec3 f3Displacement = vec3(0.0f);
+	vec3 f3WaveNormal = vec3(0.0f, 0.0f, 1.0f);
+	if (globalLayout.iWaterLowCount > 0 || globalLayout.iWaterMediumCount > 0)
+	{
+		ivec2 i2Grid = ivec2(round(f2InTexcoord * vec2(globalLayout.iWaterActiveQuadX, globalLayout.iWaterActiveQuadY)));
+		f3Displacement = texelFetch(displacementTextureSampler, i2Grid, 0).xyz;
+		f3WaveNormal = texelFetch(displacementNormalTextureSampler, i2Grid, 0).xyz;
+	}
 
 	f3OutPosition = vec3(f2OutInitialPosition + f3Displacement.xy, f3Displacement.z);
 	f3OutNormal = f3WaveNormal; // pre-blended toward (0,0,1) in compute via fWaterWaveNormalBlend

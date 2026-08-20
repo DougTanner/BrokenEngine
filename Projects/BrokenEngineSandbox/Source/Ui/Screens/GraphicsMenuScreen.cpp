@@ -28,7 +28,7 @@ constexpr float kfGraphicsColumnGutterPixels = 80.0f;
 // is emitted separately and the slider carries a hidden-label id ("##" prefix, display portion empty). That id is what
 // the agent UI snapshot records, so describe_ui reports "##Minimum Ambient" and a harness query for the human-readable
 // name resolves through AgentUiRegistry::ResolveLabel's case-insensitive substring tier.
-void ColumnSlider(const char* pcLabel, engine::Wrapper* pWrapper)
+void ColumnSlider(const char* pcLabel, engine::Wrapper* pWrapper, std::string_view format = "%.2f")
 {
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted(pcLabel);
@@ -37,7 +37,7 @@ void ColumnSlider(const char* pcLabel, engine::Wrapper* pWrapper)
 	char pcSliderId[64];
 	std::snprintf(pcSliderId, sizeof(pcSliderId), "##%s", pcLabel);
 	ImGui::SetNextItemWidth(-FLT_MIN);
-	engine::WrapperSlider(pcSliderId, pWrapper);
+	engine::WrapperSlider(pcSliderId, pWrapper, format);
 }
 
 } // namespace
@@ -77,12 +77,14 @@ void GraphicsMenuScreen::Render()
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
 
+	float fHeaderButtonWidth = engine::MenuButtonsWidth({TranslatedString(kStringDefaults), U"Back"});
 	bool bBackPressed = false;
-	if (ImGui::BeginTable("GraphicsHeader", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_NoSavedSettings))
+	if (ImGui::BeginTable("GraphicsHeader", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_NoSavedSettings))
 	{
 		ImGui::TableSetupColumn("GraphicsTitle", ImGuiTableColumnFlags_WidthStretch, 3.0f);
 		ImGui::TableSetupColumn("GraphicsFps", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-		ImGui::TableSetupColumn("GraphicsBack", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+		ImGui::TableSetupColumn("GraphicsDefaults", ImGuiTableColumnFlags_WidthFixed, fHeaderButtonWidth);
+		ImGui::TableSetupColumn("GraphicsBack", ImGuiTableColumnFlags_WidthFixed, fHeaderButtonWidth);
 		ImGui::TableNextRow();
 
 		ImGui::TableNextColumn();
@@ -98,10 +100,15 @@ void GraphicsMenuScreen::Render()
 		ImGui::Text("FPS: %lld", engine::gpGraphics->mRendersInTheLastSecond.Get());
 
 		ImGui::TableNextColumn();
-		float fBackWidth = engine::MenuButtonsWidth({U"Back"});
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - fBackWidth);
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + std::max(0.0f, (fHeaderHeight - ImGui::GetFrameHeight()) * 0.5f));
-		bBackPressed = engine::MenuButton("Back", ImVec2(fBackWidth, 0.0f), mfBackHoverAnim);
+		if (engine::MenuButton(engine::AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(kStringDefaults)), ImVec2(fHeaderButtonWidth, 0.0f), mfDefaultsHoverAnim))
+		{
+			ResetGraphicsSettings();
+		}
+
+		ImGui::TableNextColumn();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + std::max(0.0f, (fHeaderHeight - ImGui::GetFrameHeight()) * 0.5f));
+		bBackPressed = engine::MenuButton("Back", ImVec2(fHeaderButtonWidth, 0.0f), mfBackHoverAnim);
 
 		ImGui::EndTable();
 	}
@@ -115,13 +122,8 @@ void GraphicsMenuScreen::Render()
 		// Left column: Display
 		ImGui::TableNextColumn();
 
-		// Time of day (only in main menu)
-		if (gpGame->InMainMenu())
-		{
-			ColumnSlider("Time of Day", &engine::gSunAngleOverride);
-		}
-
-		ColumnSlider("Minimum Ambient", &engine::gSunMoonMinimumAmbient);
+		ColumnSlider("Time of Day", &engine::gSunAngleOverride);
+		ColumnSlider("Minimum Ambient", &engine::gSunMoonMinimumAmbient, "%.4f");
 
 		ImGui::Separator();
 
@@ -133,36 +135,30 @@ void GraphicsMenuScreen::Render()
 		ImGui::Separator();
 
 		engine::WrapperToggle("Multisampling", &engine::gMultisampling);
-		if (engine::gMultisampling.Get<bool>())
-		{
-			engine::RadioRow(nullptr, &engine::gSampleCount, engine::gSampleCount.Get(),
-				{{"2x", static_cast<float>(VK_SAMPLE_COUNT_2_BIT)}, {"4x", static_cast<float>(VK_SAMPLE_COUNT_4_BIT)}, {"8x", static_cast<float>(VK_SAMPLE_COUNT_8_BIT)}, {"16x", static_cast<float>(VK_SAMPLE_COUNT_16_BIT)}});
-		}
+		ImGui::BeginDisabled(!engine::gMultisampling.Get<bool>());
+		engine::RadioRow(nullptr, &engine::gSampleCount, engine::gSampleCount.Get(),
+			{{"2x", static_cast<float>(VK_SAMPLE_COUNT_2_BIT)}, {"4x", static_cast<float>(VK_SAMPLE_COUNT_4_BIT)}, {"8x", static_cast<float>(VK_SAMPLE_COUNT_8_BIT)}, {"16x", static_cast<float>(VK_SAMPLE_COUNT_16_BIT)}});
+		ImGui::EndDisabled();
 
 		ImGui::Separator();
 
 		engine::WrapperToggle("Sample Shading", &engine::gSampleShading);
-		if (engine::gSampleShading.Get<bool>())
-		{
-			ColumnSlider("Min Sample Shading", &engine::gMinSampleShading);
-		}
+		ImGui::BeginDisabled(!engine::gSampleShading.Get<bool>());
+		ColumnSlider("Min Sample Shading", &engine::gMinSampleShading);
+		ImGui::EndDisabled();
 
 		ImGui::Separator();
 
 		engine::WrapperToggle("Anisotropy", &engine::gAnisotropy);
-		if (engine::gAnisotropy.Get<bool>())
-		{
-			ColumnSlider("Max Anisotropy", &engine::gMaxAnisotropy);
-		}
+		ImGui::BeginDisabled(!engine::gAnisotropy.Get<bool>());
+		ColumnSlider("Max Anisotropy", &engine::gMaxAnisotropy);
+		ImGui::EndDisabled();
 		ColumnSlider("Mip Lod Bias", &engine::gMipLodBias);
 
 		// Right column: Effects & UI
 		ImGui::TableNextColumn();
 
-		if (engine::RadioRow("Water", &engine::gWaterLevel, engine::gWaterLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
-		{
-			engine::ApplyWaterLevel();
-		}
+		engine::RadioRow("Water", &engine::gWaterLevel, engine::gWaterLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}});
 
 		ImGui::Separator();
 
@@ -173,35 +169,29 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::Separator();
 
-		if (engine::RadioRow("Object Shadows", &engine::gObjectShadowsLevel, engine::gObjectShadowsLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
-		{
-			engine::ApplyObjectShadowsLevel();
-		}
-
-		ImGui::Separator();
-
+		engine::WrapperToggle("Lighting", &engine::gLightingEnabled);
+		ImGui::BeginDisabled(!engine::gLightingEnabled.Get<bool>());
 		if (engine::RadioRow("Lighting", &engine::gLightingLevel, engine::gLightingLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
 			engine::ApplyLightingLevel();
 		}
+		ColumnSlider("Lighting Update Cadence", &engine::gLightingUpdateCadence, "%.0f");
+		ImGui::EndDisabled();
 
 		ImGui::Separator();
 
 		engine::WrapperToggle("Smoke", &engine::gSmokeEnabled);
-		if (engine::gSmokeEnabled.Get<bool>())
+		ImGui::BeginDisabled(!engine::gSmokeEnabled.Get<bool>());
+		if (engine::RadioRow("Smoke Detail", &engine::gSmokeDetailLevel, engine::gSmokeDetailLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
-			if (engine::RadioRow("Smoke Detail", &engine::gSmokeDetailLevel, engine::gSmokeDetailLevel.Get(), {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
-			{
-				engine::ApplySmokeDetailLevel();
-			}
-
-			ColumnSlider("Smoke Area", &engine::gSmokeSimulationArea);
+			engine::ApplySmokeDetailLevel();
 		}
+		ColumnSlider("Smoke Area", &engine::gSmokeSimulationArea);
+		ImGui::EndDisabled();
 
 		ImGui::Separator();
 
 		engine::WrapperToggle("Wind", &engine::gWindEnabled);
-		ColumnSlider("Lighting Update Cadence", &engine::gLightingUpdateCadence);
 
 		ImGui::EndTable();
 	}

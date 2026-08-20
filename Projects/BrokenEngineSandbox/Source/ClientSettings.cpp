@@ -91,21 +91,35 @@ void ResetGameSettings()
 
 struct SoundSettings
 {
-	static constexpr int64_t kiVersion = 2;
+	static constexpr int64_t kiVersion = 3;
 
 	float fMasterVolume = 0.0f;
 	float fMusicVolume = 0.0f;
 	float fSoundVolume = 0.0f;
+	uint8_t uiMuteInBackground = 0;
+	uint8_t uiPad[3] {};
 };
+static_assert(std::is_trivially_copyable_v<SoundSettings>, "SoundSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
+static_assert(std::is_standard_layout_v<SoundSettings>, "SoundSettings must stay standard-layout — BT_OFFSETOF above is only well-defined for standard-layout types");
+static_assert(BT_OFFSETOF(SoundSettings, fMasterVolume) == 0, "SoundSettings::fMasterVolume offset changed — existing volume bytes move");
+static_assert(BT_OFFSETOF(SoundSettings, fMusicVolume) == 4, "SoundSettings::fMusicVolume offset changed — existing volume bytes move");
+static_assert(BT_OFFSETOF(SoundSettings, fSoundVolume) == 8, "SoundSettings::fSoundVolume offset changed — existing volume bytes move");
+static_assert(BT_OFFSETOF(SoundSettings, uiMuteInBackground) == 12, "SoundSettings::uiMuteInBackground offset changed — mute byte is appended after volumes");
+static_assert(BT_OFFSETOF(SoundSettings, uiPad) == 13, "SoundSettings padding changed — SoundSettings must remain 16 bytes");
+static_assert(sizeof(SoundSettings) == 16, "SoundSettings::kiVersion must be bumped with this layout");
 static constexpr char kpcSoundSettingsPath[] = "SoundSettings.bin";
 
 void SaveSoundSettings()
 {
+	// Heap: file I/O allocates
+	ScopedSuppressAllocationTracking suppress;
+
 	SoundSettings soundSettings
 	{
 		.fMasterVolume = engine::gMasterVolume.Get(),
 		.fMusicVolume = engine::gMusicVolume.Get(),
 		.fSoundVolume = engine::gSoundVolume.Get(),
+		.uiMuteInBackground = static_cast<uint8_t>(engine::gMuteInBackground.Get<bool>()),
 	};
 
 	engine::WriteVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, kpcSoundSettingsPath, soundSettings);
@@ -120,6 +134,7 @@ void LoadSoundSettings()
 		engine::gMasterVolume.Set(soundSettings.fMasterVolume);
 		engine::gMusicVolume.Set(soundSettings.fMusicVolume);
 		engine::gSoundVolume.Set(soundSettings.fSoundVolume);
+		engine::gMuteInBackground.Set(soundSettings.uiMuteInBackground != 0);
 	}
 
 	if constexpr (kbRecording)
@@ -133,6 +148,7 @@ void ResetSoundSettings()
 	engine::gMasterVolume.ResetToDefault();
 	engine::gMusicVolume.ResetToDefault();
 	engine::gSoundVolume.ResetToDefault();
+	engine::gMuteInBackground.ResetToDefault();
 
 	SaveSoundSettings();
 }
@@ -145,11 +161,12 @@ enum class GraphicsSettingsFlags : uint8_t
 	kSampleShading = 1 << 3,
 	kSmoke         = 1 << 4,
 	kWind          = 1 << 5,
+	kLighting      = 1 << 6,
 };
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 12;
+	static constexpr int64_t kiVersion = 15;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t uiPad[3] {};
@@ -163,12 +180,12 @@ struct GraphicsSettings
 	float fLightingUpdateCadence = 1.0f;
 	// The quality levels are the single source of truth for the wrappers they drive; those wrapper values are
 	// never persisted directly. uint8_t, not the enum: the file layout must not follow GraphicsQualityLevel.
+	uint8_t uiWaterLevel = 0;
 	uint8_t uiTerrainShadowsLevel = 0;
 	uint8_t uiObjectShadowsLevel = 0;
 	uint8_t uiLightingLevel = 0;
 	uint8_t uiSmokeDetailLevel = 0;
-	uint8_t uiWaterLevel = 0;
-	uint8_t uiPadLevels[3] {};
+	uint8_t uiQualityPad[3] {};
 };
 static constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
@@ -187,11 +204,11 @@ void SaveGraphicsSettings()
 		.fSmokeSimulationArea = engine::gSmokeSimulationArea.Get(),
 		.fMinimumAmbient = engine::gSunMoonMinimumAmbient.Get(),
 		.fLightingUpdateCadence = engine::gLightingUpdateCadence.Get(),
+		.uiWaterLevel = engine::gWaterLevel.Get<uint8_t>(),
 		.uiTerrainShadowsLevel = engine::gTerrainShadowsLevel.Get<uint8_t>(),
 		.uiObjectShadowsLevel = engine::gObjectShadowsLevel.Get<uint8_t>(),
 		.uiLightingLevel = engine::gLightingLevel.Get<uint8_t>(),
 		.uiSmokeDetailLevel = engine::gSmokeDetailLevel.Get<uint8_t>(),
-		.uiWaterLevel = engine::gWaterLevel.Get<uint8_t>(),
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, engine::gFullscreen.Get<bool>());
@@ -200,6 +217,7 @@ void SaveGraphicsSettings()
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kSampleShading, engine::gSampleShading.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kSmoke, engine::gSmokeEnabled.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kWind, engine::gWindEnabled.Get<bool>());
+	graphicsSettings.flags.Set(GraphicsSettingsFlags::kLighting, engine::gLightingEnabled.Get<bool>());
 
 	engine::WriteVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, kpcGraphicsSettingsPath, graphicsSettings);
 }
@@ -219,6 +237,7 @@ void LoadGraphicsQualityLevel(engine::Wrapper& rLevel, uint8_t uiLevel)
 bool LoadGraphicsSettings()
 {
 	GraphicsSettings graphicsSettings {};
+	engine::gWaterShapeDetail.ResetToDefault();
 
 	bool bRead = engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, kpcGraphicsSettingsPath, graphicsSettings);
 	if (bRead)
@@ -244,11 +263,12 @@ bool LoadGraphicsSettings()
 			engine::gLightingUpdateCadence.ResetToDefault();
 		}
 		engine::gWindEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kWind);
+		engine::gLightingEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kLighting);
+		LoadGraphicsQualityLevel(engine::gWaterLevel, graphicsSettings.uiWaterLevel);
 		LoadGraphicsQualityLevel(engine::gTerrainShadowsLevel, graphicsSettings.uiTerrainShadowsLevel);
 		LoadGraphicsQualityLevel(engine::gObjectShadowsLevel, graphicsSettings.uiObjectShadowsLevel);
 		LoadGraphicsQualityLevel(engine::gLightingLevel, graphicsSettings.uiLightingLevel);
 		LoadGraphicsQualityLevel(engine::gSmokeDetailLevel, graphicsSettings.uiSmokeDetailLevel);
-		LoadGraphicsQualityLevel(engine::gWaterLevel, graphicsSettings.uiWaterLevel);
 	}
 
 	// Also on a failed read: the default levels still have to drive their underlying wrappers, otherwise a fresh
@@ -269,17 +289,19 @@ void ResetGraphicsSettings()
 	engine::gSampleShading.ResetToDefault();
 	engine::gMinSampleShading.ResetToDefault();
 	engine::gMipLodBias.ResetToDefault();
+	engine::gWaterShapeDetail.ResetToDefault();
 	engine::gSmokeEnabled.ResetToDefault();
 	engine::gSmokeSimulationArea.ResetToDefault();
 	engine::gSunMoonMinimumAmbient.ResetToDefault();
 	engine::gLightingUpdateCadence.ResetToDefault();
 	engine::gWindEnabled.ResetToDefault();
+	engine::gLightingEnabled.ResetToDefault();
 
+	engine::gWaterLevel.ResetToDefault();
 	engine::gTerrainShadowsLevel.ResetToDefault();
 	engine::gObjectShadowsLevel.ResetToDefault();
 	engine::gLightingLevel.ResetToDefault();
 	engine::gSmokeDetailLevel.ResetToDefault();
-	engine::gWaterLevel.ResetToDefault();
 	engine::ApplyAllGraphicsQualityLevels();
 
 	SaveGraphicsSettings();

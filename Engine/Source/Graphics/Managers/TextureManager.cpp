@@ -387,8 +387,8 @@ void TextureManager::CreateSamplers()
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.mipLodBias = -gMipLodBias.Get(),
-		.anisotropyEnable = gAnisotropy.Get<bool>() ? VK_TRUE : VK_FALSE,
-		.maxAnisotropy = gMaxAnisotropy.Get(),
+		.anisotropyEnable = VK_FALSE,
+		.maxAnisotropy = 1.0f,
 		.compareEnable = VK_FALSE,
 		.compareOp = VK_COMPARE_OP_ALWAYS,
 		.minLod = 0.0f,
@@ -396,6 +396,12 @@ void TextureManager::CreateSamplers()
 		.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK,
 		.unnormalizedCoordinates = VK_FALSE,
 	};
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotLinearClamp]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotLinearClamp], "LinearClamp");
+
+	vkSamplerCreateInfo.mipLodBias = -gMipLodBias.Get();
+	vkSamplerCreateInfo.anisotropyEnable = gAnisotropy.Get<bool>() ? VK_TRUE : VK_FALSE;
+	vkSamplerCreateInfo.maxAnisotropy = gMaxAnisotropy.Get();
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotClamp]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotClamp], "Clamp");
 
@@ -443,6 +449,18 @@ void TextureManager::CreateSamplers()
 	vkSamplerCreateInfo.mipLodBias = std::clamp(gWaterNormalMipBias.Get(), -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotMirroredRepeatWater]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotMirroredRepeatWater], "MirroredRepeatWater");
+
+	vkSamplerCreateInfo.mipLodBias = -gMipLodBias.Get();
+	vkSamplerCreateInfo.anisotropyEnable = VK_FALSE;
+	vkSamplerCreateInfo.maxAnisotropy = 1.0f;
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotMirroredRepeatLinear]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotMirroredRepeatLinear], "MirroredRepeatLinear");
+
+	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotRepeatLinear]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotRepeatLinear], "RepeatLinear");
 }
 
 VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
@@ -458,6 +476,9 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 		{DescriptorFlags::kSamplerRepeat, kSamplerSlotRepeat},
 		{DescriptorFlags::kSamplerMirroredRepeat, kSamplerSlotMirroredRepeat},
 		{DescriptorFlags::kSamplerMirroredRepeatWater, kSamplerSlotMirroredRepeatWater},
+		{DescriptorFlags::kSamplerClampLinear, kSamplerSlotLinearClamp},
+		{DescriptorFlags::kSamplerRepeatLinear, kSamplerSlotRepeatLinear},
+		{DescriptorFlags::kSamplerMirroredRepeatLinear, kSamplerSlotMirroredRepeatLinear},
 		{DescriptorFlags::kSamplerSmoke, kSamplerSlotSmoke},
 		{DescriptorFlags::kSamplerWindClamp, kSamplerSlotWindClamp},
 	};
@@ -478,8 +499,9 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 		}
 	}
 
-	// No sampler flag set — default to clamp (matches the prior else branch).
-	return mpSamplers[kSamplerSlotClamp];
+	// Unflagged descriptors sample internal render targets. They need linear clamp filtering, but player-facing
+	// anisotropy applies only to the explicitly flagged image-render samplers.
+	return mpSamplers[kSamplerSlotLinearClamp];
 }
 
 void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
@@ -781,9 +803,9 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 	Pipeline& rBlurH = gpPipelineManager->mpPipelines[kPipelineLightingBlurH];
 	Pipeline& rBlurV = gpPipelineManager->mpPipelines[kPipelineLightingBlurV];
 
-	rBlurH.UpdateCombinedImageSamplerDescriptor(0, rSource.mVkImageView, mpSamplers[kSamplerSlotClamp]);
+	rBlurH.UpdateCombinedImageSamplerDescriptor(0, rSource.mVkImageView, mpSamplers[kSamplerSlotLinearClamp]);
 	rBlurH.UpdateStorageImageDescriptor(1, rIntermediate.mVkImageView);
-	rBlurV.UpdateCombinedImageSamplerDescriptor(0, rIntermediate.mVkImageView, mpSamplers[kSamplerSlotClamp]);
+	rBlurV.UpdateCombinedImageSamplerDescriptor(0, rIntermediate.mVkImageView, mpSamplers[kSamplerSlotLinearClamp]);
 	rBlurV.UpdateStorageImageDescriptor(1, rResult.mVkImageView);
 
 	// Execute blur via one-shot command buffer

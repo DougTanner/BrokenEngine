@@ -3,6 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Profile/ProfileManager.h"
+#include "Ui/GraphicsSettingsWrappersBase.h"
 
 namespace engine
 {
@@ -110,7 +111,7 @@ void HexShieldsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	gpProfileManager->SetCount(kCpuCounterHexShields, siTotalCount);
 	gpProfileManager->SetCount(kCpuCounterHexShieldsRendered, siRendered);
 	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShields].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
 }
 
 } // namespace engine

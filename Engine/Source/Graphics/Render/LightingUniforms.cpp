@@ -3,6 +3,7 @@
 #include "Render.h"
 
 #include "Graphics/Camera.h"
+#include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
@@ -59,7 +60,7 @@ struct LightingTemporalAreaLatch
 
 static bool sbLightingRefreshFrame = true; // Cached before global lighting publication so the spread, combine, and temporal chain share one refresh epoch
 
-static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, bool bScheduledRefresh)
+static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, bool bScheduledRefresh, bool bLightingEnabled)
 {
 	// Lighting area: world-sized texels from a raw-frustum-safe camera-height reference (mirror of the shadow-area path in
 	// PopulateShadowParameters). The deposit/spread/combine textures are pre-sized (RenderTargetTextures, via
@@ -85,7 +86,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	static XMFLOAT4 sf4HeldVisibleArea {};
 	static bool sbHeldVisibleArea = false;
 	sbLightingRefreshFrame = bScheduledRefresh || !sTemporalAreaLatch.bInitialized || !sbHeldVisibleArea
-		|| !IsVisibleAreaInsideHeldCombineCrop(rVisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight);
+		|| (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rVisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
 	if (sbLightingRefreshFrame)
 	{
 		rGlobalLayout.fLightingTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbLightingTemporalReset, gLightingTemporalBlend.Get(), rGlobalLayout.f4LightingAreaPrevious);
@@ -120,10 +121,16 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 {
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
+	[[maybe_unused]] auto [bLightingEnabled, bLightingEnabledPrevious, bLightingEnabledChanged] = gLightingEnabled.Changed<bool>();
+	if (bLightingEnabledChanged)
+	{
+		gbLightingTemporalReset = true;
+	}
+
 	static int64_t siLightingRefreshFrame = 0;
 	int64_t iLightingUpdateCadence = gLightingUpdateCadence.Get<int64_t>();
 	++siLightingRefreshFrame;
-	bool bScheduledLightingRefresh = gbLightingTemporalReset || siLightingRefreshFrame % iLightingUpdateCadence == 0;
+	bool bScheduledLightingRefresh = gbLightingTemporalReset || (bLightingEnabled && siLightingRefreshFrame % iLightingUpdateCadence == 0);
 
 	// Generate run-unique seed once and reuse every frame: stable noise pattern across the run, no temporal flicker.
 	static const uint32_t skuiRandomSeed = []
@@ -223,7 +230,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	}
 
 	// Lighting world-area / temporal / tile / readout population — colocated here so the whole Lighting region lives in one file (region ownership).
-	PopulateLightingParameters(rGlobalLayout, bScheduledLightingRefresh);
+	PopulateLightingParameters(rGlobalLayout, bScheduledLightingRefresh, bLightingEnabled);
 }
 
 void RenderLightingMain(int64_t iCommandBuffer)
@@ -382,9 +389,9 @@ void RenderLightingMain(int64_t iCommandBuffer)
 
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 {
-	// A refresh must draw every spread pass even for an empty deposit so it publishes fresh zero results;
-	// skips publish no chain work and retain the prior area/history epoch.
-	int64_t iInstanceCount = sbLightingRefreshFrame ? 1 : 0;
+	// A disabled refresh still runs combine/temporal/history once to publish black, but the unconditional spread
+	// attachment clears already provide its zero inputs, so no spread draw is needed.
+	int64_t iInstanceCount = sbLightingRefreshFrame && gLightingEnabled.Get<bool>() ? 1 : 0;
 
 	// All kiMaxSpreadPasses pipelines, not just the gSpreadPassCount active ones. Which passes the Main CB
 	// actually draws is decided at record time, and the slots come back zeroed from every pipeline recreate

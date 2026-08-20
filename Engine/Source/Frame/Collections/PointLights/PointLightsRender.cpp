@@ -3,6 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Profile/ProfileManager.h"
+#include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 
 namespace engine
@@ -147,7 +148,7 @@ void PointLightsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
 	gpProfileManager->SetCount(kCpuCounterPointLights, siTotalCount);
 	gpProfileManager->SetCount(kCpuCounterPointLightsRendered, siRendered);
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
 	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineVisibleLights].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 

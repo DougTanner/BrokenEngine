@@ -6,6 +6,7 @@
 #include "Profile/ProfileManager.h"
 #include "Server/ServerDisplay.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/SoundSettingsWrappersBase.h"
 #include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 
 namespace engine
@@ -243,6 +244,10 @@ void MainThread(HINSTANCE hinstance)
 	// Load settings
 	game::LoadSoundSettings();
 	game::LoadGameSettings();
+	if (gMuteInBackground.Get<bool>() || gLaunchOptions.iAgentPort != 0)
+	{
+		gpAudioManager->Suspend();
+	}
 
 	// Create terrain collision data (before Graphics, which creates Islands that reads beach elevation)
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
@@ -323,11 +328,6 @@ void MainThread(HINSTANCE hinstance)
 		SetForegroundWindow(sHwnd);
 		BringWindowToTop(sHwnd);
 		SetFocus(sHwnd);
-	}
-	else
-	{
-		// Agent-mode clients boot silent; focus gain resumes.
-		gpAudioManager->Suspend();
 	}
 #else
 	if (gLaunchOptions.iAgentPort == 0)
@@ -720,7 +720,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				sbHasFocus = false;
 
 #if defined(BT_CLIENT)
-				gpAudioManager->Suspend();
+				if (gMuteInBackground.Get<bool>())
+				{
+					gpAudioManager->Suspend();
+				}
 
 				gpRawInputManager->UpdateFocus(false, sHwnd);
 #endif // BT_CLIENT

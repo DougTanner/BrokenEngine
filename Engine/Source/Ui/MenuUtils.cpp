@@ -54,10 +54,10 @@ bool WrapperToggle(std::string_view label, engine::Wrapper* pWrapper)
 	return false;
 }
 
-bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper)
+bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::string_view format)
 {
 	float fValue = pWrapper->Get();
-	if (ImGui::SliderFloat(label.data(), &fValue, pWrapper->GetMin(), pWrapper->GetMax(), "%.2f"))
+	if (ImGui::SliderFloat(label.data(), &fValue, pWrapper->GetMin(), pWrapper->GetMax(), format.data()))
 	{
 		pWrapper->Set(fValue);
 		return true;

@@ -9,6 +9,11 @@ Game-owned localization and settings persistence; player-facing screens consume 
 - Players see the audio menu labeled AUDIO, while its screen, UI state, wrappers, and settings file keep the internal Sound name. The split is deliberate: renaming the internals would rewrite a persisted filename for no player-visible gain.
 - Engine UI owns UTF-32-to-UTF-8 conversion and its workbuffer-backed result handle. Screens perform conversion at the consuming expression and do not retain the result past its workbuffer lifetime.
 
+## Sound Settings Persistence
+
+- `SoundSettings.bin` is version 3 and persists the three volume controls plus the checked-by-default `Mute in background` setting. Version 2 is intentionally rejected and settings fall back to defaults without a compatibility reader; reset restores the checked default, and save/load preserve the setting.
+- Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
+
 ## Wrapper Affinity
 
 - Wrappers read by shared Frame code compile into both client and server projects even when only the client UI changes them.
@@ -18,6 +23,7 @@ Game-owned localization and settings persistence; player-facing screens consume 
 
 ## Graphics Quality Persistence
 
-- `ClientSettings` persists the engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; the derived renderer wrapper values are not serialized.
+- `ClientSettings` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
+- `GraphicsSettings.bin` version 15 persists Water quality in place of the former detail float while retaining the payload size. Lighting defaults on; version 14 files intentionally fail the current-format gate and reset with the other graphics settings.
 - Treat levels read from the settings file as opaque input: clamp each value before assigning it, then invoke the engine quality-level apply operation after both successful and failed graphics-settings loads so the defaults or loaded selections drive the renderer.
-- `GraphicsMenuScreen` consumes the engine-owned level wrappers and invokes the corresponding engine apply function when a selection changes. It does not own the wrapper definitions or renderer tables.
+- `GraphicsMenuScreen` consumes the engine-owned level wrappers. Water is read directly by per-frame rendering; the other selections invoke their corresponding engine apply functions.

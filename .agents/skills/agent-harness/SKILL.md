@@ -118,6 +118,11 @@ The channel permits one request still in progress. Client deferred commands occu
 
 Write any multi-line PowerShell driver — anything with `function` definitions, loops, or more than a few statements — to a script file under `<absolute adopted worktree>\Temp` and run it with `pwsh -File`. Never compact such a driver into a semicolon-joined one-liner; compaction corrupts function definitions (observed: `function Snap([string]$p)` mangled into an unrecognized `Snap$d` token).
 
+## Performance investigations
+
+- GPU performance investigations run the client fullscreen at 4K. Restore the client, send `fullscreen {"on":true}`, and require the response to report `fullscreen:true`, `width:3840`, and `height:2160` before collecting measurements. Keep the window visible for the full measurement interval. If the active display cannot provide that framebuffer, report the GPU criterion `BLOCKED` instead of substituting a smaller or windowed mode.
+- CPU performance investigations build and run the measured client or server with the `Profile` configuration/target. Debug and Release CPU timings are not acceptance evidence for a CPU performance investigation.
+
 ## Authoritative verification
 
 The selected project's harness doc owns the concrete setup recipe (which commands seed server state, confirm client connection, and address UI) and its replay determinism acceptance sequence. Regardless of project, hold these verification-evidence principles:

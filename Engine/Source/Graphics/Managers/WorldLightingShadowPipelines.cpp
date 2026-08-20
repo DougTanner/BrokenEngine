@@ -145,8 +145,8 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		{
 			{.flags = kGlobalLayoutUniformBuffers},
 			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
-			// kSamplerElevation: bindless source is R16_SFLOAT; sampler is unconditionally LINEAR (spec-mandated for 16-bit-float formats, see TextureManager::CreateSamplers).
-			{.flags = {kCombinedSamplers, kSamplerElevation, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 2 (elevation)
+			// The unflagged default keeps this offscreen shadow prepass linear without player-facing anisotropy.
+			{.flags = {kCombinedSamplers, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 2 (elevation)
 		},
 	});
 

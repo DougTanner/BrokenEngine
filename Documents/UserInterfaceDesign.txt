@@ -309,21 +309,25 @@ Screen-specific commitments this contract makes, each verified visually:
     and keeps its single themed action centered.
   - Graphics: the two-column split is semantic — display/sampling/filtering
     settings left, Effects & UI settings right — not arbitrary, though the
-    columns no longer carry equal row counts; the header keeps FPS and Back
-    visible at every supported Font Size. Sample Shading sits on the left
+    columns no longer carry equal row counts; the header keeps FPS, localized
+    Defaults, and Back visible at every supported Font Size, with the two
+    actions sharing one text-measured width. Sample Shading sits on the left
     directly below Multisampling, with the sampling settings it belongs to.
   - Graphics: every slider row reads label first, then bar — the name is drawn
     left of a bar that fills the rest of the column, instead of trailing it.
-  - Graphics: heavy features are chosen as one Low/Medium/High row each, not as
-    raw detail sliders — Water (replacing Water Shape Detail), Terrain Shadows,
-    Object Shadows, Lighting, and Smoke Detail (replacing Smoke Pixels), all on
-    the right. Water, Terrain Shadows, Object Shadows, and Lighting run
-    contiguously at the top of the right column, each standing alone between
-    separators; Smoke Detail sits inside the separator-bounded Smoke group,
-    between the Smoke toggle and the Smoke Area slider, and appears only while
-    Smoke is on. That Smoke group follows the four quality rows, directly above
-    Wind. The rows carry the feature name only; the three option labels repeat
-    verbatim down the column.
+    Display precision follows behavior: Water Detail uses three decimals,
+    smooth Minimum Ambient uses four, and whole-frame Lighting Update Cadence
+    uses no decimals.
+  - Graphics: heavy features use Low/Medium/High rows rather than raw detail
+    sliders — Terrain Shadows, Object Shadows, Lighting Detail, and Smoke Detail
+    (replacing Smoke Pixels), all on the right. A smooth Water Detail slider
+    spanning one-eighth through one-half resolution sits first; Terrain Shadows
+    and Object Shadows follow as standalone rows. The Lighting group follows
+    with its toggle, detail row, and update-cadence slider; the Smoke group then
+    carries its toggle, detail row, and area slider directly above Wind.
+    Dependent controls remain visible and dimmed while their parent is off,
+    matching the sample-count, sample-shading, and anisotropy groups on the left.
+    The three option labels repeat verbatim down the column.
 
 Files:
   Engine/Source/Ui/MenuUtils.cpp:204  ComputeMouseOpennessTarget (fixed-extent hover zone)

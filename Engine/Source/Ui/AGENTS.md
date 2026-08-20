@@ -7,6 +7,7 @@ Shared runtime settings, player-facing menu helpers, renderer quality levels, ne
 - `Wrapper` stores float, bool, or discrete values with one-consumer change tracking. `Changed<T>()` advances the previous-value state, so exactly one consumer may poll a wrapper each frame.
 - Mutate through `Set` or `Reset`; assignment is disabled. `Set` leaves the prior value intact so the next poll observes a change. `Reset` updates both values and is for initialization or capability clamping that must not trigger rebuilds.
 - Discrete wrappers fall back to their first allowed value when persisted or capability-derived input is invalid. Float wrappers may snap to a configured grid.
+- One-argument construction is Boolean-only. Non-Boolean numeric and enum constructors are deleted so a scalar cannot silently convert to the Boolean overload; floats use the ranged constructor and discrete values supply an allowed-value set.
 - Wrapper bounds annotated with shader invariants are correctness constraints, not UI tuning.
 - Settings that alter baked render-target dimensions must participate in `Graphics::Refresh`; prefer per-frame uniforms when recreation is unnecessary.
 - Wrapper headers are intentionally consumed directly rather than aggregated into `Engine.h`, limiting recompilation from tuning edits.
@@ -18,9 +19,9 @@ Shared runtime settings, player-facing menu helpers, renderer quality levels, ne
 
 ## Graphics Quality Levels
 
-- The renderer quality levels are engine-owned client-only wrappers. Each discrete level is the persisted source of truth, while the renderer wrappers it drives are derived and are never persisted.
-- Apply functions write the derived renderer wrappers through `Set` when a level changes and once after both successful and failed graphics-settings loads. `Graphics::Refresh` is the sole consumer polling those wrappers; apply functions never call `Changed<T>()`.
-- Values read from a settings file are opaque input, so clamp each level before indexing its table. Keep the `kWaterLevels` counts within the `gWaterLowCount`/`gWaterMediumCount` allowed set `{15, 31, 63, 127, 255}`.
+- The renderer quality levels are engine-owned client-only wrappers. Each discrete level is the persisted source of truth. Water is consumed directly during per-frame rendering; the other levels drive derived renderer wrappers that are never persisted.
+- Apply functions write derived renderer wrappers through `Set` when a level changes and once after both successful and failed graphics-settings loads. `Graphics::Refresh` is the sole consumer polling those wrappers; apply functions never call `Changed<T>()`.
+- Values read from a settings file are opaque input, so clamp each level before indexing its table.
 - `GraphicsQualityWrappersBase.h` remains a `BT_CLIENT` direct include and stays out of `Engine.h`; game UI owns persistence and menu consumption.
 
 ## Shared Types

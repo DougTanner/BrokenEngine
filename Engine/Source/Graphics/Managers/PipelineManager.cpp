@@ -214,8 +214,8 @@ void PipelineManager::CreateTerrainDataPipelines()
 		{
 			{.flags = kGlobalLayoutUniformBuffers},
 			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
-			// kSamplerElevation for R16_SFLOAT bindless heightmap (unconditionally LINEAR — spec-mandated for 16-bit-float formats). See TextureManager::CreateSamplers.
-			{.flags = {kCombinedSamplers, kSamplerElevation, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 2 (elevation, kPipelineTerrainElevation)
+			// The unflagged default keeps this offscreen elevation prepass linear without player-facing anisotropy.
+			{.flags = {kCombinedSamplers, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 2 (elevation, kPipelineTerrainElevation)
 		},
 	});
 }
@@ -292,7 +292,7 @@ void PipelineManager::CreateSmokeWindPipelines()
 		{
 			{.flags = kGlobalLayoutUniformBuffers},
 			{.flags = {kCombinedSamplers, kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
-			{.flags = {kCombinedSamplers, kSamplerMirroredRepeat}, .textureCrc = data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc},
+			{.flags = {kCombinedSamplers, kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc},
 			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
 			{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
 			{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
@@ -311,7 +311,7 @@ void PipelineManager::CreateSmokeWindPipelines()
 		{
 			{.flags = kGlobalLayoutUniformBuffers},
 			{.flags = {kCombinedSamplers, kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo},
-			{.flags = {kCombinedSamplers, kSamplerMirroredRepeat}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
+			{.flags = {kCombinedSamplers, kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
 			{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
 			{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
 			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
@@ -376,7 +376,7 @@ void PipelineManager::CreateSmokeWindPipelines()
 			{
 				{.flags = kGlobalLayoutUniformBuffers},
 				{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = rDescription.pSourceTexture},
-				{.flags = {kCombinedSamplers, kSamplerMirroredRepeat}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
+				{.flags = {kCombinedSamplers, kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
 				{.flags = kStorageImages, .pTexture = rDescription.pDestinationTexture},
 				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pActiveTileVkBuffer},
 				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pOccupancyVkBuffer},

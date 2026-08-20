@@ -58,7 +58,7 @@ Wrapper gSpreadOutputCompressEnd(1.0f, 0.0f, 4.0f);
 // Write - Temporal (mirror of the shadow texel-contraction + temporal-blend tunables)
 Wrapper gLightingTexelRampMetersPerSec(150.0f, 10.0f, 2000.0f);
 Wrapper gLightingTemporalBlend(0.2f, 0.05f, 1.0f);
-Wrapper gLightingUpdateCadence(1.0f, 1.0f, 4.0f, 1.0f);
+Wrapper gLightingUpdateCadence(2.0f, 1.0f, 4.0f, 1.0f);
 
 // Combine (Uchimura tone curve)
 Wrapper gCombineMaxBrightness(1.3f, 0.1f, 4.0f);

@@ -5,6 +5,7 @@ Client-only point lights support owner-driven and fire-and-forget controlled lif
 ## Invariants
 
 - Culling must keep the deposit and sprite cursors aligned. The deposit projects to terrain or ocean base height; the sprite remains at the original world position.
+- The player-facing Lighting toggle gates only the deposit indirect count; the visible sprite retains the shared rendered count.
 - The visible sprite may be world-axis-aligned or camera-facing by type. The deposit is always world-axis-aligned and samples the blurred texture; the sprite samples the unblurred texture.
 - Clamp deposit area to the renderer's minimum detail-texel footprint using the un-bumped detail texture size.
 - Controller wrappers apply when controlled lights are seeded and animated. Owner `Sync` writes bypass those wrappers.

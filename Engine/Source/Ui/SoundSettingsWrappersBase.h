@@ -9,6 +9,7 @@ namespace engine
 extern Wrapper gMasterVolume;
 extern Wrapper gMusicVolume;
 extern Wrapper gSoundVolume;
+extern Wrapper gMuteInBackground;
 
 // Listener distance / curve / audible-floor are camera-height-lerped per the canonical
 // "Camera-Height-Conditional Uniforms" pattern.

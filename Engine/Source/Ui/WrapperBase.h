@@ -17,6 +17,10 @@ public:
 
 	Wrapper() = delete;
 
+	template <typename T>
+	requires ((std::is_arithmetic_v<T> || std::is_enum_v<T>) && !std::is_same_v<std::remove_cv_t<T>, bool>)
+	explicit Wrapper(T) = delete;
+
 	explicit Wrapper(float fValue, float fMin, float fMax, float fStep = 0.0f)
 	: mfStep(fStep)
 	, mfDefault(Snap(fValue, fStep))

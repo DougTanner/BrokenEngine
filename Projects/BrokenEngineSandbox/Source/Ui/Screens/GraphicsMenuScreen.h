@@ -11,6 +11,7 @@ public:
 
 private:
 
+	float mfDefaultsHoverAnim = 0.0f;
 	float mfBackHoverAnim = 0.0f;
 };
 

@@ -4,6 +4,7 @@
 
 #include "Game.h"
 #include "Graphics/Debug/DebugRender.h"
+#include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/HexShieldWrappersBase.h"
 #include "Ui/WaterWrappersBase.h"
 #include "Ui/WrapperBase.h"
@@ -399,8 +400,15 @@ static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, shader
 // Wave phase reduction: read elapsed time from already-populated global layout.
 // Non-const: when a per-stack camera-eye-height fade clamps amplitude to zero, the band helpers zero
 // the matching iWater*Count so the WaterDisplacement.comp Gerstner loop short-circuits to no work.
-static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, shaders::GlobalLayout& rGlobalLayout)
+static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, shaders::GlobalLayout& rGlobalLayout, GraphicsQualityLevel eWaterLevel)
 {
+	if (eWaterLevel == GraphicsQualityLevel::kLow)
+	{
+		rGlobalLayout.iWaterLowCount = 0;
+		rGlobalLayout.iWaterMediumCount = 0;
+		return;
+	}
+
 	double dWaveTime = static_cast<double>(rGlobalLayout.fElapsedTime);
 	XMFLOAT4A f4WaveCameraPos {};
 	XMStoreFloat4A(&f4WaveCameraPos, game::gpCamera->mVecPosition);
@@ -417,6 +425,12 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, shaders::Glo
 	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraEyeHeight) / std::max(fMediumFadeEnd - fMediumFadeStart, 1e-3f), 0.0f, 1.0f);
 
 	PopulateGerstnerLowWaves(rMainLayout, rGlobalLayout, dWaveTime, dWaveCameraX, dWaveCameraY, fLowAmplitudeScale);
+
+	if (eWaterLevel == GraphicsQualityLevel::kMedium)
+	{
+		rGlobalLayout.iWaterMediumCount = 0;
+		return;
+	}
 
 	PopulateGerstnerMediumWaves(rMainLayout, rGlobalLayout, dWaveTime, dWaveCameraX, dWaveCameraY, fMediumAmplitudeScale);
 }
@@ -486,6 +500,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoord);
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
+	GraphicsQualityLevel eWaterLevel = static_cast<GraphicsQualityLevel>(std::clamp(gWaterLevel.Get<int64_t>(), int64_t {0}, static_cast<int64_t>(GraphicsQualityLevel::kCount) - 1));
 
 	RenderLightingMain(iCommandBuffer);
 	gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
@@ -506,10 +521,17 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	rGlobalLayout.iWaterActiveQuadX = static_cast<int32_t>(rWaterLevelOfDetail.iQuadCountX);
 	rGlobalLayout.iWaterActiveQuadY = static_cast<int32_t>(rWaterLevelOfDetail.iQuadCountY);
 
-	// Indirect dispatch dims for kPipelineWaterDisplacement: one workgroup per kiComputeTileSize block over the
-	// (iQuadCount + 1) active-LOD texel rectangle the compute shader writes — the live sub-region only, not the
-	// full LOD0 grid. Written per framebuffer to match RecordComputeIndirect's slot indexing.
-	gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, (rWaterLevelOfDetail.iQuadCountX + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, (rWaterLevelOfDetail.iQuadCountY + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, 1);
+	// Low writes a zero dispatch because Water.vert also bypasses the displacement textures. Medium and High use
+	// one workgroup per kiComputeTileSize block over the active LOD sub-region, written per framebuffer to match
+	// RecordComputeIndirect's slot indexing.
+	if (eWaterLevel == GraphicsQualityLevel::kLow)
+	{
+		gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, 0, 0, 0);
+	}
+	else
+	{
+		gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, (rWaterLevelOfDetail.iQuadCountX + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, (rWaterLevelOfDetail.iQuadCountY + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, 1);
+	}
 
 	// Phase 1: BeginRender — compute total capacities, resize GPU buffers, reset counters
 	game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
@@ -598,7 +620,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	XMStoreFloat4(&rMainLayout.f4BillboardRight, vecBillboardRight);
 	XMStoreFloat4(&rMainLayout.f4BillboardUp, XMVector3Cross(vecToEyeNormal, vecBillboardRight));
 
-	PopulateGerstnerWaves(rMainLayout, rGlobalLayout);
+	PopulateGerstnerWaves(rMainLayout, rGlobalLayout, eWaterLevel);
 
 	PopulateHexShield(rMainLayout);
 }

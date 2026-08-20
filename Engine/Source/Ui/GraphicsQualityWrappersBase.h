@@ -16,13 +16,13 @@ enum class GraphicsQualityLevel : uint8_t
 	kCount,
 };
 
-// Player-facing quality levels. Each holds a GraphicsQualityLevel as its int64_t value and owns no rendering
-// state itself; the Apply functions below are what write the underlying engine wrappers.
+// Player-facing quality levels. Each holds a GraphicsQualityLevel as its int64_t value. Water is consumed
+// directly by per-frame rendering; the other levels use the Apply functions below to write engine wrappers.
+extern engine::Wrapper gWaterLevel;
 extern engine::Wrapper gTerrainShadowsLevel;
 extern engine::Wrapper gObjectShadowsLevel;
 extern engine::Wrapper gLightingLevel;
 extern engine::Wrapper gSmokeDetailLevel;
-extern engine::Wrapper gWaterLevel;
 
 // Write the underlying engine wrappers for one feature from its current level. Call right after the level
 // changes: Set() leaves the underlying wrappers' previous value intact, so Graphics::Refresh still sees the
@@ -31,7 +31,6 @@ void ApplyTerrainShadowsLevel();
 void ApplyObjectShadowsLevel();
 void ApplyLightingLevel();
 void ApplySmokeDetailLevel();
-void ApplyWaterLevel();
 
 void ApplyAllGraphicsQualityLevels();
 

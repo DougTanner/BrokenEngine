@@ -24,13 +24,16 @@ enum class DescriptorFlags : uint64_t
 		kSamplerBorderWhite         = 0x0200, // CLAMP_TO_BORDER + opaque white (1.0) — shadow's "no shadow" beyond coverage
 		kSamplerWindClamp           = 0x10000,
 		kSamplerElevation           = 0x20000,
-		kSamplerMirroredRepeatWater = 0x80000, // MirroredRepeat with the gWaterNormalMipBias slider instead of the global -gMipLodBias sharpen (water normal maps)
+		kSamplerMirroredRepeatWater  = 0x80000, // MirroredRepeat with the gWaterNormalMipBias slider instead of the global -gMipLodBias sharpen (water normal maps)
+		kSamplerClampLinear          = 0x400000,
+		kSamplerRepeatLinear         = 0x800000,
+		kSamplerMirroredRepeatLinear = 0x1000000,
 		// Any-bit mask of every sampler flag, for the standalone-sampler (bSampler) test in
-		// PipelineDescriptorWriter::Write. Value is the OR of the nine kSampler* bits above. Includes
+		// PipelineDescriptorWriter::Write. Value is the OR of all kSampler* bits above. Includes
 		// kSamplerBorderWhite (0x0200), which is behavior-neutral: that flag only ever appears alongside
 		// kCombinedSamplers, and the standalone-sampler branch excludes kCombinedSamplers, so its presence in
 		// the mask never reclassifies a descriptor as a standalone sampler.
-		kSamplerAny                 = 0x00010 | 0x00020 | 0x00040 | 0x00080 | 0x00100 | 0x00200 | 0x10000 | 0x20000 | 0x80000,
+		kSamplerAny                 = 0x00010 | 0x00020 | 0x00040 | 0x00080 | 0x00100 | 0x00200 | 0x10000 | 0x20000 | 0x80000 | 0x400000 | 0x800000 | 0x1000000,
 	kStorageImages                  = 0x0400,
 
 	// One plain buffer shared by every frame in flight — correct only for data the CPU does not rewrite per frame.

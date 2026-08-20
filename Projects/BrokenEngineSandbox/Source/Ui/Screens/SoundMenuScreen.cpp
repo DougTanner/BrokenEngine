@@ -14,6 +14,7 @@ namespace
 {
 
 constexpr float kfSoundSliderWidthPixels = 640.0f;
+constexpr std::string_view kMuteInBackgroundLabel = "Mute in background";
 
 } // namespace
 
@@ -51,6 +52,9 @@ void SoundMenuScreen::Render()
 	engine::WrapperSlider("Music Volume", &engine::gMusicVolume);
 	ImGui::SetNextItemWidth(fSliderWidth);
 	engine::WrapperSlider("Sound Volume", &engine::gSoundVolume);
+	const float fMuteRowWidth = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(kMuteInBackgroundLabel.data()).x;
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, 0.5f * (ImGui::GetContentRegionAvail().x - fMuteRowWidth)));
+	engine::WrapperToggle(kMuteInBackgroundLabel, &engine::gMuteInBackground);
 
 	ImGui::Separator();
 

@@ -146,6 +146,7 @@ public:
 	{
 		kSamplerSlotSmoke,
 		kSamplerSlotWindClamp,
+		kSamplerSlotLinearClamp,
 		kSamplerSlotBorder,
 		kSamplerSlotBorderWhite,
 		kSamplerSlotClamp,
@@ -154,6 +155,8 @@ public:
 		kSamplerSlotRepeatModelData,
 		kSamplerSlotMirroredRepeat,
 		kSamplerSlotMirroredRepeatWater,
+		kSamplerSlotRepeatLinear,
+		kSamplerSlotMirroredRepeatLinear,
 		kSamplerSlotCount,
 	};
 	VkSampler mpSamplers[kSamplerSlotCount] {};

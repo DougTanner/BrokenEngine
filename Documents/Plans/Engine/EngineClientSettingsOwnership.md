@@ -16,19 +16,21 @@ boundary.
   separate, localization-dependent D6 stage recorded in
   `EngineGameSettingsOwnership.md`; it is listed here only to establish the
   complete current schema range.
-- `SoundSettings` at lines 92-138 (`kiVersion = 2`, `SoundSettings.bin`), with
-  three volume floats and the `kbRecording` mute policy in `LoadSoundSettings()`.
-- `GraphicsSettings` at lines 140-285 (`kiVersion = 12`,
+- `SoundSettings` at lines 92-154 (`kiVersion = 3`, `SoundSettings.bin`), with
+  three volume floats at offsets 0/4/8, a `uint8_t` `Mute in background`
+  setting at offset 12, padding at offsets 13-15 (size 16), and the existing
+  `kbRecording` music mute override in `LoadSoundSettings()`.
+- `GraphicsSettings` at lines 156-312 (`kiVersion = 14`,
   `GraphicsSettings.bin`), including its flag bitset, Vulkan enum fields,
   floats, quality-level bytes, and padding.
-- `TweaksSettings` at lines 288-335 (`kiVersion = 14`, `TweaksSettings.bin`),
+- `TweaksSettings` at lines 314-361 (`kiVersion = 14`, `TweaksSettings.bin`),
   including the game UI visibility and the engine-owned tweak section state.
-- `ClientStateSettings` at lines 337-380 (`kiVersion = 3`,
+- `ClientStateSettings` at lines 363-406 (`kiVersion = 3`,
   `ClientState.bin`), including fleet GUID, focused ship, and camera-height
   state.
 
 The engine already consumes these game entry points in
-`Engine/Source/Main.cpp:212,244-245,463-465` and consumes the wrapper values
+`Engine/Source/Main.cpp:213,245-246,462-465` and consumes the wrapper values
 through the engine UI/graphics/audio code. The current storage root is created
 from the explicit launch AppData directory or the OS AppData directory, then
 `game::kGameName` is appended at `Engine/Source/File/FileManager.cpp:112-143`;
@@ -79,12 +81,16 @@ that the recommendation is already approved:
    dependency; the separate `EngineGameSettingsOwnership.md` Plan carries that
    edge.
 2. Move or invert `SoundSettings` after the recording-policy decision. Preserve
-   `kiVersion = 2`, `SoundSettings.bin`, field order and types, all three volume
-   values, load/reset behavior, and the selected recording mute policy.
+   `kiVersion = 3`, `SoundSettings.bin`, the field order and types (three volume
+   floats at offsets 0/4/8, `uint8_t` `Mute in background` at offset 12,
+   padding at offsets 13-15, size 16), the default-checked mute setting,
+   v2 rejection/defaulting without a compatibility reader, load/reset behavior,
+   `SaveSoundSettings()` main-loop allocation suppression, and the existing
+   recording music override.
 3. Move or invert `GraphicsSettings` after the completed
    `GraphicsQualityWrappersToEngine` prerequisite (landing evidence `cd07f0b`).
-   Preserve `kiVersion = 12`, `GraphicsSettings.bin`, the flag bit positions,
-   Vulkan enum fields, all persisted floats and quality-level bytes, padding,
+   Preserve `kiVersion = 14`, `GraphicsSettings.bin`, the flag bit positions,
+   Vulkan enum fields, all persisted floats and four quality-level bytes, padding,
    wrapper application, and reset behavior.
 4. Handle `GameSettings` only through the separate
    `EngineGameSettingsOwnership.md` Plan after its localization dependency and
@@ -96,9 +102,10 @@ that the recommendation is already approved:
 For every moved schema, add both `sizeof` and important `offsetof` assertions;
 `sizeof` alone cannot detect a same-size reorder, offset change, or enum-layout
 change. Existing version counters and `.bin` filenames are file-format
-identity. A version bump or changed layout intentionally resets an existing
-settings file; do not add backward-compatibility code without explicit user
-approval.
+identity. The current `SoundSettings` v3 format rejects v2 and defaults it
+without a compatibility reader; do not add backward-compatibility code or
+migration without explicit user approval. A version bump or changed layout
+intentionally resets an existing settings file.
 
 The settings files are outside deterministic Frame/PostRender CRC and network
 packets, but they are opaque file input and their layout is persistent state.
@@ -169,11 +176,16 @@ invariants remain load-bearing.
 
 Invariants:
 
-1. Existing `SoundSettings.bin` and `GraphicsSettings.bin` bytes decode with
+1. The current `SoundSettings.bin` v3 format remains the owned format: three
+   volume floats at offsets 0/4/8, `uint8_t` `Mute in background` at offset 12,
+   padding at offsets 13-15, and size 16. Version 2 is rejected/defaulted
+   without a compatibility reader. `GraphicsSettings.bin` bytes decode with
    the same version, field types, order, padding, and defaults after the move.
-2. `SoundSettings` keeps version 2, three volume floats, and the selected
-   recording mute policy; `GraphicsSettings` keeps version 12, all flag bits,
-   Vulkan fields, persisted floats, five quality-level bytes, and padding.
+2. `SoundSettings` keeps version 3, the default-checked mute setting, and the
+   existing recording music override; reset, save, and load preserve them. Its
+   file write remains allocation-suppressed when invoked from the UI.
+   `GraphicsSettings` keeps version 14, all flag bits, Vulkan fields, persisted
+   floats, four quality-level bytes, and padding.
 3. A shared default AppData root cannot make two games read each other's files:
    stable distinct `kGameName` values or distinct explicit roots are required.
 4. Moved schemas have both size and offset assertions; an enum's underlying
@@ -203,11 +215,15 @@ ownership is independent and belongs to `EngineBuildSwitchContract.md`.
    no option is presented as settled before that record exists.
 2. **Sound persistence remains compatible.** Inspect the owner and compile the
    affected client/server targets; exercise save, load, reset, and recording
-   behavior. Expected: version 2 and `SoundSettings.bin` remain unchanged,
-   all three volumes round-trip, and music mute follows the selected policy.
+   behavior. Expected: version 3 and the `SoundSettings.bin` v3 layout (three
+   volume floats at offsets 0/4/8, `uint8_t` mute at offset 12, padding at
+   13-15, size 16) remain unchanged; v2 is rejected/defaulted without a
+   compatibility reader; all three volumes and the default-checked mute
+   setting round-trip; UI-triggered saves remain allocation-suppressed; and
+   the existing recording music override remains in effect.
 3. **Graphics persistence remains compatible.** Inspect layout assertions,
    compile the affected targets, and exercise graphics reset/save/load. Expected:
-   version 12 and `GraphicsSettings.bin` remain unchanged, flag/enum/float/
+   version 14 and `GraphicsSettings.bin` remain unchanged, flag/enum/float/
    quality-level fields round-trip, and quality wrappers are applied as before.
 4. **Path identity is isolated.** With two game names under one default root,
    inspect or run the file-path scenario. Expected: each game resolves its own
