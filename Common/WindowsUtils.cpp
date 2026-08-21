@@ -220,18 +220,6 @@ ExecutableResult RunExecutable(const std::filesystem::path& rExecutableFile, std
 	return {.mOutput = std::move(output), .miExitCode = static_cast<int64_t>(uiExitCode)};
 }
 
-void LaunchExecutable(const std::filesystem::path& rExecutableFile)
-{
-	STARTUPINFOW startupinfow {};
-	startupinfow.cb = sizeof(STARTUPINFOW);
-	PROCESS_INFORMATION processInformation {};
-	std::wstring commandLine = rExecutableFile.native();
-	CreateProcessW(rExecutableFile.native().c_str(), commandLine.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &startupinfow, &processInformation);
-
-	CloseHandle(processInformation.hThread);
-	CloseHandle(processInformation.hProcess);
-}
-
 ExecutableResult RunExecutableInNewConsole(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine)
 {
 	// CREATE_NEW_CONSOLE gives the child real console handles for stdin/stdout/stderr — required

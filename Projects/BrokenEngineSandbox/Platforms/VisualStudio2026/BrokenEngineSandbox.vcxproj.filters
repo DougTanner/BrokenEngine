@@ -270,13 +270,7 @@
     <ClInclude Include="..\..\Source\Network\Client\ClientSession.h">
       <Filter>Game\Network\Client</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Network\Client\ClientDesyncManager.h">
-      <Filter>Game\Network\Client</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Network\Client\ClientReconciler.h">
-      <Filter>Game\Network\Client</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Network\Client\ReconcileReplay.h">
       <Filter>Game\Network\Client</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Network\PlayerEvents.h">
@@ -300,7 +294,13 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\Client.h">
       <Filter>Engine\Network\Client</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientDesyncCore.h">
+      <Filter>Engine\Network\Client</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.h">
+      <Filter>Engine\Network\Client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.h">
       <Filter>Engine\Network\Client</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkCursor.h">
@@ -890,22 +890,10 @@
     <ClCompile Include="..\..\Source\Network\Client\ClientSessionReceive.cpp">
       <Filter>Game\Network\Client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Client\ClientDesyncManager.cpp">
-      <Filter>Game\Network\Client</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Network\Client\ClientReconciler.cpp">
       <Filter>Game\Network\Client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Client\ReconcileReplay.cpp">
-      <Filter>Game\Network\Client</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayCrc.cpp">
-      <Filter>Game\Network\Client</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayClientState.cpp">
-      <Filter>Game\Network\Client</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayTick.cpp">
       <Filter>Game\Network\Client</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp">
@@ -923,7 +911,19 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\Client.cpp">
       <Filter>Engine\Network\Client</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientDesyncCore.cpp">
+      <Filter>Engine\Network\Client</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.cpp">
+      <Filter>Engine\Network\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.cpp">
+      <Filter>Engine\Network\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplayCrc.cpp">
+      <Filter>Engine\Network\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplayTick.cpp">
       <Filter>Engine\Network\Client</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientReceive.cpp">
@@ -953,10 +953,13 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp">
       <Filter>Engine\Profile</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Profile\ProfileManager.cpp">
-      <Filter>Game\Profile</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\NetworkGraphs.cpp">
+      <Filter>Engine\Profile</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Profile\NetworkGraphs.cpp">
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileNetworkScreen.cpp">
+      <Filter>Engine\Profile</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Profile\ProfileManager.cpp">
       <Filter>Game\Profile</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Islands.cpp">

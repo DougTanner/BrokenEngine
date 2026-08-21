@@ -83,7 +83,7 @@ nlohmann::json BuildFullStateFixtureCoordState(engine::GridCoord coord)
 
 nlohmann::json BuildFullStateFixtureState()
 {
-	ClientDesyncManager& rDesyncManager = *gpClientSession->mpDesyncManager;
+	engine::ClientDesyncCore& rDesyncManager = *gpClientSession->mpDesyncManager;
 	nlohmann::json result;
 	result["clientTick"] = gpGame->TickCounter();
 	result["stalled"] = gpClientSession->mpDesyncManager->IsStalled();
@@ -117,7 +117,7 @@ void ExerciseFullStateMatchingTick(engine::GridCoord coord, nlohmann::json& rRes
 	}
 
 	nlohmann::json beforeDefer = BuildFullStateFixtureCoordState(coord);
-	ReconcileDesyncInfo deferDesync = gpClientSession->mpReconciler->Run();
+	engine::ReconcileDesyncInfo deferDesync = gpClientSession->mpReconciler->Run();
 	bool bPendingPreserved = rFrames.pendingFullState.has_value() && rFrames.pendingFullState->iTick == iPendingTick;
 	nlohmann::json afterDefer = BuildFullStateFixtureCoordState(coord);
 	if (!bPendingPreserved)
@@ -140,7 +140,7 @@ void ExerciseFullStateMatchingTick(engine::GridCoord coord, nlohmann::json& rRes
 	gpGame->SetTickCounter(iPendingTick);
 	gpGame->SetCurrentTime(fPendingTime);
 	gpGame->mTimeStep.ClearAccumulator();
-	ReconcileDesyncInfo injectionDesync = gpClientSession->mpReconciler->Run();
+	engine::ReconcileDesyncInfo injectionDesync = gpClientSession->mpReconciler->Run();
 
 	nlohmann::json afterInjection = BuildFullStateFixtureCoordState(coord);
 	bool bPendingCleared = !rFrames.pendingFullState.has_value();
@@ -176,7 +176,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 	}
 
 	const std::string action = rParams.at("action").get<std::string>();
-	ClientDesyncManager& rDesyncManager = *gpClientSession->mpDesyncManager;
+	engine::ClientDesyncCore& rDesyncManager = *gpClientSession->mpDesyncManager;
 	if (action == "clear")
 	{
 		rDesyncManager.ClearAgentFullStateFixture();
@@ -269,7 +269,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		}
 
 		nlohmann::json beforeDefer = BuildFullStateFixtureCoordState(coord);
-		ReconcileDesyncInfo deferDesync = gpClientSession->mpReconciler->Run();
+		engine::ReconcileDesyncInfo deferDesync = gpClientSession->mpReconciler->Run();
 		bool bPendingPreserved = rFrames.pendingFullState.has_value() && rFrames.pendingFullState->iTick == iPendingTick;
 		nlohmann::json afterDefer = BuildFullStateFixtureCoordState(coord);
 		if (!bPendingPreserved)
@@ -297,7 +297,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		gpGame->SetTickCounter(iPendingTick);
 		gpGame->SetCurrentTime(fPendingTime);
 		gpGame->mTimeStep.ClearAccumulator();
-		ReconcileDesyncInfo adoptionDesync = gpClientSession->mpReconciler->Run();
+		engine::ReconcileDesyncInfo adoptionDesync = gpClientSession->mpReconciler->Run();
 
 		nlohmann::json afterAdoption = BuildFullStateFixtureCoordState(coord);
 		bool bObsoleteUpdatesAbsent = rFrames.serverUpdates.empty() || rFrames.serverUpdates.begin()->first > iPendingTick;
@@ -450,7 +450,7 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 		std::unique_ptr<Frame> pSnapshot = std::make_unique<Frame>();
 		inputStream >> *pSnapshot;
 
-		ReconcileDesyncInfo desyncInfo
+		engine::ReconcileDesyncInfo desyncInfo
 		{
 			.bDesync = true,
 			.iDesyncTick = iTick,

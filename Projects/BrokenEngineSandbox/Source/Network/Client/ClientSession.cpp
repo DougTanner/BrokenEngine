@@ -33,7 +33,7 @@ ClientSession::ClientSession()
 	ASSERT(gpClientSession == nullptr);
 
 	gpClientSession = this;
-	mpDesyncManager = std::make_unique<ClientDesyncManager>();
+	mpDesyncManager = std::make_unique<engine::ClientDesyncCore>();
 	mpReconciler = std::make_unique<ClientReconciler>();
 	mpRuntime = std::make_unique<engine::ClientSessionRuntime>(*this);
 }
@@ -135,19 +135,6 @@ void ClientSession::UpdatePlayerCoord(engine::global_id_t globalPlayerId, engine
 	}
 }
 
-void ClientSession::Poll()
-{
-	ASSERT(common::gpMultithreading->IsMainThread());
-	// Heap: transport receive buffers and game packet/frame adoption
-	ScopedSuppressAllocationTracking suppress;
-	engine::NetworkTimeState networkTimeState {
-		.bFastForward = gpGame->mTimeStep.miTimeMultiply > 1,
-		.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(gpGame->mTimeStep.SimToWall(NetworkSessionContract::kTickDuration)).count(),
-		.iExpectedUpdatesPerSecond = engine::kiTickRate * gpGame->mTimeStep.miTimeMultiply / gpGame->mTimeStep.miTimeDivide,
-	};
-	mpRuntime->PollAndDrain(networkTimeState);
-}
-
 void ClientSession::Reconcile()
 {
 	if (mpDesyncManager->IsStalled())
@@ -162,31 +149,13 @@ void ClientSession::Reconcile()
 		int64_t iCurrentTick = gpGame->TickCounter();
 		if (engine::gpClient != nullptr)
 		{
-			ReconcileDesyncInfo desyncInfo = mpReconciler->Run();
+			engine::ReconcileDesyncInfo desyncInfo = mpReconciler->Run();
 			if (desyncInfo.bDesync)
 			{
 				mpDesyncManager->OnDesyncDetected(std::move(desyncInfo));
 			}
 		}
-		std::chrono::nanoseconds clockCorrectionNs = mpRuntime->EvaluateClock(iCurrentTick);
-		gpProfileManager->SetClockCorrection(mpRuntime->miClockOffset, mpRuntime->miClockTargetBehind, mpRuntime->miClockError);
-
-		if (mpRuntime->miLatestServerTick >= 0 && std::abs(mpRuntime->miClockError) >= engine::kiClockSnapThreshold)
-		{
-			// Snap tick counter to recover from extreme clock error. Sim runs BEHIND latestServerTick.
-			// Clamp at 0 so a fresh post-load server (latestServerTick < currentTargetBehind)
-			// doesn't drive the client tick negative.
-			int64_t iSnapTick = std::max<int64_t>(0, mpRuntime->miLatestServerTick - mpRuntime->miCurrentTargetBehind);
-			LOG(kNetwork, kWarning, "ClientSession::Reconcile Clock snap OldTick: {} NewTick: {} LatestServerTick: {} TargetBehind: {}", iCurrentTick, iSnapTick, mpRuntime->miLatestServerTick, mpRuntime->miCurrentTargetBehind);
-			gpGame->SetTickCounter(iSnapTick);
-			gpGame->mTimeStep.ClearAccumulator();
-			gpGame->ResetRenderClock();
-			mpRuntime->miClockError = 0;
-		}
-		else
-		{
-			gpGame->mTimeStep.mTickRemainderNs = std::max(0ns, gpGame->mTimeStep.mTickRemainderNs + clockCorrectionNs);
-		}
+		mpRuntime->ApplyClockCorrection(iCurrentTick);
 	}
 	gpProfileManager->CpuStop(engine::kCpuTimerNetworkPollReconcile, engine::CpuStopFlags::kSmoothNow);
 }

@@ -75,6 +75,9 @@ public:
 	int64_t GetServerUpdateBufferSize() const;
 
 	std::chrono::nanoseconds EvaluateClock(int64_t iPreReconcileTick);
+	// Evaluates the clock and applies the result: an extreme error snaps the game tick counter, anything
+	// smaller steers the time-step remainder. Pass the tick sampled before reconciliation ran.
+	void ApplyClockCorrection(int64_t iPreReconcileTick);
 	void ResetClock();
 
 	game::ClientSession& mrSession;

@@ -276,25 +276,12 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		request.data.uiPendingWeaponModeTicks = rCurrentPostRender.puiPendingWeaponModeTicks[i];
 		request.data.uiClientGuidHigh = rCurrentPostRender.pClientGuids[i].uiHigh;
 		request.data.uiClientGuidLow = rCurrentPostRender.pClientGuids[i].uiLow;
-		engine::ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
-
-		// Heap realloc warning: capacity exceeded during a shared per-tick burst. Producers are
-		// unbounded, so investigate entities re-flagging kTransfer across iterations or an
-		// unexpected push path.
-		if (rFrame.postRender.transferRequests.size() == rFrame.postRender.transferRequests.capacity()) [[unlikely]]
+		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Player Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) GlobalPlayerId: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coord.x, rStaticData.coord.y, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pGlobalPlayerIds[i], rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
-		common::ValidateVector<true >(request.data.vecPosition);
-		common::ValidateVector<false>(request.data.vecDirection);
-		common::ValidateVector<false>(request.data.vecVelocity);
-		{
-			// Heap: no finite reserve can be proven sufficient because engine::GrowPairedCollections
-			// grows collections unbounded
-			ScopedSuppressAllocationTracking suppress;
-			rFrame.postRender.transferRequests.push_back(request);
-		}
+		PushTransferRequest(rFrame.postRender, request);
 
 		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
 #if defined(BT_CLIENT)

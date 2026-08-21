@@ -20,7 +20,15 @@ void Server::SendCoordFullState(int64_t iClientId, int64_t iSlot, int64_t iTick,
 		return;
 	}
 
-	LOG(kNetwork, kDebug, "Server::SendCoordFullState Client: {} Frame: {} Slot: {} Coord: ({},{})", iClientId, iTick, iSlot, coord.x, coord.y);
+	// Adopting this full state makes iTick the client's ACK floor, which moves that floor backward whenever the
+	// client had already received later ticks. Record the tick so Server::ClientAckStream admits that one
+	// regression; without it the monotonic floor guard rejects every later ack for this slot, the ticks the
+	// client discarded on adoption are never resent, and the client self-disconnects on its frozen floor.
+	// Re-baselining the floor here instead cannot work: the client keeps acking its pre-adoption floor until the
+	// reliable full state arrives, and those higher floors are accepted and simply raise it back.
+	ClientConnection::SlotState& rSlot = pClient->slots.at(iSlot);
+	LOG(kNetwork, kDebug, "Server::SendCoordFullState Client: {} Frame: {} Slot: {} Coord: ({},{}) AckFloor: {}", iClientId, iTick, iSlot, coord.x, coord.y, rSlot.ack.iAckFloor);
+	rSlot.iPendingFullStateTick = iTick;
 
 	// Serialize frame into the reusable scratch (server main thread only - single-writer contract)
 	ScopedSuppressAllocationTracking suppress;
@@ -37,7 +45,7 @@ void Server::SendCoordFullState(int64_t iClientId, int64_t iSlot, int64_t iTick,
 
 	NetworkMessages::ServerCoordFullStateMessage message {
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
-		.uiEpoch = pClient->slots.at(iSlot).ack.uiEpoch,
+		.uiEpoch = rSlot.ack.uiEpoch,
 		.iTick = iTick,
 		.coord = coord,
 		.iUncompressedSize = static_cast<int32_t>(mSendScratch.size()),
@@ -315,11 +323,6 @@ void Server::BroadcastTimespeedIfChanged()
 
 void Server::SendTimespeedToNewClient(ENetPeer* pPeer)
 {
-	if (game::gpGame->mTimeStep.miTimeMultiply == 1 && game::gpGame->mTimeStep.miTimeDivide == 1)
-	{
-		return;
-	}
-
 	SendTimespeedUpdate(pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide);
 }
 

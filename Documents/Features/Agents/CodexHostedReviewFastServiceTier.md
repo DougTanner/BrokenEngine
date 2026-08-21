@@ -1,9 +1,10 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-20T12:48:53.376Z","dependsOn":[]} -->
 # Run Codex-hosted Sol reviews on the fast service tier
+
+Revisit When: Codex-hosted Sol review turnaround becomes a bottleneck worth the roughly 2.5x fast-tier credit burn for the reviewer role.
 
 ## Context
 
-Reviews dispatched from Claude Code already run on Codex's fast (priority) service tier: `.codex/codex-review.ps1:193` passes `-c 'service_tier="fast"'` to the detached `codex exec` invocation. That change was deliberately scoped to the Claude Code route only.
+Reviews dispatched from Claude Code already run on Codex's fast (priority) service tier: `.codex/codex-review.ps1:225` passes `-c 'service_tier="fast"'` to the detached `codex exec` invocation. That change was deliberately scoped to the Claude Code route only.
 
 Codex-hosted sessions never call that script. Their `reviewer` role resolves to `.codex/agents/sol.toml`, which sets only `model = "gpt-5.6-sol"` and `model_reasoning_effort = "medium"` and carries no service-tier setting, so the tier falls back to the user's `~/.codex/config.toml`. The suggested maintainer profile documented at `README.md:151` sets `service_tier = "default"`. Root cause: Sol reviews started inside Codex therefore run on the standard tier while the identical review started from Claude Code runs fast, purely because of where it was dispatched.
 
@@ -50,8 +51,11 @@ Expected Change Workflow Tier 2 — scoped tool behavior for the Codex review di
 - A Sol review dispatched from a Codex-hosted session either runs on the fast tier with no unknown-key or unadvertised-tier warning, or the tracked documentation states plainly that it does not and why
 - `.codex/agents/fable.toml`, `opus.toml`, and `sonnet.toml` are byte-unchanged
 - `.codex/codex-review.ps1` is byte-unchanged
-- `WorktreeCli plan validate` exits 0
 
 ## Notes
 
 The 2.5x-for-1.5x cost trade and the reviewer-only scoping are the user's decisions from the session that recorded this Plan; do not revisit them, and do not broaden fast tier to other roles without new user direction.
+
+### Session findings (2026-08-21)
+
+Preparation settled this document's open fact: the installed Codex CLI (v0.148.0) honors a `service_tier` key in per-agent role TOMLs under `.codex/agents/`, because its role-config strings list `service_tier` alongside `model_reasoning_effort`, and a role's tier takes precedence over a tier supplied in the spawn request. The CLI's `models_cache.json` also shows that `gpt-5.6-sol` advertises the fast tier, so the Design's "Supported" branch is the expected outcome. The one thing still unproven is that a role-file tier overrides a user-level `~/.codex/config.toml` setting of `service_tier = "default"`. Settling that requires an observed run, and that run must produce positive evidence the request actually used the fast tier rather than merely showing no warnings.

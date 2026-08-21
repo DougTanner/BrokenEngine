@@ -133,6 +133,26 @@ function Invoke-PromptScript([string[]] $Arguments) {
 
 $script:BinaryMarker = 'BINARY-PAYLOAD-MARKER'
 $script:ScopeText = "Files and regions: Engine/Source/Keep.cpp lines 1-5.`nFocus: the changed bytes only.`nResiduals: none.`n"
+# A verbatim instance of the summary block .agents/skills/progressive-disclosure-review/SKILL.md
+# documents, so the gate is exercised against the bytes a real handoff carries.
+$script:DisclosureHandoff = @(
+	'Skill: progressive-disclosure-review'
+	'Baseline: 3c7f1b9a2d4e6f8017253649a8b0c2d4e6f80917'
+	'Files checked: 1 (.agents/references/shared.md)'
+	'Findings: none'
+	'Status: PASS'
+	'Changed files: none'
+	'Decisive checks: pwsh -NoProfile -File .agents/scripts/Measure-Tokens.ps1 -Path .agents/references/shared.md = 118 bt-token-v1'
+	'Build required: none'
+	'Executor: gpt-5.6-sol medium'
+	'Residuals: none'
+) -join "`n"
+$script:DisclosureHandoff += "`n"
+
+# One compact build envelope line, the shape `WorktreeCli build` emits, whose own target names the
+# game project. Only the fixtures whose reviewed diff carries C++ append it, so a docs-only diff keeps
+# proving that the build gate stays silent there.
+$script:BuildEnvelope = "Client build: {`"schemaVersion`":`"broken-engine-build-result/v1`",`"status`":`"success`",`"target`":{`"requested`":`"C:\\repo\\Projects\\BrokenEngineSandbox\\Platforms\\VisualStudio2026\\BrokenEngineSandbox.vcxproj`",`"normalized`":`"c:/repo/projects/brokenenginesandbox/platforms/visualstudio2026/brokenenginesandbox.vcxproj`"}}`n"
 
 function New-VerifyScopeText([string] $Baseline, [string] $Head) {
 	return ($script:ScopeText + "Baseline: $Baseline`nHead: $Head`n")
@@ -405,10 +425,8 @@ function Test-VerifyChangesTypedArtifacts() {
 	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'landed')
 	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
 
-	# One compact build envelope line, the shape `WorktreeCli build` emits, whose own target names the
-	# game project — present in every case below to hold that a game build requires no extra marker.
-	$gameBuildLine = "Client build: {`"schemaVersion`":`"broken-engine-build-result/v1`",`"status`":`"success`",`"target`":{`"requested`":`"C:\\repo\\Projects\\BrokenEngineSandbox\\Platforms\\VisualStudio2026\\BrokenEngineSandbox.vcxproj`",`"normalized`":`"c:/repo/projects/brokenenginesandbox/platforms/visualstudio2026/brokenenginesandbox.vcxproj`"}}`n"
-	$missingText = (New-VerifyScopeText $baseline $head) + $gameBuildLine
+	# The build envelope is present in every case below to hold that a game build requires no extra marker.
+	$missingText = (New-VerifyScopeText $baseline $head) + $script:BuildEnvelope
 	$missingPath = New-ScratchPath 'noartifacts'
 	$missing = Invoke-PromptScript @(
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
@@ -418,6 +436,7 @@ function Test-VerifyChangesTypedArtifacts() {
 		Assert-Equal 'blocked' $missing.Json.status 'verify-changes without typed artifacts status'
 		Assert-Equal 'prompt.typed-artifacts-required' $missing.Json.code 'verify-changes without typed artifacts code'
 		Assert-True ($missing.Json.message.Contains('Validation: PASS')) 'verify-changes names the missing /validate-skill marker'
+		Assert-True ($missing.Json.message.Contains('progressive-disclosure-review')) 'verify-changes names the missing /progressive-disclosure-review handoff for the changed SKILL.md'
 		Assert-True (-not $missing.Json.message.Contains('"operation":"validate"')) 'verify-changes never demands a plan validate receipt'
 	}
 	else { Assert-True $false 'verify-changes without typed artifacts emitted JSON' }
@@ -425,7 +444,7 @@ function Test-VerifyChangesTypedArtifacts() {
 
 	# The same game build envelope with the /validate-skill artifact present and no plan validate receipt,
 	# so a touched Plan assembles on the identity values alone and the game build demands nothing further.
-	$artifactText = $missingText + "Skill validation: Validation: PASS`n"
+	$artifactText = $missingText + "Skill validation: Validation: PASS`n" + $script:DisclosureHandoff
 	$presentPath = New-ScratchPath 'artifacts'
 	$present = Invoke-PromptScript @(
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
@@ -440,7 +459,7 @@ function Test-VerifyChangesTypedArtifacts() {
 	}
 
 	# The same complete artifacts bound to a revision that is not the reviewed one.
-	$mismatchText = $script:ScopeText + "Baseline: $('0' * 40)`nHead: $('1' * 40)`nSkill validation: Validation: PASS`n"
+	$mismatchText = $script:ScopeText + "Baseline: $('0' * 40)`nHead: $('1' * 40)`nSkill validation: Validation: PASS`n" + $script:DisclosureHandoff
 	$mismatchPath = New-ScratchPath 'artifactidentity'
 	$mismatch = Invoke-PromptScript @(
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
@@ -454,6 +473,122 @@ function Test-VerifyChangesTypedArtifacts() {
 	}
 	else { Assert-True $false 'verify-changes with mismatched identity emitted JSON' }
 	Assert-True (-not (Test-Path -LiteralPath $mismatchPath)) 'verify-changes with mismatched identity creates no prompt file'
+}
+
+function New-InstructionDocFixture([string] $Name, [scriptblock] $Change) {
+	# One landing diff per path shape, so the /progressive-disclosure-review gate is decided by that
+	# shape alone: no SKILL.md changes here, which would also demand the /validate-skill marker.
+	$root = New-FixtureRoot $Name
+	Add-FixtureSkill $root @('verify-changes')
+	Set-FixtureText $root 'Engine/AGENTS.md' "baseline engine guidance`n"
+	Set-FixtureText $root 'AGENTS.md' "baseline root guidance`n"
+	Set-FixtureText $root 'CLAUDE.md' "baseline import stub`n"
+	Set-FixtureText $root '.agents/skills/verify-changes/references/notes.md' "baseline skill reference`n"
+	Set-FixtureText $root '.agents/references/shared.md' "baseline shared reference`n"
+	Set-FixtureText $root 'Documents/Notes.md' "baseline note`n"
+	Set-FixtureText $root 'Documents/agents.md' "baseline lower-case name`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	& $Change $root
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'landed')
+	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	return [pscustomobject] @{ Root = $root; Baseline = $baseline; Head = $head }
+}
+
+function Invoke-InstructionDocPrompt($Fixture, [string] $Name, [string] $ScopeText) {
+	return Invoke-PromptScript @(
+		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'verify-changes',
+		'-ScopeFile', (New-ScratchFile 'scope' $ScopeText), '-PromptPath', (New-ScratchPath $Name), '-Head', $Fixture.Head)
+}
+
+function Test-InstructionDocCase([string] $Name, [bool] $Gated, [scriptblock] $Change) {
+	$fixture = New-InstructionDocFixture $Name $Change
+	$scopeText = New-VerifyScopeText $fixture.Baseline $fixture.Head
+	$bare = Invoke-InstructionDocPrompt $fixture $Name $scopeText
+	if (-not $Gated) {
+		Assert-Equal 0 $bare.ExitCode "$Name needs no /progressive-disclosure-review handoff"
+		return
+	}
+	Assert-Equal 2 $bare.ExitCode "$Name without the /progressive-disclosure-review handoff exit code"
+	if ($null -ne $bare.Json) {
+		Assert-Equal 'blocked' $bare.Json.status "$Name without the /progressive-disclosure-review handoff status"
+		Assert-Equal 'prompt.typed-artifacts-required' $bare.Json.code "$Name without the /progressive-disclosure-review handoff code"
+		Assert-True ($bare.Json.message.Contains('progressive-disclosure-review')) "$Name names the missing /progressive-disclosure-review handoff"
+		Assert-True (-not $bare.Json.message.Contains('Validation: PASS')) "$Name demands no /validate-skill marker for an unchanged SKILL.md"
+	}
+	else { Assert-True $false "$Name without the /progressive-disclosure-review handoff emitted JSON" }
+	# The skill's own path is what an ordinary changed-file list already carries, so it cannot satisfy the gate.
+	$pathOnly = Invoke-InstructionDocPrompt $fixture "$Name-pathonly" ($scopeText + "M .agents/skills/progressive-disclosure-review/SKILL.md`n")
+	Assert-Equal 2 $pathOnly.ExitCode "$Name with the skill path but neither handoff marker exit code"
+	if ($null -ne $pathOnly.Json) { Assert-Equal 'prompt.typed-artifacts-required' $pathOnly.Json.code "$Name with the skill path but neither handoff marker code" }
+	else { Assert-True $false "$Name with the skill path but neither handoff marker emitted JSON" }
+	# One marker of the conjunctive gate: the handoff body without its 'Skill:' identifying line.
+	$partial = Invoke-InstructionDocPrompt $fixture "$Name-partial" ($scopeText + ($script:DisclosureHandoff -replace '(?m)^Skill: progressive-disclosure-review\r?\n', ''))
+	Assert-Equal 2 $partial.ExitCode "$Name with 'Files checked:' but no 'Skill:' line exit code"
+	if ($null -ne $partial.Json) { Assert-Equal 'prompt.typed-artifacts-required' $partial.Json.code "$Name with 'Files checked:' but no 'Skill:' line code" }
+	else { Assert-True $false "$Name with 'Files checked:' but no 'Skill:' line emitted JSON" }
+	$complete = Invoke-InstructionDocPrompt $fixture "$Name-complete" ($scopeText + $script:DisclosureHandoff)
+	Assert-Equal 0 $complete.ExitCode "$Name with the complete /progressive-disclosure-review handoff exit code"
+}
+
+function Test-VerifyChangesInstructionDocs() {
+	Test-InstructionDocCase 'nesteddoc' $true { param($Root) Set-FixtureText $Root 'Engine/AGENTS.md' "landed engine guidance`n" }
+	Test-InstructionDocCase 'rootdoc' $true { param($Root) Set-FixtureText $Root 'AGENTS.md' "landed root guidance`n" }
+	Test-InstructionDocCase 'claudedoc' $true { param($Root) Set-FixtureText $Root 'CLAUDE.md' "landed import stub`n" }
+	Test-InstructionDocCase 'skillreference' $true { param($Root) Set-FixtureText $Root '.agents/skills/verify-changes/references/notes.md' "landed skill reference`n" }
+	Test-InstructionDocCase 'sharedreference' $true { param($Root) Set-FixtureText $Root '.agents/references/shared.md' "landed shared reference`n" }
+	# Only the old side is an instruction doc, so the gate has to read both sides of a rename.
+	Test-InstructionDocCase 'renamedaway' $true { param($Root) Invoke-FixtureGit $Root @('mv', '.agents/references/shared.md', 'Documents/Moved.md') }
+	Test-InstructionDocCase 'plaindoc' $false { param($Root) Set-FixtureText $Root 'Documents/Notes.md' "landed note`n" }
+	# The inventory routes the exact names only, so a lower-case leaf outside the two prefixes is a plain doc.
+	Test-InstructionDocCase 'wrongcasedoc' $false { param($Root) Set-FixtureText $Root 'Documents/agents.md' "landed lower-case name`n" }
+}
+
+function Test-VerifyChangesBuildEnvelope() {
+	# A landing diff whose only change is C++: the build envelope is the artifact the scope has to carry,
+	# and no other typed-artifact gate fires, so this case is decided by the envelope alone.
+	$root = New-FixtureRoot 'buildenvelope'
+	Add-FixtureSkill $root @('verify-changes')
+	Set-FixtureText $root 'Engine/Source/Built.cpp' "baseline`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	Set-FixtureText $root 'Engine/Source/Built.cpp' "landed`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'landed')
+	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+
+	# The identity values and every other required artifact are present, and the schema name appears as
+	# ordinary acceptance prose: the bare name must not stand in for the envelope itself.
+	$proseText = (New-VerifyScopeText $baseline $head) + "Builds: the acceptance table cites broken-engine-build-result/v1 for the client build.`n"
+	$prosePath = New-ScratchPath 'buildproseonly'
+	$prose = Invoke-PromptScript @(
+		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
+		'-ScopeFile', (New-ScratchFile 'scope' $proseText), '-PromptPath', $prosePath, '-Head', $head)
+	Assert-Equal 2 $prose.ExitCode 'C++ diff with the bare schema name exit code'
+	if ($null -ne $prose.Json) {
+		Assert-Equal 'blocked' $prose.Json.status 'C++ diff with the bare schema name status'
+		Assert-Equal 'prompt.typed-artifacts-required' $prose.Json.code 'C++ diff with the bare schema name code'
+		Assert-True ($prose.Json.message.Contains('broken-engine-build-result/v1')) 'C++ diff names the missing build envelope'
+	}
+	else { Assert-True $false 'C++ diff with the bare schema name emitted JSON' }
+	Assert-True (-not (Test-Path -LiteralPath $prosePath)) 'C++ diff with the bare schema name creates no prompt file'
+
+	$envelopeText = $proseText + $script:BuildEnvelope
+	$envelopePath = New-ScratchPath 'buildenvelope'
+	$envelope = Invoke-PromptScript @(
+		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
+		'-ScopeFile', (New-ScratchFile 'scope' $envelopeText), '-PromptPath', $envelopePath, '-Head', $head)
+	Assert-Equal 0 $envelope.ExitCode 'C++ diff with the build envelope exit code'
+	if ($null -ne $envelope.Json) { Assert-Equal 'pass' $envelope.Json.status 'C++ diff with the build envelope status' }
+	else { Assert-True $false 'C++ diff with the build envelope emitted JSON' }
+	Assert-True (Test-Path -LiteralPath $envelopePath) 'C++ diff with the build envelope writes the prompt'
+	if (Test-Path -LiteralPath $envelopePath) {
+		$prompt = $script:Utf8.GetString([IO.File]::ReadAllBytes($envelopePath))
+		Assert-True ((Get-PromptSectionBody $prompt '(b) Scope' "`n---`n`n# (c) Evidence`n`n") -ceq $envelopeText) 'C++ diff with the build envelope still copies the scope text byte-identically'
+	}
 }
 
 # --- Repository B: a committed head over a dirty working tree ------------------------------------
@@ -567,7 +702,8 @@ function Test-VerifyChangesHead() {
 	Invoke-FixtureGit $root @('add', '--all')
 	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'landed')
 	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
-	$scopeFile = New-ScratchFile 'scope' (New-VerifyScopeText $baseline $head)
+	# The reviewed diff carries C++, so every case here supplies the build envelope the scope gate demands.
+	$scopeFile = New-ScratchFile 'scope' ((New-VerifyScopeText $baseline $head) + $script:BuildEnvelope)
 
 	$noHeadPath = New-ScratchPath 'nohead'
 	$noHead = Invoke-PromptScript @(
@@ -659,7 +795,7 @@ function Test-VerifyChangesCandidateHead() {
 	$candidate = New-FixtureCandidateCommit $root $baseline
 	$branchTip = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
 	Assert-Equal $baseline $branchTip 'candidate head leaves the branch ref unmoved'
-	$scopeFile = New-ScratchFile 'scope' (New-VerifyScopeText $baseline $candidate)
+	$scopeFile = New-ScratchFile 'scope' ((New-VerifyScopeText $baseline $candidate) + $script:BuildEnvelope)
 
 	$matchPath = New-ScratchPath 'candidatematch'
 	$match = Invoke-PromptScript @(
@@ -743,7 +879,7 @@ function Test-VerifyChangesReviewedPathShapes() {
 	$treeText = Get-FixtureGitText $root @('ls-tree', '-r', '--name-only', $candidate)
 	Assert-True ($treeText.Contains('Engine/Source/casename.cpp')) 'candidate tree carries the new spelling'
 	Assert-True (-not $treeText.Contains('Engine/Source/CaseName.cpp')) 'candidate tree drops the old spelling'
-	$scopeFile = New-ScratchFile 'scope' (New-VerifyScopeText $baseline $candidate)
+	$scopeFile = New-ScratchFile 'scope' ((New-VerifyScopeText $baseline $candidate) + $script:BuildEnvelope)
 
 	$matchPath = New-ScratchPath 'pathshapes'
 	$match = Invoke-PromptScript @(
@@ -868,6 +1004,8 @@ try {
 	Test-MixedCaseAssignedSkill $repositoryA
 	Test-PlanAuditExecutionCard $repositoryA
 	Test-VerifyChangesTypedArtifacts
+	Test-VerifyChangesInstructionDocs
+	Test-VerifyChangesBuildEnvelope
 	Test-HeadHonoured
 	Test-ZeroTargets
 	Test-UntrackedRenameTargets

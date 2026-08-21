@@ -1,12 +1,13 @@
+#include "Pch.h"
+
 #include "Network/Client/ReconcileReplay.h"
 
-#include "Game.h"
-#include "Network/Client/ClientReconciler.h"
-
-namespace game
-{
-
 #if defined(BT_CLIENT)
+
+#include "Frame/Frame.h"
+
+namespace engine
+{
 
 void ReconcileInjectPendingFullState(CoordWork& rWork)
 {
@@ -380,6 +381,118 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 	ApplyCoordWriteback(rWork);
 }
 
-#endif // BT_CLIENT
+ReconcileDispatchResult ReconcileDispatcher::Run(GameBase& rGameBase, const ReconcileInputs& rInputs)
+{
+	// Heap: work list growth and per-coord scratch retention
+	ScopedSuppressAllocationTracking suppress;
 
-} // namespace game
+	// Populate per-coord works (only eligible coords — those with iConfirmedTick >= 0).
+	// Uses resize() + in-place assignment to retain CoordScratch::replayStack capacity
+	// across Run() calls, avoiding per-frame heap churn.
+	size_t eligibleCount = 0;
+	for (const auto& [rCoord, rFrames] : rGameBase.mCoordFrames)
+	{
+		if (rFrames.iConfirmedTick >= 0)
+		{
+			++eligibleCount;
+		}
+	}
+	if (mWorks.size() < eligibleCount)
+	{
+		mWorks.resize(eligibleCount);
+	}
+	size_t iSlot = 0;
+	for (auto& [rCoord, rFrames] : rGameBase.mCoordFrames)
+	{
+		if (rFrames.iConfirmedTick < 0)
+		{
+			continue;
+		}
+		CoordWork& rWork = mWorks[iSlot++];
+		rWork.coord = rCoord;
+		rWork.pFrames = &rFrames;
+		rWork.scratch.Reset();
+	}
+	const size_t iActiveCount = iSlot;
+	miActiveCount = static_cast<int64_t>(iActiveCount);
+
+	ReconcileDispatchResult result;
+	result.iActiveCount = miActiveCount;
+
+	if (iActiveCount == 0)
+	{
+		return result;
+	}
+
+	// Parallel per-coord reconciliation via the shared multithreading pool.
+	// Each worker touches only its own CoordFrames entry — no cross-coord writes.
+	std::span<CoordWork> activeWorks(mWorks.data(), iActiveCount);
+	const int64_t iCount = static_cast<int64_t>(iActiveCount);
+	auto processRange = [&](int64_t iBegin, int64_t iEnd)
+	{
+		// Heap: ReconcileCoord may grow per-coord scratch (frames, replay buffers) on dispatch
+		ScopedSuppressAllocationTracking suppress;
+		for (int64_t i = iBegin; i < iEnd; ++i)
+		{
+			ReconcileCoord(activeWorks[i], rInputs);
+		}
+	};
+	common::gpMultithreading->Dispatch(iCount, processRange);
+
+	// Post-dispatch merge: profiling, desync (first-wins), bAnyFullReplay
+	for (CoordWork& rWork : activeWorks)
+	{
+		const CoordScratch& rScratch = rWork.scratch;
+		result.profiling.iCrcValidatedFrameTicks += rScratch.profiling.iCrcValidatedFrameTicks;
+		result.profiling.iAssumedFrameTicks += rScratch.profiling.iAssumedFrameTicks;
+		result.profiling.iCrcFastPathEvents += rScratch.profiling.iCrcFastPathEvents;
+		result.profiling.iStatusChangeReplayTicks += rScratch.profiling.iStatusChangeReplayTicks;
+		result.profiling.iKnockOnReplayTicks += rScratch.profiling.iKnockOnReplayTicks;
+
+		if (rScratch.iDesyncTick >= 0 && result.pDesyncWork == nullptr)
+		{
+			result.pDesyncWork = &rWork;
+		}
+
+		using enum ReconcileScratchFlags;
+
+		// Audio voice invalidation skip is gated on the client coord experiencing a full replay.
+		if ((rScratch.flags & kReplayed) && rWork.coord == rGameBase.mClientGridCoord)
+		{
+			result.bAnyFullReplay = true;
+		}
+
+		if (rScratch.iDesyncTick >= 0 || ((rScratch.flags & kReplayed) && (rScratch.flags & kReSimOccurred)))
+		{
+			bool bLogThis = !(rScratch.flags & kSuppressRepeatLogs) || (rWork.pFrames->iStuckFrameCount % engine::CoordFrames::kiStuckLogInterval == 0);
+			if (bLogThis)
+			{
+				if (rScratch.iDesyncTick >= 0)
+				{
+					LOG(kNetwork, kDebug, "Reconcile post-replay Rollback/replay exhausted with unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.x, rWork.coord.y, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
+				}
+				else
+				{
+					LOG(kNetwork, kDebug, "Reconcile post-replay Reconciliation resimulation completed without an unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.x, rWork.coord.y, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+std::span<const CoordWork> ReconcileDispatcher::ActiveWorks() const
+{
+	return std::span<const CoordWork>(mWorks.data(), static_cast<size_t>(miActiveCount));
+}
+
+void ReconcileDispatcher::Reset()
+{
+	mWorks.clear();
+	miActiveCount = 0;
+}
+
+} // namespace engine
+
+#endif // BT_CLIENT

@@ -7,7 +7,9 @@ param(
 	[Parameter(Mandatory)][string] $Owner,
 	[Parameter(Mandatory)][ValidateRange(1, 65535)][int] $Port,
 	[ValidateRange(1, 600)][int] $TimeoutSeconds = 120,
-	[ValidateRange(1, 600000)][int] $TimeoutMilliseconds = 2000
+	[ValidateRange(1, 600000)][int] $TimeoutMilliseconds = 2000,
+	# Absolute process-check state path. Omitted means no process check runs and the wait behaves exactly as before.
+	[string] $ProcessCheckStatePath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,6 +62,34 @@ function Get-ResponseField($Record, [string] $Name) {
 	return $Record.$Name
 }
 
+# The checker writes its JSON with [Console]::Out.Write, so console output is redirected into a buffer
+# for the duration of the call and would otherwise corrupt this script's own stdout result.
+function Invoke-ProcessCheck([string] $StatePath) {
+	$exitCode = 1
+	$captured = ''
+	$failure = $null
+	try {
+		$writer = [IO.StringWriter]::new()
+		$previousOut = [Console]::Out
+		$global:LASTEXITCODE = 0
+		[Console]::SetOut($writer)
+		try {
+			$pipeline = @(& (Join-Path $PSScriptRoot 'Invoke-AgentHarnessProcessCheck.ps1') `
+				-Action Check -StatePath $StatePath 2>&1)
+		}
+		finally { [Console]::SetOut($previousOut) }
+		$exitCode = $global:LASTEXITCODE
+		$captured = ((@($writer.ToString()) + @($pipeline | ForEach-Object { [string]$_ })) -join [Environment]::NewLine).Trim()
+	}
+	catch { $failure = $_.Exception.Message }
+
+	$payload = $null
+	if ($null -eq $failure -and -not [string]::IsNullOrWhiteSpace($captured)) {
+		try { $payload = $captured | ConvertFrom-Json -Depth 32 } catch { $payload = $null }
+	}
+	return [pscustomobject]@{ ExitCode = $exitCode; Payload = $payload; Failure = $failure }
+}
+
 try {
 	if ([string]::IsNullOrWhiteSpace($Owner)) { throw 'Owner must not be empty.' }
 	if (-not (Test-Path -LiteralPath $AgentHarness -PathType Leaf)) {
@@ -69,6 +99,7 @@ try {
 
 	$stopwatch = [Diagnostics.Stopwatch]::StartNew()
 	$deadlineMilliseconds = $TimeoutSeconds * 1000
+	$processCheckReported = $false
 	while ($stopwatch.ElapsedMilliseconds -lt $deadlineMilliseconds) {
 		$attemptMilliseconds = [Math]::Max(1, [Math]::Min($TimeoutMilliseconds,
 			$deadlineMilliseconds - [int]$stopwatch.ElapsedMilliseconds))
@@ -89,6 +120,23 @@ try {
 		}
 		else {
 			$result.lastObservation = Limit-Text "Attempt $($result.attempts) failed with exit $($ping.ExitCode): $(($ping.Stdout, $ping.Stderr) -join ' ')" $MaximumMessageLength
+		}
+		if (-not [string]::IsNullOrWhiteSpace($ProcessCheckStatePath)) {
+			$processCheck = Invoke-ProcessCheck $ProcessCheckStatePath
+			if ($null -eq $processCheck.Failure -and $processCheck.ExitCode -eq 2 -and $null -ne $processCheck.Payload) {
+				$findings = Get-ResponseField $processCheck.Payload 'findings'
+				if ($null -eq $findings) { $findings = @() }
+				# An if-expression assignment would unroll a single finding out of its array, so the cast keeps it a JSON array.
+				$result.findings = [object[]]@($findings)
+				$result.elapsedMilliseconds = [long]$stopwatch.ElapsedMilliseconds
+				Complete-HarnessPing 2 'blocked' 'process.unexpected-exit' "A registered harness process exited unexpectedly while waiting for port $Port. $(Get-ResponseField $processCheck.Payload 'message')"
+			}
+			# A checker that cannot run must not turn a healthy wait into a failure, so it is reported once and polling continues.
+			if ($processCheck.ExitCode -ne 0 -and -not $processCheckReported) {
+				$processCheckReported = $true
+				$checkDetail = if ($null -ne $processCheck.Failure) { $processCheck.Failure } else { Get-ResponseField $processCheck.Payload 'message' }
+				$result.processCheckWarning = Limit-Text "Process check did not run (exit $($processCheck.ExitCode)): $checkDetail" $MaximumMessageLength
+			}
 		}
 		# Sleeping a full interval past the deadline would report a wait longer than the promised one.
 		$remainingMilliseconds = $deadlineMilliseconds - [int]$stopwatch.ElapsedMilliseconds

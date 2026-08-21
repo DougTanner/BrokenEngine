@@ -14,7 +14,10 @@ param(
 	[int] $TimeoutSeconds = 60,
 
 	[Parameter(Mandatory = $true)]
-	[string] $ArtifactPath
+	[string] $ArtifactPath,
+
+	# Absolute process-check state path. Omitted means no process check runs and the wait behaves exactly as before.
+	[string] $ProcessCheckStatePath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +28,8 @@ $SceneAttempts = 0
 $ClientTick = $null
 $ReadyScene = $null
 $LastObservation = 'No command attempted.'
+$ProcessFindings = $null
+$ProcessCheckWarning = $null
 
 function Test-JsonInteger($Value)
 {
@@ -159,6 +164,14 @@ function Write-ResultArtifact([string] $Status, [string] $Code, [string] $Phase,
 		Scene = $ReadyScene
 		Message = $Message
 	}
+	if ($null -ne $script:ProcessFindings)
+	{
+		$Artifact['Findings'] = [object[]]@($script:ProcessFindings)
+	}
+	if ($null -ne $script:ProcessCheckWarning)
+	{
+		$Artifact['ProcessCheckWarning'] = $script:ProcessCheckWarning
+	}
 	$ArtifactJson = $Artifact | ConvertTo-Json -Depth 100
 	$ArtifactDirectory = Split-Path -Parent $script:ResolvedArtifactPath
 	if ($ArtifactDirectory)
@@ -168,6 +181,83 @@ function Write-ResultArtifact([string] $Status, [string] $Code, [string] $Phase,
 	[IO.File]::WriteAllText($script:ResolvedArtifactPath, ($ArtifactJson + [Environment]::NewLine),
 		[Text.UTF8Encoding]::new($false))
 	[Console]::Out.Write($ArtifactJson)
+}
+
+# The checker writes its JSON with [Console]::Out.Write, so console output is redirected into a buffer
+# for the duration of the call and would otherwise corrupt this script's own stdout artifact.
+function Invoke-ProcessCheck([string] $StatePath)
+{
+	$ExitCode = 1
+	$Captured = ''
+	$Failure = $null
+	try
+	{
+		$Writer = [IO.StringWriter]::new()
+		$PreviousOut = [Console]::Out
+		$global:LASTEXITCODE = 0
+		[Console]::SetOut($Writer)
+		try
+		{
+			$Pipeline = @(& (Join-Path $PSScriptRoot 'Invoke-AgentHarnessProcessCheck.ps1') `
+				-Action Check -StatePath $StatePath 2>&1)
+		}
+		finally
+		{
+			[Console]::SetOut($PreviousOut)
+		}
+		$ExitCode = $global:LASTEXITCODE
+		$Captured = ((@($Writer.ToString()) + @($Pipeline | ForEach-Object { [string]$_ })) -join [Environment]::NewLine).Trim()
+	}
+	catch
+	{
+		$Failure = $_.Exception.Message
+	}
+
+	$Payload = $null
+	if ($null -eq $Failure -and -not [string]::IsNullOrWhiteSpace($Captured))
+	{
+		try
+		{
+			$Payload = $Captured | ConvertFrom-Json -Depth 100
+		}
+		catch
+		{
+			$Payload = $null
+		}
+	}
+
+	return [pscustomobject]@{ ExitCode = $ExitCode; Payload = $Payload; Failure = $Failure }
+}
+
+# Ends the wait as soon as a registered process is gone instead of consuming the remaining poll timeout.
+function Exit-OnUnexpectedProcessExit([string] $Phase)
+{
+	if ([string]::IsNullOrWhiteSpace($ProcessCheckStatePath))
+	{
+		return
+	}
+
+	$Check = Invoke-ProcessCheck $ProcessCheckStatePath
+	if ($null -eq $Check.Failure -and $Check.ExitCode -eq 2 -and $null -ne $Check.Payload)
+	{
+		$Findings = $Check.Payload.findings
+		if ($null -eq $Findings)
+		{
+			$Findings = @()
+		}
+		# An if-expression assignment would unroll a single finding out of its array, so the cast keeps it a JSON array.
+		$script:ProcessFindings = [object[]]@($Findings)
+		Write-ResultArtifact 'failure' 'ProcessUnexpectedExit' $Phase `
+			"A registered harness process exited unexpectedly. $($Check.Payload.message)" $false
+		exit 1
+	}
+
+	# A checker that cannot run must not turn a healthy wait into a failure, so it is reported once and polling continues.
+	if ($Check.ExitCode -ne 0 -and $null -eq $script:ProcessCheckWarning)
+	{
+		$Detail = if ($null -ne $Check.Failure) { $Check.Failure } elseif ($null -ne $Check.Payload) { $Check.Payload.message } else { 'No readable checker output.' }
+		$script:ProcessCheckWarning = "Process check did not run (exit $($Check.ExitCode)): $Detail"
+	}
 }
 
 try
@@ -187,6 +277,7 @@ try
 	$NextPoll = 0L
 	while ((Get-RemainingMilliseconds) -gt 0)
 	{
+		Exit-OnUnexpectedProcessExit 'ping'
 		Wait-ForNextPoll $NextPoll
 		if ((Get-RemainingMilliseconds) -le 0)
 		{
@@ -245,6 +336,7 @@ try
 	$NextPoll = $Stopwatch.ElapsedMilliseconds
 	while ((Get-RemainingMilliseconds) -gt 0)
 	{
+		Exit-OnUnexpectedProcessExit 'describe_scene'
 		Wait-ForNextPoll $NextPoll
 		if ((Get-RemainingMilliseconds) -le 0)
 		{

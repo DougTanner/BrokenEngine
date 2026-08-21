@@ -27,8 +27,12 @@ Require the task brief from `../../references/subagent-reporting.md`, plus:
   propagation, checks, reviews, fixes, hygiene, builds, external claims, and
   residuals; and
 - the typed artifacts this change set triggers: on a changed `SKILL.md`, the
-  complete `/validate-skill` PASS handoff, and for a finalization that carries
-  the history overlay, the complete
+  complete `/validate-skill` PASS handoff; on a changed instruction doc
+  (`AGENTS.md`, `CLAUDE.md`, or an `.md` file under `.agents/skills/` or
+  `.agents/references/`), the complete `/progressive-disclosure-review` PASS
+  handoff; on a diff touching C++ or GLSL, each build's
+  `broken-engine-build-result/v1` envelope, which `## Acceptance table` governs;
+  and for a finalization that carries the history overlay, the complete
   preverification `broken-engine-code-quality-history-contract/v1` receipt.
 
 Do not accept an unapproved delta or pasted full logs. For a completed claimed
@@ -107,6 +111,10 @@ their data evidence is that same envelope reporting success with wrapper exit
 
 Skill changes require a complete `/validate-skill` PASS handoff with mechanical
 self-check, target validator exit/output, semantic review, and no Critical
+finding.
+
+Instruction-doc changes require a complete `/progressive-disclosure-review` PASS
+handoff with the baseline, the files checked, the findings, and no unresolved
 finding.
 
 When the landing includes the history overlay, the acceptance table must carry

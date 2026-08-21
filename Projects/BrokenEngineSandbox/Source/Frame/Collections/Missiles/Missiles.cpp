@@ -367,25 +367,12 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 			},
 			.iPushedTick = rFrame.interpolate.iTick,
 		};
-		engine::ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
-
-		// Heap realloc warning: capacity exceeded during a shared per-tick burst. Producers are
-		// unbounded, so investigate entities re-flagging kTransfer across iterations or an
-		// unexpected push path.
-		if (rFrame.postRender.transferRequests.size() == rFrame.postRender.transferRequests.capacity()) [[unlikely]]
+		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Missile Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coord.x, rStaticData.coord.y, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
-		common::ValidateVector<true >(request.data.vecPosition);
-		common::ValidateVector<false>(request.data.vecDirection);
-		common::ValidateVector<false>(request.data.vecVelocity);
-		{
-			// Heap: no finite reserve can be proven sufficient because engine::GrowPairedCollections
-			// grows collections unbounded
-			ScopedSuppressAllocationTracking suppress;
-			rFrame.postRender.transferRequests.push_back(request);
-		}
+		PushTransferRequest(rFrame.postRender, request);
 
 		RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 

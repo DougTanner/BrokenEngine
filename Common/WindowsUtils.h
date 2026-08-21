@@ -43,13 +43,6 @@ struct ExecutableResult
 // Thread-safety: Thread-safe - uses local resources and process isolation
 ExecutableResult RunExecutable(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine);
 
-// Launches an external process without waiting for it to complete (fire-and-forget)
-// Parameters:
-//   rExecutableFile - Full path to the executable to run
-// Creates the process with CREATE_NO_WINDOW flag and immediately closes handles
-// Thread-safety: Thread-safe - uses local resources and process isolation
-void LaunchExecutable(const std::filesystem::path& rExecutableFile);
-
 // Executes an external process attached to a fresh console window and waits for it to complete.
 // Used for tools like Gaea.Swarm.exe that throw "The handle is invalid" when stdin/stdout/stderr
 // are pipes or files rather than real console handles. Output is NOT captured — the child writes

@@ -17,6 +17,14 @@ namespace
 
 constexpr std::chrono::seconds kDesyncDiagnosticCooldown = 2s;
 
+// How long a full state's tick stays usable as a floor re-baseline target. A client that adopted the full state
+// has its floor frozen at that tick until the server admits the regression, so it re-sends the same floor every
+// flush and survives ACK loss; once the live ticks it keeps receiving run more than kiNetworkBufferSize past that
+// floor it disconnects itself (Client::TrackReceivedTick), so past this window no client can still need the
+// re-baseline. Doubling covers full-state delivery and the ACK trip. Bounding it matters: a slot whose client
+// never re-baselined would otherwise keep the monotonic floor guard relaxed for the life of the subscription.
+constexpr int64_t kiPendingFullStateWindowTicks = 2 * kiNetworkBufferSize;
+
 } // namespace
 
 void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClientId)
@@ -56,12 +64,29 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 			continue;
 		}
 
-		if (uiSlotEpoch == pClient->slots.at(uiSlotIndex).ack.uiEpoch &&
-			iSlotAckFloor >= pClient->slots.at(uiSlotIndex).ack.iAckFloor)
+		ClientConnection::SlotState& rSlot = pClient->slots.at(uiSlotIndex);
+
+		// Adopting a full state re-baselines the client's floor to that full state's tick, so the floor legitimately
+		// moves backward when the client had already received later ticks. Admit exactly that regression, never below
+		// the tick whose authoritative state the client now holds. The acks the client sent before it adopted still
+		// carry higher floors and satisfy the strict guard, which is why the pending tick is consumed here — by the
+		// regressed ack it exists for — rather than by the first ack that merely reaches it.
+		bool bFullStateRebaseline = rSlot.iPendingFullStateTick >= 0
+			&& miLatestBufferedTick - rSlot.iPendingFullStateTick <= kiPendingFullStateWindowTicks
+			&& iSlotAckFloor < rSlot.ack.iAckFloor
+			&& iSlotAckFloor >= rSlot.iPendingFullStateTick;
+
+		if (uiSlotEpoch == rSlot.ack.uiEpoch &&
+			(iSlotAckFloor >= rSlot.ack.iAckFloor || bFullStateRebaseline))
 		{
 			// Clamp to server's latest sent tick to prevent future ACK floors
 			iSlotAckFloor = std::min(iSlotAckFloor, miLatestBufferedTick);
-			AckState& rAckState = pClient->slots.at(uiSlotIndex).ack;
+			AckState& rAckState = rSlot.ack;
+			if (bFullStateRebaseline)
+			{
+				LOG(kNetwork, kDebug, "Server::ClientAckStream Full-state floor re-baseline Client: {} Slot: {} Floor: {} -> {} FullStateTick: {}", iClientId, uiSlotIndex, rAckState.iAckFloor, iSlotAckFloor, rSlot.iPendingFullStateTick);
+				rSlot.iPendingFullStateTick = -1;
+			}
 			if (iSlotAckFloor == rAckState.iAckFloor)
 			{
 				rAckState.uiReceivedBitfieldLow |= uiSlotBitfieldLow;
@@ -75,9 +100,9 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 				rAckState.uiReceivedBitfieldHigh = uiSlotBitfieldHigh;
 			}
 		}
-		else if (uiSlotEpoch != pClient->slots.at(uiSlotIndex).ack.uiEpoch)
+		else if (uiSlotEpoch != rSlot.ack.uiEpoch)
 		{
-			LOG(kNetwork, kVerbose, "Server::ClientAckStream EpochMismatch Client: {} Slot: {} ClientEpoch: {} ServerEpoch: {}", iClientId, uiSlotIndex, uiSlotEpoch, pClient->slots.at(uiSlotIndex).ack.uiEpoch);
+			LOG(kNetwork, kVerbose, "Server::ClientAckStream EpochMismatch Client: {} Slot: {} ClientEpoch: {} ServerEpoch: {}", iClientId, uiSlotIndex, uiSlotEpoch, rSlot.ack.uiEpoch);
 		}
 	}
 

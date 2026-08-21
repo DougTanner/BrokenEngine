@@ -19,9 +19,14 @@ and the landing confirmation belongs to `/finalize-changes`.
 
 Require a clean wrapper-created session worktree, except for the retained-work
 resume documented under Claim lifecycle below, and derive the authoritative
-primary, baseline, owner, and provisioned WorktreeCli from
+primary, owner, and provisioned WorktreeCli from
 `Get-NextPlanContext`, run from the session worktree root as one shell call:
 `Import-Module ./.agents/skills/next-plan/scripts/NextPlanWorkflowCommon.psm1; Get-NextPlanContext`
+Its baseline is provisional until a claim runs: every claim result carrying the
+`sync` object described below records that result's `sync.to` as the session
+baseline, and a result without one leaves the recorded baseline unchanged, so
+the `Get-NextPlanContext` baseline holds only until the first claim reports a
+`sync` object.
 Missing tooling requires explicitly authorized primary
 maintenance through `/compile`. Never create/adopt a worktree or inspect
 machine-local claims directly.

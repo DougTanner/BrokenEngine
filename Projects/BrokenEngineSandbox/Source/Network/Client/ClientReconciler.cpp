@@ -32,7 +32,7 @@ static bool GetClientSnapshotPosition(XMVECTOR& rOut)
 	return true;
 }
 
-ReconcileDesyncInfo ClientReconciler::Run()
+engine::ReconcileDesyncInfo ClientReconciler::Run()
 {
 	// Heap: Frame allocation during replay, map operations on serverUpdates, and scratch resize
 	ScopedSuppressAllocationTracking suppress;
@@ -42,115 +42,32 @@ ReconcileDesyncInfo ClientReconciler::Run()
 	mConfirmedClientState.clientGlobalPlayerId = gpGame->ClientPlayerId();
 	mConfirmedClientState.fPreviousClientArmor = gpGame->PreviousClientArmor();
 
-	ReconcileInputs inputs;
+	engine::ReconcileInputs inputs;
 	inputs.iTargetTick = gpGame->TickCounter();
 	ASSERT(inputs.iTargetTick >= 0);
 	common::LogTickScope logTickScope(inputs.iTargetTick);
 
-	// Populate per-coord works (only eligible coords — those with iConfirmedTick >= 0).
-	// Uses resize() + in-place assignment to retain CoordScratch::replayStack capacity
-	// across Run() calls, avoiding per-frame heap churn.
-	size_t eligibleCount = 0;
-	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
-	{
-		if (rFrames.iConfirmedTick >= 0)
-		{
-			++eligibleCount;
-		}
-	}
-	if (mWorks.size() < eligibleCount)
-	{
-		mWorks.resize(eligibleCount);
-	}
-	size_t iSlot = 0;
-	for (auto& [rCoord, rFrames] : gpGame->mCoordFrames)
-	{
-		if (rFrames.iConfirmedTick < 0)
-		{
-			continue;
-		}
-		CoordWork& rWork = mWorks[iSlot++];
-		rWork.coord = rCoord;
-		rWork.pFrames = &rFrames;
-		rWork.scratch.Reset();
-	}
-	const size_t iActiveCount = iSlot;
+	// Capture client pre-writeback position for visual error smoothing. Read before the dispatch,
+	// which is the single engine entry point; the value goes unused when no coord is eligible.
+	XMVECTOR vecPreWritebackPosition {};
+	bool bCapturedPrePosition = GetClientSnapshotPosition(vecPreWritebackPosition);
 
-	if (iActiveCount == 0)
+	engine::ReconcileDispatchResult dispatch = mDispatcher.Run(*gpGame, inputs);
+
+	if (dispatch.iActiveCount == 0)
 	{
 		return {};
 	}
 
-	// Capture client pre-writeback position for visual error smoothing
-	XMVECTOR vecPreWritebackPosition {};
-	bool bCapturedPrePosition = GetClientSnapshotPosition(vecPreWritebackPosition);
-
-	// Parallel per-coord reconciliation via the shared multithreading pool.
-	// Each worker touches only its own CoordFrames entry — no cross-coord writes.
-	std::span<CoordWork> activeWorks(mWorks.data(), iActiveCount);
-	const int64_t iCount = static_cast<int64_t>(iActiveCount);
-	auto processRange = [&](int64_t iBegin, int64_t iEnd)
+	if (dispatch.pDesyncWork != nullptr)
 	{
-		// Heap: ReconcileCoord may grow per-coord scratch (frames, replay buffers) on dispatch
-		ScopedSuppressAllocationTracking suppress;
-		for (int64_t i = iBegin; i < iEnd; ++i)
-		{
-			ReconcileCoord(activeWorks[i], inputs);
-		}
-	};
-	common::gpMultithreading->Dispatch(iCount, processRange);
-
-	// Post-dispatch merge: profiling, desync (first-wins), bAnyFullReplay
-	ReconcileProfiling mergedProfiling;
-	bool bAnyFullReplay = false;
-	CoordWork* pDesyncWork = nullptr;
-	for (CoordWork& rWork : activeWorks)
-	{
-		const CoordScratch& rScratch = rWork.scratch;
-		mergedProfiling.iCrcValidatedFrameTicks += rScratch.profiling.iCrcValidatedFrameTicks;
-		mergedProfiling.iAssumedFrameTicks += rScratch.profiling.iAssumedFrameTicks;
-		mergedProfiling.iCrcFastPathEvents += rScratch.profiling.iCrcFastPathEvents;
-		mergedProfiling.iStatusChangeReplayTicks += rScratch.profiling.iStatusChangeReplayTicks;
-		mergedProfiling.iKnockOnReplayTicks += rScratch.profiling.iKnockOnReplayTicks;
-
-		if (rScratch.iDesyncTick >= 0 && pDesyncWork == nullptr)
-		{
-			pDesyncWork = &rWork;
-		}
-
-		using enum ReconcileScratchFlags;
-
-		// Audio voice invalidation skip is gated on the client coord experiencing a full replay.
-		if ((rScratch.flags & kReplayed) && rWork.coord == mConfirmedClientState.clientGridCoord)
-		{
-			bAnyFullReplay = true;
-		}
-
-		if (rScratch.iDesyncTick >= 0 || ((rScratch.flags & kReplayed) && (rScratch.flags & kReSimOccurred)))
-		{
-			bool bLogThis = !(rScratch.flags & kSuppressRepeatLogs) || (rWork.pFrames->iStuckFrameCount % engine::CoordFrames::kiStuckLogInterval == 0);
-			if (bLogThis)
-			{
-				if (rScratch.iDesyncTick >= 0)
-				{
-					LOG(kNetwork, kDebug, "Reconcile post-replay Rollback/replay exhausted with unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.x, rWork.coord.y, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
-				}
-				else
-				{
-					LOG(kNetwork, kDebug, "Reconcile post-replay Reconciliation resimulation completed without an unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.x, rWork.coord.y, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
-				}
-			}
-		}
-	}
-
-	if (pDesyncWork != nullptr)
-	{
+		engine::CoordWork* pDesyncWork = dispatch.pDesyncWork;
 		char acExpected[20] {}, acActual[20] {};
 		common::ToHex(std::span<char, 20>(acExpected), pDesyncWork->scratch.desyncExpectedCrc);
 		common::ToHex(std::span<char, 20>(acActual), pDesyncWork->scratch.desyncActualCrc);
 		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.x, pDesyncWork->coord.y, pDesyncWork->scratch.iDesyncTick, acExpected, acActual, pDesyncWork->scratch.iReplayStackCount, pDesyncWork->scratch.iNewConfirmedTick);
 
-		ReconcileDesyncInfo desyncInfo;
+		engine::ReconcileDesyncInfo desyncInfo;
 		desyncInfo.bDesync = true;
 		desyncInfo.iDesyncTick = pDesyncWork->scratch.iDesyncTick;
 		desyncInfo.desyncCoord = pDesyncWork->coord;
@@ -162,10 +79,10 @@ ReconcileDesyncInfo ClientReconciler::Run()
 
 	// Compute new confirmed client state (client coord time advance + transfer migration)
 	ConfirmedClientState newConfirmedClientState = mConfirmedClientState;
-	ReconcileUpdateClientState(activeWorks, bAnyFullReplay, newConfirmedClientState);
+	ReconcileUpdateClientState(mDispatcher.ActiveWorks(), dispatch.bAnyFullReplay, newConfirmedClientState);
 
 	// Visual error offset: pre/post client position delta accumulated into gpGame
-	if (bCapturedPrePosition && bAnyFullReplay)
+	if (bCapturedPrePosition && dispatch.bAnyFullReplay)
 	{
 		XMVECTOR vecPostWritebackPosition {};
 		if (GetClientSnapshotPosition(vecPostWritebackPosition))
@@ -202,16 +119,16 @@ ReconcileDesyncInfo ClientReconciler::Run()
 	mConfirmedClientState = newConfirmedClientState;
 	gpGame->SetPreviousClientArmor(newConfirmedClientState.fPreviousClientArmor);
 
-	gpProfileManager->SetReconcileCounters(mergedProfiling.iCrcValidatedFrameTicks, mergedProfiling.iAssumedFrameTicks, mergedProfiling.iCrcFastPathEvents, mergedProfiling.iStatusChangeReplayTicks, mergedProfiling.iKnockOnReplayTicks);
+	gpProfileManager->SetReconcileCounters(dispatch.profiling.iCrcValidatedFrameTicks, dispatch.profiling.iAssumedFrameTicks, dispatch.profiling.iCrcFastPathEvents, dispatch.profiling.iStatusChangeReplayTicks, dispatch.profiling.iKnockOnReplayTicks);
 
 	// Large single-frame re-sim bursts are frame-time spike candidates
-	int64_t iReSimTicks = mergedProfiling.iStatusChangeReplayTicks + mergedProfiling.iKnockOnReplayTicks;
+	int64_t iReSimTicks = dispatch.profiling.iStatusChangeReplayTicks + dispatch.profiling.iKnockOnReplayTicks;
 	if (iReSimTicks >= 8)
 	{
-		LOG(kNetwork, kVerbose, "Replay burst ReSimTicks: {} StatusChange: {} KnockOn: {} Assumed: {} CrcValidated: {} Coords: {}", iReSimTicks, mergedProfiling.iStatusChangeReplayTicks, mergedProfiling.iKnockOnReplayTicks, mergedProfiling.iAssumedFrameTicks, mergedProfiling.iCrcValidatedFrameTicks, iActiveCount);
+		LOG(kNetwork, kVerbose, "Replay burst ReSimTicks: {} StatusChange: {} KnockOn: {} Assumed: {} CrcValidated: {} Coords: {}", iReSimTicks, dispatch.profiling.iStatusChangeReplayTicks, dispatch.profiling.iKnockOnReplayTicks, dispatch.profiling.iAssumedFrameTicks, dispatch.profiling.iCrcValidatedFrameTicks, dispatch.iActiveCount);
 	}
 
-	if (bAnyFullReplay && engine::gpAudioManager != nullptr)
+	if (dispatch.bAnyFullReplay && engine::gpAudioManager != nullptr)
 	{
 		engine::gpAudioManager->SkipNextStaticVoiceInvalidation();
 	}
@@ -222,7 +139,7 @@ ReconcileDesyncInfo ClientReconciler::Run()
 void ClientReconciler::Reset()
 {
 	mConfirmedClientState = {};
-	mWorks.clear();
+	mDispatcher.Reset();
 	mfLastLoggedVisualErrorDelta = 0.0f;
 	miLastVisualErrorLogTick = -1000;
 }

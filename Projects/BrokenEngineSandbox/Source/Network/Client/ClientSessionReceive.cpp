@@ -55,7 +55,18 @@ void ClientSession::HydrateReceivedFullState(Frame& rReceived, const Frame* pRin
 
 void ClientSession::ResetCoordStatesForResync()
 {
-	mpDesyncManager->ResetCoordStatesForResync();
+	for (auto& [rCoord, rSub] : gpGame->mCoordFrames)
+	{
+		rSub.ResetClientState();
+	}
+
+	mpReconciler->Reset();
+	mpRuntime->mUnwantedTimestamps.clear();
+}
+
+void ClientSession::LogDesyncFrameDifferences(const Frame& rClientFrame, const Frame& rServerFrame)
+{
+	rClientFrame.LogDifferences(rServerFrame);
 }
 
 #endif // BT_CLIENT

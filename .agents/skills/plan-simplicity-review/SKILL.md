@@ -23,8 +23,10 @@ it is solved. Most executable Plans are written by agents on their own
 decision; authoring, tracking, claiming, or selecting a Plan never means the
 user approved its objective, so the objective is reviewable like any other part
 of the plan, and recommending that the whole plan be rejected is an in-remit
-outcome when no amount of simplification makes it worth implementing. Use this
-skill at every tier, for every implementation plan with a
+outcome when no amount of simplification makes it worth implementing. The
+plan's internal design decisions and its rejected alternatives are equally
+non-authoritative, per the authority-order directive in root `AGENTS.md`. Use
+this skill at every tier, for every implementation plan with a
 step that adds new code per Step 2's trigger in root `AGENTS.md` — including an
 addition inside an existing file — or that modifies non-documentation behavior
 per that same trigger, which owns where skill prose ends and skill behavior
@@ -61,8 +63,10 @@ reviewer is unavailable, the manager reports a blocker.
 
 ## Review
 
-Apply questions 1-5 only to the steps that add code; apply question 6 to every
-step that changes a non-documentation artifact.
+Apply questions 1-5, 8, and 9 only to the steps that add code; apply question 6
+to every step that changes a non-documentation artifact; apply question 7 to a
+plan whose steps change product, user interface, tooling, or public interface
+behavior.
 
 1. Reachability. Establish that the addition handles a failure or state that
    actually occurs. Report it when the condition is ultra-rare, self-healing, or
@@ -87,9 +91,32 @@ step that changes a non-documentation artifact.
    compensates for a defect or misbehavior, establish whether the change removes
    the cause or only suppresses the symptom — re-tuning a value, adding a
    compensating offset, catching and ignoring a failure, or special-casing one
-   call site of a shared bug. Every bandaid finding names the suspected root
-   cause with repository evidence (`path:line`) and sketches the base-level
-   durable fix as its alternative.
+   call site of a shared bug. Evaluate a choice the plan itself declares decided
+   against the root-cause alternative it rejected. Every bandaid finding names
+   the suspected root cause with repository evidence (`path:line`) and sketches
+   the base-level durable fix as its alternative.
+7. Actual consumer and observable benefit. Name who consumes the result and the
+   benefit they can observe once this plan lands. Judge only what the plan
+   already proposes: never ask for an extra feature or a wider boundary to
+   supply the missing benefit. When no step reaches a consumer, that absence is
+   the finding.
+8. Requested signal or pass-through. For a step that adds or forwards a signal —
+   a field, status, flag, event, or parameter threaded between layers — name the
+   owner that produces it and the consumer that reads it, and establish whether
+   the signal already exists at either boundary. Require evidence of the
+   consumer before the plumbing is added, and keep every required layer, trust,
+   client/server, and repository boundary intact; a simpler alternative never
+   means crossing one. Question 5 already covers an option, hook, or format with
+   no current consumer — report such a case once, there.
+9. Representation fit. For coupled flags, repeated variants, or a family of
+   branches, ask whether a repository-native shape — an enum, `common::Flags`,
+   an SOA column, or a lookup — replaces them. Support that swap only when the
+   plan's evidence shows it deletes concrete branches or rules, and report a
+   proposed registry, state machine, or similar indirection that deletes none.
+
+Report a question 7-9 finding under an existing class — `speculative-hardening`
+for machinery built ahead of its consumer, otherwise `overbuilt-mechanism` —
+unless the whole-plan rule below applies.
 
 When the whole plan's value does not justify any implementation — not one
 overbuilt step, but the objective itself — report exactly one whole-plan finding

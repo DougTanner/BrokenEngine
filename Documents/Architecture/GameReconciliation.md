@@ -1,6 +1,6 @@
 # Architecture: Game Reconciliation
 
-> Maintained architecture reference for `Projects/BrokenEngineSandbox/Source/`; update when depicted reconciliation flow, client-loop integration, desync handling, or player-event parsing changes.
+> Maintained architecture reference for `Projects/BrokenEngineSandbox/Source/` and the reconciliation replay chain in `Engine/Source/Network/Client/`; update when depicted reconciliation flow, client-loop integration, desync handling, or player-event parsing changes.
 
 ## Reconciliation State Machine
 
@@ -14,7 +14,7 @@ flowchart TD
     classDef error fill:#fee2e2,stroke:#ef4444
     classDef state fill:#fef3c7,stroke:#d97706
 
-    START["ClientReconciler::Run()<br/>per CoordWork"] --> COORD["ReconcileCoord()<br/>per-coord orchestrator"]
+    START["ClientReconciler::Run()<br/>engine::ReconcileDispatcher::Run()<br/>per CoordWork"] --> COORD["ReconcileCoord()<br/>per-coord orchestrator"]
 
     COORD --> CRC
 
@@ -85,7 +85,7 @@ flowchart LR
 
 ## Extrapolation Mode
 
-No longer a distinct mode. Forward simulation from the confirmed server state is performed inline by `ClientReconciler::Run()`'s catch-up pass (`ReconcileCatchUpCoord` simulates empty-input ticks up to the post-advance `miTickCounter`). The snapshot ring (`CoordFrames::snapshots[]`) is now the unified state buffer — there is no separate extrapolation stack or transition step.
+No longer a distinct mode. Forward simulation from the confirmed server state is performed inline by the reconcile dispatch's catch-up pass (`ReconcileCatchUpCoord` simulates empty-input ticks up to the post-advance `miTickCounter`). The snapshot ring (`CoordFrames::snapshots[]`) is now the unified state buffer — there is no separate extrapolation stack or transition step.
 
 ## Main Loop Integration
 
@@ -102,7 +102,7 @@ flowchart TD
     MSG["ProcessMessages()<br/>RawInput Update"] --> TICK_FRAMES
 
     subgraph TICK_FRAMES ["GameBase::ClientUpdate()"]
-        POLL["ClientSession::Poll()<br/>network poll, ACK, flush"]:::reconcile
+        POLL["ClientSessionRuntime::PollAndDrain()<br/>network poll, ACK, flush"]:::reconcile
 
         STALL_CHECK{"IsStalled()?"}
         POLL --> STALL_CHECK
@@ -146,7 +146,7 @@ sequenceDiagram
         Main->>Net: SendDebugFrameRequest()
         Main->>Net: Set Client::mStateFlags kDesyncDebugMode
         Net->>Server: Debug frame request
-        Note over Main: Polling and filling local slots from received state continue.<br/>ClientDesyncManager::IsStalled() gates physics,<br/>subscriptions, and reconciliation. Render and audio still run.
+        Note over Main: Polling and filling local slots from received state continue.<br/>ClientDesyncCore::IsStalled() gates physics,<br/>subscriptions, and reconciliation. Render and audio still run.
         alt Debug frame arrives before timeout
             Server->>Net: Debug frame response
             Main->>Main: ClientSessionRuntime::PollAndDrain() drains debug frame

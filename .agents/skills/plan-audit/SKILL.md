@@ -15,10 +15,13 @@ Use this skill for every Tier-2 and Tier-3 change; Tier-1 mechanical work
 skips it. Assume the supplied plan is flawed, verify it against the current
 repository, and return only concrete findings and improvement suggestions for
 the manager to resolve when user input is actually needed — through
-`/external-grill-plan` for Tier 3, or directly with the user for Tier 2. The
-audit is findings-only work and never creates an approval gate; a `/next-plan`
-invocation additionally follows the authoritative implementation-approval
-contract (`../next-plan/SKILL.md`, "Implementation approval").
+`/external-grill-plan` for Tier 3, or directly with the user for Tier 2. A
+plan's own decision declarations are hypotheses to verify like any other
+statement it makes, except as the authority-order directive in root `AGENTS.md`
+provides. The audit is findings-only work and never creates an approval gate; a
+`/next-plan` invocation additionally follows the authoritative
+implementation-approval contract (`../next-plan/SKILL.md`, "Implementation
+approval").
 
 ## Inputs and Snapshot
 
@@ -76,7 +79,7 @@ mandatory reviewer is unavailable, the manager reports a blocker.
 
    Anchor every search to a plan claim: callers, mirrors, cited-type
    headers, or affected-site hunts. Do not explore unrelated plans/subsystems.
-2. Verify structural assumptions, call sites, mirrored client/server paths, ownership, data layout, frame phase, threading, determinism, serialization, build wiring, and runtime verification where relevant.
+2. Verify structural assumptions, call sites, mirrored client/server paths, ownership, data layout, frame phase, threading, determinism, serialization, build wiring, and runtime verification where relevant. When the plan puts concurrent writers on one target, first make it prove the requirement truly needs a single canonical target; when it does not, require partitioned ownership with independently published results. When it does, require a structural coordination mechanism the plan proves already exists or explicitly introduces and verifies, and trace ordering, visibility, progress after a failure, serialization/CRC effects, and client/server publication. An instruction that writers take turns is not synchronization evidence.
 3. Hunt unresolved options, hidden behavior changes, contradictions, magic defaults, undeclared invariant exposure, missing affected locations, ungrounded requirements or checks, scope that duplicates an existing mechanism, and any file the plan's own `## Coordination` section obliges the implementer to edit yet its scope contract omits. Require `## In scope` and `## Out of scope` headings that are each concrete enough to test a diff region against; scope naming a file without its regions is a finding. Take heading presence from the step 1 citation check's heading-presence result and judge concreteness yourself.
 4. Ground corrections in user intent, repository contract, or necessary
    integration. Prefer reuse, narrower scope, missing propagation/verification,

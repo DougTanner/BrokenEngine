@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-20T21:14:34.737Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-20T21:14:34.737Z","dependsOn":["Documents/Plans/Engine/FrameRegistry.md"]} -->
 # Resolve the server transfer/broadcast Player collection dependency
 
 ## Context
@@ -32,39 +32,38 @@ those two constants in `Engine/Source/Frame/NavBuild.cpp` and
 `Documents/Plans/Engine/PusherAnchorContract.md`, which owns the
 `PushersUpdate.cpp` include.
 
-Authority conflict to resolve before editing. `Engine/Source/Network/Server/AGENTS.md`
-currently records a deliberate exception for these two classes: "Both classes
-name `game::StatusChange` and read game Frame state — a deliberate exception to
-the engine/game contract, because the payload crossing a cell boundary is
+Authority conflict, settled. `Engine/Source/Network/Server/AGENTS.md` currently
+records a deliberate exception for these two classes: "Both classes name
+`game::StatusChange` and read game Frame state — a deliberate exception to the
+engine/game contract, because the payload crossing a cell boundary is
 game-defined while the machinery moving it is not." The approved D15 boundary
-outranks that documentation under the repository authority order, but the
-documented exception is the reason the current code is shaped this way, so this
-Plan exists to settle the conflict rather than to assume one side.
+outranks that documentation under the repository authority order, and the user
+resolved the conflict in D15's favour on 2026-08-21, so the Player-collection
+reads are removed and the exception text is updated to match.
 
 ## Design
 
-Before editing, resolve the conflict above with the user and select exactly one
-outcome:
+Remove the Player-collection dependency from the two Engine translation units.
+The engine-facing seam is the `FrameRegistry` ownership layer and its scalar
+wrappers, added by the dependency `Documents/Plans/Engine/FrameRegistry.md` — not
+bespoke game free functions and not a new session-contract method. The three
+needs this Plan covers through that view are the destination-liveness count, the
+global-id to frame-local-uuid lookup, and the arrival client-GUID bind via
+`AssignRegistryClientGuid`. Both files drop the Player-specific include, and
+`Engine/Source/Network/Server/AGENTS.md` is updated so its recorded exception
+covers only the remaining `game::StatusChange` payload dependency.
 
-1. Confirm and narrow the documented exception. The `game::StatusChange`
-   payload dependency stays, but the Player-collection dependency is written
-   down explicitly in `Engine/Source/Network/Server/AGENTS.md` as part of the
-   same deliberate ownership, and no source changes. Selecting this completes
-   the Plan with a documentation-only change.
-2. Replace the Player-collection reads with a bounded generic contract: the
-   game supplies the destination-liveness answer and the global-id to
-   frame-local-uuid lookup through the existing `game::NetworkSessionContract`
-   or `game::gpServerSession` seam, and the Engine files drop the
-   Player-specific include.
+(Keeping the documented exception as-is and merely narrowing it in documentation
+was the alternative considered; the user rejected it on 2026-08-21.)
 
-Whichever outcome is selected, the current observable behavior is preserved
-exactly: the liveness rule (a destination is live when it has a committed
-player or an active subscriber), the `kTransferPlayer` exemption from the
-liveness gate, deterministic transfer type ordering, the post-transfer
-`sharedCrc` recomputation on the destination Frame, the emitted log field sets
-and text, allocation-suppression behavior, and main-thread affinity. If the
-selected outcome would require changing any of those, return the work for
-re-planning instead of expanding scope.
+The current observable behavior is preserved exactly: the liveness rule (a
+destination is live when it has a committed player or an active subscriber), the
+`kTransferPlayer` exemption from the liveness gate, deterministic transfer type
+ordering, the post-transfer `sharedCrc` recomputation on the destination Frame,
+the emitted log field sets and text (byte-identical), allocation-suppression
+behavior, and main-thread affinity. No version bump happens here beyond the one
+the dependency Plan already makes. If the work would require changing any of
+those, return it for re-planning instead of expanding scope.
 
 ## Critical files
 
@@ -72,21 +71,20 @@ re-planning instead of expanding scope.
   — the Player include, liveness test, logs, and destination player scan.
 - `Engine/Source/Network/Server/ServerBroadcaster.cpp:7,273-281` — the Player
   include and the global-id to player-uuid scan.
-- `Engine/Source/Network/Server/AGENTS.md` — the recorded deliberate exception
-  that either narrows (outcome 1) or is updated to match (outcome 2).
-- `Projects/BrokenEngineSandbox/Source/Network/NetworkSessionContract.h` and
-  `Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.h` — only
-  if outcome 2 needs a declaration or a supplying call site.
+- `Engine/Source/Network/Server/AGENTS.md` — the recorded deliberate exception,
+  updated to cover only the `game::StatusChange` payload dependency.
+- `Engine/Source/Frame/FrameRegistry.h` — the ownership layer and scalar
+  wrappers this Plan consumes, supplied by the dependency Plan.
+- `Projects/BrokenEngineSandbox/Source/Frame/Frame.h` — `Frame::OwnershipLayer`,
+  the game-side builder of that layer, supplied by the dependency Plan.
 
 ## In scope
 
-- Selecting one of the two outcomes above with the user, and recording it
-  before any source edit.
-- The exact regions named in `## Critical files`, and only if outcome 2 is
-  selected: replacing the Player-collection reads and removing the
-  Player-specific include from those two Engine translation units.
-- Updating the `Engine/Source/Network/Server/AGENTS.md` exception text to match
-  the selected outcome.
+- The exact regions named in `## Critical files`: replacing the
+  Player-collection reads with the `FrameRegistry` ownership layer and its
+  scalar wrappers, and removing the Player-specific include from those two
+  Engine translation units.
+- Updating the `Engine/Source/Network/Server/AGENTS.md` exception text to match.
 
 ## Out of scope
 
@@ -100,11 +98,13 @@ re-planning instead of expanding scope.
   anchoring; those belong to the other D15 Plans.
 - Player gameplay, fleet policy, owned-entity registry semantics, the wire
   format, and the protocol version.
-- Compatibility wrappers, callback/registry abstractions, and unit tests.
+- Compatibility wrappers, callback abstractions, any registry surface beyond the
+  ownership layer and scalar wrappers the dependency Plan supplies, and unit
+  tests.
 
 ## Risk tier and invariants
 
-Expected Change Workflow Tier 3: these paths sit on the cross-cell transfer and
+Change Workflow Tier 3: these paths sit on the cross-cell transfer and
 per-cell publication route that feeds the wire payload and the deterministic
 `sharedCrc` the CRC check covers, and they span independently owned Engine and
 game subsystems. Preserve PostRender bit determinism, transfer type ordering,
@@ -115,7 +115,11 @@ is authorized here.
 
 ## Coordination
 
-No directional prerequisite is required. If
+`Documents/Plans/Engine/FrameRegistry.md` is the directional prerequisite and is
+carried in this Plan's metadata: it adds the ownership layer, the scalar
+wrappers, and `Frame::OwnershipLayer` that this Plan consumes, and it moves the
+surrounding code, so re-derive every line citation from current source at claim
+time. If
 `Documents/Plans/Engine/ChangeListTransportContract.md` is implemented first,
 it may move or renumber the regions cited above; re-derive the citations from
 current source before editing rather than trusting the line numbers. That Plan
@@ -125,13 +129,11 @@ exist.
 
 ## Acceptance criteria
 
-- The selected outcome is recorded before any source edit.
-- If outcome 1 is selected, no tracked C++ file changes and
-  `Engine/Source/Network/Server/AGENTS.md` names the Player-collection
-  dependency explicitly.
-- If outcome 2 is selected, a scoped search finds no
-  `Frame/Collections/Players/Players.h` include and no `PlayersPostRender`
-  member access in either file, while game-owned player handling stays intact.
+- A scoped search finds no `Frame/Collections/Players/Players.h` include and no
+  `PlayersPostRender` member access in either file, while game-owned player
+  handling stays intact.
+- `Engine/Source/Network/Server/AGENTS.md` no longer claims a Player-collection
+  dependency for these two classes.
 - Client and server both compile.
 - A harness run with a cross-cell player transfer and an update-player request
   shows the same liveness decisions, destination CRC results, publication

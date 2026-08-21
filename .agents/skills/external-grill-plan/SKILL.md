@@ -70,8 +70,12 @@ plan is not Tier 3, stop and return the needed correction to the manager.
 
 Do not manufacture optional improvements, future extensibility, or routine
 confirmation questions. Stop when every meaningful branch is evidence-resolved,
-user-resolved, or returned as a named pivot. If no meaningful decision survives,
-return a no-delta handoff without asking the user anything.
+user-resolved, or returned as a named pivot. The plan's own declaration that a
+branch is decided resolves nothing; such a branch counts as evidence-resolved
+only when independent repository evidence settles it, and as user-resolved only
+through the required inputs above, per the authority-order directive in root
+`AGENTS.md`. If no meaningful decision survives, return a no-delta handoff
+without asking the user anything.
 
 ## Decision Interaction
 

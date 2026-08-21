@@ -423,7 +423,8 @@ function Test-PromptReviewedTreeClean() {
 function Test-PromptScopeEvidence([object] $ChangeSet) {
 	# Two assigned skills each need evidence produced earlier in the workflow that the reviewer cannot
 	# recover from the diff: the draft execution card, and — for /verify-changes — another reviewer's
-	# /validate-skill result plus the reviewed revision's identity values. Without this check a scope
+	# /validate-skill and /progressive-disclosure-review results, a build envelope, plus the reviewed
+	# revision's identity values. Without this check a scope
 	# that omits it costs a whole review round. The scope text is only read here: section (b) still
 	# copies the caller's bytes verbatim.
 	# Case-insensitively, because the producing skills head the card differently — 'Draft execution card'
@@ -433,14 +434,36 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 	}
 	if ($AssignedSkill -ne 'verify-changes') { return }
 	$skillTouched = $false
+	$instructionDocTouched = $false
 	foreach ($entry in @($ChangeSet.entries)) {
 		foreach ($path in @($entry.path, $entry.oldPath)) {
 			if ([string]::IsNullOrEmpty($path)) { continue }
-			if ([IO.Path]::GetFileName($path) -eq 'SKILL.md') { $skillTouched = $true }
+			$leaf = [IO.Path]::GetFileName($path)
+			if ($leaf -eq 'SKILL.md') { $skillTouched = $true }
+			# Exact-case names and prefixes, matching Test-InstructionDocPath in
+			# Get-SessionChangeInventory.ps1: the two skills must gate on the same path set, and a
+			# case-insensitive match here would gate a plain 'agents.md' the inventory never routes.
+			if ($leaf -ceq 'AGENTS.md' -or $leaf -ceq 'CLAUDE.md') { $instructionDocTouched = $true }
+			if ($leaf.EndsWith('.md', [StringComparison]::OrdinalIgnoreCase) -and
+				($path.StartsWith('.agents/skills/', [StringComparison]::Ordinal) -or $path.StartsWith('.agents/references/', [StringComparison]::Ordinal))) {
+				$instructionDocTouched = $true
+			}
 		}
 	}
 	$missing = [Collections.Generic.List[string]]::new()
 	if ($skillTouched -and -not $script:ScopeText.Contains('Validation: PASS')) { $missing.Add('Validation: PASS') }
+	# Both markers, and both as that handoff's summary block emits them: the bare skill name also
+	# appears in an ordinary changed-file list, while 'Files checked:' heads no other gated handoff.
+	if ($instructionDocTouched -and -not ($script:ScopeText.Contains('Skill: progressive-disclosure-review') -and $script:ScopeText.Contains('Files checked:'))) {
+		$missing.Add("the /progressive-disclosure-review handoff, marked by 'Skill: progressive-disclosure-review' and 'Files checked:'")
+	}
+	# A diff carrying C++ or shader bytes was built, and the build envelope is the only authoritative
+	# result: acceptance prose alone cannot stand in for it. The JSON signature is matched rather than
+	# the bare schema name, which that same prose can legitimately mention without carrying the artifact.
+	if (($ChangeSet.triggers.repoCodeReview -or $ChangeSet.triggers.glslReview) -and
+		-not $script:ScopeText.Contains('"schemaVersion":"broken-engine-build-result/v1"')) {
+		$missing.Add("each build's 'broken-engine-build-result/v1' envelope")
+	}
 	# The identity values bind every supplied artifact to the reviewed revision, so a scope that names
 	# neither leaves the reviewer validating evidence against an unknown change set.
 	if (-not $script:ScopeText.Contains($ChangeSet.baselineSha)) { $missing.Add('the baseline SHA') }

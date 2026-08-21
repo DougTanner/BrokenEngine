@@ -34,6 +34,14 @@ repository before asking about gaps. Record:
 - bit-deterministic, CRC-checked PostRender state versus non-deterministic
   Interpolate/render state and client-only visuals.
 
+A requirement the user states while the brief is being built becomes a core
+constraint of all three designs, not a late amendment applied afterwards. Sort
+the recorded material into essential invariants the repository actually
+requires and accidental seams a current caller happens to expose, such as its
+parameter shape or call order; a design may discard an accidental seam, so
+never carry one forward as if it were a contract. Keep passing the scope and
+compatibility constraints into every design.
+
 Before any delegation, decide whether the requested system or a viable design
 could add a `Collection<T>` type or SOA member pointer. If so, read
 `/add-collection` and `/add-collection-member` and pass their applicable layout,

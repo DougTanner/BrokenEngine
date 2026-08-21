@@ -727,6 +727,29 @@ void FramePostRender::ServerRead(std::istream& rStream)
 	engine::SharedCollectionsRead(rStream, GamePostRenderCollections(*this));
 }
 
+bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest)
+{
+	engine::ComputeTransferDelta(rBounds, rRequest.data.vecPosition, rRequest.iDeltaX, rRequest.iDeltaY);
+
+	// Heap realloc warning: capacity exceeded during a shared per-tick burst. Producers are
+	// unbounded, so investigate entities re-flagging kTransfer across iterations or an
+	// unexpected push path.
+	return rPostRender.transferRequests.size() == rPostRender.transferRequests.capacity();
+}
+
+void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rRequest)
+{
+	common::ValidateVector<true >(rRequest.data.vecPosition);
+	common::ValidateVector<false>(rRequest.data.vecDirection);
+	common::ValidateVector<false>(rRequest.data.vecVelocity);
+	{
+		// Heap: no finite reserve can be proven sufficient because engine::GrowPairedCollections
+		// grows collections unbounded
+		ScopedSuppressAllocationTracking suppress;
+		rPostRender.transferRequests.push_back(rRequest);
+	}
+}
+
 common::crc_t Frame::Crcs() const
 {
 	common::crc_t crc = FrameInterpolate::Crcs(interpolate);

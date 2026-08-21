@@ -763,7 +763,10 @@ void ProfileManagerBase::UpdateProfileText()
 			FormatFramesScreen(rWorkbuffer);
 		}
 
-		FormatGameScreens(rWorkbuffer);
+		if (meProfileScreen == ProfileScreen::kNetwork)
+		{
+			FormatNetworkScreen(rWorkbuffer);
+		}
 #endif // BT_CLIENT
 	}
 }

@@ -60,7 +60,13 @@ Skip this phase in audit-only mode.
    unknown as a residual for manager resolution, with user involvement when
    necessary.
 3. Implement the smallest complete assigned change. Preserve all snapshotted
-   pre-existing work and leave unrelated cleanup alone.
+   pre-existing work and leave unrelated cleanup alone. For an approved repeated
+   sweep or migration whose plan defines a focused check for each unit, run that
+   check after finishing the unit and before starting any unit that depends on
+   it; a failed checkpoint stops the dependent work and returns the evidence to
+   the manager. These checkpoints create no per-unit commit or stage and never
+   replace the stage's final acceptance, and builder, runtime, and independent
+   reviewer checks remain the manager-owned handoffs of step 6.
 4. If plan and repository reality meaningfully conflict, stop that item. Quote
    the plan assumption and repository evidence as a residual; never improvise
    a replacement design. Continue only independent valid items.

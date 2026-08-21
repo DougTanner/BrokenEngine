@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 namespace engine
 {
 
@@ -17,3 +19,5 @@ private:
 };
 
 } // namespace engine
+
+#endif // BT_CLIENT

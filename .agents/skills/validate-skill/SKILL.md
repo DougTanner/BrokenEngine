@@ -1,6 +1,6 @@
 ---
 name: validate-skill
-description: Validate repository skill packages with the authoritative Claude and Codex mechanical and semantic contracts. Use after creating, revising, auditing, or final-tree verifying any `.agents/skills/*/SKILL.md`, and whenever frontmatter, `agents/openai.yaml`, invocation policy, trigger quality, bundled links, or progressive disclosure need review.
+description: Validate repository skill packages with the authoritative Claude and Codex mechanical and semantic contracts. Use after creating, revising, auditing, or final-tree verifying any `.agents/skills/*/SKILL.md`, and whenever frontmatter, `agents/openai.yaml`, invocation policy, trigger quality, or bundled links need review.
 allowed-tools: [Read, Grep, Glob, PowerShell]
 ---
 
@@ -36,8 +36,10 @@ Read `references/frontmatter-schema.md` completely before interpreting frontmatt
    - Recommended: plain wording — apply the one-term-per-concept and plain-words rules in root `AGENTS.md` `## Directives`, and name concrete actions instead of abstract noun-stacks unless the stack is an established term or code identifier. Report a reintroduced synonym for an established term as a finding.
    - Recommended: phrase each rule positively as the action to take; keep a prohibition only where the requirement cannot be stated positively, and pair it with what to do instead.
    - Recommended: end each workflow step on a checkable done-condition, so the agent can tell done from not-done.
-   - Recommended: measure large bodies with `pwsh -NoProfile -File .agents/scripts/Measure-Tokens.ps1 -Path <file>`; consider progressive disclosure above 10,000 `bt-token-v1`, target at most 15,000, and give reference files over 2,000 a table of contents.
 5. List confirmed passes under Accurate checks. Do not promote ordinary quality advice to Critical unless discovery or invocation is concretely incorrect.
+
+Progressive disclosure and body/reference size belong to
+`/progressive-disclosure-review`; report neither here.
 
 For validator changes, run the disposable `VALID`/`INVALID`/`SETUP_ERROR` matrix in the schema reference. Do not commit fixture packages.
 

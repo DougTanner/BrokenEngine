@@ -660,6 +660,7 @@ nlohmann::json BuildDescribeUi(const GameBase& rGame)
 {
 	nlohmann::json result;
 	result["uiState"] = UiStateName(rGame.meUiState);
+	result["tweaksVisible"] = rGame.mbShowImGui;
 	result["gameFlags"] = GameFlagNames(rGame.mGameFlags);
 
 	result["framebuffer"] = {engine::gpGraphics->mFramebufferExtent2D.width, engine::gpGraphics->mFramebufferExtent2D.height};
@@ -1071,7 +1072,6 @@ const char* UiStateName(UiState eState)
 		case UiState::kModal: return "kModal";
 		case UiState::kPause: return "kPause";
 		case UiState::kSound: return "kSound";
-		case UiState::kTweaks: return "kTweaks";
 	}
 	return "kNone";
 }

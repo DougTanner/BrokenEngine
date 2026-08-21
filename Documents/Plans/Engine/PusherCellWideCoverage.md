@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-20T20:25:34.255Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-20T20:25:34.255Z","dependsOn":["Documents/Plans/Agents/HarnessPlacementAndPusherOverflowObservability.md"]} -->
 # Cover the whole cell with pusher zones
 
 ## Context

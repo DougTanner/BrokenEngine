@@ -1,12 +1,12 @@
 # Network Client - Session and Reconciliation
 
-Client-only game networking. `ClientSession` is the game-policy wrapper over `engine::ClientSessionRuntime`; it owns static-data application, per-frame gameplay hydration and smoke continuity, reconciliation, and desync/gameplay policy. Collection-slot hydration rules are in `../../Frame/Collections/AGENTS.md`.
+Client-only game networking. `ClientSession` is the game-policy wrapper over `engine::ClientSessionRuntime`; it owns static-data application, per-frame gameplay hydration and smoke continuity, reconciliation policy, and gameplay policy. The reconciliation replay chain that policy drives — CRC fast path, rollback, replay, catch-up — and desync reporting and escalation are engine-owned (`../../../../../Engine/Source/Network/Client/AGENTS.md`). Collection-slot hydration rules are in `../../Frame/Collections/AGENTS.md`.
 
 ## Ownership
 
-- `engine::ClientSessionRuntime` owns connection/GUID/discovery, subscription state, clock state, generic received full-state/delta adoption, received-update ring/buffer/confirmation mechanics, and static→full-state→delta drain order. `ClientSession` supplies desired coordinates, applies static data, hydrates gameplay state with smoke continuity, and owns reconciliation and desync policy; static-data arrival also requests matching terrain textures.
-- `ClientReconciler` dispatches each coordinate once per client update. Workers write only their assigned `CoordFrames`; result merging, first-wins desync selection, visual-error aggregation, and cross-coordinate player-transfer migration run after dispatch.
-- `ClientDesyncManager` coordinates debug capture, resync, and repeated-desync disconnect policy.
+- `engine::ClientSessionRuntime` owns connection/GUID/discovery, subscription state, clock state, generic received full-state/delta adoption, received-update ring/buffer/confirmation mechanics, static→full-state→delta drain order, and applying clock correction. `ClientSession` supplies desired coordinates, applies static data, hydrates gameplay state with smoke continuity, and owns reconciliation policy; static-data arrival also requests matching terrain textures.
+- `ClientReconciler` runs one engine reconcile dispatch per client update and owns what stays game-side: confirmed client-state tracking, filling in the engine-owned desync record handed back to the session, and the visual-error aggregation and cross-coordinate player-transfer migration it computes from the dispatch result. The per-coordinate work list, its parallel dispatch, the selection of the reported desync, and the record's declaration are engine-owned (`../../../../../Engine/Source/Network/Client/AGENTS.md`).
+- Desync policy that stays game-side is the resync reset sequencing and the client/server frame-difference logging that `ClientSession` exposes for the engine desync core to call back into, plus the agent full-state fixture policy (`../../Agent/AGENTS.md`). The rest of the desync core is engine-owned (`../../../../../Engine/Source/Network/Client/AGENTS.md`).
 
 ## Session Policy
 
@@ -20,9 +20,8 @@ Client-only game networking. `ClientSession` is the game-policy wrapper over `en
 
 - A server-validated tick is frozen and must not be simulated again. Matching speculative CRCs advance confirmation without replay; unresolved mismatches or due pending authoritative state enter rollback and replay. Future full states stay queued until due; a due state becomes the authoritative ring base wherever it lands — at the confirmed tick, at a matching replayed tick, or beyond an update gap — and stays the base until a later validated replayed frame supersedes it.
 - Preserve render-behind history when advancing confirmed state. Replay and catch-up must remain within the coordinate ring budget: the retained base occupies one ring slot, so the combined replay and catch-up write budget is one less than the ring size and writes can never wrap onto the base.
-- Apply transfer `StatusChange`s after each tick, matching server Destroy/Spawn order, and recompute the Frame CRC when transfers modify the result. The server recomputes the same way after its own transfers land, so this side's frame only matches the broadcast CRC if both sides recompute; dropping either recompute turns every cross-cell transfer into a reported desync.
+- Applying transfer `StatusChange`s after each replayed tick and recomputing the Frame CRC when they change the frame is engine-owned (`../../../../../Engine/Source/Network/Client/AGENTS.md`).
 - Server-load notification clears coord, clock, identity, fleet, subscription, and reconciler state before the client accepts post-load data.
-- Clock correction remains signed, but applying it to the time-step remainder floors that remainder at zero before the next reconcile advance; a correction must never produce a negative target tick.
 - Player-event and fleet-sync handlers have independent log-and-continue exception boundaries. Static-data application and per-frame gameplay hydration remain outside those catches.
 - Sticky desired subscriptions reduce visible churn; the engine slot queue owns transport throttling. During a real debug-frame wait or the synthetic full-state fixture stall, transport polling and receive-buffer drains continue while subscription updates, simulation, and reconciliation remain stalled.
 

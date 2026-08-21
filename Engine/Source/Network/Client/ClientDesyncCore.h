@@ -2,13 +2,25 @@
 
 #if defined(BT_CLIENT)
 
+// The engine owns desync reporting and escalation: the debug-frame request and correlation, the repeated-desync
+// window that escalates to disconnect, and the synthetic agent full-state fixture stall. The game supplies the two
+// policy operations this core calls back into — resetting per-coord client state for a resync and logging the
+// captured client/server Frame differences. Naming the game Frame the captured snapshot holds keeps this header out
+// of the Engine.h aggregation; its consumers include it directly.
+
 namespace game
 {
 
 struct Frame;
+
+} // namespace game
+
+namespace engine
+{
+
 struct ReconcileDesyncInfo;
 
-class ClientDesyncManager
+class ClientDesyncCore
 {
 public:
 
@@ -25,7 +37,7 @@ public:
 	{
 		return mAgentFullStateFixtureState.iTick;
 	}
-	engine::GridCoord GetAgentFullStateFixtureCoord() const
+	GridCoord GetAgentFullStateFixtureCoord() const
 	{
 		return mAgentFullStateFixtureState.coord;
 	}
@@ -34,9 +46,8 @@ public:
 	void PollDebugFrameResponse();
 	bool PollDesyncTimeout();
 	void RecoverFromDesync();
-	void ResetCoordStatesForResync();
 	void Reset();
-	void ArmAgentFullStateFixture(int64_t iTick, engine::GridCoord coord);
+	void ArmAgentFullStateFixture(int64_t iTick, GridCoord coord);
 	void ClearAgentFullStateFixture();
 
 private:
@@ -44,8 +55,8 @@ private:
 	struct DesyncDebugState
 	{
 		int64_t iTick = -1;
-		engine::GridCoord coord {};
-		std::unique_ptr<Frame> pClientFrame;
+		GridCoord coord {};
+		std::unique_ptr<game::Frame> pClientFrame;
 		std::chrono::steady_clock::time_point entryTime {};
 	};
 	DesyncDebugState mDesyncDebugState;
@@ -54,7 +65,7 @@ private:
 	{
 		bool bStalled = false;
 		int64_t iTick = -1;
-		engine::GridCoord coord {};
+		GridCoord coord {};
 	};
 	AgentFullStateFixtureState mAgentFullStateFixtureState {};
 
@@ -67,6 +78,6 @@ private:
 	static constexpr std::chrono::seconds kDesyncWindowDuration {10};
 };
 
-} // namespace game
+} // namespace engine
 
 #endif // BT_CLIENT

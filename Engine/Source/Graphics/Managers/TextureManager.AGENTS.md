@@ -7,7 +7,7 @@ Owns loaded textures, global texture descriptors, cached generated textures, and
 ## Resource Boundaries
 
 - Swapchain recreation selectively rebuilds screen-dependent targets and descriptor sets while preserving loaded textures.
-- Unflagged combined samplers and the explicit offscreen linear variants omit anisotropy. Anisotropic variants are confined to visible image-render texture sampling; format-specific smoke, elevation, model-material, and water-normal variants remain separate.
+- Explicit repeat/clamp samplers cover authored/generated deposit lookup and visible-light textures. Unflagged combined samplers, explicit offscreen linear variants, and dedicated smoke/wind variants all omit anisotropy; internal render-target reads remain non-anisotropic. Format-specific elevation, model-material, and water-normal variants remain separate.
 - Light-type textures consume a fixed reservation of bindless slots for pre-blurred results. Grow that reservation if the registered lighting-texture count exceeds its capacity.
 - A lighting texture's pre-blurred result is found under its own CRC salted with `kBlurSalt`, so the blur write site and every read site agree without a second lookup table. `ReblurAllLightingTextures` re-runs the blur for every ready lighting texture after a change that invalidates the results.
 - Pack-backed cubemaps and texture headers are trust boundaries; validate sizes before allocation or copy. Invalid deferred data preserves the placeholder rather than creating a replacement image.

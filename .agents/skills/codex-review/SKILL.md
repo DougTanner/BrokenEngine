@@ -13,7 +13,8 @@ allowed-tools: [Read, Bash, Agent]
 Claude Code runs every delegated reviewer or auditor role (Sol on Codex, per the
 root [AGENTS.md](../../../AGENTS.md) role table) — `plan-audit`,
 `plan-simplicity-review`,
-`repo-code-review`, `glsl-review`, `scope-review`, `adversarial-review`,
+`repo-code-review`, `glsl-review`, `scope-review`,
+`progressive-disclosure-review`, `adversarial-review`,
 `session-audit`, and external review lenses — on Codex/Sol through this skill.
 Parent/manager orchestrators that dispatch their own child reviewer, including
 `/next-plan-review`, are excluded, and so is the child reviewer they dispatch:
@@ -55,10 +56,13 @@ resolves to Sol.
    Write the judgment content yourself into `-ScopeFile`: the exact scope, the
    files and regions authorized for review, focus notes, and current residuals.
    The script copies that text verbatim and never authors, summarizes, or edits
-   it, and never decides which files are in scope. When a verification dispatch
-   needs a mechanical tool check the read-only sandbox cannot run, run only that
-   non-judgment check host-side first and put its verbatim result and identity
-   binding in `-ScopeFile` for the reviewer to validate, leaving every
+   it, and never decides which files are in scope. Relay a plan's agent-made
+   decisions there as reviewable claims, never as settled constraints; the
+   authority-order directive in the root [AGENTS.md](../../../AGENTS.md) owns
+   which decisions bind. When a verification dispatch needs a mechanical tool
+   check the read-only sandbox cannot run, run only that non-judgment check
+   host-side first and put its verbatim result and identity binding in
+   `-ScopeFile` for the reviewer to validate, leaving every
    evaluation of that result to the reviewer alone. Include the assigned
    skill's own required evidence in that
    same file before dispatching: `plan-audit`'s draft execution card
@@ -117,10 +121,19 @@ resolves to Sol.
    then returns a single-line JSON receipt. A `completed` receipt is followed by
    the separator line `--- findings ---` and then the findings themselves, all on
    that same call's stdout, so the success path never reads `<out>`; that file
-   remains the retained full critique on disk. Validate the inline result:
-   success requires a non-empty structured result — a skill-native status line or
-   a verdict token, either vocabulary counts. Benign CLI notices/deprecations are
-   not failures. Return the handoff plus the `<out>` path, and do not paste extra
+   remains the retained full critique on disk.
+
+   A result counts as well-formed only when its last non-empty line is the final
+   verdict line every prompt mandates — `PASS`, `CHANGES-REQUIRED: <n>`, or
+   `BLOCKED: <reason>`. The script's `.NOTES` header documents that check, the
+   automatic retry behind it, and every receipt field. What each terminal status
+   means for you: `completed` — proceed, and a `retried: true` value on it needs
+   no action; `malformed` or `failed` — map it to `CODEX-UNAVAILABLE` under
+   `## Fallback`. Your own judgment remains the backstop for a result the
+   mechanical check accepted: benign CLI notices/deprecations are not failures,
+   but a `completed` result that is drafting notes rather than a review of the
+   assigned scope is malformed however it ends, and `## Fallback` says what to do
+   about it. Return the handoff plus the `<out>` path, and do not paste extra
    narration beyond the concise handoff into the session.
 
    A review that outruns the budget comes back as a `running` receipt naming its
@@ -133,11 +146,11 @@ resolves to Sol.
 
    That call waits the same bounded budget and answers in the same shapes, so a
    `completed` answer carries the separator and the findings inline exactly as
-   above. `completed` or `failed` ends the wait. Because the run is detached, a
-   call killed by its host timeout never kills the review and the same `runId`
-   always resumes it, and every call stays bounded below the host's 10-minute
-   command cap, so a long review never needs a background run or a truncated
-   scope.
+   above. `completed`, `malformed`, or `failed` ends the wait. Because the run
+   is detached, a call killed by its host timeout never kills the review and the
+   same `runId` always resumes it, and every call stays bounded below the host's
+   10-minute command cap, so a long review never needs a background run or a
+   truncated scope.
 
 ## Manager evaluation
 
@@ -152,9 +165,24 @@ those steps, and even then present the cost to the user before implementing.
 
 ## Fallback
 
-Genuine failure means a `failed` wait status, a non-zero script exit, or
-malformed output. Duration alone is never a `CODEX-UNAVAILABLE` cause: a run
-that stays `running` across many waits is progressing normally, so keep waiting.
+Genuine failure means a `failed` wait status, a `malformed` wait status, or a
+non-zero script exit. None of the three is retried. Duration alone is never a
+`CODEX-UNAVAILABLE` cause: a run that stays `running` across many waits is
+progressing normally, so keep waiting.
+
+One bounded exception covers what the script's mechanical check cannot see. When
+a `completed` result passed that check but this session judges it malformed
+anyway — leaked drafting notes, or an answer to no assigned scope — re-dispatch
+the identical prompt exactly once, with a fresh `<out>` path and `-NoRetry`:
+
+```powershell
+pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <the same promptPath> -OutFile <fresh out> -NoRetry
+```
+
+`-NoRetry` spends no automatic retry, so this dispatch is the assignment's last
+one: its result is final, and a second malformed result is reported as
+`CODEX-UNAVAILABLE` under the rule below.
+
 On a genuine failure, stop and report `CODEX-UNAVAILABLE: <short reason>` with
 the unchanged target. This is a
 blocking failure: never dispatch a substitute reviewer automatically. Only
@@ -162,8 +190,8 @@ explicit user authorization in the current session unblocks it, by routing the
 same unchanged assignment to the normal Opus `reviewer` subagent — or, if that
 subagent type is also unavailable, at most once to `subagent_type:
 "general-purpose"` with `model: "opus"` and the reviewer or auditor role stated
-at the top of the prompt. Do not retry Codex or add another reviewer for
-consensus.
+at the top of the prompt. Do not retry Codex beyond the single re-dispatch above
+or add another reviewer for consensus.
 
 ## Notes
 

@@ -217,9 +217,18 @@ function Get-InventoryEntry([hashtable] $Row, [hashtable] $BinaryPaths, [bool] $
 	}
 }
 
+function Test-InstructionDocPath([string] $Path) {
+	$leaf = $Path.Substring($Path.LastIndexOf('/') + 1)
+	if ($leaf -ceq 'AGENTS.md' -or $leaf -ceq 'CLAUDE.md') { return $true }
+	if (-not $leaf.ToLowerInvariant().EndsWith('.md')) { return $false }
+	return $Path.StartsWith('.agents/skills/') -or $Path.StartsWith('.agents/references/')
+}
+
 function Get-RoutingTrigger([object[]] $Entries) {
 	$classes = [Collections.Generic.HashSet[string]]::new([string[]] @())
 	$membershipClasses = [Collections.Generic.HashSet[string]]::new([string[]] @())
+	# Instruction docs span the doc and skill classes, so this one trigger is decided from the paths.
+	$instructionDoc = $false
 	foreach ($entry in $Entries) {
 		[void] $classes.Add($entry.Class)
 		if ($null -ne $entry.OldClass) { [void] $classes.Add($entry.OldClass) }
@@ -227,6 +236,8 @@ function Get-RoutingTrigger([object[]] $Entries) {
 			[void] $membershipClasses.Add($entry.Class)
 			if ($null -ne $entry.OldClass) { [void] $membershipClasses.Add($entry.OldClass) }
 		}
+		if (Test-InstructionDocPath $entry.Path) { $instructionDoc = $true }
+		if ($null -ne $entry.OldPath -and (Test-InstructionDocPath $entry.OldPath)) { $instructionDoc = $true }
 	}
 	$cpp = $classes.Contains('cpp') -or $classes.Contains('dual-language-header')
 	$glsl = $classes.Contains('glsl') -or $classes.Contains('dual-language-header')
@@ -239,6 +250,7 @@ function Get-RoutingTrigger([object[]] $Entries) {
 		updateVcxproj = $sourceMembership
 		updateClaudeDocs = $cpp -or $glsl
 		validateSkill = $classes.Contains('skill')
+		progressiveDisclosureReview = $instructionDoc
 		planTouched = $classes.Contains('plan')
 	}
 }

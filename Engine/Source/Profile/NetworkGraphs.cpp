@@ -2,11 +2,11 @@
 
 #if defined(BT_CLIENT)
 
-#include "ProfileManager.h"
+#include "ProfileManagerBase.h"
 
 #include "Network/Client/Client.h"
 
-namespace game
+namespace engine
 {
 
 static ImPlotPoint SmoothedGetter(int iIndex, void* pData)
@@ -31,7 +31,7 @@ static void PlotSmoothed(const char* pLabel, common::Smoothed<int64_t>& rSmoothe
 	}
 }
 
-void ProfileManager::RenderImPlotGraphs()
+void ProfileManagerBase::RenderImPlotGraphs()
 {
 	if (meProfileScreen != engine::ProfileScreen::kNetwork)
 	{
@@ -58,6 +58,6 @@ void ProfileManager::RenderImPlotGraphs()
 	ImGui::End();
 }
 
-} // namespace game
+} // namespace engine
 
 #endif // BT_CLIENT

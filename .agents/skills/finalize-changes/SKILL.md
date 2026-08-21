@@ -98,7 +98,8 @@ every other lease is foreign.
 3. Main dispatches `/verify-changes` on the resulting diff, only once every
    hygiene handoff the session-change inventory's `triggers` object reports
    true already exists — `/code-style-review` for changed C++,
-   `/update-vcxproj`, `/validate-skill`, `/update-claude-docs` — and passes
+   `/update-vcxproj`, `/validate-skill`, `/update-claude-docs`,
+   `/progressive-disclosure-review` — and passes
    every typed receipt verbatim, each `broken-engine-build-result/v1` envelope
    included, never summarized. A meaningful change to that diff re-runs review
    of the changed regions only.

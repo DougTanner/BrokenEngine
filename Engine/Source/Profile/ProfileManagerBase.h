@@ -376,7 +376,10 @@ public:
 	void GpuStop(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eGpuTimer);
 	void GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers eEnd, bool bLatchShadowSample);
 
-	virtual void RenderImPlotGraphs() {}
+	void RenderImPlotGraphs();
+
+	void SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError);
+	void SetReconcileCounters(int64_t iCrcValidated, int64_t iAssumed, int64_t iCrcFastPath, int64_t iStatusChangeReplay, int64_t iKnockOnReplay);
 #endif // BT_CLIENT
 
 	void BootStart(BootTimers eBootTimer);
@@ -396,8 +399,6 @@ public:
 	std::string_view GetCpuTimerName(int64_t iIndex);
 	int64_t GetCpuCounterCount() const;
 	int64_t GetCpuTimerCount() const;
-
-	virtual void FormatGameScreens(common::Workbuffer&) {}
 
 #if defined(BT_CLIENT)
 	GpuTimer* GetGpuTimers() { return mGpuTimers; }
@@ -475,6 +476,34 @@ protected:
 	std::unique_ptr<common::DiagnosticLog> mpDumpLog;
 	std::chrono::steady_clock::time_point mDumpStartTime {};
 	std::chrono::steady_clock::time_point mLastDumpTime {};
+#endif // BT_CLIENT
+
+private:
+
+#if defined(BT_CLIENT)
+	void FormatNetworkScreen(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkTransport(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENetPeer& rPeer);
+	void FormatNetworkTraffic(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkSync(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkPrediction(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkClock(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkReconciliation(common::Workbuffer& rWorkbuffer);
+
+	common::Smoothed<int64_t> mSmoothedRtt;
+	common::Smoothed<int64_t> mSmoothedJitter;
+	common::Smoothed<int64_t> mSmoothedClockOffset;
+	common::Smoothed<int64_t> mSmoothedClockTarget;
+	common::Smoothed<int64_t> mSmoothedClockError;
+	common::Smoothed<int64_t> mSmoothedRollback;
+	common::Smoothed<int64_t> mSmoothedBuffer;
+	common::Smoothed<int64_t> mSmoothedRecv;
+
+	common::InTheLastSecond mCrcValidatedTicksPerSecond;
+	common::InTheLastSecond mAssumedTicksPerSecond;
+	common::InTheLastSecond mCrcFastPathEventsPerSecond;
+	common::InTheLastSecond mStatusChangeReplayTicksPerSecond;
+	common::InTheLastSecond mKnockOnReplayTicksPerSecond;
 #endif // BT_CLIENT
 };
 

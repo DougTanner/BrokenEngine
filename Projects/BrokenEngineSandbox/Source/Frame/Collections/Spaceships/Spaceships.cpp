@@ -406,12 +406,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 			},
 			.iPushedTick = rFrame.interpolate.iTick,
 		};
-		engine::ComputeTransferDelta(bounds, vecPosition, request.iDeltaX, request.iDeltaY);
-
-		// Heap realloc warning: capacity exceeded during a shared per-tick burst. Producers are
-		// unbounded, so investigate entities re-flagging kTransfer across iterations or an
-		// unexpected push path.
-		if (rFrame.postRender.transferRequests.size() == rFrame.postRender.transferRequests.capacity()) [[unlikely]]
+		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError,
 				"Spaceship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}",
@@ -428,15 +423,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 				rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
-		common::ValidateVector<true >(request.data.vecPosition);
-		common::ValidateVector<false>(request.data.vecDirection);
-		common::ValidateVector<false>(request.data.vecVelocity);
-		{
-			// Heap: no finite reserve can be proven sufficient because engine::GrowPairedCollections
-			// grows collections unbounded
-			ScopedSuppressAllocationTracking suppress;
-			rFrame.postRender.transferRequests.push_back(request);
-		}
+		PushTransferRequest(rFrame.postRender, request);
 
 		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, true);
 

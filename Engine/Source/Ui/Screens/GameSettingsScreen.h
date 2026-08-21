@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "Ui/LocalizationBase.h"
 
 namespace engine
@@ -21,3 +23,5 @@ private:
 };
 
 } // namespace engine
+
+#endif // BT_CLIENT

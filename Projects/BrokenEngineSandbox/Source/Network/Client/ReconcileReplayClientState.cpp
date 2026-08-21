@@ -10,9 +10,9 @@ namespace game
 
 #if defined(BT_CLIENT)
 
-static bool FindMatchingPlayerInCoord(std::span<const CoordWork> works, engine::GridCoord destination, engine::global_id_t globalPlayerId)
+static bool FindMatchingPlayerInCoord(std::span<const engine::CoordWork> works, engine::GridCoord destination, engine::global_id_t globalPlayerId)
 {
-	for (const CoordWork& rDestWork : works)
+	for (const engine::CoordWork& rDestWork : works)
 	{
 		if (rDestWork.coord != destination)
 		{
@@ -20,14 +20,14 @@ static bool FindMatchingPlayerInCoord(std::span<const CoordWork> works, engine::
 		}
 
 		const engine::CoordFrames& rDestFrames = *rDestWork.pFrames;
-		const CoordScratch& rDestScratch = rDestWork.scratch;
+		const engine::CoordScratch& rDestScratch = rDestWork.scratch;
 
 		const Frame* pDestFrame = nullptr;
 		if (rDestScratch.iReplayStackCount > 0)
 		{
 			pDestFrame = rDestScratch.replayStack[rDestScratch.iReplayStackCount - 1];
 		}
-		else if ((rDestScratch.flags & ReconcileScratchFlags::kCrcFastPath) && rDestScratch.outputLayout.iHead >= 0)
+		else if ((rDestScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath) && rDestScratch.outputLayout.iHead >= 0)
 		{
 			int64_t iConfirmedPhysical = SnapshotIndex(rDestScratch.outputLayout.iHead, rDestScratch.outputLayout.iConfirmedInner);
 			pDestFrame = rDestFrames.snapshots[iConfirmedPhysical].get();
@@ -51,17 +51,17 @@ static bool FindMatchingPlayerInCoord(std::span<const CoordWork> works, engine::
 	return false;
 }
 
-void ReconcileUpdateClientState(std::span<const CoordWork> works, bool bAnyFullReplay, ConfirmedClientState& rInOutState)
+void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool bAnyFullReplay, ConfirmedClientState& rInOutState)
 {
 	ConfirmedClientState clientState = rInOutState;
 
 	if (bAnyFullReplay)
 	{
 		// Scan full-replay coords for client migration via transfer requests
-		for (const CoordWork& rWork : works)
+		for (const engine::CoordWork& rWork : works)
 		{
-			const CoordScratch& rScratch = rWork.scratch;
-			if (rScratch.flags & ReconcileScratchFlags::kCrcFastPath)
+			const engine::CoordScratch& rScratch = rWork.scratch;
+			if (rScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath)
 			{
 				continue;
 			}

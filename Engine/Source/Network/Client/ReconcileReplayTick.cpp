@@ -1,22 +1,24 @@
+#include "Pch.h"
+
 #include "Network/Client/ReconcileReplay.h"
-
-#include "Game.h"
-#include "Frame/FrameBase.h"
-#include "Frame/StatusChange.h"
-#include "Network/Client/ClientReconciler.h"
-#include "SpawnTransfer.h"
-
-namespace game
-{
 
 #if defined(BT_CLIENT)
 
-static std::unique_ptr<Frame> CloneFrameViaSerialization(const Frame& rFrame)
+#include "Frame/Frame.h"
+#include "Frame/FrameBase.h"
+#include "Frame/FrameInput.h"
+#include "Frame/StatusChange.h"
+#include "SpawnTransfer.h"
+
+namespace engine
+{
+
+static std::unique_ptr<game::Frame> CloneFrameViaSerialization(const game::Frame& rFrame)
 {
 	std::ostringstream outputStream(std::ios::binary);
 	outputStream << rFrame;
 	std::istringstream inputStream(outputStream.str(), std::ios::binary);
-	std::unique_ptr<Frame> pClone = std::make_unique<Frame>();
+	std::unique_ptr<game::Frame> pClone = std::make_unique<game::Frame>();
 	inputStream >> *pClone;
 	return pClone;
 }
@@ -89,7 +91,7 @@ static void LogTransferSummary(const CoordWork& rWork, int64_t iTick, int64_t iT
 	}
 }
 
-static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, FrameInput& rFrameInput, bool bIsReplay)
+static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, game::FrameInput& rFrameInput, bool bIsReplay)
 {
 	engine::CoordFrames& rFrames = *rWork.pFrames;
 	CoordScratch& rScratch = rWork.scratch;
@@ -111,11 +113,11 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 	int64_t iNextSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
 	if (rFrames.snapshots[iNextSlot] == nullptr)
 	{
-		rFrames.snapshots[iNextSlot] = std::make_unique<Frame>();
+		rFrames.snapshots[iNextSlot] = std::make_unique<game::Frame>();
 	}
 
-	Frame* pCurrent = rScratch.replayStack[rScratch.iReplayStackCount - 1];
-	Frame* pNext = rFrames.snapshots[iNextSlot].get();
+	game::Frame* pCurrent = rScratch.replayStack[rScratch.iReplayStackCount - 1];
+	game::Frame* pNext = rFrames.snapshots[iNextSlot].get();
 
 	pNext->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated);
 
@@ -134,30 +136,30 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 	int64_t iTransferSpaceshipCount = 0;
 	int64_t iTransferMissileCount = 0;
 	engine::global_id_t transferPlayerIds[8] {};
-	for (const StatusChange& rStatusChange : rFrameInput.statusChanges)
+	for (const game::StatusChange& rStatusChange : rFrameInput.statusChanges)
 	{
-		if (IsTransferType(rStatusChange.eType))
+		if (game::IsTransferType(rStatusChange.eType))
 		{
-			const TransferData& rData = std::get<TransferData>(rStatusChange.data);
-			SpawnTransfer(*pNext, rStatusChange.eType, rData, pNext->postRender.playerAlignment);
+			const game::TransferData& rData = std::get<game::TransferData>(rStatusChange.data);
+			game::SpawnTransfer(*pNext, rStatusChange.eType, rData, pNext->postRender.playerAlignment);
 			bHadTransfers = true;
 
 			switch (rStatusChange.eType)
 			{
-				case StatusChangeType::kTransferPlayer:
+				case game::StatusChangeType::kTransferPlayer:
 					if (iTransferPlayerCount < 8)
 					{
 						transferPlayerIds[iTransferPlayerCount] = rData.globalPlayerId;
 					}
 					++iTransferPlayerCount;
 					break;
-				case StatusChangeType::kTransferBlaster:
+				case game::StatusChangeType::kTransferBlaster:
 					++iTransferBlasterCount;
 					break;
-				case StatusChangeType::kTransferSpaceship:
+				case game::StatusChangeType::kTransferSpaceship:
 					++iTransferSpaceshipCount;
 					break;
-				case StatusChangeType::kTransferMissile:
+				case game::StatusChangeType::kTransferMissile:
 					++iTransferMissileCount;
 					break;
 				default:
@@ -170,9 +172,9 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 		rWork.pFrames->iLastSpawnTransferLogTick = iTick;
 		LogTransferSummary(rWork, iTick, iTransferPlayerCount, iTransferBlasterCount, iTransferSpaceshipCount, iTransferMissileCount, transferPlayerIds, std::min(iTransferPlayerCount, int64_t {8}));
 	}
-	std::erase_if(rFrameInput.statusChanges, [](const StatusChange& rStatusChange)
+	std::erase_if(rFrameInput.statusChanges, [](const game::StatusChange& rStatusChange)
 	{
-		return IsTransferType(rStatusChange.eType);
+		return game::IsTransferType(rStatusChange.eType);
 	});
 
 	if (bHadTransfers)
@@ -188,12 +190,12 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 	return true;
 }
 
-static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const engine::CoordFrames::CoordServerUpdate& rUpdate, const FrameInput& rFrameInput)
+static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const engine::CoordFrames::CoordServerUpdate& rUpdate, const game::FrameInput& rFrameInput)
 {
 	engine::CoordFrames& rFrames = *rWork.pFrames;
 	CoordScratch& rScratch = rWork.scratch;
 
-	Frame& rCurrentFrame = *rScratch.replayStack[rScratch.iReplayStackCount - 1];
+	game::Frame& rCurrentFrame = *rScratch.replayStack[rScratch.iReplayStackCount - 1];
 	rCurrentFrame.interpolate.frameFlags.Clear(engine::FrameFlags::kRecalculated);
 	common::crc_t clientCrc = rCurrentFrame.postRender.sharedCrc;
 
@@ -242,7 +244,7 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxCo
 			rScratch.flags.Set(ReconcileScratchFlags::kReSimOccurred);
 		}
 
-		FrameInput frameInput;
+		game::FrameInput frameInput;
 		frameInput.statusChanges = updateIt->second.statusChanges;
 
 		if (!ReconcileRunTickCoord(rWork, iTick, rfTime, frameInput, true))
@@ -300,7 +302,7 @@ static bool ReconcileForwardStepCoord(CoordWork& rWork, int64_t iTick, float& rf
 
 	rfTime += engine::kfDeltaTime;
 
-	FrameInput frameInput;
+	game::FrameInput frameInput;
 	auto updateIt = rFrames.serverUpdates.find(iTick);
 	if (updateIt != rFrames.serverUpdates.end())
 	{
@@ -360,7 +362,7 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 
 	int64_t iTailOffset = rFrames.iSnapshotCount - 1;
 	int64_t iTailPhysical = SnapshotIndex(rFrames.iSnapshotHead, iTailOffset);
-	Frame* pTail = rFrames.snapshots[iTailPhysical].get();
+	game::Frame* pTail = rFrames.snapshots[iTailPhysical].get();
 	if (pTail == nullptr || pTail->interpolate.iTick >= iTargetTick)
 	{
 		return;
@@ -398,6 +400,6 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 		static_cast<int64_t>(engine::kiNetworkBufferSize));
 }
 
-#endif // BT_CLIENT
+} // namespace engine
 
-} // namespace game
+#endif // BT_CLIENT

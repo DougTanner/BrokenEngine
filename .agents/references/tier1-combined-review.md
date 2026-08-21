@@ -17,10 +17,13 @@ folded in — it binds to the final prepared diff, which does not exist yet.
 1. Step 5 coherence review of the changed bytes. Owner: Step 5's direct
    coherence routing. Passes when no accepted semantic finding remains
    unresolved.
-2. Every Step 6 reviewer-role check the change triggers — today `/validate-skill`
-   for a changed `.agents/skills/*/SKILL.md`. Run the skill in full and return
-   its complete PASS handoff unmodified, exactly as `/verify-changes` requires
-   for a skill change. Passes on that skill's own pass condition.
+2. Every Step 6 reviewer-role check the change triggers — today
+   `/validate-skill` for a changed `.agents/skills/*/SKILL.md`, and
+   `/progressive-disclosure-review` for a changed `AGENTS.md`, `CLAUDE.md`,
+   `.agents/skills/**/*.md`, or `.agents/references/**/*.md` file. Run each triggered
+   skill in full and return its complete handoff unmodified, exactly as
+   `/verify-changes` requires for a skill change. Each passes on its own skill's
+   pass condition.
 3. When Step 7 applies — a stage completing without landing — map every approved
    criterion and invariant to evidence that settles the question on its own,
    including each duplicate check's independent signal, using Step 7's Tier-1
@@ -41,8 +44,8 @@ Components 1 and 3 have no owning skill output format, so the pass returns:
 - `Criteria` — one row per approved criterion and invariant: the criterion, the
   evidence, and pass or fail. Omitted when Step 7 does not apply.
 
-Component 2 returns its skill's own complete handoff verbatim; never summarize,
-reformat, or merge it into the sections above.
+Component 2 returns each triggered skill's own complete handoff verbatim, one
+after another; never summarize, reformat, or merge them into the sections above.
 
 ## Routing
 

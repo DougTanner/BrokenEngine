@@ -111,8 +111,10 @@ the exact objective, owned scope/exclusions, fixed decisions, governing paths,
 affected artifacts, meaningful identity, acceptance checks, prohibitions, and
 return format. Flag a Codex turn forked with the conversation context carried
 along unless it is the smallest positive fork and gives a concrete reason
-authoritative conversation text could not safely be summarized. Require the
-standard handoff:
+authoritative conversation text could not safely be summarized. Require it to
+answer this one question as part of the same analysis:
+`Which reasonable alternative explanation for the recorded workflow outcome is not tested by the current evidence, and what existing artifact would confirm or refute it? Return none when every material explanation is already covered.`
+Require the standard handoff:
 
 ```text
 Status: PASS | BLOCKED
@@ -215,6 +217,21 @@ evidence inputs, and governing contract were unchanged, plus measured cost,
 signal gained, and safety risk of removal. A control not firing once is not
 removal evidence. Prioritize from demonstrated impact and risk; no repetition,
 extra reconcile, or elapsed-time threshold is automatically P0.
+
+Carry an improvement forward only when this landing's evidence supports it
+directly, the signal is durable rather than one session's stylistic preference,
+and it would plausibly change a future decision. A correction also names the
+existing owning skill, script, or document and the concrete decision rule that
+owner is missing or leaves ambiguous; an owner that states the broad principle
+but does not decide the case still qualifies, and a candidate with no such gap
+does not. Recommend a genuinely unowned capability as a new capability rather
+than forcing it into a correction to an owner that does not own it.
+
+When the evidence proves a recurring failure, propose the highest enforcement
+that evidence supports, in this order: make the invalid state unrepresentable;
+add deterministic validation, a lint rule, or a banned-API rule; centralize the
+behavior in one canonical helper; add a runtime check; state it in prose only
+when the judgment cannot be encoded.
 
 ## Report
 

@@ -3,9 +3,9 @@
 #if defined(BT_CLIENT)
 
 #include "Frame/GridCoord.h"
+#include "Network/Client/ClientDesyncCore.h"
 
 #include "Fleet.h"
-#include "Network/Client/ClientDesyncManager.h"
 #include "Network/Client/ClientReconciler.h"
 
 namespace engine
@@ -50,7 +50,6 @@ public:
 	void ConnectToServer(std::string_view serverAddress);
 
 	// Main-loop integration
-	void Poll();
 	void Reconcile();
 
 	// Subscriptions
@@ -71,8 +70,12 @@ public:
 	// Subscriptions
 	void UpdateDesiredCoords(SubscriptionChangeReason eReason);
 
+	// Game policy the engine desync core calls back into
+	void ResetCoordStatesForResync();
+	void LogDesyncFrameDifferences(const Frame& rClientFrame, const Frame& rServerFrame);
+
 	// Managers
-	std::unique_ptr<ClientDesyncManager> mpDesyncManager;
+	std::unique_ptr<engine::ClientDesyncCore> mpDesyncManager;
 	std::unique_ptr<ClientReconciler> mpReconciler;
 	std::unique_ptr<engine::ClientSessionRuntime> mpRuntime;
 
@@ -89,7 +92,6 @@ private:
 	void ProcessReceivedGamePackets();
 	void OnCoordReleased(engine::GridCoord coord);
 	void HydrateReceivedFullState(Frame& rReceived, const Frame* pRingTail);
-	void ResetCoordStatesForResync();
 
 	// Game packet helpers
 	void ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent);

@@ -4,45 +4,105 @@ Project-specific launch configuration, verification recipes, durable caveats, an
 
 ## Launch
 
-Follow the skill's generic launch requirements (`--loopback-only`, log parents under the absolute adopted worktree's `Temp`, and Codex `Start-Process -PassThru` PID retention), then launch these executables. This fence is one independent shell call; assign its path values locally.
+Follow the skill's generic launch requirements (`--loopback-only`, log parents under the absolute adopted worktree's `Temp`, `Start-Process -PassThru` PID retention, and the per-role process-check sequence), then launch these executables. Every fence below is its own independent shell call and they run in the order shown; assign each fence's path values locally and substitute values retained from an earlier fence as literals.
+
+First create the directories and fix this run's single process-check state path. The timestamp makes that path new for every run, so no earlier run's registrations are ever inherited:
+
+```powershell
+$ROOT = '<absolute adopted worktree>'
+$TempDir = Join-Path $ROOT 'Temp'
+New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
+$AppDataRoot = Join-Path $TempDir 'AppData'
+New-Item -ItemType Directory -Force -Path $AppDataRoot | Out-Null
+$RunStamp = [datetime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
+$LaunchPaths = [ordered]@{
+	appDataRoot = $AppDataRoot
+	processCheckStatePath = Join-Path $TempDir "harness-process-check-$RunStamp.json"
+	serverLog = Join-Path $TempDir 'server-agent.log'
+	clientLog = Join-Path $TempDir 'client-agent.log'
+}
+$LaunchPaths | ConvertTo-Json -Compress
+```
+
+Retain that record outside shell state. Every process-check action, wait helper, and release call of this run uses that one `processCheckStatePath`, and no later run reuses it; a per-scenario run that uses its own AppData root generates its own state path the same way.
+
+Baseline the server's crash-report candidates before starting it. This launch block passes `--app-data-directory`, so pass the same root as `-ConfiguredAppDataRoot`:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role 'server' -GameName 'Broken Engine Sandbox Server' -ConfiguredAppDataRoot '<absolute app-data root>'
+```
+
+Then launch the server and retain its exact PID and process-start identity:
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'
 $GameDataDirectory = '<normalized Data path>'
 $Output = Join-Path $ROOT 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output'
 $ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
-$ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
-$TempDir = Join-Path $ROOT 'Temp'
-New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
-$AppDataRoot = Join-Path $TempDir 'AppData'
-New-Item -ItemType Directory -Force -Path $AppDataRoot | Out-Null
 $QuotedData = '"' + $GameDataDirectory + '"'
-$QuotedAppData = '"' + $AppDataRoot + '"'
-$ServerLog = Join-Path $TempDir 'server-agent.log'
-$ClientLog = Join-Path $TempDir 'client-agent.log'
-$LifecycleRecord = [ordered]@{
-	serverPid = $null
-	clientPid = $null
-	appDataRoot = $AppDataRoot
-}
-
+$QuotedAppData = '"' + '<absolute app-data root>' + '"'
+$QuotedServerLog = '"' + '<absolute server log path>' + '"'
 $ServerProcess = Start-Process -FilePath $ServerExe -ArgumentList @(
 	'--agent-port', '27100', '--loopback-only', '--data-directory', $QuotedData,
 	'--app-data-directory', $QuotedAppData,
-	'--log-file', ('"' + $ServerLog + '"')) -WindowStyle Hidden -PassThru -ErrorAction Stop
-$LifecycleRecord.serverPid = $ServerProcess.Id
-$LifecycleRecord | ConvertTo-Json -Compress
-$ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @(
-	'--agent-port', '27101', '--loopback-only', '--data-directory', $QuotedData,
-	'--app-data-directory', $QuotedAppData,
-	'--windowed', '1600x900', '--log-file', ('"' + $ClientLog + '"')) -WindowStyle Hidden -PassThru -ErrorAction Stop
-$LifecycleRecord.clientPid = $ClientProcess.Id
+	'--log-file', $QuotedServerLog) -WindowStyle Hidden -PassThru -ErrorAction Stop
+$LifecycleRecord = [ordered]@{
+	serverPid = $ServerProcess.Id
+	serverStartTimeUtc = $ServerProcess.StartTime.ToUniversalTime().ToString('o')
+	clientPid = $null
+	clientStartTimeUtc = $null
+	appDataRoot = '<absolute app-data root>'
+	processCheckStatePath = '<absolute process-check state path>'
+}
 $LifecycleRecord | ConvertTo-Json -Compress
 ```
 
-Both processes share the absolute app-data root recorded as `appDataRoot`, so saves, settings, caches, and replay artifacts land under this worktree instead of the per-user AppData folder, each process in its own `game::kGameName` child. Crash reports not directed to the Desktop (the prompt's No choice) use the `--app-data-directory` root when the complete identity fits the fixed path buffer: `<app-data-root>\<Game Name>\<Game-Name>-Crash-Report.txt`; otherwise the existing `%APPDATA%` per-user location remains. A fresh root has no autosave and cold `pipeline.cache`/`BrdfLut.cache`, so the first launch after creating it is slower; wrapper-worktree setup pre-seeds those two caches into the shared `Temp\AppData` root while creating the worktree, taking each file independently from the primary checkout's `Temp\AppData\Broken Engine Sandbox` when present and otherwise from `%APPDATA%\Broken Engine Sandbox`, skipping a file present in neither source so that file stays cold, so the cold-cache cost applies mainly to per-scenario roots. The stopped-server AppData recipe below reads and backs up from `<absolute app-data root>\Broken Engine Sandbox Server`, not `%APPDATA%`.
+Register that exact identity immediately, substituting the snapshot's `serverPid` and `serverStartTimeUtc`:
 
-The latest compact JSON snapshot is authoritative. Retain each snapshot outside shell state. If the client launch fails, use the earlier snapshot and release only its non-null `serverPid`; do not invent a client PID. If the server launch fails, no PID argument exists. After both launches, release with both exact non-null numeric PIDs. `reset` is server-scoped and never clears the client's own persisted state: the client writes `ClientState.bin` under `<absolute app-data root>\Broken Engine Sandbox` whenever the tracked state — focused fleet/ship or camera zoom/height target — changes during a run, and reloads it on the next start, so even a killed or crashed client leaves persisted state behind. Two runs sharing one root therefore start the second run from the first run's client settings, which silently invalidates a before/after comparison. A scenario that requires fresh client state must instead use a per-scenario directory that does not exist yet, for example `<absolute app-data root>\AppData-CameraComparison`, and record that the entire per-scenario root was absent before the launch block's `New-Item` created it. Scenarios that deliberately depend on persisted client or server state keep the shared `<absolute adopted worktree>\Temp\AppData` root above, which is also what the cold-cache note and the stopped-server recipe below assume.
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Register -StatePath '<absolute process-check state path>' -Role 'server' -ProcessId <server PID> -StartTimeUtc '<server start time UTC>'
+```
+
+Then check immediately, before any readiness wait, so a server that already died during startup is caught against its true pre-launch baseline:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Check -StatePath '<absolute process-check state path>'
+```
+
+Run the same four-call sequence for the client. Its baseline uses the client's own game name:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role 'client' -GameName 'Broken Engine Sandbox' -ConfiguredAppDataRoot '<absolute app-data root>'
+```
+
+```powershell
+$ROOT = '<absolute adopted worktree>'
+$GameDataDirectory = '<normalized Data path>'
+$Output = Join-Path $ROOT 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output'
+$ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
+$QuotedData = '"' + $GameDataDirectory + '"'
+$QuotedAppData = '"' + '<absolute app-data root>' + '"'
+$QuotedClientLog = '"' + '<absolute client log path>' + '"'
+$ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @(
+	'--agent-port', '27101', '--loopback-only', '--data-directory', $QuotedData,
+	'--app-data-directory', $QuotedAppData,
+	'--windowed', '1600x900', '--log-file', $QuotedClientLog) -WindowStyle Hidden -PassThru -ErrorAction Stop
+$LifecycleRecord = [ordered]@{
+	serverPid = <server PID>
+	serverStartTimeUtc = '<server start time UTC>'
+	clientPid = $ClientProcess.Id
+	clientStartTimeUtc = $ClientProcess.StartTime.ToUniversalTime().ToString('o')
+	appDataRoot = '<absolute app-data root>'
+	processCheckStatePath = '<absolute process-check state path>'
+}
+$LifecycleRecord | ConvertTo-Json -Compress
+```
+
+Then `Register` the client with `-Role 'client'` and the snapshot's `clientPid`/`clientStartTimeUtc`, and run the same immediate `Check`. The skill owns the process-check result shape and exit codes: exit `0` healthy, exit `2` an unexpected exit whose findings name the role, report path, exception headline, and retained evidence location, exit `1` a setup or state failure.
+
+Both processes share the absolute app-data root recorded as `appDataRoot`, so saves, settings, caches, and replay artifacts land under this worktree instead of the per-user AppData folder, each process in its own `game::kGameName` child. That name separates only the client and server children, so an additional simultaneous client gets its own root instead (see [Additional simultaneous client](#additional-simultaneous-client)). Crash reports not directed to the Desktop (the prompt's No choice) use the `--app-data-directory` root when the complete identity fits the fixed path buffer: `<app-data-root>\<Game Name>\<Game-Name>-Crash-Report.txt`; otherwise the existing `%APPDATA%` per-user location remains. These are the identities the process check baselines, which is why its `-GameName` is the role's `<Game Name>` (`Broken Engine Sandbox Server` or `Broken Engine Sandbox`) and its `-ConfiguredAppDataRoot` is the same root this block launches with. A report the check reports as newly written stays on disk as evidence; never delete, move, or rewrite one. A fresh root has no autosave and cold `pipeline.cache`/`BrdfLut.cache`, so the first launch after creating it is slower; wrapper-worktree setup pre-seeds those two caches into the shared `Temp\AppData` root while creating the worktree, taking each file independently from the primary checkout's `Temp\AppData\Broken Engine Sandbox` when present and otherwise from `%APPDATA%\Broken Engine Sandbox`, skipping a file present in neither source so that file stays cold, so the cold-cache cost applies mainly to per-scenario roots. The stopped-server AppData recipe below reads and backs up from `<absolute app-data root>\Broken Engine Sandbox Server`, not `%APPDATA%`.
+
+The latest compact JSON snapshot is authoritative. Retain each snapshot outside shell state; its `serverStartTimeUtc`/`clientStartTimeUtc` values are only for the matching `Register` call, and its `processCheckStatePath` is the value every later process check, wait helper, and release call uses. If the client launch fails, use the earlier snapshot and release only its non-null `serverPid`; do not invent a client PID. If the server launch fails, no PID argument exists. After both launches, release with both exact non-null numeric PIDs. `reset` is server-scoped and never clears the client's own persisted state: the client writes `ClientState.bin` under `<absolute app-data root>\Broken Engine Sandbox` whenever the tracked state — focused fleet/ship or camera zoom/height target — changes during a run, and reloads it on the next start, so even a killed or crashed client leaves persisted state behind. Two runs sharing one root therefore start the second run from the first run's client settings, which silently invalidates a before/after comparison. A scenario that requires fresh client state must instead use a per-scenario directory that does not exist yet, for example `<absolute app-data root>\AppData-CameraComparison`, and record that the entire per-scenario root was absent before the launch block's `New-Item` created it. Scenarios that deliberately depend on persisted client or server state keep the shared `<absolute adopted worktree>\Temp\AppData` root above, which is also what the cold-cache note and the stopped-server recipe below assume.
 
 After both generic deadline-limited `Wait-HarnessPing.ps1` readiness checks succeed (server port `27100`, then client port `27101`), restore the minimized agent-mode client and require a successful response confirming `result.minimized:false` before relying on Debug/Profile UI auto-connect:
 
@@ -59,13 +119,74 @@ if ($WindowStateResponse.ok -ne $true -or $WindowStateResponse.result.minimized 
 
 Keep the client visible for the scenario. The Debug and Profile clients auto-connect: once server discovery finds the local server the client enters gameplay by itself, so the main menu and its `LOCAL SERVER` button are gone without any click, and clicking that label there fails with `no widget matches label` against in-gameplay HUD candidates. Only a Release client stays on the main menu and needs `click "LOCAL SERVER"`, and only after discovery replaces the disabled `SCANNING...` button with it. The server loads its exit autosave, so use `reset` when the scenario needs fresh state.
 
+### Additional simultaneous client
+
+Launch this only for a criterion that needs two clients connected at once; the skill owns the convention, this block owns the concrete values. Run it after the first client is ready. Create its own app-data root first — a directory holding no state from any earlier run, so the two clients never share the `Broken Engine Sandbox` per-client directory and a later run never inherits the previous run's client settings. The fixed path below is reused across runs, so remove a leftover root before creating it:
+
+```powershell
+$ROOT = '<absolute adopted worktree>'
+$SecondAppDataRoot = Join-Path (Join-Path $ROOT 'Temp') 'AppData-ClientB'
+if (Test-Path -LiteralPath $SecondAppDataRoot) { Remove-Item -Recurse -Force -LiteralPath $SecondAppDataRoot }
+New-Item -ItemType Directory -Path $SecondAppDataRoot | Out-Null
+[ordered]@{
+	secondAppDataRoot = $SecondAppDataRoot
+	secondClientLog = Join-Path (Join-Path $ROOT 'Temp') 'client-b-agent.log'
+} | ConvertTo-Json -Compress
+```
+
+Baseline its own role against its own root, using this run's single process-check state path:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role 'client-b' -GameName 'Broken Engine Sandbox' -ConfiguredAppDataRoot '<absolute second app-data root>'
+```
+
+Then launch the same client executable with the same `--data-directory`, changing only the agent port, the app-data root, and the log file:
+
+```powershell
+$ROOT = '<absolute adopted worktree>'
+$GameDataDirectory = '<normalized Data path>'
+$Output = Join-Path $ROOT 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output'
+$ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
+$QuotedData = '"' + $GameDataDirectory + '"'
+$QuotedAppData = '"' + '<absolute second app-data root>' + '"'
+$QuotedClientLog = '"' + '<absolute second client log path>' + '"'
+$SecondClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @(
+	'--agent-port', '27102', '--loopback-only', '--data-directory', $QuotedData,
+	'--app-data-directory', $QuotedAppData,
+	'--windowed', '1600x900', '--log-file', $QuotedClientLog) -WindowStyle Hidden -PassThru -ErrorAction Stop
+[ordered]@{
+	secondClientPid = $SecondClientProcess.Id
+	secondClientStartTimeUtc = $SecondClientProcess.StartTime.ToUniversalTime().ToString('o')
+} | ConvertTo-Json -Compress
+```
+
+`Register` that exact identity with `-Role 'client-b'`, run the same immediate `Check`, then wait for its port after the `27100` and `27101` waits:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-HarnessPing.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -Port 27102 -TimeoutSeconds 120 -ProcessCheckStatePath '<absolute process-check state path>'
+```
+
+Address it like the first client, on port `27102`. It auto-connects the same way, and `status.clientCount` counts both.
+
+Shut it down before the release call, because release covers only ports `27100`/`27101`:
+
+```powershell
+'{"cmd":"quit"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port 27102 --timeout-ms 3000 -
+Wait-Process -Id <second client PID> -Timeout 60
+if (Get-Process -Id <second client PID> -ErrorAction SilentlyContinue) { throw 'Second client did not exit.' }
+```
+
+`Wait-Process` only reports a non-terminating error when its timeout expires, so the `Get-Process` check above is what proves the exit. Do not run the fresh `Baseline` or release while that PID still exists — treat it as a failed run and stop or investigate that exact process first, otherwise releasing the lock orphans a live client.
+
+Once the exit is confirmed, run one fresh `Baseline` for `-Role 'client-b'` with the same game name and root, clearing its registration so the intended quit is not reported as an unexpected exit, and release with the server and first-client PIDs as usual.
+
 For an approved island-footprint or island-render criterion only, run the readiness helper after both processes launch as its own independent call. Retain the latest lifecycle snapshot and absolute artifact path outside shell state when checking the result:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ClientPort 27101 -TimeoutSeconds 120 -ArtifactPath '<absolute artifact path>'
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ClientPort 27101 -TimeoutSeconds 120 -ArtifactPath '<absolute artifact path>' -ProcessCheckStatePath '<absolute process-check state path>'
 ```
 
-Require exit `0` from that call; on any other exit the readiness gate failed — inspect `<absolute artifact path>` and report the criterion blocked. Then require the artifact evidence itself:
+Require exit `0` from that call; on any other exit the readiness gate failed — inspect `<absolute artifact path>` and report the criterion blocked, and treat artifact `Code:ProcessUnexpectedExit` as a crashed client rather than a slow one. Then require the artifact evidence itself:
 
 ```powershell
 $IslandReadinessArtifact = '<absolute artifact path>'
@@ -108,7 +229,7 @@ Run this on the Debug server only (`kbDebugInput` is required). Before capturing
 
 `replay_transfer_fixture` is accepted during active recording, or only while the server is paused with an unconsumed `replay_record {"start":true}` transition. It rejects playback, ordinary non-recording use, an unpaused pending start, cancelled starts, invalid source frames, and invalid coordinates. Its optional Boolean `pauseAfterWriterInput` arms count `1` for a pending start. During active recording it snapshots the current writer-input count `N` and arms `N + 1`: after command drain, that update's `SyncReplayTick` records writer input `N + 1` for event tick `E`, then the same update's `FinalizeFrameTick` harvests the fixture at `E` and records it in that coord's post-dispatch channel at `E`, so the whole event is complete before the pause takes effect. Playback applies and publishes the transfer after dispatch at `E`, while the destination first enters the simulation dispatch set at `E + 1`. The `player` arm mints a synthetic player with an empty client GUID, so this fixture proves transfer state, ordering, CRC, and replay-reader behavior only; it cannot prove persistent ownership or GUID relinking. The result echoes the applied Boolean.
 
-`replay_transfer_capture` exposes `firstWriterInputTick` and `writerInputCount` in addition to the event fields. For a transfer event at `E`, require `recordingEventTick == playbackEventTick == E`. `playbackEventTick` is a direct observation: the reader loads the post-dispatch record stored at exactly `E` and latches the tick it applied it on. If the setup command returned effective Network level `Verbose`, use a newly appended `ServerBroadcaster::BuildTickPublication Coord: (...) Tick: E StatusChanges: ...` line as runtime publication evidence. If the requested `Verbose` level was clamped to `Debug`, that kVerbose line is unavailable and must not be required; the static source/phase trace owns publication-at-`E` (post-dispatch record load and transfer staging at `E` before dispatch, normal dispatch at `E`, transfer apply/publication at `E` after that dispatch, then the destination's first dispatch at `E + 1`). In either case, a status or query response cannot prove historical timing; runtime acceptance uses the capture event ticks, final state/count, checksum/no-desync signals, and the completed replay loop. The count is one per advancing simulation tick with one or more nonterminal writer updates, never one per writer or coordinate; terminal flushes do not increment it.
+`replay_transfer_capture` exposes `firstWriterInputTick` and `writerInputCount` in addition to the event fields. Both tick fields and the event counts latch as described in the `replay_transfer_capture` command entry, so one snapshot describes one event only while recording; during playback `recordingEventTick` and the counts still describe the last recorded event while `playbackEventTick` sweeps the replayed event ticks, so a playback snapshot can pair fields from two different events: for a single-event recording at `E`, require `recordingEventTick == playbackEventTick == E`, and for a multi-event recording evaluate across polls instead — take a capture poll as each event is recorded and require its matching count to be `1` with the other counts zero, then during playback require the set of distinct observed `playbackEventTick` values to equal the set of recorded event ticks. `playbackEventTick` is a direct observation: the reader loads the post-dispatch record stored at exactly `E` and latches the tick it applied it on. If the setup command returned effective Network level `Verbose`, use a newly appended `ServerBroadcaster::BuildTickPublication Coord: (...) Tick: E StatusChanges: ...` line as runtime publication evidence. If the requested `Verbose` level was clamped to `Debug`, that kVerbose line is unavailable and must not be required; the static source/phase trace owns publication-at-`E` (post-dispatch record load and transfer staging at `E` before dispatch, normal dispatch at `E`, transfer apply/publication at `E` after that dispatch, then the destination's first dispatch at `E + 1`). In either case, a status or query response cannot prove historical timing; runtime acceptance uses the capture event ticks, final state/count, checksum/no-desync signals, and the completed replay loop. The count is one per advancing simulation tick with one or more nonterminal writer updates, never one per writer or coordinate; terminal flushes do not increment it.
 
 For the focused active-recording pause scenario, begin with `writerInputCount == N > 1`, then queue a player fixture with `pauseAfterWriterInput:true`. Require one automatic pause at count `N + 1`, `recordingEventTick == E`, `playbackEventTick == E` after playback, and exactly one synthetic player transfer. Resume, allow a later writer input, and prove it does not pause again. Use the natural persistent-GUID scenario below for ownership and GUID assertions; do not attribute those assertions to this fixture.
 
@@ -117,8 +238,8 @@ Run the following A–G matrix. Keep a newly appended server-log slice for the e
 A. Send `reset`, `pause {"paused":true}`, then `replay_record {"start":true}`. While still paused, queue `replay_transfer_fixture {"type":"player","source":[0,0],"destination":[1,0],"pauseAfterWriterInput":true}` and require its echoed Boolean. Unpause. Tick `E` starts recording and harvests the fixture; after the `E + 1` writer input, require automatic `status.paused:true`, `recordingEventTick == E`, `firstWriterInputTick == E + 1`, `writerInputCount == 1`, `playerCount == 1`, and every other transfer count zero. Treat the player as synthetic state only; no ownership or GUID conclusion is allowed.
 B. While automatically paused after A, send `pause {"paused":false}` and require the server to resume recording. Keep recording for at least `engine::kiTickRate` advancing ticks beyond `recordingEventTick` (require `status.tick >= recordingEventTick + engine::kiTickRate`) before sending `replay_record {"start":false}`. Poll until `status.recording:false` before sending `replay_play`, then poll `status.replaying:true`.
 C. During that playback, poll `replay_transfer_capture` until `playbackEventTick == recordingEventTick == E`. Immediately, before terminal reload, query `query_frame` and `query_players {"coord":[1,0]}`; require exactly one synthetic player, the matching destination player count, and the capture result's expected event tick and final transfer count. If the setup response reported effective Network `Verbose`, require the newly appended `ServerBroadcaster::BuildTickPublication` line for destination `[1,0]` at `Tick: E`; if it reported clamped `Debug`, do not fail on the missing line and use the static source/phase trace to establish publication at `E` and first simulation dispatch at `E + 1`. Do not infer either historical point from `status` or `query_players`. After those immediate observations, separately wait for a newly appended `End replay <tick>, looping` marker and scan the appended log slice for CRC/read/`CONFIRMED DESYNC` errors. This proves delayed activation, replayed transfer publication, and checksum validation; the marker confirms one completed loop while playback remains active.
-D. Record a multi-event variant in this order: use the player fixture to create `[1,0]`, then queue one each of `spaceship`, `blaster`, and `missile` from `[0,0]` to `[1,0]`. For each event, require its matching count to be `1`, the other counts zero, and `playbackEventTick == recordingEventTick`. When effective Network `Verbose` is available, also require the matching `ServerBroadcaster::BuildTickPublication` line at the event tick; when it is clamped to `Debug`, use the static source/phase trace and do not require that line. Require the matching `query_collection` count at `[1,0]` after playback, no checksum/CRC/`CONFIRMED DESYNC` error, and the completed replay loop. The Blaster query is the deterministic tick-39222 regression signal; this matrix makes no ownership claim.
-E. Retire `[1,0]` after D by reading its player `uuid`, sending `inject_status_changes {"changes":[{"coord":[1,0],"type":"DestroyPlayer","playerUuid":<uuid>}]}`, and waiting for it to leave `status.activeCoords`. Stop, poll `recording:false`, then issue `replay_play`. The destination must retire at its recorded terminal boundary without missing/duplicate collections, `Replay reader terminal data was not fully consumed`, or `advanced beyond terminal`; require an `End replay <tick>, looping` marker.
+D. Record a multi-event variant in this order: use the player fixture to create `[1,0]`, then queue one each of `spaceship`, `blaster`, and `missile` from `[0,0]` to `[1,0]`. As each event is recorded, poll `replay_transfer_capture` and require its matching count to be `1` and the other counts zero; during playback, require the set of distinct observed `playbackEventTick` values to equal the set of the four recorded event ticks. When effective Network `Verbose` is available, also require the matching `ServerBroadcaster::BuildTickPublication` line at the event tick; when it is clamped to `Debug`, use the static source/phase trace and do not require that line. Require the matching `query_collection` count at `[1,0]` after playback, no checksum/CRC/`CONFIRMED DESYNC` error, and the completed replay loop. The Blaster query is the deterministic tick-39222 regression signal; this matrix makes no ownership claim.
+E. D ends in active playback and injection is rejected during replay, so first cancel that playback by sending `replay_play` again and polling `status.replaying:false`, then start a fresh recording over the still-live `[1,0]` D created: send `replay_record {"start":true}`, poll `recording:true`, and keep recording through advancing ticks so the retirement below lands mid-recording. Retire `[1,0]` during that fresh recording by reading its player `uuid`, sending `inject_status_changes {"changes":[{"coord":[1,0],"type":"DestroyPlayer","playerUuid":<uuid>}]}`, and waiting for it to leave `status.activeCoords`. Stop, poll `recording:false`, then issue `replay_play`. The destination must retire at its recorded terminal boundary without missing/duplicate collections, `Replay reader terminal data was not fully consumed`, or `advanced beyond terminal`; require an `End replay <tick>, looping` marker.
 F. Abort a pending start: `reset`, pause, request recording, queue the player fixture, then send `replay_record {"start":false}` before unpausing. After unpausing, require no `[1,0]` destination, no transferred entity, and no recording event in `replay_transfer_capture`.
 G. Abort an injected start failure: `reset`, pause, arm `replay_inject_persistence_failure {"stage":"invalidation"}`, request recording, and queue the player fixture. Unpause. Require no `[1,0]` destination, no transferred entity, and no recording event in `replay_transfer_capture`.
 
@@ -194,7 +315,7 @@ Live recipe for `set_client_grid_coord`. Run it in order; the rejection probes c
 2. Give the client the assigned player this command requires. A connected client starts with zero players and the injected flagship is unowned AI, so spawn through the ordinary fleet path: client `click {"label":"[+]##Fleet"}`, then client `click {"label":"[+]##Player"}`. Then poll `set_client_grid_coord {"coord":[0,0]}` until it returns `ok:true`; it returns `ok:false` until the server has assigned the spawned player. Do no coordinate work before that.
 3. Set the server Network log level to Debug with `set_log_level {"category":"Network","level":"Debug"}` so the decisive server lines emit past the default `kInfo` runtime threshold. Do not ask the client for `Verbose`: this project compiles Network at a `kDebug` floor, so the request clamps and reports `effective:"Debug"`, and the `kVerbose` line `Client::ServerCoordFullState ...` is compile-eliminated in every configuration. Capture ordered log baselines, server `status`, client `describe_scene {"includeUnits":false}`, and both ticks, so later checks can identify only appended lines.
 4. Send `set_client_grid_coord {"coord":[0,1]}` and require `ok:true` with `clientGridCoord:[0,1]`.
-5. Decisive subscription evidence is server `status` showing `[0,1]` active plus a newly appended server line `Server::SendCoordFullState Client: <n> Frame: <tick> Slot: <s> Coord: (0,1)`. `describe_scene.subscribedCoords` lists local frames including the still-unconfirmed own cell, so treat it only as a coordinate-changed signal.
+5. Decisive subscription evidence is server `status` showing `[0,1]` active plus a newly appended server line `Server::SendCoordFullState Client: <n> Frame: <tick> Slot: <s> Coord: (0,1) AckFloor: <floor>`. `describe_scene.subscribedCoords` lists local frames including the still-unconfirmed own cell, so treat it only as a coordinate-changed signal.
 6. Prove client-side adoption with `client_full_state_fixture {"action":"arm_stall"}`: the `[0,1]` coord state must report `present:true`, `confirmedTick >= 0`, `snapshotCount > 0`, `ringValid:true`, and `lastFullStateTick` equal to the `Frame:` tick of a newly appended `Server::SendCoordFullState ... Coord: (0,1)` line. If multiple such lines were appended, match the line whose `Frame:` equals `lastFullStateTick`; a later resync send may be logged before the client adopts it. That matching pair, not any client log line, proves the client adopted that full state. Then send `client_full_state_fixture {"action":"clear"}`.
 7. Require the client tick to stay monotonic and never reset across the move.
 8. Capture the clean-log check before any rejection probe: no newly appended `LogDifferences CRC Client`, `CONFIRMED DESYNC`, checksum-mismatch, or full-state read/decompression failure line.
@@ -269,13 +390,13 @@ Frame-read schemas/extractors (`query_frame`, `query_players`, `query_collection
 - `fullscreen`: `{"on":bool}`. Toggles borderless fullscreen/windowed without persisting. Windowed restore uses launch extent, not a later resize. Returns `{"fullscreen","width","height"}`. Rejects while minimized.
 - `window_state`: `{"minimized":bool}`. Minimize uses normal minimize; restore does not activate and waits for settled swapchain. Returns `{"minimized","width"?,"height"?}`.
 - `dump_render_target`: `{"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}`. Unknown names list valid names. Single-channel output normalizes to grayscale PNG; four-byte RGBA writes direct PNG; float formats require raw `.bin`. The default base path is `%TEMP%\Screenshots\dump_<name>_N`. Requires `kbScreenshots`.
-- `describe_ui`: no params. Returns UI state, game flags, framebuffer, mouse, windows, and labeled items with rect/disabled/checked/inputable/hovered/visible fields. Values are not exposed.
+- `describe_ui`: no params. Returns UI state, `tweaksVisible` (true while the F3 Tweaks overlay is shown), game flags, framebuffer, mouse, windows, and labeled items with rect/disabled/checked/inputable/hovered/visible fields. Values are not exposed.
 - `click`: `{"label","window"?,"timeoutFrames"?:120,"describeUiAfter"?:true}`. Stabilizes and clicks the item center. Returns found/enabled and optional UI. Ambiguous/not-found errors list candidates; scrolled-out targets fail.
 - `hover`: `{"label","window"?,"holdFrames"?:2}`. Returns found/enabled plus UI.
 - `set_slider`: `{"label","window"?,"value":number}`. Uses Ctrl+Click, typing, Enter. Returns found/enabled.
 - `key`: `{"key":name,"holdFrames"?:1}`. `holdFrames` is an integer in `0..1798` (default `1`); signed negative values normalize to `0`. The limit counts client drains/frames rather than wall-clock time, so duration varies with the client drain rate. Supports case-insensitive single letters/digits; `ESC`/`ESCAPE`, `SPACE`, `TAB`, `ENTER`/`RETURN`, `UP`/`DOWN`/`LEFT`/`RIGHT`, and `F1`–`F24`. Returns `{"ok":true}`.
 - `mouse`: `{"action"?:"move"|"down"|"up"|"click"|"wheel","x"?,"y"?,"button"?:"left"|"right"|"middle","notches"?:1}`. Non-wheel actions require x/y. Wheel accepts both coordinates or neither and always feeds the ImGui wheel event. It also feeds camera zoom unless the hovered ImGui window can actually scroll, ImGui's wheeling lock holds an earlier scroll target, or an ImGui key owner claims `ImGuiKey_MouseWheelY` (including ImPlot); menus that do not scroll still zoom the camera. ImPlot ownership remains visible for the first two input polls after leaving a plot; the following poll first sees no owner. A coordinate mouse move runs two active frames and, once complete, establishes the new target. A direct coordinate-bearing background wheel immediately after plot hover may remain UI-owned; a subsequent notch after that command completes reaches the camera. Returns `{"ok":true}`.
-- `describe_scene`: `{"includeUnits"?:true,"maxUnits"?:200}`. Returns `camera{eye,visibleArea,lod}`, `uiState`, `gameFlags`, `tick`, `clientGridCoord`, `subscribedCoords`, `fleets[{index,focused,members?}]`, `units[{type,globalId?,world,screen,armor?,shield?,health?,alignment,flags}]`, cell-wide `counts{players,spaceships,missiles,blasters,targets}`, `islands[{coord,center,rotation,footprint?}]`, and `truncated`. Unit positions come from the committed snapshot and trail rendered pixels.
+- `describe_scene`: `{"includeUnits"?:true,"maxUnits"?:200}`. Returns `camera{eye,visibleArea,lod}`, `uiState`, `tweaksVisible` (true while the F3 Tweaks overlay is shown), `gameFlags`, `tick`, `clientGridCoord`, `subscribedCoords`, `fleets[{index,focused,members?}]`, `units[{type,globalId?,world,screen,armor?,shield?,health?,alignment,flags}]`, cell-wide `counts{players,spaceships,missiles,blasters,targets}`, `islands[{coord,center,rotation,footprint?}]`, and `truncated`. Unit positions come from the committed snapshot and trail rendered pixels.
 - `query_profile`: no params (only an empty object is accepted). Client-only GPU profile query; returns `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for every timer row, including zeros, and frame-coherent `shadowSample{sequence,currentUs}`. The sample is published after the matching framebuffer fence; sequence advances only when a new available Shadow result is latched.
 
 ### Client command behavior

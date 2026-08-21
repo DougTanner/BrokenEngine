@@ -93,6 +93,17 @@ error-path progress. Internal callers may rely on established preconditions;
 do not demand defensive checks between trusted code units. Validate opaque
 file, network, OS, user, and third-party data at its owning trust boundary.
 
+### Type and domain modeling
+
+Report a primitive mixup when a changed path lets a real caller pass the wrong
+value, such as adjacent parameters of the same primitive type a reachable caller
+swaps; where the layout contract permits, name a focused domain type as the
+smallest correction. When the change carries independent discriminators that can
+contradict each other, prefer one discriminator that cannot represent the
+invalid combination. Boundary validation, enum and variant consumer tracing,
+`common::Flags`, and SoA, wire, CRC, layout, and existing mirror contracts stay
+with the subsections that own them.
+
 ### Changed comments
 
 Treat a changed comment as a correctness issue only when it asserts a runtime
@@ -136,7 +147,7 @@ Use `gpThreadLocal->mWorkbuffer` for tracked temporary data. Follow
 `GameBase::BuildAndDispatchFrameTicks` (`/Engine/Source/GameBase.cpp`) for a
 scoped workbuffer-backed list whose lifetime covers synchronous dispatch. For
 loop-built dynamic log text, follow the current
-`CrcValidateLoop` (`/Projects/BrokenEngineSandbox/Source/Network/Client/ReconcileReplayCrc.cpp`)
+`CrcValidateLoop` (`/Engine/Source/Network/Client/ReconcileReplayCrc.cpp`)
 `ScopedWorkbufferArena` construction. Verify changed tracked logs use the
 repository's allocation-free wrappers and formatters rather than temporary
 strings or allocating formatting paths.

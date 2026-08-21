@@ -1,15 +1,16 @@
+#include "Pch.h"
+
 #include "Network/Client/ReconcileReplay.h"
-
-#include "Game.h"
-
-#include "Network/Client/ClientReconciler.h"
-
-namespace game
-{
 
 #if defined(BT_CLIENT)
 
-static int64_t FindSnapshotIndex(std::unique_ptr<Frame> (&rSnapshots)[engine::kiNetworkBufferSize], int64_t iHead, int64_t iCount, int64_t iTick)
+#include "Frame/Frame.h"
+#include "Frame/StatusChange.h"
+
+namespace engine
+{
+
+static int64_t FindSnapshotIndex(std::unique_ptr<game::Frame> (&rSnapshots)[engine::kiNetworkBufferSize], int64_t iHead, int64_t iCount, int64_t iTick)
 {
 	for (int64_t i = 0; i < iCount; ++i)
 	{
@@ -59,7 +60,7 @@ static CrcValidateResult CrcValidateLoop(CoordWork& rWork, int64_t iTargetTick, 
 			continue;
 		}
 		int64_t iPhysical = SnapshotIndex(rFrames.iSnapshotHead, iIndex);
-		const Frame& rClientFrame = *rFrames.snapshots[iPhysical];
+		const game::Frame& rClientFrame = *rFrames.snapshots[iPhysical];
 
 		if (rClientFrame.postRender.sharedCrc == it->second.sharedCrc)
 		{
@@ -84,13 +85,13 @@ static CrcValidateResult CrcValidateLoop(CoordWork& rWork, int64_t iTargetTick, 
 				common::ScopedWorkbufferArena builder = common::gpThreadLocal->mWorkbuffer.Push();
 				if (!it->second.statusChanges.empty())
 				{
-					int64_t counts[static_cast<int64_t>(StatusChangeType::kCount)] {};
-					for (const StatusChange& rStatusChange : it->second.statusChanges)
+					int64_t counts[static_cast<int64_t>(game::StatusChangeType::kCount)] {};
+					for (const game::StatusChange& rStatusChange : it->second.statusChanges)
 					{
 						++counts[static_cast<int64_t>(rStatusChange.eType)];
 					}
 					bool bFirst = true;
-					for (int64_t i = 0; i < static_cast<int64_t>(StatusChangeType::kCount); ++i)
+					for (int64_t i = 0; i < static_cast<int64_t>(game::StatusChangeType::kCount); ++i)
 					{
 						if (counts[i] > 0)
 						{
@@ -98,7 +99,7 @@ static CrcValidateResult CrcValidateLoop(CoordWork& rWork, int64_t iTargetTick, 
 							{
 								builder.Append(", ");
 							}
-							builder.Append(StatusChangeTypeName(static_cast<StatusChangeType>(i)));
+							builder.Append(game::StatusChangeTypeName(static_cast<game::StatusChangeType>(i)));
 							if (counts[i] > 1)
 							{
 								builder.Append("x");
@@ -282,6 +283,6 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 	return result;
 }
 
-#endif // BT_CLIENT
+} // namespace engine
 
-} // namespace game
+#endif // BT_CLIENT

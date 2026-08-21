@@ -52,7 +52,7 @@ Save side (this is what makes the shutdown block look incomplete):
 
 Its callers:
 
-- `Projects/BrokenEngineSandbox/Source/Graphics/Camera.cpp:144` — called at the
+- `Projects/BrokenEngineSandbox/Source/Graphics/Camera.cpp:79` — called at the
   end of the camera update, i.e. on every client frame, guarded only by the
   diff check above.
 - `Projects/BrokenEngineSandbox/Source/FleetSelection.cpp:44`, `:54`, `:102`,
@@ -71,8 +71,8 @@ So the write-through design is real and intentional-looking, and the original
 2. **How often does the file actually get written during normal play?** The
    camera call site runs every frame, but `mfCameraEyeHeightTarget` only changes
    on a frame whose input poll reports a nonzero scroll delta that the min/max
-   clamp does not absorb (`Projects/BrokenEngineSandbox/Source/Input/Input.cpp:150`,
-   `Projects/BrokenEngineSandbox/Source/Graphics/Camera.cpp:266-283`); the
+   clamp does not absorb (`Engine/Source/Input/Input.cpp:118`,
+   `Engine/Source/Graphics/EngineCamera.cpp:243-258`); the
    animation frames in between only move `mfCameraEyeHeight`, which the diff
    check does not test, so they write nothing. That makes the write count
    roughly one per wheel notch rather than one per frame. Measure the real write

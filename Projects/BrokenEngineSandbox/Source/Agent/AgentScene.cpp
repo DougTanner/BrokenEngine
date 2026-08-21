@@ -150,6 +150,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		{"lod", engine::gpCamera->miVisibleAreaLod},
 	};
 	rResult["uiState"] = engine::UiStateName(gpGame->meUiState);
+	rResult["tweaksVisible"] = gpGame->mbShowImGui;
 	rResult["gameFlags"] = engine::GameFlagNames(gpGame->mGameFlags);
 	rResult["tick"] = gpGame->TickCounter();
 	rResult["clientGridCoord"] = CoordToJson(gpGame->mClientGridCoord);

@@ -677,6 +677,29 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 	return std::chrono::nanoseconds(-iSteps * game::NetworkSessionContract::kTickDuration.count() / iDivisor);
 }
 
+void ClientSessionRuntime::ApplyClockCorrection(int64_t iPreReconcileTick)
+{
+	std::chrono::nanoseconds clockCorrectionNs = EvaluateClock(iPreReconcileTick);
+	gpProfileManager->SetClockCorrection(miClockOffset, miClockTargetBehind, miClockError);
+
+	if (miLatestServerTick >= 0 && std::abs(miClockError) >= kiClockSnapThreshold)
+	{
+		// Snap tick counter to recover from extreme clock error. Sim runs BEHIND latestServerTick.
+		// Clamp at 0 so a fresh post-load server (latestServerTick < currentTargetBehind)
+		// doesn't drive the client tick negative.
+		int64_t iSnapTick = std::max<int64_t>(0, miLatestServerTick - miCurrentTargetBehind);
+		LOG(kNetwork, kWarning, "ClientSessionRuntime::ApplyClockCorrection Clock snap OldTick: {} NewTick: {} LatestServerTick: {} TargetBehind: {}", iPreReconcileTick, iSnapTick, miLatestServerTick, miCurrentTargetBehind);
+		game::gpGame->SetTickCounter(iSnapTick);
+		game::gpGame->mTimeStep.ClearAccumulator();
+		game::gpGame->ResetRenderClock();
+		miClockError = 0;
+	}
+	else
+	{
+		game::gpGame->mTimeStep.mTickRemainderNs = std::max(0ns, game::gpGame->mTimeStep.mTickRemainderNs + clockCorrectionNs);
+	}
+}
+
 } // namespace engine
 
 #endif // BT_CLIENT

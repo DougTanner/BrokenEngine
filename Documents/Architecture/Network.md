@@ -59,7 +59,7 @@ The server treats every inbound client packet as hostile/corruptible. A declarat
 | Packet | Min | Max | /tick | Handshake | Over-cap | Residual semantic validation |
 |--------|----|----|------|-----------|----------|------------------------------|
 | `kClientHello` | 21 | 101 | 4 | no | violation | `kuiProtocolVersion` (every incompatible `StatusChange`/`TransferData` layout change requires its author to increment the then-current literal; no automatic signature) → `game::NetworkSessionContract::GetFrameVersion()` (bound to `game::Frame::kiVersion`) → ordered `Islands.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; ghost-client drop; idempotent re-Hello |
-| `kClientAckStream` | 10 | 1738 | 128 | yes | **silent** | exact size `2 + count*27 + 8` (`BoundedCursor`); per-slot epoch match; floor clamped ≤ latest buffered tick; timestamp echo monotonic |
+| `kClientAckStream` | 10 | 1738 | 128 | yes | **silent** | exact size `2 + count*27 + 8` (`BoundedCursor`); per-slot epoch match; floor clamped ≤ latest buffered tick; floor must advance, except the one backward floor a client's coord-full-state adoption produces, admitted no lower than that full state's own tick; timestamp echo monotonic |
 | `kClientSubscribe` | 9 | 9 | 64 | yes | violation | 3×3 adjacency of an authorized coord (`kOriginCoord` always allowed); slot clamped to `game::NetworkSessionContract::kiCoordSlots` (bound to `game::kiDesiredCoordSlots`) |
 | `kClientUnsubscribe` | 4 | 4 | 64 | yes | violation | slot index + epoch; after existing-client lookup, ACK every syntactically valid request; free only an in-range active slot with matching epoch |
 | `kClientResyncRequest` | 1 | 1 | 4 | yes | violation | — |
@@ -83,9 +83,9 @@ The desync diagnostic cooldown is handler-local and uses `steady_clock`, so paus
 
 `game::ClientSession` and `game::ServerSession` are game-policy wrappers over composed engine runtimes. `game::NetworkSessionContract` binds Frame/status types, version/tick/slot constants, codecs, and game packet contracts at compile time; no virtual session base or runtime type erasure is involved.
 
-- `ClientSessionRuntime` owns connection/GUID/discovery, subscription and clock state, transport polling, load reset, generic received full-state/delta adoption, received-update ring/buffer/confirmation mechanics, static→full-state→delta drain order, ACK, and conditional flush. `game::ClientSession` owns static-data application, per-frame gameplay hydration and smoke continuity, reconciliation, desync policy, UI transitions, and applying clock correction.
-- `ServerSessionRuntime` owns host/discovery/pacing lifetime and enforces poll, tick, paused, resend, and flush order. Hello acceptance sends the engine-owned `kServerTimespeedUpdate` synchronously when the server is not at a 1/1 time ratio. Tick publication workbuffer-backed views are consumed synchronously by the runtime before the owning outer arena exits.
-- `gpClient`/`gpServer` expose safe queries and ordinary sends. Polling, receive drains, ACK/flush, buffering, resend, and persistent queue drains are runtime-only operations surfaced through the game wrapper where gameplay managers require typed data.
+- `ClientSessionRuntime` owns connection/GUID/discovery, subscription and clock state, transport polling, load reset, generic received full-state/delta adoption, received-update ring/buffer/confirmation mechanics, static→full-state→delta drain order, ACK, conditional flush, and applying clock correction. `game::ClientSession` owns static-data application, per-frame gameplay hydration and smoke continuity, reconciliation, desync policy, and UI transitions.
+- `ServerSessionRuntime` owns host/discovery/pacing lifetime and enforces poll, tick, paused, resend, and flush order. Hello acceptance always sends the engine-owned `kServerTimespeedUpdate` synchronously, carrying the server's current time ratio. Tick publication workbuffer-backed views are consumed synchronously by the runtime before the owning outer arena exits.
+- `gpClient`/`gpServer` expose safe queries and ordinary sends. Polling, receive drains, ACK/flush, buffering, resend, and persistent queue drains are runtime-only operations surfaced through the game wrapper only where gameplay managers require typed data.
 
 ## See Also
 

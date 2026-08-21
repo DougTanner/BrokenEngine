@@ -20,7 +20,7 @@ Server-only engine transport. `Server` (`gpServer`) owns the ENet host, client t
 - `ServerSessionRuntime` owns the active coordinate set: it combines subscribed coordinates with the coordinates the game session contributes, always including origin. It then creates a Frame for every coordinate that entered the set and erases the Frames of coordinates that left it, handing each departing Frame to the game session first so game-owned retention can keep it.
 - A subscription must be origin or adjacent to an authorized coordinate. Subscription, ACK, and resend-log bookkeeping stay together per slot; allocation stays within the client-supported count, and reuse increments rather than resets the epoch (the reuse counter).
 - After existing-client lookup, unsubscribe ACKs every syntactically valid request and frees only an in-range active slot whose epoch matches the request.
-- Clamp ACK floors to buffered history. Treat an all-zero ACK field as latency, not a resend gap, and cap resends per slot per tick.
+- Clamp ACK floors to buffered history and otherwise require them to advance; the one exception is the backward floor a client produces by adopting a coord full state, which sending that full state arms per slot and which is admitted only down to that full state's own tick and only while the tick stays within a bounded window of the latest buffered tick. Treat an all-zero ACK field as latency, not a resend gap, and cap resends per slot per tick.
 
 ## Transfers and Publication
 

@@ -48,8 +48,6 @@ enum class UiState
 	kModal,
 	kPause,
 	kSound,
-
-	kTweaks,
 };
 
 enum class GameFlags : uint64_t

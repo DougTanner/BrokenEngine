@@ -1,6 +1,7 @@
 # Run the whole harness lifecycle release: quit both ports, wait for the supplied exact PIDs,
 # stop only a supplied exact PID that survived, and release the lock only when every supplied PID
 # is confirmed absent. A surviving PID leaves the claim held. Safe to call after a crashed run.
+# With -ProcessCheckStatePath, one advisory crash check runs before the first quit and only reports.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $AgentHarness,
@@ -10,6 +11,7 @@ param(
 	[ValidateRange(1, 65535)][int] $ServerPort = 27100,
 	[ValidateRange(1, 65535)][int] $ClientPort = 27101,
 	[string] $Key = 'default',
+	[string] $ProcessCheckStatePath = '',
 	[ValidateRange(1, 600)][int] $TimeoutSeconds = 60
 )
 
@@ -30,6 +32,8 @@ $result = [ordered]@{
 	key = $Key
 	agentHarness = $AgentHarness
 	timeoutSeconds = $TimeoutSeconds
+	crashFindings = @()
+	processCheckNote = $null
 	quits = @()
 	processes = @()
 	survivingPids = @()
@@ -74,6 +78,34 @@ try {
 	}
 	$harness = (Resolve-Path -LiteralPath $AgentHarness).Path
 	$result.agentHarness = $harness
+
+	# Quitting or force-stopping a role destroys the live evidence a crash check reads, so the one
+	# check runs here, before the first quit. It is advisory: findings never change cleanup, its
+	# ordering, or the exit code, and nothing here touches a crash report or its evidence directory.
+	if (-not [string]::IsNullOrWhiteSpace($ProcessCheckStatePath)) {
+		# Every checker failure is a note: this local catch keeps it out of the outer catch, which would
+		# otherwise turn an advisory problem into an error exit. The checker runs in its own process so
+		# that its own exit code cannot end this run.
+		$findings = $null
+		$detail = 'no result'
+		try {
+			$check = Invoke-NativeCapture 'pwsh' @(
+				'-NoProfile', '-File', (Join-Path $PSScriptRoot 'Invoke-AgentHarnessProcessCheck.ps1'),
+				'-Action', 'Check', '-StatePath', $ProcessCheckStatePath)
+			$detail = "exit $($check.ExitCode): " + (($check.Stdout, $check.Stderr) -join ' ')
+			$findings = (ConvertFrom-Json $check.Stdout).findings
+		}
+		catch {
+			$findings = $null
+			$detail = $_.Exception.Message
+		}
+		if ($null -ne $findings) {
+			$result.crashFindings = @($findings)
+		}
+		else {
+			$result.processCheckNote = Limit-Text "process check returned no findings ($detail)" $MaximumMessageLength
+		}
+	}
 
 	# A dead port would otherwise consume the full default connect budget, so each quit is short.
 	$quits = @()

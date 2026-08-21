@@ -41,6 +41,10 @@ struct ClientConnection
 		AckState ack {};
 		int64_t iPrevResendCount = 0;
 		int64_t iResendLogCooldown = 0;
+		// Tick of the last full state sent on this slot, until the client's re-baselined ACK floor arrives or
+		// Server::ClientAckStream's bounded window closes on it.
+		// Server-local: the client derives the same tick from the full state itself, so this stays off the wire.
+		int64_t iPendingFullStateTick = -1;
 	};
 
 	ENetPeer* pPeer = nullptr;

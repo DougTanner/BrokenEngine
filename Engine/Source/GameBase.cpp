@@ -204,7 +204,16 @@ void GameBase::ClientUpdate()
 {
 	common::LogTickScope logTickScope(miTickCounter);
 
-	game::gpClientSession->Poll();
+	{
+		// Heap: transport receive buffers and game packet/frame adoption
+		ScopedSuppressAllocationTracking suppress;
+		NetworkTimeState networkTimeState {
+			.bFastForward = mTimeStep.miTimeMultiply > 1,
+			.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimToWall(game::NetworkSessionContract::kTickDuration)).count(),
+			.iExpectedUpdatesPerSecond = kiTickRate * mTimeStep.miTimeMultiply / mTimeStep.miTimeDivide,
+		};
+		game::gpClientSession->mpRuntime->PollAndDrain(networkTimeState);
+	}
 
 	if (game::gpClientSession->mpDesyncManager->IsStalled())
 	{
