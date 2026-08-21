@@ -5,7 +5,7 @@
 namespace engine
 {
 
-// UI color theme, selectable in the game's settings menu. Values are persisted (ClientSettings GameSettings) — append only.
+// UI color theme, selectable in the game's settings menu. Values are persisted (GameSettings.bin) — append only.
 enum class UiTheme : uint8_t
 {
 	kNavalSteel = 0,

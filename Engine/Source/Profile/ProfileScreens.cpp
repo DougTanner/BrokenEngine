@@ -2,9 +2,10 @@
 
 #include "ProfileManagerBase.h"
 
+#include "Graphics/EngineCamera.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
-#include "Graphics/Camera.h"
+#include "Game.h"
 
 namespace engine
 {
@@ -135,7 +136,7 @@ void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rPr
 
 	// Active visible-area LOD vertex grid (quads + 1), shared by the water displacement compute pre-pass
 	// (writes the top-left rectangle) and the water mesh draw. Mirrors the LOD pick in RenderFrameMain.
-	int iWaterLod = std::clamp(game::gpCamera->miVisibleAreaLod, 0, static_cast<int>(BufferManager::kiVisibleAreaLodCount) - 1);
+	int iWaterLod = std::clamp(engine::gpCamera->miVisibleAreaLod, 0, static_cast<int>(BufferManager::kiVisibleAreaLodCount) - 1);
 	const BufferManager::VisibleAreaMeshLod& rWaterLod = gpBufferManager->mWaterMeshLods[iWaterLod];
 	int64_t iWaterGridX = rWaterLod.iQuadCountX + 1;
 	int64_t iWaterGridY = rWaterLod.iQuadCountY + 1;
@@ -241,6 +242,60 @@ void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
 
 	gpImGuiManager->UpdateTextArea(kTextProfileMemory, rWorkbuffer.View());
 }
+
+void FormatFramesMap(common::Workbuffer& rWorkbuffer)
+{
+	int32_t iMinX = game::gpGame->mClientGridCoord.x;
+	int32_t iMaxX = game::gpGame->mClientGridCoord.x;
+	int32_t iMinY = game::gpGame->mClientGridCoord.y;
+	int32_t iMaxY = game::gpGame->mClientGridCoord.y;
+	for (const GridCoord& rCoord : game::gpGame->mActiveCoords)
+	{
+		iMinX = std::min(iMinX, rCoord.x);
+		iMaxX = std::max(iMaxX, rCoord.x);
+		iMinY = std::min(iMinY, rCoord.y);
+		iMaxY = std::max(iMaxY, rCoord.y);
+	}
+	for (int32_t y = iMaxY; y >= iMinY; --y)
+	{
+		for (int32_t x = iMinX; x <= iMaxX; ++x)
+		{
+			bool bClient = (x == game::gpGame->mClientGridCoord.x && y == game::gpGame->mClientGridCoord.y);
+			if (bClient)
+			{
+				rWorkbuffer.Append("P");
+			}
+			else
+			{
+				bool bActive = false;
+				for (const GridCoord& rCoord : game::gpGame->mActiveCoords)
+				{
+					if (rCoord.x == x && rCoord.y == y)
+					{
+						bActive = true;
+						break;
+					}
+				}
+				rWorkbuffer.Append(bActive ? "#" : "O");
+			}
+		}
+		rWorkbuffer.Append("\n");
+	}
+}
+
+void FormatFramesTick(common::Workbuffer& rWorkbuffer)
+{
+	auto profileCoordIt = game::gpGame->mCoordFrames.find(game::gpGame->mClientGridCoord);
+	if (profileCoordIt != game::gpGame->mCoordFrames.end() && profileCoordIt->second.iSnapshotCount > 0)
+	{
+		const game::Frame& rRenderFrame = game::gpGame->RenderFrame(game::gpGame->mClientGridCoord);
+		rWorkbuffer.Append("Tick: ");
+		rWorkbuffer.Append(rRenderFrame.interpolate.iTick);
+		rWorkbuffer.Append("  Time: ");
+		rWorkbuffer.AppendFloat(rRenderFrame.interpolate.fCurrentTime, 1);
+		rWorkbuffer.Append("s");
+	}
+}
 #endif // BT_CLIENT
 
 } // namespace
@@ -279,7 +334,7 @@ void FormatFpsHeader(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfi
 	rWorkbuffer.Append(static_cast<int64_t>(rProfileManager.mInterpolateUpdatesInTheLastSecond.Get()));
 	rWorkbuffer.Append(" interpolate");
 	rWorkbuffer.Append("   Camera height: ");
-	rWorkbuffer.Append(static_cast<int64_t>(game::gpCamera->mfCameraEyeHeight));
+	rWorkbuffer.Append(static_cast<int64_t>(engine::gpCamera->mfCameraEyeHeight));
 	rWorkbuffer.Append(" m");
 	gpImGuiManager->UpdateTextArea(kTextProfileFps, rWorkbuffer.View());
 }
@@ -335,6 +390,23 @@ void FormatGpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfi
 	FormatGpuGraphicsInfo(rWorkbuffer);
 	FormatGpuTimerRows(rWorkbuffer, rProfileManager, bReevaluate);
 	FormatGpuMemoryStats(rWorkbuffer);
+}
+
+void FormatFramesScreen(common::Workbuffer& rWorkbuffer)
+{
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	rWorkbuffer.Append("Frames: ");
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mActiveCoords.size()));
+	rWorkbuffer.Append(" [");
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoord.x));
+	rWorkbuffer.Append(",");
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoord.y));
+	rWorkbuffer.Append("]\n");
+
+	FormatFramesMap(rWorkbuffer);
+	FormatFramesTick(rWorkbuffer);
+
+	gpImGuiManager->UpdateTextArea(kTextProfileFrameStats, rWorkbuffer.View());
 }
 
 #endif // BT_CLIENT

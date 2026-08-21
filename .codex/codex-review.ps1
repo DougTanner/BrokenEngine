@@ -10,15 +10,20 @@
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
 	OpenAI API credits (verify with `codex login status`). The wrapper refuses an inherited
 	OPENAI_API_KEY so the child cannot bill the API instead.
+	Reviews request the fast service tier: ~1.5x speed for ~2.5x subscription credit burn; if the
+	model does not advertise that tier Codex warns and runs standard.
 
-	Two-call contract: a launch call (-Worktree/-PromptFile/-OutFile) starts Codex detached and
-	returns a single-line JSON receipt naming the run identifier immediately; -Poll <run identifier>
-	reports that run as running, completed, or failed, also immediately. No call ever waits for
-	Codex, so a slow review can never be killed by the caller's command timeout.
+	One-call contract: a launch call (-Worktree/-PromptFile/-OutFile) starts Codex detached, then
+	waits up to 540 seconds for it and returns a single-line JSON receipt naming the run identifier
+	and its status. A completed receipt is followed by the line `--- findings ---` and then the
+	out-file's bytes verbatim, so the findings need no separate read. If the budget expires with the
+	run still alive the receipt reports running, and one further -Wait <run identifier> call resumes
+	the same bounded wait. Every call stays well below the caller's command timeout, and because the
+	run is detached a killed call never kills the review.
 
-	Exit codes: 0 for a successful launch and for every successful poll whatever its status;
+	Exit codes: 0 for every wait whatever its status;
 	126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, any other
-	non-zero only for a script error (the driver treats non-zero, and a failed poll status, as
+	non-zero only for a script error (the driver treats non-zero, and a failed wait status, as
 	CODEX-UNAVAILABLE and the skill falls back to the Opus reviewer subagent, then general-purpose
 	on Opus).
 #>
@@ -36,8 +41,8 @@ param(
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[string] $OutFile,                                    # Codex writes its final message here, complete or not at all
 
-	[Parameter(Mandatory, ParameterSetName = 'Poll')]
-	[string] $Poll,                                       # run identifier from a launch receipt
+	[Parameter(Mandatory, ParameterSetName = 'Wait')]
+	[string] $Wait,                                       # run identifier from a running receipt
 
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[string] $InternalRunId                               # detached-run mode: launched by this script, never by a caller
@@ -49,10 +54,14 @@ $ErrorActionPreference = 'Stop'
 $recordDirectory = Join-Path ([System.IO.Path]::GetTempPath()) 'broken-engine-codex-review'
 $temporaryDirectory = [System.IO.Path]::GetTempPath()
 
+# One wait stays 60 seconds under the caller's 600000 ms command cap; a longer review resumes with -Wait.
+$waitBudgetSeconds = 540
+$waitSleepSeconds = 5
+
 function Write-Receipt([hashtable] $Fields)
 {
 	Write-Output ([ordered]@{
-		schemaVersion = 'broken-engine-codex-review/v1'
+		schemaVersion = 'broken-engine-codex-review/v2'
 		status = $Fields.status
 		runId = $Fields.runId
 		outFile = $Fields.outFile
@@ -71,56 +80,81 @@ function Get-DoneRecordPath([string] $RunId)
 	return (Join-Path $recordDirectory "$RunId.done.json")
 }
 
-if ($PSCmdlet.ParameterSetName -ceq 'Poll')
+# Shared by both entry paths: the launch waits on the run it just started, -Wait resumes that same wait.
+function Wait-Run([string] $RunId)
 {
-	$runPath = Get-RunRecordPath $Poll
-	$donePath = Get-DoneRecordPath $Poll
-	if (Test-Path -LiteralPath $donePath -PathType Leaf)
-	{
-		$done = Get-Content -LiteralPath $donePath -Raw | ConvertFrom-Json
-		# Records survive the poll so a repeated poll of a terminal run keeps answering the same way.
-		if ($done.exitCode -eq 0)
-		{
-			Write-Receipt @{ status = 'completed'; runId = $Poll; outFile = $done.outFile; exitCode = 0; reason = $null }
-		}
-		else
-		{
-			Write-Receipt @{ status = 'failed'; runId = $Poll; outFile = $done.outFile; exitCode = $done.exitCode; reason = $done.reason }
-		}
-		exit 0
-	}
+	$runPath = Get-RunRecordPath $RunId
+	$donePath = Get-DoneRecordPath $RunId
+	$deadline = (Get-Date).AddSeconds($waitBudgetSeconds)
 
-	if (-not (Test-Path -LiteralPath $runPath -PathType Leaf))
+	while ($true)
 	{
-		Write-Receipt @{ status = 'failed'; runId = $Poll; outFile = $null; exitCode = $null; reason = 'unavailable: no run record for that identifier (never launched, or its records were swept)' }
-		exit 0
-	}
+		# Completion keys on the done record, never on the out-file, which appears just before it.
+		if (Test-Path -LiteralPath $donePath -PathType Leaf)
+		{
+			$done = Get-Content -LiteralPath $donePath -Raw | ConvertFrom-Json
+			# Records survive the wait so a repeated wait on a terminal run keeps answering the same way.
+			if ($done.exitCode -eq 0)
+			{
+				Write-Receipt @{ status = 'completed'; runId = $RunId; outFile = $done.outFile; exitCode = 0; reason = $null }
+				# The findings ride this call's own stdout, so a successful review needs no separate read.
+				Write-Output '--- findings ---'
+				# Console.Out keeps the out-file's bytes verbatim; the pipeline would append a trailing newline.
+				[Console]::Out.Write([string](Get-Content -LiteralPath $done.outFile -Raw -ErrorAction SilentlyContinue))
+			}
+			else
+			{
+				Write-Receipt @{ status = 'failed'; runId = $RunId; outFile = $done.outFile; exitCode = $done.exitCode; reason = $done.reason }
+			}
+			return
+		}
 
-	$run = Get-Content -LiteralPath $runPath -Raw | ConvertFrom-Json
-	$alive = $false
-	try
-	{
-		$process = Get-Process -Id $run.processId -ErrorAction SilentlyContinue
-		# Start time distinguishes the launched run from an unrelated process that reused its id.
-		$alive = ($null -ne $process) -and ($process.StartTime.ToUniversalTime().Ticks -eq $run.processStartTicks)
-	}
-	catch
-	{
+		if (-not (Test-Path -LiteralPath $runPath -PathType Leaf))
+		{
+			Write-Receipt @{ status = 'failed'; runId = $RunId; outFile = $null; exitCode = $null; reason = 'unavailable: no run record for that identifier (never launched, or its records were swept)' }
+			return
+		}
+
+		$run = Get-Content -LiteralPath $runPath -Raw | ConvertFrom-Json
 		$alive = $false
-	}
+		try
+		{
+			$process = Get-Process -Id $run.processId -ErrorAction SilentlyContinue
+			# Start time distinguishes the launched run from an unrelated process that reused its id.
+			$alive = ($null -ne $process) -and ($process.StartTime.ToUniversalTime().Ticks -eq $run.processStartTicks)
+		}
+		catch
+		{
+			$alive = $false
+		}
 
-	if ($alive)
-	{
-		Write-Receipt @{ status = 'running'; runId = $Poll; outFile = $run.outFile; exitCode = $null; reason = $null }
+		# A dead run without a done record can never finish, so answering now beats burning the budget.
+		if (-not $alive)
+		{
+			Write-Receipt @{ status = 'failed'; runId = $RunId; outFile = $run.outFile; exitCode = $null; reason = 'detached run ended without publishing a result; exit code unavailable' }
+			return
+		}
+
+		if ((Get-Date) -ge $deadline)
+		{
+			# The run outlives this call, so its identifier is what the caller resumes with.
+			Write-Receipt @{ status = 'running'; runId = $RunId; outFile = $run.outFile; exitCode = $null; reason = $null }
+			return
+		}
+
+		# The last sleep is clamped to what is left, so the call never returns past the budget.
+		$remainingSeconds = ($deadline - (Get-Date)).TotalSeconds
+		Start-Sleep -Milliseconds ([int]([Math]::Min($waitSleepSeconds, $remainingSeconds) * 1000))
 	}
-	else
-	{
-		Write-Receipt @{ status = 'failed'; runId = $Poll; outFile = $run.outFile; exitCode = $null; reason = 'detached run ended without publishing a result; exit code unavailable' }
-	}
+}
+
+if ($PSCmdlet.ParameterSetName -ceq 'Wait')
+{
+	Wait-Run $Wait
 	exit 0
 }
 
-# Only the modes that start Codex refuse the key; a poll stays a status query in any environment.
+# Only the modes that start Codex refuse the key; a wait stays a status query in any environment.
 if ($null -ne [Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'Process'))
 {
 	Write-Error 'refusing to launch Codex with inherited OPENAI_API_KEY' -ErrorAction Continue
@@ -144,7 +178,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$detachedPrompt = Join-Path $temporaryDirectory "broken-engine-codex-review-$runId.prompt.md"
 
 	New-Item -ItemType Directory -Path $recordDirectory -Force | Out-Null
-	# Records are kept for repeat polls, so a launch is what bounds the directory.
+	# Records are kept for repeat waits, so a launch is what bounds the directory.
 	Get-ChildItem -LiteralPath $recordDirectory -Filter '*.json' -File -ErrorAction SilentlyContinue |
 		Where-Object { $_.LastWriteTimeUtc -lt (Get-Date).ToUniversalTime().AddDays(-7) } |
 		Remove-Item -Force -ErrorAction SilentlyContinue
@@ -169,7 +203,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	} | ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath (Get-RunRecordPath $runId) -Encoding utf8NoBOM
 	$detached.Dispose()
 
-	Write-Receipt @{ status = 'launched'; runId = $runId; outFile = $absoluteOutput; exitCode = $null; reason = $null }
+	Wait-Run $runId
 	exit 0
 }
 
@@ -188,6 +222,7 @@ try
 		-C $Worktree `
 		-m gpt-5.6-sol `
 		-c 'model_reasoning_effort="medium"' `
+		-c 'service_tier="fast"' `
 		--ephemeral `
 		-o $stagingOutput `
 		-

@@ -130,6 +130,15 @@ function Get-ContextNormalizedPaths([string] $Text) {
 }
 
 function Get-ContextTrigger([string] $Path) {
+	# Repository agent documentation is never a data-pipeline input, so it never counts as a path
+	# trigger. The Raw carve-out mirrors ExportRaw, which packs any file under a directory segment
+	# named Raw whatever its extension.
+	$segments = $Path.Split('/')
+	$leaf = $segments[$segments.Length - 1]
+	if ($leaf.Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase) -or $leaf.Equals('CLAUDE.md', [StringComparison]::OrdinalIgnoreCase)) {
+		$rawDirectories = @($segments | Select-Object -SkipLast 1 | Where-Object { $_.Equals('Raw', [StringComparison]::OrdinalIgnoreCase) })
+		if ($rawDirectories.Count -eq 0) { return $null }
+	}
 	foreach ($trigger in $script:PathTriggers) {
 		if ($null -ne $trigger.exact -and $Path.Equals($trigger.exact, [StringComparison]::OrdinalIgnoreCase)) { return $trigger.trigger }
 		if ($null -ne $trigger.prefix -and $Path.StartsWith($trigger.prefix, [StringComparison]::OrdinalIgnoreCase)) { return $trigger.trigger }

@@ -149,7 +149,11 @@ IslandTerrain::~IslandTerrain()
 	}
 }
 
-void IslandTerrain::WaitForElevationMaps([[maybe_unused]] float fNavThreshold)
+#if defined(BT_SERVER)
+void IslandTerrain::WaitForElevationMaps(float fNavThreshold, float fNavClearanceMeters)
+#else
+void IslandTerrain::WaitForElevationMaps()
+#endif
 {
 	gpFileManager->WaitForChunks(mIslandCrcsSorted);
 
@@ -237,7 +241,7 @@ void IslandTerrain::WaitForElevationMaps([[maybe_unused]] float fNavThreshold)
 			int64_t iHeightmapTexels = static_cast<int64_t>(rTemplate.miHeightmapWidth) * static_cast<int64_t>(rTemplate.miHeightmapHeight);
 			std::vector<float> heightmapFloats(static_cast<size_t>(iHeightmapTexels));
 			DirectX::PackedVector::XMConvertHalfToFloatStream(heightmapFloats.data(), sizeof(float), rTemplate.mpHeightmapHalf, sizeof(uint16_t), static_cast<size_t>(iHeightmapTexels));
-			BuildNavContour(rTemplate.mNavContour, heightmapFloats.data(), rTemplate.miHeightmapWidth, rTemplate.miHeightmapHeight, fNavThreshold, rTemplate.mfQuadFootprintX, rTemplate.mfQuadFootprintY);
+			BuildNavContour(rTemplate.mNavContour, heightmapFloats.data(), rTemplate.miHeightmapWidth, rTemplate.miHeightmapHeight, fNavThreshold, fNavClearanceMeters, rTemplate.mfQuadFootprintX, rTemplate.mfQuadFootprintY);
 		}
 	}
 #endif

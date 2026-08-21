@@ -2,7 +2,7 @@
 
 #include "Render.h"
 
-#include "Graphics/Camera.h"
+#include "Graphics/EngineCamera.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/SmokeWrappersBase.h"
 
@@ -48,7 +48,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 
 	// World-area follows the visible area each frame: aspect inherits from the framebuffer,
 	// size grows with camera zoom-out. gSmokeSimulationArea acts as a margin multiplier.
-	const XMFLOAT4& rVisible = game::gpCamera->f4RenderVisibleArea;
+	const XMFLOAT4& rVisible = engine::gpCamera->f4RenderVisibleArea;
 	float fCenterX = 0.5f * (rVisible.x + rVisible.z);
 	float fCenterY = 0.5f * (rVisible.y + rVisible.w);
 	float fHalfWidth = 0.5f * (rVisible.z - rVisible.x) * gSmokeSimulationArea.Get();

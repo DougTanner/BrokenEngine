@@ -513,6 +513,7 @@ void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& 
 void FormatFpsHeader(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, int64_t iTotalCpuTimeUs);
 void FormatCpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate);
 void FormatGpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate);
+void FormatFramesScreen(common::Workbuffer& rWorkbuffer);
 #endif
 
 } // namespace engine

@@ -76,9 +76,9 @@ void RenderTargetTextures::CreateShadowTextures()
 
 	auto [iBaseX, iBaseY] = TextureManager::DetailTextureSize(gShadowRenderMultiplier.Get());
 	int64_t iLimit = static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D);
-	int64_t iShadowTextureX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * game::Camera::kfShadowHeadroomMultiplier)), (iLimit / 3) * 2);
+	int64_t iShadowTextureX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * engine::Camera::kfShadowHeadroomMultiplier)), (iLimit / 3) * 2);
 	iShadowTextureX &= ~1ll;
-	int64_t iShadowTextureY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * game::Camera::kfShadowHeadroomMultiplier)), iLimit);
+	int64_t iShadowTextureY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * engine::Camera::kfShadowHeadroomMultiplier)), iLimit);
 	LOG(kGraphics, kDebug, "iShadowTexture: {} x {}", iShadowTextureX, iShadowTextureY);
 	mShadowElevationTexture.Create(
 	{

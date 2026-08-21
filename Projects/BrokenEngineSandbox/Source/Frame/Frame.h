@@ -1,11 +1,10 @@
 #pragma once
 
 #include "Frame/FrameBase.h"
+#include "Frame/FrameInput.h"
 #include "Frame/GridCoord.h"
 #include "Frame/NavBuild.h"
 #include "Frame/TimeStep.h"
-
-#include "Input/Input.h"
 
 namespace game
 {
@@ -45,6 +44,9 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	// Interpolate phases
 	static void AllocateAndCopy(FrameInterpolate& __restrict rCurrent, const FrameInterpolate& __restrict rPrevious);
 	static void Update(FrameInterpolate& __restrict rCurrent, const Frame& __restrict rPreviousFrame, float fDeltaTime);
+
+	// Required by the engine: the point the pusher zone grid centers on
+	[[nodiscard]] static XMVECTOR XM_CALLCONV SpatialAnchor(const FrameInterpolate& rFrameInterpolate);
 
 #if defined(BT_CLIENT)
 	// Render

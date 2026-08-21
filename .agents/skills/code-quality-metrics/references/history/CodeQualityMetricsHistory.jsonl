@@ -646,3 +646,6 @@
 {"index": 644, "sha": "cca29844f6029d078527db0da011c5c5c9a84cd0", "date": "2026-08-10T11:57:51-04:00", "cppChanging": true, "verbosity": 0.03847182426, "structuralErosion": 0.557454628529, "supported": 513, "parsed": 513}
 {"index": 645, "sha": "4a718c7c9e77a13da2de4a279512d8a5d9bcfe92", "date": "2026-08-10T12:59:40-04:00", "cppChanging": true, "verbosity": 0.038432914146, "structuralErosion": 0.557882659401, "supported": 513, "parsed": 513}
 {"index": 646, "sha": "e571f6f11f62e5cb7f9f57c2705a0a38e3391d40", "date": "2026-08-10T17:08:54-04:00", "cppChanging": true, "verbosity": 0.038432914146, "structuralErosion": 0.557882659401, "supported": 513, "parsed": 513}
+{"index":647,"date":"2026-08-21","captureMode":"catch-up","verbosity":0.037870513352,"structuralErosion":0.523127303363,"supported":525,"parsed":524}
+{"index":648,"date":"2026-08-21","captureMode":"carry-forward","verbosity":0.037870513352,"structuralErosion":0.523127303363,"supported":525,"parsed":524}
+{"index":649,"date":"2026-08-21","captureMode":"carry-forward","verbosity":0.037870513352,"structuralErosion":0.523127303363,"supported":525,"parsed":524}

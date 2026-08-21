@@ -6,6 +6,7 @@ namespace engine
 {
 
 static std::string sDxDiag;
+static std::atomic<bool> sbDxDiagComplete { false };
 static wchar_t spcAppDataOverride[MAX_PATH + 1] {};
 
 void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
@@ -39,7 +40,8 @@ void HandleException(std::optional<const std::exception*> pException)
 {
 	DEBUG_BREAK();
 
-	int iResult = MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
+	// An agent-launched instance must never block on a modal dialog — take the unprompted branch so the report still saves.
+	int iResult = gLaunchOptions.iAgentPort != 0 ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
 
 	// Fixed-buffer formatting (no heap allocation): reachable from the SIGABRT handler on heap corruption, so re-entering the allocator could re-fault.
 	wchar_t pcGameName[64] {};
@@ -106,7 +108,12 @@ void HandleException(std::optional<const std::exception*> pException)
 	ofstream << "<End callstack>\n" << std::flush;
 
 	ofstream << "\n\n\n<Begin DxDiag>\n" << std::flush;
-	ofstream << sDxDiag;
+	// The DxDiag thread appends to sDxDiag without a lock. The real crash path always joins it first, but the agent crash-report
+	// fixture calls this mid-main-loop, so skip the still-growing string rather than race it; the markers are always written.
+	if (sbDxDiagComplete.load(std::memory_order_acquire))
+	{
+		ofstream << sDxDiag;
+	}
 	ofstream << "<End DxDiag>\n" << std::flush;
 
 	common::LogDumpBuffers(ofstream);
@@ -184,6 +191,8 @@ void ReadDxDiag()
 	{
 		LOG(kDefault, kError, "Failed to read DxDiag");
 	}
+
+	sbDxDiagComplete.store(true, std::memory_order_release);
 }
 
 } // namespace engine

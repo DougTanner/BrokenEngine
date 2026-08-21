@@ -1,15 +1,15 @@
 ---
 name: plan-simplicity-review
 description: >-
-  Review an implementation plan that adds new code or modifies any
-  non-documentation artifact (root AGENTS.md Step 2 owns the exact trigger) for
+  Review an implementation plan that adds new code or modifies
+  non-documentation behavior (root AGENTS.md Step 2 owns the exact trigger) for
   YAGNI/KISS violations before implementation: ultra-rare edge-case handling,
   speculative hardening, problems a plainly simpler mechanism or a deferred
   ASSERT would solve, and bandaid fixes that suppress a symptom instead of
   removing its root cause. Runs at every tier inside one delegated `reviewer`,
-  in parallel with /plan-audit where that runs; skip documentation-only plans
-  that add no code. Findings only, with no edits, harness work, user interview,
-  or further delegation.
+  in parallel with /plan-audit where that runs; skip a plan for which Step 2's
+  trigger does not fire. Findings only, with no edits, harness work, user
+  interview, or further delegation.
 allowed-tools: [Read, Grep, Glob, PowerShell]
 ---
 
@@ -19,13 +19,18 @@ Judge one question: are the plan's changes the simplest complete way to serve
 the repository? The plan's own problem statement carries no authority here —
 this pass is a repository-level safeguard against over-engineered plans, so
 question whether the stated problem is worth solving at all before judging how
-it is solved. Use this skill at every tier, for every implementation plan with a
+it is solved. Most executable Plans are written by agents on their own
+decision; authoring, tracking, claiming, or selecting a Plan never means the
+user approved its objective, so the objective is reviewable like any other part
+of the plan, and recommending that the whole plan be rejected is an in-remit
+outcome when no amount of simplification makes it worth implementing. Use this
+skill at every tier, for every implementation plan with a
 step that adds new code per Step 2's trigger in root `AGENTS.md` — including an
-addition inside an existing file — or that modifies any non-documentation
-artifact (C++, shaders, scripts, skills), tracked executable Plans and
-session-prepared plans alike; only documentation-only plans that add no code
-skip it. Correctness, traceability, and citation verification belong to
-`/plan-audit`, running in parallel on the same snapshot where that review runs —
+addition inside an existing file — or that modifies non-documentation behavior
+per that same trigger, which owns where skill prose ends and skill behavior
+begins, tracked executable Plans and session-prepared plans alike; a plan for
+which that trigger does not fire skips it. Correctness, traceability, and
+citation verification belong to `/plan-audit`, running in parallel on the same snapshot where that review runs —
 leave them there; post-implementation diff minimality belongs to
 `/scope-review`. A clean pass is the expected common outcome, because this pass
 must not become its own source of over-engineering.
@@ -86,6 +91,16 @@ step that changes a non-documentation artifact.
    cause with repository evidence (`path:line`) and sketches the base-level
    durable fix as its alternative.
 
+When the whole plan's value does not justify any implementation — not one
+overbuilt step, but the objective itself — report exactly one whole-plan finding
+of class `plan-not-worth-executing` recommending rejection, cite the plan's goal
+or title line, and drop the per-step findings that recommendation subsumes.
+Rejecting a tracked Plan always requires explicit user authorization
+(`Documents/Plans/AGENTS.md`, `plan reject --user-authorized-rejection`), so
+give that finding the `user-judgment` disposition with its options and a
+recommendation; the manager routes it, and this reviewer still never interviews
+the user.
+
 Give every finding one disposition. Use `simplify` when the evidence supports a
 concrete simpler replacement. Use `user-judgment` when two or more viable
 answers remain and the trade-off is genuinely the user's — accepting a rare
@@ -104,10 +119,15 @@ For each finding:
 
 > `PSR-F-###` — `plan-path:line` or `snapshot#heading-id` — class:
 > rare-edge-case | speculative-hardening | overbuilt-mechanism |
-> assert-and-defer | bandaid-fix — concrete problem — evidence:
-> `repository-path:line` — simpler alternative(s), which for `bandaid-fix`
-> carries the root-cause fix sketch — disposition: simplify | user-judgment
+> assert-and-defer | bandaid-fix | plan-not-worth-executing — concrete problem
+> — evidence: `repository-path:line` — simpler alternative(s), which for
+> `bandaid-fix` carries the root-cause fix sketch and for
+> `plan-not-worth-executing` states what happens instead of the plan (nothing,
+> or a much smaller change) — disposition: simplify | user-judgment
 > (options + recommendation)
+
+A `plan-not-worth-executing` finding cites the plan's goal or title line and is
+always the only finding in the report.
 
 If clean, state `PASS — plan changes are minimally scoped.` Return:
 

@@ -1,7 +1,6 @@
 #include "FrameBase.h"
 
 #include "Frame/Frame.h"
-#include "Frame/FrameCollections.h"
 #include "Frame/FrameStaticData.h"
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavBuild.h"
@@ -108,8 +107,8 @@ bool FramePostRenderBase::LogDifferences(const FramePostRenderBase& rOther) cons
 
 // Write/Read serialize the client-only UUID counters under BT_CLIENT, so the two builds'
 // stream layouts differ structurally — a client-written stream is unreadable by a server
-// Read (and vice versa). Safe today only because save/load is server-only
-// (game::GameSaveLoad); the guard is convention, not structure. ServerRead handles the
+// Read (and vice versa). Safe today only because the stream owners are server-only
+// (engine::GridSave and engine::Replay); the guard is convention, not structure. ServerRead handles the
 // cross-build (network) direction and documents the skip.
 void FramePostRenderBase::Write(std::ostream& rStream) const
 {

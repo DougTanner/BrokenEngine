@@ -61,7 +61,7 @@ struct NavData
 	void Read(std::istream& rStream);
 };
 
-void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fFootprintXMeters, float fFootprintYMeters);
+void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters);
 void BuildCellNavData(NavData& rNavData, const std::vector<IslandPlacement>& rPlacements);
 
 // Rebuild the derived broad-phase acceleration (polygon AABBs, explicit edges, edge grid, per-vertex

@@ -171,6 +171,12 @@
     <ClInclude Include="..\..\..\..\Engine\Source\File\DifferenceStream.h">
       <Filter>Engine\File</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\File\GridSave.h">
+      <Filter>Engine\File</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\File\Replay.h">
+      <Filter>Engine\File</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Game.h">
       <Filter>Game</Filter>
     </ClInclude>
@@ -195,11 +201,11 @@
     <ClInclude Include="..\..\Source\Network\Server\FleetNavigationController.h">
       <Filter>Game\Network\Server</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Network\Server\ServerTransferManager.h">
-      <Filter>Game\Network\Server</Filter>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTransferManager.h">
+      <Filter>Engine\Network\Server</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Network\Server\ServerBroadcaster.h">
-      <Filter>Game\Network\Server</Filter>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerBroadcaster.h">
+      <Filter>Engine\Network\Server</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Network\Server\ServerClientManager.h">
       <Filter>Game\Network\Server</Filter>
@@ -375,6 +381,9 @@
     <ClInclude Include="..\..\Source\Frame\Frame.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\FrameInput.h">
+      <Filter>Game\Frame</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Frame\TerrainUtils.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
@@ -492,9 +501,6 @@
     <ClInclude Include="..\..\Source\Frame\StatusChange.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Input\Input.h">
-      <Filter>Game\Input</Filter>
-    </ClInclude>
     <ClInclude Include="$(GameDataDirectory)\Texture.h">
       <Filter>DataFiles</Filter>
     </ClInclude>
@@ -531,11 +537,11 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.h">
       <Filter>Engine\Frame\Collections\Pushers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Ui\Screens\DeathMenuScreen.h">
-      <Filter>Game\Ui\Screens</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h">
       <Filter>Game\Ui\Screens</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h">
+      <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h">
       <Filter>Engine\Ui</Filter>
@@ -555,6 +561,12 @@
       <Filter>Engine\File</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\File\PackChunks.cpp">
+      <Filter>Engine\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\File\GridSave.cpp">
+      <Filter>Engine\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\File\Replay.cpp">
       <Filter>Engine\File</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Game.cpp">
@@ -578,11 +590,11 @@
     <ClCompile Include="..\..\Source\Network\Server\FleetNavigationController.cpp">
       <Filter>Game\Network\Server</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Server\ServerTransferManager.cpp">
-      <Filter>Game\Network\Server</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerTransferManager.cpp">
+      <Filter>Engine\Network\Server</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Server\ServerBroadcaster.cpp">
-      <Filter>Game\Network\Server</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerBroadcaster.cpp">
+      <Filter>Engine\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Network\Server\ServerClientManager.cpp">
       <Filter>Game\Network\Server</Filter>
@@ -596,8 +608,8 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkManager.cpp">
       <Filter>Engine\Network</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\NetworkSerialization.cpp">
-      <Filter>Game\Network</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.cpp">
+      <Filter>Engine\Network</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\Server.cpp">
       <Filter>Engine\Network\Server</Filter>
@@ -672,6 +684,9 @@
       <Filter>Common</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Frame.cpp">
+      <Filter>Game\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\FrameInput.cpp">
       <Filter>Game\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp">
@@ -761,9 +776,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavQuery.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Input\Input.cpp">
-      <Filter>Game\Input</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\TimeStep.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
@@ -834,8 +846,8 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\Screens\DeathMenuScreen.cpp">
-      <Filter>Game\Ui\Screens</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.cpp">
+      <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp">
       <Filter>Engine\Ui</Filter>

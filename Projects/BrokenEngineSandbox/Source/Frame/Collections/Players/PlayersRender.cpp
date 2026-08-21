@@ -7,6 +7,7 @@
 
 #include "Graphics/Debug/DebugRender.h"
 #include "Profile/ProfileManager.h"
+#include "Ui/WrapperBase.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 
 namespace game

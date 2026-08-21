@@ -152,6 +152,7 @@ private:
 	void ServerSubscribeAccept(std::span<const uint8_t> packetData);
 	void ServerUnsubscribeAck(std::span<const uint8_t> packetData);
 	void ServerLoadNotification(std::span<const uint8_t> packetData);
+	void ServerTimespeedUpdate(std::span<const uint8_t> packetData);
 	void SendHello();
 
 	enum class FullStateFlags : uint8_t

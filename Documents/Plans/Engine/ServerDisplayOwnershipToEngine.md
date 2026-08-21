@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-18T18:52:53.186Z","dependsOn":["Documents/Plans/Engine/NetworkProfileOwnershipToEngine.md","Documents/Plans/Engine/WorldGridStateOwnershipToEngine.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-18T18:52:53.186Z","dependsOn":["Documents/Plans/Engine/NetworkProfileOwnershipToEngine.md"]} -->
 # Move ServerDisplay ownership to the engine
 
 ## Context

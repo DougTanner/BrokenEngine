@@ -5,6 +5,7 @@
 #include "Frame/NavQuery.h"
 #include "Frame/TerrainUtils.h"
 #include "Profile/ProfileManager.h"
+#include "Ui/WrapperBase.h"
 #include "Frame/Collections/Pushers/Pushers.h"
 
 namespace game
@@ -173,7 +174,7 @@ bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRender& rCu
 	// point kfNavLookahead ahead along the carried bearing OR the current position. Both are needed:
 	// containment ahead does not imply containment at the position, and a ship that has already been driven
 	// inside sits there as its steady state. This replaces an elevation probe that tested the *inner*
-	// contour — Main.cpp passes gBaseHeight - kfPlayerRadius - kfPushMargin as the nav threshold and
+	// contour — NavThresholdElevation supplies gBaseHeight - kfPlayerRadius - kfPushMargin as the nav threshold and
 	// ApplyTerrainPush below uses that same expression, while the nav polygon is that contour inflated
 	// outward — so a ship stranded in the no-nav band measured zero terrain push and never tripped the
 	// probe. Deterministic: rVecAiDirection (carried, shared), vecPosition, and navData (server-built and

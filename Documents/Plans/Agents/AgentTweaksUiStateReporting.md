@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-19T01:46:49.924Z","dependsOn":["Documents/Plans/Agents/ClientAgentCommandsToEngine.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-19T01:46:49.924Z","dependsOn":[]} -->
 # Report the effective Tweaks UI state
 
 ## Context

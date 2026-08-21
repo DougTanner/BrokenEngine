@@ -16,10 +16,18 @@ flowchart LR
 
 The client main loop is [`Main.cpp`](../../Engine/Source/Main.cpp): input precedes [`GameBase::ClientUpdate()`](../../Engine/Source/GameBase.cpp), then [`GameBase::Render()`](../../Engine/Source/GameBase.cpp), then audio update. [`ClientSessionRuntime.cpp`](../../Engine/Source/Network/Client/ClientSessionRuntime.cpp) owns engine network-cycle boundaries; [`ClientSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp) owns game reconciliation policy, including the replay/catch-up work in [`ReconcileReplayTick.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ReconcileReplayTick.cpp).
 
+`GameBase::ProcessInput` has a fixed internal order. [`Input::BeginPoll`](../../Engine/Source/Input/Input.cpp) publishes the display-frame raw snapshot and produces menu and camera input; engine menu policy runs next (quit, then the modal gate, cursor, pause/back-out, engine toggles); `Game::ProcessGameMenuInput` runs last; and `Input::CompletePoll` advances the previous snapshot on every path, including the modal path that skips the game callback.
+
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 flowchart LR
     input["ProcessInput"] --> update["GameBase::ClientUpdate"] --> render["GameBase::Render"] --> audio["Audio update"]
+```
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+flowchart LR
+    beginPoll["Input::BeginPoll"] --> policy["Engine menu policy"] --> callback["Game::ProcessGameMenuInput"] --> completePoll["Input::CompletePoll"] --> clientUpdate["GameBase::ClientUpdate"]
 ```
 
 ## Server Main Loop

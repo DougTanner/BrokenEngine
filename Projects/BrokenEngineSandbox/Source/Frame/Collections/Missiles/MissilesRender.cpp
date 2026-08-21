@@ -93,7 +93,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 	{
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, rCurrent.pVecPositions[i]);
-		if (!gpCamera->InVisibleArea(gpCamera->f4RenderVisibleArea, f4Position))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->f4RenderVisibleArea, f4Position))
 		{
 			continue;
 		}

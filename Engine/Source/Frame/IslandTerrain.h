@@ -145,7 +145,11 @@ public:
 	IslandTerrain();
 	~IslandTerrain();
 
-	void WaitForElevationMaps(float fNavThreshold);
+#if defined(BT_SERVER)
+	void WaitForElevationMaps(float fNavThreshold, float fNavClearanceMeters);
+#else
+	void WaitForElevationMaps();
+#endif
 
 	// Sim path (Frame-tick callers). Cell-local O(1) nearest-texel lookup into the cell's
 	// precomputed FrameStaticData::elevationGrid. Out-of-cell positions return mfSeaFloorElevation.

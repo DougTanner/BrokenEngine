@@ -2,7 +2,7 @@
 
 #include "Render.h"
 
-#include "Graphics/Camera.h"
+#include "Graphics/EngineCamera.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/LightingWrappersBase.h"
@@ -77,9 +77,9 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	float fLightingTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent.height);
 	float fCombineTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.extent.width);
 	float fCombineTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.extent.height);
-	const XMFLOAT4& rVisibleArea = game::gpCamera->f4RenderVisibleArea;
+	const XMFLOAT4& rVisibleArea = engine::gpCamera->f4RenderVisibleArea;
 
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(game::Camera::kfLightingHeadroomMultiplier, game::gpCamera->mfLightingTexelEyeHeight, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, gFov.Get(), game::gpCamera->mVecPosition);
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::Camera::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelEyeHeight, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, gFov.Get(), engine::gpCamera->mVecPosition);
 
 	// Temporal accumulation publishes the current and previous world areas from one refresh epoch; a skip retains both.
 	static LightingTemporalAreaLatch sTemporalAreaLatch {};
@@ -204,7 +204,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	// Spread End (interpolation targets for last spread pass)
 	rGlobalLayout.fSpreadDirectionalityEnd = gSpreadDirectionalityEnd.Get();
 	rGlobalLayout.fSpreadDirectionCountEnd = gSpreadDirectionCountEnd.Get();
-	rGlobalLayout.fSpreadDistanceEnd = gSpreadDistanceEnd.Resolve(game::gpCamera->mfCameraEyeHeight);
+	rGlobalLayout.fSpreadDistanceEnd = gSpreadDistanceEnd.Resolve(engine::gpCamera->mfCameraEyeHeight);
 	rGlobalLayout.fSpreadRingCountEnd = gSpreadRingCountEnd.Get();
 	rGlobalLayout.fSpreadJitterEnd = gSpreadJitterEnd.Get();
 	rGlobalLayout.fSpreadSampleJitterRangeEnd = gSpreadSampleJitterRangeEnd.Get();
@@ -245,10 +245,10 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.uiWaterNormalIndexThree = static_cast<uint32_t>(gWaterNormalIndexThree.Get<int64_t>());
 	// Resolve the 3 normal-weight samples CPU-side by camera eye height and upload one float each
 	// Hard-coded fade band (default..2x default eye height) with no author
-	// control over the band -> free LerpAtHeight, not a HeightLerpWrapperQuartet; fade endpoint single-sourced on game::Camera.
-	float fWaterNormalWeightOne = engine::LerpAtHeight(game::gpCamera->mfCameraEyeHeight, game::Camera::kfCameraEyeHeightDefault, game::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMin.Get(), gLightingSampledNormalsWeightOneMax.Get());
-	float fWaterNormalWeightTwo = engine::LerpAtHeight(game::gpCamera->mfCameraEyeHeight, game::Camera::kfCameraEyeHeightDefault, game::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMin.Get(), gLightingSampledNormalsWeightTwoMax.Get());
-	float fWaterNormalWeightThree = engine::LerpAtHeight(game::gpCamera->mfCameraEyeHeight, game::Camera::kfCameraEyeHeightDefault, game::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMin.Get(), gLightingSampledNormalsWeightThreeMax.Get());
+	// control over the band -> free LerpAtHeight, not a HeightLerpWrapperQuartet; fade endpoint single-sourced on engine::Camera.
+	float fWaterNormalWeightOne = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMin.Get(), gLightingSampledNormalsWeightOneMax.Get());
+	float fWaterNormalWeightTwo = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMin.Get(), gLightingSampledNormalsWeightTwoMax.Get());
+	float fWaterNormalWeightThree = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMin.Get(), gLightingSampledNormalsWeightThreeMax.Get());
 	rMainLayout.fWaterNormalWeightOne = fWaterNormalWeightOne;
 	rMainLayout.fWaterNormalWeightTwo = fWaterNormalWeightTwo;
 	rMainLayout.fWaterNormalWeightThree = fWaterNormalWeightThree;
@@ -313,9 +313,9 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	std::memcpy(&rMainLayout.pfWaterSpecAAMipVariance[2 * shaders::kiWaterSpecAAMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexThree.Get<int64_t>()], shaders::kiWaterSpecAAMipTableSize * sizeof(float));
 	// Full-detail reference weights for WATER_SPEC_AA_FADE_HANDOFF: the same LerpAtHeight the live
 	// fWaterNormalWeight* uploads above use, evaluated at the near-camera endpoint height.
-	rMainLayout.fWaterNormalWeightFullOne = engine::LerpAtHeight(game::Camera::kfCameraEyeHeightDefault, game::Camera::kfCameraEyeHeightDefault, game::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMin.Get(), gLightingSampledNormalsWeightOneMax.Get());
-	rMainLayout.fWaterNormalWeightFullTwo = engine::LerpAtHeight(game::Camera::kfCameraEyeHeightDefault, game::Camera::kfCameraEyeHeightDefault, game::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMin.Get(), gLightingSampledNormalsWeightTwoMax.Get());
-	rMainLayout.fWaterNormalWeightFullThree = engine::LerpAtHeight(game::Camera::kfCameraEyeHeightDefault, game::Camera::kfCameraEyeHeightDefault, game::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMin.Get(), gLightingSampledNormalsWeightThreeMax.Get());
+	rMainLayout.fWaterNormalWeightFullOne = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMin.Get(), gLightingSampledNormalsWeightOneMax.Get());
+	rMainLayout.fWaterNormalWeightFullTwo = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMin.Get(), gLightingSampledNormalsWeightTwoMax.Get());
+	rMainLayout.fWaterNormalWeightFullThree = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMin.Get(), gLightingSampledNormalsWeightThreeMax.Get());
 
 	rMainLayout.fLightingWaterReflectedAmount = gLightingWaterReflectedAmount.Get();
 	rMainLayout.fLightingWaterReflectedNormalBlendWave = gLightingWaterReflectedNormalBlendWave.Get();

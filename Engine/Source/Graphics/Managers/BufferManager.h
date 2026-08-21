@@ -88,7 +88,7 @@ public:
 	// binds once and switches LODs by writing per-frame indirect-draw params (firstIndex, indexCount,
 	// vertexOffset) — no command-buffer re-record on LOD change. (Water only — terrain draws
 	// per-island Gaea2 Mesher-baked meshes on each IslandTemplate in CommandBufferRecordMain instead.
-	// miVisibleAreaLod still drives camera-snap math via CameraBase.)
+	// miVisibleAreaLod still drives camera-snap math via engine::Camera.)
 	static constexpr int64_t kiVisibleAreaLodCount = 4;
 	struct VisibleAreaMeshLod
 	{

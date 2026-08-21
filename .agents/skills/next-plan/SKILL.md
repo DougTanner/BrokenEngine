@@ -19,10 +19,12 @@ and the landing confirmation belongs to `/finalize-changes`.
 
 Require a clean wrapper-created session worktree, except for the retained-work
 resume documented under Claim lifecycle below, and derive the authoritative
-primary, baseline, and owner from `Get-AgentWorktreeSessionContext`, and the
-provisioned WorktreeCli from `Get-NextPlanContext`. Missing tooling requires
-explicitly authorized primary maintenance through `/compile`. Never create/adopt
-a worktree or inspect machine-local claims directly.
+primary, baseline, owner, and provisioned WorktreeCli from
+`Get-NextPlanContext`, run from the session worktree root as one shell call:
+`Import-Module ./.agents/skills/next-plan/scripts/NextPlanWorkflowCommon.psm1; Get-NextPlanContext`
+Missing tooling requires explicitly authorized primary
+maintenance through `/compile`. Never create/adopt a worktree or inspect
+machine-local claims directly.
 
 - Bare invocation selects the oldest eligible Plan by immutable `createdUtc`,
   then normalized UTF-8 path.
@@ -81,8 +83,8 @@ is good for the codebase`, each 2-4 plain sentences, then records goal, out of
 scope, tier trigger, interfaces/invariants, acceptance checks with expected
 observations, and required/conditional roles. Tier 1 skips plan audit. Tier 2
 uses one fresh `/plan-audit` reviewer. At every tier, a plan that adds new code
-or modifies any non-documentation artifact (Step 2's trigger in root
-`AGENTS.md`) also gets one fresh `/plan-simplicity-review` reviewer on the same
+or modifies non-documentation behavior per Step 2's trigger in root
+`AGENTS.md` also gets one fresh `/plan-simplicity-review` reviewer on the same
 snapshot, parallel to `/plan-audit` where that runs. Tier 3 follows
 `/external-grill-plan`, whose authoritative workflow reference owns its
 iterative preparation. Missing a

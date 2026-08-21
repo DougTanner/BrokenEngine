@@ -132,9 +132,7 @@ function Invoke-PromptScript([string[]] $Arguments) {
 # --- Repository A: the assembled prompt ---------------------------------------------------------
 
 $script:BinaryMarker = 'BINARY-PAYLOAD-MARKER'
-# The digest marker is part of the shared scope text because every `repo-code-review` case has to reach
-# the assembly the case is about rather than the missing-evidence guard.
-$script:ScopeText = "Files and regions: Engine/Source/Keep.cpp lines 1-5.`nFocus: the changed bytes only.`nMetrics digest: {`"schemaVersion`":`"broken-engine-code-quality-evidence/v2`"}`nResiduals: none.`n"
+$script:ScopeText = "Files and regions: Engine/Source/Keep.cpp lines 1-5.`nFocus: the changed bytes only.`nResiduals: none.`n"
 
 function New-VerifyScopeText([string] $Baseline, [string] $Head) {
 	return ($script:ScopeText + "Baseline: $Baseline`nHead: $Head`n")
@@ -389,157 +387,6 @@ function Test-PlanAuditExecutionCard($Fixture) {
 	if (-not (Test-Path -LiteralPath $cardPath)) { return }
 	$prompt = $script:Utf8.GetString([IO.File]::ReadAllBytes($cardPath))
 	Assert-True ((Get-PromptSectionBody $prompt '(b) Scope' "`n---`n`n# (c) Evidence`n`n") -ceq $cardText) 'plan-audit with an execution card still copies the scope text byte-identically'
-}
-
-function Test-RepoCodeReviewMetricsDigest($Fixture) {
-	# The Compare cache write is denied inside the reviewer's read-only sandbox, so the host-produced
-	# digest has to be in the scope before the dispatch runs.
-	$withoutDigest = "Files and regions: Engine/Source/Keep.cpp lines 1-5.`nFocus: the changed bytes only.`nResiduals: none.`n"
-	$missingPath = New-ScratchPath 'nodigest'
-	$missing = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', (New-ScratchFile 'scope' $withoutDigest), '-PromptPath', $missingPath,
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 2 $missing.ExitCode 'repo-code-review without a metrics digest exit code'
-	if ($null -ne $missing.Json) {
-		Assert-Equal 'blocked' $missing.Json.status 'repo-code-review without a metrics digest status'
-		Assert-Equal 'prompt.metrics-digest-required' $missing.Json.code 'repo-code-review without a metrics digest code'
-	}
-	else { Assert-True $false 'repo-code-review without a metrics digest emitted JSON' }
-	Assert-True (-not (Test-Path -LiteralPath $missingPath)) 'repo-code-review without a metrics digest creates no prompt file'
-	Assert-True (-not (Test-Path -LiteralPath (Get-TargetsPath $missingPath))) 'repo-code-review without a metrics digest creates no targets file'
-
-	$digestPath = New-ScratchPath 'digest'
-	$digest = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', (New-ScratchFile 'scope' $script:ScopeText), '-PromptPath', $digestPath,
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 0 $digest.ExitCode 'repo-code-review with a metrics digest exit code'
-	Assert-True (Test-Path -LiteralPath $digestPath) 'repo-code-review with a metrics digest writes the prompt'
-	if (-not (Test-Path -LiteralPath $digestPath)) { return }
-	$prompt = $script:Utf8.GetString([IO.File]::ReadAllBytes($digestPath))
-	Assert-True ((Get-PromptSectionBody $prompt '(b) Scope' "`n---`n`n# (c) Evidence`n`n") -ceq $script:ScopeText) 'repo-code-review with a metrics digest still copies the scope text byte-identically'
-}
-
-function Test-RepoCodeReviewTargetModes($Fixture) {
-	# Preflight uses the ordinary inventory and path checks but deliberately reaches target emission
-	# without the host-produced metrics digest. The prompt path remains available for the later reuse.
-	$preflightScope = New-ScratchFile 'preflight-scope' "Files and regions: Engine/Source/Keep.cpp.`nResiduals: none.`n"
-	$preflightPath = New-ScratchPath 'preflight'
-	$preflight = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', $preflightScope, '-PromptPath', $preflightPath, '-PreflightTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 0 $preflight.ExitCode 'preflight target-only exit code'
-	if ($null -ne $preflight.Json) {
-		Assert-Equal 'pass' $preflight.Json.status 'preflight target-only status'
-		Assert-Equal 'ok' $preflight.Json.code 'preflight target-only code'
-		Assert-True ($null -eq $preflight.Json.promptPath) 'preflight target-only reports no prompt path'
-		Assert-Equal (Get-TargetsPath $preflightPath) $preflight.Json.targetsPath 'preflight target-only reports its sibling path'
-		Assert-Equal 0 $preflight.Json.promptBytes 'preflight target-only reports zero prompt bytes'
-		Assert-Equal 0 $preflight.Json.sectionsWritten 'preflight target-only reports zero prompt sections'
-	}
-	else { Assert-True $false 'preflight target-only emitted JSON' }
-	Assert-True (-not (Test-Path -LiteralPath $preflightPath)) 'preflight target-only creates no prompt'
-	$preflightTargets = Get-TargetsPath $preflightPath
-	Assert-True (Test-Path -LiteralPath $preflightTargets) 'preflight target-only writes the targets sibling'
-	if (-not (Test-Path -LiteralPath $preflightTargets)) { return }
-	$preflightBytes = [IO.File]::ReadAllBytes($preflightTargets)
-	$preflightText = $script:Utf8.GetString($preflightBytes)
-	$preflightManifest = $preflightText | ConvertFrom-Json -Depth 32
-	Assert-Equal 'broken-engine-code-quality-targets/v1' $preflightManifest.schemaVersion 'preflight target-only writes the canonical schema'
-
-	# A read-only caller-owned target makes an accidental second write fail, while a matching reuse
-	# still has to embed exactly the bytes preflight returned.
-	(Get-Item -LiteralPath $preflightTargets -Force).IsReadOnly = $true
-	$reusePath = $preflightPath
-	$reuse = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', (New-ScratchFile 'reuse-scope' $script:ScopeText), '-PromptPath', $reusePath, '-ReuseTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 0 $reuse.ExitCode 'reuse target-only exit code'
-	Assert-True (Test-Path -LiteralPath $reusePath) 'reuse target-only writes the prompt'
-	if ($null -ne $reuse.Json) { Assert-Equal $preflightTargets $reuse.Json.targetsPath 'reuse target-only reports the caller-owned sibling' }
-	else { Assert-True $false 'reuse target-only emitted JSON' }
-	Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($preflightTargets)) -ceq [Convert]::ToBase64String($preflightBytes)) 'reuse target-only leaves the preflight bytes unchanged'
-	if (Test-Path -LiteralPath $reusePath) {
-		$reusePrompt = $script:Utf8.GetString([IO.File]::ReadAllBytes($reusePath))
-		Assert-True ($reusePrompt.Contains("Targets file: $preflightTargets`n`n$preflightText")) 'reuse target-only embeds the captured target bytes'
-	}
-	(Get-Item -LiteralPath $preflightTargets -Force).IsReadOnly = $false
-
-	$missingPath = New-ScratchPath 'reuse-missing'
-	$missing = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', (New-ScratchFile 'reuse-missing-scope' $script:ScopeText), '-PromptPath', $missingPath, '-ReuseTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 2 $missing.ExitCode 'reuse missing target exit code'
-	if ($null -ne $missing.Json) { Assert-Equal 'prompt.targets-missing' $missing.Json.code 'reuse missing target blocker code' }
-	else { Assert-True $false 'reuse missing target emitted JSON' }
-	Assert-True (-not (Test-Path -LiteralPath $missingPath)) 'reuse missing target creates no prompt'
-
-	$modifiedPreflightPath = New-ScratchPath 'reuse-modified'
-	$modifiedPreflight = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', $preflightScope, '-PromptPath', $modifiedPreflightPath, '-PreflightTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 0 $modifiedPreflight.ExitCode 'modified-target preflight exit code'
-	$modifiedTargets = Get-TargetsPath $modifiedPreflightPath
-	$modifiedBytes = [IO.File]::ReadAllBytes($modifiedTargets)
-	[IO.File]::WriteAllBytes($modifiedTargets, $modifiedBytes + [byte[]] @(32))
-	$modifiedReuse = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', (New-ScratchFile 'reuse-modified-scope' $script:ScopeText), '-PromptPath', $modifiedPreflightPath, '-ReuseTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 2 $modifiedReuse.ExitCode 'reuse modified target exit code'
-	if ($null -ne $modifiedReuse.Json) { Assert-Equal 'prompt.targets-mismatch' $modifiedReuse.Json.code 'reuse modified target blocker code' }
-	else { Assert-True $false 'reuse modified target emitted JSON' }
-	Assert-True (-not (Test-Path -LiteralPath $modifiedPreflightPath)) 'reuse modified target creates no prompt'
-	Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($modifiedTargets)) -ceq [Convert]::ToBase64String($modifiedBytes + [byte[]] @(32))) 'reuse modified target preserves caller bytes'
-
-	$invalidPath = New-ScratchPath 'target-mode-invalid'
-	$invalid = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'scope-review',
-		'-ScopeFile', (New-ScratchFile 'target-mode-invalid-scope' $script:ScopeText), '-PromptPath', $invalidPath, '-PreflightTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 2 $invalid.ExitCode 'target mode with another assigned skill exit code'
-	if ($null -ne $invalid.Json) { Assert-Equal 'prompt.targets-mode-invalid' $invalid.Json.code 'target mode with another assigned skill blocker code' }
-	else { Assert-True $false 'target mode with another assigned skill emitted JSON' }
-	Assert-True (-not (Test-Path -LiteralPath $invalidPath)) 'target mode with another assigned skill creates no prompt'
-
-	$mutualPath = New-ScratchPath 'target-mode-mutual'
-	$mutual = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', $preflightScope, '-PromptPath', $mutualPath, '-PreflightTargets', '-ReuseTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 2 $mutual.ExitCode 'mutual target modes exit code'
-	if ($null -ne $mutual.Json) { Assert-Equal 'prompt.targets-mode-invalid' $mutual.Json.code 'mutual target modes blocker code' }
-	else { Assert-True $false 'mutual target modes emitted JSON' }
-	Assert-True (-not (Test-Path -LiteralPath $mutualPath)) 'mutual target modes create no prompt'
-
-	# Reuse must not clean up the caller-owned target when a later prompt assembly blocker occurs.
-	$failurePreflightPath = New-ScratchPath 'reuse-failure'
-	$failurePreflight = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', $preflightScope, '-PromptPath', $failurePreflightPath, '-PreflightTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md')
-	Assert-Equal 0 $failurePreflight.ExitCode 'reuse failure preflight exit code'
-	$failureTargets = Get-TargetsPath $failurePreflightPath
-	$failureBytes = [IO.File]::ReadAllBytes($failureTargets)
-	$builder = [Text.StringBuilder]::new()
-	for ($index = 0; $index -lt 150000; $index++) { [void] $builder.Append("reuse failure evidence line $index`n") }
-	Set-FixtureText $Fixture.Root 'Huge.txt' $builder.ToString()
-	(Get-Item -LiteralPath $failureTargets -Force).IsReadOnly = $true
-	$failure = Invoke-PromptScript @(
-		'-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-AssignedSkill', 'repo-code-review',
-		'-ScopeFile', (New-ScratchFile 'reuse-failure-scope' $script:ScopeText), '-PromptPath', $failurePreflightPath, '-ReuseTargets',
-		'-UntrackedPath', 'Notes.md,Tools/Blob.bin,Docs/Capture.md,Huge.txt')
-	Assert-Equal 2 $failure.ExitCode 'reuse later assembly failure exit code'
-	if ($null -ne $failure.Json) { Assert-Equal 'prompt.diff-too-large' $failure.Json.code 'reuse later assembly failure blocker code' }
-	else { Assert-True $false 'reuse later assembly failure emitted JSON' }
-	Assert-True (-not (Test-Path -LiteralPath $failurePreflightPath)) 'reuse later assembly failure creates no prompt'
-	Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($failureTargets)) -ceq [Convert]::ToBase64String($failureBytes)) 'reuse later assembly failure preserves caller bytes'
-	(Get-Item -LiteralPath $failureTargets -Force).IsReadOnly = $false
 }
 
 function Test-VerifyChangesTypedArtifacts() {
@@ -1020,8 +867,6 @@ try {
 	Test-AssignedSkillUnknown $repositoryA
 	Test-MixedCaseAssignedSkill $repositoryA
 	Test-PlanAuditExecutionCard $repositoryA
-	Test-RepoCodeReviewMetricsDigest $repositoryA
-	Test-RepoCodeReviewTargetModes $repositoryA
 	Test-VerifyChangesTypedArtifacts
 	Test-HeadHonoured
 	Test-ZeroTargets

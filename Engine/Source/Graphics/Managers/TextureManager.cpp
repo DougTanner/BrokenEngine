@@ -42,9 +42,9 @@ std::tuple<int64_t, int64_t> TextureManager::LightingDetailTextureSize(float fMu
 	// clamps pre-multiply); force width even so downstream half-width math stays integer.
 	auto [iBaseX, iBaseY] = DetailTextureSize(fMultiplier);
 	int64_t iLimit = static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D);
-	int64_t iX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * game::Camera::kfLightingHeadroomMultiplier)), iLimit);
+	int64_t iX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * engine::Camera::kfLightingHeadroomMultiplier)), iLimit);
 	iX &= ~1ll;
-	int64_t iY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * game::Camera::kfLightingHeadroomMultiplier)), iLimit);
+	int64_t iY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * engine::Camera::kfLightingHeadroomMultiplier)), iLimit);
 	return std::make_tuple(iX, iY);
 }
 

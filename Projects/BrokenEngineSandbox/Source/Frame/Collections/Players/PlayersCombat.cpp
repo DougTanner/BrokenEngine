@@ -7,6 +7,7 @@
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
+#include "Ui/WindDepositsWrappers.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"

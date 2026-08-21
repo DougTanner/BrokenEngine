@@ -25,7 +25,7 @@ Engine CPU/GPU profiling, boot timing, overlays, and profile dumps. `ProfileMana
 ## Presentation and Dumps
 
 - `TickVisibilityCadence` is the single synchronized visibility decision for CPU timers, CPU counters, and GPU rows. UI views hide sustained zero rows; raw agent queries include them.
-- Overlay screens may be game-owned, but engine formatters own shared CPU text. Server formatting must remain server-safe and allocation-disciplined.
+- Engine formatters own shared CPU text and the CPU, GPU, and Frames screens; remaining overlay screens may be game-owned, and the base dispatches its own screens before handing the game its turn. The Frames screen reads the grid state stored on `GameBase` through `game::gpGame`, so `ProfileScreens.cpp` is a deliberate engine consumer of the game header, and it writes into its own text slot. Server formatting must remain server-safe and allocation-disciplined.
 - When `kbProfilingDump` is enabled, CSV sampling continues with the overlay hidden and without GPU timestamp support. Its diagnostic-log lifetime spans graphics recreation and ends with manager destruction.
 
 ## See Also

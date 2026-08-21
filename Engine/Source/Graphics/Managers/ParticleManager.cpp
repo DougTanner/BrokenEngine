@@ -31,7 +31,7 @@ void ParticleManager::Spawn(shaders::ParticlesSpawnLayout& rParticlesSpawnLayout
 {
 	// Cull before taking the lock: both checks read only the by-value layout copy and the immutable camera rect,
 	// so culled spawns no longer serialize workers on mSpawnMutex during parallel tick dispatch.
-	if (layout.f4Position.x < game::gpCamera->f4RenderVisibleArea.x || layout.f4Position.x > game::gpCamera->f4RenderVisibleArea.z || layout.f4Position.y > game::gpCamera->f4RenderVisibleArea.y || layout.f4Position.y < game::gpCamera->f4RenderVisibleArea.w)
+	if (layout.f4Position.x < engine::gpCamera->f4RenderVisibleArea.x || layout.f4Position.x > engine::gpCamera->f4RenderVisibleArea.z || layout.f4Position.y > engine::gpCamera->f4RenderVisibleArea.y || layout.f4Position.y < engine::gpCamera->f4RenderVisibleArea.w)
 	{
 		return;
 	}

@@ -7,6 +7,8 @@
 #include "Frame/FrameStaticData.h"
 #include "Network/NetworkCursor.h"
 
+#include "Game.h"
+
 namespace engine
 {
 
@@ -277,6 +279,48 @@ void Server::BroadcastLoadNotification()
 		NetworkMessages::Write(rWorkbuffer, message);
 		NetworkManager::SendPacket(rClient.pPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 	}
+}
+
+void Server::SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide)
+{
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	NetworkMessages::ServerTimespeedUpdateMessage message {.iMultiply = iMultiply, .iDivide = iDivide};
+	NetworkMessages::Write(rWorkbuffer, message);
+	NetworkManager::SendPacket(pPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+}
+
+void Server::BroadcastTimespeedIfChanged()
+{
+	if (!game::gpGame->mTimeStep.mbTimeScaleChanged) [[likely]]
+	{
+		return;
+	}
+	game::gpGame->mTimeStep.mbTimeScaleChanged = false;
+
+	int64_t iMultiply = game::gpGame->mTimeStep.miTimeMultiply;
+	int64_t iDivide = game::gpGame->mTimeStep.miTimeDivide;
+	LOG(kNetwork, kDebug, "Server::BroadcastTimespeedIfChanged Multiply: {} Divide: {}", iMultiply, iDivide);
+
+	for (ClientConnection& rClient : mClients)
+	{
+		if (!rClient.bHandshakeComplete)
+		{
+			continue;
+		}
+
+		SendTimespeedUpdate(rClient.pPeer, iMultiply, iDivide);
+	}
+}
+
+void Server::SendTimespeedToNewClient(ENetPeer* pPeer)
+{
+	if (game::gpGame->mTimeStep.miTimeMultiply == 1 && game::gpGame->mTimeStep.miTimeDivide == 1)
+	{
+		return;
+	}
+
+	SendTimespeedUpdate(pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide);
 }
 
 } // namespace engine

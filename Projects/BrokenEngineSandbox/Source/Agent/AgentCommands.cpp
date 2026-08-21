@@ -3,6 +3,10 @@
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Game.h"
 
+#if defined(BT_CLIENT)
+#include "Profile/ProfileManager.h"
+#endif
+
 namespace game
 {
 
@@ -231,6 +235,13 @@ void ExecuteAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nl
 	}
 
 #if defined(BT_CLIENT)
+	// Engine-generic client automation (capture, window, UI, synthetic input, GPU profile) runs before the game
+	// client handler; it reads the live game/profile state through these references instead of the game globals.
+	if (engine::ExecuteClientAgentCommand(cmd, rParams, rResult, *gpGame, *gpProfileManager))
+	{
+		return;
+	}
+
 	if (!ExecuteAgentCommandClient(cmd, rParams, rResult))
 	{
 		throw std::runtime_error("unknown command");

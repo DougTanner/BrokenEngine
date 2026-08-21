@@ -224,7 +224,8 @@ inline constexpr bool XmIsInf(float fValue)
 	#include "backends/imgui_impl_vulkan.h"
 	#include "implot.h"
 	// Client-only: imgui internals for the agent UI registry (engine::AgentUiRegistry reads ImRect / ImGuiContext /
-	// ImGuiWindow and implements the test-engine hook externs). IMGUI_ENABLE_TEST_ENGINE only exposes those extern
+	// ImGuiWindow and implements the test-engine hook externs) and for engine display input (engine::Input reads
+	// ImGuiContext / ImGuiWindow to arbitrate wheel ownership). IMGUI_ENABLE_TEST_ENGINE only exposes those extern
 	// declarations + the ItemAdd/ItemInfo macros; the gating ImGuiContext member exists unconditionally, so the
 	// client view matches the vendored library (compiled with the same define). Kept out of the server PCH.
 	#if defined(BT_CLIENT)

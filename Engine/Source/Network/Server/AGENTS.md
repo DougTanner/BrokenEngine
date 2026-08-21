@@ -1,6 +1,6 @@
 # Network Server - Host, Slots, and Resends
 
-Server-only engine transport. `Server` (`gpServer`) owns the ENet host, client transport records, subscription slots, update rings, and resend state. It also performs client-to-server admission and violation accounting for both engine and game packets, including handler throws. `ServerSessionRuntime` owns host lifetime, fixed-tick pacing, discovery, poll/tick/paused sequencing, persistent queue servicing, broadcast consumption, resend, flush, and transport reset. `OwnedEntityRegistry` owns the per-client owned-entity records and keeps their `authorizedCoords` mirror index-parallel. The concrete game server session (`../../../../Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md`) supplies game packet contracts and dispatch, authorization, broadcast construction, transfers, and gameplay hooks.
+Server-only engine transport. `Server` (`gpServer`) owns the ENet host, client transport records, subscription slots, update rings, and resend state. It also performs client-to-server admission and violation accounting for both engine and game packets, including handler throws. `ServerSessionRuntime` owns host lifetime, fixed-tick pacing, discovery, poll/tick/paused sequencing, persistent queue servicing, broadcast consumption, resend, flush, and transport reset. `OwnedEntityRegistry` owns the per-client owned-entity records and keeps their `authorizedCoords` mirror index-parallel. The concrete game server session (`../../../../Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md`) supplies game packet contracts and dispatch, authorization, transfer payloads and classification, and gameplay hooks.
 
 ## Affinity and Lifetime
 
@@ -21,6 +21,14 @@ Server-only engine transport. `Server` (`gpServer`) owns the ENet host, client t
 - A subscription must be origin or adjacent to an authorized coordinate. Subscription, ACK, and resend-log bookkeeping stay together per slot; allocation stays within the client-supported count, and reuse increments rather than resets the epoch (the reuse counter).
 - After existing-client lookup, unsubscribe ACKs every syntactically valid request and frees only an in-range active slot whose epoch matches the request.
 - Clamp ACK floors to buffered history. Treat an all-zero ACK field as latency, not a resend gap, and cap resends per slot per tick.
+
+## Transfers and Publication
+
+- `ServerTransferManager` owns cross-cell transfer harvest, adjacency and destination-liveness validation, deterministic type ordering, and destination materialization. `ServerBroadcaster` owns the broadcast snapshot of a tick's status changes, the drain of agent-injected changes held for a later tick, and the per-coordinate publication `ServerSessionRuntime` hands to the delta resend ring at tick completion.
+- A transfer destination must be adjacent. A non-player transfer requires a destination that is already live; a player transfer makes its destination live.
+- Recompute each destination Frame's `sharedCrc` after applying arrived transfers. The frame tick computes `sharedCrc` before transfers land, and clients check their own simulated frame against the CRC the server broadcast for that tick, so skipping the recompute desyncs every client on the receiving end of a transfer. This is not defensive recomputation and must not be optimized away as redundant.
+- Both classes name `game::StatusChange` and read game Frame state — a deliberate exception to the engine/game contract, because the payload crossing a cell boundary is game-defined while the machinery moving it is not. Their headers therefore stay out of the `Engine.h` aggregation and consumers include them directly.
+- Game policy stays on `game::ServerSession` and is reached through `game::gpServerSession`: the replay transfer fixtures, the pending subscription updates, and the agent-injected changes awaiting a tick that can consume them. Harvested transfers additionally go to the engine replay owner for recording (`../../File/AGENTS.md`), which is engine-internal and carries no game policy. Each manager's reset clears the queues it drains, so the game layer needs no second clear.
 
 ## Buffered State
 

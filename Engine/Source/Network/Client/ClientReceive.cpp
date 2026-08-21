@@ -624,6 +624,30 @@ void Client::ServerLoadNotification(std::span<const uint8_t> packetData)
 	}
 }
 
+void Client::ServerTimespeedUpdate(std::span<const uint8_t> packetData)
+{
+	// The legitimate server sends its connection response before any timespeed update, so anything
+	// arriving earlier is unsolicited and must not reach the time step
+	if (!(mStateFlags & ClientStateFlags::kConnectionAccepted))
+	{
+		return;
+	}
+
+	NetworkMessages::ServerTimespeedUpdateMessage message {};
+	if (std::ssize(packetData) != NetworkMessages::ServerTimespeedUpdateMessage::kiFixedSize)
+	{
+		return;
+	}
+
+	if (!NetworkMessages::Read(packetData, message))
+	{
+		return;
+	}
+
+	LOG(kNetwork, kDebug, "Client::ServerTimespeedUpdate Multiply: {} Divide: {}", message.iMultiply, message.iDivide);
+	game::gpGame->mTimeStep.SetTimeScale(message.iMultiply, message.iDivide);
+}
+
 } // namespace engine
 
 #endif // BT_CLIENT

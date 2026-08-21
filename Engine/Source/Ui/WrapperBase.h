@@ -194,7 +194,7 @@ public:
 		}
 
 		// Intentional soft-fall: an off-grid value is legitimately reachable — a corrupt/hand-edited persisted
-		// setting (ClientSettings load) or a device-capability clamp (gSampleCount/gPresentMode) — so this never
+		// setting (settings-file load) or a device-capability clamp (gSampleCount/gPresentMode) — so this never
 		// throws. Returns index 0; the sole return-consuming caller clamps it (TweaksScreenBase.cpp), and the
 		// graphics path re-clamps sample-count/present-mode against device support. DEBUG_BREAK is a debug-only
 		// hint for genuine internal misuse (no-op in release).
@@ -218,7 +218,7 @@ private:
 	// integer-backed values must stay below 2^24 or Get<T>() loses precision. Live caution: gPresentMode's allowed
 	// set holds VK_PRESENT_MODE_FIFO_LATEST_READY_KHR (1000361000 -> 1000361024.0f) — safe only because
 	// SwapchainManager.cpp:160-175 normalizes to FIFO/Mailbox/Immediate and Resets before any Get<VkPresentModeKHR>()
-	// consumption (:245), and no UI nor the ClientSettings.cpp:125 load path selects it today.
+	// consumption (:245), and no UI nor the GraphicsSettings.cpp:122 load path selects it today.
 	float mfStep = 0.0f;
 	float mfDefault = 0.0f;
 	float mfMin = 0.0f;

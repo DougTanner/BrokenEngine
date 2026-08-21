@@ -5,7 +5,7 @@ namespace game
 
 // Dispatches a single agent command by name. rParams is the request "params" object, rResult the response
 // "result" object to populate. Tries the engine shared commands first (engine::ExecuteSharedAgentCommand —
-// ping/quit/get_logs/set_log_level), then falls through to the side-specific BT_CLIENT/BT_SERVER handlers.
+// ping/quit/get_logs/set_log_level/crash_report_fixture), then falls through to the side-specific BT_CLIENT/BT_SERVER handlers.
 // Throws (std::runtime_error / nlohmann type/parse errors) on any failure — unknown command, missing/mistyped
 // params, unknown category or level, invalid regex — which the engine AgentCommandServer::Drain() catches and
 // formats into the failure envelope. Engine calling game:: is the sanctioned direction. nlohmann::json arrives
@@ -13,9 +13,10 @@ namespace game
 void ExecuteAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult);
 
 #if defined(BT_CLIENT)
-// Client-only command dispatch (capture, input, scene, GPU profile, and diagnostic probes). ExecuteAgentCommand falls
-// through to this under BT_CLIENT before the unknown-command throw; returns true if handled. Defined in the
-// client-vcxproj-only AgentCommandsClient.cpp. Throws on bad params (trust boundary), caught by AgentCommandServer::Drain().
+// Client-only command dispatch (full-state fixture, scene query, desync probe, and grid-cell move). ExecuteAgentCommand
+// falls through to this under BT_CLIENT after engine::ExecuteClientAgentCommand and before the unknown-command throw;
+// returns true if handled. Defined in the client-vcxproj-only AgentCommandsClient.cpp. Throws on bad params (trust
+// boundary), caught by AgentCommandServer::Drain().
 bool ExecuteAgentCommandClient(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult);
 #endif
 

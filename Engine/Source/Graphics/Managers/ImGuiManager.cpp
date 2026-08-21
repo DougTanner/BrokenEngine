@@ -3,7 +3,6 @@
 #include "ImGuiManager.h"
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/Screens/DeathMenuScreen.h"
 #include "Ui/Screens/GameSettingsScreen.h"
 #include "Ui/Screens/GraphicsMenuScreen.h"
 #include "Ui/Screens/HudScreen.h"
@@ -177,13 +176,12 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 
 	// Allocate game screens
 	mpTweaksScreen = std::make_unique<game::TweaksScreen>();
-	mpMainMenuScreen = std::make_unique<game::MainMenuScreen>();
-	mpModalScreen = std::make_unique<game::ModalScreen>();
-	mpPauseMenuScreen = std::make_unique<game::PauseMenuScreen>();
-	mpGraphicsMenuScreen = std::make_unique<game::GraphicsMenuScreen>();
-	mpSoundMenuScreen = std::make_unique<game::SoundMenuScreen>();
-	mpGameSettingsScreen = std::make_unique<game::GameSettingsScreen>();
-	mpDeathMenuScreen = std::make_unique<game::DeathMenuScreen>();
+	mpMainMenuScreen = std::make_unique<MainMenuScreen>();
+	mpModalScreen = std::make_unique<ModalScreen>();
+	mpPauseMenuScreen = std::make_unique<PauseMenuScreen>();
+	mpGraphicsMenuScreen = std::make_unique<GraphicsMenuScreen>();
+	mpSoundMenuScreen = std::make_unique<SoundMenuScreen>();
+	mpGameSettingsScreen = std::make_unique<GameSettingsScreen>();
 	mpHudScreen = std::make_unique<game::HudScreen>();
 }
 
@@ -509,18 +507,17 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	// Menu screens required to progress past the pre-game / rejection flows must render even
 	// with Tweaks open — otherwise a persisted-active Tweaks menu strands a fresh client with
 	// no way to reach Connect/Spawn. Each self-gates internally on the game's UI state.
-	mpMainMenuScreen->Render();
-	mpModalScreen->Render();
+	mpMainMenuScreen->Render(*game::gpGame);
+	mpModalScreen->Render(*game::gpGame);
 
 	// Hide in-game UI when Tweaks menu is active
 	if (game::gpGame->ShouldShowInGameUi())
 	{
 		mpHudScreen->Render();
-		mpPauseMenuScreen->Render();
-		mpGraphicsMenuScreen->Render();
-		mpSoundMenuScreen->Render();
-		mpGameSettingsScreen->Render();
-		mpDeathMenuScreen->Render();
+		mpPauseMenuScreen->Render(*game::gpGame);
+		mpGraphicsMenuScreen->Render(*game::gpGame);
+		mpSoundMenuScreen->Render(*game::gpGame);
+		mpGameSettingsScreen->Render(*game::gpGame);
 	}
 
 	mpTweaksScreen->Render();

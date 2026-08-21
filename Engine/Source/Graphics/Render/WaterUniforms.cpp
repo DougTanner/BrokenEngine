@@ -2,7 +2,7 @@
 
 #include "Render.h"
 
-#include "Graphics/Camera.h"
+#include "Graphics/EngineCamera.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/WaterWrappersBase.h"
 
@@ -54,7 +54,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	// sizeMult values (0.2, 1.1, 2.5, etc.). With mod 1.0, wraps produce non-integer UV jumps that
 	// fract() can't absorb. With mod 10.0, sizeMult * 10 is always an integer for current multipliers.
 	XMFLOAT4A f4CameraPos {};
-	XMStoreFloat4A(&f4CameraPos, game::gpCamera->mVecPosition);
+	XMStoreFloat4A(&f4CameraPos, engine::gpCamera->mVecPosition);
 	rGlobalLayout.fWaterOriginX = f4CameraPos.x;
 	rGlobalLayout.fWaterOriginY = f4CameraPos.y;
 
@@ -62,7 +62,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	double dSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.Get());
 	double dSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.Get());
 	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
-	float fCameraHeightZoomFactor = engine::LerpAtHeight(game::gpCamera->mfCameraEyeHeight, game::Camera::kfCameraEyeHeightDefault, game::Camera::kfWaveFadeEndHeight, 0.0f, 1.0f);
+	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, 0.0f, 1.0f);
 	double dSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMin.Get(), gLightingSampledNormalsSpeedOneMax.Get(), fCameraHeightZoomFactor));
 	double dSpeedTwo = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedTwoMin.Get(), gLightingSampledNormalsSpeedTwoMax.Get(), fCameraHeightZoomFactor));
 	double dSpeedThree = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedThreeMin.Get(), gLightingSampledNormalsSpeedThreeMax.Get(), fCameraHeightZoomFactor));

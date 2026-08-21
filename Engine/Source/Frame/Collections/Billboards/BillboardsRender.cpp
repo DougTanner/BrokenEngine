@@ -62,7 +62,7 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		const BillboardsInterpolate::Type& rType = BillboardsInterpolate::sTypes.at(uiTypeIndex);
 
 		// Project world position to clip space
-		XMVECTOR vecProjection = XMVector4Transform(vecPosition, XMMatrixMultiply(game::gpCamera->mMatView, game::gpCamera->mMatPerspective));
+		XMVECTOR vecProjection = XMVector4Transform(vecPosition, XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatPerspective));
 
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecProjection);

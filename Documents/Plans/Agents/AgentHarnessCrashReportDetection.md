@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-19T01:46:42.616Z","dependsOn":["Documents/Plans/Engine/AgentModeCrashReportSilentSave.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-19T01:46:42.616Z","dependsOn":[]} -->
 # Detect agent process crashes and retain report evidence
 
 ## Context

@@ -1,8 +1,6 @@
 #include "Explosions.h"
 
-#if defined(BT_CLIENT)
-#include "Ui/SmokeWrappers.h"
-#endif // BT_CLIENT
+#include "Ui/WrapperBase.h"
 
 namespace engine
 {
@@ -82,7 +80,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 			}
 
 			// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
-			const float fDurationMultiplier = (j == 0) ? game::gExplosionPrimaryTrailDuration.Get() : game::gExplosionSecondaryTrailDuration.Get();
+			const float fDurationMultiplier = (j == 0) ? sTuning.pPrimaryTrailDuration->Get() : sTuning.pSecondaryTrailDuration->Get();
 			const float fEffectiveTrailTime = rCurrent.pfTrailTimes[j][i] * fDurationMultiplier;
 			float fTrailEndTime = fTimePercent * rType.fTrailDelayTime + fEffectiveTrailTime;
 

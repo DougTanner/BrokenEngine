@@ -22,7 +22,7 @@ ServerSessionRuntime::ServerSessionRuntime(game::ServerSession& rSession, uint16
 	mTimerHandle = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
 	try
 	{
-		mpServer = std::make_unique<Server>(uiPort, *this);
+		mpServer = std::make_unique<Server>(uiPort);
 	}
 	catch (...)
 	{
@@ -221,7 +221,7 @@ void ServerSessionRuntime::CompleteTick(int64_t iTick)
 		common::ScopedWorkbufferArena publicationArena = common::gpThreadLocal->mWorkbuffer.Push();
 		mrSession.mpBroadcaster->BuildTickPublication(iTick, *this, publicationArena);
 	}
-	mrSession.mpBroadcaster->ClearBroadcastStatusChanges();
+	mrSession.mpBroadcaster->mBroadcastStatusChanges.clear();
 	mrSession.SubscriptionUpdates();
 	mpServer->Flush();
 }

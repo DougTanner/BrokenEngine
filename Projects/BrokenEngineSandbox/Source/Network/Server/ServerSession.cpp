@@ -4,6 +4,7 @@
 
 #include "Network/NetworkCursor.h"
 
+#include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Game.h"
 #include "Network/GamePacketType.h"
@@ -24,8 +25,8 @@ ServerSession::ServerSession()
 	ASSERT(gpServerSession == nullptr);
 	gpServerSession = this;
 	mpFleetManager = std::make_unique<ServerFleetManager>();
-	mpTransferManager = std::make_unique<ServerTransferManager>();
-	mpBroadcaster = std::make_unique<ServerBroadcaster>();
+	mpTransferManager = std::make_unique<engine::ServerTransferManager>();
+	mpBroadcaster = std::make_unique<engine::ServerBroadcaster>();
 	mpClientManager = std::make_unique<ServerClientManager>();
 	mpRuntime = std::make_unique<engine::ServerSessionRuntime>(*this, engine::kuiDefaultPort);
 }
@@ -39,7 +40,7 @@ ServerSession::~ServerSession()
 void ServerSession::PrepareTick()
 {
 	// During replay, PrepareActiveSet already configured mActiveCoords from the reader map
-	if (gpGame->mGameSaveLoad.IsReplaying()) [[unlikely]]
+	if (gpGame->mbReplaying) [[unlikely]]
 	{
 		return;
 	}
@@ -184,7 +185,7 @@ void ServerSession::ParseReceivedGamePackets()
 					LOG(kDefault, kDebug, "ServerSession::kClientLoadRequest Client: {}", rPacket.iClientId);
 					if (!gpGame->mGameSaveLoad.ServerLoad())
 					{
-						// Corrupt/truncated save: ReadGrid already left a clean-slate grid, but ServerLoad's success
+						// Corrupt/truncated save: engine::ReadGridSave already left a clean-slate grid, but ServerLoad's success
 						// tail (client reset + active-set recompute) never ran. Fall back exactly like ServerReset
 						// (fresh frame + reset connected clients for load) rather than ticking a torn grid.
 						LOG(kDefault, kError, "ServerSession::kClientLoadRequest ServerLoad failed; resetting to fresh game");
@@ -278,7 +279,7 @@ void ServerSession::AfterNetworkPoll()
 
 void ServerSession::FinalizeTickClients()
 {
-	if (!gpGame->mGameSaveLoad.IsReplaying())
+	if (!gpGame->mbReplaying)
 	{
 		mpClientManager->FinalizeNewClients();
 	}
@@ -302,7 +303,7 @@ void ServerSession::AddGameRequiredCoords()
 
 void ServerSession::OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame>& rpFrame)
 {
-	gpGame->mGameSaveLoad.RetainReplayEndFrame(coord, rpFrame);
+	engine::gpReplay->RetainReplayEndFrame(coord, rpFrame);
 }
 
 void ServerSession::SendAssignPlayer(int64_t iClientId, engine::global_id_t globalId, engine::GridCoord coord)
@@ -342,29 +343,6 @@ void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWire
 	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
-void ServerSession::BroadcastTimespeedIfChanged()
-{
-	if (!gpGame->mTimeStep.mbTimeScaleChanged) [[likely]]
-	{
-		return;
-	}
-	gpGame->mTimeStep.mbTimeScaleChanged = false;
-
-	int64_t iMultiply = gpGame->mTimeStep.miTimeMultiply;
-	int64_t iDivide = gpGame->mTimeStep.miTimeDivide;
-	LOG(kNetwork, kDebug, "ServerSession::BroadcastTimespeedIfChanged Multiply: {} Divide: {}", iMultiply, iDivide);
-
-	for (engine::ClientConnection& rClient : engine::gpServer->mClients)
-	{
-		if (!rClient.bHandshakeComplete)
-		{
-			continue;
-		}
-		// [1B type][8B multiply][8B divide]
-		engine::gpServer->SendSimplePacket(rClient.pPeer, GamePacketType::kServerTimespeedUpdate, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, iMultiply, iDivide);
-	}
-}
-
 void ServerSession::StepTimescale(bool bFaster)
 {
 	if (bFaster)
@@ -375,24 +353,14 @@ void ServerSession::StepTimescale(bool bFaster)
 	{
 		gpGame->mTimeStep.DecreaseTimeScale();
 	}
-	BroadcastTimespeedIfChanged();
-}
-
-void ServerSession::SendTimespeedToNewClient(ENetPeer* pPeer)
-{
-	if (gpGame->mTimeStep.miTimeMultiply == 1 && gpGame->mTimeStep.miTimeDivide == 1)
-	{
-		return;
-	}
-	// [1B type][8B multiply][8B divide]
-	engine::gpServer->SendSimplePacket(pPeer, GamePacketType::kServerTimespeedUpdate, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, gpGame->mTimeStep.miTimeMultiply, gpGame->mTimeStep.miTimeDivide);
+	engine::gpServer->BroadcastTimespeedIfChanged();
 }
 
 void ServerSession::SubscriptionUpdates()
 {
 	mpRuntime->SendNewSubscriptionFullStates();
 
-	std::vector<SubscriptionUpdate>& rPendingUpdates = mpTransferManager->mPendingSubscriptionUpdates;
+	std::vector<SubscriptionUpdate>& rPendingUpdates = mPendingSubscriptionUpdates;
 	if (rPendingUpdates.empty())
 	{
 		return;

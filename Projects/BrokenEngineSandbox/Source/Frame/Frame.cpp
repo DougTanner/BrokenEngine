@@ -2,6 +2,10 @@
 
 #include "Frame/FrameCollections.h"
 #include "Profile/ProfileManager.h"
+#include "Frame/Collections/Players/Players.h"
+#include "Ui/LightingWrappers.h"
+#include "Ui/SmokeWrappers.h"
+#include "Ui/WindDepositsWrappers.h"
 
 namespace game
 {
@@ -50,6 +54,54 @@ Frame& Frame::operator=(Frame&&) noexcept = default;
 
 void FrameInterpolate::Register()
 {
+#if defined(BT_CLIENT)
+	// Explosion tuning is game content driven by the Tweaks sliders; the engine owns only the effect mechanism.
+	// This must complete before the parent Register() below, which reads every field.
+	engine::ExplosionsInterpolate::sTuning =
+	{
+		.pPrimaryVisibleAreaOne = &gExplosionPrimaryVisibleAreaOne,
+		.pPrimaryVisibleAreaTwo = &gExplosionPrimaryVisibleAreaTwo,
+		.pPrimaryVisibleAreaThree = &gExplosionPrimaryVisibleAreaThree,
+		.pPrimaryVisibleIntensityOne = &gExplosionPrimaryVisibleIntensityOne,
+		.pPrimaryVisibleIntensityTwo = &gExplosionPrimaryVisibleIntensityTwo,
+		.pPrimaryVisibleIntensityThree = &gExplosionPrimaryVisibleIntensityThree,
+		.pPrimaryLightingAreaOne = &gExplosionPrimaryLightingAreaOne,
+		.pPrimaryLightingAreaTwo = &gExplosionPrimaryLightingAreaTwo,
+		.pPrimaryLightingAreaThree = &gExplosionPrimaryLightingAreaThree,
+		.pPrimaryLightingIntensityOne = &gExplosionPrimaryLightingIntensityOne,
+		.pPrimaryLightingIntensityTwo = &gExplosionPrimaryLightingIntensityTwo,
+		.pPrimaryLightingIntensityThree = &gExplosionPrimaryLightingIntensityThree,
+		.pSecondaryVisibleAreaOne = &gExplosionSecondaryVisibleAreaOne,
+		.pSecondaryVisibleAreaTwo = &gExplosionSecondaryVisibleAreaTwo,
+		.pSecondaryVisibleAreaThree = &gExplosionSecondaryVisibleAreaThree,
+		.pSecondaryVisibleIntensityOne = &gExplosionSecondaryVisibleIntensityOne,
+		.pSecondaryVisibleIntensityTwo = &gExplosionSecondaryVisibleIntensityTwo,
+		.pSecondaryVisibleIntensityThree = &gExplosionSecondaryVisibleIntensityThree,
+		.pSecondaryLightingAreaOne = &gExplosionSecondaryLightingAreaOne,
+		.pSecondaryLightingAreaTwo = &gExplosionSecondaryLightingAreaTwo,
+		.pSecondaryLightingAreaThree = &gExplosionSecondaryLightingAreaThree,
+		.pSecondaryLightingIntensityOne = &gExplosionSecondaryLightingIntensityOne,
+		.pSecondaryLightingIntensityTwo = &gExplosionSecondaryLightingIntensityTwo,
+		.pSecondaryLightingIntensityThree = &gExplosionSecondaryLightingIntensityThree,
+		.pPrimaryPuffAreaOne = &gExplosionPrimaryPuffAreaOne,
+		.pPrimaryPuffAreaTwo = &gExplosionPrimaryPuffAreaTwo,
+		.pPrimaryPuffIntensityOne = &gExplosionPrimaryPuffIntensityOne,
+		.pPrimaryPuffIntensityTwo = &gExplosionPrimaryPuffIntensityTwo,
+		.pSecondaryPuffAreaOne = &gExplosionSecondaryPuffAreaOne,
+		.pSecondaryPuffAreaTwo = &gExplosionSecondaryPuffAreaTwo,
+		.pSecondaryPuffIntensityOne = &gExplosionSecondaryPuffIntensityOne,
+		.pSecondaryPuffIntensityTwo = &gExplosionSecondaryPuffIntensityTwo,
+		.pPrimaryTrailLength = &gExplosionPrimaryTrailLength,
+		.pPrimaryTrailDuration = &gExplosionPrimaryTrailDuration,
+		.pPrimaryTrailIntensity = &gExplosionPrimaryTrailIntensity,
+		.pSecondaryTrailLength = &gExplosionSecondaryTrailLength,
+		.pSecondaryTrailDuration = &gExplosionSecondaryTrailDuration,
+		.pSecondaryTrailIntensity = &gExplosionSecondaryTrailIntensity,
+		.pWindIntensity = &gWindDepositExplosionsIntensity,
+		.pWindWidth = &gWindDepositExplosionsWidth,
+	};
+#endif // BT_CLIENT
+
 	// Parent
 	FrameInterpolateBase::Register();
 
@@ -119,6 +171,11 @@ void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame
 
 	// Collections
 	engine::ForEachInterpolateUpdate(GameInterpolateTypes{}, rCurrent, rPreviousFrame);
+}
+
+XMVECTOR XM_CALLCONV FrameInterpolate::SpatialAnchor(const FrameInterpolate& rFrameInterpolate)
+{
+	return rFrameInterpolate.pPlayers->iCount > 0 ? rFrameInterpolate.pPlayers->pVecPositions[0] : XMVectorZero();
 }
 
 void FramePostRender::AllocateAndCopy(FramePostRender& __restrict rCurrent, const FramePostRender& __restrict rPrevious)

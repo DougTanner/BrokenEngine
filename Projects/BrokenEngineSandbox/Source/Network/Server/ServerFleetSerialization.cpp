@@ -3,6 +3,8 @@
 #include "Network/Server/ServerFleetSerialization.h"
 
 #include "Network/GamePacketType.h"
+#include "Network/Server/ServerFleetManager.h"
+#include "Network/Server/ServerSession.h"
 
 namespace game
 {
@@ -170,6 +172,29 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 	uint64_t uiRandomState = 0;
 	common::Read(rFileStream, uiRandomState);
 	rRandom.SetSerializedState(uiRandomState);
+}
+
+void WriteSaveState(std::fstream& rFileStream)
+{
+	gpServerSession->WriteFleetData(rFileStream);
+}
+
+void ReadSaveState(std::fstream& rFileStream, SaveStagedState& rStagedState)
+{
+	ReadFleetData(rFileStream, rStagedState.fleets, rStagedState.guidToClientId, rStagedState.randomEngine);
+}
+
+void AdoptSaveState(SaveStagedState&& rStagedState)
+{
+	ServerFleetManager& rFleetManager = *gpServerSession->mpFleetManager;
+	rFleetManager.mFleets = std::move(rStagedState.fleets);
+	rFleetManager.mGuidToClientId = std::move(rStagedState.guidToClientId);
+	rFleetManager.mRandomEngine = std::move(rStagedState.randomEngine);
+}
+
+void ResetSaveState()
+{
+	gpServerSession->mpFleetManager->ResetState();
 }
 
 #endif // BT_SERVER

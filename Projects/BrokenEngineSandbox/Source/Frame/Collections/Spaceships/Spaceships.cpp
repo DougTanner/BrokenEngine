@@ -14,6 +14,7 @@
 #include "Frame/Collections/Targets/Targets.h"
 
 #include "Ui/ParticleWrappers.h"
+#include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)
 #include "Data/Scene.h"
 #include "Frame/Collections/PointLights/PointLights.h"

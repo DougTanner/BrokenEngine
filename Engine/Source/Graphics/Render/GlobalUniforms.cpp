@@ -2,7 +2,7 @@
 
 #include "Render.h"
 
-#include "Graphics/Camera.h"
+#include "Graphics/EngineCamera.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/MiscWrappersBase.h"
@@ -320,7 +320,7 @@ static void PopulateShadowArea(shaders::GlobalLayout& rGlobalLayout, float fShad
 	// f4ShadowArea is the full footprint, camera-centered and snapped to the current texel grid (integer-texel pan).
 	// The base texel derives from the analytic straight-down frustum width (gFov/aspect), never the snapped
 	// render-area width, so it stays bit-stable at a settled height.
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(game::Camera::kfShadowHeadroomMultiplier, game::gpCamera->mfShadowTexelEyeHeight, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, gFov.Get(), game::gpCamera->mVecPosition);
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::Camera::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelEyeHeight, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, gFov.Get(), engine::gpCamera->mVecPosition);
 	rGlobalLayout.f4ShadowArea = area.f4Area;
 
 	// Latch the previous world area. A recreate makes the previous area current and forces pure-current temporal
@@ -460,7 +460,7 @@ static void PopulateTerrainParameters(shaders::GlobalLayout& rGlobalLayout, floa
 
 	// fTerrainSnowBlend folds into f4TerrainSnowSunNormal (PopulateSunMoonDirection); no standalone field remains.
 	rGlobalLayout.fTerrainSnowAmbientOcclusionExclusion = gTerrainSnowAmbientOcclusionExclusion.Get();
-	const float fTerrainDetailNormalsMultiplier = gTerrainDetailNormalsMultiplier.Resolve(game::gpCamera->mfCameraEyeHeight);
+	const float fTerrainDetailNormalsMultiplier = gTerrainDetailNormalsMultiplier.Resolve(engine::gpCamera->mfCameraEyeHeight);
 
 	rGlobalLayout.fTerrainRockSize = gTerrainRockSize.Get();
 	rGlobalLayout.fTerrainRockBlend = gTerrainRockBlend.Get();
@@ -483,7 +483,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, float fCurrentTime)
 	RenderSmokeGlobal(iCommandBuffer);
 	RenderWindGlobal(iCommandBuffer);
 
-	float fSunAngle = game::gpCamera->SunAngle();
+	float fSunAngle = engine::gpCamera->SunAngle();
 
 	// Global data
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
@@ -495,10 +495,10 @@ void RenderFrameGlobal(int64_t iCommandBuffer, float fCurrentTime)
 	rGlobalLayout.fAspectRatioInv = 1.0f / gpSwapchainManager->mfAspectRatio;
 
 	XMFLOAT4A f4CameraPosGlobal {};
-	XMStoreFloat4A(&f4CameraPosGlobal, game::gpCamera->mVecPosition);
+	XMStoreFloat4A(&f4CameraPosGlobal, engine::gpCamera->mVecPosition);
 	rGlobalLayout.f2CameraPosition.x = f4CameraPosGlobal.x;
 	rGlobalLayout.f2CameraPosition.y = f4CameraPosGlobal.y;
-	rGlobalLayout.f4VisibleArea = game::gpCamera->f4RenderVisibleArea;
+	rGlobalLayout.f4VisibleArea = engine::gpCamera->f4RenderVisibleArea;
 
 	float fDayPercent = 0.0f;
 	float fNoonPercent = 0.0f;

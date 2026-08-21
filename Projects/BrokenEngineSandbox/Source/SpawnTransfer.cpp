@@ -5,6 +5,7 @@
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Frame/HealthDamage.h"
+#include "Ui/WindDepositsWrappers.h"
 
 namespace game
 {

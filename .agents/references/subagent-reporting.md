@@ -56,8 +56,21 @@ Status: PASS | NEEDS_ACTION | BLOCKED
 Changed files: <paths and regions, or none>
 Decisive checks: <command/read and result>
 Build required: <exact targets, or none>
+Executor: <own model id> <own effort>, each `unknown` when unreadable
 Residuals: <actionable blocker or none>
 ```
+
+Both `Executor` values are what the host reports to the worker itself: the model
+identity the host states in the worker's own context, and the effort from the
+worker's own `CLAUDE_EFFORT` shell environment variable when it is set. Never
+read a session transcript for either value — in a subagent shell,
+`CLAUDE_CODE_SESSION_ID` and the matching transcript under `~/.claude/projects/`
+name the parent session, so that route mis-attributes the parent's model to the
+child. A Codex worker has no runtime source for either value — config and CLI
+pins state intent, not proof — so it writes `unknown`, and headless
+`/codex-review` runs are instead proved by their commit-time wrapper pins. Each
+of the two values is written `unknown` independently when its source is
+unreadable.
 
 Skills may extend this form, but retain `Build required` and keep `Residuals`
 last. Name an existing file or log plus a narrow selector when evidence is

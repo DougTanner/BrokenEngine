@@ -10,9 +10,9 @@
 namespace engine
 {
 
-// The engine consumes game CPU timers/counters by name (GetCpuTimer(game::kCpuTimerFrameUpdate) below; GameBase phase brackets), and the base GetCpuTimer/GetCpuCounter accessors dispatch on a contiguous index space where the first game enumerator must start at the engine count. Pin that contract here so an omitted game-enum initializer is a compile error, not a silent misroute of every game index into the engine arrays.
+// The base GetCpuTimer/GetCpuCounter accessors dispatch on a contiguous index space where the first game enumerator must start at the engine count. Pin that contract here so an omitted game-enum initializer is a compile error, not a silent misroute of every game index into the engine arrays. The engine consumes game CPU timers by name (GetCpuTimer(game::kCpuTimerFrameUpdate) below; GameBase phase brackets), so the timer anchor is that first named timer; the counter block is anchored on the generic first index the game profile header supplies.
 static_assert(static_cast<int64_t>(game::kCpuTimerFrameUpdate) == static_cast<int64_t>(kEngineCpuTimerCount), "First game CPU timer must start at kEngineCpuTimerCount (contiguous engine->game index space).");
-static_assert(static_cast<int64_t>(game::kCpuCounterPlayers) == static_cast<int64_t>(kEngineCpuCounterCount), "First game CPU counter must start at kEngineCpuCounterCount (contiguous engine->game index space).");
+static_assert(static_cast<int64_t>(game::kGameCpuCounterFirst) == static_cast<int64_t>(kEngineCpuCounterCount), "First game CPU counter must start at kEngineCpuCounterCount (contiguous engine->game index space).");
 
 // All profile-text rows re-evaluate their show/hide state together on this cadence; a state therefore persists at least this long.
 constexpr std::chrono::seconds kProfileVisibilityInterval = 2s;
@@ -756,6 +756,11 @@ void ProfileManagerBase::UpdateProfileText()
 		if (meProfileScreen == ProfileScreen::kGpu)
 		{
 			FormatGpuScreen(rWorkbuffer, *this, bReevaluate);
+		}
+
+		if (meProfileScreen == ProfileScreen::kFrames)
+		{
+			FormatFramesScreen(rWorkbuffer);
 		}
 
 		FormatGameScreens(rWorkbuffer);

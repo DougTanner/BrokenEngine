@@ -27,7 +27,9 @@ Require the task brief from `../../references/subagent-reporting.md`, plus:
   propagation, checks, reviews, fixes, hygiene, builds, external claims, and
   residuals; and
 - the typed artifacts this change set triggers: on a changed `SKILL.md`, the
-  complete `/validate-skill` PASS handoff.
+  complete `/validate-skill` PASS handoff, and for a finalization that carries
+  the history overlay, the complete
+  preverification `broken-engine-code-quality-history-contract/v1` receipt.
 
 Do not accept an unapproved delta or pasted full logs. For a completed claimed
 Plan whose file the change deletes, the manager supplies its approved text or
@@ -48,6 +50,10 @@ its Git-history path.
 2. Reconcile the diff paths against the caller-declared owned paths. Each
    changed region must name its authorizing Plan clause or user instruction.
    Extra, missing without a recorded no-change decision, or unauthorized bytes block.
+   The sole postconfirmation exception is the history overlay of exactly
+   `.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl`
+   and `.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg`,
+   which `## Acceptance table` governs.
 3. Confirm every handoff still applies to this diff and no later change
    invalidated it. A fix ends the run: main applies it and re-review covers only
    the changed regions.
@@ -102,6 +108,17 @@ their data evidence is that same envelope reporting success with wrapper exit
 Skill changes require a complete `/validate-skill` PASS handoff with mechanical
 self-check, target validator exit/output, semantic review, and no Critical
 finding.
+
+When the landing includes the history overlay, the acceptance table must carry
+and validate the preverification Contract receipt verbatim, and this pass must
+confirm the reviewed source diff leaves the two reserved generated paths
+untouched and treats the PNG deletion as an ordinary source deletion. Root
+`AGENTS.md` and `/finalize-changes` alone authorize and validate the
+postconfirmation Generate receipt under the landing lock; it does not exist
+during this read-only pass. Current-primary corpus/history data is permitted
+input and may regenerate without re-review; any other generated path, byte, or
+contract mismatch, and any changed reviewed contract or reachable source patch,
+is unauthorized and requires focused review and a fresh confirmation.
 
 ## Executable Plan check
 

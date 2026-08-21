@@ -3,7 +3,6 @@
 #if defined(BT_SERVER)
 
 #include "Network/Server/Server.h"
-#include "Network/Server/ServerSessionRuntime.h"
 
 #include "Game.h"
 
@@ -17,8 +16,7 @@ static_assert(NetworkMessages::ClientAckStreamMessage::kiMaxSlotCount == Network
 static_assert(kiMaxAckStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaxEnetCoordSlots),
 	"kiMaxAckStreamPacketSize must match the ack-stream wire layout sized by kiMaxEnetCoordSlots");
 
-Server::Server(uint16_t uiPort, ServerSessionRuntime& rSessionRuntime)
-:	mrSessionRuntime(rSessionRuntime)
+Server::Server(uint16_t uiPort)
 {
 	ASSERT(gpServer == nullptr);
 

@@ -33,6 +33,12 @@ struct ReplayMeta
 	uint8_t uiPad[4] {};
 };
 
+// Isolated replay metadata: staged by ReadReplayMeta, applied only once the whole replay generation validates.
+struct ReplayStagedMeta
+{
+	ReplayMeta meta {};
+};
+
 class Game : public engine::GameBase
 {
 public:
@@ -54,13 +60,11 @@ public:
 	void ChangeFrame(GameFlags_t gameFlags);
 	void CreateNewFrame(GameFlags_t gameFlags);
 
-	bool InMainMenu()
-	{
-		return mGameFlags & engine::GameFlags::kMainMenu;
-	}
-
 #if defined(BT_CLIENT)
-	void ProcessMenuInput(const MenuInput& rMenuInput) override;
+	void ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engine::InputPoll& rInputPoll) override;
+
+	engine::StandardMenuModel GetStandardMenuModel() const override;
+	void ApplyStandardMenuAction(engine::StandardMenuAction eAction) override;
 #endif
 
 	// Multi-frame grid
@@ -72,9 +76,7 @@ public:
 	void EnsureNextFrames();
 #endif
 	void BuildFrameInputs();
-	void CreateFrameAtCoord(engine::GridCoord coord);
 	void HarvestTransfers();
-	void CaptureHarvestedTransfers(engine::GridCoord coord, std::span<const StatusChange> transfers, const Frame& rPreTransferFrame);
 
 #if defined(BT_SERVER)
 	std::unique_ptr<ServerSession> mpServerSession;
@@ -130,7 +132,7 @@ public:
 	// In-memory mirror of ClientState.bin; loaded at startup, written through whenever any tracked field changes.
 	game::FleetGuid mRememberedFleetGuid {};
 	engine::global_id_t mRememberedFocusedShipId {};
-	float mfRememberedCameraEyeHeightTarget = Camera::kfCameraEyeHeightInitial;
+	float mfRememberedCameraEyeHeightTarget = engine::Camera::kfCameraEyeHeightInitial;
 
 	static constexpr float kfVisualErrorDecayRate = 15.0f;
 	static constexpr float kfVisualErrorMaxDistance = 5.0f;
@@ -141,18 +143,14 @@ public:
 	// (largest footprint first); advanced by 'E'.
 	int64_t miMenuIslandIndex = 0;
 
-	engine::GridCoord mClientGridCoord {};
 	engine::GridCoord mVisibleNeighbors[8] {};
 	int64_t miVisibleNeighborCount = 0;
-	std::vector<engine::GridCoord> mActiveCoords;
 
-	// Cache stores absolute coords keyed off mClientGridCoord; any write must invalidate.
 	void SetClientGridCoord(engine::GridCoord coord)
 	{
 		mClientGridCoord = coord;
 		miVisibleNeighborCount = 0;
 	}
-	std::unordered_map<engine::GridCoord, FrameInput> mFrameInputs;
 
 private:
 
@@ -193,9 +191,6 @@ public:
 #endif
 
 	void InitFramePostRender(Frame& rFrame);
-#if defined(BT_CLIENT)
-	void ProcessDebugInput(const MenuInput& rMenuInput);
-#endif
 
 private:
 };

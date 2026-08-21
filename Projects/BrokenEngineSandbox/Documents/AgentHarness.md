@@ -1,6 +1,6 @@
 # BrokenEngineSandbox Agent Harness
 
-Project-specific launch configuration, verification recipes, durable caveats, and command schemas for driving BrokenEngineSandbox through the `/agent-harness` skill. The skill ([SKILL.md](../../../.agents/skills/agent-harness/SKILL.md)) owns provision/claim, ownership/takeover, the request/response envelope, lifecycle/release, and — in [command-reference.md](../../../.agents/skills/agent-harness/references/command-reference.md) — the four engine-shared command schemas (`ping`, `quit`, `get_logs`, `set_log_level`). Read this doc after selecting BrokenEngineSandbox and before launching; it owns the executable paths, output directory, extra launch arguments, game command schemas, and authoritative verification recipes.
+Project-specific launch configuration, verification recipes, durable caveats, and command schemas for driving BrokenEngineSandbox through the `/agent-harness` skill. The skill ([SKILL.md](../../../.agents/skills/agent-harness/SKILL.md)) owns provision/claim, ownership/takeover, the request/response envelope, lifecycle/release, and — in [command-reference.md](../../../.agents/skills/agent-harness/references/command-reference.md) — the five engine-shared command schemas (`ping`, `quit`, `get_logs`, `set_log_level`, `crash_report_fixture`). Read this doc after selecting BrokenEngineSandbox and before launching; it owns the executable paths, output directory, extra launch arguments, game command schemas, and authoritative verification recipes.
 
 ## Launch
 
@@ -57,7 +57,7 @@ if ($WindowStateResponse.ok -ne $true -or $WindowStateResponse.result.minimized 
 }
 ```
 
-Keep the client visible for the scenario. Release requires `click "LOCAL SERVER"`. The server loads its exit autosave, so use `reset` when the scenario needs fresh state.
+Keep the client visible for the scenario. The Debug and Profile clients auto-connect: once server discovery finds the local server the client enters gameplay by itself, so the main menu and its `LOCAL SERVER` button are gone without any click, and clicking that label there fails with `no widget matches label` against in-gameplay HUD candidates. Only a Release client stays on the main menu and needs `click "LOCAL SERVER"`, and only after discovery replaces the disabled `SCANNING...` button with it. The server loads its exit autosave, so use `reset` when the scenario needs fresh state.
 
 For an approved island-footprint or island-render criterion only, run the readiness helper after both processes launch as its own independent call. Retain the latest lifecycle snapshot and absolute artifact path outside shell state when checking the result:
 
@@ -207,7 +207,7 @@ Live recipe for `set_client_grid_coord`. Run it in order; the rejection probes c
 - Injection during replay fails. Injection while clients wait for spawn also fails immediately so it cannot corrupt snapshot-diff assignment; it is never queued for later. Injection while paused remains accepted with `deferred:true` and applies on the next unpaused tick.
 - `navQueryActivation` is sticky until its exact event sequence is acknowledged. Do not issue another armed transition while `activationEvent.available` is true. A retained event is one immutable payload, not a history: an additional query-count-eight candidate cannot overwrite it and sets only `activationEvent.overrun`; treat `overrun:true` as measurement failure. A false latch (pause, non-`1/1` timescale, burst/catch-up, save/replay, zero-tick, or replay no-dispatch), shared reset/load, and replay-load entry cancel only an unpublished arm/floor and clear pending raw values; they preserve a retained payload, sequence, and sticky overrun. The client command surface and client profile schema remain unchanged.
 - When comparing `query_profile` timings, run and discard a warm-up cohort first, take baselines only after values settle, and compare cohorts of equal sample count captured within one process lifetime. For the server `NavQuery` raw row, retain every observed sequence and gap marker, then qualify cohorts only from records with `queryCount == 8 && aStarCount == 8`; do not reconstruct skipped sequences or use the overlapping `averageUs`/`maxUs` smoother rows as cohorts.
-- Server frame-read query schema and extraction live in `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp`; simulation control, replay, CPU `query_profile`, injection, and dispatch live in `AgentCommandsServer.cpp`. Client capture/input/UI/GPU `query_profile` commands live in `AgentCommandsClient.cpp`; scene commands live in `AgentScene.cpp`.
+- Server frame-read query schema and extraction live in `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp`; simulation control, replay, CPU `query_profile`, injection, and dispatch live in `AgentCommandsServer.cpp`. Client capture/input/UI/GPU `query_profile` commands live in `Engine/Source/Agent/AgentCommandsClientGeneric.cpp`; the client full-state fixture, desync probe, grid-cell move, and client dispatch live in `AgentCommandsClient.cpp`, and scene commands live in `AgentScene.cpp`.
 
 ## Command reference
 

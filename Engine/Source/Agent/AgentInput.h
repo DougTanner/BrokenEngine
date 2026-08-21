@@ -66,7 +66,7 @@ struct AgentScript
 
 // Frame-stepped synthetic-input engine. Advanced one step per rendered frame at the client drain point
 // (before ImGui NewFrame), so injected events land in the same frame. Two sinks: ImGui IO events (UI driving) and
-// a RawInput snapshot overlay (game key bindings). Zero steady-state heap — all state is fixed members.
+// a RawInput snapshot overlay (engine key bindings). Zero steady-state heap — all state is fixed members.
 class AgentInput
 {
 public:

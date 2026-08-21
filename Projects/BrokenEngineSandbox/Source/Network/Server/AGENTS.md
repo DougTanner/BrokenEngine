@@ -1,6 +1,6 @@
 # Network Server - Game Session and Managers
 
-Server-only game networking. `ServerSession` is the game-policy wrapper over `engine::ServerSessionRuntime`, coordinating client, fleet, transfer, and broadcast managers. The runtime owns host/discovery/pacing and fixed poll/tick/paused phase order; game hooks mutate game state around the deterministic Frame tick.
+Server-only game networking. `ServerSession` is the game-policy wrapper over `engine::ServerSessionRuntime`. It owns the client and fleet managers and holds the engine-owned transfer and broadcast managers (`../../../../../Engine/Source/Network/Server/AGENTS.md`), supplying them the game payloads and policy queues they work on. The runtime owns host/discovery/pacing and fixed poll/tick/paused phase order; game hooks mutate game state around the deterministic Frame tick.
 
 ## State Ownership
 
@@ -8,6 +8,7 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 - `authorizedCoords` remains the engine authority for subscription adjacency and server display.
 - Fleets are keyed by persistent `ClientGuid` so they survive disconnect and reconnect: disconnect only clears that GUID's client id, it never erases the fleet, and the fleet's ships keep running on the server. A separate reap pass therefore handles deaths in fleets whose owner is gone — marking members dead and shifting the flagship — because the connected-client death path skips those fleets by design.
 - Fleet RNG is seeded once, serialized with fleet state, and consumes exactly two 64-bit draws when generating a fleet identifier.
+- Fleet serialization supplies the game half of an engine grid save through four entry points the engine reader requires — write the fleet payload into the save stream, read it into an isolated staged value the engine carries without inspecting, adopt that staged value into the live fleet manager, and reset fleet state for a fresh game. Keep the set in step with the engine contract (`../../../../../Engine/Source/File/AGENTS.md`).
 - A fleet's position within its client's list shifts on delete, so requests and queued server work that outlive a poll carry the generated fleet identifier and re-resolve it at consumption.
 - The entities being re-attached are sorted by global ID before rebuilding client ownership so reconnect and save-load preserve creation order.
 - Normal update prepares tick inputs; replay supplies its recorded `FrameInput`.
@@ -20,14 +21,13 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 
 ## Deterministic Tick Contracts
 
-- The engine runtime owns the active set and calls two hooks here: this layer contributes every coordinate holding at least one Player, and hands each Frame leaving the set to `GameSaveLoad` for replay retention before the runtime erases it.
+- The engine runtime owns the active set and calls two hooks here: this layer contributes every coordinate holding at least one Player, and hands each Frame leaving the set to the engine replay owner for retention before the runtime erases it.
 - Replay uses coordinates with live readers. Normal live inputs and transfer batches are sorted into the deterministic type order before recording and publication; replay consumes the recorded `FrameInput` order exactly and does not sort it again.
 - Apply transfer ownership relinks before death detection: a transferred Player updates its client/GUID ownership record before the tick's death pass, so a live handoff cannot be treated as a death. A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
 - Spawn assignment diffs origin player IDs across the tick and pairs new IDs with waiting clients in request order. The client GUID written into Frame state is the persistent relink key.
 - Fleet navigation defers flagship updates through `StatusChange`s. Within `BuildFrameInputs`, waiting-client spawn construction, queued player updates, fleet timers and pending flagship updates, plus broadcast and pre-spawn snapshot capture run only on advancing updates; this work remains deferred through paused and other zero-tick updates.
 - Agent-injected `StatusChange`s remain queued until a normal, advancing, frame-ready tick can consume them. Consumed changes use the same deterministic type grouping as broadcast serialization.
-- Transfer destinations must be adjacent. Non-player transfers require a live destination; player transfer makes the destination live itself. Recompute the destination Frame CRC after applying arrived transfers: the frame tick computes each frame's `sharedCrc` before transfers land, so the harvest step re-runs `Frame::Crcs()` on every destination frame and logs the before and after values. Clients check their own simulated frame against the CRC the server broadcast for that tick, so skipping this recompute desyncs every client on the receiving end of a transfer. It is not defensive recomputation and must not be optimized away as redundant.
-- `ServerSessionRuntime::CompleteTick` invokes `ServerBroadcaster::BuildTickPublication`, which passes each tick to `ServerSessionRuntime::PublishTick` to maintain the delta resend ring. The publication includes complete per-coordinate Frames for the separate diagnostic ring only when `kbDesyncDebugFrames` is enabled. This manual flag is disabled by default and must match the client build.
+- Transfer validation, deterministic ordering, destination materialization, the destination CRC recompute, and publication assembly are engine-owned. The game half is the transfer payloads, the ownership relink above, waiting-client spawn coordination, fleet notification, and the three transient queues `ServerSession` retains for the engine machinery to drain — replay transfer fixtures, pending subscription updates, and agent-injected `StatusChange`s — which stay here because every other consumer of them is game policy.
 - Replay transfer publication may include a coordinate that is publication-only at `E` and simulation-active at `E + 1`; it is still sent through the existing per-coordinate update publication and does not alter wire layout or starvation rules.
 
 ## Trust and Lifecycle Boundaries
@@ -35,7 +35,7 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 - Engine `Server` admits both engine and game packets before dispatch and owns the resulting violation accounting, including handler throws. This layer supplies game contracts, dispatches admitted packets, and catches/logs handler failures. Side-specific bounds validate navigation timing, fleet sizes, and save/replay fleet data without partially applying a request.
 - Connect-time new-client processing, including its ownership relink, begins only after the engine accepts `ClientHello` and marks the connection handshake complete.
 - A client is dead only after all owned players are gone; skip death handling while a player is mid-transfer.
-- Load reset clears client, transfer, and broadcast transient state after restored fleet state is read. Do not erase restored fleet RNG or pending navigation updates.
+- Load reset clears client, transfer, and broadcast transient state after restored fleet state is read; resetting the two engine managers also clears the queues this session retains for them, so no second clear belongs here. Do not erase restored fleet RNG or pending navigation updates.
 
 ## See Also
 

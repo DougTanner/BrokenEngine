@@ -25,7 +25,8 @@ identity, semantics, layout, guard scope, or named invariant.
 ## Plan review
 
 Main dispatches `/plan-audit`, plus `/plan-simplicity-review` when the plan adds
-new code or modifies any non-documentation artifact, to one `reviewer` each,
+new code or modifies non-documentation behavior per Step 2's trigger in root
+`AGENTS.md`, to one `reviewer` each,
 then returns their accepted findings to the preparation `implementer`. That
 worker performs every repository read and search `/external-grill-plan`
 requires and returns an immutable decision brief in that skill's question format,

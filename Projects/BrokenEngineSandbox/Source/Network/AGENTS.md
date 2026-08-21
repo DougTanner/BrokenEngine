@@ -1,6 +1,6 @@
 # Game Network - Sessions and Game Wire Payloads
 
-Game-layer packet extensions, status-change serialization, and multiplayer orchestration. Engine transport, channels, ACK state, cursors, and hostile-input enforcement are owned by `../../../../Engine/Source/Network/AGENTS.md`.
+Game-layer packet extensions, status-change payload formats, and multiplayer orchestration. Engine transport, channels, ACK state, cursors, hostile-input enforcement, and the status-change batch codec body are owned by `../../../../Engine/Source/Network/AGENTS.md`.
 
 ## Game Packet Contracts
 
@@ -11,16 +11,15 @@ Game-layer packet extensions, status-change serialization, and multiplayer orche
 
 ## Status-Change Wire Format
 
-- `StatusChangeType` is declared with Frame status data, but its append-only wire compatibility contract is owned here. Adding a type requires matching serialization, deserialization, wire-size, and default-data handling; keep the per-item maximum large enough for every payload.
+- `StatusChangeType` is declared with Frame status data, but its append-only wire compatibility contract is owned here. Adding a type requires matching write, read, per-type wire-size, and default-data handling in the engine codec; keep the per-item maximum large enough for every payload.
 - Any incompatible `StatusChange` or `TransferData` layout change — type tag, field order, field width, variant arm membership, or per-item wire size — requires the game codec author to increment `engine::kuiProtocolVersion`; Engine Network owns the shared Hello rejection gate.
 - The protocol gate is distinct from `FrameInput::kiVersion` (replay-input compatibility) and `Frame::kiVersion` (deterministic-Frame/save/replay compatibility); neither Frame version substitutes for the protocol bump.
-- Serialization groups changes deterministically by type, then wraps the batch in an LZ4 envelope. The uncompressed-size prefix is a trust boundary and must be clamped before reserving scratch memory.
-- Deserialization bounds every item through the co-located wire-size contract and rejects the entire batch on an invalid type, short read, or decompression failure. Client-only values still occupy identical server-side wire space.
+- The codec body — deterministic grouping by type, the LZ4 envelope, its clamped uncompressed-size prefix, and whole-batch rejection of malformed input — is engine-owned; this document owns only the payloads it carries. Client-only values still occupy identical server-side wire space.
 - `GameMessages` owns the field order and byte size of game payloads. Each message struct carries one `Visit` descriptor that both the writing and the reading side route through, plus a `static_assert`ed `kiSize`, and the wire-sensitive event enums sit in the same descriptor table. Add or change a game payload there rather than hand-writing a write on one side and a matching read on the other, which is how the two sides drift apart. Local-only synthesized states never enter the stream.
 
 ## Layering
 
 - Top-level code owns packet identifiers, shared game payload codecs, and side-agnostic parsing.
 - `Client/AGENTS.md` owns reconciliation and client game-session behavior.
-- `Server/AGENTS.md` owns fleets, transfers, client management, and broadcast orchestration.
+- `Server/AGENTS.md` owns fleets, client management, and the game policy the engine-owned transfer and broadcast machinery works on.
 - Detailed rollback and packet flow belong in `../../../../Documents/Architecture/GameReconciliation.md` and `../../../../Documents/Architecture/Network.md`.

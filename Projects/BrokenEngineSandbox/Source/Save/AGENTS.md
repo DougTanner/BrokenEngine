@@ -1,31 +1,27 @@
-# Save - Server Persistence and Replay
+# Save - Server Persistence
 
 ## Overview
 
-`GameSaveLoad` owns server save/load/reset and deterministic replay. Files are versioned by `game::Frame::kiVersion`; navigation and elevation are derived and are not persisted.
+`GameSaveLoad` orchestrates server save, load, reset, and autosave, and this subsystem supplies the game half of the engine-owned grid save and replay contracts. Files are versioned by `game::Frame::kiVersion`; navigation and elevation are derived and are not persisted.
 
 ## Save and Load
 
-- Grid saves use atomic replacement and write coord frames in sorted key order. Return the actual commit result to callers.
-- Deserialization is a trust boundary. Validate version headers, counts, capacities, IDs, and stream completion before applying the loaded state.
-- A failed or truncated read clears partial frame/fleet state so callers can rebuild a fresh game. Apply counters and clocks only after full validation.
+- Grid file framing, validation, staging, and adoption are engine-owned (`../../../../Engine/Source/File/AGENTS.md`); this subsystem owns only when a save, load, reset, or autosave runs and what happens around it. Return the actual commit result to callers.
 - Successful loads preserve the saved simulation clock and resynchronize clients to that state. Fresh-game paths reset server fleet management explicitly.
-- Server load/reset and replay-load entry cancel pending raw profile samples and unpublished event arms before mutating or restoring frame state; this diagnostic cleanup does not alter the persisted payload or replay stream.
+- Server load and reset cancel pending raw profile samples and unpublished event arms before mutating or restoring frame state; this diagnostic cleanup does not alter the persisted payload.
 
-## Replay
+## Replay Contract
 
-- The replay manifest is the marker that commits one replay generation — a single recording instance, named in code by `kReplayManifestGenerationDomain` and `ComputeReplayGenerationDigest` — plus the checksummed list of that generation's files. Recording start invalidates it before replacing any component; recording stop publishes it only after writers and metadata succeed. Playback validates its authoritative component identities, byte counts, SHA-256 digests, and replay generation root before reading components or applying staged state.
-- A staged replay reader whose file records a version different from this build's is an expected refusal, not corrupt data: report it and abandon playback. Every other reader failure, including a truncated or damaged header, stays on the corrupt-data path.
-- Writer state persists across frames. A writer's first coord eviction is terminal: retain that coord's last complete frame and never resume the writer. Missing retained terminal state invalidates that coord's replay files without skipping attempts for other writers or metadata.
-- Playback readers retire independently at recorded endpoints. Loop only after the last reader retires, and stop the current fixed-tick iteration before loading the next loop.
-- A transfer harvested after dispatch at event tick `E` is recorded at `E` in that coord's post-dispatch channel, never inside a `FrameInput`. Playback loads the record for the exact tick `E`, applies the transfer after dispatch at `E`, and publishes the destination at `E`; a reader that remains live first participates in simulation dispatch at `E + 1`. Terminal input never carries transfers, and playback refuses a recorded input that carries a transfer-typed entry. Terminal readers always consume and validate their terminal input/end frame before retirement, and the loop stops before the next dispatch.
-- Successfully applying replay state starts a fresh fixed-step wall-clock interval. Replay validation and file I/O are outside simulation time; never carry their elapsed time or accumulated tick debt into the restored loop, or a batch of extra ticks can break replay CRCs.
-- Replay compares recorded checksums with resimulation each tick. Transfer harvest remains disabled during playback so the deterministic stream matches recording.
-- Replay manifest records are written in canonical activation-tick-then-coord order and manifest counts are bounded before allocation. The in-memory replay active-coord list is not order-significant: coords dispatch in parallel and every consumer is coord-keyed.
+Recording, playback, the manifest, and every stream lifetime rule are engine-owned (`../../../../Engine/Source/File/AGENTS.md`), the same deferral the grid file uses. This subsystem owns the game half of that contract.
+
+- Replay metadata is game-owned: written after the writer files complete, and read into an isolated staged value the engine carries without inspecting and applies only once the whole replay generation validates.
+- When the engine invalidates its replay streams, the game clears its replay-only transfer fixture and leaves the live game running.
+- After a successful save load, a fresh reset, or replay adoption, one game entry point relinks and resynchronizes connected clients. It is the sole caller of that relink, so all three paths share identical ordering.
+- Counting captured transfers by type is game policy, because only game code knows the `StatusChange` payload types. The engine carries the resulting per-type counts as an opaque member of its capture record.
 
 ## Affinity
 
-The subsystem is whole-file `BT_SERVER`. Replay operations are available only when `kbDebugInput` enables their tick-time implementation.
+The subsystem is whole-file `BT_SERVER`.
 
 ## See Also
 

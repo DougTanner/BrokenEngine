@@ -5,12 +5,14 @@
 #include "Network/Client/ClientSession.h"
 #endif
 #if defined(BT_SERVER)
+#include "File/Replay.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/Server/ServerTransferManager.h"
 #endif
 #include "Frame/FrameBase.h"
 #include "Input/Input.h"
 #include "Profile/ProfileManager.h"
+#include "Ui/GraphicsSettingsWrappersBase.h"
 
 namespace engine
 {
@@ -18,6 +20,10 @@ namespace engine
 GameBase::GameBase()
 {
 	game::FrameInterpolate::Register();
+
+#if defined(BT_SERVER)
+	mpReplay = std::make_unique<Replay>(*this);
+#endif // BT_SERVER
 }
 
 GameBase::~GameBase()
@@ -31,11 +37,165 @@ GameBase::~GameBase()
 }
 
 #if defined(BT_CLIENT)
-void GameBase::ProcessInput(bool bLostFocus, game::MenuInput& rMenuInput)
+// Fixed policy order: BeginPoll -> quit -> modal gate -> cursor -> pause/back-out -> engine toggles -> game
+// callback -> CompletePoll. The modal gate skips everything after it except CompletePoll, so a modal frame still
+// resolves quit and still advances the previous snapshot that the next frame's edge detection needs.
+void GameBase::ProcessInput(bool bLostFocus)
 {
-	game::gpInput->UpdateMenuInput(bLostFocus, rMenuInput);
-	game::gpInput->UpdateCameraInput();
-	ProcessMenuInput(rMenuInput);
+	MenuInput menuInput {};
+	InputPoll inputPoll = gpInput->BeginPoll(bLostFocus, meUiState != UiState::kNone, menuInput);
+
+	// Escape quits only from the basic main menu; with a settings sub-menu open it backs out to the menu below instead
+	if (menuInput.flags & MenuInputFlags::kQuit || (menuInput.flags & MenuInputFlags::kPauseMenu && (mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kPause))
+	{
+		mGameFlags.Set(GameFlags::kQuit);
+	}
+
+	if (meUiState == UiState::kModal)
+	{
+		gpInput->CompletePoll();
+		return;
+	}
+
+	if (menuInput.bGamepad && mMenuFlags & MenuFlags::kMouseVisible)
+	{
+		ShowCursor(FALSE);
+		mMenuFlags.Clear(MenuFlags::kMouseVisible);
+	}
+	else if (!menuInput.bGamepad && !(mMenuFlags & MenuFlags::kMouseVisible))
+	{
+		ShowCursor(TRUE);
+		mMenuFlags.Set(MenuFlags::kMouseVisible);
+	}
+
+	if (menuInput.flags & MenuInputFlags::kPauseMenu) [[unlikely]]
+	{
+		if (meUiState == UiState::kNone || meUiState == UiState::kGameSettings || meUiState == UiState::kGraphicsSettings || meUiState == UiState::kSound)
+		{
+			meUiState = UiState::kPause;
+		}
+		else if (!(mGameFlags & GameFlags::kMainMenu))
+		{
+			meUiState = UiState::kNone;
+		}
+	}
+
+	if (menuInput.flags & MenuInputFlags::kToggleFullscreen)
+	{
+		gFullscreen.Toggle();
+	}
+
+	if constexpr (kbProfiling)
+	{
+		if (menuInput.flags & MenuInputFlags::kToggleProfileText)
+		{
+			gpProfileManager->ToggleProfileText();
+		}
+	}
+
+	if constexpr (kbDebugRender)
+	{
+		if (menuInput.flags & MenuInputFlags::kToggleDebugRender)
+		{
+			DebugRender::Toggle();
+		}
+	}
+
+	if constexpr (kbDebugInput)
+	{
+		if (menuInput.flags & MenuInputFlags::kMenuTweaks)
+		{
+			mbShowImGui = !mbShowImGui;
+		}
+
+		if (menuInput.flags & MenuInputFlags::kMenuDebugTexture)
+		{
+			gDebugTexture.Toggle();
+		}
+		if (menuInput.flags & MenuInputFlags::kDebugTextureNext)
+		{
+			float fNext = gDebugTextureIndex.Get() + 1.0f;
+			if (fNext >= static_cast<float>(gpTextureManager->mRenderTargetTextures.miDebugTextureCount))
+			{
+				fNext = 0.0f;
+			}
+			gDebugTextureIndex.Set(fNext);
+		}
+		if (menuInput.flags & MenuInputFlags::kDebugTexturePrev)
+		{
+			float fPrev = gDebugTextureIndex.Get() - 1.0f;
+			if (fPrev < 0.0f)
+			{
+				fPrev = static_cast<float>(gpTextureManager->mRenderTargetTextures.miDebugTextureCount - 1);
+			}
+			gDebugTextureIndex.Set(fPrev);
+		}
+
+		// Runs before the game callback's timespeed request packets, which is safe because mbTimeScaleChanged is
+		// set only where an applied timespeed change lands, never by sending the request.
+		if (mTimeStep.mbTimeScaleChanged)
+		{
+			mTimeStep.mbTimeScaleChanged = false;
+			LOG(kNetwork, kWarning, "Timespeed changed Multiply: {} Divide: {}", mTimeStep.miTimeMultiply, mTimeStep.miTimeDivide);
+
+			if (mTimeStep.miTimeMultiply == 1 && mTimeStep.miTimeDivide == 1)
+			{
+				gpImGuiManager->UpdateTextArea(kTextDebug, "");
+			}
+			else
+			{
+				common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
+				if (mTimeStep.miTimeMultiply > 1)
+				{
+					common::gpThreadLocal->mWorkbuffer.Append("Time ratio: ");
+					common::gpThreadLocal->mWorkbuffer.Append(mTimeStep.miTimeMultiply);
+					common::gpThreadLocal->mWorkbuffer.Append("x");
+				}
+				else
+				{
+					common::gpThreadLocal->mWorkbuffer.Append("Time ratio: 1/");
+					common::gpThreadLocal->mWorkbuffer.Append(mTimeStep.miTimeDivide);
+					common::gpThreadLocal->mWorkbuffer.Append("x");
+				}
+				gpImGuiManager->UpdateTextArea(kTextDebug, common::gpThreadLocal->mWorkbuffer.View());
+			}
+		}
+
+		// Local pause state flips here so the callback's pause packet reports the state the client just entered.
+		if (menuInput.flags & MenuInputFlags::kTogglePauseFrame)
+		{
+			mGameFlags.Toggle(GameFlags::kPaused);
+			if (mGameFlags & GameFlags::kPaused)
+			{
+				gpImGuiManager->UpdateTextArea(kTextDebug, "PAUSED");
+			}
+			else
+			{
+				gpImGuiManager->UpdateTextArea(kTextDebug, "");
+			}
+		}
+	}
+
+	if constexpr (kbScreenshots)
+	{
+		// F9 toggles continuous dev capture: while on, queue a default one-shot request each frame (preserves the
+		// prior continuous-capture behavior atop the new request mailbox). Empty request path -> default %TEMP% path.
+		static bool sbContinuousScreenshots = false;
+		if (menuInput.flags & MenuInputFlags::kToggleScreenshots)
+		{
+			sbContinuousScreenshots = !sbContinuousScreenshots;
+		}
+		if (sbContinuousScreenshots && !gpGraphics->mScreenshotRequest)
+		{
+			// Fill only when empty so the per-frame F9 default request can't overwrite an agent-issued request's
+			// parameters (path / maxWidth / bPublishResult) before the capture site consumes it.
+			gpGraphics->mScreenshotRequest = ScreenshotRequest {};
+		}
+	}
+
+	ProcessGameMenuInput(menuInput, inputPoll);
+
+	gpInput->CompletePoll();
 }
 #endif // BT_CLIENT
 
@@ -140,7 +300,7 @@ void GameBase::ServerUpdate()
 		gpAgentCommandServer->Drain();
 	}
 
-	game::gpGame->mGameSaveLoad.SaveLoadReplay();
+	gpReplay->SaveLoadReplay();
 
 	game::gpServerSession->mpRuntime->WaitForTick(mTimeStep);
 
@@ -157,11 +317,11 @@ void GameBase::ServerUpdate()
 			mTimeStep.miTimeMultiply == 1 &&
 			mTimeStep.miTimeDivide == 1 &&
 			!(mGameFlags & GameFlags::kPaused) &&
-			!game::gpGame->mGameSaveLoad.IsRecording() &&
-			!game::gpGame->mGameSaveLoad.IsReplaying() &&
+			!gpReplay->IsRecording() &&
+			!mbReplaying &&
 			!(mGameFlags & GameFlags::kSaveReplay);
 	}
-	game::gpServerSession->BroadcastTimespeedIfChanged();
+	gpServer->BroadcastTimespeedIfChanged();
 	if (mGameFlags & GameFlags::kPaused) [[unlikely]]
 	{
 		mTimeStep.ClearAccumulator();
@@ -172,7 +332,7 @@ void GameBase::ServerUpdate()
 		LOG(kDefault, kWarning, "ServerUpdate FullTicks: {} (expected 1)", iFullTicks);
 	}
 	int64_t iUnusedTicks = 0;
-	if (game::gpGame->mGameSaveLoad.mReplayTransferCaptureInfo.iPauseAfterWriterInputCount != -1 && iFullTicks > 1)
+	if (gpReplay->mReplayTransferCaptureInfo.iPauseAfterWriterInputCount != -1 && iFullTicks > 1)
 	{
 		iUnusedTicks = iFullTicks - 1;
 		iFullTicks = 1;
@@ -181,7 +341,7 @@ void GameBase::ServerUpdate()
 
 	PrepareActiveSet();
 
-	const std::vector<GridCoord>& rActiveCoords = game::gpGame->mActiveCoords;
+	const std::vector<GridCoord>& rActiveCoords = mActiveCoords;
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameUpdate);
 	int64_t iFinalizedTicks = 0;
@@ -197,7 +357,7 @@ void GameBase::ServerUpdate()
 
 		game::gpServerSession->PrepareTick();
 
-		if (game::gpGame->mGameSaveLoad.IsReplaying()) [[unlikely]]
+		if (mbReplaying) [[unlikely]]
 		{
 			// Pick up readers activated by the previous iteration's SyncReplayTick, which the pre-loop PrepareActiveSet
 			// only sees once per update. Must run before this iteration's SyncReplayTick: the recording never simulated
@@ -205,9 +365,9 @@ void GameBase::ServerUpdate()
 			RefreshReplayActiveSet();
 		}
 
-		if (game::gpGame->mGameSaveLoad.IsRecording() || game::gpGame->mGameSaveLoad.IsReplaying() || (mGameFlags & GameFlags::kSaveReplay)) [[unlikely]]
+		if (gpReplay->IsRecording() || mbReplaying || (mGameFlags & GameFlags::kSaveReplay)) [[unlikely]]
 		{
-			if (!game::gpGame->mGameSaveLoad.SyncReplayTick())
+			if (!gpReplay->SyncReplayTick())
 			{
 				if constexpr (kbProfiling)
 				{
@@ -216,8 +376,8 @@ void GameBase::ServerUpdate()
 				}
 				// The final replay reader retired before dispatch. Reload now so server display/network observers never
 				// see an empty grid between updates, but start simulating the new loop on the next update.
-				game::gpGame->mGameSaveLoad.SaveLoadReplay();
-				if (!game::gpGame->mGameSaveLoad.IsReplaying())
+				gpReplay->SaveLoadReplay();
+				if (!mbReplaying)
 				{
 					// The reload failed after this iteration advanced the sim clock but before it finalized a frame.
 					// Restore the exact pre-tick values so buffered-frame indexing remains contiguous.
@@ -303,7 +463,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 		common::gpThreadLocal->mWorkbuffer.PushBack<ActiveFrameRef>({
 			.pNext = &NextFrame(rCoord),
 			.pCurrent = &CurrentFrame(rCoord),
-			.pFrameInput = &game::gpGame->mFrameInputs.at(rCoord),
+			.pFrameInput = &mFrameInputs.at(rCoord),
 			.pStaticData = &rFrames.staticData,
 		});
 	}
@@ -336,7 +496,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 void GameBase::FinalizeFrameTick()
 {
 	// Transfer entities that crossed frame boundaries into destination frames
-	if (!game::gpGame->mGameSaveLoad.IsReplaying())
+	if (!mbReplaying)
 	{
 		game::gpGame->HarvestTransfers();
 	}
@@ -349,7 +509,7 @@ void GameBase::FinalizeFrameTick()
 
 	game::gpServerSession->mpRuntime->CompleteTick(miTickCounter);
 
-	for (auto& [rCoord, rFrameInput] : game::gpGame->mFrameInputs)
+	for (auto& [rCoord, rFrameInput] : mFrameInputs)
 	{
 		rFrameInput.statusChanges.clear();
 	}
@@ -609,7 +769,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 		// holds its last state and mRenderInterpolates.at(cameraCoord) would throw on the absent entry.
 		if (bHaveRenderableCamera)
 		{
-			game::gpCamera->Update(mRenderInterpolates.at(cameraCoord));
+			gpCamera->Update(mRenderInterpolates.at(cameraCoord), static_cast<float>(mfLastRenderFrameSeconds));
 		}
 
 		// Decay visual error offset for smooth reconciliation corrections using the sim-scaled render delta
@@ -693,7 +853,7 @@ bool GameBase::HandleDeferredSwapchain()
 
 void GameBase::Render()
 {
-	const std::vector<GridCoord>& rActiveCoords = game::gpGame->mActiveCoords;
+	const std::vector<GridCoord>& rActiveCoords = mActiveCoords;
 
 	// Interpolate elapsed time with the sub-step remainder for smooth rendering
 	float fCurrentTime = mfCurrentTime + std::max(0.0f, common::NanosecondsToFloatSeconds<float>(mTimeStep.mTickRemainderNs));
@@ -725,10 +885,10 @@ void GameBase::RefreshReplayActiveSet()
 	// During replay, all coords with live readers are active; SyncReplayTick retires ended readers before dispatch.
 	// Heap: vector clear/push_back, unordered_map insertion + make_unique<Frame>
 	ScopedSuppressAllocationTracking suppress;
-	game::gpGame->mActiveCoords.clear();
-	for (const auto& [rCoord, rpReader] : game::gpGame->mGameSaveLoad.GetReplayReaders())
+	mActiveCoords.clear();
+	for (const auto& [rCoord, rpReader] : gpReplay->mReplayReaders)
 	{
-		game::gpGame->mActiveCoords.push_back(rCoord);
+		mActiveCoords.push_back(rCoord);
 		CoordFrames& rSub = mCoordFrames.try_emplace(rCoord).first->second;
 		if (rSub.pNext == nullptr)
 		{
@@ -738,10 +898,40 @@ void GameBase::RefreshReplayActiveSet()
 }
 #endif // BT_SERVER
 
+void GameBase::CreateFrameAtCoord(GridCoord coord)
+{
+	// Heap: unordered_map insertion + make_unique<Frame>. Frame persists across game lifetime
+	ScopedSuppressAllocationTracking suppress;
+
+	CoordFrames& rFrames = mCoordFrames.try_emplace(coord).first->second;
+#if defined(BT_CLIENT)
+	// Client uses snapshot ring as the source of truth — seed slot 0.
+	rFrames.iSnapshotHead = 0;
+	rFrames.iSnapshotCount = 1;
+	rFrames.snapshots[0] = std::make_unique<game::Frame>();
+	game::Frame& rFrame = *rFrames.snapshots[0];
+#else
+	rFrames.pCurrent = std::make_unique<game::Frame>();
+	game::Frame& rFrame = *rFrames.pCurrent;
+#endif
+	rFrame.interpolate.iTick = miTickCounter;
+	rFrame.interpolate.fCurrentTime = mfCurrentTime;
+	rFrame.interpolate.gameFlags.Set(game::GameFlags::kGame);
+	game::gpGame->InitFramePostRender(rFrame);
+
+	// Populate static data for this coord
+	FrameStaticData& rStaticData = rFrames.staticData;
+	XMVECTOR vecBaseArea = XMVectorSet(kfBaseAreaMinX, kfBaseAreaMaxY, kfBaseAreaMaxX, kfBaseAreaMinY);
+	rStaticData.vecArea = ComputeFrameArea(vecBaseArea, coord);
+	rStaticData.coord = coord;
+	GenerateIslandChain(coord, rStaticData.islands);
+	// navData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
+}
+
 void GameBase::PrepareActiveSet()
 {
 #if defined(BT_SERVER)
-	if (game::gpGame->mGameSaveLoad.IsReplaying())
+	if (mbReplaying)
 	{
 		RefreshReplayActiveSet();
 		// SyncReplayTick creates and overwrites each recorded FrameInput. Do not advance normal server managers here.
@@ -766,7 +956,7 @@ void GameBase::SwapFrames()
 
 	// After swap, .next holds old current frames (stale data, reusable memory).
 	// Ensure active entries exist for next iteration's AllocateAndCopy.
-	if (!game::gpGame->mGameSaveLoad.IsReplaying())
+	if (!mbReplaying)
 	{
 		game::gpGame->EnsureNextFrames();
 	}

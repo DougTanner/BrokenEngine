@@ -17,7 +17,7 @@ This plan's fullscreen sky pass is distinct from those water
 reflections; to avoid confusion with the existing water "Skybox"
 naming, prefer a non-colliding naming scheme for the new work
 (e.g. kPipelineSky / Sky.frag instead of kPipelineSkybox /
-Skybox.frag).  CameraBase drives a sun angle that controls day/night
+Skybox.frag).  engine::Camera drives a sun angle that controls day/night
 lighting via PopulateSunAndLighting() in GlobalUniforms.cpp.
 
 Why
@@ -121,9 +121,9 @@ Changes (11 files)
 
      // Skybox inverse VP (rotation only -- zero out view translation)
      {
-         XMMATRIX matViewRotation = game::gpCamera->mMatView;
+         XMMATRIX matViewRotation = engine::gpCamera->mMatView;
          matViewRotation.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-         XMMATRIX matVP = XMMatrixMultiply(matViewRotation, XMMatrixMultiply(matCameraShake, game::gpCamera->mMatPerspective));
+         XMMATRIX matVP = XMMatrixMultiply(matViewRotation, XMMatrixMultiply(matCameraShake, engine::gpCamera->mMatPerspective));
          XMMATRIX matInvVP = XMMatrixInverse(nullptr, matVP);
          XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4InverseViewProjectionRotation[0]), XMMatrixTranspose(matInvVP));
      }

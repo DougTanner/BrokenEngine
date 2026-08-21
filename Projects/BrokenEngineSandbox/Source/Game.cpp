@@ -1,11 +1,11 @@
 #include "Game.h"
 
+#include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
+#include "Input/Input.h"
 #include "Network/GamePacketType.h"
 #include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerTransferManager.h"
-#include "Profile/ProfileManager.h"
-#include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/Localization.h"
 
 namespace game
@@ -200,7 +200,7 @@ void Game::ComputeActiveSet()
 		if (ClientPlayerId().IsValid())
 		{
 			// Camera-zoom-dependent VisibleArea: f4LargeVisibleArea packs (minX, maxY, maxX, minY).
-			const XMFLOAT4& f4Visible = gpCamera->f4LargeVisibleArea;
+			const XMFLOAT4& f4Visible = engine::gpCamera->f4LargeVisibleArea;
 			XMVECTOR vecArea = mCoordFrames.at(mClientGridCoord).staticData.vecArea;
 			float fCellMinX = XMVectorGetX(vecArea);
 			float fCellMaxY = XMVectorGetY(vecArea);
@@ -343,7 +343,7 @@ void Game::BuildFrameInputs()
 			float fCurrentArmor = rPlayersPostRender.pfArmors[*oIdx];
 			if (fCurrentArmor < mfPreviousClientArmor)
 			{
-				gpCamera->mfShake = std::min(gpCamera->mfShake + kfCameraShakeAdd, kfCameraShakeMax);
+				engine::gpCamera->mfShake = std::min(engine::gpCamera->mfShake + kfCameraShakeAdd, kfCameraShakeMax);
 			}
 			mfPreviousClientArmor = fCurrentArmor;
 		}
@@ -351,47 +351,10 @@ void Game::BuildFrameInputs()
 #endif // BT_SERVER
 }
 
-void Game::CreateFrameAtCoord(engine::GridCoord coord)
-{
-	// Heap: unordered_map insertion + make_unique<Frame>. Frame persists across game lifetime
-	ScopedSuppressAllocationTracking suppress;
-
-	engine::CoordFrames& rFrames = mCoordFrames.try_emplace(coord).first->second;
-#if defined(BT_CLIENT)
-	// Client uses snapshot ring as the source of truth — seed slot 0.
-	rFrames.iSnapshotHead = 0;
-	rFrames.iSnapshotCount = 1;
-	rFrames.snapshots[0] = std::make_unique<Frame>();
-	Frame& rFrame = *rFrames.snapshots[0];
-#else
-	rFrames.pCurrent = std::make_unique<Frame>();
-	Frame& rFrame = *rFrames.pCurrent;
-#endif
-	rFrame.interpolate.iTick = miTickCounter;
-	rFrame.interpolate.fCurrentTime = mfCurrentTime;
-	rFrame.interpolate.gameFlags.Set(GameFlags::kGame);
-	InitFramePostRender(rFrame);
-
-	// Populate static data for this coord
-	engine::FrameStaticData& rStaticData = rFrames.staticData;
-	XMVECTOR vecBaseArea = XMVectorSet(engine::kfBaseAreaMinX, engine::kfBaseAreaMaxY, engine::kfBaseAreaMaxX, engine::kfBaseAreaMinY);
-	rStaticData.vecArea = engine::ComputeFrameArea(vecBaseArea, coord);
-	rStaticData.coord = coord;
-	engine::GenerateIslandChain(coord, rStaticData.islands);
-	// navData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
-}
-
 void Game::HarvestTransfers()
 {
 #if defined(BT_SERVER)
 	gpServerSession->mpTransferManager->HarvestTransfers();
-#endif
-}
-
-void Game::CaptureHarvestedTransfers([[maybe_unused]] engine::GridCoord coord, [[maybe_unused]] std::span<const StatusChange> transfers, [[maybe_unused]] const Frame& rPreTransferFrame)
-{
-#if defined(BT_SERVER)
-	mGameSaveLoad.CaptureHarvestedTransfers(coord, transfers, rPreTransferFrame);
 #endif
 }
 
@@ -425,22 +388,11 @@ void Game::Reset()
 	mfCurrentTime = 0.0f;
 
 #if defined(BT_SERVER)
-	mGameSaveLoad.ResetStreams();
+	engine::gpReplay->ResetStreams();
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
-	game::gpCamera->ResetSunAngle();
-	game::gpCamera->mVecLastKnownPlayerPosition = {};
-	game::gpCamera->mVecLastKnownPlayerVelocity = {};
-	game::gpCamera->mfLastKnownPlayerTime = 0.0f;
-	game::gpCamera->mVecJumpStartPosition = {};
-	game::gpCamera->mVecPreviousTargetPosition = {};
-	game::gpCamera->mfJumpStartTime = 0.0f;
-	game::gpCamera->mbJumping = false;
-	// Reinitialize both references directly to the new session's live zoom on the next camera update; do not carry
-	// contraction across sessions.
-	game::gpCamera->mfShadowTexelEyeHeight = 0.0f;
-	game::gpCamera->mfLightingTexelEyeHeight = 0.0f;
+	engine::gpCamera->ResetForSession();
 	engine::gbSmokeClear = true;
 	engine::gpParticleManager->mbReset = true;
 	engine::WindTrailsInterpolate::ResetRenderState();
@@ -534,6 +486,42 @@ bool Game::ShouldShowInGameUi()
 {
 	return !mbShowImGui;
 }
+
+engine::StandardMenuModel Game::GetStandardMenuModel() const
+{
+	const engine::ClientSessionRuntime& rRuntime = *gpClientSession->mpRuntime;
+
+	engine::StandardMenuState_t state;
+	state.Set(engine::StandardMenuState::kClientPresent, rRuntime.mpClient != nullptr);
+	state.Set(engine::StandardMenuState::kDiscoveryScannerPresent, rRuntime.mpDiscoveryScanner != nullptr);
+	state.Set(engine::StandardMenuState::kServerDiscovered, rRuntime.mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered);
+	// Set only while a client exists, so the menu can test this bit on its own.
+	state.Set(engine::StandardMenuState::kConnectionAccepted, rRuntime.mpClient != nullptr && (rRuntime.mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted));
+	state.Set(engine::StandardMenuState::kAutoConnect, kbAutoConnect);
+
+	return engine::StandardMenuModel
+	{
+		.pcTitle = "BROKEN ENGINE",
+		.features = {engine::StandardMenuFeature::kLocalServer, engine::StandardMenuFeature::kRemoteServer},
+		.state = state,
+	};
+}
+
+void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
+{
+	switch (eAction)
+	{
+		case engine::StandardMenuAction::kStartDiscovery:
+			gpClientSession->mpRuntime->StartDiscovery();
+			break;
+		case engine::StandardMenuAction::kConnectToDiscoveredServer:
+			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots);
+			break;
+		case engine::StandardMenuAction::kChangeFrameToMainMenu:
+			ChangeFrame(GameFlags::kMainMenu);
+			break;
+	}
+}
 #endif // BT_CLIENT
 
 void Game::ChangeFrame(GameFlags_t gameFlags)
@@ -567,85 +555,94 @@ void Game::ChangeFrame(GameFlags_t gameFlags)
 }
 
 #if defined(BT_CLIENT)
-void Game::ProcessMenuInput(const MenuInput& rMenuInput)
+void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engine::InputPoll& rInputPoll)
 {
-	// Escape quits only from the basic main menu; with a settings sub-menu open it backs out to the menu below instead
-	if (rMenuInput.flags & MenuInputFlags::kQuit || (rMenuInput.flags & MenuInputFlags::kPauseMenu && InMainMenu() && meUiState == engine::UiState::kPause))
+	if constexpr (kbDebugInput)
 	{
-		mGameFlags.Set(engine::GameFlags::kQuit);
-	}
+		// Return drives two independent game actions; poll the edge once and let both branches read it.
+		bool bReturnPressed = rInputPoll.KeyboardPressed(VK_RETURN);
+		bool bCycleMenuIslandPressed = rInputPoll.KeyboardPressed('E');
 
-	if (meUiState == engine::UiState::kModal)
-	{
-		return;
-	}
-
-	if (rMenuInput.bGamepad && mMenuFlags & engine::MenuFlags::kMouseVisible)
-	{
-		ShowCursor(FALSE);
-		mMenuFlags.Clear(engine::MenuFlags::kMouseVisible);
-	}
-	else if (!rMenuInput.bGamepad && !(mMenuFlags & engine::MenuFlags::kMouseVisible))
-	{
-		ShowCursor(TRUE);
-		mMenuFlags.Set(engine::MenuFlags::kMouseVisible);
-	}
-
-	if (rMenuInput.flags & MenuInputFlags::kPauseMenu) [[unlikely]]
-	{
-		if (meUiState == kNone || meUiState == kGameSettings || meUiState == kGraphicsSettings || meUiState == kSound)
+		if (engine::gpClient != nullptr)
 		{
-			meUiState = kPause;
+			if (rMenuInput.flags & engine::MenuInputFlags::kQuicksave)
+			{
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientSaveRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+			if (rMenuInput.flags & engine::MenuInputFlags::kQuickload)
+			{
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientLoadRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+			if (rMenuInput.flags & engine::MenuInputFlags::kSaveReplay)
+			{
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayRecordRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+			if (rMenuInput.flags & engine::MenuInputFlags::kLoadReplay)
+			{
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayPlaybackRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+			if (bReturnPressed)
+			{
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientResetRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
 		}
-		else if (!InMainMenu())
+
+		if (rMenuInput.flags & engine::MenuInputFlags::kSlowTime)
 		{
-			meUiState = kNone;
+			if (engine::gpClient != nullptr)
+			{
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>(0));
+			}
+		}
+		else if (rMenuInput.flags & engine::MenuInputFlags::kSpeedUpTime)
+		{
+			if (engine::gpClient != nullptr)
+			{
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>(1));
+			}
+		}
+
+		// GameBase already flipped the local pause state, so this reports the state the client just entered.
+		if (rMenuInput.flags & engine::MenuInputFlags::kTogglePauseFrame)
+		{
+			if (engine::gpClient != nullptr)
+			{
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientPauseRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>((mGameFlags & engine::GameFlags::kPaused) ? 1 : 0));
+			}
+		}
+
+		if (bReturnPressed && InMainMenu())
+		{
+			if (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered)
+			{
+				gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots);
+			}
+			else
+			{
+				gpClientSession->ConnectToServer("127.0.0.1");
+			}
+		}
+
+		if (bCycleMenuIslandPressed && InMainMenu())
+		{
+			miMenuIslandIndex = (miMenuIslandIndex + 1) % std::ssize(engine::gpIslandTerrain->mIslandCrcsByArea);
+			auto it = mCoordFrames.find(engine::kOriginCoord);
+			BuildMenuIslandPlacement(miMenuIslandIndex, it->second.staticData.islands);
+			// Cycling rewrites the placement list on an existing cell — drop the derived elevation grid
+			// and the render-path query cache so RunFrameTick rebuilds both from the new placements
+			// next tick.
+			it->second.staticData.elevationGrid = {};
+			it->second.staticData.islandRenderQueries = {};
+
+			// Pre-mint the texture slot now (mirrors ClientSession::ApplyReceivedStaticData) so the
+			// elevation upload and chunk loads are in-flight before UpdateActiveIslands references the
+			// slot this same frame. AcquireTextureSlot is idempotent (hot-path early return).
+			for (const engine::IslandPlacement& rPlacement : it->second.staticData.islands)
+			{
+				engine::gpIslandTerrain->AcquireTextureSlot(rPlacement.islandCrc);
+			}
 		}
 	}
-
-	if (rMenuInput.flags & MenuInputFlags::kToggleFullscreen)
-	{
-		engine::gFullscreen.Toggle();
-	}
-
-	if constexpr (kbProfiling)
-	{
-		if (rMenuInput.flags & MenuInputFlags::kToggleProfileText)
-		{
-			gpProfileManager->ToggleProfileText();
-		}
-	}
-
-#if defined(BT_CLIENT)
-	if constexpr (kbDebugRender)
-	{
-		if (rMenuInput.flags & MenuInputFlags::kToggleDebugRender)
-		{
-			engine::DebugRender::Toggle();
-		}
-	}
-#endif
-
-	ProcessDebugInput(rMenuInput);
-
-#if defined(BT_CLIENT)
-	if constexpr (kbScreenshots)
-	{
-		// F9 toggles continuous dev capture: while on, queue a default one-shot request each frame (preserves the
-		// prior continuous-capture behavior atop the new request mailbox). Empty request path -> default %TEMP% path.
-		static bool sbContinuousScreenshots = false;
-		if (rMenuInput.flags & MenuInputFlags::kToggleScreenshots)
-		{
-			sbContinuousScreenshots = !sbContinuousScreenshots;
-		}
-		if (sbContinuousScreenshots && !engine::gpGraphics->mScreenshotRequest)
-		{
-			// Fill only when empty so the per-frame F9 default request can't overwrite an agent-issued request's
-			// parameters (path / maxWidth / bPublishResult) before the capture site consumes it.
-			engine::gpGraphics->mScreenshotRequest = engine::ScreenshotRequest {};
-		}
-	}
-#endif // BT_CLIENT
 }
 #endif // BT_CLIENT
 
@@ -668,7 +665,7 @@ void Game::CaptureClientStateAndSaveIfChanged()
 		}
 	}
 
-	const float fNewCameraEyeHeightTarget = gpCamera->mfCameraEyeHeightTarget;
+	const float fNewCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget;
 
 	if (newFleetGuid == mRememberedFleetGuid
 		&& newShipId == mRememberedFocusedShipId
@@ -708,158 +705,6 @@ void Game::InitFramePostRender(Frame& rFrame)
 	rFrame.postRender.enemyAlignment = mEnemyAlignment;
 	rFrame.postRender.alignments = mAlignments;
 }
-
-#if defined(BT_CLIENT)
-void Game::ProcessDebugInput(const MenuInput& rMenuInput)
-{
-	if constexpr (kbDebugInput)
-	{
-		if (engine::gpClient != nullptr)
-		{
-			if (rMenuInput.flags & MenuInputFlags::kQuicksave)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientSaveRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-			if (rMenuInput.flags & MenuInputFlags::kQuickload)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientLoadRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-			if (rMenuInput.flags & MenuInputFlags::kSaveReplay)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayRecordRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-			if (rMenuInput.flags & MenuInputFlags::kLoadReplay)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayPlaybackRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-			if (rMenuInput.flags & MenuInputFlags::kResetFrame)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientResetRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-		}
-
-		if (rMenuInput.flags & MenuInputFlags::kMenuTweaks)
-		{
-			mbShowImGui = !mbShowImGui;
-		}
-
-		if (rMenuInput.flags & MenuInputFlags::kMenuDebugTexture)
-		{
-			engine::gDebugTexture.Toggle();
-		}
-		if (rMenuInput.flags & MenuInputFlags::kDebugTextureNext)
-		{
-			float fNext = engine::gDebugTextureIndex.Get() + 1.0f;
-			if (fNext >= static_cast<float>(engine::gpTextureManager->mRenderTargetTextures.miDebugTextureCount))
-			{
-				fNext = 0.0f;
-			}
-			engine::gDebugTextureIndex.Set(fNext);
-		}
-		if (rMenuInput.flags & MenuInputFlags::kDebugTexturePrev)
-		{
-			float fPrev = engine::gDebugTextureIndex.Get() - 1.0f;
-			if (fPrev < 0.0f)
-			{
-				fPrev = static_cast<float>(engine::gpTextureManager->mRenderTargetTextures.miDebugTextureCount - 1);
-			}
-			engine::gDebugTextureIndex.Set(fPrev);
-		}
-
-		if (rMenuInput.flags & MenuInputFlags::kSlowTime)
-		{
-			if (engine::gpClient != nullptr)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>(0));
-			}
-		}
-		else if (rMenuInput.flags & MenuInputFlags::kSpeedUpTime)
-		{
-			if (engine::gpClient != nullptr)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>(1));
-			}
-		}
-
-		if (mTimeStep.mbTimeScaleChanged)
-		{
-			mTimeStep.mbTimeScaleChanged = false;
-			LOG(kNetwork, kWarning, "Timespeed changed Multiply: {} Divide: {}", mTimeStep.miTimeMultiply, mTimeStep.miTimeDivide);
-
-			if (mTimeStep.miTimeMultiply == 1 && mTimeStep.miTimeDivide == 1)
-			{
-				engine::gpImGuiManager->UpdateTextArea(engine::kTextDebug, "");
-			}
-			else
-			{
-				common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
-				if (mTimeStep.miTimeMultiply > 1)
-				{
-					common::gpThreadLocal->mWorkbuffer.Append("Time ratio: ");
-					common::gpThreadLocal->mWorkbuffer.Append(mTimeStep.miTimeMultiply);
-					common::gpThreadLocal->mWorkbuffer.Append("x");
-				}
-				else
-				{
-					common::gpThreadLocal->mWorkbuffer.Append("Time ratio: 1/");
-					common::gpThreadLocal->mWorkbuffer.Append(mTimeStep.miTimeDivide);
-					common::gpThreadLocal->mWorkbuffer.Append("x");
-				}
-				engine::gpImGuiManager->UpdateTextArea(engine::kTextDebug, common::gpThreadLocal->mWorkbuffer.View());
-			}
-		}
-
-		if (rMenuInput.flags & MenuInputFlags::kTogglePauseFrame)
-		{
-			mGameFlags.Toggle(engine::GameFlags::kPaused);
-			if (engine::gpClient != nullptr)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientPauseRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>((mGameFlags & engine::GameFlags::kPaused) ? 1 : 0));
-			}
-			if (mGameFlags & engine::GameFlags::kPaused)
-			{
-				engine::gpImGuiManager->UpdateTextArea(engine::kTextDebug, "PAUSED");
-			}
-			else
-			{
-				engine::gpImGuiManager->UpdateTextArea(engine::kTextDebug, "");
-			}
-		}
-
-		if (rMenuInput.flags & MenuInputFlags::kConnectLocal && InMainMenu())
-		{
-			if (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered)
-			{
-				gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots);
-			}
-			else
-			{
-				gpClientSession->ConnectToServer("127.0.0.1");
-			}
-		}
-
-		if (rMenuInput.flags & MenuInputFlags::kCycleMenuIsland && InMainMenu())
-		{
-			miMenuIslandIndex = (miMenuIslandIndex + 1) % std::ssize(engine::gpIslandTerrain->mIslandCrcsByArea);
-			auto it = mCoordFrames.find(engine::kOriginCoord);
-			BuildMenuIslandPlacement(miMenuIslandIndex, it->second.staticData.islands);
-			// Cycling rewrites the placement list on an existing cell — drop the derived elevation grid
-			// and the render-path query cache so RunFrameTick rebuilds both from the new placements
-			// next tick.
-			it->second.staticData.elevationGrid = {};
-			it->second.staticData.islandRenderQueries = {};
-
-			// Pre-mint the texture slot now (mirrors ClientSession::ApplyReceivedStaticData) so the
-			// elevation upload and chunk loads are in-flight before UpdateActiveIslands references the
-			// slot this same frame. AcquireTextureSlot is idempotent (hot-path early return).
-			for (const engine::IslandPlacement& rPlacement : it->second.staticData.islands)
-			{
-				engine::gpIslandTerrain->AcquireTextureSlot(rPlacement.islandCrc);
-			}
-		}
-	}
-}
-#endif // BT_CLIENT
 
 void Game::RestoreReplayMeta(const ReplayMeta& rMeta)
 {

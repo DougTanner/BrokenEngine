@@ -1,5 +1,6 @@
 #include "TerrainUtils.h"
 
+#include "Frame/Collections/Players/Players.h"
 #include "Frame/FrameStaticData.h"
 
 namespace game
@@ -128,5 +129,19 @@ float XM_CALLCONV ComputeTerrainAvoidance(const engine::FrameStaticData& rStatic
 
 	return fCurrentDeltaRotation;
 }
+
+#if defined(BT_SERVER)
+
+float NavClearanceMeters()
+{
+	return kfPlayerRadius + kfPushMargin;
+}
+
+float NavThresholdElevation(float fBaseHeight)
+{
+	return fBaseHeight - kfPlayerRadius - kfPushMargin;
+}
+
+#endif // BT_SERVER
 
 } // namespace game

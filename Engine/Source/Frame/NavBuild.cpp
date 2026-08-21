@@ -2,8 +2,6 @@
 
 #include "NavBuildInternal.h"
 
-#include "Frame/Collections/Players/Players.h"
-
 namespace engine
 {
 
@@ -341,7 +339,7 @@ bool PointInPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, int32_t iVertex
 	return iWinding != 0;
 }
 
-void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fFootprintXMeters, float fFootprintYMeters)
+void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters)
 {
 	LOG(kNavData, kDebug, "NavBuild: heightmap {}x{} worldThreshold={}", iHeightmapWidth, iHeightmapHeight, common::Wb(fWorldThreshold, 4));
 
@@ -368,7 +366,6 @@ void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t
 	// Clipper2 is Vatti-based with integer-coordinate robustness; miter offsets fall back to
 	// bevel at concave corners that would otherwise self-intersect (the bowtie failure mode
 	// the previous custom miter offset suffered from).
-	static constexpr double kfClearanceMeters = game::kfPlayerRadius + game::kfPushMargin;
 	static constexpr double kfMiterLimit = 2.0;
 	static constexpr double kfSimplifyEpsilonMeters = 1.00;
 	// Clipper2 PathsD quantizes doubles to int64 at 10^precision per unit. Keep precision 6 for both
@@ -406,7 +403,7 @@ void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t
 	// The nav polygon is deliberately the terrain-push contour plus ship clearance. All new or changed
 	// distances and tolerances here are meters; UV is representation only.
 	// Outward miter offset; Clipper2 auto-bevels when miter would exceed limit.
-	Clipper2Lib::PathsD inflated = Clipper2Lib::InflatePaths(unioned, kfClearanceMeters, Clipper2Lib::JoinType::Miter, Clipper2Lib::EndType::Polygon, kfMiterLimit, kiClipperPrecision);
+	Clipper2Lib::PathsD inflated = Clipper2Lib::InflatePaths(unioned, static_cast<double>(fClearanceMeters), Clipper2Lib::JoinType::Miter, Clipper2Lib::EndType::Polygon, kfMiterLimit, kiClipperPrecision);
 	// Topology-preserving simplification (does not introduce crossings).
 	Clipper2Lib::PathsD simplified = Clipper2Lib::SimplifyPaths(inflated, kfSimplifyEpsilonMeters);
 

@@ -29,7 +29,6 @@ inline constexpr bool kbSingleInstance = false;
 // #define ENABLE_CRT_DEBUG_HEAP
 inline constexpr const char* kpcBuildConfigName = "Debug";
 
-inline constexpr bool kbAutoRunServer = false;
 inline constexpr bool kbAutoConnect = true;
 inline constexpr bool kbDebugBreak = true;
 inline constexpr bool kbDebugInput = true;
@@ -47,7 +46,6 @@ inline constexpr bool kbShowProfileTextByDefault = false;
 #elif defined(BT_PROFILE)
 inline constexpr const char* kpcBuildConfigName = "Profile";
 
-inline constexpr bool kbAutoRunServer = false;
 inline constexpr bool kbAutoConnect = true;
 inline constexpr bool kbDebugBreak = false;
 inline constexpr bool kbDebugInput = false;
@@ -65,7 +63,6 @@ inline constexpr bool kbShowProfileTextByDefault = true;
 #elif defined(BT_RELEASE)
 inline constexpr const char* kpcBuildConfigName = "Release";
 
-inline constexpr bool kbAutoRunServer = false;
 inline constexpr bool kbAutoConnect = false;
 inline constexpr bool kbDebugBreak = false;
 inline constexpr bool kbDebugInput = false;
@@ -99,7 +96,6 @@ inline constexpr LogLevel keLogLevelInput = keLogLevelDefault;
 // chain has no external includes of its own), and Shaders/ShaderLayouts.h must precede Engine.h — this is the repo's sole C++ include site for shaders:: constants; engine TUs consume them only via this PCH
 #include "Common.h"
 #include "Shaders/ShaderLayouts.h"
-#include "Ui/WindDepositsWrappers.h"
 #include "Frame/Frame.h"
 #include "Network/NetworkSessionContract.h"
 #include "Engine.h"

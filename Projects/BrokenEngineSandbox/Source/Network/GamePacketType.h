@@ -22,7 +22,6 @@ enum class GamePacketType : uint8_t
 	kClientReplayPlaybackRequest, // Client requests server replay playback (debug only)
 	kClientPauseRequest,          // Client requests server pause/unpause (debug only)
 	kClientTimespeedRequest,      // Client requests timescale change (debug only)
-	kServerTimespeedUpdate,       // Server broadcasts current timescale to all clients
 };
 
 // Declarative per-packet contract for game-range client -> server packets, checked once at the ParseReceivedGamePackets

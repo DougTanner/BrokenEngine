@@ -163,7 +163,7 @@ class Server
 {
 public:
 
-	Server(uint16_t uiPort, ServerSessionRuntime& rSessionRuntime);
+	explicit Server(uint16_t uiPort);
 	~Server();
 
 	template <typename TType, typename... TArgs>
@@ -179,6 +179,8 @@ public:
 	void SendCoordFullState(int64_t iClientId, int64_t iSlot, int64_t iTick, GridCoord coord, const game::Frame* pFrame);
 	void SendCoordStaticData(int64_t iClientId, int64_t iSlot, GridCoord coord, const FrameStaticData& rStaticData);
 	void BroadcastLoadNotification();
+	// Consume-once: sends only when TimeStep recorded an applied time-scale change since the last call.
+	void BroadcastTimespeedIfChanged();
 
 	std::vector<ClientConnection> mClients;
 	std::vector<PendingDisconnect> mPendingDisconnects;
@@ -220,6 +222,8 @@ private:
 	void ClientResyncRequest(std::span<const uint8_t> packetData, int64_t iClientId);
 	void SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pMessage, const ClientGuid* pGuid);
 	void SendSubscribeAccept(ClientConnection& rClient, int64_t iSlot, GridCoord coord);
+	void SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide);
+	void SendTimespeedToNewClient(ENetPeer* pPeer);
 
 	void WriteBufferedFramePacket(common::Workbuffer& rWorkbuffer, PacketType eType, int64_t iSlot, uint16_t uiEpoch, const PerCoordBufferedFrame& rBuffered, int64_t iTimestampNs);
 	const PerCoordBufferedFrame* FindBufferedFrame(GridCoord coord, int64_t iTick) const;
@@ -254,7 +258,6 @@ private:
 	// Network simulation delay queue
 	std::deque<DelayedPacket> mDelayedPackets;
 	NetworkSimulationState mNetworkSimState;
-	ServerSessionRuntime& mrSessionRuntime;
 };
 
 inline Server* gpServer = nullptr;

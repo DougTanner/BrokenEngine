@@ -411,12 +411,12 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, shaders::Glo
 
 	double dWaveTime = static_cast<double>(rGlobalLayout.fElapsedTime);
 	XMFLOAT4A f4WaveCameraPos {};
-	XMStoreFloat4A(&f4WaveCameraPos, game::gpCamera->mVecPosition);
+	XMStoreFloat4A(&f4WaveCameraPos, engine::gpCamera->mVecPosition);
 	double dWaveCameraX = static_cast<double>(f4WaveCameraPos.x);
 	double dWaveCameraY = static_cast<double>(f4WaveCameraPos.y);
 
 	// Fade geometric wave amplitudes by camera eye height — per-stack Start/End sliders (1.0 at ≤ Start, 0.0 at ≥ End, linear between).
-	float fCameraEyeHeight = game::gpCamera->mfCameraEyeHeight;
+	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;
 	float fLowFadeStart = gWaterLowAmplitudeFadeStart.Get();
 	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.Get();
 	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraEyeHeight) / std::max(fLowFadeEnd - fLowFadeStart, 1e-3f), 0.0f, 1.0f);
@@ -507,10 +507,10 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 	// Per-frame visible-area LOD draw params for water. The water pipeline binds a single concat
 	// mesh buffer holding all LODs; per-frame we tell vkCmdDrawIndexedIndirect which LOD's index
-	// range and vertex base to draw. CameraBase computes miVisibleAreaLod from eye distance with 4×
+	// range and vertex base to draw. engine::Camera computes miVisibleAreaLod from eye distance with 4×
 	// hysteresis bands; mesh density and snap-grid are in lockstep. Terrain draws via one
 	// vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain.cpp.
-	int64_t iLevelOfDetail = game::gpCamera->miVisibleAreaLod;
+	int64_t iLevelOfDetail = engine::gpCamera->miVisibleAreaLod;
 	const BufferManager::VisibleAreaMeshLod& rWaterLevelOfDetail = gpBufferManager->mWaterMeshLods[iLevelOfDetail];
 	gpPipelineManager->mpPipelines[kPipelineWater].WriteIndirectBuffer(iCommandBuffer, 1, rWaterLevelOfDetail.iIndexCount, rWaterLevelOfDetail.iIndexOffset, rWaterLevelOfDetail.iVertexOffset);
 
@@ -593,11 +593,11 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
 	static int32_t siRenderCount = 0;
-	rMainLayout.iFrameNumber = static_cast<int>(game::gpCamera->miFrame);
+	rMainLayout.iFrameNumber = static_cast<int>(engine::gpCamera->miFrame);
 	rMainLayout.iRenderNumber = ++siRenderCount;
 
 	// Camera shake
-	float fCameraShake = game::gpCamera->mfShake;
+	float fCameraShake = engine::gpCamera->mfShake;
 	static constexpr float kfMaxRoll = 0.005f;
 	static constexpr float kfMaxPitch = 0.005f;
 	static constexpr float kfMaxYaw = 0.01f;
@@ -607,10 +607,10 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	static const siv::BasicPerlinNoise<float> sPerlinYaw(2);
 	auto matCameraShake = XMMatrixRotationRollPitchYaw(kfMaxRoll * fCameraShake * (-1.0f + 2.0f * sPerlinRoll.octave1D_01(8.0f * rFrameInterpolate.fCurrentTime, 4)), kfMaxPitch * fCameraShake * (-1.0f + 2.0f * sPerlinPitch.octave1D_01(8.0f * rFrameInterpolate.fCurrentTime, 4)), kfMaxYaw * fCameraShake * (-1.0f + 2.0f * sPerlinYaw.octave1D_01(8.0f * rFrameInterpolate.fCurrentTime, 4)));
 
-	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(XMMatrixMultiply(game::gpCamera->mMatView, XMMatrixMultiply(matCameraShake, game::gpCamera->mMatPerspective))));
+	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(XMMatrixMultiply(engine::gpCamera->mMatView, XMMatrixMultiply(matCameraShake, engine::gpCamera->mMatPerspective))));
 
-	XMStoreFloat4(&rMainLayout.f4EyePosition, game::gpCamera->mVecEyePosition);
-	XMVECTOR vecToEyeNormal = game::gpCamera->mVecToEyeNormal;
+	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
+	XMVECTOR vecToEyeNormal = engine::gpCamera->mVecToEyeNormal;
 	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, vecToEyeNormal);
 	// Camera-facing billboard basis (DebugRenderBillboard.vert): fold the shader's per-vertex worldUp select +
 	// cross chain CPU-side since f4ToEyeNormal is invocation-invariant. Mirror the shader exactly — 0.999 z

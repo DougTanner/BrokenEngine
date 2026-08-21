@@ -9,9 +9,6 @@
 #include "Frame/Collections/Puffs/Puffs.h"
 #include "Frame/Collections/SmokeTrails/SmokeTrails.h"
 #include "Frame/Collections/WindRadials/WindRadials.h"
-#include "Ui/LightingWrappers.h"
-#include "Ui/ParticleWrappers.h"
-#include "Ui/SmokeWrappers.h"
 #endif // BT_CLIENT
 
 namespace engine
@@ -117,7 +114,7 @@ void ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 	if (rType.uiWindRadialControllerTypeIndex != kuiInvalidControllerType)
 	{
 		float fWindSizePercent = std::sqrt(rInfo.fSizePercent);
-		WindRadialsPostRender::AddControlled(rFrame, fCurrentTime, rType.uiWindRadialControllerTypeIndex, rInfo.vecPosition, game::gWindDepositExplosionsIntensity.Get() * fWindSizePercent, game::gWindDepositExplosionsWidth.Get() * fWindSizePercent);
+		WindRadialsPostRender::AddControlled(rFrame, fCurrentTime, rType.uiWindRadialControllerTypeIndex, rInfo.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->Get() * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->Get() * fWindSizePercent);
 	}
 #endif
 
@@ -144,9 +141,9 @@ void ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 #if defined(BT_CLIENT)
 		// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
 		const bool bPrimary = (j == 0);
-		const float fLengthMul = bPrimary ? game::gExplosionPrimaryTrailLength.Get() : game::gExplosionSecondaryTrailLength.Get();
-		const float fDurationMul = bPrimary ? game::gExplosionPrimaryTrailDuration.Get() : game::gExplosionSecondaryTrailDuration.Get();
-		fTrailIntensity *= bPrimary ? game::gExplosionPrimaryTrailIntensity.Get() : game::gExplosionSecondaryTrailIntensity.Get();
+		const float fLengthMul = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailLength->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailLength->Get();
+		const float fDurationMul = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->Get();
+		fTrailIntensity *= bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailIntensity->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailIntensity->Get();
 		// Scaling the head's travel distance by Duration keeps head speed constant when Update later scales
 		// pfTrailTimes by the same Duration multiplier — so increasing Duration extends both space and time
 		// in lockstep rather than slowing the head into the engine's smoke-decay window.

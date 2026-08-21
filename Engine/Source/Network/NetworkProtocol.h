@@ -29,6 +29,7 @@ enum class PacketType : uint8_t
 	kServerSubscribeAccept,     // Server confirms subscription with assigned slot
 	kServerUnsubscribeAck,      // Server confirms unsubscription
 	kServerLoadNotification,    // Server loaded a save, clients must reset state
+	kServerTimespeedUpdate,     // Server broadcasts the current time scale to all clients
 	kGamePacketStart,           // All values >= this are game-layer packets forwarded as raw bytes
 };
 
@@ -52,13 +53,14 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 		case PacketType::kServerSubscribeAccept:        return "kServerSubscribeAccept";
 		case PacketType::kServerUnsubscribeAck:         return "kServerUnsubscribeAck";
 		case PacketType::kServerLoadNotification:       return "kServerLoadNotification";
+		case PacketType::kServerTimespeedUpdate:        return "kServerTimespeedUpdate";
 		case PacketType::kGamePacketStart:              return "kGamePacketStart";
 	}
 	return "Unknown";
 }
 
 // Protocol constants
-inline constexpr uint32_t kuiProtocolVersion = 10;
+inline constexpr uint32_t kuiProtocolVersion = 11;
 inline constexpr uint8_t kuiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr uint16_t kuiDefaultPort = 27015;
 inline constexpr int64_t kiMaxResendFrames = 8;

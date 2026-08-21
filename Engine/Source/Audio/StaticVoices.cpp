@@ -527,8 +527,8 @@ void StaticVoices::UpdateListenerPosition()
 	//     'left-of-screen → left-ear' instead of being collapsed near-center by altitude.
 	// Velocity is zero — the RTS camera moves slowly enough that listener-motion Doppler is
 	// negligible, and zeroing it avoids artifacts during snap-to-unit / jump-easing.
-	mVecListenerPosition = game::gpCamera->mVecEyePosition;
-	XMVECTOR vecPanListener = XMVectorSetZ(game::gpCamera->mVecPosition, gBaseHeight.Get());
+	mVecListenerPosition = engine::gpCamera->mVecEyePosition;
+	XMVECTOR vecPanListener = XMVectorSetZ(engine::gpCamera->mVecPosition, gBaseHeight.Get());
 	XMFLOAT3A f3PanPosition {};
 	XMStoreFloat3A(&f3PanPosition, vecPanListener);
 	mX3dAudioListener.OrientFront = {0.0f, 0.0f, -1.0f};
@@ -542,7 +542,7 @@ void StaticVoices::UpdateListenerPosition()
 	// and is exposed in the Sound > Tweaks sub-tab. Distances on the consumer side
 	// (Apply3dVolume / ComputeAttenuatedVolume) are 3D against mVecListenerPosition (camera
 	// eye), so altitude naturally pushes ground emitters into the fade band as the camera climbs.
-	const float fEyeHeight = game::gpCamera->mfCameraEyeHeight;
+	const float fEyeHeight = engine::gpCamera->mfCameraEyeHeight;
 	mfEffectiveFadeStart = gListenerDistanceStart.Resolve(fEyeHeight);
 	mfEffectiveFadeEnd = gListenerDistanceEnd.Resolve(fEyeHeight);
 	mfCurveDistanceScaler = gListenerCurve.Resolve(fEyeHeight);

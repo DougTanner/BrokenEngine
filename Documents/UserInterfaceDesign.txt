@@ -18,14 +18,15 @@ screen the code still calls Sound.
 
 1. Purpose & Scope
 -------------------
-Every pixel the player sees is drawn by ImGui through the game screens under
-Ui/Screens/, rendered by the engine ImGuiManager. This document governs their
+Every pixel the player sees is drawn by ImGui through the engine standard menu
+screens and the game HUD under Ui/Screens/, rendered by the engine ImGuiManager. This document governs their
 layout. Text color, panel fills, borders, and button chrome are not layout —
 they live in the per-theme tables and are deliberately excluded so a theme
 edit never touches a screen's geometry.
 
 Files:
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/          (all player screens)
+  Engine/Source/Ui/Screens/                                (standard player menus)
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/          (HUD)
   Engine/Source/Graphics/Managers/ImGuiManager.cpp         (ThemePalettes — colors)
   Engine/Source/Ui/MenuUtils.cpp                         (kMenuChromes — colors)
 
@@ -105,7 +106,7 @@ and text line boxes may include padding or font bearings the player never sees.
 They can diagnose a layout, but only the rendered result can validate it.
 
 Files:
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md:12-15  (the three-rule standard)
+  Engine/Source/Ui/Screens/AGENTS.md  "Shared Authoring Rules"  (the three-rule standard)
   Engine/Source/Ui/MenuUtils.cpp:253  float MenuButtonsWidth(...)  (text-driven width precedent)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:152  float HudScreen::PanelWidth()
 
@@ -131,11 +132,11 @@ Files:
     kfLanguageMenuGeometryScale = 0.5
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:14-16
     kfHudEdgeMarginFraction = 0.05f, kfHudPanelTopFraction = 0.125f, kfHudPanelMaxHeightFraction = 0.75f
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/GraphicsMenuScreen.cpp
+  Engine/Source/Ui/Screens/GraphicsMenuScreen.cpp
     responsive width/font curve, heading scale, and semantic column gutter
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/SoundMenuScreen.cpp
+  Engine/Source/Ui/Screens/SoundMenuScreen.cpp
     slider width
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/ModalScreen.cpp
+  Engine/Source/Ui/Screens/ModalScreen.cpp
     wrap width, message scale, and message/action gap
 
 
@@ -162,11 +163,11 @@ the same horizontal pivot and seats its vertical pivot slightly above screen
 center at kfModalAnchorFractionY rather than 0.5.
 
 Files:
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/PauseMenuScreen.cpp:30  (pivot centering — the model)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/GraphicsMenuScreen.cpp:85 (pivot centering)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/ModalScreen.cpp:32   (pivot centering at kfModalAnchorFractionY)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/SoundMenuScreen.cpp:31 (pivot centering)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/GameSettingsScreen.cpp:24 (pivot centering)
+  Engine/Source/Ui/Screens/PauseMenuScreen.cpp:31  (pivot centering — the model)
+  Engine/Source/Ui/Screens/GraphicsMenuScreen.cpp:63 (pivot centering)
+  Engine/Source/Ui/Screens/ModalScreen.cpp:31   (pivot centering at kfModalAnchorFractionY)
+  Engine/Source/Ui/Screens/SoundMenuScreen.cpp:34 (pivot centering)
+  Engine/Source/Ui/Screens/GameSettingsScreen.cpp:32 (pivot centering)
 
 
 6. Size to Content
@@ -189,7 +190,7 @@ to the fleet member list, capped at kfHudPanelMaxHeightFraction of the screen
 live height for symmetry rather than hugging its own smaller content.
 
 Files:
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/PauseMenuScreen.cpp:33  ImGuiWindowFlags_AlwaysAutoResize
+  Engine/Source/Ui/Screens/PauseMenuScreen.cpp:34  ImGuiWindowFlags_AlwaysAutoResize
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:182-187  (content-driven height, capped via SetNextWindowSizeConstraints)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:16  kfHudPanelMaxHeightFraction (height cap)
 
@@ -204,7 +205,7 @@ SizingStretchSame) with display/filtering settings left, Effects & UI right,
 and an explicit semantic gutter between them.
 
 Files:
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/GraphicsMenuScreen.cpp:134  BeginTable("GraphicsColumns", 2, ImGuiTableFlags_SizingStretchSame)
+  Engine/Source/Ui/Screens/GraphicsMenuScreen.cpp:122  BeginTable("GraphicsColumns", 2, ImGuiTableFlags_SizingStretchSame)
 
 
 8. Every Menu Button Is Themed
@@ -224,7 +225,7 @@ Files:
   Engine/Source/Ui/MenuUtils.cpp:289  bool MenuButton(...)
   Engine/Source/Ui/MenuUtils.cpp:253  float MenuButtonsWidth(std::initializer_list<std::u32string_view>)
   Engine/Source/Ui/MenuUtils.h:30-31  kfPrimaryButtonMinWidthPixels, kfModalButtonMinWidthPixels
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/ModalScreen.cpp:55  MenuButton("OK", ...)  (themed button)
+  Engine/Source/Ui/Screens/ModalScreen.cpp:54  MenuButton("OK", ...)  (themed button)
 
 
 9. Vertical Rhythm
@@ -263,7 +264,7 @@ deliberate label-set change: it is allowed only where the visible text is
 unchanged and the name still resolves to exactly one widget.
 
 Files:
-  Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsClient.cpp  (describe_ui / click / hover by label)
+  Engine/Source/Agent/AgentCommandsClientGeneric.cpp                 (describe_ui / click / hover by label)
   Engine/Source/Agent/                                               (AgentUiRegistry label snapshot)
 
 
@@ -332,7 +333,8 @@ Screen-specific commitments this contract makes, each verified visually:
 Files:
   Engine/Source/Ui/MenuUtils.cpp:204  ComputeMouseOpennessTarget (fixed-extent hover zone)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:138-139  (left/right hover targets)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md  (per-screen layout notes)
+  Engine/Source/Ui/Screens/AGENTS.md  (standard menu layout notes)
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md  (HUD layout notes)
 
 
 12. Aesthetic Composition

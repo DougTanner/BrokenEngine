@@ -5,7 +5,10 @@ namespace game
 
 enum GameCpuCounters : int64_t
 {
-	kCpuCounterPlayers = engine::kEngineCpuCounterCount,
+	// The engine pins its contiguous engine->game counter index contract to this anchor by name; keep it first and keep the counter after it explicitly initialized from it.
+	kGameCpuCounterFirst = engine::kEngineCpuCounterCount,
+
+	kCpuCounterPlayers = kGameCpuCounterFirst,
 	kCpuCounterBlasters,
 		kCpuCounterBlastersRendered,
 	kCpuCounterMissiles,
@@ -113,9 +116,6 @@ private:
 	engine::CpuTimer mGameCpuTimers[static_cast<int64_t>(kGameCpuTimerCount) - static_cast<int64_t>(engine::kEngineCpuTimerCount)];
 
 #if defined(BT_CLIENT)
-	void FormatFramesScreen(common::Workbuffer& rWorkbuffer);
-	void FormatFramesMap(common::Workbuffer& rWorkbuffer);
-	void FormatFramesTick(common::Workbuffer& rWorkbuffer);
 	void FormatNetworkScreen(common::Workbuffer& rWorkbuffer);
 	void FormatNetworkTransport(common::Workbuffer& rWorkbuffer);
 	void FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENetPeer& rPeer);

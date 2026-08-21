@@ -14,10 +14,16 @@ Angle-bracket values are placeholders; quote every one.
 
 ```text
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route session-landing -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<primary-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<primary-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<candidate-parent>' -ExpectedPrimaryTip '<candidate-parent>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>' -VerifiedCandidateCommit '<candidate-commit>' -VerifiedCandidateTree '<candidate-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -WorktreeCliExecutable '<worktreecli-exe>' -SessionLabel '<session-label>' -OwnerToken '<owner-token>' -AdvancePrimary
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeApprovalPreparation.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -OwnerToken '<owner-token>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -OwnerToken '<owner-token>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -HistoryContractRowDate '<historyUpdate.rowDate>' -HistoryJsonSha256 '<historyUpdate.jsonl.sha256>' -HistoryJsonBytes '<historyUpdate.jsonl.bytes>' -HistorySvgSha256 '<historyUpdate.svg.sha256>' -HistorySvgBytes '<historyUpdate.svg.bytes>' -HistorySvgEmbeddedSha256 '<historyUpdate.svg.embeddedSha256>' -OwnerToken '<owner-token>'
+pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract -RepositoryRoot '<current-worktree>' -BaseCommit '<primary-tip>' -TipCommit '<approved-commit>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
@@ -28,6 +34,14 @@ preparation, `-CommitMessageFile '<message-file>'` to the approval-preparation
 command when the rules below call for the message override, and `-LeaseSeconds`,
 `-CooperatingSessionOwner`, or `-WaitSeconds`
 only where the rules below call for a non-default value.
+A landing claim's `-Worktree` is the route's own worktree —
+`'<current-worktree>'` on the session route and `'<primary-worktree>'` on the
+separately requested primary-commit route — because landing accepts the lease
+only when its recorded worktree matches the landing identity.
+The second landing form is the recovery invocation when a structured result
+survived: map all six history values from its `historyUpdate` fields exactly as
+shown. After a hard crash with no result, use the first form and omit all six;
+never pass a partial recovery tuple.
 
 ## Contracts
 
@@ -42,6 +56,25 @@ only where the rules below call for a non-default value.
   invocation passes the same set unchanged. A path found in neither the baseline
   tree nor the expected-tip tree nor the worktree still blocks with
   `input.path-not-single-entry`.
+- On `-Route primary-commit` without `-AdvancePrimary`, the candidate result is
+  bound to the read-only history Contract before verification. On the confirmed
+  `-AdvancePrimary` resume, `-OwnerToken` is mandatory and must name the caller's
+  live 3600-second landing lease; no omitted-token primary mutation is allowed.
+  The result is `broken-engine-finalize-candidate/v3` with `historyContract`,
+  `historyUpdate`, and `final` fields. The final commit is the deterministic
+  sole-parent replacement, while `candidate.commit` remains the reviewed source
+  candidate.
+- `Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract -RepositoryRoot <root>
+  -BaseCommit <primary-tip> -TipCommit <source-tip>` is read-only and writes no
+  tracked file. Generate uses the same exact `RepositoryRoot,BaseCommit,TipCommit,DateUtc,OutputDirectory`
+  interface. Production reads history bytes from the supplied immutable BaseCommit;
+  it never uses a working-tree JSONL suffix. Its exact typed result is
+  `broken-engine-code-quality-history-contract/v1`; approval preparation returns
+  that receipt plus a compact canonical receipt digest, generator digest, optional
+  capture digest, patch digest, and capture mode. `series.historyBytesSha256` binds
+  the complete BaseCommit history bytes, including the live suffix. Contract mode
+  does not choose a final date, row index, or output hash — those are dynamic under
+  the landing lock.
 - `Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
   one commit on the current primary tip, and blocks with
   `git.primary-not-ancestor` when the session tip does not already contain that
@@ -95,8 +128,9 @@ only where the rules below call for a non-default value.
   one. Allow a landing invocation on the default budget a command timeout of up
   to 20 minutes; its worst case is about 13 minutes — the omitted-token route's
   300-second lock-claim wait, this 500-second index-lock budget, and the
-  landing's own Git work — so a caller raising that budget must raise its host
-  timeout by the same amount. Pass the post-confirmation claim's owner token as
+  landing's own Git work, plus the measured roughly 60-second history Snapshot
+  catch-up/C++ path — so a caller raising that budget must raise its host timeout
+  by the same amount. Pass the post-confirmation claim's owner token as
   `-OwnerToken` so landing continues under that same lease, which it accepts only
   as a same-actor continuation under the `SKILL.md` `## Bundled scripts` ownership
   rule, preserving the raw `$SessionLabel`. Without `-OwnerToken`, it derives
@@ -109,9 +143,28 @@ only where the rules below call for a non-default value.
   derived identity. A recovery invocation applies the identity matching rule
   without the duration gate to release a live retained claim because it performs
   no rebase or advance; foreign, mismatched, and unverifiable claims are untouched.
-  When primary advanced first it makes at most one internal rebase
-  and lands only a provably byte-identical patch, so report the commit from the
-  result's `landed` block rather than `candidate`. A blocked result reports its
+  Under the held 3600-second lease it re-runs Contract against current primary and
+  source, permits only dynamic corpus/history data plus the documented
+  `catch-up`/`cpp-change`/`carry-forward` mode reclassification, and runs Generate
+  with one captured UTC date into a unique ignored `Temp` directory. Generate must
+  classify the mode before capture comparison: only an approved `catch-up` that
+  narrows to `carry-forward` may lose its active capture/runtime identity; every
+  other missing or changed active identity blocks. Generate must return
+  `broken-engine-code-quality-history-update/v1` with exactly
+  `CodeQualityMetricsHistory.jsonl` and `CodeQualityMetricsHistory.svg`; hashes,
+  sizes, row date/index, coverage, and SVG embedded series/generator digests are
+  validated before a temporary-index overlay creates one sole-parent replacement
+  commit with frozen approved metadata. The producer receives a new, absent child
+  directory beneath an existing ignored `Temp` parent; it never reuses an output
+  directory. The public v4 receipt stores only the two repository-relative
+  reserved paths, hashes, sizes, dates, indices, and digests — never an absolute
+  or GUID-bearing Temp path. No branch ref moves while that object is built. The final result is `broken-engine-finalize-landing/v4` and separates
+  `approvedSource`, `rebasedSource`, `historyUpdate`, and `final` commit/tree
+  fields. The reviewed PNG deletion remains an ordinary source change; only the
+  two reserved generated paths are allowed after confirmation. When primary
+  advanced first it makes at most one internal rebase and lands only a provably
+  byte-identical non-history patch plus a valid regenerated overlay, so report the
+  commit from the result's `landed` block rather than `candidate`. A blocked result reports its
   `disposition` and a `lock` projection; act on those, never a memorized code
   list. A `retryable-wait` result may be re-invoked with the approval-bound
   arguments after its reported `retryAfterMilliseconds`. When it acquired no lock
@@ -126,7 +179,15 @@ only where the rules below call for a non-default value.
   and always retains the lease; `landing.retry-exhausted` is retryable and leaves
   the confirmed session commit restored. Re-invoking it with the original approved
   arguments after a crash is idempotent, including against a tip its own internal
-  rebase produced.
+  rebase produced. Recovery searches only first-parent descendants back to the
+  approved ancestor for exactly one replacement matching frozen metadata, the
+  approved non-history patch digest, one valid committed row date, and exact
+  JSONL/SVG plus embedded SVG digests. It never assigns indices or reruns
+  historical Snapshot, never changes newer primary, and resets only the original
+  session branch/worktree; zero, multiple, or non-ancestor matches block. When a
+  structured result survived, pass its complete row-date/hash/size/embedded-digest
+  tuple for an additional exact match; omit the whole tuple after a hard crash,
+  because a partial tuple is invalid.
   Pass `-ReleasePlanClaim` when a claimed Plan reached final preparation; the
   script then deletes the claim best-effort. Without the switch it invokes no
   `plan` command at all.
@@ -163,6 +224,7 @@ for `<worktreecli-exe>` and
   `Invoke-FinalizeCandidateCommit.ps1`,
   `Invoke-FinalizeApprovalPreparation.ps1`, `Invoke-FinalizeLockClaim.ps1`,
   `Invoke-FinalizeLanding.ps1`, `Show-FinalizeApprovalReview.ps1`,
+  `.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1`,
   `.agents/scripts/AgentScriptCommon.psm1`,
   `.agents/scripts/AgentWorktreeSession.psm1`,
   `.agents/scripts/FinalizeWorkflowCommon.psm1`,

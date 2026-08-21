@@ -283,6 +283,9 @@ void Client::Receive(std::span<const uint8_t> packetData)
 			case PacketType::kServerLoadNotification:
 				ServerLoadNotification(packetData);
 				break;
+			case PacketType::kServerTimespeedUpdate:
+				ServerTimespeedUpdate(packetData);
+				break;
 			default:
 				if (static_cast<uint8_t>(eType) >= static_cast<uint8_t>(PacketType::kGamePacketStart))
 				{

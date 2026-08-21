@@ -6,7 +6,10 @@
 `-Target <relative-POSIX-path> -Scope Exact|Directory|Recursive`; Compare requires `-Targets <UTF-8
 JSON file> -Baseline <full lowercase Git SHA>`. Both require an existing `-RepositoryRoot`, absolute
 or resolved against the current directory, and accept
-`-OutputPath`, `-Digest`, and `-Phase0Hints` (which implies `-Digest`).
+`-OutputPath`, `-Digest`, `-DigestPath`, and `-Phase0Hints` (which implies `-Digest`). `-DigestPath`
+names the file the digest is written to and is rejected together with `-Digest`, which already puts
+the digest on stdout. A `-DigestPath` that already exists is refused before any bootstrap or analyzer
+work, and the file is never overwritten, so a retry after a partly written file uses a fresh path.
 
 The targets file is UTF-8 JSON with unique, ordinal-sorted, normalized relative POSIX paths:
 
@@ -87,6 +90,12 @@ reasons are only `baseline-inapplicable`, `context-change`, `current-inapplicabl
 targetSelection,coverage,comparison}` selected from that same report, adding capped `hints` under
 `-Phase0Hints`. `-OutputPath` always receives the full report.
 
+`-DigestPath` writes those same digest bytes — UTF-8 without BOM and with exactly one final LF — to
+the named file and replaces stdout with one receipt line
+`{"schemaVersion":"broken-engine-code-quality-digest-receipt/v1","mode":...,"digestPath":<absolute
+path written>,"digestBytes":<byte count>}`, so the digest itself never reaches the caller's console.
+It applies to both modes, and `-Phase0Hints` adds the same capped hints to the written digest.
+
 ## Failures
 
 Compare requires complete parsing and signature extraction for every listed target, and a Compare
@@ -125,3 +134,11 @@ requires x64 CPython 3.12 or newer. It copies the checkout's own `ThirdParty/scb
 `requirements.lock` into a fresh ignored stage under `Temp/CodeQualityMetrics` and imports that copy.
 The venv key and `complete.json` are keyed only by Python interpreter identity and the
 `requirements.lock` hash.
+
+`-Mode BootstrapIdentity` uses that same resolution, probe, bootstrap, and operational validation
+without starting `Analyze-CodeQualityMetrics.py`. Its path-free output is the typed
+`broken-engine-code-quality-bootstrap-identity/v1` object documented in
+[HistoryContract.md](HistoryContract.md). It contains Python implementation/version/architecture
+and executable SHA, lock SHA, cache key, venv Python SHA, `sg` SHA/version, canonical completion
+identity SHA, and the scb content digest. Snapshot and Compare continue to emit the exact v2 shape
+above; BootstrapIdentity is a separate mode and does not add fields to those reports.

@@ -59,38 +59,28 @@ another round.
 
 ## Workflow
 
-1. Settle `code-quality-metrics` Compare early against the supplied targets file
-   and session baseline, exactly as
-   [metrics-protocol.md](references/metrics-protocol.md) requires. Under
-   `/codex-review` the read-only sandbox denies the Compare cache write, so the
-   scope file carries the host-run digest: validate that digest against the
-   reviewed change set instead of running Compare. Run Compare yourself only
-   outside that sandbox. Metrics are advisory and never become a finding; an
-   operational failure, an absent digest, or a digest bound to another change set
-   leaves the review incomplete with `NEEDS_ACTION` rather than producing one,
-   and never licenses skipping metrics.
-2. Read the changed regions in full-function context, their applicable
+1. Read the changed regions in full-function context, their applicable
    `AGENTS.md`, and the producers, consumers, callers, and mirrored paths needed
    to trace the declared contracts. Diff-only inspection is insufficient.
-3. Search changed signatures, semantics, enum values, layouts, ownership,
+2. Search changed signatures, semantics, enum values, layouts, ownership,
    guards, frame phases, and serialization identities across every affected
    site. Check substantial new logic against existing helpers and deliberate
    mirrored patterns.
-4. Apply the relevant checks below. Turn a checklist concern into a finding
+3. Apply the relevant checks below. Turn a checklist concern into a finding
    only when a concrete changed path makes the failure reachable.
-5. Try to disprove each candidate finding against guards, caller preconditions,
+4. Try to disprove each candidate finding against guards, caller preconditions,
    lifecycle, and current repository contracts. Report the smallest correction,
    without implementing it.
-6. Emit a single-claim `/verify-external-claims` request for every candidate
+5. Emit a single-claim `/verify-external-claims` request for every candidate
    finding that depends on a non-obvious external API, language,
    specification, OS, or library fact. Do not browse or present that fact as confirmed.
-7. Measure the changed `.cpp` files in one batched run:
+6. Measure the changed `.cpp` files in one batched run:
    `pwsh -NoProfile -Command "& '.agents/scripts/Measure-Tokens.ps1' -Path
    'a','b','c' -Json"`. Use `-Command`, not `-File`: under `-File` the
    comma-separated list binds as one filename and the run fails. Record a size
    observation only when the changed region exposes a concrete cohesive split. Return it as a manager follow-up candidate; never reduce the
    file or prescribe an inline reduction during review.
-8. Return the report and the conditional `/update-vcxproj` trigger. Never read
+7. Return the report and the conditional `/update-vcxproj` trigger. Never read
    or grep project XML in this review.
 
 ## Correctness Checks
@@ -125,7 +115,7 @@ the owning subsystem's established failure channel; there is no universal
   additionally records the contract violation. Keep their handshake, budget,
   and packet-specific policies distinct.
 - Invalid persisted grid data follows
-  `GameSaveLoad::ReadGrid` (`/Projects/BrokenEngineSandbox/Source/Save/GameSaveLoad.cpp`):
+  `engine::ReadGridSave` (`/Engine/Source/File/GridSave.cpp`):
   clear partial grid/fleet state, log, and return `false`; apply the global-ID
   counter only after the complete read succeeds.
 - Corrupt boot-required eager animation data follows
@@ -248,8 +238,7 @@ ordering. Do not apply this check to semantic codecs or serialization adapters.
 
 Flag incomplete integration and reachable edge failures. Flag substantial new
 near-copies or repeated multi-condition logic only after independent source
-inspection proves an existing helper fits. Compare clone evidence is an
-investigation lead, not a finding by itself. Deliberate client/server and
+inspection proves an existing helper fits. Deliberate client/server and
 collection mirrors remain parallel.
 
 Exclude micro-simplifications, style preferences, naming, header placement
@@ -282,11 +271,6 @@ finding is `Required`. Omit empty optional sections.
 ### Size Observations
 - `path` (`N bt-token-v1`) — <cohesive split and why it is a manager follow-up candidate>
 
-### Metric Evidence
-- profile and target-selection status — <digest `profile` and `targetSelection`>
-- target/corpus/common-parsed-cohort and coverage — <short `coverage` and `comparison` evidence>
-- context changes and metric residual outcome — <count/status; no scope expansion>
-
 ### Files Reviewed
 - `path` — <regions and affected paths traced>
 
@@ -299,9 +283,8 @@ Project membership trigger: /update-vcxproj — <paths/reason> | none
 
 Follow those extension fields with the shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
-review never changes a file and never requires a build, its `Decisive checks`
-include the Compare result and short metric evidence, and a pre-existing defect,
-incomplete trace, or pending external verdict belongs in `Residuals`.
+review never changes a file and never requires a build, and a pre-existing
+defect, incomplete trace, or pending external verdict belongs in `Residuals`.
 
 For a clean review, state `PASS — no issues found`, list the evidence and files,
 and keep the unchanged footer. Never return `LGTM` without decisive trace

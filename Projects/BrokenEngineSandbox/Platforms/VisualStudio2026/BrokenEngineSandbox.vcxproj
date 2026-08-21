@@ -391,10 +391,11 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsShared.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentInput.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentUiRegistry.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h" />
     <ClInclude Include="..\..\Source\Agent\AgentScene.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\CameraBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\EngineCamera.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Graphics.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\GraphicsUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Islands.h" />
@@ -426,6 +427,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\AnimationData.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\OneShotCommandBuffer.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Screenshot.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Input\Input.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\Client.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.h" />
@@ -455,9 +457,12 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\GameSettings.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettings.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h" />
     <ClInclude Include="..\..\Data\Shaders\ShaderLayouts.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Blasters\Blasters.h" />
@@ -465,6 +470,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Targets\Targets.h" />
     <ClInclude Include="..\..\Source\Frame\Frame.h" />
+    <ClInclude Include="..\..\Source\Frame\FrameInput.h" />
     <ClInclude Include="..\..\Source\Frame\TerrainUtils.h" />
     <ClInclude Include="..\..\Source\Frame\FrameCollections.h" />
     <ClInclude Include="..\..\Source\Frame\HealthDamage.h" />
@@ -483,18 +489,17 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Network\GamePacketType.h" />
     <ClInclude Include="..\..\Source\Network\NetworkSessionContract.h" />
     <ClInclude Include="..\..\Source\Graphics\Camera.h" />
-    <ClInclude Include="..\..\Source\Input\Input.h" />
     <ClInclude Include="..\..\Source\Pch.h" />
     <ClInclude Include="..\..\Source\Ui\Localization.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\DeathMenuScreen.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\GameSettingsScreen.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\GraphicsMenuScreen.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\GraphicsMenuScreen.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\MainMenuScreen.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\MainMenuScreen.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\ModalScreen.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\PauseMenuScreen.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\SoundMenuScreen.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\ModalScreen.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\PauseMenuScreen.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\SoundMenuScreen.h" />
     <ClInclude Include="..\..\Source\Ui\LightingWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\SmokeWrappers.h" />
@@ -587,11 +592,12 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsShared.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentInput.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentUiRegistry.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentCommands.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentCommandsClient.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentScene.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\CameraBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\EngineCamera.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Debug\DebugRender.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Graphics.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\GraphicsUtils.cpp" />
@@ -625,6 +631,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\AnimationData.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\OneShotCommandBuffer.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Screenshot.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Input\Input.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Input\RawInputManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -639,7 +646,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSend.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryScanner.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkManager.cpp" />
-    <ClCompile Include="..\..\Source\Network\NetworkSerialization.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp" />
     <ClCompile Include="..\..\Source\Profile\ProfileManager.cpp" />
@@ -667,9 +674,12 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GameSettings.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettings.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
     <ClCompile Include="..\..\Source\Ui\LightingWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp" />
@@ -698,6 +708,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Frame\Collections\Targets\Targets.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Targets\TargetsUpdate.cpp" />
     <ClCompile Include="..\..\Source\Frame\Frame.cpp" />
+    <ClCompile Include="..\..\Source\Frame\FrameInput.cpp" />
     <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Players\Players.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersNavigation.cpp" />
@@ -718,15 +729,14 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayTick.cpp" />
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp" />
     <ClCompile Include="..\..\Source\Graphics\Camera.cpp" />
-    <ClCompile Include="..\..\Source\Input\Input.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\DeathMenuScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\GameSettingsScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\GraphicsMenuScreen.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\GraphicsMenuScreen.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\HudScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\MainMenuScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\ModalScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\PauseMenuScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\SoundMenuScreen.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\MainMenuScreen.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\ModalScreen.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\PauseMenuScreen.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\SoundMenuScreen.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
   </ItemGroup>
   <ItemGroup>

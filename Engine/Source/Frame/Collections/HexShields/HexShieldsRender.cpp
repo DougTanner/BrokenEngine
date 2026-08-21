@@ -62,7 +62,7 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		// Visibility culling
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecPosition);
-		if (!game::gpCamera->InVisibleArea(game::gpCamera->f4RenderVisibleArea, f4Position, kfAdjust, kfAdjust, kfAdjust, kfAdjust))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->f4RenderVisibleArea, f4Position, kfAdjust, kfAdjust, kfAdjust, kfAdjust))
 		{
 			continue;
 		}

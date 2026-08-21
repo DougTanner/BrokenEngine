@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-18T18:52:47.288Z","dependsOn":["Documents/Plans/Engine/ClientDesyncPolicyToEngine.md","Documents/Plans/Engine/ClientPollTimingRecovery.md","Documents/Plans/Engine/WorldGridStateOwnershipToEngine.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-18T18:52:47.288Z","dependsOn":["Documents/Plans/Engine/ClientDesyncPolicyToEngine.md","Documents/Plans/Engine/ClientPollTimingRecovery.md"]} -->
 # Move the Network profile and NetworkGraphs surface to the engine
 
 ## Context

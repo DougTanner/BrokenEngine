@@ -559,6 +559,23 @@ struct ServerLoadNotificationMessage
 	}
 };
 
+struct ServerTimespeedUpdateMessage
+{
+	static constexpr PacketType keType = PacketType::kServerTimespeedUpdate;
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(int64_t) + sizeof(int64_t);
+
+	int64_t iMultiply = 1;
+	int64_t iDivide = 1;
+
+	template <typename TVisitor>
+	static void Visit(TVisitor& rVisitor, ServerTimespeedUpdateMessage& rMessage)
+	{
+		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.iMultiply);
+		rVisitor.Field(rMessage.iDivide);
+	}
+};
+
 struct ServerCoordFullStateMessage
 {
 	static constexpr PacketType keType = PacketType::kServerCoordFullState;

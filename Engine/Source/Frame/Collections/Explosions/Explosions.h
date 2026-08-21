@@ -18,6 +18,62 @@ class Wrapper;
 #if defined(BT_CLIENT)
 struct SmokeTrailsInterpolate;
 using smoke_trails_t = id_t<SmokeTrailsInterpolate>;
+
+// Live-tunable explosion content values. The game owns the sliders; the engine owns the effect mechanism.
+// Contract: the game fills every field once at client startup, before FrameInterpolateBase::Register(). The
+// server never reads it, and the engine dereferences each pointer without a null fallback.
+struct ExplosionTuning
+{
+	// Primary light
+	Wrapper* pPrimaryVisibleAreaOne = nullptr;
+	Wrapper* pPrimaryVisibleAreaTwo = nullptr;
+	Wrapper* pPrimaryVisibleAreaThree = nullptr;
+	Wrapper* pPrimaryVisibleIntensityOne = nullptr;
+	Wrapper* pPrimaryVisibleIntensityTwo = nullptr;
+	Wrapper* pPrimaryVisibleIntensityThree = nullptr;
+	Wrapper* pPrimaryLightingAreaOne = nullptr;
+	Wrapper* pPrimaryLightingAreaTwo = nullptr;
+	Wrapper* pPrimaryLightingAreaThree = nullptr;
+	Wrapper* pPrimaryLightingIntensityOne = nullptr;
+	Wrapper* pPrimaryLightingIntensityTwo = nullptr;
+	Wrapper* pPrimaryLightingIntensityThree = nullptr;
+
+	// Secondary light
+	Wrapper* pSecondaryVisibleAreaOne = nullptr;
+	Wrapper* pSecondaryVisibleAreaTwo = nullptr;
+	Wrapper* pSecondaryVisibleAreaThree = nullptr;
+	Wrapper* pSecondaryVisibleIntensityOne = nullptr;
+	Wrapper* pSecondaryVisibleIntensityTwo = nullptr;
+	Wrapper* pSecondaryVisibleIntensityThree = nullptr;
+	Wrapper* pSecondaryLightingAreaOne = nullptr;
+	Wrapper* pSecondaryLightingAreaTwo = nullptr;
+	Wrapper* pSecondaryLightingAreaThree = nullptr;
+	Wrapper* pSecondaryLightingIntensityOne = nullptr;
+	Wrapper* pSecondaryLightingIntensityTwo = nullptr;
+	Wrapper* pSecondaryLightingIntensityThree = nullptr;
+
+	// Puffs
+	Wrapper* pPrimaryPuffAreaOne = nullptr;
+	Wrapper* pPrimaryPuffAreaTwo = nullptr;
+	Wrapper* pPrimaryPuffIntensityOne = nullptr;
+	Wrapper* pPrimaryPuffIntensityTwo = nullptr;
+	Wrapper* pSecondaryPuffAreaOne = nullptr;
+	Wrapper* pSecondaryPuffAreaTwo = nullptr;
+	Wrapper* pSecondaryPuffIntensityOne = nullptr;
+	Wrapper* pSecondaryPuffIntensityTwo = nullptr;
+
+	// Trails
+	Wrapper* pPrimaryTrailLength = nullptr;
+	Wrapper* pPrimaryTrailDuration = nullptr;
+	Wrapper* pPrimaryTrailIntensity = nullptr;
+	Wrapper* pSecondaryTrailLength = nullptr;
+	Wrapper* pSecondaryTrailDuration = nullptr;
+	Wrapper* pSecondaryTrailIntensity = nullptr;
+
+	// Wind
+	Wrapper* pWindIntensity = nullptr;
+	Wrapper* pWindWidth = nullptr;
+};
 #endif
 
 inline constexpr int64_t kiMaxExplosionTrails = 8;
@@ -128,6 +184,9 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	}
 
 #if defined(BT_CLIENT)
+	// Game-filled tuning pointers; see ExplosionTuning for the fill contract
+	static inline ExplosionTuning sTuning;
+
 	// Get registered controller type indices
 	static uint8_t GetPrimaryLightControllerTypeIndex();
 	static uint8_t GetSecondaryLightControllerTypeIndex();

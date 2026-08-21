@@ -219,9 +219,9 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	// are sunk to mfSeaFloorElevation, whose perspective footprint is the widest; expand analytically
 	// about the camera XY so every higher vertex lies within this conservative area.
 	XMFLOAT4A f4EyePosition {};
-	XMStoreFloat4A(&f4EyePosition, game::gpCamera->mVecEyePosition);
+	XMStoreFloat4A(&f4EyePosition, engine::gpCamera->mVecEyePosition);
 	float fSeaFloorScale = (f4EyePosition.z - gpIslandTerrain->mfSeaFloorElevation) / f4EyePosition.z;
-	XMFLOAT4 f4MeshVisibleArea = game::gpCamera->f4RenderVisibleArea;
+	XMFLOAT4 f4MeshVisibleArea = engine::gpCamera->f4RenderVisibleArea;
 	f4MeshVisibleArea.x = f4EyePosition.x + (f4MeshVisibleArea.x - f4EyePosition.x) * fSeaFloorScale;
 	f4MeshVisibleArea.y = f4EyePosition.y + (f4MeshVisibleArea.y - f4EyePosition.y) * fSeaFloorScale;
 	f4MeshVisibleArea.z = f4EyePosition.x + (f4MeshVisibleArea.z - f4EyePosition.x) * fSeaFloorScale;
@@ -231,7 +231,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	{
 		float fRadius = 0.5f * std::hypot(rTemplate.mfQuadFootprintX, rTemplate.mfQuadFootprintY);
 		XMFLOAT4 f4Position {rPlacement.f2WorldPos.x, rPlacement.f2WorldPos.y, 0.0f, 1.0f};
-		return game::gpCamera->InVisibleArea(f4MeshVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius);
+		return engine::gpCamera->InVisibleArea(f4MeshVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius);
 	};
 
 	// Count every active placement with the same frame and visibility predicates used by both emission passes.

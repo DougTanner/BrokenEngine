@@ -1,5 +1,7 @@
 #pragma once
 
+// game::FrameInput is the mapped type of mFrameInputs below, so the complete definition is required here.
+#include "Frame/FrameInput.h"
 #include "Frame/FrameStaticData.h"
 
 #if defined(BT_CLIENT)
@@ -11,7 +13,6 @@ namespace game
 {
 
 struct Frame;
-struct MenuInput;
 struct FrameInput;
 struct StatusChange;
 
@@ -19,6 +20,18 @@ struct StatusChange;
 
 namespace engine
 {
+
+#if defined(BT_CLIENT)
+// Complete definitions come from Input/Input.h — included directly by GameBase.cpp and aggregated by Engine.h —
+// so this public header stays independent of PCH include order.
+struct MenuInput;
+class InputPoll;
+#endif // BT_CLIENT
+
+#if defined(BT_SERVER)
+// File/Replay.h names game types, so it stays out of Engine.h and out of this header; GameBase.cpp includes it.
+class Replay;
+#endif // BT_SERVER
 
 enum class MenuFlags : uint64_t
 {
@@ -145,6 +158,41 @@ constexpr int64_t SnapshotIndex(int64_t iHead, int64_t iLogical)
 // retention floor in ReconcileReplayCrc's fast-path and the source index in
 // GameBase::RenderFrame — change here and the reconcile/render pair move together.
 inline constexpr int64_t kiRenderBehindTicks = 2;
+
+// Standard-menu contract. The engine owns the six standard menu screens (Ui/Screens); this is the
+// narrow surface they cannot read for themselves: which optional entries the game offers, the live
+// client/discovery state behind the Main Menu, and the game-owned side effects.
+enum class StandardMenuFeature : uint8_t
+{
+	kLocalServer  = 0x01,
+	kRemoteServer = 0x02,
+};
+using StandardMenuFeature_t = common::Flags<StandardMenuFeature>;
+
+enum class StandardMenuState : uint8_t
+{
+	kClientPresent           = 0x01,
+	kDiscoveryScannerPresent = 0x02,
+	kServerDiscovered        = 0x04,
+	kConnectionAccepted      = 0x08,
+	kAutoConnect             = 0x10,
+};
+using StandardMenuState_t = common::Flags<StandardMenuState>;
+
+struct StandardMenuModel
+{
+	// Must refer to storage that outlives the render pass; a workbuffer allocation would dangle.
+	const char* pcTitle;
+	StandardMenuFeature_t features;
+	StandardMenuState_t state;
+};
+
+enum class StandardMenuAction
+{
+	kStartDiscovery,
+	kConnectToDiscoveredServer,
+	kChangeFrameToMainMenu,
+};
 #endif // BT_CLIENT
 
 class GameBase
@@ -158,9 +206,14 @@ public:
 	virtual bool ShouldTrapCursor() = 0;
 	virtual bool ShouldUseCrosshair() = 0;
 	virtual bool ShouldShowInGameUi() = 0;
-	virtual void ProcessMenuInput(const game::MenuInput& rMenuInput) = 0;
+	virtual void ProcessGameMenuInput(const MenuInput& rMenuInput, const InputPoll& rInputPoll) = 0;
 
-	void ProcessInput(bool bLostFocus, game::MenuInput& rMenuInput);
+	// The standard menu screens read this every render pass, and again after any action that can
+	// change it, because an action's effect must be visible to later decisions in the same pass.
+	virtual StandardMenuModel GetStandardMenuModel() const = 0;
+	virtual void ApplyStandardMenuAction(StandardMenuAction eAction) = 0;
+
+	void ProcessInput(bool bLostFocus);
 	void ClientUpdate();
 	void Render();
 	float AdvanceRenderClock(double dT, bool bPaused, bool bHaveInterpolationWindow, double dSimDeltaSeconds);
@@ -181,6 +234,8 @@ public:
 	int64_t GenerateGlobalId() { return miNextGlobalId++; }
 	int64_t NextGlobalId() const { return miNextGlobalId; }
 	void SetNextGlobalId(int64_t iNextGlobalId) { miNextGlobalId = iNextGlobalId; }
+
+	bool InMainMenu() const { return mGameFlags & GameFlags::kMainMenu; }
 
 #if defined(BT_SERVER)
 	game::Frame& CurrentFrame(GridCoord coord) const
@@ -214,6 +269,28 @@ public:
 	double mfLastRenderFrameSeconds = 0.0;
 #endif // BT_CLIENT
 	std::unordered_map<GridCoord, CoordFrames> mCoordFrames;
+	// Awake cells for this update: the coords simulated, published, and rendered. Populated by game policy
+	// (Game::ComputeActiveSet on the client, ServerSessionRuntime::ComputeActiveSet on the server); the append
+	// order is observable and reaches dispatch, broadcast, transfer, and render. Membership does not imply a
+	// client is watching a cell, so liveness checks must not be derived from it.
+	std::vector<GridCoord> mActiveCoords;
+	// game::Game caches the visible-neighbor ring keyed off this coord, so every write goes through
+	// Game::SetClientGridCoord, which invalidates that cache.
+	GridCoord mClientGridCoord {};
+
+	std::unordered_map<GridCoord, game::FrameInput> mFrameInputs;
+
+	// Creates the cell's frame storage and static data on demand; the game supplies the frame's contents.
+	void CreateFrameAtCoord(GridCoord coord);
+
+#if defined(BT_SERVER)
+	// True while replay playback owns the simulation, i.e. a reader is live or staged for a later tick.
+	// engine::Replay owns the replay streams and republishes this whenever its reader sets change.
+	bool mbReplaying = false;
+
+	// Owns gpReplay for this game's lifetime; every user reaches it through that global.
+	std::unique_ptr<Replay> mpReplay;
+#endif // BT_SERVER
 
 #if defined(BT_CLIENT)
 	// Per-coord render interpolation. Render() and the Main.cpp boot path own its lifecycle and forward

@@ -6,7 +6,6 @@ description: >-
   Use when a quality snapshot, clone/complexity trend, or review advisory is needed without
   changing source, grading contributors, or automatically prescribing refactors.
 allowed-tools: [Read, PowerShell]
-disable-model-invocation: false
 ---
 
 # Code Quality Metrics
@@ -14,6 +13,19 @@ disable-model-invocation: false
 Run the public PowerShell entry point from the repository root. Read
 [MetricContract.md](references/MetricContract.md) before creating a targets file or consuming a
 report; read [Remediation.md](references/Remediation.md) only when explaining advisory results.
+For the immutable history workflow, read [HistoryContract.md](references/HistoryContract.md) before
+using `BootstrapIdentity`, `Contract`, or `Generate`.
+
+## Bootstrap identity
+
+`Invoke-CodeQualityMetrics.ps1 -Mode BootstrapIdentity -RepositoryRoot <absolute repository root>`
+emits one path-free identity object and never starts the analyzer.
+
+## History
+
+`Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract` is a read-only decision; `-Mode Generate`
+runs under the caller's landing lock and writes only the `CodeQualityMetricsHistory.jsonl`/`.svg`
+pair into the supplied ignored `Temp` directory.
 
 ## Snapshot
 
@@ -51,7 +63,10 @@ but suppress target attribution.
 Both modes write canonical compact JSON to stdout and, when requested, the same full report to
 `-OutputPath`. Add `-Digest` to emit a compact `broken-engine-code-quality-evidence/v2` summary to
 stdout instead of the full report, or `-Phase0Hints` (which implies `-Digest`) to add capped
-outlier, clone, complexity, and skip hints for the target paths.
+outlier, clone, complexity, and skip hints for the target paths. Add `-DigestPath <file>` instead of
+`-Digest` to write those digest bytes to that file and print only a
+`broken-engine-code-quality-digest-receipt/v1` line; an existing path is refused before any analyzer
+work and is never overwritten.
 
 Diagnostics go to stderr; exit `2` means inputs, capture, bootstrap, analyzer, drift, digest, or
 output persistence failed. A target parse or signature-extraction failure exits `2` with the

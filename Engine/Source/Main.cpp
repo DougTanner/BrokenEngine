@@ -1,11 +1,15 @@
 #include "Memory/GlobalAllocator.h"
 
 #include "CrashReport.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/TerrainUtils.h"
 #include "Game.h"
+#include "Input/Input.h"
 #include "Profile/ProfileManager.h"
 #include "Server/ServerDisplay.h"
+#include "Ui/GameSettings.h"
+#include "Ui/GraphicsSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/SoundSettings.h"
 #include "Ui/SoundSettingsWrappersBase.h"
 #include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 
@@ -210,7 +214,7 @@ void MainThread(HINSTANCE hinstance)
 
 	// Setup window rect & matrices
 #if defined(BT_CLIENT)
-	game::LoadGraphicsSettings();
+	LoadGraphicsSettings();
 	gWantedFramebufferExtent2D = SetupWindow(WantedFullscreen(), sWindowStyle, sWindowRect);
 #else
 	LONG iWindowStyle = WS_POPUP;
@@ -242,8 +246,8 @@ void MainThread(HINSTANCE hinstance)
 
 #if defined(BT_CLIENT)
 	// Load settings
-	game::LoadSoundSettings();
-	game::LoadGameSettings();
+	LoadSoundSettings();
+	LoadGameSettings();
 	if (gMuteInBackground.Get<bool>() || gLaunchOptions.iAgentPort != 0)
 	{
 		gpAudioManager->Suspend();
@@ -255,7 +259,7 @@ void MainThread(HINSTANCE hinstance)
 	// Wait for islands to load and initialize heightmaps before Graphics ctor. Terrain mesh CPU
 	// slices are reclaimed immediately afterward; Graphics records its stable empty arena at boot.
 	gpProfileManager->BootStart(kBootTimerWaitForIslands);
-	gpIslandTerrain->WaitForElevationMaps(gBaseHeight.Get() - game::kfPlayerRadius - game::kfPushMargin);
+	gpIslandTerrain->WaitForElevationMaps();
 	gpProfileManager->BootStop(kBootTimerWaitForIslands);
 
 	// Register tweaks sections before the Graphics ctor builds ImGuiManager
@@ -271,13 +275,13 @@ void MainThread(HINSTANCE hinstance)
 	auto pGame = std::make_unique<game::Game>();
 
 	// Input
-	auto pInput = std::make_unique<game::Input>();
-	game::gpInput = pInput.get();
+	auto pInput = std::make_unique<Input>();
+	gpInput = pInput.get();
 
 	// Load tweaks settings (requires both Game and ImGuiManager)
 	game::LoadTweaksSettings();
 
-	// Load persistent client state (focused fleet/ship + zoom). Requires gpCamera and gpGame; both exist by here.
+	// Load persistent client state (focused fleet/ship + zoom). Requires engine::gpCamera and gpGame; both exist by here.
 	game::LoadClientState();
 
 	gpProfileManager->BootStop(kBootTimerVulkan);
@@ -293,7 +297,7 @@ void MainThread(HINSTANCE hinstance)
 		ScopedSuppressAllocationTracking suppress;
 		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolates.try_emplace(kOriginCoord).first->second, pGame->RenderFrame(pGame->mClientGridCoord).interpolate);
 	}
-	game::gpCamera->Update(pGame->mRenderInterpolates.at(kOriginCoord));
+	gpCamera->Update(pGame->mRenderInterpolates.at(kOriginCoord), static_cast<float>(pGame->mfLastRenderFrameSeconds));
 
 	// Render and present all framebuffers, then show window
 	gpProfileManager->BootStart(kBootTimerRenderPresent);
@@ -310,7 +314,7 @@ void MainThread(HINSTANCE hinstance)
 #else
 	// Server: create terrain collision data (no Graphics)
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
-	gpIslandTerrain->WaitForElevationMaps(gBaseHeight.Get() - game::kfPlayerRadius - game::kfPushMargin);
+	gpIslandTerrain->WaitForElevationMaps(game::NavThresholdElevation(gBaseHeight.Get()), game::NavClearanceMeters());
 
 	auto pGame = std::make_unique<game::Game>();
 
@@ -386,8 +390,7 @@ void MainThread(HINSTANCE hinstance)
 
 		// Input
 #if defined(BT_CLIENT)
-		game::MenuInput menuInput {};
-		pGame->ProcessInput(bLostFocus, menuInput);
+		pGame->ProcessInput(bLostFocus);
 		if (pGame->mGameFlags & engine::GameFlags::kQuit) [[unlikely]]
 		{
 			break;
@@ -460,9 +463,9 @@ void MainThread(HINSTANCE hinstance)
 #if defined(BT_CLIENT)
 	// Save settings
 	game::SaveTweaksSettings();
-	game::SaveSoundSettings();
-	game::SaveGraphicsSettings();
-	game::SaveGameSettings();
+	SaveSoundSettings();
+	SaveGraphicsSettings();
+	SaveGameSettings();
 #endif
 
 	PostQuitMessage(0);

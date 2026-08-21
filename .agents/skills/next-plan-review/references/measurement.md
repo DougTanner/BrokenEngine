@@ -82,6 +82,18 @@ verdict; exposed tokens/active time; and citation. Aggregate affected-child
 counts and token/active-time cost only
 where exposed; otherwise report cost as unavailable.
 
+When host-owned child-session execution metadata is unavailable, an ordinary
+Claude child may instead be proved by its parent delegation event, recorded
+returned child relationship, and the `Executor` line of its returned handoff
+(`../../../references/subagent-reporting.md`), cited as self-reported. That line
+carries a model and an effort, each independently proved by it or unproved, and
+a self-reported value never substitutes for host metadata where host metadata is
+present. The row is `compliant` only when both values are proved; a row whose
+`Executor` line states a model but writes `unknown` for effort stays
+`unverified`, with its citation recording the proved model half as
+self-reported, and a missing or fully `unknown` `Executor` line leaves the row
+plainly `unverified`.
+
 Verdicts are `compliant`, `compliant fallback`, `violation`, `unverified`, or
 `not-executed`. `not-executed` is a nonfinding only when the parent event/result
 conclusively proves the dispatch failed before any executor started. A started

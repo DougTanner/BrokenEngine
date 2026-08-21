@@ -127,47 +127,6 @@ nlohmann::json BuildFleets()
 
 } // namespace
 
-const char* UiStateName(engine::UiState eState)
-{
-	switch (eState)
-	{
-		case engine::UiState::kNone: return "kNone";
-		case engine::UiState::kGameSettings: return "kGameSettings";
-		case engine::UiState::kGraphicsSettings: return "kGraphicsSettings";
-		case engine::UiState::kModal: return "kModal";
-		case engine::UiState::kPause: return "kPause";
-		case engine::UiState::kSound: return "kSound";
-		case engine::UiState::kTweaks: return "kTweaks";
-	}
-	return "kNone";
-}
-
-nlohmann::json GameFlagNames(engine::GameFlags_t flags)
-{
-	nlohmann::json names = nlohmann::json::array();
-	if (flags & engine::GameFlags::kQuit)
-	{
-		names.push_back("kQuit");
-	}
-	if (flags & engine::GameFlags::kSaveReplay)
-	{
-		names.push_back("kSaveReplay");
-	}
-	if (flags & engine::GameFlags::kLoadReplay)
-	{
-		names.push_back("kLoadReplay");
-	}
-	if (flags & engine::GameFlags::kMainMenu)
-	{
-		names.push_back("kMainMenu");
-	}
-	if (flags & engine::GameFlags::kPaused)
-	{
-		names.push_back("kPaused");
-	}
-	return names;
-}
-
 void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	// Trust boundary — validate optional params.
@@ -183,15 +142,15 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 	int64_t iMaxUnits = std::max<int64_t>(0, rParams.contains("maxUnits") ? rParams.at("maxUnits").get<int64_t>() : 200);
 
 	// Camera / UI / game state — always present (graceful empty state: no subscribed coords still returns these).
-	XMFLOAT4 f4VisibleArea = gpCamera->f4RenderVisibleArea;
+	XMFLOAT4 f4VisibleArea = engine::gpCamera->f4RenderVisibleArea;
 	rResult["camera"] =
 	{
-		{"eye", Vec3ToJson(gpCamera->mVecEyePosition)},
+		{"eye", Vec3ToJson(engine::gpCamera->mVecEyePosition)},
 		{"visibleArea", nlohmann::json::array({f4VisibleArea.x, f4VisibleArea.y, f4VisibleArea.z, f4VisibleArea.w})},
-		{"lod", gpCamera->miVisibleAreaLod},
+		{"lod", engine::gpCamera->miVisibleAreaLod},
 	};
-	rResult["uiState"] = UiStateName(gpGame->meUiState);
-	rResult["gameFlags"] = GameFlagNames(gpGame->mGameFlags);
+	rResult["uiState"] = engine::UiStateName(gpGame->meUiState);
+	rResult["gameFlags"] = engine::GameFlagNames(gpGame->mGameFlags);
 	rResult["tick"] = gpGame->TickCounter();
 	rResult["clientGridCoord"] = CoordToJson(gpGame->mClientGridCoord);
 	rResult["fleets"] = BuildFleets();
@@ -252,7 +211,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		for (int64_t i = 0; i < rPlayersPost.iCount; ++i)
 		{
 			XMVECTOR vecPosition = rPlayersInterp.pVecPositions[i];
-			if (!gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+			if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
 			{
 				continue;
 			}
@@ -261,7 +220,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 				bTruncated = true;
 				break;
 			}
-			XMVECTOR vecScreen = gpCamera->WorldToScreen(vecPosition);
+			XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
 			units.push_back(
 			{
 				{"type", "player"},
@@ -281,7 +240,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		for (int64_t i = 0; i < rShipsPost.iCount; ++i)
 		{
 			XMVECTOR vecPosition = rShipsInterp.pVecPositions[i];
-			if (!gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+			if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
 			{
 				continue;
 			}
@@ -290,7 +249,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 				bTruncated = true;
 				break;
 			}
-			XMVECTOR vecScreen = gpCamera->WorldToScreen(vecPosition);
+			XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
 			units.push_back(
 			{
 				{"type", "spaceship"},

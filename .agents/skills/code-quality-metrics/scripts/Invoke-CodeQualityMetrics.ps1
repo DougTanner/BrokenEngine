@@ -8,7 +8,8 @@ param(
     [string]$RepositoryRoot,
     [switch]$Digest,
     [switch]$Phase0Hints,
-    [string]$OutputPath
+    [string]$OutputPath,
+    [string]$DigestPath
 )
 
 Set-StrictMode -Version Latest
@@ -20,6 +21,11 @@ $script:CloneInstanceLimit = 4
 function Write-Diagnostic([string]$Message) { [Console]::Error.WriteLine("CodeQualityMetrics: $Message") }
 function Fail([string]$Message) { Write-Diagnostic $Message; exit 2 }
 function Get-Sha256([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
+function Get-BytesSha256([byte[]]$Bytes) { [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes)).ToLowerInvariant() }
+function Get-CanonicalJsonSha256([object]$Value) {
+    $json = $Value | ConvertTo-Json -Compress -Depth 32
+    Get-BytesSha256 ([Text.UTF8Encoding]::new($false).GetBytes($json))
+}
 function Assert-OrdinaryDirectory([string]$Path, [string]$Root) {
     $resolvedRoot = [IO.Path]::GetFullPath($Root)
     $resolvedPath = [IO.Path]::GetFullPath($Path)
@@ -67,6 +73,57 @@ function Copy-AnalyzerTree([string]$From, [string]$To) {
             Copy-AnalyzerTree $entry.FullName (Join-Path $To $entry.Name)
         }
         else { Copy-Item -LiteralPath $entry.FullName -Destination (Join-Path $To $entry.Name) -ErrorAction Stop }
+    }
+}
+function Get-ScbContentDigest([string]$Lock, [string]$Source) {
+    $rows = [Collections.Generic.List[string]]::new()
+    $rows.Add("requirements.lock|100644|file|$((Get-Item -LiteralPath $Lock -Force).Length)|$(Get-Sha256 $Lock)")
+    $pending = [Collections.Generic.Stack[object]]::new()
+    $pending.Push([pscustomobject]@{ Path = $Source; Relative = 'src' })
+    while ($pending.Count -gt 0) {
+        $current = $pending.Pop()
+        foreach ($entry in (Get-ChildItem -LiteralPath $current.Path -Force | Sort-Object Name)) {
+            if ($entry.Name -eq '__pycache__' -and $entry.PSIsContainer) { continue }
+            if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Analyzer source contains a reparse entry: '$($entry.FullName)'." }
+            $relative = "$($current.Relative)/$($entry.Name)"
+            if ($entry.PSIsContainer) {
+                $pending.Push([pscustomobject]@{ Path = $entry.FullName; Relative = $relative })
+                continue
+            }
+            $rows.Add("$relative|100644|file|$($entry.Length)|$(Get-Sha256 $entry.FullName)")
+        }
+    }
+    $rows.Sort([StringComparer]::Ordinal)
+    Get-BytesSha256 ([Text.UTF8Encoding]::new($false).GetBytes(($rows -join "`n") + "`n"))
+}
+function Get-BootstrapIdentity([string]$Environment, [string]$Lock, [string]$Source, [string]$Key, [object]$Probe, [string]$PythonSha) {
+    $completePath = Join-Path $Environment 'complete.json'
+    $complete = Get-Content -Raw -LiteralPath $completePath | ConvertFrom-Json
+    $venvPython = Join-Path $Environment 'Scripts\python.exe'
+    $sg = Join-Path $Environment 'Scripts\sg.exe'
+    $completionIdentity = [ordered]@{
+        key = [string]$complete.key
+        python = [string]$complete.python
+        lockSha256 = [string]$complete.lockSha256
+        venvPythonSha256 = [string]$complete.venvPythonSha256
+        sgSha256 = [string]$complete.sgSha256
+        sgVersion = [string]$complete.sgVersion
+    }
+    $completionIdentitySha = Get-CanonicalJsonSha256 $completionIdentity
+    [ordered]@{
+        schemaVersion = 'broken-engine-code-quality-bootstrap-identity/v1'
+        python = [ordered]@{
+            implementation = [string]$Probe.implementation
+            version = [string]$Probe.version
+            architecture = [string]$Probe.arch
+            executableSha256 = $PythonSha
+        }
+        lockSha256 = Get-Sha256 $Lock
+        cacheKey = [string]$Key
+        venvPythonSha256 = Get-Sha256 $venvPython
+        sg = [ordered]@{ sha256 = Get-Sha256 $sg; version = [string]$complete.sgVersion }
+        completionIdentitySha256 = $completionIdentitySha
+        scbContentDigest = Get-ScbContentDigest $Lock $Source
     }
 }
 function New-ImmutableScbCheckSource([string]$CacheRoot, [string]$Repository) {
@@ -286,16 +343,24 @@ $failure = $null
 $analyzerDiagnostics = $null
 $pendingText = $null
 $pendingOutputPath = $null
+$pendingDigestPath = $null
 $sourceStage = $null
 $cacheRoot = $null
 $repository = $null
 try {
-    if ($Mode -notin @('Snapshot', 'Compare')) { throw 'Mode must be Snapshot or Compare.' }
+    if ($Mode -notin @('Snapshot', 'Compare', 'BootstrapIdentity')) { throw 'Mode must be Snapshot, Compare, or BootstrapIdentity.' }
     if (-not $RepositoryRoot) { throw 'RepositoryRoot must be an existing directory.' }
     if ($Scope -and $Scope -notin @('Exact', 'Directory', 'Recursive')) { throw 'Scope must be Exact, Directory, or Recursive.' }
     if ($Baseline -and $Baseline -notmatch '^[0-9a-f]{40}$') { throw 'Baseline must be a 40-character lowercase hexadecimal commit SHA.' }
+    if ($Mode -eq 'BootstrapIdentity' -and ($Target -or $Scope -or $Targets -or $Baseline -or $Digest -or $Phase0Hints -or $OutputPath -or $DigestPath)) { throw 'BootstrapIdentity requires only RepositoryRoot.' }
     if ($Mode -eq 'Snapshot' -and ((-not $Target) -or (-not $Scope) -or $Targets -or $Baseline)) { throw 'Snapshot requires only Target and Scope.' }
     if ($Mode -eq 'Compare' -and ((-not $Targets) -or (-not $Baseline) -or $Target -or $Scope)) { throw 'Compare requires only Targets and Baseline.' }
+    if ($DigestPath -and $Digest) { throw 'DigestPath and Digest are mutually exclusive: DigestPath already writes the digest.' }
+    if ($DigestPath) {
+        # Refused here rather than only at the final write, so an existing file costs no analyzer run.
+        $pendingDigestPath = [IO.Path]::GetFullPath($DigestPath)
+        if (Test-Path -LiteralPath $pendingDigestPath) { throw "DigestPath already exists and is never overwritten: '$pendingDigestPath'." }
+    }
     $repository = Get-CanonicalPath $RepositoryRoot
     if (-not (Test-Path -LiteralPath $repository -PathType Container)) { throw 'RepositoryRoot must be an existing directory.' }
     $rootItem = Get-Item -LiteralPath $repository -Force
@@ -362,61 +427,67 @@ try {
     } finally {
         if ($mutex) { try { $mutex.ReleaseMutex() } catch {} ; $mutex.Dispose() }
     }
-    $request = [ordered]@{ mode = $Mode; repositoryRoot = $repository; captureRoot = $environment; analyzerSource = Get-CanonicalPath $sourceStage.Source; tool = [ordered]@{ adapterVersion = '5'; lockSha256 = $lockSha; python = [ordered]@{ implementation = $probe.implementation; version = $probe.version; architecture = $probe.arch; executableSha256 = $pythonSha }; disableSg = $true } }
-    if ($Mode -eq 'Snapshot') { $request.target = $Target; $request.scope = $Scope } else { $request.targets = [IO.Path]::GetFullPath($Targets); $request.baseline = $Baseline }
-    $requestPath = Join-Path $environment ("request-" + [guid]::NewGuid().ToString('N') + '.json')
-    $requestFailure = $null
-    $requestDiagnostics = $null
-    try {
-        [IO.File]::WriteAllText($requestPath, ($request | ConvertTo-Json -Compress -Depth 5), [Text.UTF8Encoding]::new($false))
-        $venvPython = Join-Path $environment 'Scripts\python.exe'
-        $analyzer = Join-Path $PSScriptRoot 'Analyze-CodeQualityMetrics.py'
-        $processStart = [Diagnostics.ProcessStartInfo]::new()
-        $processStart.FileName = $venvPython
-        $processStart.UseShellExecute = $false
-        $processStart.RedirectStandardOutput = $true
-        $processStart.RedirectStandardError = $true
-        $processStart.Environment['PYTHONIOENCODING'] = 'utf-8'
-        $processStart.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
-        $processStart.StandardErrorEncoding = [Text.UTF8Encoding]::new($false)
-        [void]$processStart.ArgumentList.Add($analyzer)
-        [void]$processStart.ArgumentList.Add('--request')
-        [void]$processStart.ArgumentList.Add($requestPath)
-        $analyzerProcess = [Diagnostics.Process]::new()
-        try {
-            $analyzerProcess.StartInfo = $processStart
-            if (-not $analyzerProcess.Start()) { throw 'Metrics analyzer failed to start.' }
-            $stdoutTask = $analyzerProcess.StandardOutput.ReadToEndAsync()
-            $stderrTask = $analyzerProcess.StandardError.ReadToEndAsync()
-            $analyzerProcess.WaitForExit()
-            $payload = $stdoutTask.GetAwaiter().GetResult()
-            $diagnostics = $stderrTask.GetAwaiter().GetResult()
-            if ($analyzerProcess.ExitCode -ne 0) {
-                # The analyzer owns its own diagnostic wording, including the two structured target-failure lines.
-                $requestDiagnostics = if ($diagnostics.Trim()) { $diagnostics } else { "CodeQualityMetrics: Metrics analyzer failed with exit $($analyzerProcess.ExitCode).`n" }
-            }
-        } finally { $analyzerProcess.Dispose() }
-        $pendingText = $payload.TrimEnd("`r", "`n") + "`n"
-        if ($OutputPath) { $pendingOutputPath = [IO.Path]::GetFullPath($OutputPath) }
+    if ($Mode -eq 'BootstrapIdentity') {
+        $identity = Get-BootstrapIdentity $environment $lock $source $key $probe $pythonSha
+        $pendingText = ($identity | ConvertTo-Json -Compress -Depth 16) + "`n"
     }
-    catch {
-        $requestFailure = $_.Exception.Message
-    }
-    finally {
+    else {
+        $request = [ordered]@{ mode = $Mode; repositoryRoot = $repository; captureRoot = $environment; analyzerSource = Get-CanonicalPath $sourceStage.Source; tool = [ordered]@{ adapterVersion = '5'; lockSha256 = $lockSha; python = [ordered]@{ implementation = $probe.implementation; version = $probe.version; architecture = $probe.arch; executableSha256 = $pythonSha }; disableSg = $true } }
+        if ($Mode -eq 'Snapshot') { $request.target = $Target; $request.scope = $Scope } else { $request.targets = [IO.Path]::GetFullPath($Targets); $request.baseline = $Baseline }
+        $requestPath = Join-Path $environment ("request-" + [guid]::NewGuid().ToString('N') + '.json')
+        $requestFailure = $null
+        $requestDiagnostics = $null
         try {
-            if (Test-Path -LiteralPath $requestPath) {
-                Remove-Item -LiteralPath $requestPath -Force -ErrorAction Stop
-                if (Test-Path -LiteralPath $requestPath) { throw 'Request cleanup left the invocation-owned request file behind.' }
-            }
+            [IO.File]::WriteAllText($requestPath, ($request | ConvertTo-Json -Compress -Depth 5), [Text.UTF8Encoding]::new($false))
+            $venvPython = Join-Path $environment 'Scripts\python.exe'
+            $analyzer = Join-Path $PSScriptRoot 'Analyze-CodeQualityMetrics.py'
+            $processStart = [Diagnostics.ProcessStartInfo]::new()
+            $processStart.FileName = $venvPython
+            $processStart.UseShellExecute = $false
+            $processStart.RedirectStandardOutput = $true
+            $processStart.RedirectStandardError = $true
+            $processStart.Environment['PYTHONIOENCODING'] = 'utf-8'
+            $processStart.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+            $processStart.StandardErrorEncoding = [Text.UTF8Encoding]::new($false)
+            [void]$processStart.ArgumentList.Add($analyzer)
+            [void]$processStart.ArgumentList.Add('--request')
+            [void]$processStart.ArgumentList.Add($requestPath)
+            $analyzerProcess = [Diagnostics.Process]::new()
+            try {
+                $analyzerProcess.StartInfo = $processStart
+                if (-not $analyzerProcess.Start()) { throw 'Metrics analyzer failed to start.' }
+                $stdoutTask = $analyzerProcess.StandardOutput.ReadToEndAsync()
+                $stderrTask = $analyzerProcess.StandardError.ReadToEndAsync()
+                $analyzerProcess.WaitForExit()
+                $payload = $stdoutTask.GetAwaiter().GetResult()
+                $diagnostics = $stderrTask.GetAwaiter().GetResult()
+                if ($analyzerProcess.ExitCode -ne 0) {
+                    # The analyzer owns its own diagnostic wording, including the two structured target-failure lines.
+                    $requestDiagnostics = if ($diagnostics.Trim()) { $diagnostics } else { "CodeQualityMetrics: Metrics analyzer failed with exit $($analyzerProcess.ExitCode).`n" }
+                }
+            } finally { $analyzerProcess.Dispose() }
+            $pendingText = $payload.TrimEnd("`r", "`n") + "`n"
+            if ($OutputPath) { $pendingOutputPath = [IO.Path]::GetFullPath($OutputPath) }
         }
         catch {
-            $cleanupFailure = "Metrics request cleanup failed: $($_.Exception.Message)"
-            if ($null -eq $requestFailure) { $requestFailure = $cleanupFailure }
-            else { $requestFailure = "$requestFailure`n$cleanupFailure" }
+            $requestFailure = $_.Exception.Message
         }
+        finally {
+            try {
+                if (Test-Path -LiteralPath $requestPath) {
+                    Remove-Item -LiteralPath $requestPath -Force -ErrorAction Stop
+                    if (Test-Path -LiteralPath $requestPath) { throw 'Request cleanup left the invocation-owned request file behind.' }
+                }
+            }
+            catch {
+                $cleanupFailure = "Metrics request cleanup failed: $($_.Exception.Message)"
+                if ($null -eq $requestFailure) { $requestFailure = $cleanupFailure }
+                else { $requestFailure = "$requestFailure`n$cleanupFailure" }
+            }
+        }
+        if ($null -ne $requestFailure) { throw $requestFailure }
+        if ($null -ne $requestDiagnostics) { $analyzerDiagnostics = $requestDiagnostics }
     }
-    if ($null -ne $requestFailure) { throw $requestFailure }
-    if ($null -ne $requestDiagnostics) { $analyzerDiagnostics = $requestDiagnostics }
 }
 catch {
     $failure = $_.Exception.Message
@@ -443,7 +514,16 @@ try {
         [IO.File]::WriteAllText($pendingOutputPath, $pendingText, [Text.UTF8Encoding]::new($false))
     }
     $emitText = $pendingText
-    if ($Digest -or $Phase0Hints) { $emitText = (New-CodeQualityDigest ($pendingText | ConvertFrom-Json -Depth 64) $Mode $Phase0Hints.IsPresent) + "`n" }
+    if ($Digest -or $Phase0Hints -or $pendingDigestPath) { $emitText = (New-CodeQualityDigest ($pendingText | ConvertFrom-Json -Depth 64) $Mode $Phase0Hints.IsPresent) + "`n" }
+    if ($pendingDigestPath) {
+        # CreateNew, so a file that appeared during the run still loses the race rather than being lost.
+        $digestBytes = [Text.UTF8Encoding]::new($false).GetBytes($emitText)
+        $digestStream = [IO.File]::Open($pendingDigestPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try { $digestStream.Write($digestBytes, 0, $digestBytes.Length) }
+        finally { $digestStream.Dispose() }
+        # The digest bytes leave through the file alone; stdout carries only where they went.
+        $emitText = ([ordered]@{ schemaVersion = 'broken-engine-code-quality-digest-receipt/v1'; mode = $Mode; digestPath = $pendingDigestPath; digestBytes = $digestBytes.Length } | ConvertTo-Json -Compress) + "`n"
+    }
     [Console]::Out.Write($emitText)
 }
 catch { Fail $_.Exception.Message }

@@ -393,6 +393,267 @@ function Invoke-FinalizeLandingLockClaim {
 	return New-FinalizeLandingLockClaimResult $false 'landing-lock.retryable-wait' 'A foreign landing lease remains live; retry this claim after its reported expiry.' 'retryable-wait' $false $PollMilliseconds $Owner $state.Status 1
 }
 
+function Assert-FinalizeHistoryObject($Value, [string] $Name) {
+	if ($null -eq $Value -or $Value -is [string] -or $Value -is [ValueType] -or $Value -is [Array]) {
+		throw "$Name must be a JSON object."
+	}
+}
+
+function Assert-FinalizeHistoryProperties($Value, [string[]] $Expected, [string] $Name) {
+	Assert-FinalizeHistoryObject $Value $Name
+	$actual = @($Value.PSObject.Properties.Name)
+	$expectedSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	foreach ($property in $Expected) { [void]$expectedSet.Add($property) }
+	if ($actual.Count -ne $Expected.Count -or $expectedSet.Count -ne $Expected.Count) {
+		throw "$Name does not have the exact v1 property set."
+	}
+	foreach ($property in $actual) {
+		if (-not $expectedSet.Contains([string]$property)) { throw "$Name does not have the exact v1 property set." }
+	}
+}
+
+function Assert-FinalizeHistoryString($Value, [string] $Name) {
+	if ($Value -isnot [string] -or [string]::IsNullOrWhiteSpace($Value)) {
+		throw "$Name must be a JSON string."
+	}
+}
+
+function Assert-FinalizeHistoryBoolean($Value, [string] $Name) {
+	if ($Value -isnot [bool]) { throw "$Name must be a JSON boolean." }
+}
+
+function Test-FinalizeHistoryNumber($Value) {
+	return $null -ne $Value -and $Value -isnot [bool] -and $Value -isnot [string] -and
+		($Value -is [byte] -or $Value -is [sbyte] -or $Value -is [int16] -or $Value -is [uint16] -or
+			$Value -is [int32] -or $Value -is [uint32] -or $Value -is [int64] -or $Value -is [uint64] -or
+			$Value -is [single] -or $Value -is [double] -or $Value -is [decimal])
+}
+
+function Assert-FinalizeHistoryInteger($Value, [string] $Name, [long] $Minimum = 0) {
+	if (-not (Test-FinalizeHistoryNumber $Value) -or $Value -is [single] -or $Value -is [double] -or $Value -is [decimal]) { throw "$Name must be a JSON integer." }
+	$number = [double]$Value
+	if ([double]::IsNaN($number) -or [double]::IsInfinity($number) -or [Math]::Truncate($number) -ne $number -or
+		$number -lt [double]$Minimum) {
+		throw "$Name must be a JSON integer greater than or equal to $Minimum."
+	}
+	return [int64]$Value
+}
+
+function Assert-FinalizeHistoryMetric($Value, [string] $Name) {
+	if (-not (Test-FinalizeHistoryNumber $Value)) { throw "$Name must be a JSON number." }
+	$number = [double]$Value
+	if ([double]::IsNaN($number) -or [double]::IsInfinity($number) -or $number -lt 0.0 -or $number -gt 1.0) {
+		throw "$Name must be a finite JSON number in [0,1]."
+	}
+}
+
+function Assert-FinalizeHistoryDigest($Value, [string] $Name) {
+	Assert-FinalizeHistoryString $Value $Name
+	if ($Value -cnotmatch '^[0-9a-f]{64}$') { throw "$Name must be a lowercase SHA-256 digest." }
+}
+
+function Assert-FinalizeHistoryCommit($Value, [string] $Name) {
+	Assert-FinalizeHistoryString $Value $Name
+	if ($Value -cnotmatch '^[0-9a-f]{40}$') { throw "$Name must be a lowercase 40-character commit identity." }
+}
+
+function Assert-FinalizeHistoryDate($Value, [string] $Name) {
+	Assert-FinalizeHistoryString $Value $Name
+	if ($Value -notmatch '^\d{4}-\d{2}-\d{2}$') { throw "$Name must be a UTC calendar date in YYYY-MM-DD form." }
+	$parsed = [datetime]::MinValue
+	if (-not [datetime]::TryParseExact($Value, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed)) {
+		throw "$Name must be a valid UTC calendar date."
+	}
+}
+
+function Assert-FinalizeHistoryRelativePath($Value, [string] $Name, [string] $RequiredLeaf = $null) {
+	Assert-FinalizeHistoryString $Value $Name
+	if ($Value.IndexOf([char]0) -ge 0 -or $Value.IndexOf([char]13) -ge 0 -or $Value.IndexOf([char]10) -ge 0 -or
+		$Value.Contains('\', [StringComparison]::Ordinal) -or
+		$Value.StartsWith('/', [StringComparison]::Ordinal) -or $Value.Contains(':', [StringComparison]::Ordinal) -or
+		[IO.Path]::IsPathRooted($Value)) { throw "$Name must be canonical repository-relative POSIX text." }
+	$parts = $Value.Split('/')
+	foreach ($part in $parts) {
+		if ([string]::IsNullOrEmpty($part) -or $part -ceq '.' -or $part -ceq '..') { throw "$Name must not contain empty or traversing path components." }
+	}
+	if (-not [string]::IsNullOrEmpty($RequiredLeaf) -and [IO.Path]::GetFileName($Value) -cne $RequiredLeaf) { throw "$Name must name '$RequiredLeaf'." }
+}
+
+function Get-FinalizeHistoryJsonSha256($Value) {
+	$json = $Value | ConvertTo-Json -Compress -Depth 64
+	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($json))).ToLowerInvariant()
+}
+
+function Assert-FinalizeHistoryPrefix($Prefix, [string] $Name) {
+	Assert-FinalizeHistoryProperties $Prefix @('bytes', 'lines', 'sha256') $Name
+	if ((Assert-FinalizeHistoryInteger $Prefix.bytes "$Name.bytes") -ne 133323 -or
+		(Assert-FinalizeHistoryInteger $Prefix.lines "$Name.lines") -ne 648) { throw "$Name does not match the immutable history prefix." }
+	Assert-FinalizeHistoryDigest $Prefix.sha256 "$Name.sha256"
+	if ($Prefix.sha256 -cne '5a39debf4be41abebd8496b9f25ee4023d109813788e95b30da8f74474fe75ed') { throw "$Name does not match the immutable history prefix." }
+}
+
+function Assert-FinalizeHistoryRow($Row, [string] $Name) {
+	Assert-FinalizeHistoryProperties $Row @('index', 'date', 'captureMode', 'verbosity', 'structuralErosion', 'supported', 'parsed') $Name
+	Assert-FinalizeHistoryInteger $Row.index "$Name.index" | Out-Null
+	Assert-FinalizeHistoryDate $Row.date "$Name.date"
+	Assert-FinalizeHistoryString $Row.captureMode "$Name.captureMode"
+	if ($Row.captureMode -cnotin @('catch-up', 'cpp-change', 'carry-forward')) { throw "$Name.captureMode is invalid." }
+	Assert-FinalizeHistoryMetric $Row.verbosity "$Name.verbosity"
+	Assert-FinalizeHistoryMetric $Row.structuralErosion "$Name.structuralErosion"
+	$supported = Assert-FinalizeHistoryInteger $Row.supported "$Name.supported"
+	$parsed = Assert-FinalizeHistoryInteger $Row.parsed "$Name.parsed"
+	if ($parsed -gt $supported) { throw "$Name.parsed must not exceed $Name.supported." }
+}
+
+function Assert-FinalizeHistoryPatch($Patch, [string] $BaseCommit, [string] $TipCommit, [string] $Name) {
+	Assert-FinalizeHistoryProperties $Patch @('baseCommit', 'tipCommit', 'changes', 'metricSupportedChanges', 'cppChanged') $Name
+	Assert-FinalizeHistoryCommit $Patch.baseCommit "$Name.baseCommit"
+	Assert-FinalizeHistoryCommit $Patch.tipCommit "$Name.tipCommit"
+	if ($Patch.baseCommit -cne $BaseCommit -or $Patch.tipCommit -cne $TipCommit) { throw "$Name commit identities do not match the requested source." }
+	if ($Patch.changes -isnot [Array]) { throw "$Name.changes must be a JSON array." }
+	$metricCount = 0
+	foreach ($changeIndex in 0..([Math]::Max(0, $Patch.changes.Count - 1))) {
+		if ($Patch.changes.Count -eq 0) { break }
+		$change = $Patch.changes[$changeIndex]
+		$changeName = "$Name.changes[$changeIndex]"
+		Assert-FinalizeHistoryProperties $change @('status', 'path', 'oldPath', 'metricSupported') $changeName
+		Assert-FinalizeHistoryString $change.status "$changeName.status"
+		if ($change.status -cnotmatch '^[ACDMRTUXB]$') { throw "$changeName.status is invalid." }
+		Assert-FinalizeHistoryRelativePath $change.path "$changeName.path"
+		if ($null -ne $change.oldPath) {
+			Assert-FinalizeHistoryRelativePath $change.oldPath "$changeName.oldPath"
+			if ($change.status -notin @('R', 'C')) { throw "$changeName.oldPath is only valid for rename or copy records." }
+		}
+		elseif ($change.status -in @('R', 'C')) { throw "$changeName.oldPath is required for rename or copy records." }
+		Assert-FinalizeHistoryBoolean $change.metricSupported "$changeName.metricSupported"
+		if ($change.metricSupported) { $metricCount++ }
+	}
+	$declaredMetricCount = Assert-FinalizeHistoryInteger $Patch.metricSupportedChanges "$Name.metricSupportedChanges"
+	Assert-FinalizeHistoryBoolean $Patch.cppChanged "$Name.cppChanged"
+	if ($declaredMetricCount -ne $metricCount -or [bool]$Patch.cppChanged -ne ($metricCount -gt 0)) { throw "$Name metric-supported change counts are inconsistent." }
+}
+
+function Assert-FinalizeHistoryManifest($Manifest, [string] $Name) {
+	Assert-FinalizeHistoryProperties $Manifest @('gitlinkCommit', 'resolvedHead', 'clean', 'entries') $Name
+	Assert-FinalizeHistoryCommit $Manifest.gitlinkCommit "$Name.gitlinkCommit"
+	Assert-FinalizeHistoryCommit $Manifest.resolvedHead "$Name.resolvedHead"
+	Assert-FinalizeHistoryBoolean $Manifest.clean "$Name.clean"
+	if (-not $Manifest.clean -or $Manifest.entries -isnot [Array] -or $Manifest.entries.Count -eq 0) { throw "$Name must be clean and contain file entries." }
+	$previousPath = $null
+	foreach ($entryIndex in 0..($Manifest.entries.Count - 1)) {
+		$entry = $Manifest.entries[$entryIndex]
+		$entryName = "$Name.entries[$entryIndex]"
+		Assert-FinalizeHistoryProperties $entry @('relativePath', 'gitMode', 'type', 'length', 'rawSha256') $entryName
+		Assert-FinalizeHistoryRelativePath $entry.relativePath "$entryName.relativePath"
+		if ($null -ne $previousPath -and [StringComparer]::Ordinal.Compare($previousPath, [string]$entry.relativePath) -ge 0) { throw "$Name.entries must be unique and ordinally sorted." }
+		$previousPath = [string]$entry.relativePath
+		Assert-FinalizeHistoryString $entry.gitMode "$entryName.gitMode"
+		if ($entry.gitMode -notin @('100644', '100755')) { throw "$entryName.gitMode is invalid." }
+		Assert-FinalizeHistoryString $entry.type "$entryName.type"
+		if ($entry.type -cne 'file') { throw "$entryName.type is invalid." }
+		Assert-FinalizeHistoryInteger $entry.length "$entryName.length" | Out-Null
+		Assert-FinalizeHistoryDigest $entry.rawSha256 "$entryName.rawSha256"
+	}
+}
+
+function Assert-FinalizeHistoryCapture($Capture, [string] $Mode, [string] $Name) {
+	if ($Mode -ceq 'carry-forward') {
+		if ($null -ne $Capture) { throw "$Name must be null for carry-forward." }
+		return
+	}
+	if ($null -eq $Capture) { throw "$Name is required for an active capture." }
+	Assert-FinalizeHistoryProperties $Capture @('digest', 'bootstrapIdentityDigest', 'scbContentDigest', 'manifest', 'manifestDigest') $Name
+	foreach ($field in @('digest', 'bootstrapIdentityDigest', 'scbContentDigest', 'manifestDigest')) { Assert-FinalizeHistoryDigest $Capture.$field "$Name.$field" }
+	Assert-FinalizeHistoryManifest $Capture.manifest "$Name.manifest"
+	if ((Get-FinalizeHistoryJsonSha256 $Capture.manifest) -cne $Capture.manifestDigest) { throw "$Name.manifestDigest does not match its manifest." }
+}
+
+function Assert-FinalizeHistoryCoverage($Coverage, [string] $Name) {
+	if ($null -eq $Coverage) { return }
+	Assert-FinalizeHistoryProperties $Coverage @('corpusCounts', 'targetCounts') $Name
+	foreach ($field in @('corpusCounts', 'targetCounts')) {
+		$counts = $Coverage.$field
+		$countName = "$Name.$field"
+		Assert-FinalizeHistoryProperties $counts @('supported', 'parsed', 'omitted') $countName
+		$supported = Assert-FinalizeHistoryInteger $counts.supported "$countName.supported"
+		$parsed = Assert-FinalizeHistoryInteger $counts.parsed "$countName.parsed"
+		Assert-FinalizeHistoryInteger $counts.omitted "$countName.omitted" | Out-Null
+		if ($parsed -gt $supported) { throw "$countName.parsed must not exceed $countName.supported." }
+	}
+}
+
+function Assert-FinalizeHistoryContractReceipt($Receipt, [string] $BaseCommit, [string] $TipCommit) {
+	Assert-FinalizeHistoryProperties $Receipt @('schemaVersion', 'mode', 'source', 'prefix', 'series', 'patch', 'decision', 'generator', 'capture', 'snapshot') 'History Contract receipt'
+	Assert-FinalizeHistoryString $Receipt.schemaVersion 'History Contract receipt.schemaVersion'
+	Assert-FinalizeHistoryString $Receipt.mode 'History Contract receipt.mode'
+	if ($Receipt.schemaVersion -cne 'broken-engine-code-quality-history-contract/v1' -or $Receipt.mode -cne 'Contract') { throw 'History Contract receipt is not a broken-engine-code-quality-history-contract/v1 result.' }
+	Assert-FinalizeHistoryProperties $Receipt.source @('baseCommit', 'tipCommit') 'History Contract source'
+	Assert-FinalizeHistoryCommit $Receipt.source.baseCommit 'History Contract source.baseCommit'; Assert-FinalizeHistoryCommit $Receipt.source.tipCommit 'History Contract source.tipCommit'
+	if ($Receipt.source.baseCommit -cne $BaseCommit -or $Receipt.source.tipCommit -cne $TipCommit) { throw 'History Contract source identities do not match the requested commits.' }
+	Assert-FinalizeHistoryPrefix $Receipt.prefix 'History Contract prefix'
+	Assert-FinalizeHistoryProperties $Receipt.series @('rows', 'liveRows', 'lastIndex', 'lastDate', 'historyBytesSha256') 'History Contract series'
+	$rows = Assert-FinalizeHistoryInteger $Receipt.series.rows 'History Contract series.rows' 1
+	$liveRows = Assert-FinalizeHistoryInteger $Receipt.series.liveRows 'History Contract series.liveRows'
+	$lastIndex = Assert-FinalizeHistoryInteger $Receipt.series.lastIndex 'History Contract series.lastIndex'
+	if ($liveRows -gt $rows -or $lastIndex -ne $rows - 1) { throw 'History Contract series counts are inconsistent.' }
+	Assert-FinalizeHistoryDate $Receipt.series.lastDate 'History Contract series.lastDate'; Assert-FinalizeHistoryDigest $Receipt.series.historyBytesSha256 'History Contract series.historyBytesSha256'
+	Assert-FinalizeHistoryPatch $Receipt.patch $BaseCommit $TipCommit 'History Contract patch'
+	Assert-FinalizeHistoryProperties $Receipt.decision @('captureMode', 'reason', 'forceSnapshot') 'History Contract decision'
+	Assert-FinalizeHistoryString $Receipt.decision.captureMode 'History Contract decision.captureMode'
+	if ($Receipt.decision.captureMode -notin @('catch-up', 'cpp-change', 'carry-forward')) { throw 'History Contract decision.captureMode is invalid.' }
+	Assert-FinalizeHistoryString $Receipt.decision.reason 'History Contract decision.reason'
+	$reasons = @{ 'catch-up' = 'no-live-suffix'; 'cpp-change' = 'metric-supported-cpp-change'; 'carry-forward' = 'no-metric-supported-cpp-change' }
+	if ($Receipt.decision.reason -cne $reasons[[string]$Receipt.decision.captureMode]) { throw 'History Contract decision.reason is inconsistent with captureMode.' }
+	Assert-FinalizeHistoryBoolean $Receipt.decision.forceSnapshot 'History Contract decision.forceSnapshot'
+	if ([bool]$Receipt.decision.forceSnapshot -ne ([string]$Receipt.decision.captureMode -ne 'carry-forward')) { throw 'History Contract decision.forceSnapshot is inconsistent with captureMode.' }
+	Assert-FinalizeHistoryProperties $Receipt.generator @('relativePath', 'sha256') 'History Contract generator'
+	Assert-FinalizeHistoryRelativePath $Receipt.generator.relativePath 'History Contract generator.relativePath' 'Invoke-CodeQualityMetricsHistory.ps1'; Assert-FinalizeHistoryDigest $Receipt.generator.sha256 'History Contract generator.sha256'
+	Assert-FinalizeHistoryCapture $Receipt.capture ([string]$Receipt.decision.captureMode) 'History Contract capture'
+	if ([string]$Receipt.decision.captureMode -eq 'carry-forward') {
+		if ($null -ne $Receipt.snapshot) { throw 'History Contract snapshot must be null for carry-forward.' }
+	}
+	else {
+		Assert-FinalizeHistoryProperties $Receipt.snapshot @('target', 'scope', 'coverageRequired') 'History Contract snapshot'
+		Assert-FinalizeHistoryString $Receipt.snapshot.target 'History Contract snapshot.target'; Assert-FinalizeHistoryString $Receipt.snapshot.scope 'History Contract snapshot.scope'; Assert-FinalizeHistoryBoolean $Receipt.snapshot.coverageRequired 'History Contract snapshot.coverageRequired'
+		if ($Receipt.snapshot.target -cne 'Engine/Source' -or $Receipt.snapshot.scope -cne 'Recursive' -or -not $Receipt.snapshot.coverageRequired) { throw 'History Contract snapshot does not describe the required coverage.' }
+	}
+	return $Receipt
+}
+
+function Assert-FinalizeHistoryArtifact($Artifact, [string] $Name, [string] $Leaf) {
+	Assert-FinalizeHistoryProperties $Artifact @('path', 'bytes', 'sha256') $Name
+	Assert-FinalizeHistoryRelativePath $Artifact.path "$Name.path" $Leaf
+	if (-not ([string]$Artifact.path).StartsWith('Temp/', [StringComparison]::Ordinal)) { throw "$Name.path must be beneath repository Temp." }
+	Assert-FinalizeHistoryInteger $Artifact.bytes "$Name.bytes" | Out-Null; Assert-FinalizeHistoryDigest $Artifact.sha256 "$Name.sha256"
+}
+
+function Assert-FinalizeHistoryUpdateReceipt($Receipt, [string] $BaseCommit, [string] $TipCommit) {
+	Assert-FinalizeHistoryProperties $Receipt @('schemaVersion', 'mode', 'date', 'captureMode', 'source', 'prefix', 'patch', 'generator', 'capture', 'series', 'outputs') 'History Generate receipt'
+	Assert-FinalizeHistoryString $Receipt.schemaVersion 'History Generate receipt.schemaVersion'; Assert-FinalizeHistoryString $Receipt.mode 'History Generate receipt.mode'
+	if ($Receipt.schemaVersion -cne 'broken-engine-code-quality-history-update/v1' -or $Receipt.mode -cne 'Generate') { throw 'History Generate receipt is not a broken-engine-code-quality-history-update/v1 result.' }
+	Assert-FinalizeHistoryDate $Receipt.date 'History Generate receipt.date'; Assert-FinalizeHistoryString $Receipt.captureMode 'History Generate receipt.captureMode'
+	if ($Receipt.captureMode -notin @('catch-up', 'cpp-change', 'carry-forward')) { throw 'History Generate receipt.captureMode is invalid.' }
+	Assert-FinalizeHistoryProperties $Receipt.source @('baseCommit', 'tipCommit') 'History Generate source'
+	Assert-FinalizeHistoryCommit $Receipt.source.baseCommit 'History Generate source.baseCommit'; Assert-FinalizeHistoryCommit $Receipt.source.tipCommit 'History Generate source.tipCommit'
+	if ($Receipt.source.baseCommit -cne $BaseCommit -or $Receipt.source.tipCommit -cne $TipCommit) { throw 'History Generate source identities do not match the requested commits.' }
+	Assert-FinalizeHistoryPrefix $Receipt.prefix 'History Generate prefix'
+	Assert-FinalizeHistoryPatch $Receipt.patch $BaseCommit $TipCommit 'History Generate patch'
+	Assert-FinalizeHistoryProperties $Receipt.generator @('relativePath', 'sha256') 'History Generate generator'
+	Assert-FinalizeHistoryRelativePath $Receipt.generator.relativePath 'History Generate generator.relativePath' 'Invoke-CodeQualityMetricsHistory.ps1'; Assert-FinalizeHistoryDigest $Receipt.generator.sha256 'History Generate generator.sha256'
+	Assert-FinalizeHistoryCapture $Receipt.capture ([string]$Receipt.captureMode) 'History Generate capture'
+	Assert-FinalizeHistoryProperties $Receipt.series @('index', 'digest', 'historyBytesSha256', 'row', 'coverage') 'History Generate series'
+	$index = Assert-FinalizeHistoryInteger $Receipt.series.index 'History Generate series.index'
+	Assert-FinalizeHistoryDigest $Receipt.series.digest 'History Generate series.digest'; Assert-FinalizeHistoryDigest $Receipt.series.historyBytesSha256 'History Generate series.historyBytesSha256'
+	Assert-FinalizeHistoryRow $Receipt.series.row 'History Generate series.row'
+	if ($Receipt.series.row.index -ne $index -or $Receipt.series.row.date -cne $Receipt.date -or $Receipt.series.row.captureMode -cne $Receipt.captureMode) { throw 'History Generate series row does not match the receipt date, index, or capture mode.' }
+	if ($Receipt.captureMode -eq 'carry-forward' -and $null -ne $Receipt.series.coverage) { throw 'History Generate coverage must be null for carry-forward.' }
+	if ($Receipt.captureMode -ne 'carry-forward' -and $null -eq $Receipt.series.coverage) { throw 'History Generate coverage is required for an active capture.' }
+	Assert-FinalizeHistoryCoverage $Receipt.series.coverage 'History Generate series.coverage'
+	Assert-FinalizeHistoryProperties $Receipt.outputs @('jsonl', 'svg') 'History Generate outputs'
+	Assert-FinalizeHistoryArtifact $Receipt.outputs.jsonl 'History Generate outputs.jsonl' 'CodeQualityMetricsHistory.jsonl'; Assert-FinalizeHistoryArtifact $Receipt.outputs.svg 'History Generate outputs.svg' 'CodeQualityMetricsHistory.svg'
+	return $Receipt
+}
+
 # Scratch-fixture helpers shared by the finalize-changes suites. Assert-SafeScratchRoot gates every
 # recursive scratch delete: a root only passes when it is the expected GUID leaf directly under the
 # expected fixture parent.
@@ -411,4 +672,4 @@ function Invoke-ScratchGit([string] $Root, [string[]] $Arguments) {
 	return $output
 }
 
-Export-ModuleMember -Function Assert-SafeScratchRoot, Invoke-ScratchGit, Get-FinalizeRootPreservingFullPath, Get-FinalizeExistingWindowsIdentity, Test-FinalizeExistingIdentityEqual, Invoke-FinalizeNativeText, Invoke-FinalizeGit, Test-FinalizeGitSuccess, Get-FinalizeGitIdentity, Assert-FinalizeGitPath, Get-FinalizeWorktreeRecords, Test-FinalizeWorktreeRegistration, Test-FinalizeAllWorktreesClear, Test-FinalizeLandingSanity, Test-FinalizeLandingLockClaimIdentity, Get-FinalizeLandingLockState, Invoke-FinalizeLandingLockClaim
+Export-ModuleMember -Function Assert-SafeScratchRoot, Invoke-ScratchGit, Get-FinalizeRootPreservingFullPath, Get-FinalizeExistingWindowsIdentity, Test-FinalizeExistingIdentityEqual, Invoke-FinalizeNativeText, Invoke-FinalizeGit, Test-FinalizeGitSuccess, Get-FinalizeGitIdentity, Assert-FinalizeGitPath, Get-FinalizeWorktreeRecords, Test-FinalizeWorktreeRegistration, Test-FinalizeAllWorktreesClear, Test-FinalizeLandingSanity, Test-FinalizeLandingLockClaimIdentity, Get-FinalizeLandingLockState, Invoke-FinalizeLandingLockClaim, Assert-FinalizeHistoryRow, Assert-FinalizeHistoryContractReceipt, Assert-FinalizeHistoryUpdateReceipt

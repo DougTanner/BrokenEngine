@@ -1,6 +1,6 @@
 # File - Runtime I/O and Packed Assets
 
-`FileManager` (`gpFileManager`) owns platform paths, versioned and atomic files, packed-asset access, and deterministic replay streams. `PackChunks` is its private packed-asset implementation, not a manager or aggregation-header surface.
+`FileManager` (`gpFileManager`) owns platform paths, versioned and atomic files, and packed-asset access. `PackChunks` is its private packed-asset implementation, not a manager or aggregation-header surface. `Replay` (`gpReplay`) owns the server's deterministic record and playback lifetime.
 
 ## File Contracts
 
@@ -9,6 +9,17 @@
 - Versioned files share `WriteVersionHeader` / `ReadAndValidateVersionHeader`. Raw trivially-copyable payloads validate size; streamed payload types own their serialization. Change an on-disk layout and its owning version together.
 - Failure detail is reported through out-reference parameters alongside a success return or success out-param; a class must not store a failure reason for a later query.
 - One-shot writes are atomic through a sibling temporary and rename. Direct write streams opt out only with `kStreaming`; backup failure is reported but does not weaken the atomic main-file write.
+
+## Grid Saves
+
+Server-only. The whole simulation grid is written as one versioned file through the atomic one-shot write above, with coord frames emitted in sorted coord-key order so equal state produces equal bytes. Navigation data is derived and is not persisted.
+
+- Reading is two-stage: the file is staged into an isolated snapshot and moved into the live grid only after the entire stream validates, so a torn file never leaves a half-loaded grid. Adoption applies the frames, then the game's staged state, then the identifier counter and the clock.
+- A save file is a trust boundary. Bound every count against the bytes remaining in the stream, reject a non-positive global-id counter, require one identical tick and current time across every frame, and require the recorded followed cell to name a frame that was actually read.
+- Failure splits at the version header: a version mismatch or unreadable header leaves existing state untouched, while any failure past that point clears the grid and resets game save state so the caller can rebuild a fresh game.
+- The game supplies the other half of the payload through four required entry points — write, staged read, adopt, and reset ([game Network Server](../../../Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md)). Adding a fifth stage or changing what one of them owns changes both sides at once.
+- The staged snapshot deliberately carries the game's half by value as an opaque member, and engine code never inspects it; the engine-owned fields of that snapshot stay readable by callers, so the opacity runs one way only.
+- This header includes a game header, so it stays out of `Engine.h`: aggregating it would pull game types into the shared PCH. Consumers include it directly.
 
 ## Packed Assets
 
@@ -27,8 +38,22 @@
 
 ## Replay Streams
 
-`DifferenceStream` writes full boundaries, per-frame deltas, and checksums. Publishing succeeds only when every sibling file succeeds; any failure removes the complete sibling set. Replay manifests authenticate their expected component bytes and sizes with SHA-256; hash only ordinary, non-reparse files, and treat a hash/read failure as an invalid replay generation. Optional full-frame diagnostics remain gated by `kbReplayFullFrames`; malformed or stale `.fullframes` data permanently disables those diagnostics for that reader without changing authoritative replay or checksum validation, and mismatch reporting follows the operand labeling owned by Log ([`Common/Log/AGENTS.md`](../../../Common/Log/AGENTS.md)).
-- The coord base header carries a post-dispatch channel separate from the carry-forward difference records: each entry is one tick's post-dispatch payload, keyed by exact tick. Recorded ticks are strictly increasing and lie within `[start tick, savedEnd tick]`; the start tick is allowed. A record is returned only on an exact tick match and is never carried forward to a later tick, because these entries are one-shot events rather than persisting state.
+Server-only. `Replay` owns writer and reader lifetime, the manifest that commits a recording, staged adoption, and the per-tick checksum comparison; `GameBase` constructs it and holds the only owning pointer, and every user reaches it through `gpReplay`. Replay operations exist only when `kbDebugInput` enables their tick-time implementation. `DifferenceStream` is the underlying stream format, writing full boundaries, per-frame deltas, and checksums.
+
+- `Replay.h` includes a game header, so it stays out of `Engine.h`: aggregating it would pull game types into the shared PCH. Consumers include it directly.
+- The manifest is the marker that commits one replay generation — a single recording instance — together with the checksummed inventory of that generation's files. Recording start invalidates it before replacing any component; recording stop publishes it only after every writer and the game metadata succeed. Publishing succeeds only when every sibling file succeeds; any failure removes the complete sibling set. Manifests authenticate their expected component bytes and sizes with SHA-256; hash only ordinary, non-reparse files, and treat a hash or read failure as an invalid replay generation. Records are written in canonical activation-tick-then-coord order and counts are bounded before allocation; the in-memory active-coord list is not order-significant, because coords dispatch in parallel and every consumer is coord-keyed.
+- Playback validates the manifest's component identities, byte counts, digests, and replay generation root before reading any component, then correlates the staged grid's coord membership against the manifest before anything replaces live state, because replacement notifies clients.
+- A staged reader whose file records a Frame version different from this build's is an expected refusal, not corrupt data: report it and abandon playback. Every other reader failure, including a truncated or damaged header, stays on the corrupt-data path.
+- Writer state persists across frames. A writer's first coord eviction is terminal: retain that coord's last complete frame and never resume the writer. Missing retained terminal state invalidates that coord's replay files without skipping attempts for other writers or metadata.
+- Failure handling splits two ways. Invalidation is reachable while the live game is still running, so it discards only replay-exclusive state — readers, pending readers, and the game's replay-only fixtures. Aborting playback that was already running additionally clears the engine's own transfer and broadcast staging, and deliberately leaves the current frames, inputs, and active set intact so live simulation resumes.
+- Adoption runs in a fixed order that is re-entrant with `Game::Reset`: reset, adopt the staged grid, activate readers, set tick and time, adopt the game's staged metadata, then notify the game that state was replaced. Reset also clears the recording evidence the transfer-capture fixture reports, so preserve that evidence across the reset and restore it afterward or a replay loop stops relatching playback.
+- Whether playback is running is a single engine-owned flag on `GameBase` rather than a query over the reader maps, because engine and game code on the tick path read it every update. Republish it after every change to the live or pending reader sets, including the clears on abort, retirement, and loop transition.
+- Readers retire independently at recorded endpoints, and a terminal reader always consumes and checksum-validates its terminal input and saved end frame before its coord is removed, without dispatching or publishing that input a second time. Loop only after the last reader retires, and stop the current fixed-tick iteration before the next dispatch. Successfully applying replay state starts a fresh fixed-step wall-clock interval: validation and file I/O are outside simulation time, and carrying their elapsed time or accumulated tick debt into the restored loop lets a batch of extra ticks break replay CRCs.
+- Each tick compares recorded checksums against resimulation. Transfer harvest stays disabled during playback so the deterministic stream matches recording.
+- The game supplies its half of the lifetime through six required entry points — write metadata, staged metadata read, adopt, clear replay-only fixtures on invalidation, notify that state was replaced, and tally captured transfers by type ([game Save](../../../Projects/BrokenEngineSandbox/Source/Save/AGENTS.md)). Changing what one of them owns changes both sides at once.
+- Staged metadata and the transfer-capture tallies are carried by value as opaque game-owned members that engine code never inspects — the same one-way opacity the staged grid save uses.
+- Optional full-frame diagnostics remain gated by `kbReplayFullFrames`; malformed or stale `.fullframes` data permanently disables those diagnostics for that reader without changing authoritative replay or checksum validation, and mismatch reporting follows the operand labeling owned by Log ([`Common/Log/AGENTS.md`](../../../Common/Log/AGENTS.md)).
+- The coord base header carries a post-dispatch channel separate from the carry-forward difference records: each entry is one tick's post-dispatch payload, keyed by exact tick. Recorded ticks are strictly increasing and lie within `[start tick, savedEnd tick]`; the start tick is allowed. A record is returned only on an exact tick match and is never carried forward to a later tick, because these entries are one-shot events rather than persisting state. Replay files are a trust boundary here: a cross-cell transfer belongs only to this channel, so playback refuses a recorded input carrying a transfer-typed entry, and terminal input never carries one.
 
 ## See Also
 

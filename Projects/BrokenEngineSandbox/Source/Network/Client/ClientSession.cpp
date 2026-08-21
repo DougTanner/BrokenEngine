@@ -67,32 +67,6 @@ void ClientSession::ProcessReceivedGamePackets()
 		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing player events: {}", rException.what());
 	}
 
-	// Apply server timespeed updates from remaining game packets
-	try
-	{
-		for (const std::pair<uint8_t, std::vector<uint8_t>>& rPacket : mpRuntime->mpClient->mReceivedGamePackets)
-		{
-			if (static_cast<GamePacketType>(rPacket.first) != GamePacketType::kServerTimespeedUpdate)
-			{
-				continue;
-			}
-			// 8B multiply + 8B divide = 16 bytes (type byte already stripped)
-			if (rPacket.second.size() < 16)
-			{
-				continue;
-			}
-			const uint8_t* pCursor = rPacket.second.data();
-			int64_t iMultiply = engine::ReadInt64(pCursor);
-			int64_t iDivide = engine::ReadInt64(pCursor);
-			LOG(kNetwork, kDebug, "ClientSession::ServerTimespeedUpdate Multiply: {} Divide: {}", iMultiply, iDivide);
-			gpGame->mTimeStep.SetTimeScale(iMultiply, iDivide);
-		}
-	}
-	catch (const std::exception& rException)
-	{
-		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing server timespeed updates: {}", rException.what());
-	}
-
 	// Parse fleet sync from remaining game packets
 	try
 	{

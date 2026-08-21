@@ -293,7 +293,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 	{
 		LOG(kNetwork, kInfo, "Server::ClientHello Replay Client: {} GUID: {} {}", iClientId, pClient->clientGuid.uiHigh, pClient->clientGuid.uiLow);
 		SendConnectionResponse(pPeer, true, nullptr, &pClient->clientGuid);
-		mrSessionRuntime.mrSession.SendTimespeedToNewClient(pPeer);
+		SendTimespeedToNewClient(pPeer);
 		return;
 	}
 
@@ -312,7 +312,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 	LOG(kNetwork, kInfo, "Server::ClientHello Accepted Client: {} Config: {} GUID: {} {}", iClientId, pcClientConfig, clientGuid.uiHigh, clientGuid.uiLow);
 	SendConnectionResponse(pPeer, true, nullptr, &clientGuid);
 
-	mrSessionRuntime.mrSession.SendTimespeedToNewClient(pPeer);
+	SendTimespeedToNewClient(pPeer);
 }
 
 void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClientId)

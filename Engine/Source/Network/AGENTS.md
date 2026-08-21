@@ -8,7 +8,7 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 - Each coordinate slot has independent ACK floor, bitfield, and epoch state (epoch is the reuse counter). Epoch mismatch drops stale traffic after slot reuse; unsubscribe carries the observed epoch, so a stale request cannot free a reused slot while the server still ACKs the no-op.
 - Engine packet types remain below `kGamePacketStart`; game packets are forwarded opaquely.
 - The handshake verifies protocol version, deterministic Frame version, and ordered island-manifest identity before accepting a peer.
-- Every incompatible game `StatusChange` or `TransferData` wire-layout change requires its game codec owner to increment `engine::kuiProtocolVersion`; Engine Network owns the shared version and Hello rejection gate.
+- Every incompatible wire change increments `engine::kuiProtocolVersion`: a game `StatusChange` or `TransferData` layout change is bumped by its game codec owner, and an engine packet layout change or an added engine packet type is bumped here, because inserting a type before `kGamePacketStart` shifts every game packet identifier. Engine Network owns the shared version and Hello rejection gate.
 - `Frame::kiVersion` is a separate deterministic-Frame/save/replay compatibility gate, not a substitute for the protocol-version bump.
 - Cursor primitives are unchecked. Validate exact fixed layouts or gate every variable-length read with `BoundedCursor` before passing its cursor to a primitive.
 - Client-to-server packet additions require a contract row, size and semantic validation, handshake/debug gating where applicable, per-tick rate limits, and violation reporting through the server contract path. Send commands at tick cadence, not render cadence; that cadence rule governs per-tick rate-limited command generation, so immediately flushing an already-authorized rare user request is permitted because it changes departure time, not packet count.
@@ -31,7 +31,9 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 - Client and server leaves own the side-specific transport peers, receive buffers, contracts, slots, and packet handling.
 - `ClientSessionRuntime` and `ServerSessionRuntime` own reusable connection/discovery, subscription/queue, clock/pacing, poll, flush, resend, and reset sequencing. Canonical game sessions compose them and supply synchronous typed policy hooks.
 - `game::NetworkSessionContract` supplies Frame/status types, protocol constants, codecs, and game packet contracts at compile time. Runtimes use no virtual session base, runtime type erasure, or additional global manager.
-- `NetworkSerialization` declares the game-defined status-change codec without owning its payload format.
+- `NetworkSerialization` owns the status-change batch codec body: the per-type group envelope, the LZ4 framing, and the bounded receive path. Game Network owns the status-change type set, the payload formats, and the per-type read/write operations the codec calls through `game::NetworkSessionContract`.
+- `ServerTransferManager` and `ServerBroadcaster` own cross-cell transfer handling and per-cell publication assembly. Game Network supplies the `StatusChange` payloads they carry and the transient policy queues they drain; Server (`Server/AGENTS.md`) records the deliberate game-type ownership that entails.
+- A status-change batch is all-or-nothing at both ends. The server drops a whole over-cap batch rather than send part of one, and the receive side returns zero changes on any malformed byte, an out-of-range uncompressed-size prefix, or a decoded count past the caller's cap. Applying part of a batch would silently desync the cell; whole-batch rejection leaves the frame's CRC to mismatch, which resyncs through the existing path.
 
 ## See Also
 

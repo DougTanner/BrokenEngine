@@ -77,85 +77,9 @@ ProfileManager::~ProfileManager()
 
 void ProfileManager::FormatGameScreens(common::Workbuffer& rWorkbuffer)
 {
-	if (meProfileScreen == engine::ProfileScreen::kFrames)
-	{
-		FormatFramesScreen(rWorkbuffer);
-	}
-
 	if (meProfileScreen == engine::ProfileScreen::kNetwork)
 	{
 		FormatNetworkScreen(rWorkbuffer);
-	}
-}
-
-void ProfileManager::FormatFramesScreen(common::Workbuffer& rWorkbuffer)
-{
-	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	rWorkbuffer.Append("Frames: ");
-	rWorkbuffer.Append(static_cast<int64_t>(gpGame->mActiveCoords.size()));
-	rWorkbuffer.Append(" [");
-	rWorkbuffer.Append(static_cast<int64_t>(gpGame->mClientGridCoord.x));
-	rWorkbuffer.Append(",");
-	rWorkbuffer.Append(static_cast<int64_t>(gpGame->mClientGridCoord.y));
-	rWorkbuffer.Append("]\n");
-
-	FormatFramesMap(rWorkbuffer);
-	FormatFramesTick(rWorkbuffer);
-
-	engine::gpImGuiManager->UpdateTextArea(engine::kTextProfileFrameStats, rWorkbuffer.View());
-}
-
-void ProfileManager::FormatFramesMap(common::Workbuffer& rWorkbuffer)
-{
-	int32_t iMinX = gpGame->mClientGridCoord.x;
-	int32_t iMaxX = gpGame->mClientGridCoord.x;
-	int32_t iMinY = gpGame->mClientGridCoord.y;
-	int32_t iMaxY = gpGame->mClientGridCoord.y;
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
-	{
-		iMinX = std::min(iMinX, rCoord.x);
-		iMaxX = std::max(iMaxX, rCoord.x);
-		iMinY = std::min(iMinY, rCoord.y);
-		iMaxY = std::max(iMaxY, rCoord.y);
-	}
-	for (int32_t y = iMaxY; y >= iMinY; --y)
-	{
-		for (int32_t x = iMinX; x <= iMaxX; ++x)
-		{
-			bool bClient = (x == gpGame->mClientGridCoord.x && y == gpGame->mClientGridCoord.y);
-			if (bClient)
-			{
-				rWorkbuffer.Append("P");
-			}
-			else
-			{
-				bool bActive = false;
-				for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
-				{
-					if (rCoord.x == x && rCoord.y == y)
-					{
-						bActive = true;
-						break;
-					}
-				}
-				rWorkbuffer.Append(bActive ? "#" : "O");
-			}
-		}
-		rWorkbuffer.Append("\n");
-	}
-}
-
-void ProfileManager::FormatFramesTick(common::Workbuffer& rWorkbuffer)
-{
-	auto profileCoordIt = gpGame->mCoordFrames.find(gpGame->mClientGridCoord);
-	if (profileCoordIt != gpGame->mCoordFrames.end() && profileCoordIt->second.iSnapshotCount > 0)
-	{
-		const game::Frame& rRenderFrame = gpGame->RenderFrame(gpGame->mClientGridCoord);
-		rWorkbuffer.Append("Tick: ");
-		rWorkbuffer.Append(rRenderFrame.interpolate.iTick);
-		rWorkbuffer.Append("  Time: ");
-		rWorkbuffer.AppendFloat(rRenderFrame.interpolate.fCurrentTime, 1);
-		rWorkbuffer.Append("s");
 	}
 }
 

@@ -2,10 +2,9 @@
 
 #include "GraphicsUtils.h"
 
+#include "Graphics/EngineCamera.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/WrapperBase.h"
-
-#include "Graphics/Camera.h"
 
 namespace engine
 {
@@ -80,13 +79,13 @@ void VkNameImpl([[maybe_unused]] VkObjectType type, [[maybe_unused]] uint64_t ha
 bool IsPointVisible(XMVECTOR vecPosition, XMFLOAT4A& rOutPosition)
 {
 	XMStoreFloat4A(&rOutPosition, vecPosition);
-	return rOutPosition.x >= game::gpCamera->f4RenderVisibleArea.x && rOutPosition.x <= game::gpCamera->f4RenderVisibleArea.z && rOutPosition.y <= game::gpCamera->f4RenderVisibleArea.y && rOutPosition.y >= game::gpCamera->f4RenderVisibleArea.w;
+	return rOutPosition.x >= engine::gpCamera->f4RenderVisibleArea.x && rOutPosition.x <= engine::gpCamera->f4RenderVisibleArea.z && rOutPosition.y <= engine::gpCamera->f4RenderVisibleArea.y && rOutPosition.y >= engine::gpCamera->f4RenderVisibleArea.w;
 }
 
 XMVECTOR ProjectToBaseHeight(XMVECTOR vecPosition)
 {
 	float fElevation = gpIslandTerrain->GlobalElevation(vecPosition);
-	return common::ToBaseHeight(vecPosition, game::gpCamera->mVecEyePosition, std::max(fElevation, gBaseHeight.Get()));
+	return common::ToBaseHeight(vecPosition, engine::gpCamera->mVecEyePosition, std::max(fElevation, gBaseHeight.Get()));
 }
 
 void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& f4Position, float fArea, const XMFLOAT4A& f4Params, uint32_t uiColor)
@@ -107,8 +106,8 @@ float MinLightingDepositSize()
 	// formula), so the un-bumped DetailTextureSize is the right basis here — NOT LightingDetailTextureSize,
 	// which would shrink the floor by the headroom factor. The ceil only inflates the floor sub-texel.
 	auto [iLightingTextureX, iLightingTextureY] = TextureManager::DetailTextureSize(gLightingDepositTextureMultiplier.Get());
-	float fTexelSizeX = std::ceil(game::gpCamera->f4RenderVisibleArea.z - game::gpCamera->f4RenderVisibleArea.x) / static_cast<float>(iLightingTextureX);
-	float fTexelSizeY = std::ceil(game::gpCamera->f4RenderVisibleArea.y - game::gpCamera->f4RenderVisibleArea.w) / static_cast<float>(iLightingTextureY);
+	float fTexelSizeX = std::ceil(engine::gpCamera->f4RenderVisibleArea.z - engine::gpCamera->f4RenderVisibleArea.x) / static_cast<float>(iLightingTextureX);
+	float fTexelSizeY = std::ceil(engine::gpCamera->f4RenderVisibleArea.y - engine::gpCamera->f4RenderVisibleArea.w) / static_cast<float>(iLightingTextureY);
 	return std::max(fTexelSizeX, fTexelSizeY) * 8.0f;
 }
 

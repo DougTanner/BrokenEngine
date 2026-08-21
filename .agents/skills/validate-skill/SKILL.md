@@ -6,9 +6,10 @@ allowed-tools: [Read, Grep, Glob, PowerShell]
 
 # Validate Skill
 
-Run inside one fresh delegated `reviewer`; never delegate. Validate skills
-without modifying them. Mechanical failures and Critical semantic findings
-block a passing result; Recommended findings remain advisory.
+Run inside one fresh delegated `reviewer` — which may be the Tier-1 combined
+pass of `.agents/references/tier1-combined-review.md`; never delegate. Validate
+skills without modifying them. Mechanical failures and Critical semantic
+findings block a passing result; Recommended findings remain advisory.
 
 ## Inputs
 

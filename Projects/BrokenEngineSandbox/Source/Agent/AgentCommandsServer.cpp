@@ -3,6 +3,7 @@
 #if defined(BT_SERVER)
 
 #include "Agent/AgentCommandsServerQueries.h"
+#include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Game.h"
 #include "Network/Server/ServerBroadcaster.h"
@@ -10,6 +11,7 @@
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerTransferManager.h"
 #include "Profile/ProfileManager.h"
+#include "Ui/WrapperBase.h"
 
 namespace game
 {
@@ -79,8 +81,8 @@ void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::jso
 {
 	rResult["tick"] = gpGame->TickCounter();
 	rResult["paused"] = gpGame->mGameFlags & engine::GameFlags::kPaused;
-	rResult["recording"] = gpGame->mGameSaveLoad.IsRecording();
-	rResult["replaying"] = gpGame->mGameSaveLoad.IsReplaying();
+	rResult["recording"] = engine::gpReplay->IsRecording();
+	rResult["replaying"] = gpGame->mbReplaying;
 
 	int64_t iClientCount = 0;
 	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
@@ -256,7 +258,7 @@ void CommandLoad(const nlohmann::json& rParams, nlohmann::json& rResult)
 	bool bResetToFresh = false;
 	if (!gpGame->mGameSaveLoad.ServerLoad(file))
 	{
-		// Corrupt/truncated save: ReadGrid already left a clean-slate grid, but ServerLoad's success tail never ran.
+		// Corrupt/truncated save: engine::ReadGridSave already left a clean-slate grid, but ServerLoad's success tail never ran.
 		// Fall back to a fresh game exactly like kClientLoadRequest rather than ticking a torn grid.
 		gpGame->mGameSaveLoad.ServerReset();
 		bResetToFresh = true;
@@ -297,7 +299,7 @@ void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe
 		// pending flag (if any) is consumed. If that already matches the request, no change is pending; otherwise flip the
 		// toggle: setting a clear flag schedules a transition, clearing a set flag cancels a not-yet-consumed one.
 		bool bFlagPending = gpGame->mGameFlags & engine::GameFlags::kSaveReplay;
-		bool bEffective = gpGame->mGameSaveLoad.IsRecording() != bFlagPending;
+		bool bEffective = engine::gpReplay->IsRecording() != bFlagPending;
 		if (bStart == bEffective)
 		{
 			rResult["pending"] = false;
@@ -305,10 +307,10 @@ void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe
 		else if (bFlagPending)
 		{
 			// Cancel a pending transition (e.g. a stop request voids a not-yet-started recording).
-			if (!gpGame->mGameSaveLoad.IsRecording())
+			if (!engine::gpReplay->IsRecording())
 			{
-				gpServerSession->mpTransferManager->mReplayTransferFixtures.clear();
-				gpGame->mGameSaveLoad.mReplayTransferCaptureInfo = {};
+				gpServerSession->mReplayTransferFixtures.clear();
+				engine::gpReplay->mReplayTransferCaptureInfo = {};
 			}
 			gpGame->mGameFlags.Clear(engine::GameFlags::kSaveReplay);
 			rResult["pending"] = false;
@@ -343,15 +345,15 @@ void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& rParams
 	}
 	else
 	{
-		const GameSaveLoad::ReplayTransferCaptureInfo& rCaptureInfo = gpGame->mGameSaveLoad.mReplayTransferCaptureInfo;
+		const engine::Replay::ReplayTransferCaptureInfo& rCaptureInfo = engine::gpReplay->mReplayTransferCaptureInfo;
 		rResult["recordingEventTick"] = rCaptureInfo.iRecordingEventTick;
 		rResult["playbackEventTick"] = rCaptureInfo.iPlaybackEventTick;
 		rResult["firstWriterInputTick"] = rCaptureInfo.iFirstWriterInputTick;
 		rResult["writerInputCount"] = rCaptureInfo.iWriterInputCount;
-		rResult["playerCount"] = rCaptureInfo.iPlayerCount;
-		rResult["spaceshipCount"] = rCaptureInfo.iSpaceshipCount;
-		rResult["blasterCount"] = rCaptureInfo.iBlasterCount;
-		rResult["missileCount"] = rCaptureInfo.iMissileCount;
+		rResult["playerCount"] = rCaptureInfo.transferCounts.iPlayerCount;
+		rResult["spaceshipCount"] = rCaptureInfo.transferCounts.iSpaceshipCount;
+		rResult["blasterCount"] = rCaptureInfo.transferCounts.iBlasterCount;
+		rResult["missileCount"] = rCaptureInfo.transferCounts.iMissileCount;
 	}
 }
 
@@ -363,13 +365,13 @@ void CommandReplayDropRetainedEndFrame([[maybe_unused]] const nlohmann::json& rP
 	}
 	else
 	{
-		if (!gpGame->mGameSaveLoad.IsRecording())
+		if (!engine::gpReplay->IsRecording())
 		{
 			throw std::runtime_error("replay_drop_retained_end_frame requires active recording");
 		}
 
 		engine::GridCoord coord = CoordFromParam(rParams);
-		if (!gpGame->mGameSaveLoad.DropRetainedReplayEndFrame(coord))
+		if (!engine::gpReplay->DropRetainedReplayEndFrame(coord))
 		{
 			throw std::runtime_error("replay_drop_retained_end_frame requires a retained terminal frame for 'coord'");
 		}
@@ -393,59 +395,59 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 		}
 
 		const std::string stage = rParams.at("stage").get<std::string>();
-		GameSaveLoad::ReplayPersistenceFailurePoint eFailurePoint = GameSaveLoad::ReplayPersistenceFailurePoint::kNone;
+		engine::Replay::ReplayPersistenceFailurePoint eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kNone;
 		if (stage == "invalidation")
 		{
-			eFailurePoint = GameSaveLoad::ReplayPersistenceFailurePoint::kManifestInvalidation;
+			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kManifestInvalidation;
 		}
 		else if (stage == "grid")
 		{
-			eFailurePoint = GameSaveLoad::ReplayPersistenceFailurePoint::kGrid;
+			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kGrid;
 		}
 		else if (stage == "coordinate_writer")
 		{
-			eFailurePoint = GameSaveLoad::ReplayPersistenceFailurePoint::kCoordinateWriter;
+			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter;
 		}
 		else if (stage == "metadata")
 		{
-			eFailurePoint = GameSaveLoad::ReplayPersistenceFailurePoint::kMetadata;
+			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kMetadata;
 		}
 		else if (stage == "inventory")
 		{
-			eFailurePoint = GameSaveLoad::ReplayPersistenceFailurePoint::kInventory;
+			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kInventory;
 		}
 		else if (stage == "final_manifest")
 		{
-			eFailurePoint = GameSaveLoad::ReplayPersistenceFailurePoint::kFinalManifest;
+			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kFinalManifest;
 		}
 		else
 		{
 			throw std::runtime_error("'stage' must be invalidation|grid|coordinate_writer|metadata|inventory|final_manifest");
 		}
 
-		if ((eFailurePoint == GameSaveLoad::ReplayPersistenceFailurePoint::kManifestInvalidation ||
-			eFailurePoint == GameSaveLoad::ReplayPersistenceFailurePoint::kGrid) == gpGame->mGameSaveLoad.IsRecording())
+		if ((eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kManifestInvalidation ||
+			eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kGrid) == engine::gpReplay->IsRecording())
 		{
-			throw std::runtime_error(gpGame->mGameSaveLoad.IsRecording() ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
+			throw std::runtime_error(engine::gpReplay->IsRecording() ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
 		}
 
-		if ((eFailurePoint == GameSaveLoad::ReplayPersistenceFailurePoint::kCoordinateWriter) != rParams.contains("coord"))
+		if ((eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter) != rParams.contains("coord"))
 		{
-			throw std::runtime_error(eFailurePoint == GameSaveLoad::ReplayPersistenceFailurePoint::kCoordinateWriter ? "coordinate_writer requires 'coord'" : "'coord' is only valid for coordinate_writer");
+			throw std::runtime_error(eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter ? "coordinate_writer requires 'coord'" : "'coord' is only valid for coordinate_writer");
 		}
 
 		engine::GridCoord coord {};
-		if (eFailurePoint == GameSaveLoad::ReplayPersistenceFailurePoint::kCoordinateWriter)
+		if (eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter)
 		{
 			coord = CoordFromParam(rParams);
 		}
-		if (!gpGame->mGameSaveLoad.ArmReplayPersistenceFailure(eFailurePoint, coord))
+		if (!engine::gpReplay->ArmReplayPersistenceFailure(eFailurePoint, coord))
 		{
 			throw std::runtime_error("coordinate_writer 'coord' has no replay writer with an end frame");
 		}
 
 		rResult["stage"] = stage;
-		if (eFailurePoint == GameSaveLoad::ReplayPersistenceFailurePoint::kCoordinateWriter)
+		if (eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter)
 		{
 			rResult["coord"] = {coord.x, coord.y};
 		}
@@ -594,13 +596,13 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 	}
 	else
 	{
-		if (gpGame->mGameSaveLoad.IsReplaying())
+		if (gpGame->mbReplaying)
 		{
 			throw std::runtime_error("cannot queue replay transfer fixture during replay playback");
 		}
 		const bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused) &&
-			(gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !gpGame->mGameSaveLoad.IsRecording();
-		if (!gpGame->mGameSaveLoad.IsRecording() && !bPendingStart)
+			(gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !engine::gpReplay->IsRecording();
+		if (!engine::gpReplay->IsRecording() && !bPendingStart)
 		{
 			throw std::runtime_error("replay_transfer_fixture requires active recording or a paused pending recording start");
 		}
@@ -617,7 +619,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			}
 			bPauseAfterWriterInput = rParams.at("pauseAfterWriterInput").get<bool>();
 		}
-		if (bPauseAfterWriterInput && gpGame->mGameSaveLoad.mReplayTransferCaptureInfo.iPauseAfterWriterInputCount != -1)
+		if (bPauseAfterWriterInput && engine::gpReplay->mReplayTransferCaptureInfo.iPauseAfterWriterInputCount != -1)
 		{
 			throw std::runtime_error("replay_transfer_fixture pauseAfterWriterInput is already armed");
 		}
@@ -725,8 +727,8 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 		}
 		if (bPauseAfterWriterInput)
 		{
-			gpGame->mGameSaveLoad.mReplayTransferCaptureInfo.iPauseAfterWriterInputCount = bPendingStart ? 1 :
-				gpGame->mGameSaveLoad.mReplayTransferCaptureInfo.iWriterInputCount + 1;
+			engine::gpReplay->mReplayTransferCaptureInfo.iPauseAfterWriterInputCount = bPendingStart ? 1 :
+				engine::gpReplay->mReplayTransferCaptureInfo.iWriterInputCount + 1;
 		}
 
 		rResult["type"] = type;
@@ -854,7 +856,7 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 
 	// Replay playback resimulates from the recorded stream: SyncReplayTick's LoadDifference overwrites mFrameInputs,
 	// so an injection would be silently lost (or broadcast-but-not-simulated → desync). Reject rather than mislead.
-	if (gpGame->mGameSaveLoad.IsReplaying())
+	if (gpGame->mbReplaying)
 	{
 		throw std::runtime_error("cannot inject during replay playback");
 	}
@@ -878,7 +880,7 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 		{
 			throw std::runtime_error("navQueryActivation requires timescale 1/1");
 		}
-		else if (gpGame->mGameSaveLoad.IsRecording() || gpGame->mGameSaveLoad.IsReplaying())
+		else if (engine::gpReplay->IsRecording() || gpGame->mbReplaying)
 		{
 			throw std::runtime_error("navQueryActivation requires recording and replay to be inactive");
 		}
@@ -902,7 +904,7 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 		{
 			// Prepare a complete queue copy before touching the profiler state. A failed allocation leaves both the
 			// existing queue and the event arm unchanged.
-			std::unordered_map<engine::GridCoord, std::vector<StatusChange>> preparedPendingAgentStatusChanges = gpServerSession->mpBroadcaster->mPendingAgentStatusChanges;
+			std::unordered_map<engine::GridCoord, std::vector<StatusChange>> preparedPendingAgentStatusChanges = gpServerSession->mPendingAgentStatusChanges;
 			for (const auto& [rCoord, rChange] : built)
 			{
 				preparedPendingAgentStatusChanges.try_emplace(rCoord).first->second.push_back(rChange);
@@ -933,8 +935,8 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 			{
 				throw std::runtime_error("navQueryActivation event is occupied or overrun");
 			}
-			static_assert(noexcept(preparedPendingAgentStatusChanges.swap(gpServerSession->mpBroadcaster->mPendingAgentStatusChanges)));
-			preparedPendingAgentStatusChanges.swap(gpServerSession->mpBroadcaster->mPendingAgentStatusChanges);
+			static_assert(noexcept(preparedPendingAgentStatusChanges.swap(gpServerSession->mPendingAgentStatusChanges)));
+			preparedPendingAgentStatusChanges.swap(gpServerSession->mPendingAgentStatusChanges);
 		}
 	}
 	else
@@ -951,7 +953,7 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 
 void CommandSpawnPlayers(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
-	if (gpGame->mGameSaveLoad.IsReplaying())
+	if (gpGame->mbReplaying)
 	{
 		throw std::runtime_error("cannot inject during replay playback");
 	}

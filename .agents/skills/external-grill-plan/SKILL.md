@@ -80,13 +80,19 @@ Lead with the first concrete decision, not a plan summary. For each question:
 - state the repository evidence and why the choice changes the plan;
 - offer exactly two or three meaningful, mutually exclusive choices;
 - put the recommended choice first and explain its tradeoff;
-- make every choice name the exact refinement it would produce.
+- make every choice name the exact refinement it would produce;
+- say what the answer changes or blocks, in plain, non-expert language;
+- keep the question answerable from the current message alone, without the user
+  recalling earlier turns or reading the plan or the source.
 
-Use the host's structured choice UI when available. Otherwise ask in prose but
-preserve the same two or three choices, in the same recommended-first order,
-with the same tradeoffs and refinements. Do not replace them with an open-ended
-prompt. In prose, give every question in the round one fixed numbered shape so
-the user can answer by number:
+Use the host's structured choice UI when available. Make the structured-choice
+tool call only after the round's full context is already visible to the user as
+rendered message text, and let that call carry only the choices; text emitted in
+the same turn before such a call may never be displayed, so it does not count.
+Otherwise ask in prose but preserve the same two or three choices, in the same
+recommended-first order, with the same tradeoffs and refinements. Do not replace
+them with an open-ended prompt. In prose, give every question in the round one
+fixed numbered shape so the user can answer by number:
 
 ```text
 Q<n> — <decision title>: <evidence, why the choice changes the plan, and the

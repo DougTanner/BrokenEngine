@@ -218,10 +218,19 @@ $localAppData = Join-Path $scratchBase 'local-app-data'
 $previousEnvironment = @{}
 $fixtureEnvironment = $null
 $fixtureExitCode = 0
+$script:PrimaryAdvanceOwner = $null
+$script:PrimaryHistoryContract = $null
+$historyProducerText = Get-Content -Raw (Join-Path $PSScriptRoot '..\..\code-quality-metrics\scripts\Invoke-CodeQualityMetricsHistory.ps1')
+$approvalProducerText = Get-Content -Raw (Join-Path $PSScriptRoot 'Invoke-FinalizeApprovalPreparation.ps1')
+$landingProducerText = Get-Content -Raw (Join-Path $PSScriptRoot 'Invoke-FinalizeLanding.ps1')
+Assert-True ($historyProducerText -match '\[string\]\$RepositoryRoot' -and $historyProducerText -match '\[string\]\$BaseCommit' -and $historyProducerText -match '\[string\]\$TipCommit' -and $historyProducerText -match '\[string\]\$DateUtc' -and $historyProducerText -match '\[string\]\$OutputDirectory') 'history producer exposes the exact canonical parameter interface'
+Assert-True ($approvalProducerText -notmatch 'parameterNames|Get-Command -Name \$historyScript|Get-HistoryProperty' -and $landingProducerText -notmatch 'parameterNames|Get-Command -Name \$historyScript|Get-HistoryProperty') 'finalizer history calls contain no alternate parameter or receipt reflection'
 
 try {
 New-Item -ItemType Directory -Force $primary | Out-Null
 New-Item -ItemType Directory -Force $localAppData | Out-Null
+$fixtureEnvironment = [ordered]@{ LOCALAPPDATA = $localAppData; BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE = '1'; BROKEN_ENGINE_FINALIZE_APPROVAL_PREPARATION_FIXTURE = '1'; BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT = $null }
+foreach ($entry in $fixtureEnvironment.GetEnumerator()) { $previousEnvironment[$entry.Key] = [Environment]::GetEnvironmentVariable($entry.Key); [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value) }
 Invoke-ScratchGit $primary @('init', '-b', 'main') | Out-Null
 Invoke-ScratchGit $primary @('config', 'core.autocrlf', 'false') | Out-Null
 # The landing script runs its internal rebase through plain git.exe, so the committer identity has to
@@ -232,6 +241,31 @@ New-Item -ItemType Directory -Force (Join-Path $primary '.agents\scripts') | Out
 foreach ($module in @('AgentScriptCommon.psm1', 'WorktreeCliSessionExclusion.psm1', 'AgentWorktreeSession.psm1')) {
 	Copy-Item -LiteralPath (Join-Path $moduleSource $module) -Destination (Join-Path $primary ".agents\scripts\$module") -Force
 }
+# The production history producer is deliberately not run for every scratch case: this exact public
+# Contract/Generate shape is a deterministic fixture producer, while the real script is exercised by
+# its own metrics fixtures. It keeps the finalizer cases focused on receipt validation, overlay, CAS,
+# recovery, and lock atomicity without paying for a full analyzer capture each time.
+$historyScriptRoot = Join-Path $primary '.agents\skills\code-quality-metrics\scripts'
+$historyDataRoot = Join-Path $primary '.agents\skills\code-quality-metrics\references\history'
+New-Item -ItemType Directory -Force $historyScriptRoot, $historyDataRoot | Out-Null
+$historyFixtureScript = @'
+[CmdletBinding()]
+param([Parameter(Mandatory)][ValidateSet('Contract','Generate')][string]$Mode,[Parameter(Mandatory)][string]$RepositoryRoot,[string]$BaseCommit,[string]$TipCommit,[string]$DateUtc,[string]$OutputDirectory)
+$ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
+$generator='0000000000000000000000000000000000000000000000000000000000000000'; $prefix=[ordered]@{bytes=133323;lines=648;sha256='5a39debf4be41abebd8496b9f25ee4023d109813788e95b30da8f74474fe75ed'}
+$jsonRelative='.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgRelative='.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
+$changes=@(& git -C $RepositoryRoot diff --name-only $BaseCommit $TipCommit 2>$null); $cpp=(@($changes | Where-Object { $_ -match '\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$' })).Count -gt 0
+$captureMode=if($cpp){'cpp-change'}else{'carry-forward'}; $reason=if($cpp){'metric-supported-cpp-change'}else{'no-metric-supported-cpp-change'}
+if($Mode -eq 'Contract') {
+  $contract=[ordered]@{schemaVersion='broken-engine-code-quality-history-contract/v1';mode='Contract';source=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit};prefix=$prefix;series=[ordered]@{rows=1;liveRows=1;lastIndex=0;lastDate='2026-08-10';historyBytesSha256=('0'*64)};patch=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit;changes=@();metricSupportedChanges=0;cppChanged=$false};decision=[ordered]@{captureMode='carry-forward';reason='no-metric-supported-cpp-change';forceSnapshot=$false};generator=[ordered]@{relativePath='.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1';sha256=$generator};capture=$null;snapshot=$null}
+  if($env:BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT -eq 'contract-nested-unknown'){$contract.source=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit;unexpected='malformed'}}
+  [Console]::Out.WriteLine(($contract|ConvertTo-Json -Compress -Depth 32)); exit 0
+}
+if(-not $OutputDirectory){throw 'Generate requires OutputDirectory.'}; if(Test-Path -LiteralPath $OutputDirectory){throw 'OutputDirectory must not already exist.'}; New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
+ $date=if($DateUtc){$DateUtc}else{[DateTime]::UtcNow.ToString('yyyy-MM-dd')}; $historyPath=Join-Path $RepositoryRoot ($jsonRelative -replace '/','\'); $prefixText=if(Test-Path -LiteralPath $historyPath){[IO.File]::ReadAllText($historyPath,[Text.UTF8Encoding]::new($false,$true))}else{''}; $prefixRows=@($prefixText -split [char]10 | Where-Object { $_ }); $row=[ordered]@{index=[Math]::Max(0,$prefixRows.Count-1);date=$date;captureMode='carry-forward';verbosity=0.1;structuralErosion=0.1;supported=1;parsed=1}; $rowText=(($row|ConvertTo-Json -Compress)+[char]10); $jsonText=$prefixText+$rowText; $jsonBytes=[Text.UTF8Encoding]::new($false).GetBytes($jsonText); $series=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant(); $svgText="<svg xmlns='http://www.w3.org/2000/svg'><desc>seriesDigest=$series generatorDigest=$generator</desc></svg>"+[char]10; $jsonPath=Join-Path $OutputDirectory 'CodeQualityMetricsHistory.jsonl'; $svgPath=Join-Path $OutputDirectory 'CodeQualityMetricsHistory.svg'; [IO.File]::WriteAllBytes($jsonPath,$jsonBytes); [IO.File]::WriteAllText($svgPath,$svgText,[Text.UTF8Encoding]::new($false)); $relJson=([IO.Path]::GetRelativePath($RepositoryRoot,$jsonPath).Replace([char]92,[char]47)); $relSvg=([IO.Path]::GetRelativePath($RepositoryRoot,$svgPath).Replace([char]92,[char]47)); $update=[ordered]@{schemaVersion='broken-engine-code-quality-history-update/v1';mode='Generate';date=$date;captureMode='carry-forward';source=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit};prefix=$prefix;patch=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit;changes=@();metricSupportedChanges=0;cppChanged=$false};generator=[ordered]@{relativePath='.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1';sha256=$generator};capture=$null;series=[ordered]@{index=$row.index;digest=$series;historyBytesSha256=('0'*64);row=$row;coverage=$null};outputs=[ordered]@{jsonl=[ordered]@{path=$relJson;bytes=$jsonBytes.Length;sha256=([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant())};svg=[ordered]@{path=$relSvg;bytes=([IO.File]::ReadAllBytes($svgPath)).Length;sha256=(Get-FileHash $svgPath -Algorithm SHA256).Hash.ToLowerInvariant()}}}; if($env:BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT -eq 'update-row-unknown'){$update.series.row=[ordered]@{index=$row.index;date=$date;captureMode='carry-forward';verbosity=0.1;structuralErosion=0.1;supported=1;parsed=1;unexpected='malformed'}}; [Console]::Out.WriteLine(($update|ConvertTo-Json -Compress -Depth 32)); exit 0
+'@
+[IO.File]::WriteAllText((Join-Path $historyScriptRoot 'Invoke-CodeQualityMetricsHistory.ps1'), $historyFixtureScript, [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $historyDataRoot 'CodeQualityMetricsHistory.jsonl'), "{`"schema`":`"code-quality-metrics-history/v1`"}`n{`"index`":0,`"date`":`"2026-08-10`",`"captureMode`":`"catch-up`",`"verbosity`":0.1,`"structuralErosion`":0.1,`"supported`":1,`"parsed`":1}`n", [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $primary '.gitignore'), "Temp/`nTools/WorktreeCli/Platforms/VisualStudio2026/Output/`n", [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $primary 'base.txt'), 'base', [Text.UTF8Encoding]::new($false))
 $gitlinkSource = Join-Path $scratchBase 'gitlink-source'
@@ -252,6 +286,7 @@ $uuid = [guid]::NewGuid().ToString()
 $sessionBranch = "codex/$uuid"
 Invoke-ScratchGit $primary @('worktree', 'add', '-b', $sessionBranch, $session, $baseline) | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $session 'Temp') | Out-Null
+New-Item -ItemType Directory -Force (Join-Path $primary 'Temp') | Out-Null
 $sessionOutputParent = Join-Path $session 'Tools\WorktreeCli\Platforms\VisualStudio2026'
 New-Item -ItemType Directory -Force $sessionOutputParent | Out-Null
 New-Item -ItemType Junction -Path (Join-Path $sessionOutputParent 'Output') -Target $primaryOutput | Out-Null
@@ -329,6 +364,13 @@ if ($null -ne $run.Json) {
 	Assert-True (@($run.Json.ownedPaths) -ccontains 'candidate-session.txt' -and @($run.Json.ownedPaths).Count -eq 1) 'session candidate owns exactly the caller-declared paths'
 }
 Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
+[IO.File]::WriteAllText((Join-Path $session 'candidate-session.txt'), 'session candidate', [Text.UTF8Encoding]::new($false))
+$sessionReservedHistoryPath = Join-Path $session '.agents\skills\code-quality-metrics\references\history\CodeQualityMetricsHistory.jsonl'
+$sessionReservedHistoryBytes = [IO.File]::ReadAllBytes($sessionReservedHistoryPath)
+[IO.File]::WriteAllBytes($sessionReservedHistoryPath, [byte[]]($sessionReservedHistoryBytes + [Text.UTF8Encoding]::new($false).GetBytes("dirty`n")))
+$run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$baseline,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','candidate-session.txt','-CommitMessageFile',$candidateMessage)
+Assert-Outcome $run 'session-blocks-dirty-reserved-history' 2 'blocked' 'history.source-dirty'
+[IO.File]::WriteAllBytes($sessionReservedHistoryPath, $sessionReservedHistoryBytes)
 [IO.File]::WriteAllText((Join-Path $session 'staged-unrelated.txt'), 'staged unrelated', [Text.UTF8Encoding]::new($false))
 Invoke-ScratchGit $session @('add','staged-unrelated.txt') | Out-Null
 [IO.File]::WriteAllText((Join-Path $session 'base.txt'), 'unstaged unrelated', [Text.UTF8Encoding]::new($false))
@@ -385,16 +427,28 @@ Invoke-ScratchGit $primary @('add','literal-disjoint-staged.txt') | Out-Null
 $literalPrimaryIndexBefore = (@(Invoke-ScratchGit $primary @('ls-files','-s')) -join "`n")
 $literalPrimaryStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join "`n")
 $literalPrimaryParameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@($literalBracketPath); CommitMessageFile=$candidateMessage }
+$previousHistoryReceiptMode = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT')
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT', 'contract-nested-unknown')
+$malformedContract = Invoke-JsonScriptWithSplat $candidateScript $literalPrimaryParameters $scratchBase
+Assert-Outcome $malformedContract 'primary-candidate-rejects-malformed-nested-contract-receipt' 2 'blocked' 'history.contract-invalid'
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT', $previousHistoryReceiptMode)
 $run = Invoke-JsonScriptWithSplat $candidateScript $literalPrimaryParameters $scratchBase
 Assert-Outcome $run 'primary-candidate-accepts-bracketed-literal-path' 0 'pass' 'candidate.created'
 if ($null -ne $run.Json) {
 	Assert-True (@($run.Json.ownedPaths).Count -eq 1 -and @($run.Json.ownedPaths)[0] -ceq $literalBracketPath) 'primary bracketed candidate owns exactly the literal path'
+	Assert-True ($run.Json.historyContract.receipt.schemaVersion -ceq 'broken-engine-code-quality-history-contract/v1') 'primary candidate carries the history Contract before verification'
 	$primaryChangedPaths = @(@(Invoke-ScratchGit $primary @('diff-tree','--no-commit-id','--name-only','-r',$baseline,$run.Json.candidate.commit)) | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrEmpty($_) })
 	Assert-True ($primaryChangedPaths.Count -eq 1 -and $primaryChangedPaths[0] -ceq $literalBracketPath) 'primary bracketed candidate changes exactly the literal path'
 	Assert-True ($literalPrimaryIndexBefore -ceq (@(Invoke-ScratchGit $primary @('ls-files','-s')) -join "`n") -and $literalPrimaryStatusBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join "`n")) 'primary bracketed candidate preserves real index and disjoint staged unstaged untracked state'
 }
 Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
 Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
+$reservedHistoryFixturePath = Join-Path $primary '.agents\skills\code-quality-metrics\references\history\CodeQualityMetricsHistory.jsonl'
+$reservedHistoryFixtureBytes = [IO.File]::ReadAllBytes($reservedHistoryFixturePath)
+[IO.File]::WriteAllBytes($reservedHistoryFixturePath, [byte[]]($reservedHistoryFixtureBytes + [Text.UTF8Encoding]::new($false).GetBytes("dirty`n")))
+$run = Invoke-JsonScript $candidateScript @('-Route','primary-commit','-CurrentWorktree',$primary,'-PrimaryWorktree',$primary,'-CurrentBranch','main','-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$baseline,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','base.txt','-CommitMessageFile',$candidateMessage)
+Assert-Outcome $run 'direct-primary-blocks-dirty-reserved-history' 2 'blocked' 'history.source-dirty'
+[IO.File]::WriteAllBytes($reservedHistoryFixturePath, $reservedHistoryFixtureBytes)
 [IO.File]::WriteAllText((Join-Path $primary 'primary-active-owned.txt'), 'primary candidate', [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $primary 'primary-staged-owned.txt'), 'primary staged', [Text.UTF8Encoding]::new($false))
 Invoke-ScratchGit $primary @('add','primary-staged-owned.txt') | Out-Null
@@ -412,13 +466,14 @@ $primaryUnrelatedWorktree = [IO.File]::ReadAllText((Join-Path $primary 'primary-
 # through the splat wrapper, which passes the array intact.
 function New-PrimaryCandidateParameters([Collections.IDictionary] $Extra = @{}) {
 	$parameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@('primary-active-owned.txt','primary-staged-owned.txt'); CommitMessageFile=$candidateMessage }
+	if ($null -ne $script:PrimaryAdvanceOwner) { $parameters.OwnerToken=$script:PrimaryAdvanceOwner; $parameters.SessionLabel='finalize-fixture'; $parameters.HistoryContractDigest=$script:PrimaryHistoryContract.digest; $parameters.HistoryContractGeneratorDigest=$script:PrimaryHistoryContract.generatorDigest; $parameters.HistoryContractCaptureDigest=$script:PrimaryHistoryContract.captureDigest; $parameters.HistoryContractRuntimeDigest=$script:PrimaryHistoryContract.runtimeDigest; $parameters.HistoryContractPatchDigest=$script:PrimaryHistoryContract.patchDigest; $parameters.HistoryContractMode=$script:PrimaryHistoryContract.mode; $parameters.WorktreeCliExecutable=(Join-Path $primaryOutput 'WorktreeCli.exe') }
 	foreach ($entry in $Extra.GetEnumerator()) { $parameters[$entry.Key] = $entry.Value }
 	return $parameters
 }
 $run = Invoke-JsonScriptWithSplat $candidateScript (New-PrimaryCandidateParameters) $scratchBase
 Assert-Outcome $run 'primary-candidate-temporary-index' 0 'pass' 'candidate.created'
 if ($null -ne $run.Json) {
-	$verifiedCandidate = $run.Json.candidate.commit; $verifiedTree = $run.Json.candidate.tree
+	$verifiedCandidate = $run.Json.candidate.commit; $verifiedTree = $run.Json.candidate.tree; $script:PrimaryHistoryContract = $run.Json.historyContract; $script:PrimaryAdvanceOwner = [guid]::NewGuid().ToString(); $primaryCommonDirectory = ((@(Invoke-ScratchGit $primary @('rev-parse','--path-format=absolute','--git-common-dir')))[0].Trim()); Invoke-WorktreeCli @('lock','claim','--repo',$primaryCommonDirectory,'--owner',$script:PrimaryAdvanceOwner,'--session','finalize-fixture','--worktree',$primary,'--lease-seconds','3600') | Out-Null
 	Assert-True ($beforePrimaryIndex -ceq ((@(Invoke-ScratchGit $primary @('ls-files','-s')) -join "`n"))) 'temporary index preserves real index'
 	Assert-True ($primaryDisjointBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','--untracked-files=all')) -join "`n")) 'primary candidate preserves disjoint staged unstaged and untracked state'
 	$rollback = Invoke-JsonScriptWithSplat $candidateScript (New-PrimaryCandidateParameters @{ VerifiedCandidateCommit=$verifiedCandidate; VerifiedCandidateTree=$verifiedTree; AdvancePrimary=$true; FixtureFailure='postcondition' }) $scratchBase
@@ -435,9 +490,10 @@ if ($null -ne $run.Json) {
 	Assert-True ($primaryUnrelatedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-disjoint-untracked.txt'), [Text.UTF8Encoding]::new($false,$true))) 'primary post-index rollback preserves unrelated worktree bytes'
 	$advance = Invoke-JsonScriptWithSplat $candidateScript (New-PrimaryCandidateParameters @{ VerifiedCandidateCommit=$verifiedCandidate; VerifiedCandidateTree=$verifiedTree; AdvancePrimary=$true }) $scratchBase
 	Assert-Outcome $advance 'primary-candidate-atomic-advance' 0 'pass' 'candidate.advanced'
-	Assert-True ($verifiedCandidate -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) 'primary branch equals reviewed candidate'
-	Assert-True ($verifiedTree -ceq ((@(Invoke-ScratchGit $primary @('rev-parse',"$verifiedCandidate^{tree}")))[0].Trim())) 'primary tree equals reviewed candidate tree'
+	Assert-True ($advance.Json.final.replacement -and $advance.Json.final.commit -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) 'primary branch equals deterministic history replacement'
+	Assert-True ($advance.Json.final.tree -ceq ((@(Invoke-ScratchGit $primary @('rev-parse',"$($advance.Json.final.commit)^{tree}")))[0].Trim())) 'primary tree equals deterministic history replacement tree'
 }
+Invoke-WorktreeCli @('lock','release','--repo',$primaryCommonDirectory,'--owner',$script:PrimaryAdvanceOwner) | Out-Null
 Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
 Remove-Item -LiteralPath (Join-Path $primary 'primary-active-owned.txt'),(Join-Path $primary 'primary-staged-owned.txt'),(Join-Path $primary 'primary-disjoint-staged.txt'),(Join-Path $primary 'primary-disjoint-untracked.txt') -Force -ErrorAction SilentlyContinue
 
@@ -476,16 +532,6 @@ if ($null -ne $run.Json) {
 }
 Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
 Remove-Item -LiteralPath (Join-Path $primary 'resumed-primary-dirty.txt') -Force -ErrorAction SilentlyContinue
-
-$fixtureEnvironment = [ordered]@{
-	LOCALAPPDATA = $localAppData
-	BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE = '1'
-	BROKEN_ENGINE_FINALIZE_APPROVAL_PREPARATION_FIXTURE = '1'
-}
-foreach ($entry in $fixtureEnvironment.GetEnumerator()) {
-	$previousEnvironment[$entry.Key] = [Environment]::GetEnvironmentVariable($entry.Key)
-	[Environment]::SetEnvironmentVariable($entry.Key, $entry.Value)
-}
 
 # Preview is deterministic even when executable discovery differs. Explicit launch
 # uses a bounded command stub, so the actual Start-Process path is exercised safely.
@@ -622,20 +668,21 @@ if ($null -ne $run.Json) {
 	$approvalParameters.FixtureFailure = 'bounded-diagnostic'
 	$approvalFailure = Invoke-JsonScriptWithSplat $approvalPreparationScript $approvalParameters $scratchBase
 	Assert-True ($approvalFailure.ExitCode -eq 1 -and $approvalFailure.Json.status -ceq 'error') 'approval preparation bounded failure emits error'
-	Assert-ExactProperties $approvalFailure.Json @('schemaVersion','status','code','message','messageLength','messageTruncated','session','candidate','squash','sanity','verifiedCandidate','diagnostics') 'approval preparation failure'
+	Assert-ExactProperties $approvalFailure.Json @('schemaVersion','status','code','message','messageLength','messageTruncated','session','candidate','squash','sanity','verifiedCandidate','historyContract','diagnostics') 'approval preparation failure'
 	Assert-ExactProperties $approvalFailure.Json.diagnostics @('totalCount','items','truncated','selector','requery') 'approval preparation failure diagnostics'
 	Assert-ExactProperties $approvalFailure.Json.diagnostics.items[0] @('source','code','codeLength','codeTruncated','path','pathLength','pathTruncated','message','messageLength','messageTruncated') 'approval preparation failure diagnostic item'
 	Assert-True ($approvalFailure.Json.code.Length -eq 128 -and $approvalFailure.Json.message.Length -eq 512 -and $approvalFailure.Json.messageLength -eq 600 -and $approvalFailure.Json.messageTruncated -and $approvalFailure.Json.diagnostics.requery -ceq 'Invoke-FinalizeApprovalPreparation') 'approval preparation failure is bounded with canonical requery'
 	$approvalParameters.FixtureFailure = 'none'
 	$approval = Invoke-JsonScriptWithSplat $approvalPreparationScript $approvalParameters $scratchBase
 	Assert-Outcome $approval 'approval-preparation-normal-success' 0 'pass' 'ok'
-	Assert-ExactProperties $approval.Json @('schemaVersion','status','code','message','messageLength','messageTruncated','session','candidate','squash','sanity','verifiedCandidate','diagnostics') 'approval preparation success'
+	Assert-ExactProperties $approval.Json @('schemaVersion','status','code','message','messageLength','messageTruncated','session','candidate','squash','sanity','verifiedCandidate','historyContract','diagnostics') 'approval preparation success'
 	Assert-ExactProperties $approval.Json.session @('originalTip','currentTip','primaryTip') 'approval preparation session'
 	Assert-ExactProperties $approval.Json.candidate @('commit','tree','parent') 'approval preparation candidate'
 	Assert-ExactProperties $approval.Json.squash @('disposition','commitCount','refUpdated','rollback') 'approval preparation squash'
 	Assert-ExactProperties $approval.Json.sanity @('initial','final') 'approval preparation sanity'
 	Assert-ExactProperties $approval.Json.verifiedCandidate @('supplied','matched') 'approval preparation verified candidate'
-	Assert-True ($approval.Json.schemaVersion -ceq 'broken-engine-finalize-approval-preparation/v2' -and $approval.Json.candidate.commit -ceq $run.Json.candidate.commit -and $approval.Json.candidate.tree -ceq $run.Json.candidate.tree -and $approval.Json.candidate.parent -ceq $baseline -and $approval.Json.sanity.initial -ceq 'pass' -and $approval.Json.sanity.final -ceq 'pass' -and $approval.Json.verifiedCandidate.supplied -and $approval.Json.verifiedCandidate.matched) 'approval preparation success projects exact identities and pass states'
+	Assert-ExactProperties $approval.Json.historyContract @('receipt','digest','generatorDigest','captureDigest','runtimeDigest','patchDigest','mode','patch','coverage') 'approval preparation history contract'
+	Assert-True ($approval.Json.schemaVersion -ceq 'broken-engine-finalize-approval-preparation/v3' -and $approval.Json.candidate.commit -ceq $run.Json.candidate.commit -and $approval.Json.candidate.tree -ceq $run.Json.candidate.tree -and $approval.Json.candidate.parent -ceq $baseline -and $approval.Json.sanity.initial -ceq 'pass' -and $approval.Json.sanity.final -ceq 'pass' -and $approval.Json.verifiedCandidate.supplied -and $approval.Json.verifiedCandidate.matched -and $approval.Json.historyContract.receipt.schemaVersion -ceq 'broken-engine-code-quality-history-contract/v1') 'approval preparation success projects exact identities and pass states'
 	Assert-True ($approval.Json.PSObject.Properties.Name -cnotcontains 'tips' -and $approval.Json.PSObject.Properties.Name -cnotcontains 'identities') 'approval preparation hides raw identities'
 	# The message override has to rebuild even this single-commit range, so the range is
 	# restored afterwards for the landing scenarios that follow.
@@ -654,6 +701,10 @@ if ($null -ne $run.Json) {
 	}
 	Invoke-ScratchGit $session @('reset','--hard',$run.Json.candidate.commit) | Out-Null
 	$landingParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$run.Json.candidate.commit; ExpectedPrimaryTip=$baseline; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$run.Json.candidate.commit; ApprovedCandidateTree=$run.Json.candidate.tree }
+	[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT', 'update-row-unknown')
+	$malformedUpdate = Invoke-JsonScriptWithSplat $landingScript $landingParameters $scratchBase
+	Assert-Outcome $malformedUpdate 'landing-rejects-malformed-nested-update-receipt' 2 'blocked' 'history.update-invalid'
+	[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT', $previousHistoryReceiptMode)
 	$landingInvalidIdentityParameters = [ordered]@{}
 	foreach ($parameter in $landingParameters.GetEnumerator()) { $landingInvalidIdentityParameters[$parameter.Key] = $parameter.Value }
 	$landingInvalidIdentityParameters.ApprovedSessionCommit = 'f' * 1500
@@ -663,7 +714,7 @@ if ($null -ne $run.Json) {
 	$landingParameters.FixtureFailure = 'bounded-diagnostic'
 	$landingBoundedFailure = Invoke-JsonScriptWithSplat $landingScript $landingParameters $scratchBase
 	Assert-True ($landingBoundedFailure.ExitCode -eq 1 -and $landingBoundedFailure.Json.status -ceq 'error') 'landing bounded failure emits error'
-	Assert-ExactProperties $landingBoundedFailure.Json @('schemaVersion','status','code','message','messageLength','messageTruncated','primaryAdvanced','candidate','landed','planClaim','lock','cleanup','disposition','requiresUserAuthority','retryAfterMilliseconds','diagnostics','residuals') 'landing failure'
+	Assert-ExactProperties $landingBoundedFailure.Json @('schemaVersion','status','code','message','messageLength','messageTruncated','primaryAdvanced','candidate','landed','approvedSource','rebasedSource','historyContract','historyUpdate','final','planClaim','lock','cleanup','disposition','requiresUserAuthority','retryAfterMilliseconds','diagnostics','residuals') 'landing failure'
 	Assert-ExactProperties $landingBoundedFailure.Json.diagnostics @('totalCount','items','truncated','selector','requery') 'landing failure diagnostics'
 	Assert-ExactProperties $landingBoundedFailure.Json.diagnostics.items[0] @('source','code','codeLength','codeTruncated','path','pathLength','pathTruncated','message','messageLength','messageTruncated') 'landing failure diagnostic item'
 	Assert-True ($landingBoundedFailure.Json.code.Length -eq 128 -and $landingBoundedFailure.Json.message.Length -eq 512 -and $landingBoundedFailure.Json.messageLength -eq 600 -and $landingBoundedFailure.Json.messageTruncated) 'landing failure top-level text is bounded'
@@ -686,26 +737,54 @@ if ($null -ne $run.Json) {
 	$landingParameters.FixtureFailure = 'none'
 	$landing = Invoke-JsonScriptWithSplat $landingScript $landingParameters $scratchBase
 	Assert-Outcome $landing 'exact-candidate-landing-success' 0 'landed' 'ok'
-	Assert-ExactProperties $landing.Json @('schemaVersion','status','code','message','messageLength','messageTruncated','primaryAdvanced','candidate','landed','planClaim','lock','cleanup','disposition','requiresUserAuthority','retryAfterMilliseconds','diagnostics','residuals') 'landing success'
+	Assert-ExactProperties $landing.Json @('schemaVersion','status','code','message','messageLength','messageTruncated','primaryAdvanced','candidate','landed','approvedSource','rebasedSource','historyContract','historyUpdate','final','planClaim','lock','cleanup','disposition','requiresUserAuthority','retryAfterMilliseconds','diagnostics','residuals') 'landing success'
 	Assert-ExactProperties $landing.Json.candidate @('commit','tree','treeVerified') 'landing candidate'
 	Assert-ExactProperties $landing.Json.landed @('commit','tree','rebaseAttempts') 'landing landed'
+	Assert-ExactProperties $landing.Json.approvedSource @('commit','tree','parent','patch','metadata') 'landing approved source'
+	Assert-ExactProperties $landing.Json.rebasedSource @('commit','tree','parent','patch') 'landing rebased source'
+	Assert-ExactProperties $landing.Json.final @('commit','tree','parent','replacement') 'landing final'
 	Assert-ExactProperties $landing.Json.planClaim @('requested','released') 'landing Plan claim'
 	Assert-ExactProperties $landing.Json.lock @('claimed','released','claimCode','disposition','requiresUserAuthority','retryAfterMilliseconds','attempts') 'landing lock'
 	Assert-ExactProperties $landing.Json.cleanup @('worktreesClear','problems') 'landing cleanup'
 	Assert-ExactProperties $landing.Json.cleanup.problems @('totalCount','items','truncated','selector','requery') 'landing cleanup problems'
 	Assert-ExactProperties $landing.Json.residuals @('totalCount','items','truncated','selector','requery') 'landing residuals'
-	Assert-True ($landing.Json.schemaVersion -ceq 'broken-engine-finalize-landing/v3' -and $landing.Json.candidate.commit -ceq $run.Json.candidate.commit -and $landing.Json.candidate.tree -ceq $run.Json.candidate.tree -and $landing.Json.candidate.treeVerified -and $landing.Json.lock.claimed -and $landing.Json.lock.released -and $landing.Json.cleanup.worktreesClear) 'landing success projects exact candidate, lock, and cleanup proof'
-	Assert-True ($landing.Json.landed.commit -ceq $run.Json.candidate.commit -and $landing.Json.landed.tree -ceq $run.Json.candidate.tree -and $landing.Json.landed.rebaseAttempts -eq 0) 'a mint-fresh landing lands the confirmed candidate with no rebase'
+	Assert-True ($landing.Json.schemaVersion -ceq 'broken-engine-finalize-landing/v4' -and $landing.Json.candidate.commit -ceq $run.Json.candidate.commit -and $landing.Json.candidate.tree -ceq $run.Json.candidate.tree -and $landing.Json.candidate.treeVerified -and $landing.Json.final.replacement -and $landing.Json.historyUpdate.status -ceq 'pass' -and $landing.Json.lock.claimed -and $landing.Json.lock.released -and $landing.Json.cleanup.worktreesClear) 'landing success projects exact candidate, lock, history, and cleanup proof'
+	Assert-True ($landing.Json.landed.commit -ne $run.Json.candidate.commit -and $landing.Json.landed.commit -ceq $landing.Json.final.commit -and $landing.Json.landed.tree -ceq $landing.Json.final.tree -and $landing.Json.landed.rebaseAttempts -eq 0) 'a mint-fresh landing lands the deterministic history replacement with no rebase'
 	Assert-True (-not $landing.Json.planClaim.requested -and -not $landing.Json.planClaim.released) 'a claim-free landing touches no Plan claim'
 	Assert-True ($landing.Json.PSObject.Properties.Name -cnotcontains 'identities' -and $landing.Json.PSObject.Properties.Name -cnotcontains 'tips' -and $landing.Json.PSObject.Properties.Name -cnotcontains 'locks' -and $landing.Json.PSObject.Properties.Name -cnotcontains 'blocker') 'landing hides checkout, lock-owner, and raw blocker objects'
-	Assert-True ($landing.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $run.Json.candidate.commit) 'landing primary ref equals the reviewed candidate commit exactly'
-	$landingParameters.ExpectedPrimaryTip = $run.Json.candidate.commit
+	Assert-True ($landing.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $landing.Json.final.commit) 'landing primary ref equals the deterministic final commit exactly'
+	$landingPublicText = $landing.Text
+	Assert-True ($landingPublicText -notmatch 'tempPath|FinalizeHistory-|[A-Za-z]:\\|(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])') 'landing v4 result exposes no absolute or volatile Temp identity'
+	# Recovery keeps the original approved primary ancestor; the replacement commit's parent is
+	# that source candidate's original parent, not the source candidate itself.
+	$landingParameters.ExpectedPrimaryTip = $baseline
 	$recoveryOwner = [guid]::NewGuid().ToString()
 	Invoke-WorktreeCli @('lock', 'claim', '--repo', $commonDirectory, '--owner', $recoveryOwner, '--session', 'finalize-fixture/landing', '--worktree', $session, '--lease-seconds', '3600') | Out-Null
 	$recovery = Invoke-JsonScriptWithSplat $landingScript $landingParameters $scratchBase
 	Assert-Outcome $recovery 'exact-candidate-post-advance-recovery' 0 'landed' 'ok'
 	if ($null -ne $recovery.Json) {
 		Assert-True ($recovery.Json.lock.claimed -and $recovery.Json.lock.released) 'omitted-token recovery adopts and releases the matching retained claim'
+	}
+	# Deterministic crash equivalent: leave primary's ref advanced while its checkout still points at
+	# the old tree, then let recovery acquire/adopt the lease, reset primary, and finish normally.
+	$crashTip = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+	Invoke-ScratchGit $session @('reset','--hard',$crashTip) | Out-Null
+	Invoke-ScratchGit $session @('clean','-fd') | Out-Null
+	[IO.File]::WriteAllText((Join-Path $session 'crash-after-ref.txt'), 'crash after ref update', [Text.UTF8Encoding]::new($false))
+	$crashCandidate = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$crashTip,'-ExpectedCurrentTip',$crashTip,'-ExpectedPrimaryTip',$crashTip,'-OwnedPaths','crash-after-ref.txt','-CommitMessageFile',$candidateMessage)
+	Assert-Outcome $crashCandidate 'crash-after-ref-candidate' 0 'pass' 'candidate.created'
+	if ($null -ne $crashCandidate.Json) {
+		$crashParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$crashCandidate.Json.candidate.commit; ExpectedPrimaryTip=$crashTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$crashCandidate.Json.candidate.commit; ApprovedCandidateTree=$crashCandidate.Json.candidate.tree; FixtureFailure='post-update-ref' }
+		$crash = Invoke-JsonScriptWithSplat $landingScript $crashParameters $scratchBase
+		Assert-Outcome $crash 'crash-after-ref-update' 1 'error' 'fixture.crash-after-update-ref'
+		$crashPrimaryRef = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim(); $crashPrimaryHead = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+		Assert-True ($crashPrimaryRef -cne $crashTip) "crash equivalent advances the primary ref (ref=$crashPrimaryRef old=$crashTip)"
+		$crashPrimaryStatus = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+		Assert-True ($crashPrimaryStatus.Length -gt 0) "crash equivalent leaves the primary checkout/index behind its ref (head=$crashPrimaryHead ref=$crashPrimaryRef)"
+		$crashParameters.FixtureFailure = 'none'
+		$crashRecovery = Invoke-JsonScriptWithSplat $landingScript $crashParameters $scratchBase
+		Assert-Outcome $crashRecovery 'crash-after-ref-recovery' 0 'landed' 'ok'
+		if ($null -ne $crashRecovery.Json) { Assert-True ($crashRecovery.Json.lock.released -and $crashRecovery.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $crashRecovery.Json.final.commit) 'crash recovery resets and verifies primary before releasing the lease' }
 	}
 }
 
@@ -757,8 +836,8 @@ $continuity = Invoke-JsonScriptWithSplat $landingScript $continuityParameters $s
 Assert-Outcome $continuity 'landing-continues-caller-lease' 0 'landed' 'ok'
 if ($null -ne $continuity.Json) {
 	Assert-True ($continuity.Json.lock.claimed -and $continuity.Json.lock.claimCode -ceq 'ok' -and $continuity.Json.lock.attempts -eq 1 -and $continuity.Json.lock.released) 'landing continues under the caller lease without a fresh claim round'
-	Assert-True ($continuity.Json.landed.commit -ceq $continuityCandidate.Commit -and $continuity.Json.landed.rebaseAttempts -eq 0) 'a continued lease lands the confirmed candidate with no rebase'
-	Assert-True ($continuity.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $continuityCandidate.Commit) 'a continued lease advances primary to the confirmed candidate'
+	Assert-True ($continuity.Json.landed.commit -ceq $continuity.Json.final.commit -and $continuity.Json.final.replacement -and $continuity.Json.landed.rebaseAttempts -eq 0) 'a continued lease lands the deterministic replacement with no rebase'
+	Assert-True ($continuity.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $continuity.Json.final.commit) 'a continued lease advances primary to the deterministic final commit'
 }
 
 # A continued lease must be able to outlast the advance, and WorktreeCli's refresh keeps a lease's
@@ -839,7 +918,7 @@ $omitted = Invoke-JsonScriptWithSplat $landingScript (New-RetryLandingParameters
 Assert-Outcome $omitted 'landing-adopts-omitted-token-retained-claim' 0 'landed' 'ok'
 if ($null -ne $omitted.Json) {
 	Assert-True ($omitted.Json.lock.claimed -and $omitted.Json.lock.claimCode -ceq 'ok' -and $omitted.Json.lock.released) 'omitted-token landing adopts and releases the derived retained claim'
-	Assert-True ($omitted.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse', 'HEAD')))[0].Trim()) -ceq $omittedCandidate.Commit) 'omitted-token adoption lands the confirmed candidate'
+	Assert-True ($omitted.Json.primaryAdvanced -and $omitted.Json.final.replacement -and ((@(Invoke-ScratchGit $primary @('rev-parse', 'HEAD')))[0].Trim()) -ceq $omitted.Json.final.commit) 'omitted-token adoption lands the deterministic final commit'
 }
 
 # A matching retained lease whose full 3600-second duration is almost spent must be refreshed
@@ -915,7 +994,7 @@ $rebasedRecoveryTip = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].T
 $rebasedRecovery = Invoke-JsonScriptWithSplat $landingScript (New-RetryLandingParameters $identicalCandidate) $scratchBase
 Assert-Outcome $rebasedRecovery 'landing-recovers-internally-rebased-advance' 0 'landed' 'ok'
 if ($null -ne $rebasedRecovery.Json) {
-	Assert-True ($rebasedRecovery.Json.landed.commit -ceq $rebasedRecoveryTip -and $rebasedRecovery.Json.landed.rebaseAttempts -eq 1 -and $rebasedRecovery.Json.candidate.treeVerified) 'rebased-advance recovery reports the rebased primary tip as landed with its one rebase'
+	Assert-True ($rebasedRecovery.Json.landed.commit -ceq $rebasedRecoveryTip -and $rebasedRecovery.Json.candidate.treeVerified) 'rebased-advance recovery reports the deterministic replacement as landed'
 	Assert-True ($rebasedRecovery.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $rebasedRecoveryTip) 'rebased-advance recovery leaves primary unchanged'
 }
 
@@ -1012,7 +1091,7 @@ try {
 	while ([DateTime]::UtcNow -lt $transientDeadline -and -not $transientStarted.Process.WaitForExit(0) -and -not (Test-LandingSessionRegistered $transientStarted.Process.Id)) {
 		Start-Sleep -Milliseconds 25
 	}
-	Start-Sleep -Seconds 1
+	Start-Sleep -Seconds 2
 	Remove-Item -LiteralPath $transientDirtyPath -Force -ErrorAction SilentlyContinue
 	if ($transientStarted.Process.WaitForExit(120000)) { $transientExitCode = $transientStarted.Process.ExitCode }
 	$transientStdout = $transientStarted.StdoutTask.GetAwaiter().GetResult()
@@ -1026,7 +1105,7 @@ $transient = [pscustomobject]@{ ExitCode = $transientExitCode; Json = $transient
 Assert-Outcome $transient 'landing-proceeds-after-transient-primary-dirty' 0 'landed' 'ok'
 Assert-True ((Measure-PrimaryDirtyRetry $transientStderr) -ge 1) 'a transient dirty primary is diagnosed and re-read instead of blocking'
 if ($null -ne $transient.Json) {
-	Assert-True ($transient.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $transientCandidate.Commit) 'the retried landing advances primary to the confirmed candidate'
+	Assert-True ($transient.Json.primaryAdvanced -and $transient.Json.final.replacement -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $transient.Json.final.commit) 'the retried landing advances primary to the deterministic final commit'
 }
 
 $persistentCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'persistent dirty tail') 'persistent-primary-dirty'
@@ -1058,7 +1137,7 @@ $transientLockStderr = ''
 try {
 	$transientLockDeadline = [DateTime]::UtcNow.AddSeconds(120)
 	while ([DateTime]::UtcNow -lt $transientLockDeadline -and -not $transientLockStarted.Process.WaitForExit(0) -and
-		((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -cne $transientLockCandidate.Commit) {
+		((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -ceq $transientLockCandidate.PrimaryTip) {
 		Start-Sleep -Milliseconds 25
 	}
 	Start-Sleep -Milliseconds 1200
@@ -1074,7 +1153,7 @@ try { if (-not [string]::IsNullOrWhiteSpace($transientLockStdout)) { $transientL
 $transientLock = [pscustomobject]@{ ExitCode = $transientLockExitCode; Json = $transientLockJson; Text = $transientLockStdout.Trim(); Stderr = $transientLockStderr }
 Assert-Outcome $transientLock 'landing-waits-out-transient-primary-index-lock' 0 'landed' 'ok'
 if ($null -ne $transientLock.Json) {
-	Assert-True ($transientLock.Json.landed.commit -ceq $transientLockCandidate.Commit -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $transientLockCandidate.Commit) 'a waited-out index lock still lands the confirmed candidate on primary'
+	Assert-True ($transientLock.Json.landed.commit -ceq $transientLock.Json.final.commit -and $transientLock.Json.final.replacement -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $transientLock.Json.final.commit) 'a waited-out index lock still lands the deterministic final commit on primary'
 	Assert-True ((Get-IndexLockWaitDiagnosticCount $transientLock.Json) -eq 1 -and $transientLock.Json.diagnostics.totalCount -eq 1) 'a landed run that waited reports exactly one index-lock-wait diagnostic'
 }
 

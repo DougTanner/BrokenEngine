@@ -25,7 +25,7 @@ shell call.
 
 Read the focused references only when applicable:
 
-- Read the command reference (`references/command-reference.md`) for the four engine-shared command schemas (`ping`, `quit`, `get_logs`, `set_log_level`) and the `params`/`result` placement convention; the request/response envelope itself is defined in the Invoke commands section below. The selected project's `Projects/<Project>/Documents/AgentHarness.md` owns every game command schema, verification recipe, and game caveat.
+- Read the command reference (`references/command-reference.md`) for the five engine-shared command schemas (`ping`, `quit`, `get_logs`, `set_log_level`, `crash_report_fixture`) and the `params`/`result` placement convention; the request/response envelope itself is defined in the Invoke commands section below. The selected project's `Projects/<Project>/Documents/AgentHarness.md` owns every game command schema, verification recipe, and game caveat.
 - Read the private-LAN firewall reference (`references/private-lan-firewall.md`) only for an explicitly requested cross-machine or private-Wi-Fi scenario. Ordinary same-machine runs stay loopback-only and never inspect or change firewall state.
 - Read the RenderDoc capture reference (`references/renderdoc.md`) only for a GPU frame-capture or capture-analysis scenario; it owns the `--renderdoc` launch, `renderdoc_capture`, and the headless `rdc_*` analysis scripts.
 

@@ -5,7 +5,7 @@ description: >-
   Codex/Sol headless. Codex callers stop because they are already the Sol
   mapping (see the root AGENTS.md role table). Use for every Change Workflow review dispatch in Claude Code
   except the child reviewer a parent/manager orchestrator (such as /next-plan-review) dispatches itself.
-allowed-tools: [Read, Bash]
+allowed-tools: [Read, Bash, Agent]
 ---
 
 # Codex Review
@@ -49,24 +49,8 @@ resolves to Sol.
    wrote. From the session worktree root:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole] [-PreflightTargets | -ReuseTargets]
+   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole]
    ```
-
-   `/repo-code-review` has an ordered path that only handles the targets file
-   for the host-side metrics run. Add `-PreflightTargets` to this invocation
-   to perform the ordinary repository, inventory, revision, untracked-path,
-   scope-file, and sibling-path checks while bypassing only the metrics-digest
-   requirement. It creates no prompt and writes the exact canonical targets
-   file to `<PromptPath>.targets.json`; give the receipt's `targetsPath` to
-   Compare. Add that digest, together with the baseline and head identities it
-   used, to the scope file, then invoke the script again with the same prompt
-   path and `-ReuseTargets`. Reuse requires that sibling, regenerates the
-   canonical targets file contents in memory, compares the captured file bytes
-   exactly, and embeds those captured bytes. The caller owns the targets file
-   from a successful preflight; reuse never rewrites or deletes it, including
-   if prompt assembly later fails. The two switches are mutually exclusive,
-   valid only for `repo-code-review`, and there is no parameter for the
-   targets file path.
 
    Write the judgment content yourself into `-ScopeFile`: the exact scope, the
    files and regions authorized for review, focus notes, and current residuals.
@@ -78,10 +62,7 @@ resolves to Sol.
    evaluation of that result to the reviewer alone. Include the assigned
    skill's own required evidence in that
    same file before dispatching: `plan-audit`'s draft execution card
-   (`../plan-audit/SKILL.md`), the host-run `code-quality-metrics` Compare digest
-   for `repo-code-review` alongside the baseline and head identity values it ran
-   against, as `../repo-code-review/references/metrics-protocol.md` requires
-   (`../code-quality-metrics/SKILL.md`), and, for
+   (`../plan-audit/SKILL.md`) and, for
    `verify-changes`, the reviewed change set's baseline and head SHAs plus each
    typed artifact its `## Required inputs` conditions name
    (`../verify-changes/SKILL.md`). The script blocks the dispatch when a SHA or
@@ -99,16 +80,11 @@ resolves to Sol.
    instead — untracked and outside any ignored directory — and name each one in
    `-UntrackedPath`; remove them once the review no longer needs them, because
    any such file left behind stays a mandatory `-UntrackedPath` member.
-   Ordinary assembly still requires the metrics digest;
-   only `-PreflightTargets` bypasses that guard.
 2. Read the receipt, one compact JSON object on stdout. Exit `0` carries
    `promptPath`, `promptBytes`, `fileCount`, `binaryExcluded`,
-   `sectionsWritten`, and `targetsPath`. For ordinary `repo-code-review`,
+   `sectionsWritten`, and `targetsPath`. For `repo-code-review`,
    `targetsPath` is the newly created targets file next to the prompt and that
-   file is embedded in the evidence. A successful preflight reports
-   `promptPath: null`, its sibling `targetsPath`, and zero `promptBytes` and
-   `sectionsWritten`; a successful reuse reports the caller-owned targets file
-   and embeds its matching bytes. Other assigned skills report `targetsPath: null`.
+   file is embedded in the evidence. Other assigned skills report `targetsPath: null`.
    Exit `2` is blocked and its `code` names the fix:
    `prompt.path-exists` — choose an unused prompt path, the existing file is left
    untouched; `prompt.diff-too-large` — the evidence passed the 4 MB budget, so
@@ -122,60 +98,46 @@ resolves to Sol.
    `prompt.head-required` — `verify-changes` needs a commit-valued `-Head` whose
    reviewed paths' working-tree bytes match that commit's tree;
    `prompt.execution-card-required` — a `plan-audit` scope carries no
-   `execution card` marker; `prompt.metrics-digest-required` — a
-   `repo-code-review` scope carries no `broken-engine-code-quality-evidence/v2`
-   digest; `prompt.targets-mode-invalid` — the target switches are both
-   supplied or a target switch is used with another assigned skill;
-   `prompt.targets-missing` — reuse has no sibling targets file;
-   `prompt.targets-mismatch` — the sibling bytes differ from the regenerated
-   canonical targets file contents; `prompt.typed-artifacts-required` — a `verify-changes` scope is
+   `execution card` marker; `prompt.typed-artifacts-required` — a `verify-changes` scope is
    missing the baseline or head SHA, or a typed artifact the reviewed diff
-   triggers, and the message names each one. Target-mode blockers leave the
-   prompt absent; reuse blockers preserve the caller-owned targets file bytes. Exit `1` is a
+   triggers, and the message names each one. Exit `1` is a
    script error: stop and report its `code` and `message` rather than
    hand-assembling a prompt.
-3. Launch and poll — two separate bare script calls, because no call ever waits
-   for Codex; neither is wrapped in a loop or chained with another command.
-   Launch with `pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree
-   <worktree> -PromptFile <the receipt's promptPath> -OutFile <out>`, passing a
-   repo-relative `<out>` such as `Temp/<name>-out.md`. The launch tolerates an
-   existing out-file, and stale bytes would fire every bounded watch
-   immediately, so `<out>` must be a fresh path that does not yet exist. The
-   call returns in seconds with a single-line JSON launch receipt whose `runId`
-   is what `-Poll` needs. Between polls, wait with the host's own wait
-   mechanism by watching the same repo-relative `<out>` path the launch was
-   given, from the session worktree root, under a bounded deadline — for example
-   `deadline=$((SECONDS+540)); until [ -s "Temp/<name>-out.md" ] || [ $SECONDS
-   -ge $deadline ]; do sleep 5; done`. Watch that caller-supplied path rather
-   than the receipt's absolute `outFile`, which a POSIX shell cannot resolve.
-   The loop never invokes the bundled script, so it wraps nothing — the script
-   is still only ever run as its own bare call. Each wake — the watch firing or
-   its deadline passing — gets exactly one confirming `pwsh -NoProfile -File
-   .codex/codex-review.ps1 -Poll <runId>` as its own call, which also returns
-   immediately. `completed` or `failed` ends the wait. The out-file's presence
-   is the completion signal, and it can appear moments before the run's
-   completion record, so a confirming poll that reports `running` right after
-   the file appeared may be followed by one immediate race-closing re-poll,
-   which closes a milliseconds-wide publish window rather than standing in for
-   an open-ended wait. While `<out>` is present and the status is still
-   `running`, keep issuing single confirming `-Poll` calls until `completed`:
-   the run has already finished and only its completion record is mid-publish,
-   so this brief repetition is completion signaling, not polling as the wait
-   mechanism. Resume the bounded watch with a fresh deadline only when the
-   deadline passed and `<out>` is still absent; polling is never the wait
-   mechanism for a run whose out-file has not yet appeared. A failed run never
-   produces the out-file, so a watch that reaches its deadline is the
-   failure-signal path: the confirming poll then reports `failed`, or reports
-   `running` and watching resumes. Every script call is bounded far below the host's 10-minute command
-   cap, so a long review is never killed and never needs a background run or a
-   truncated scope. Only a `completed` status guarantees `<out>` is fully
-   written, so never read `<out>` before a poll reports `completed`.
-4. After a `completed` status, read `<out>`; success requires a non-empty
-   structured result — a skill-native status line or a verdict token, either
-   vocabulary counts. Benign CLI
-   notices/deprecations are not failures. Return the handoff plus the `<out>`
-   path; the output file is the retained full critique — do not paste
-   extra narration beyond the concise handoff into the session.
+3. Run the review with one bare blocking script call, issued with a call timeout
+   of at least `600000` ms and never wrapped in a loop or chained with another
+   command:
+
+   ```powershell
+   pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <the receipt's promptPath> -OutFile <out>
+   ```
+
+   Pass a repo-relative `<out>` such as `Temp/<name>-out.md`; the launch
+   tolerates an existing out-file, so `<out>` must be a fresh path that does not
+   yet exist. The call starts Codex detached and waits up to 540 seconds for it,
+   then returns a single-line JSON receipt. A `completed` receipt is followed by
+   the separator line `--- findings ---` and then the findings themselves, all on
+   that same call's stdout, so the success path never reads `<out>`; that file
+   remains the retained full critique on disk. Validate the inline result:
+   success requires a non-empty structured result — a skill-native status line or
+   a verdict token, either vocabulary counts. Benign CLI notices/deprecations are
+   not failures. Return the handoff plus the `<out>` path, and do not paste extra
+   narration beyond the concise handoff into the session.
+
+   A review that outruns the budget comes back as a `running` receipt naming its
+   `runId`. Resume it with exactly one further bare call per wake, also issued
+   with a call timeout of at least `600000` ms and never in a loop:
+
+   ```powershell
+   pwsh -NoProfile -File .codex/codex-review.ps1 -Wait <runId>
+   ```
+
+   That call waits the same bounded budget and answers in the same shapes, so a
+   `completed` answer carries the separator and the findings inline exactly as
+   above. `completed` or `failed` ends the wait. Because the run is detached, a
+   call killed by its host timeout never kills the review and the same `runId`
+   always resumes it, and every call stays bounded below the host's 10-minute
+   command cap, so a long review never needs a background run or a truncated
+   scope.
 
 ## Manager evaluation
 
@@ -190,9 +152,9 @@ those steps, and even then present the cost to the user before implementing.
 
 ## Fallback
 
-Genuine failure means a `failed` poll status, a non-zero script exit, or
+Genuine failure means a `failed` wait status, a non-zero script exit, or
 malformed output. Duration alone is never a `CODEX-UNAVAILABLE` cause: a run
-that stays `running` across many polls is progressing normally, so keep polling.
+that stays `running` across many waits is progressing normally, so keep waiting.
 On a genuine failure, stop and report `CODEX-UNAVAILABLE: <short reason>` with
 the unchanged target. This is a
 blocking failure: never dispatch a substitute reviewer automatically. Only
