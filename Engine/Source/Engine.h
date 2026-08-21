@@ -6,6 +6,7 @@
 // Frame
 #include "Frame/AreaDamage.h"
 #include "Frame/Collision.h"
+#include "Frame/FrameRegistry.h"
 #include "Frame/TimeStep.h"
 
 // File

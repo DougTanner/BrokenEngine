@@ -373,6 +373,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameStaticData.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.h" />
@@ -470,7 +471,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Frame\Collections\Blasters\Blasters.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Missiles\Missiles.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.h" />
-    <ClInclude Include="..\..\Source\Frame\Collections\Targets\Targets.h" />
     <ClInclude Include="..\..\Source\Frame\Frame.h" />
     <ClInclude Include="..\..\Source\Frame\FrameInput.h" />
     <ClInclude Include="..\..\Source\Frame\TerrainUtils.h" />
@@ -572,6 +572,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collision.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameStaticData.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.cpp" />
@@ -710,8 +711,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsCombat.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsNavigation.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsRender.cpp" />
-    <ClCompile Include="..\..\Source\Frame\Collections\Targets\Targets.cpp" />
-    <ClCompile Include="..\..\Source\Frame\Collections\Targets\TargetsUpdate.cpp" />
     <ClCompile Include="..\..\Source\Frame\Frame.cpp" />
     <ClCompile Include="..\..\Source\Frame\FrameInput.cpp" />
     <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp" />

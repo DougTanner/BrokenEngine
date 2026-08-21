@@ -383,6 +383,11 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame)
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 	float fDeltaTime = rFrame.interpolate.fDeltaTime;
 
+	// Built once for the whole spawn loop, after Update, Transfer, and Destroy have settled this tick's spaceship
+	// rows and every current missile handle. Missiles spawned below may grow their collection, which the context
+	// tolerates because its subscription binding was already consumed.
+	RegistryWindow window = Frame::PlayerSpawnWindow(rFrame);
+
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		// Always decrement timer so releasing and re-pressing fires immediately after cooldown
@@ -432,13 +437,29 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame)
 		XMVECTOR vecMissilePosition = XMVectorAdd(vecSpawnPosition, XMVectorScale(vecJitteredDirection, kfMissileSpawnPreMove));
 		XMVECTOR vecMissileVelocity = XMVectorScale(vecJitteredDirection, kfMissileInitialVelocity);
 
+		// One-entry batch for the missile about to spawn: consumer row 0 views this player's spawn position, aim,
+		// and alignment. The result is only needed as the spawned handle, which homes from the next tick on.
+		engine::registry_id_t uiRegistryTarget {};
+		int64_t iAcquireRow = 0;
+		engine::RegistryResult acquireResult {};
+		engine::AcquireRegistryTargets(window.context,
+		{
+			.puiTargets = &uiRegistryTarget,
+			.pVecOrigins = &vecMissilePosition,
+			.pVecDirections = &vecAimDirection,
+			.pAlignments = &rCurrentPostRender.pAlignments[i],
+			.rows = std::span<const int64_t>(&iAcquireRow, 1),
+			.results = std::span<engine::RegistryResult>(&acquireResult, 1),
+			.iSourceCount = 1,
+		}, kfMissileTargetAcquireRange);
+
 		MissilesPostRender::Spawn(rFrame,
 		{
 			.vecPosition = vecMissilePosition,
 			.vecDirection = vecJitteredDirection,
 			.vecVelocity = vecMissileVelocity,
 			.vecStoredDirection = vecAimDirection,
-			.uiTarget = Frame::GetMissileTarget(rFrame, vecMissilePosition, vecAimDirection, rCurrentPostRender.pAlignments[i]),
+			.uiTarget = uiRegistryTarget,
 			.fAcceleration = kfMissileAcceleration,
 			.flags = MissileFlags::kTargetEnemy,
 			.alignment = rCurrentPostRender.pAlignments[i],

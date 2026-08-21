@@ -6,7 +6,6 @@
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
-#include "Frame/Collections/Targets/Targets.h"
 #include "Game.h"
 
 namespace game
@@ -163,7 +162,6 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 	int64_t iSpaceshipTotal = 0;
 	int64_t iMissileTotal = 0;
 	int64_t iBlasterTotal = 0;
-	int64_t iTargetTotal = 0;
 	int64_t iUnitCount = 0;
 	bool bTruncated = false;
 
@@ -200,7 +198,6 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		iSpaceshipTotal += rFrame.postRender.pSpaceships->iCount;
 		iMissileTotal += rFrame.postRender.pMissiles->iCount;
 		iBlasterTotal += rFrame.postRender.pBlasters->iCount;
-		iTargetTotal += rFrame.postRender.pTargets->iCount;
 
 		if (!bIncludeUnits)
 		{
@@ -272,7 +269,6 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		{"spaceships", iSpaceshipTotal},
 		{"missiles", iMissileTotal},
 		{"blasters", iBlasterTotal},
-		{"targets", iTargetTotal},
 	};
 	rResult["islands"] = std::move(islands);
 	rResult["truncated"] = bTruncated;

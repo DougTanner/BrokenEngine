@@ -4,7 +4,6 @@
 #include "Frame/FrameStaticData.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
-#include "Frame/Collections/Targets/Targets.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"
@@ -64,9 +63,8 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, int64_t i, FXMVECTOR vecDa
 	// Store damage direction for knockback
 	rCurrentPostRender.pVecDamageDirections[i] = vecDamageDirection;
 
-	// Remove target so missiles stop tracking
-	TargetsPostRender::Remove(rFrame, rCurrentInterpolate.puiTargets[i], {TargetFlags::kDestination});
-	rCurrentInterpolate.puiTargets[i] = {};
+	// Clear the registry id so missiles stop tracking
+	rCurrentInterpolate.puiRegistryIds[i] = {};
 
 	// Play explosion audio
 #if defined(BT_CLIENT)

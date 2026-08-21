@@ -4,7 +4,6 @@
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 #include "Frame/Collections/Collection.h"
-#include "Frame/Collections/Targets/Targets.h"
 
 
 namespace game
@@ -109,11 +108,15 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	const MissilesPostRender& rPrevious = *rPreviousFrame.postRender.pMissiles;
 	float fDeltaTime = rFrame.interpolate.fDeltaTime;
 
+	// One query window for the whole phase. Spaceships update after Missiles, so the source positions and
+	// eligibility it binds are still this tick's Interpolate state, unchanged by any later phase.
+	RegistryWindow window = Frame::MissileUpdateWindow(rFrame, rPreviousFrame);
+
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		// Load dynamic fields (static fields copied via memcpy in AllocateAndCopy)
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
-		target_t uiTarget = rPrevious.puiTargets[i];
+		engine::registry_id_t uiTarget = rPrevious.puiRegistryTargets[i];
 		float fTime = rPrevious.pfTimes[i] + fDeltaTime;
 		float fDeltaRotation = rPrevious.pfDeltaRotations[i];
 		float fDeltaRotationDelay = rPrevious.pfDeltaRotationDelays[i];
@@ -164,47 +167,30 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			// Generate new random exhaust length every frame
 			fExhaustLength = kfMissileExhaustLength + common::Random<kfMissileExhaustLengthRandom>(rFrame.postRender.randomEngine);
 
-			// Validate existing target: clear uiTarget if its source row or kDestination flag is gone
+			// Validate the retained handle against the rows the registry currently considers eligible; a source
+			// that died, transferred, or is still in arrival grace drops the handle.
+			engine::RegistryResult retained {};
+			bool bRetained = false;
 			if (uiTarget.IsValid())
 			{
-				const TargetsInterpolate& rTargets = *rFrame.interpolate.pTargets;
-				const TargetsPostRender& rTargetsPostRender = *rFrame.postRender.pTargets;
-
-				if (!rTargets.idToIndexMap.contains(uiTarget))
+				bRetained = engine::ResolveRegistryHandle(window.context, uiTarget, retained);
+				if (!bRetained)
 				{
 					uiTarget = {};
 					vecStoredDirection = rCurrentInterpolate.pVecDirections[i];
 				}
-				else
-				{
-					int64_t iTargetIndex = rTargets.IdToIndex(uiTarget);
-
-					if (!(rTargetsPostRender.pFlags[iTargetIndex] & TargetFlags::kDestination))
-					{
-						TargetsPostRender::Remove(rFrame, uiTarget, {});
-						vecStoredDirection = rCurrentInterpolate.pVecDirections[i];
-					}
-				}
 			}
 
-			// Re-acquire every Tick when targetless (alignment-aware Targets scan, same path used at spawn)
-			bool bAcquiredThisTick = false;
-			if (!uiTarget.IsValid())
-			{
-				uiTarget = Frame::GetMissileTarget(rFrame, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], rCurrent.pAlignments[i]);
-				bAcquiredThisTick = uiTarget.IsValid();
-			}
+			// A targetless missile re-acquires every tick, in the post-loop pass, so the handle it produces is
+			// stored but does not steer until the next tick.
 
-			// Home only on a target that was already valid coming into this tick; freshly-acquired targets
-			// engage homing next tick (matches engine's read-previous / write-current pattern)
-			if (uiTarget.IsValid() && !bAcquiredThisTick)
+			// Home only on a target that was already valid coming into this tick, steering toward where that
+			// source stood last tick (matches engine's read-previous / write-current pattern)
+			if (bRetained)
 			{
-				const TargetsInterpolate& rPreviousTargets = *rPreviousFrame.interpolate.pTargets;
-				int64_t iPreviousTargetIndex = rPreviousTargets.IdToIndex(uiTarget);
-
 				fDeltaRotationDelay -= fDeltaTime;
 
-				XMVECTOR vecTargetPosition = rPreviousTargets.pVecPositions[iPreviousTargetIndex];
+				XMVECTOR vecTargetPosition = retained.vecPreviousPosition;
 				XMVECTOR vecToTargetNormal = XMVector3Normalize(XMVectorSubtract(vecTargetPosition, rCurrentInterpolate.pVecPositions[i]));
 				float fDirectionDestinationCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], vecToTargetNormal));
 				float fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? kfDeltaRotationTowardsTarget : -kfDeltaRotationTowardsTarget;
@@ -245,7 +231,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 #endif
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pVecStoredDirections[i] = vecStoredDirection;
-		rCurrent.puiTargets[i] = uiTarget;
+		rCurrent.puiRegistryTargets[i] = uiTarget;
 		rCurrent.pfTimes[i] = fTime;
 		rCurrent.pfDeltaRotationDelays[i] = fDeltaRotationDelay;
 		rCurrent.pfDeltaRotations[i] = fDeltaRotation;
@@ -254,8 +240,55 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && fTime >= kfMissileLifetime)
 		{
+			// The only release site: this is the one missile transition that happens while the window is live.
+			engine::ReleaseRegistryTarget(window.context, rCurrent.puiRegistryTargets[i]);
 			Fall(rFrame, i, fDeltaTime);
 		}
+	}
+
+	// Acquisition runs after the loop so every missile has published this tick's handle and released the
+	// subscription of every missile that expired this tick, and so it runs in ascending missile order. A row that
+	// is still flying and holds no handle is exactly the targetless set the loop decided on. Fixed-size chunks keep
+	// both spans off the workbuffer, which a per-missile span would overrun on a worker thread; each chunk folds its
+	// subscriptions into the shared counts before the next one starts, so chunked ascending order assigns exactly
+	// what one whole-collection batch assigns.
+	constexpr int64_t kiAcquireChunk = 64;
+	int64_t piAcquireRows[kiAcquireChunk] {};
+	engine::RegistryResult pAcquireResults[kiAcquireChunk] {};
+	int64_t iAcquireCount = 0;
+
+	auto AcquireChunk = [&]()
+	{
+		engine::AcquireRegistryTargets(window.context,
+		{
+			.puiTargets = rCurrent.puiRegistryTargets,
+			.pVecOrigins = rCurrentInterpolate.pVecPositions,
+			.pVecDirections = rCurrentInterpolate.pVecDirections,
+			.pAlignments = rCurrent.pAlignments,
+			.rows = std::span<const int64_t>(piAcquireRows, static_cast<size_t>(iAcquireCount)),
+			.results = std::span<engine::RegistryResult>(pAcquireResults, static_cast<size_t>(iAcquireCount)),
+			.iSourceCount = rCurrent.iCount,
+		}, kfMissileTargetAcquireRange);
+		iAcquireCount = 0;
+	};
+
+	for (int64_t i = 0; i < rCurrent.iCount; ++i)
+	{
+		if ((rCurrent.pFlags[i] & kExploding) || (rCurrent.pFlags[i] & kFalling) || rCurrent.pfTimes[i] >= kfMissileLifetime || rCurrent.puiRegistryTargets[i].IsValid())
+		{
+			continue;
+		}
+
+		piAcquireRows[iAcquireCount++] = i;
+		if (iAcquireCount == kiAcquireChunk)
+		{
+			AcquireChunk();
+		}
+	}
+
+	if (iAcquireCount > 0)
+	{
+		AcquireChunk();
 	}
 }
 

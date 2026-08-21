@@ -2,6 +2,8 @@
 
 #include "Frame/FrameBase.h"
 #include "Frame/FrameInput.h"
+// Direct include, not the Engine.h aggregation: the game PCH pulls this header in ahead of Engine.h.
+#include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #include "Frame/NavBuild.h"
 #include "Frame/TimeStep.h"
@@ -18,11 +20,8 @@ struct MissilesInterpolate;
 struct MissilesPostRender;
 struct SpaceshipsInterpolate;
 struct SpaceshipsPostRender;
-struct TargetsInterpolate;
-struct TargetsPostRender;
 
 using player_t = engine::id_t<PlayersInterpolate>;
-using target_t = engine::id_t<TargetsInterpolate>;
 
 enum class GameFlags : uint64_t
 {
@@ -69,7 +68,6 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	std::unique_ptr<BlastersInterpolate> pBlasters;
 	std::unique_ptr<MissilesInterpolate> pMissiles;
 	std::unique_ptr<SpaceshipsInterpolate> pSpaceships;
-	std::unique_ptr<TargetsInterpolate> pTargets;
 
 	static common::crc_t Crcs(const FrameInterpolate& rCurrent);
 	bool LogDifferences(const FrameInterpolate& rOther) const;
@@ -114,7 +112,6 @@ struct FramePostRender : public engine::FramePostRenderBase
 	std::unique_ptr<BlastersPostRender> pBlasters;
 	std::unique_ptr<MissilesPostRender> pMissiles;
 	std::unique_ptr<SpaceshipsPostRender> pSpaceships;
-	std::unique_ptr<TargetsPostRender> pTargets;
 
 	// Transient transfer output buffer (not serialized, not in CRC/equality)
 	std::vector<TransferRequest> transferRequests;
@@ -131,6 +128,17 @@ struct FramePostRender : public engine::FramePostRenderBase
 [[nodiscard]] bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest);
 void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rRequest);
 
+// One registry query window: the context plus the workbuffer reservations its spans point into. The owner keeps
+// the whole object alive for the window; the reservations pop in reverse creation order when it dies, so nothing
+// the context spans can outlive the handle that owns it.
+struct RegistryWindow
+{
+	engine::RegistryQueryContext context {};
+	common::ScopedWorkbufferAllocation<int64_t*> ascendingRows;
+	common::ScopedWorkbufferAllocation<std::byte*> scratch;
+	common::ScopedWorkbufferAllocation<engine::RegistrySourceLayer*> layers;
+};
+
 struct Frame
 {
 	Frame();
@@ -140,7 +148,18 @@ struct Frame
 
 	static const int64_t kiVersion;
 
-	[[nodiscard]] static target_t XM_CALLCONV GetMissileTarget(Frame& __restrict rFrame, FXMVECTOR vecPosition, FXMVECTOR vecDirection, engine::alignment_t alignment);
+	// Missile homing window, built before Spaceships Update: source positions and eligibility are this tick's
+	// Interpolate state, and the subscriber counts come from the previous frame's Missile handles because the
+	// current ones are still being written during Update.
+	[[nodiscard]] static RegistryWindow MissileUpdateWindow(const Frame& rFrame, const Frame& rPreviousFrame);
+
+	// Player missile-spawn window, rebuilt after Update, Transfer, and Destroy over current spaceship lifecycle
+	// state and the fully initialized current Missile handles.
+	[[nodiscard]] static RegistryWindow PlayerSpawnWindow(const Frame& rFrame);
+
+	// Post-tick main-thread identity view over the player rows. Held by value by its caller for as long as it is
+	// used, and never across a tick, a transfer, or a reallocation.
+	[[nodiscard]] static engine::RegistryOwnershipLayer OwnershipLayer(const Frame& rFrame);
 
 	FrameInterpolate interpolate;
 	FramePostRender postRender;

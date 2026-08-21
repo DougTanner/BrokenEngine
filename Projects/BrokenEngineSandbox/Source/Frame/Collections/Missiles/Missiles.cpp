@@ -16,7 +16,6 @@
 #endif
 #include "Frame/Collections/Collection.h"
 #include "Frame/Collections/Explosions/Explosions.h"
-#include "Frame/Collections/Targets/Targets.h"
 
 #if defined(BT_CLIENT)
 #include "Data/Scene.h"
@@ -326,7 +325,9 @@ static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] 
 	}
 #endif // BT_CLIENT
 
-	TargetsPostRender::Remove(rFrame, rCurrentPostRender.puiTargets[i], {});
+	// Removal runs outside any query window, so the handle is only cleared. Subscriber counts are derived afresh
+	// from the surviving handles each window, so a cleared handle needs no release.
+	rCurrentPostRender.puiRegistryTargets[i] = {};
 }
 
 void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
@@ -394,7 +395,7 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		},
 		[&](int64_t i)
 		{
-			// Owned effects and target may already be released by Fall() or Explode()
+			// Owned effects and the registry handle may already be released by Fall() or Explode()
 			RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 
 			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
@@ -429,7 +430,7 @@ void MissilesPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const 
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
 	rCurrentPostRender.pVecExplosionDirections[iIndex] = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 	rCurrentPostRender.pVecStoredDirections[iIndex] = rInfo.vecStoredDirection;
-	rCurrentPostRender.puiTargets[iIndex] = rInfo.uiTarget;
+	rCurrentPostRender.puiRegistryTargets[iIndex] = rInfo.uiTarget;
 	rCurrentPostRender.pfTimes[iIndex] = rInfo.fTime;
 	// An arrival restores the ramp verbatim — including the negative value of a finished ramp — and draws no fresh ramp delay.
 	rCurrentPostRender.pfDeltaRotationDelays[iIndex] = rInfo.bTransfer
@@ -468,7 +469,8 @@ void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, float fDeltaT
 		return;
 	}
 
-	TargetsPostRender::Remove(rFrame, rCurrentPostRender.puiTargets[i], {});
+	// The registry subscription is released by the Update caller, which is the only site holding a live query
+	// window; the falling missile itself keeps no handle past that release.
 	rCurrentPostRender.pFlags[i].Set(kFalling);
 	rCurrentPostRender.pfDeltaRotations[i] = 0.0f;
 	rCurrentPostRender.pVecVelocities[i] = XMVectorSetZ(rCurrentPostRender.pVecVelocities[i], XMVectorGetZ(rCurrentPostRender.pVecVelocities[i]) - kfMissileGravity * fDeltaTime);
@@ -502,7 +504,8 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	{
 		return;
 	}
-	TargetsPostRender::Remove(rFrame, rCurrentPostRender.puiTargets[i], {});
+	// PostCollision runs after the Update query window is gone, so the handle is only cleared.
+	rCurrentPostRender.puiRegistryTargets[i] = {};
 
 #if defined(BT_CLIENT)
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, rCurrentInterpolate.pVecPositions[i], gExplosionVolume.Get());
@@ -574,7 +577,7 @@ bool MissilesPostRender::LogDifferences(const MissilesPostRender& rOther) const
 		bEqual &= common::LogDifference_Vec("pVecVelocities", i, pVecVelocities[i], rOther.pVecVelocities[i]);
 		bEqual &= common::LogDifference_Vec("pVecExplosionDirections", i, pVecExplosionDirections[i], rOther.pVecExplosionDirections[i]);
 		bEqual &= common::LogDifference_Vec("pVecStoredDirections", i, pVecStoredDirections[i], rOther.pVecStoredDirections[i]);
-		bEqual &= common::LogDifference<"puiTargets">(i, puiTargets[i], rOther.puiTargets[i]);
+		bEqual &= common::LogDifference<"puiRegistryTargets">(i, puiRegistryTargets[i], rOther.puiRegistryTargets[i]);
 		bEqual &= common::LogDifference<"pfTimes">(i, pfTimes[i], rOther.pfTimes[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotationDelays">(i, pfDeltaRotationDelays[i], rOther.pfDeltaRotationDelays[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotations">(i, pfDeltaRotations[i], rOther.pfDeltaRotations[i]);

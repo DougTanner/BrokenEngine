@@ -15,7 +15,7 @@ using enum GameFlags;
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 124 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + TargetsInterpolate::kiVersion + TargetsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
+const int64_t Frame::kiVersion = 126 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
 
 // FrameInterpolate
 FrameInterpolate::FrameInterpolate()
@@ -23,7 +23,6 @@ FrameInterpolate::FrameInterpolate()
 , pBlasters(std::make_unique<BlastersInterpolate>())
 , pMissiles(std::make_unique<MissilesInterpolate>())
 , pSpaceships(std::make_unique<SpaceshipsInterpolate>())
-, pTargets(std::make_unique<TargetsInterpolate>())
 {
 }
 
@@ -37,7 +36,6 @@ FramePostRender::FramePostRender()
 , pBlasters(std::make_unique<BlastersPostRender>())
 , pMissiles(std::make_unique<MissilesPostRender>())
 , pSpaceships(std::make_unique<SpaceshipsPostRender>())
-, pTargets(std::make_unique<TargetsPostRender>())
 {
 	transferRequests.reserve(engine::kuiInitialTransferCapacity);
 }
@@ -490,64 +488,105 @@ void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	engine::AreaDamage::Clear();
 }
 
-[[nodiscard]] target_t Frame::GetMissileTarget(Frame& __restrict rFrame, FXMVECTOR vecPosition, FXMVECTOR vecDirection, engine::alignment_t alignment)
+// Both spatial windows bind the same single spaceship source layer and the same missile subscription layer; they
+// differ only in which arrival-grace column decides eligibility and whether previous positions are available.
+static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const float* pfArrivalGracePeriods, const MissilesPostRender& rSubscribers)
 {
-	static constexpr float kfMaxTargetingRange = 45.0f;
-	static constexpr float kfMaxTargetingRangeSquared = kfMaxTargetingRange * kfMaxTargetingRange;
+	const SpaceshipsInterpolate& rSpaceships = *rFrame.interpolate.pSpaceships;
+	const SpaceshipsPostRender& rSpaceshipsPostRender = *rFrame.postRender.pSpaceships;
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
-	TargetsInterpolate& rTargetsInterpolate = *rFrame.interpolate.pTargets;
-	TargetsPostRender& rTargetsPostRender = *rFrame.postRender.pTargets;
+	int64_t iSpaceshipCount = rSpaceships.iCount;
+	int64_t iSubscriberCount = rSubscribers.iCount;
 
-	target_t uiTarget {};
-	float fSmallestAngle = std::numeric_limits<float>::max();
-	uint8_t uiBestSubscribers = std::numeric_limits<uint8_t>::max();
+	// A spaceship is targetable once its arrival grace has run out — the timing the removed Targets kDestination
+	// flag used to carry — and while it still publishes a registry id.
+	auto IsEligible = [&](int64_t i) { return rSpaceships.puiRegistryIds[i].IsValid() && pfArrivalGracePeriods[i] <= 0.0f; };
 
-	for (int64_t i = 0; i < rTargetsInterpolate.iCount; ++i)
+	// Ascending row indices, shared by the subscription layer (every subscriber row participates) and by the
+	// eligible-row span the registry scratch is sized against before that span has storage of its own.
+	int64_t iAscendingCount = std::max(iSpaceshipCount, iSubscriberCount);
+	auto pAscendingRows = rWorkbuffer.PushBuffer<int64_t*>(iAscendingCount * static_cast<int64_t>(sizeof(int64_t)));
+	for (int64_t i = 0; i < iAscendingCount; ++i)
 	{
-		TargetFlags_t flags = rTargetsPostRender.pFlags[i];
+		pAscendingRows[i] = i;
+	}
 
-		// Must be a destination and a valid enemy target
-		if (!(flags & TargetFlags::kDestination) || !rFrame.postRender.alignments.CanCollide(alignment, rTargetsPostRender.pAlignments[i]))
+	int64_t iEligibleCount = 0;
+	for (int64_t i = 0; i < iSpaceshipCount; ++i)
+	{
+		iEligibleCount += IsEligible(i) ? 1 : 0;
+	}
+
+	engine::RegistrySourceLayer sizingLayer {.rows = std::span<const int64_t>(static_cast<int64_t*>(pAscendingRows), static_cast<size_t>(iEligibleCount))};
+	int64_t iScratchBytes = engine::RegistryScratchBytes(std::span<const engine::RegistrySourceLayer>(&sizingLayer, 1));
+	auto pScratch = rWorkbuffer.PushBuffer<std::byte*>(iScratchBytes);
+
+	// The registry block starts with the eligible rows the caller fills and binds; the derived subscriber counts
+	// follow them. Ascending row order is what makes the fixed ranking's exact ties resolve as they did before.
+	int64_t* pEligibleRows = reinterpret_cast<int64_t*>(static_cast<std::byte*>(pScratch));
+	int64_t iEligibleRow = 0;
+	for (int64_t i = 0; i < iSpaceshipCount; ++i)
+	{
+		if (IsEligible(i))
 		{
-			continue;
-		}
-
-		XMVECTOR vecTargetPosition = rTargetsInterpolate.pVecPositions[i];
-
-		// Skip targets not visible to the player
-		if (!FrameInterpolate::IsVisible(vecPosition, vecTargetPosition))
-		{
-			continue;
-		}
-
-		XMVECTOR vecToTarget = XMVectorSubtract(vecTargetPosition, vecPosition);
-		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(vecToTarget));
-
-		// Skip targets beyond maximum targeting range
-		if (fDistanceSquared > kfMaxTargetingRangeSquared)
-		{
-			continue;
-		}
-
-		XMVECTOR vecToTargetNormal = XMVector3Normalize(vecToTarget);
-		float fAngle = std::abs(XMVectorGetX(XMVector3AngleBetweenNormals(vecDirection, vecToTargetNormal)));
-
-		uint8_t uiSubscribers = rTargetsPostRender.puiSubscribers[i];
-		if (uiSubscribers < uiBestSubscribers ||
-		    (uiSubscribers == uiBestSubscribers && fAngle < fSmallestAngle))
-		{
-			uiBestSubscribers = uiSubscribers;
-			fSmallestAngle = fAngle;
-			uiTarget = rTargetsPostRender.puiIds[i];
+			pEligibleRows[iEligibleRow++] = i;
 		}
 	}
 
-	if (uiTarget.IsValid())
+	auto pLayers = rWorkbuffer.PushBuffer<engine::RegistrySourceLayer*>(static_cast<int64_t>(sizeof(engine::RegistrySourceLayer)));
+	pLayers[0] =
 	{
-		TargetsPostRender::AddSubscriber(rFrame, uiTarget);
-	}
+		.puiIds = rSpaceships.puiRegistryIds,
+		.pVecCurrentPositions = rSpaceships.pVecPositions,
+		.pVecPreviousPositions = pVecPreviousPositions,
+		.pAlignments = rSpaceshipsPostRender.pAlignments,
+		.rows = std::span<const int64_t>(pEligibleRows, static_cast<size_t>(iEligibleCount)),
+		.iSourceCount = iSpaceshipCount,
+	};
+	std::span<const engine::RegistrySourceLayer> sourceLayers(static_cast<engine::RegistrySourceLayer*>(pLayers), 1);
 
-	return uiTarget;
+	engine::RegistrySubscriptionLayer subscriptionLayer
+	{
+		.puiTargets = rSubscribers.puiRegistryTargets,
+		.rows = std::span<const int64_t>(static_cast<int64_t*>(pAscendingRows), static_cast<size_t>(iSubscriberCount)),
+		.iSourceCount = iSubscriberCount,
+	};
+
+	return
+	{
+		.context = engine::BuildRegistryQueryContext(rFrame.postRender.alignments, sourceLayers, std::span<const engine::RegistrySubscriptionLayer>(&subscriptionLayer, 1), std::span<std::byte>(static_cast<std::byte*>(pScratch), static_cast<size_t>(iScratchBytes))),
+		.ascendingRows = std::move(pAscendingRows),
+		.scratch = std::move(pScratch),
+		.layers = std::move(pLayers),
+	};
+}
+
+RegistryWindow Frame::MissileUpdateWindow(const Frame& rFrame, const Frame& rPreviousFrame)
+{
+	// Missiles update before Spaceships, so the current rows still line up with the previous frame's: previous
+	// positions are what a retained missile homes on, and previous arrival grace is the eligibility this phase saw.
+	return BuildSpaceshipRegistryWindow(rFrame, rPreviousFrame.interpolate.pSpaceships->pVecPositions, rPreviousFrame.postRender.pSpaceships->pfArrivalGracePeriods, *rPreviousFrame.postRender.pMissiles);
+}
+
+RegistryWindow Frame::PlayerSpawnWindow(const Frame& rFrame)
+{
+	// Transfer and Destroy have already moved rows this tick, so previous-frame rows no longer line up and no
+	// previous positions are bound. A missile acquiring here does not home until the next tick, which needs none.
+	return BuildSpaceshipRegistryWindow(rFrame, nullptr, rFrame.postRender.pSpaceships->pfArrivalGracePeriods, *rFrame.postRender.pMissiles);
+}
+
+engine::RegistryOwnershipLayer Frame::OwnershipLayer(const Frame& rFrame)
+{
+	PlayersPostRender& rPlayers = *rFrame.postRender.pPlayers;
+
+	return
+	{
+		.pIdBytes = engine::RegistryIdBytes(rPlayers.puiIds),
+		.pGlobalIds = rPlayers.pGlobalPlayerIds,
+		.pClientGuids = rPlayers.pClientGuids,
+		.iCount = rPlayers.iCount,
+	};
 }
 
 #if defined(BT_CLIENT)

@@ -15,7 +15,7 @@ Preserve the target's existing accessor and lifecycle shape; do not normalize it
 
 | Variant | Live exemplar | Inspect for |
 |---|---|---|
-| Entirely shared game pair | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Targets/Targets.h`, `TargetsInterpolate::Sync`, `TargetsPostRender::Add` | `SharedMembers()` with `Members()` forwarding to it; paired versions, copy, owner-fed sync, initialization, ID map |
+| Shared-only game collection struct | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`, `SpaceshipsPostRender::Spawn`, `Spaceships.cpp` `SpaceshipsPostRender::AllocateAndCopy` | `SharedMembers()` with `Members()` forwarding to it; per-struct versions, `PersistentMembers()` carry-forward, spawn initialization |
 | Shared/client-split game pair | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`, `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp`, `MissilesInterpolate::Update` | `SharedMembers()` plus guarded `ClientMembers()`, `Members()` composition, spawn, copy, `ClientInit`, transfer send |
 | Server-visible engine pair | `/Engine/Source/Frame/Collections/Pushers/Pushers.h`, `PushersInterpolate::Sync`, `PushersPostRender::Add`, `/Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp` `Frame::kiVersion` | Existing `Members()`-only shape, per-struct versions, owner sync, zero-init, difference logging, ID map |
 | Owner-synchronized client-only pair | `/Engine/Source/Frame/Collections/Sounds/Sounds.h`, `SoundsInterpolate::Sync`, `SoundsPostRender::Add` | Whole-file `BT_CLIENT`, `Members()` only, full carry-forward copy, `SyncData`/`Sync`, Add defaults, no shared version or differences |
@@ -43,7 +43,7 @@ A shared member normally reaches `SharedCollectionCrc()` through existing `Share
 
 Trace how every row receives and retains the value; allocation itself stays automatic through the tuple.
 
-Which mechanism carries the value forward is the judgment call, and it differs per collection: `AllocateAndCopy()` copies only state that must carry forward there, while an Update-owned column is instead loaded from the previous frame and stored into current storage on every iteration, with the store unconditional and after branches and early-out decisions unless a documented transition-only copy path owns persistence. Some transition-only, controller, and identity columns are copied instead. Owner-fed state travels through `SyncData` and `Sync()`, and every `Sync()` aggregate initializer and caller has to agree. Follow the target's live pattern: Targets copies before owner sync, Pushers copies in Update, and Sounds copies in `AllocateAndCopy()`.
+Which mechanism carries the value forward is the judgment call, and it differs per collection: `AllocateAndCopy()` copies only state that must carry forward there, while an Update-owned column is instead loaded from the previous frame and stored into current storage on every iteration, with the store unconditional and after branches and early-out decisions unless a documented transition-only copy path owns persistence. Some transition-only, controller, and identity columns are copied instead. Owner-fed state travels through `SyncData` and `Sync()`, and every `Sync()` aggregate initializer and caller has to agree. Follow the target's live pattern: Spaceships carries its persistent columns through `PersistentMembers()`, Pushers copies in Update, and Sounds copies in `AllocateAndCopy()`.
 
 ## Creation, transfer, and hydration
 
@@ -56,7 +56,7 @@ A client-owned handle or resource is created in per-row `ClientInit` and must al
 ## Identity and agent queries
 
 - For `CollectionFlags::kIdToIndex`, tuple membership makes swap-and-pop move the column automatically. If the new value changes identity/key semantics, update map construction, lookup, removal, and comparisons; otherwise make no ID-map edit.
-- Decide whether a server-visible game field belongs in the deliberately minimum-and-cheap agent result. Current exposure lives in `/Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp` through `ExtractPlayers`, `ExtractSpaceships`, `ExtractMissiles`, `ExtractBlasters`, and `ExtractTargets`. Record an intentional exclusion when no scenario needs it.
+- Decide whether a server-visible game field belongs in the deliberately minimum-and-cheap agent result. Current exposure lives in `/Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp` through `ExtractPlayers`, `ExtractSpaceships`, `ExtractMissiles`, and `ExtractBlasters`. Record an intentional exclusion when no scenario needs it.
 
 ## Completion checklist
 

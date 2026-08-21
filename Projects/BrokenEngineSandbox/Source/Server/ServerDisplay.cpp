@@ -11,7 +11,6 @@
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
-#include "Frame/Collections/Targets/Targets.h"
 #include "Profile/ProfileManager.h"
 
 namespace game
@@ -91,7 +90,6 @@ void ServerUpdateDisplayStats()
 	int64_t iTotalSpaceships = 0;
 	int64_t iTotalBlasters = 0;
 	int64_t iTotalMissiles = 0;
-	int64_t iTotalTargets = 0;
 	int64_t iTotalExplosions = 0;
 
 	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
@@ -101,7 +99,6 @@ void ServerUpdateDisplayStats()
 		iTotalSpaceships += rFrame.interpolate.pSpaceships->iCount;
 		iTotalBlasters += rFrame.interpolate.pBlasters->iCount;
 		iTotalMissiles += rFrame.interpolate.pMissiles->iCount;
-		iTotalTargets += rFrame.interpolate.pTargets->iCount;
 		iTotalExplosions += rFrame.interpolate.explosions.iCount;
 	}
 
@@ -109,7 +106,6 @@ void ServerUpdateDisplayStats()
 	gpProfileManager->SetCount(game::kCpuCounterSpaceships, iTotalSpaceships);
 	gpProfileManager->SetCount(game::kCpuCounterBlasters, iTotalBlasters);
 	gpProfileManager->SetCount(game::kCpuCounterMissiles, iTotalMissiles);
-	gpProfileManager->SetCount(game::kCpuCounterTargets, iTotalTargets);
 	gpProfileManager->SetCount(engine::kCpuCounterExplosions, iTotalExplosions);
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
@@ -156,7 +152,6 @@ bool ServerDisplayContentChanged()
 		Mix(rFrame.interpolate.pSpaceships->iCount);
 		Mix(rFrame.interpolate.pBlasters->iCount);
 		Mix(rFrame.interpolate.pMissiles->iCount);
-		Mix(rFrame.interpolate.pTargets->iCount);
 		Mix(rFrame.interpolate.explosions.iCount);
 	}
 
@@ -317,7 +312,6 @@ static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMap
 				                       rFrame.interpolate.pSpaceships->iCount +
 				                       rFrame.interpolate.pBlasters->iCount +
 				                       rFrame.interpolate.pMissiles->iCount +
-				                       rFrame.interpolate.pTargets->iCount +
 				                       rFrame.interpolate.explosions.iCount;
 
 				SetTextColor(hdcBuffer, RGB(220, 220, 220));
@@ -631,7 +625,6 @@ void PaintServerDisplay(HWND hWnd)
 	textLine("Spaceships: %lld", gpProfileManager->GetCpuCounter(game::kCpuCounterSpaceships).iCount);
 	textLine("Blasters: %lld", gpProfileManager->GetCpuCounter(game::kCpuCounterBlasters).iCount);
 	textLine("Missiles: %lld", gpProfileManager->GetCpuCounter(game::kCpuCounterMissiles).iCount);
-	textLine("Targets: %lld", gpProfileManager->GetCpuCounter(game::kCpuCounterTargets).iCount);
 	iTextLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "Explosions: %lld", gpProfileManager->GetCpuCounter(engine::kCpuCounterExplosions).iCount), static_cast<int>(sizeof(pcLine)) - 1);
 	TextOutA(hdcBuffer, iTextX, iTextY, pcLine, iTextLength);
 

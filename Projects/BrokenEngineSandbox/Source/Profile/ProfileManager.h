@@ -15,7 +15,6 @@ enum GameCpuCounters : int64_t
 		kCpuCounterMissilesRendered,
 	kCpuCounterSpaceships,
 		kCpuCounterSpaceshipsRendered,
-	kCpuCounterTargets,
 
 	kGameCpuCounterCount
 };
@@ -59,7 +58,6 @@ inline constexpr std::string_view kGameCpuCounterNames[]
 	"    Rendered",
 	"Spaceships",
 	"    Rendered",
-	"Targets",
 };
 static_assert(std::size(kGameCpuCounterNames) == static_cast<size_t>(kGameCpuCounterCount) - static_cast<size_t>(engine::kEngineCpuCounterCount));
 

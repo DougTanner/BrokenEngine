@@ -11,7 +11,6 @@
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Pushers/Pushers.h"
-#include "Frame/Collections/Targets/Targets.h"
 
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
@@ -184,8 +183,9 @@ static void RegisterEnemyBlasterType()
 	});
 }
 
-// Helper to sync owned objects for a spaceship
-void XM_CALLCONV SyncSpaceship(FrameInterpolate& rFrameInterpolate, engine::pusher_t uiPusher, target_t uiTarget, FXMVECTOR vecPosition)
+// Helper to sync owned objects for a spaceship. The registry id needs no sync: the registry binds this
+// collection's position column directly instead of holding a copy to drive each tick.
+void XM_CALLCONV SyncSpaceship(FrameInterpolate& rFrameInterpolate, engine::pusher_t uiPusher, FXMVECTOR vecPosition)
 {
 	// Sync pusher
 	engine::PushersInterpolate::Sync(rFrameInterpolate, uiPusher,
@@ -196,15 +196,6 @@ void XM_CALLCONV SyncSpaceship(FrameInterpolate& rFrameInterpolate, engine::push
 		.fPower = kfSpaceshipPusherPower,
 		.flags = {engine::PusherFlags::kTypeDefault},
 	});
-
-	// Sync target
-	if (uiTarget.IsValid())
-	{
-		TargetsInterpolate::Sync(rFrameInterpolate, uiTarget,
-		{
-			.vecPosition = vecPosition,
-		});
-	}
 }
 
 #if defined(BT_CLIENT)
@@ -331,7 +322,7 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 #endif
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
-		SyncSpaceship(rCurrentFrameInterpolate, rCurrent.puiPushers[i], rCurrent.puiTargets[i], vecPosition);
+		SyncSpaceship(rCurrentFrameInterpolate, rCurrent.puiPushers[i], vecPosition);
 
 		// Sync wind deposit
 #if defined(BT_CLIENT)
@@ -360,11 +351,11 @@ void SpaceshipsPostRender::AllocateAndCopy(SpaceshipsPostRender& rCurrent, const
 	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
 }
 
-static void RemoveOwnedObjects(Frame& rFrame, SpaceshipsInterpolate& rCurrentInterpolate, int64_t i, bool bRemoveTarget)
+static void RemoveOwnedObjects(Frame& rFrame, SpaceshipsInterpolate& rCurrentInterpolate, int64_t i, bool bClearRegistryId)
 {
-	if (bRemoveTarget && rCurrentInterpolate.puiTargets[i].IsValid())
+	if (bClearRegistryId)
 	{
-		TargetsPostRender::Remove(rFrame, rCurrentInterpolate.puiTargets[i], {TargetFlags::kDestination});
+		rCurrentInterpolate.puiRegistryIds[i] = {};
 	}
 	engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
 #if defined(BT_CLIENT)
@@ -589,17 +580,9 @@ void SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInf
 	SpaceshipsInterpolate::ClientInit(rFrame, iIndex);
 #endif
 
-	// Create owned target for missile tracking
-	rCurrentInterpolate.puiTargets[iIndex] = {};
-	TargetsPostRender::Add(rFrame, rCurrentInterpolate.puiTargets[iIndex], rInfo.alignment);
-
-	// Set target flags (PostRender field, not part of Sync)
-	// Defer kDestination during arrival grace period so missiles don't target this spaceship
-	int64_t iTargetIndex = rFrame.interpolate.pTargets->IdToIndex(rCurrentInterpolate.puiTargets[iIndex]);
-	if (rInfo.fArrivalGracePeriod <= 0.0f)
-	{
-		rFrame.postRender.pTargets->pFlags[iTargetIndex] = {TargetFlags::kDestination};
-	}
+	// Create the registry id missiles home on. This consumes one frame uuid at exactly the position the removed
+	// Targets add consumed it, keeping the per-spawn order (pusher id first, registry id second) replay-identical.
+	rCurrentInterpolate.puiRegistryIds[iIndex] = engine::registry_id_t::Generate(rFrame.postRender);
 
 	// Initialize post-render state
 	rCurrentPostRender.pFlags[iIndex] = {};
@@ -612,7 +595,7 @@ void SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInf
 	rCurrentPostRender.pfArrivalGracePeriods[iIndex] = rInfo.fArrivalGracePeriod;
 
 	// Sync owned objects after Add()
-	SyncSpaceship(rFrame.interpolate, rCurrentInterpolate.puiPushers[iIndex], rCurrentInterpolate.puiTargets[iIndex], rInfo.vecPosition);
+	SyncSpaceship(rFrame.interpolate, rCurrentInterpolate.puiPushers[iIndex], rInfo.vecPosition);
 }
 
 void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
@@ -653,13 +636,6 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 		float fDestroyedExplosionTime = rPrevious.pfDestroyedExplosionTimes[i] - fDeltaTime;
 		float fNextBlasterSpawnTime = rPrevious.pfNextBlasterSpawnTimes[i] - fDeltaTime;
 		float fArrivalGracePeriod = std::max(0.0f, rPrevious.pfArrivalGracePeriods[i] - fDeltaTime);
-
-		// Set kDestination on target when grace period expires
-		if (rPrevious.pfArrivalGracePeriods[i] > 0.0f && fArrivalGracePeriod <= 0.0f && rCurrentInterpolate.puiTargets[i].IsValid())
-		{
-			int64_t iTargetIndex = rFrame.interpolate.pTargets->IdToIndex(rCurrentInterpolate.puiTargets[i]);
-			rFrame.postRender.pTargets->pFlags[iTargetIndex].Set(TargetFlags::kDestination);
-		}
 
 		// Load from Interpolate (these are now in Interpolate)
 		float fDeltaRotation = rPreviousInterpolate.pfDeltaRotations[i];
@@ -712,7 +688,7 @@ bool SpaceshipsInterpolate::LogDifferences(const SpaceshipsInterpolate& rOther) 
 		bEqual &= common::LogDifference_Vec("pVecDirections", i, pVecDirections[i], rOther.pVecDirections[i]);
 		bEqual &= common::LogDifference<"pfDestroyedTimes">(i, pfDestroyedTimes[i], rOther.pfDestroyedTimes[i]);
 		bEqual &= common::LogDifference<"puiPushers">(i, puiPushers[i], rOther.puiPushers[i]);
-		bEqual &= common::LogDifference<"puiTargets">(i, puiTargets[i], rOther.puiTargets[i]);
+		bEqual &= common::LogDifference<"puiRegistryIds">(i, puiRegistryIds[i], rOther.puiRegistryIds[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotations">(i, pfDeltaRotations[i], rOther.pfDeltaRotations[i]);
 	}
 

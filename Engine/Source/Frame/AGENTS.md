@@ -16,6 +16,15 @@ Update Frame Update Pipeline (`../../../Documents/Architecture/FrameUpdatePipeli
 - Collision gathers candidate events across every layer pair, then sorts them globally by time of impact with the layer and object indices as tiebreakers so the order is total and reproducible, and commits each accepted event to both sides. An object flagged destroy-on-collide accepts only its earliest event. Optional per-object maximum-time cutoffs are exclusive, which lets callers reserve exact-time ties for terrain and frame-boundary outcomes. Per-pair collision masks must be bi-directional and same-layer collision is unsupported; both are asserted.
 - Large terrain/nav allocations are lazy. Do not make frame constructors allocate proportional to world or mesh size.
 
+## Frame Registry
+
+- `FrameRegistry.h`/`.cpp` let one collection find rows of another without duplicating them. It binds columns the collections already own, copies no entity records, allocates nothing, and keeps no state between query windows, so nothing it produces is serialized, CRC'd, or transferred.
+- The game builds both query windows and owns their timing and which columns each one binds (`../../../Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`). The engine never names a game collection.
+- The caller owns every block a window's spans point into and releases those blocks in reverse order of creation, so each one outlives the context viewing it. `RegistryScratchBytes` sizes the registry-internal block; `RegistryBatch::rows` and `results` are caller-provided storage the registry never sizes, because they scale with the caller's consumer count rather than with the source layers. No heap allocation and no workbuffer growth happens while a context is live, and a context never survives source-layer movement, reallocation, or cell transfer.
+- Source ids are unique across every bound layer and eligible row spans are strictly ascending and in range; debug builds validate both when the context is built.
+- Acquisition is a deterministic direct scan feeding CRC'd state: one fixed ranking — fewest subscribers, then smallest angle, exact ties by layer order then row order — always bounded by the caller's radius. Alignment filtering needs the source and consumer alignment columns both bound. Changing that order changes simulation results.
+- `AssignRegistryClientGuid` is the registry's only write. It is legal only on the main thread after the tick, through an ownership layer whose client-GUID column is CRC-excluded. The caller holds that layer by value and never retains it across a tick, a transfer, or a reallocation.
+
 ## Collection and Serialization Invariants
 
 - `Collections()` order is a dependency order, not just a type list. A producer must precede an owned consumer; Explosions before SmokeTrails is the live example. Tuple-size and client/server type checks do not verify this ordering.

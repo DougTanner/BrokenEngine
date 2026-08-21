@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-20T21:14:34.737Z","dependsOn":["Documents/Plans/Engine/FrameRegistry.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-20T21:14:34.737Z","dependsOn":[]} -->
 # Resolve the server transfer/broadcast Player collection dependency
 
 ## Context

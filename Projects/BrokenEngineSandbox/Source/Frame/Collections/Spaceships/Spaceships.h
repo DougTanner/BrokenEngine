@@ -6,7 +6,6 @@
 namespace engine { struct FrameStaticData; }
 #include "Frame/GridCoord.h"
 #include "Frame/Collections/Pushers/Pushers.h"
-#include "Frame/Collections/Targets/Targets.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
@@ -35,7 +34,7 @@ inline constexpr float kfSpaceshipMaxPusherPushVelocity = kfSpaceshipMaxSpeed * 
 
 struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 {
-	static constexpr int64_t kiVersion = 2;
+	static constexpr int64_t kiVersion = 3;
 	static constexpr const char* kName = "Spaceships";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("Spaceships");
 
@@ -57,7 +56,7 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 	XMVECTOR* __restrict pVecDirections = nullptr;
 	float* __restrict pfDestroyedTimes = nullptr;
 	engine::pusher_t* __restrict puiPushers = nullptr;
-	target_t* __restrict puiTargets = nullptr;
+	engine::registry_id_t* __restrict puiRegistryIds = nullptr;
 #if defined(BT_CLIENT)
 	engine::wind_trail_t* __restrict puiWindTrails = nullptr;
 #endif
@@ -65,7 +64,7 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 #if defined(BT_CLIENT)
 	float* __restrict pfAnimationTimes = nullptr;
 #endif
-	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.puiPushers, rSelf.puiTargets, rSelf.pfDeltaRotations); }
+	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.puiPushers, rSelf.puiRegistryIds, rSelf.pfDeltaRotations); }
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
@@ -83,9 +82,9 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 	auto PersistentMembers(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.puiPushers, rSelf.puiTargets, rSelf.puiWindTrails);
+		return std::tie(rSelf.puiPushers, rSelf.puiRegistryIds, rSelf.puiWindTrails);
 #else
-		return std::tie(rSelf.puiPushers, rSelf.puiTargets);
+		return std::tie(rSelf.puiPushers, rSelf.puiRegistryIds);
 #endif
 	}
 

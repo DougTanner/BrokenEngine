@@ -35,7 +35,7 @@ do not synthesize a collection from a generic full-header template.
 
 | Requested variant | Live exemplar files and symbols | Pattern to preserve |
 |---|---|---|
-| Shared-only game collection | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Targets/Targets.h`: `TargetsInterpolate`, `TargetsPostRender`; sibling `.cpp` files | `SharedMembers()` plus `Members()` returning it; stable IDs without special frame dispatch |
+| Shared-only game collection struct | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`; sibling `.cpp` files | `SharedMembers()` plus `Members()` returning it, so a later client-only field cannot silently join the CRC; no special frame dispatch |
 | Shared game state plus client-owned state | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`: both structs; `Missiles.cpp`: `ClientInit`, `ClientInitAll`, `Transfer`; `MissilesUpdate.cpp` | guarded `ClientMembers()`, client `tuple_cat`, hydration, owned-object teardown, transfer payload |
 | Server-visible engine collection | `Engine/Source/Frame/Collections/Pushers/Pushers.h`: both structs; sibling `.cpp` files; `Engine/Source/Frame/FrameBase.h`; `game::Frame::kiVersion` in `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp` | direct FrameBase storage, server tuple registration, index helpers, per-struct version terms |
 | Owner-synchronized whole-file client-only collection | `Engine/Source/Frame/Collections/Sounds/Sounds.h`: both structs; sibling `.cpp` files; `FrameBase.h` | outer `BT_CLIENT` guard, `Members()` only, owner `Sync`/Add/Remove, custom client-only identity only when required |
@@ -80,7 +80,7 @@ build-local Write/Read, shared ServerRead/CRC, and output merging in
 `LogDifferences`.
 Reserve explicit per-collection Frame.cpp dispatch for a concrete special
 contract such as Players; `CollectionFlags::kIdToIndex` alone is not one.
-`Targets` proves that an indexable collection can use the normal tuples.
+`engine::PushersInterpolate` proves that an indexable collection can use the normal tuples.
 
 ### Engine-owned
 

@@ -124,9 +124,6 @@
     <Filter Include="Game\Frame\Collections\Missiles">
       <UniqueIdentifier>{c3d4e5f6-7890-abcd-ef01-345678901234}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Game\Frame\Collections\Targets">
-      <UniqueIdentifier>{b2c3d4e5-6789-abcd-ef01-23456789abcd}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Game\Frame\Collections\Spaceships">
       <UniqueIdentifier>{d4e5f6a7-8901-bcde-f012-456789012345}</UniqueIdentifier>
     </Filter>
@@ -741,14 +738,14 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.h">
       <Filter>Engine\Frame\Collections\Explosions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Sounds\Sounds.h">
       <Filter>Engine\Frame\Collections\Sounds</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Frame\Collections\Targets\Targets.h">
-      <Filter>Game\Frame\Collections\Targets</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Billboards\Billboards.h">
       <Filter>Engine\Frame\Collections\Billboards</Filter>
@@ -1247,11 +1244,8 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Sounds\SoundsUpdate.cpp">
       <Filter>Engine\Frame\Collections\Sounds</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Targets\Targets.cpp">
-      <Filter>Game\Frame\Collections\Targets</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Targets\TargetsUpdate.cpp">
-      <Filter>Game\Frame\Collections\Targets</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.cpp">
+      <Filter>Engine\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Billboards\Billboards.cpp">
       <Filter>Engine\Frame\Collections\Billboards</Filter>
