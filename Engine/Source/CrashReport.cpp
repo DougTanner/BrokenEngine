@@ -38,7 +38,9 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 
 void HandleException(std::optional<const std::exception*> pException)
 {
-	DEBUG_BREAK();
+	// Non-logging break: this runs from the SIGABRT handler during heap corruption, possibly while this thread already
+	// holds the log mutex, so logging here would deadlock or re-fault before any crash-report bytes are written.
+	DEBUG_BREAK_NO_LOG();
 
 	// An agent-launched instance must never block on a modal dialog — take the unprompted branch so the report still saves.
 	int iResult = gLaunchOptions.iAgentPort != 0 ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);

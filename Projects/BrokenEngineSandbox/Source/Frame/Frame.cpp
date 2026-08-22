@@ -171,11 +171,6 @@ void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame
 	engine::ForEachInterpolateUpdate(GameInterpolateTypes{}, rCurrent, rPreviousFrame);
 }
 
-XMVECTOR XM_CALLCONV FrameInterpolate::SpatialAnchor(const FrameInterpolate& rFrameInterpolate)
-{
-	return rFrameInterpolate.pPlayers->iCount > 0 ? rFrameInterpolate.pPlayers->pVecPositions[0] : XMVectorZero();
-}
-
 void FramePostRender::AllocateAndCopy(FramePostRender& __restrict rCurrent, const FramePostRender& __restrict rPrevious)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderAllocateAndCopy);

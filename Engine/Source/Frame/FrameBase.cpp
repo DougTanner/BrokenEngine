@@ -231,7 +231,7 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	ForEachPostRenderUpdate(PostRenderBaseTypes{}, rFrame, rPreviousFrame, rStaticData);
 
 	// Setup pusher zones for spatial acceleration
-	PushersInterpolate::SetupZones(rFrame);
+	PushersInterpolate::SetupZones(rFrame, rStaticData.vecArea);
 }
 
 void FramePostRenderBase::PreCollision([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)

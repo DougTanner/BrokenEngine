@@ -3,6 +3,14 @@
 namespace common
 {
 
+void LogDebugBreak(std::source_location sourceLocation)
+{
+	// Heap: formatting and the log-file sink may allocate, and DEBUG_BREAK() is itself the allocation tracker's
+	// tripwire (Engine/Source/Memory/GlobalAllocator.cpp) — without this the tripwire would re-enter itself forever.
+	ScopedSuppressAllocationTracking suppress;
+	LOG(kDefault, kWarning, "DEBUG_BREAK at {}:{} in {}", sourceLocation.file_name(), sourceLocation.line(), sourceLocation.function_name());
+}
+
 void Assert(bool bCondition, std::string_view expression, std::source_location sourceLocation)
 {
 	if (!bCondition) [[unlikely]]

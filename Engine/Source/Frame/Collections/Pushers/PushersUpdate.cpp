@@ -4,17 +4,18 @@ namespace engine
 {
 
 // Zone system constants for spatial acceleration
-constexpr float kfPusherArenaSize = 400.0f;
-constexpr float kfPusherZoneSize = 8.0f;
-constexpr int64_t kiPusherZones = static_cast<int64_t>(common::Ceil(kfPusherArenaSize / kfPusherZoneSize));
+constexpr int64_t kiPusherZones = 50;
 constexpr int64_t kiMaxPushersPerZone = 512;
 
 // Zone acceleration structure: thread_local so each Dispatch worker and reconcile thread gets its own copy
 alignas(64) thread_local uint16_t gppuiPushersPerZone[kiPusherZones][kiPusherZones] {};
 alignas(64) thread_local int16_t gpppuiPusherZones[kiPusherZones][kiPusherZones][kiMaxPushersPerZone] {};
 
-thread_local float gfPusherArenaLeft = -0.5f * kfPusherArenaSize;
-thread_local float gfPusherArenaTop = 0.5f * kfPusherArenaSize;
+// Cell bounds the zone grid spans, refreshed by SetupZones from the cell's own area
+thread_local float gfPusherAreaMinX = 0.0f;
+thread_local float gfPusherAreaMinY = 0.0f;
+thread_local float gfPusherZoneWidth = 0.0f;
+thread_local float gfPusherZoneHeight = 0.0f;
 
 void PushersInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame)
 {
@@ -40,17 +41,19 @@ void XM_CALLCONV PushersInterpolate::Sync(game::FrameInterpolate& rFrameInterpol
 	rPushers.pFlags[iIndex] = rData.flags;
 }
 
-void PushersInterpolate::SetupZones([[maybe_unused]] game::Frame& __restrict rFrame)
+void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] game::Frame& __restrict rFrame, FXMVECTOR vecArea)
 {
 	const PushersInterpolate& rCurrent = rFrame.interpolate.pushers;
 
 	// Clear zone counts
 	ZeroMemory(gppuiPushersPerZone, sizeof(gppuiPushersPerZone));
 
-	// Center arena on the game-supplied spatial anchor
-	XMVECTOR vecAnchor = game::FrameInterpolate::SpatialAnchor(rFrame.interpolate);
-	gfPusherArenaLeft = XMVectorGetX(vecAnchor) - 0.5f * kfPusherArenaSize;
-	gfPusherArenaTop = XMVectorGetY(vecAnchor) + 0.5f * kfPusherArenaSize;
+	// Span the whole cell with the fixed zone grid
+	FrameBounds bounds = ComputeFrameBounds(vecArea);
+	gfPusherAreaMinX = bounds.fMinX;
+	gfPusherAreaMinY = bounds.fMinY;
+	gfPusherZoneWidth = (bounds.fMaxX - bounds.fMinX) / static_cast<float>(kiPusherZones);
+	gfPusherZoneHeight = (bounds.fMaxY - bounds.fMinY) / static_cast<float>(kiPusherZones);
 
 	int64_t iDroppedRegistrations = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -60,12 +63,12 @@ void PushersInterpolate::SetupZones([[maybe_unused]] game::Frame& __restrict rFr
 		float fRadius = rCurrent.pfRadii[i];
 
 		// Calculate zone bounds based on position and radius
-		int64_t iZoneStartX = static_cast<int64_t>((f4Position.x - fRadius - gfPusherArenaLeft) / kfPusherZoneSize);
-		int64_t iZoneEndX = static_cast<int64_t>((f4Position.x + fRadius - gfPusherArenaLeft) / kfPusherZoneSize);
-		int64_t iZoneStartY = static_cast<int64_t>(-(f4Position.y + fRadius - gfPusherArenaTop) / kfPusherZoneSize);
-		int64_t iZoneEndY = static_cast<int64_t>(-(f4Position.y - fRadius - gfPusherArenaTop) / kfPusherZoneSize);
+		int64_t iZoneStartX = static_cast<int64_t>((f4Position.x - fRadius - gfPusherAreaMinX) / gfPusherZoneWidth);
+		int64_t iZoneEndX = static_cast<int64_t>((f4Position.x + fRadius - gfPusherAreaMinX) / gfPusherZoneWidth);
+		int64_t iZoneStartY = static_cast<int64_t>((f4Position.y - fRadius - gfPusherAreaMinY) / gfPusherZoneHeight);
+		int64_t iZoneEndY = static_cast<int64_t>((f4Position.y + fRadius - gfPusherAreaMinY) / gfPusherZoneHeight);
 
-		// Skip if completely outside arena
+		// Skip if completely outside the cell
 		if (iZoneStartX >= kiPusherZones || iZoneEndX < 0 || iZoneStartY >= kiPusherZones || iZoneEndY < 0)
 		{
 			continue;
@@ -110,8 +113,8 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 	XMStoreFloat2A(&f2Position, vecPosition);
 
 	// Get zone for query position
-	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - gfPusherArenaLeft) / kfPusherZoneSize), 0ll, kiPusherZones - 1);
-	int64_t iZoneY = std::clamp(static_cast<int64_t>(-(f2Position.y - gfPusherArenaTop) / kfPusherZoneSize), 0ll, kiPusherZones - 1);
+	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - gfPusherAreaMinX) / gfPusherZoneWidth), 0ll, kiPusherZones - 1);
+	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - gfPusherAreaMinY) / gfPusherZoneHeight), 0ll, kiPusherZones - 1);
 	int16_t* piZone = gpppuiPusherZones[iZoneX][iZoneY];
 	int64_t iPushersInZone = gppuiPushersPerZone[iZoneX][iZoneY];
 

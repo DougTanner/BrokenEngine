@@ -33,8 +33,8 @@ using PusherFlags_t = common::Flags<PusherFlags>;
 
 struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlags::kIdToIndex>
 {
-	// Bump on any SOA layout change — feeds the Frame::kiVersion save/replay gate
-	static constexpr int64_t kiVersion = 1;
+	// Bump on any SOA layout or push behavior change — feeds the Frame::kiVersion save/replay gate
+	static constexpr int64_t kiVersion = 2;
 
 	// Allocate and copy
 	static void AllocateAndCopy(PushersInterpolate& rCurrent, const PushersInterpolate& rPrevious);
@@ -55,8 +55,8 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	// Sync pusher state from owner collection
 	static void XM_CALLCONV Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData);
 
-	// Zone system - builds spatial acceleration structure each frame
-	static void SetupZones(game::Frame& __restrict rFrame);
+	// Zone system - builds spatial acceleration structure each frame over the cell's own area
+	static void XM_CALLCONV SetupZones(game::Frame& __restrict rFrame, FXMVECTOR vecArea);
 
 	// Query force at position using zone acceleration
 	static XMVECTOR XM_CALLCONV ApplyPush(const game::FrameInterpolate& rFrameInterpolate, FXMVECTOR vecPosition, id_t uiIgnorePusher = id_t {}, PusherFlags_t includeFlags = PusherFlags::kTypeDefault, PusherFlags_t excludeFlags = PusherFlags::kTypeMines);

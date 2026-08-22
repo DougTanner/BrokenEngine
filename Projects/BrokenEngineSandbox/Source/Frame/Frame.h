@@ -44,9 +44,6 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	static void AllocateAndCopy(FrameInterpolate& __restrict rCurrent, const FrameInterpolate& __restrict rPrevious);
 	static void Update(FrameInterpolate& __restrict rCurrent, const Frame& __restrict rPreviousFrame, float fDeltaTime);
 
-	// Required by the engine: the point the pusher zone grid centers on
-	[[nodiscard]] static XMVECTOR XM_CALLCONV SpatialAnchor(const FrameInterpolate& rFrameInterpolate);
-
 #if defined(BT_CLIENT)
 	// Render
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords);
