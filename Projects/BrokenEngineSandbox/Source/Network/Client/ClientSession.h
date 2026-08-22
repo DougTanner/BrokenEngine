@@ -75,7 +75,7 @@ public:
 	void LogDesyncFrameDifferences(const Frame& rClientFrame, const Frame& rServerFrame);
 
 	// Managers
-	std::unique_ptr<engine::ClientDesyncCore> mpDesyncManager;
+	std::unique_ptr<engine::ClientDesyncCore> mpDesyncCore;
 	std::unique_ptr<ClientReconciler> mpReconciler;
 	std::unique_ptr<engine::ClientSessionRuntime> mpRuntime;
 

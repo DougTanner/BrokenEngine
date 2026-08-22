@@ -83,16 +83,16 @@ nlohmann::json BuildFullStateFixtureCoordState(engine::GridCoord coord)
 
 nlohmann::json BuildFullStateFixtureState()
 {
-	engine::ClientDesyncCore& rDesyncManager = *gpClientSession->mpDesyncManager;
+	engine::ClientDesyncCore& rDesyncCore = *gpClientSession->mpDesyncCore;
 	nlohmann::json result;
 	result["clientTick"] = gpGame->TickCounter();
-	result["stalled"] = gpClientSession->mpDesyncManager->IsStalled();
-	result["desyncTick"] = gpClientSession->mpDesyncManager->GetDesyncTick();
-	result["syntheticStall"] = rDesyncManager.IsAgentFullStateFixtureArmed();
-	result["armedTick"] = rDesyncManager.GetAgentFullStateFixtureTick();
+	result["stalled"] = gpClientSession->mpDesyncCore->IsStalled();
+	result["desyncTick"] = gpClientSession->mpDesyncCore->GetDesyncTick();
+	result["syntheticStall"] = rDesyncCore.IsAgentFullStateFixtureArmed();
+	result["armedTick"] = rDesyncCore.GetAgentFullStateFixtureTick();
 	result["timeMultiply"] = gpGame->mTimeStep.miTimeMultiply;
 	result["timeDivide"] = gpGame->mTimeStep.miTimeDivide;
-	result["coordState"] = BuildFullStateFixtureCoordState(rDesyncManager.GetAgentFullStateFixtureCoord());
+	result["coordState"] = BuildFullStateFixtureCoordState(rDesyncCore.GetAgentFullStateFixtureCoord());
 	return result;
 }
 
@@ -176,10 +176,10 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 	}
 
 	const std::string action = rParams.at("action").get<std::string>();
-	engine::ClientDesyncCore& rDesyncManager = *gpClientSession->mpDesyncManager;
+	engine::ClientDesyncCore& rDesyncCore = *gpClientSession->mpDesyncCore;
 	if (action == "clear")
 	{
-		rDesyncManager.ClearAgentFullStateFixture();
+		rDesyncCore.ClearAgentFullStateFixture();
 		rResult = BuildFullStateFixtureState();
 		return;
 	}
@@ -190,7 +190,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		{
 			throw std::runtime_error("client_full_state_fixture requires an accepted connection");
 		}
-		if (gpClientSession->mpDesyncManager->IsStalled())
+		if (gpClientSession->mpDesyncCore->IsStalled())
 		{
 			throw std::runtime_error("client_full_state_fixture is already stalled");
 		}
@@ -210,12 +210,12 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 			throw std::runtime_error("client_full_state_fixture requires no pre-existing pending full state");
 		}
 
-		rDesyncManager.ArmAgentFullStateFixture(gpGame->TickCounter(), coord);
+		rDesyncCore.ArmAgentFullStateFixture(gpGame->TickCounter(), coord);
 		rResult = BuildFullStateFixtureState();
 		return;
 	}
 
-	if (!rDesyncManager.IsAgentFullStateFixtureArmed())
+	if (!rDesyncCore.IsAgentFullStateFixtureArmed())
 	{
 		throw std::runtime_error("client_full_state_fixture is not armed");
 	}
@@ -229,7 +229,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		bool bClockForced = false;
 		try
 		{
-			ExerciseFullStateMatchingTick(rDesyncManager.GetAgentFullStateFixtureCoord(), rResult, bClockForced);
+			ExerciseFullStateMatchingTick(rDesyncCore.GetAgentFullStateFixtureCoord(), rResult, bClockForced);
 		}
 		catch (...)
 		{
@@ -237,12 +237,12 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 			// anyway, so keep the fixture armed and let the caller retry; 'clear' still releases it.
 			if (bClockForced)
 			{
-				rDesyncManager.ClearAgentFullStateFixture();
+				rDesyncCore.ClearAgentFullStateFixture();
 			}
 			throw;
 		}
 
-		rDesyncManager.ClearAgentFullStateFixture();
+		rDesyncCore.ClearAgentFullStateFixture();
 		rResult["cleared"] = true;
 		return;
 	}
@@ -253,7 +253,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 
 	try
 	{
-		const engine::GridCoord coord = rDesyncManager.GetAgentFullStateFixtureCoord();
+		const engine::GridCoord coord = rDesyncCore.GetAgentFullStateFixtureCoord();
 		auto coordIt = gpGame->mCoordFrames.find(coord);
 		if (coordIt == gpGame->mCoordFrames.end() || !coordIt->second.pendingFullState.has_value())
 		{
@@ -334,11 +334,11 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 	}
 	catch (...)
 	{
-		rDesyncManager.ClearAgentFullStateFixture();
+		rDesyncCore.ClearAgentFullStateFixture();
 		throw;
 	}
 
-	rDesyncManager.ClearAgentFullStateFixture();
+	rDesyncCore.ClearAgentFullStateFixture();
 	rResult["cleared"] = true;
 }
 
@@ -439,7 +439,7 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 
 	if (bTriggerRecovery)
 	{
-		if (gpClientSession->mpDesyncManager->IsStalled())
+		if (gpClientSession->mpDesyncCore->IsStalled())
 		{
 			throw std::runtime_error("desync_probe cannot trigger recovery while desync debug mode is already stalled");
 		}
@@ -459,13 +459,13 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 			.desyncActualCrc = uiActualCrc,
 			.pDesyncClientFrame = std::move(pSnapshot),
 		};
-		gpClientSession->mpDesyncManager->OnDesyncDetected(std::move(desyncInfo));
+		gpClientSession->mpDesyncCore->OnDesyncDetected(std::move(desyncInfo));
 	}
 
 	rResult["tick"] = iTick;
 	rResult["coord"] = {coord.x, coord.y};
 	rResult["desyncDebugFrames"] = kbDesyncDebugFrames;
-	rResult["stalled"] = gpClientSession->mpDesyncManager->IsStalled();
+	rResult["stalled"] = gpClientSession->mpDesyncCore->IsStalled();
 	rResult["desyncReports"] = iDesyncReportCount;
 	rResult["debugFrameRequests"] = iDebugFrameRequestCount;
 	rResult["triggerRecovery"] = bTriggerRecovery;

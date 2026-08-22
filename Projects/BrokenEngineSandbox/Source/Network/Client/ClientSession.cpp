@@ -33,7 +33,7 @@ ClientSession::ClientSession()
 	ASSERT(gpClientSession == nullptr);
 
 	gpClientSession = this;
-	mpDesyncManager = std::make_unique<engine::ClientDesyncCore>();
+	mpDesyncCore = std::make_unique<engine::ClientDesyncCore>();
 	mpReconciler = std::make_unique<ClientReconciler>();
 	mpRuntime = std::make_unique<engine::ClientSessionRuntime>(*this);
 }
@@ -137,7 +137,7 @@ void ClientSession::UpdatePlayerCoord(engine::global_id_t globalPlayerId, engine
 
 void ClientSession::Reconcile()
 {
-	if (mpDesyncManager->IsStalled())
+	if (mpDesyncCore->IsStalled())
 	{
 		return;
 	}
@@ -152,7 +152,7 @@ void ClientSession::Reconcile()
 			engine::ReconcileDesyncInfo desyncInfo = mpReconciler->Run();
 			if (desyncInfo.bDesync)
 			{
-				mpDesyncManager->OnDesyncDetected(std::move(desyncInfo));
+				mpDesyncCore->OnDesyncDetected(std::move(desyncInfo));
 			}
 		}
 		mpRuntime->ApplyClockCorrection(iCurrentTick);
@@ -192,8 +192,8 @@ void ClientSession::OnConnectionAccepted()
 
 void ClientSession::PollDesyncState()
 {
-	mpDesyncManager->PollDebugFrameResponse();
-	mpDesyncManager->PollDesyncTimeout();
+	mpDesyncCore->PollDebugFrameResponse();
+	mpDesyncCore->PollDesyncTimeout();
 }
 
 void ClientSession::OnConnectionLost()
@@ -238,7 +238,7 @@ void ClientSession::OnServerLoad()
 
 	// Reset game-owned reconciliation and desync state.
 	mpReconciler->Reset();
-	mpDesyncManager->Reset();
+	mpDesyncCore->Reset();
 }
 
 void ClientSession::OnRuntimeDisconnected()
@@ -248,7 +248,7 @@ void ClientSession::OnRuntimeDisconnected()
 	{
 		rFrames.ResetClientState();
 	}
-	mpDesyncManager->Reset();
+	mpDesyncCore->Reset();
 }
 
 void ClientSession::OnCoordReleased(engine::GridCoord coord)

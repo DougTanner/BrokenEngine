@@ -215,7 +215,7 @@ void GameBase::ClientUpdate()
 		game::gpClientSession->mpRuntime->PollAndDrain(networkTimeState);
 	}
 
-	if (game::gpClientSession->mpDesyncManager->IsStalled())
+	if (game::gpClientSession->mpDesyncCore->IsStalled())
 	{
 		return;
 	}

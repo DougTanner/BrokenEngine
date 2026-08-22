@@ -215,11 +215,11 @@ void ProfileManagerBase::FormatNetworkPrediction(common::Workbuffer& rWorkbuffer
 	rWorkbuffer.Append("  Buffer: ");
 	rWorkbuffer.Append(mSmoothedBuffer.Get());
 	rWorkbuffer.Append("\nDesync: ");
-	bool bDesync = game::gpClientSession->mpDesyncManager->GetDesyncTick() >= 0;
+	bool bDesync = game::gpClientSession->mpDesyncCore->GetDesyncTick() >= 0;
 	if (bDesync)
 	{
 		rWorkbuffer.Append("Yes (");
-		rWorkbuffer.Append(game::gpClientSession->mpDesyncManager->GetDesyncTick());
+		rWorkbuffer.Append(game::gpClientSession->mpDesyncCore->GetDesyncTick());
 		rWorkbuffer.Append(")");
 		if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 		{
