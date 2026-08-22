@@ -11,7 +11,7 @@ sparse components on an otherwise dense collection.
 Analysis Found No Need
 ----------------------
 - MissilesPostRender has target vs untargeted fields, but the waste is ~24 bytes per missile
-  (one target_t + one XMVECTOR). With typical counts of dozens to low hundreds, this is kilobytes.
+  (one engine::registry_id_t + one XMVECTOR). With typical counts of dozens to low hundreds, this is kilobytes.
   The code handles the variant cleanly with a simple IsValid() branch.
 - PlayersPostRender AI fields are used uniformly by ALL players — no per-index override
   (the Frame does not privilege any player; the flagship/follower distinction lives at the Game

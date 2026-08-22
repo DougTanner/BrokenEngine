@@ -40,11 +40,11 @@ Split out of the retired `WaterFoamAndRefraction.txt` (foam went to `WaterFoam.m
 
 ## Coordination
 
-- `Documents/Features/Graphics/HeatDistortionAndShockwave.txt`: mandatory reciprocal scene-color-copy coordination. Either plan may land first; the first creates the shared `RenderTargetTextures` resource from `gpSwapchainManager->mHdrTexture` (F16, pre-resolve), and the later plan reuses it and verifies both copy points.
+- `Documents/Features/Graphics/HeatDistortionAndShockwave.md`: mandatory reciprocal scene-color-copy coordination. Either plan may land first; the first creates the shared `RenderTargetTextures` resource from `gpSwapchainManager->mHdrTexture` (F16, pre-resolve), and the later plan reuses it and verifies both copy points.
 
 ## Notes
 
 - Client-only rendering path; no determinism/CRC exposure.
 - **The render-pass split is the risk center**: MSAA resolve-vs-copy path, image layout transitions on the swapchain/resolve image, and any assumptions elsewhere that the main pass is a single begin/end. Pre-staged decision for `/external-grill-plan`: verify the current MSAA configuration and pick `vkCmdResolveImage` vs `vkCmdCopyImage` accordingly.
-- **Shared infrastructure**: `HeatDistortionAndShockwave.txt` also needs a scene-color copy. Whichever lands first creates `mSceneColorCopyTexture`; the other reuses it (different copy points, so confirm both copy sites can share one texture or need two).
+- **Shared infrastructure**: `HeatDistortionAndShockwave.md` also needs a scene-color copy. Whichever lands first creates `mSceneColorCopyTexture`; the other reuses it (different copy points, so confirm both copy sites can share one texture or need two).
 - If `HdrResolveAndColorGrading.txt` lands first, the copy should target the HDR intermediate format (`R16G16B16A16_SFLOAT`) instead of the swapchain format.
