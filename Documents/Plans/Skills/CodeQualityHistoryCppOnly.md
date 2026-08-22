@@ -433,11 +433,10 @@ they assert behavior that will no longer exist.
   read-only sandbox). Sequencing note only: that plan and this one both edit
   `Invoke-CodeQualityMetricsHistory.ps1`, so whichever lands second rebases onto the
   first. Do not absorb or fix it here.
-- `Documents/Plans/Skills/FinalizeCandidateStaleBaseHistoryBlock.md` and
-  `Documents/Plans/Skills/FinalizeChangesCandidateOrderContradiction.md` describe
-  candidate-creation blocks caused by frequent history-overlay commits on primary.
-  This change makes overlay commits rare but does not remove them, so both plans
-  remain valid and separately owned. Sequencing note only.
+- `Documents/Plans/Skills/FinalizeCandidateStaleBaseHistoryBlock.md` remains the
+  surviving owner of the baseline-aware session-route scope for candidate-creation
+  blocks caused by history-overlay commits on primary. This change makes overlay
+  commits rare but does not remove them. Sequencing note only.
 - No rewrite, pruning, or renumbering of the existing 19 `carry-forward` rows or of
   any tracked history byte. `Get-EffectiveRows` already inherits values across such
   rows, so they keep rendering correctly.

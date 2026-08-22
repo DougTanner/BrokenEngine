@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T13:38:36.335Z","dependsOn":["Documents/Plans/Skills/FinalizeCandidateStaleBaseHistoryBlock.md","Documents/Plans/Skills/FinalizeChangesCandidateOrderContradiction.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T13:38:36.335Z","dependsOn":["Documents/Plans/Skills/FinalizeCandidateStaleBaseHistoryBlock.md"]} -->
 # Fix: /finalize-changes step 4 — relax the exact PrimaryTip match to disjoint foreign movement
 
 ## Context
@@ -84,8 +84,9 @@ The mechanism is decided; no investigation is required before implementing it.
    patch; every non-byte-identical divergence keeps today's blocked meaning and
    returns for refreshed review and confirmation.
 
-Both `dependsOn` prerequisites rewrite the neighbouring wording region of the
-same `SKILL.md`, so they land first and this Plan starts from their wording.
+The `dependsOn` prerequisite rewrites the neighbouring wording region of the
+same `SKILL.md`, so it lands first and this Plan starts from its wording. Step
+2's ordering wording remains unchanged and is out of scope for this Plan.
 
 ## Critical files
 
@@ -120,10 +121,10 @@ that conditional case.
   `-ExpectedPrimaryTip` handling.
 - `Invoke-FinalizeCandidateCommit.ps1`, `Invoke-FinalizeApprovalPreparation.ps1`,
   `Invoke-FinalizeLockClaim.ps1`, and `Show-FinalizeApprovalReview.ps1`.
-- Step 2's ordering wording (owned by
-  `Documents/Plans/Skills/FinalizeChangesCandidateOrderContradiction.md`) and
-  the stale-base history block message (owned by
-  `Documents/Plans/Skills/FinalizeCandidateStaleBaseHistoryBlock.md`).
+- Step 2's ordering wording remains unchanged and is out of scope for this
+  Plan.
+- The stale-base history block message is owned by
+  `Documents/Plans/Skills/FinalizeCandidateStaleBaseHistoryBlock.md`.
 - The `primary-commit` route, the landing lock's own lease and compare-and-swap
   machinery, and the history producer under
   `.agents/skills/code-quality-metrics/scripts/`.

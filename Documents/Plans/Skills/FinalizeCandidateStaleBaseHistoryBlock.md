@@ -1,125 +1,106 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T13:04:09.132Z","dependsOn":[]} -->
-# Fix: /finalize-changes — a stale session base is reported as the session changing history files
+# Fix: /finalize-changes — compare session history from the validated Baseline
 
 ## Context
 
-During `/finalize-changes` step 2 (session landing of
-`Documents/Plans/Common/RemoveUnusedLaunchExecutable.md`), the documented
-invocation of
-`.agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1`
-with `-Route session-landing` returned exit `2`, `status: blocked`, code
-`history.source-changed`, message "The candidate source patch changes
-generator-owned history JSONL/SVG paths."
+Plan completion leaves the target deletion and direct-child dependency-marker
+rewrite uncommitted in the session worktree. Candidate creation is the
+mechanism that commits those prepared Plan changes. The session route in
+`.agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1:123`
+currently calls `Assert-HistoryTreeUnchanged $current $ExpectedPrimaryTip
+$ExpectedCurrentTip`; the helper at line 77 diffs the reserved history JSONL
+and SVG paths between those tips. When primary alone adds a history-overlay
+commit after the session's fork, that comparison falsely attributes the
+primary-only bytes to the session patch and blocks with `history.source-changed`.
+Pre-candidate rebase is therefore not the canonical fix: it changes the
+session context before the operation that is meant to commit the prepared
+changes.
 
-Nothing in that session touched any history path. The real situation was that
-primary had advanced to commit `c847a2766ff71e0ffca7ad91b2fa7daa945feed3` — a
-code-quality history-overlay commit touching only
-`.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl`,
-the sibling `.svg`, and a new Plan document — while the session tip still
-predated it. The guard is
-`Invoke-FinalizeCandidateCommit.ps1:123`, which calls
-`Assert-HistoryTreeUnchanged $current $ExpectedPrimaryTip $ExpectedCurrentTip`;
-that helper at `Invoke-FinalizeCandidateCommit.ps1:77` diffs the history JSONL
-and SVG paths between the primary tip and the session tip, so a session whose
-base predates any history-overlay commit shows those paths as differing even
-though the session never wrote them.
+`.agents/scripts/AgentWorktreeSession.psm1:104-145` documents and returns
+`Baseline` as the session attribution/fork identity. It accepts a recorded
+baseline only while it remains on primary history, adjusts it to the detected
+divergence after rebases/history rewrites, and falls back through fork-point
+resolution before plain merge-base. The implementation should use this
+validated value rather than introduce a raw merge-base calculation.
 
-Rework forced: the worker rebased the session branch onto the primary tip with
-`git rebase --autostash` and re-ran candidate creation, which then passed
-cleanly. The message misdirects diagnosis (it names history paths and blames
-the session's own patch rather than a stale base), and every session whose base
-predates a history-overlay landing hits the same block and the same manual
-rebase-and-retry, although `.agents/skills/finalize-changes/SKILL.md:88-89`
-already orders a rebase onto the current primary tip as part of the same step.
-
-Session provenance (machine-local; not reproducible after cleanup). The Client
-through Worktree fields name the session that observed the friction — the
-session `/next-plan-review` must reach — while the `Landing ref` line names a
-ref whose tree actually contains this Plan:
-- Client: claude
-- Conversation session ID: e994fbb2-cb6b-4492-9520-8d06fff45780
-- Worktree/branch UUID: 2f89421f-fe17-4b1c-8639-482b99ca9470
-- Session branch: claude/2f89421f-fe17-4b1c-8639-482b99ca9470
-- Worktree: .claude\worktrees\BrokenEngine\2f89421f-fe17-4b1c-8639-482b99ca9470
-- Landing ref: claude/2f89421f-fe17-4b1c-8639-482b99ca9470
-  Fallback once the recorded ref is gone:
-  `git log --diff-filter=A --format=%H -- Documents/Plans/Skills/FinalizeCandidateStaleBaseHistoryBlock.md`,
-  but a periodic Plan-history squash can make it return an unrelated aggregate
-  commit, so review its result only when the commit is attributable to one
-  session alone (its diff limited to that session's files); never review an
-  aggregate or multi-session squash commit.
-- Run the review before /cleanup-worktrees removes the worktree recorded above:
-  Codex transcript discovery requires the producing worktree to remain
-  registered, and Claude review requires the exact conversation session ID
-  above.
+The historical transcript lookup returned structured `transcript.not-found`;
+current source and Git evidence settle the mechanism, so no transcript
+dependency is required.
 
 ## Design
 
-In a new session, run `/next-plan-review claude/2f89421f-fe17-4b1c-8639-482b99ca9470`,
-supplying the recorded client (claude) and the recorded conversation session ID
-above. Root-cause the friction from the proven transcript, then make the
-smallest fix inside the `## In scope` boundary below, which is a self-describing
-block and nothing more: when `Assert-HistoryTreeUnchanged` trips only because the
-session base predates a primary history-overlay commit, the blocked result must
-name that actual cause — the stale session base, the primary tip carrying the
-history-overlay commit — and direct the rebase onto the primary tip that step 2
-already orders. The block still blocks: candidate creation never rebases by
-itself, gains no new recovery machinery, and a session patch that genuinely
-writes the reserved history paths keeps its current blocked meaning. If
-root-causing shows the fix lies outside that boundary, surface it for
-re-planning instead of expanding scope.
+The Plan author's recommendation is to change only the session-landing
+comparison base from `ExpectedPrimaryTip` to the already validated and expanded
+`Baseline`, making the guard compare `Baseline..ExpectedCurrentTip`. Leave the
+shared helper, the primary-advance call site, candidate/rebase/approval
+ordering, and all automatic reconciliation behavior unchanged. Candidate
+creation then commits the owned prepared changes first; the normal workflow
+rebases the clean candidate onto current primary and refreshes context as
+already documented.
+
+This preserves the history safety boundary: genuine final-tree changes or
+deletions to either reserved path on the session side still block,
+dirty reserved paths still block, the primary-advance
+`Assert-HistoryTreeUnchanged` call remains unchanged, and no reserved bytes may
+land.
 
 ## Critical files
 
 - `.agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1` —
-  `Assert-HistoryTreeUnchanged` (line 77) and its `session-landing` call site
-  (line 123).
-- `.agents/skills/finalize-changes/references/scripts.md` — the documented
-  result codes and invocation for that script.
-- `.agents/skills/finalize-changes/SKILL.md` — step 2, which already orders the
-  rebase onto the current primary tip.
-
-These three files are the authorized fix boundary.
+  the `session-landing` comparison argument at line 123; the shared helper and
+  primary-advance call are read-only boundaries for this Plan.
+- `.agents/skills/finalize-changes/scripts/Test-FinalizeWorkflowFixtures.ps1` —
+  the smallest matching session-landing fixture additions for primary-only
+  history overlays, reserved-path changes/deletions, dirty reserved paths, and
+  the unchanged primary-advance route.
+- `.agents/skills/finalize-changes/references/scripts.md` — wording only if
+  required to document the changed session-route comparison.
+- `.agents/skills/finalize-changes/SKILL.md` — read-only and out of scope for
+  this Plan; do not modify it.
+- `.agents/scripts/AgentWorktreeSession.psm1` — evidence source only; do not
+  modify it for this Plan.
 
 ## In scope
 
-- Root-cause investigation via /next-plan-review, run with the recorded client
-  and the review ref named in `## Design`, plus the recorded conversation
-  session ID.
-- The smallest resulting fix, confined to the files named above: the blocked
-  result's message text and only the stale-base detection needed to produce it,
-  in `Assert-HistoryTreeUnchanged` and its `session-landing` call site, plus the
-  matching wording in `references/scripts.md` and `SKILL.md` step 2.
+- Change the `session-landing` `Assert-HistoryTreeUnchanged` base argument in
+  `Invoke-FinalizeCandidateCommit.ps1` from `ExpectedPrimaryTip` to `Baseline`.
+- Add the smallest matching topology fixtures in
+  `Test-FinalizeWorkflowFixtures.ps1` and update `references/scripts.md` only
+  if its wording becomes inaccurate.
+- Preserve existing dirty-path, primary-advance, candidate/rebase, approval,
+  landing, lock, history-generation, and automatic-reconciliation behavior.
 
 ## Out of scope
 
-- The landed change the session produced.
-- The `primary-commit` route, `Invoke-FinalizeLanding.ps1`, the landing lock,
-  and the history producer under
-  `.agents/skills/code-quality-metrics/scripts/`.
-- New recovery machinery: no new script, new result field beyond what the fix
-  requires, or new retry mechanism.
-- Automatic reconciliation: candidate creation must not rebase, reset, or
-  otherwise move the session branch on its own.
-- Unrelated skills/scripts; any transcript path or transcript text in the repo.
+- Changes to `Assert-HistoryTreeUnchanged` shared-helper semantics, the
+  primary-commit or primary-advance call, approval/landing/locks, the history
+  generator, automatic stash/rebase/retry, scheduler behavior, or unrelated
+  documentation/scripts.
+- Changes to `.agents/scripts/AgentWorktreeSession.psm1`; it supplies the
+  validated `Baseline`.
+- No change to `finalize-changes/SKILL.md` in this Plan; it is unconditionally
+  read-only and out of scope.
+- Unit tests, transcript paths, transcript text, or home paths.
 
 ## Risk tier and invariants
 
-Expected Tier 2 (scoped tool behavior: what the session-landing candidate route
-blocks on and reports); escalate if the fix reaches build/bootstrap
-coordination or the primary-advance path. The invariant that must survive: a
-session may never land bytes on the generator-owned history JSONL/SVG paths,
-so any relaxation must still block a session patch that genuinely writes them.
-Never embed transcript paths or home paths.
+Expected Tier 2 only when implementation is isolated to the session-route
+comparison argument plus targeted fixtures and any matching reference wording.
+The Plan author recommends escalating to Tier 3 if the change reaches shared
+helper semantics, primary-advance/history-overlay/landing behavior, or automatic
+reconciliation. The reserved JSONL/SVG paths remain generator-owned: session
+modification/deletion and dirty worktree/index state must still block, and no
+reserved bytes may land.
 
 ## Acceptance criteria
 
-- A session whose base predates a history-overlay commit and whose patch does
-  not touch history paths is still blocked, but the blocked result no longer
-  blames its own patch: it names the stale session base against the primary tip
-  and directs the rebase onto that tip.
-- Candidate creation performs no rebase or other automatic reconciliation.
-- A session patch that does change either reserved history path is still
-  blocked with its current meaning.
-- /validate-skill passes for `.agents/skills/finalize-changes/SKILL.md`; plan
-  validate exits 0.
+- A targeted fixture where primary alone adds reserved history bytes while the
+  session changes only normal owned paths reaches `candidate.created`.
+- The same topology with a session-side reserved-path modification or deletion
+  blocks with `history.source-changed`.
+- Dirty reserved worktree or index state still blocks with
+  `history.source-dirty`.
+- The primary-advance fixture and route remain unchanged.
+- `/validate-skill` passes for any changed skill file and plan validate exits 0
+  with `status: valid` and `code: ok`.
+- No unit tests are added.
