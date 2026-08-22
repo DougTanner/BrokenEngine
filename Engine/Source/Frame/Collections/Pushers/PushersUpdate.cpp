@@ -52,6 +52,7 @@ void PushersInterpolate::SetupZones([[maybe_unused]] game::Frame& __restrict rFr
 	gfPusherArenaLeft = XMVectorGetX(vecAnchor) - 0.5f * kfPusherArenaSize;
 	gfPusherArenaTop = XMVectorGetY(vecAnchor) + 0.5f * kfPusherArenaSize;
 
+	int64_t iDroppedRegistrations = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		XMFLOAT4A f4Position {};
@@ -85,6 +86,7 @@ void PushersInterpolate::SetupZones([[maybe_unused]] game::Frame& __restrict rFr
 				if (iPushersPerZone >= kiMaxPushersPerZone) [[unlikely]]
 				{
 					DEBUG_BREAK();
+					++iDroppedRegistrations;
 					continue;
 				}
 
@@ -92,6 +94,11 @@ void PushersInterpolate::SetupZones([[maybe_unused]] game::Frame& __restrict rFr
 				++gppuiPushersPerZone[x][y];
 			}
 		}
+	}
+
+	if (iDroppedRegistrations > 0) [[unlikely]]
+	{
+		LOG(kDefault, kWarning, "PushersInterpolate::SetupZones dropped {} pusher zone registrations (cap {} per zone)", iDroppedRegistrations, kiMaxPushersPerZone);
 	}
 }
 

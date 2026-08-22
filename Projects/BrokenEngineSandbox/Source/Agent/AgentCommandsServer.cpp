@@ -779,8 +779,20 @@ std::pair<engine::GridCoord, StatusChange> BuildInjectedChange(const nlohmann::j
 		int64_t iGlobalId = gpGame->GenerateGlobalId();
 		bool bIsFlagship = rChange.contains("isFlagship") && rChange.at("isFlagship").get<bool>();
 		engine::GridCoord fleetWantedCoord = rChange.contains("fleetWantedCoord") ? CoordFromParam(rChange, "fleetWantedCoord") : coord;
+		SpawnPlayerData spawn {.iGlobalId = iGlobalId, .bIsFlagship = bIsFlagship, .fleetWantedCoord = fleetWantedCoord, .uiPendingFleetWantedCoordTicks = 0};
+		if (rChange.contains("pos"))
+		{
+			// Range is not checked here: the consumer refuses an out-of-cell spawn, and a second copy of that rule would drift from it.
+			const nlohmann::json& rPos = rChange.at("pos");
+			if (!rPos.is_array() || rPos.size() != 2 || !rPos.at(0).is_number() || !rPos.at(1).is_number())
+			{
+				throw std::runtime_error("'pos' must be an [x,y] array of numbers");
+			}
+			spawn.fSpawnOffsetX = rPos.at(0).get<float>();
+			spawn.fSpawnOffsetY = rPos.at(1).get<float>();
+		}
 		change.eType = StatusChangeType::kSpawnPlayer;
-		change.data = SpawnPlayerData {.iGlobalId = iGlobalId, .bIsFlagship = bIsFlagship, .fleetWantedCoord = fleetWantedCoord, .uiPendingFleetWantedCoordTicks = 0};
+		change.data = spawn;
 		rGlobalIds.push_back(iGlobalId);
 	}
 	else if (type == "DestroyPlayer")

@@ -158,7 +158,7 @@ static int64_t StatusChangeItemWireSize(game::StatusChangeType eType)
 
 	switch (eType)
 	{
-		case game::StatusChangeType::kSpawnPlayer:       return kiI64 + kiU8 + kiCoord + kiU8;
+		case game::StatusChangeType::kSpawnPlayer:       return kiI64 + kiU8 + kiCoord + kiU8 + 2 * kiF32;
 		case game::StatusChangeType::kRespawnPlayer:     return 0;
 		case game::StatusChangeType::kTransferBlaster:   return 2 * kiVec4 + kiU8 + kiU32 + 3 * kiF32;
 		case game::StatusChangeType::kTransferSpaceship: return 3 * kiVec4 + kiU32 + 3 * kiF32;
@@ -197,6 +197,8 @@ static void SerializeGroup(uint8_t*& pCursor, game::StatusChangeType eType, cons
 				WriteUint8(pCursor, rSpawn.bIsFlagship ? 1 : 0);
 				WriteGridCoord(pCursor, rSpawn.fleetWantedCoord);
 				WriteUint8(pCursor, rSpawn.uiPendingFleetWantedCoordTicks);
+				WriteFloat(pCursor, rSpawn.fSpawnOffsetX);
+				WriteFloat(pCursor, rSpawn.fSpawnOffsetY);
 				break;
 			}
 			case game::StatusChangeType::kRespawnPlayer:
@@ -357,6 +359,8 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 					rSpawn.bIsFlagship = ReadUint8(cursor.pCursor) != 0;
 					rSpawn.fleetWantedCoord = ReadGridCoord(cursor.pCursor);
 					rSpawn.uiPendingFleetWantedCoordTicks = ReadUint8(cursor.pCursor);
+					rSpawn.fSpawnOffsetX = ReadFloat(cursor.pCursor);
+					rSpawn.fSpawnOffsetY = ReadFloat(cursor.pCursor);
 					break;
 				}
 				case game::StatusChangeType::kRespawnPlayer:

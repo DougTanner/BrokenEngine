@@ -57,6 +57,9 @@ struct SpawnPlayerData
 	bool bIsFlagship = false;
 	engine::GridCoord fleetWantedCoord {};
 	uint8_t uiPendingFleetWantedCoordTicks = 0;
+	// Spawn point in meters from the target cell's center. Defaults reproduce the historical fixed spawn point.
+	float fSpawnOffsetX = 45.0f;
+	float fSpawnOffsetY = -12.0f;
 	bool operator==(const SpawnPlayerData&) const = default;
 };
 

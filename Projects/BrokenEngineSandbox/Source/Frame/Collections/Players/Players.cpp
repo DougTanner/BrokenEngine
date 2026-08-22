@@ -269,6 +269,9 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			PlayerFlags_t spawnFlags {PlayerFlags::kBlasterSpawnLeft};
 			engine::GridCoord spawnFleetWantedCoord {};
 			uint8_t uiSpawnPendingFleetTicks = 0;
+			// kRespawnPlayer carries no payload, so it keeps SpawnPlayerData's own default offsets.
+			float fSpawnOffsetX = SpawnPlayerData{}.fSpawnOffsetX;
+			float fSpawnOffsetY = SpawnPlayerData{}.fSpawnOffsetY;
 			// kRespawnPlayer is reserved (no issuer repo-wide) — kept compilable, not wired up.
 			// TRAP: only kSpawnPlayer extracts SpawnPlayerData, so a respawn leaves globalPlayerId at 0.
 			// A wired-up respawn spawning with id 0 would be invisible to both global-id re-resolution scans
@@ -284,14 +287,25 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 				}
 				spawnFleetWantedCoord = rSpawnData.fleetWantedCoord;
 				uiSpawnPendingFleetTicks = rSpawnData.uiPendingFleetWantedCoordTicks;
+				fSpawnOffsetX = rSpawnData.fSpawnOffsetX;
+				fSpawnOffsetY = rSpawnData.fSpawnOffsetY;
 			}
 
 			// Compute frame center from world-space vecArea for spawn offset
 			float fCenterX = (XMVectorGetX(rStaticData.vecArea) + XMVectorGetZ(rStaticData.vecArea)) * 0.5f;
 			float fCenterY = (XMVectorGetW(rStaticData.vecArea) + XMVectorGetY(rStaticData.vecArea)) * 0.5f;
 
-			XMVECTOR vecSpawnPosition = XMVectorSet(fCenterX + 45.0f, fCenterY + (-12.0f), engine::gBaseHeight.Get(), 1.0f);
-			ASSERT(!engine::IsOutOfBounds(engine::ComputeFrameBounds(rStaticData.vecArea), vecSpawnPosition));
+			XMVECTOR vecSpawnPosition = XMVectorSet(fCenterX + fSpawnOffsetX, fCenterY + fSpawnOffsetY, engine::gBaseHeight.Get(), 1.0f);
+
+			// The offsets arrive over the wire, so refuse rather than clamp: a point outside this cell's bounds
+			// belongs to a neighbouring cell, which owns anything standing there. The single bounds test also
+			// rejects NaN and +/-inf, because under /fp:strict every NaN comparison is false and an infinity
+			// fails a strict bound, so junk offsets never reach Spawn's ValidateVector asserts below.
+			if (engine::IsOutOfBounds(engine::ComputeFrameBounds(rStaticData.vecArea), vecSpawnPosition)) [[unlikely]]
+			{
+				LOG(kNetwork, kWarning, "ProcessSpawnStatusChanges: spawn offset ({},{}) is outside cell ({},{}) - no player created", common::Wb(fSpawnOffsetX, 1), common::Wb(fSpawnOffsetY, 1), rStaticData.coord.x, rStaticData.coord.y);
+				continue;
+			}
 
 			PlayersPostRender::Spawn(rFrame,
 			{
