@@ -1,24 +1,19 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T22:37:53.442Z","dependsOn":["Documents/Plans/Skills/CodeQualityHistoryFixturePrefixContract.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T22:37:53.442Z","dependsOn":[]} -->
 # Update the code-quality history files only for C++ changes
 
 ## Context
 
-The code-quality history pair
-`.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl`
-and `.../CodeQualityMetricsHistory.svg` currently gains one new row on **every**
-landing, including landings that change no C++ at all. The live series proves it:
-of the rows after the immutable 648-line prefix, 1 is `catch-up`, 13 are
-`cpp-change`, and 19 are `carry-forward` — rows that only copy the previous row's
-values. The last two rows are byte-identical in every metric field:
+The tracked JSONL source for the code-quality history begins with the immutable
+133323-byte/648-line prefix and may contain a receipt-verified live suffix that
+grows over time. Fixture checks must treat the prefix as the stable contract and
+derive complete-source facts at execution from the exact committed source,
+including its current live suffix, rather than from fixed current row counts or
+indices.
 
-```
-{"index":678,"date":"2026-08-21","captureMode":"carry-forward","verbosity":0.03786124447,"structuralErosion":0.523999375544,"supported":526,"parsed":525}
-{"index":679,"date":"2026-08-21","captureMode":"carry-forward","verbosity":0.03786124447,"structuralErosion":0.523999375544,"supported":526,"parsed":525}
-```
-
-Row 679 came from a documentation-only landing: the producer classified the patch
-as `cppChanged: false`, chose `carry-forward`, and the landing still appended the
-row, regenerated the SVG, and committed both files as a post-confirmation overlay.
+`Documents/Plans/Skills/CodeQualityHistoryFixturePrefixContract.md` is the
+separate claimed Plan that repairs prefix/full-source fixture construction. This
+`CodeQualityHistoryCppOnly.md` continues to own the producer/finalizer no-overlay
+behavior and does not rewrite the immutable prefix or live history data.
 
 User direction (binding): both history files must change **only** for C++ changes.
 Documentation-only landings — and any landing with no metric-supported change —
