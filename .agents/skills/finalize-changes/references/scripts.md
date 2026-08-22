@@ -10,7 +10,12 @@ file/XML/log body. Exit/result/schema mismatches block.
 
 Use the root AGENTS.md canonical form — from the session worktree root, one
 script invocation per shell call, repo-relative path, no `-ExecutionPolicy`.
-Angle-bracket values are placeholders; quote every one.
+Angle-bracket values are placeholders; quote every one. `<owner-token>` is a
+canonical lowercase GUID in `8-4-4-4-12` form. For the lock claim, either omit
+`-LandingOwner` so `Invoke-FinalizeLockClaim.ps1` creates and returns one, or
+create one explicitly with `WorktreeCli lock token`; later commands that supply
+the already-held token, including `-AdvancePrimary`, carry it and do not create
+one.
 
 ```text
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route session-landing -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
