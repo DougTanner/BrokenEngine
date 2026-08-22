@@ -68,9 +68,6 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.fTime = rData.fTime,
 				.fNextJitter = rData.fNextJitter,
 				.bTransfer = true,
-#if defined(BT_CLIENT)
-				.smokeTrailId = rData.smokeTrailId,
-#endif
 			});
 			break;
 		}

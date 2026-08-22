@@ -45,12 +45,6 @@ static void SerializeMissileTransfer(uint8_t*& pCursor, const game::TransferData
 	WriteFloat(pCursor, rData.fDeltaRotation);
 	WriteFloat(pCursor, rData.fDeltaRotationMax);
 	WriteFloat(pCursor, rData.fPitch);
-#if defined(BT_CLIENT)
-	int64_t iSmokeTrailId = rData.smokeTrailId.ToUuid().Value();
-#else
-	int64_t iSmokeTrailId = 0;
-#endif
-	WriteInt64(pCursor, iSmokeTrailId);
 }
 
 static void SerializePlayerTransfer(uint8_t*& pCursor, const game::TransferData& rData)
@@ -112,10 +106,6 @@ static void DeserializeMissileTransfer(const uint8_t*& pCursor, game::TransferDa
 	rData.fDeltaRotation = ReadFloat(pCursor);
 	rData.fDeltaRotationMax = ReadFloat(pCursor);
 	rData.fPitch = ReadFloat(pCursor);
-	[[maybe_unused]] int64_t iSmokeTrailId = ReadInt64(pCursor);
-#if defined(BT_CLIENT)
-	rData.smokeTrailId = smoke_trails_t(engine::uuid_t(iSmokeTrailId));
-#endif
 }
 
 static void DeserializePlayerTransfer(const uint8_t*& pCursor, game::TransferData& rData)
@@ -162,7 +152,7 @@ static int64_t StatusChangeItemWireSize(game::StatusChangeType eType)
 		case game::StatusChangeType::kRespawnPlayer:     return 0;
 		case game::StatusChangeType::kTransferBlaster:   return 2 * kiVec4 + kiU8 + kiU32 + 3 * kiF32;
 		case game::StatusChangeType::kTransferSpaceship: return 3 * kiVec4 + kiU32 + 3 * kiF32;
-		case game::StatusChangeType::kTransferMissile:   return 3 * kiVec4 + kiU32 + 7 * kiF32 + kiI64;
+		case game::StatusChangeType::kTransferMissile:   return 3 * kiVec4 + kiU32 + 7 * kiF32;
 		case game::StatusChangeType::kTransferPlayer:    return 3 * kiVec4 + kiU32 + 10 * kiF32 + kiU16 + kiI64 + kiCoord + 2 * kiU8;
 		case game::StatusChangeType::kDestroyPlayer:     return kiI64;
 		case game::StatusChangeType::kUpdatePlayer:      return kiI64 + kiU8 + kiF32 + kiU8;

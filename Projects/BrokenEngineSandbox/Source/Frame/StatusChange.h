@@ -109,17 +109,9 @@ struct TransferData
 			rSelf.uiPendingWeaponModeTicks);
 	}
 
-	// Build-asymmetric by design: on BT_CLIENT builds == additionally folds the client-only smokeTrailId, so the
-	// compiled client API compares one more field than the server's. No existing consumer compares TransferData or
-	// StatusChange values, so the asymmetry is inert; if such a comparison is ever added, exclude smokeTrailId there
-	// so the two builds agree.
 	bool operator==(const TransferData& rOther) const
 	{
-		bool bEqual = SharedMembers() == rOther.SharedMembers();
-#if defined(BT_CLIENT)
-		bEqual = bEqual && smokeTrailId == rOther.smokeTrailId;
-#endif
-		return bEqual;
+		return SharedMembers() == rOther.SharedMembers();
 	}
 
 	XMVECTOR vecPosition = DirectX::XMVectorZero();
@@ -175,11 +167,6 @@ struct TransferData
 	// Client GUID (player transfers only, not serialized over network)
 	uint64_t uiClientGuidHigh = 0;
 	uint64_t uiClientGuidLow = 0;
-
-	// Smoke trail ID reuse (missiles only)
-#if defined(BT_CLIENT)
-	engine::smoke_trails_t smokeTrailId {};
-#endif
 };
 
 using StatusChangeData = std::variant<

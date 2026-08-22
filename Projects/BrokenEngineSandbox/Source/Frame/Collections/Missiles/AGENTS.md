@@ -9,4 +9,4 @@ Guided missiles own client-side exhaust light, smoke trail, and looping sound ef
 - Lifetime, velocity, falling state, boost-ramp delay, and turn rate cross cell boundaries; an arrival restores them verbatim and draws no fresh ramp delay. Falling disables propulsion, homing, target acquisition, and exhaust random draws; terrain impact at or below sea level removes the missile without explosion damage or effects.
 - Resolve the earliest entity, terrain, or boundary event before applying explosion or transfer behavior. All missile damage enters through the area-damage registration at explosion time.
 - Client-only pitch and exhaust values still draw from shared deterministic state. Both builds must execute those draws under the same shared-state conditions.
-- Live transfer may receive a new smoke-trail identity on arrival because smoke identity is client-local; destination lights and sounds are recreated. Falling arrivals create no client effects.
+- Live transfer always receives a new smoke-trail identity on arrival; destination lights and sounds are recreated. Falling arrivals create no client effects.

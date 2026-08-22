@@ -149,7 +149,7 @@ void XM_CALLCONV SyncMissile(FrameInterpolate& rFrameInterpolate, engine::area_l
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-void MissilesInterpolate::ClientInit(Frame& rFrame, int64_t iIndex, engine::smoke_trails_t smokeTrailReuseId)
+void MissilesInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 {
 	MissilesInterpolate& rMissiles = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rPostRender = *rFrame.postRender.pMissiles;
@@ -167,7 +167,7 @@ void MissilesInterpolate::ClientInit(Frame& rFrame, int64_t iIndex, engine::smok
 		? suiPlayerExhaustAreaLightTypeIndex : suiEnemyExhaustAreaLightTypeIndex;
 	rFrame.postRender.areaLights.Add(rFrame, rMissiles.puiAreaLights[iIndex], uiAreaLightType);
 
-	engine::SmokeTrailsPostRender::Add(rFrame, rMissiles.puiSmokeTrails[iIndex], suiSmokeTrailTypeIndex, smokeTrailReuseId);
+	engine::SmokeTrailsPostRender::Add(rFrame, rMissiles.puiSmokeTrails[iIndex], suiSmokeTrailTypeIndex);
 
 	engine::SoundsPostRender::Add(rFrame, rPostRender.puiSounds[iIndex]);
 
@@ -362,9 +362,6 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.fDeltaRotation = rCurrentPostRender.pfDeltaRotations[i],
 				.fDeltaRotationMax = rCurrentPostRender.pfDeltaRotationMax[i],
 				.fPitch = rCurrentPostRender.pfPitches[i],
-#if defined(BT_CLIENT)
-				.smokeTrailId = rCurrentInterpolate.puiSmokeTrails[i],
-#endif
 			},
 			.iPushedTick = rFrame.interpolate.iTick,
 		};
@@ -454,9 +451,7 @@ void MissilesPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const 
 
 	// Sync owned objects after Add()
 #if defined(BT_CLIENT)
-	// Smoke identity is client-local, so a live missile crossing a cell boundary may receive a new smoke trail on
-	// arrival; this rare visual discontinuity is accepted rather than adding cross-cell correlation state.
-	MissilesInterpolate::ClientInit(rFrame, iIndex, rInfo.smokeTrailId);
+	MissilesInterpolate::ClientInit(rFrame, iIndex);
 #endif // BT_CLIENT
 }
 

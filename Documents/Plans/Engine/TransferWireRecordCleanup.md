@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T16:59:23.415Z","dependsOn":["Documents/Plans/Engine/MissileSmokeTrailCarryReachability.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T16:59:23.415Z","dependsOn":[]} -->
 # Transfer Wire Record Cleanup: Remove the Dead Columns in One Batch
 
 ## Context

@@ -60,7 +60,7 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
 #if defined(BT_CLIENT)
-	static void ClientInit(Frame& rFrame, int64_t iIndex, engine::smoke_trails_t smokeTrailReuseId = {});
+	static void ClientInit(Frame& rFrame, int64_t iIndex);
 	static void ClientInitAll(Frame& rFrame);
 #endif
 
@@ -184,9 +184,6 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 		float fNextJitter = 0.0f;
 		// Arrival from a neighbouring cell: restore every carried value verbatim instead of defaulting.
 		bool bTransfer = false;
-#if defined(BT_CLIENT)
-		engine::smoke_trails_t smokeTrailId {};
-#endif
 	};
 
 	static void Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);
