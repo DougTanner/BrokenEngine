@@ -71,7 +71,11 @@ function Invoke-GitBytes([string]$Repository, [string[]]$Arguments) {
         $process.StandardOutput.BaseStream.CopyTo($bytes)
         $stderr = $process.StandardError.ReadToEnd()
         $process.WaitForExit()
-        if ($process.ExitCode -ne 0) { throw (($stderr.Trim()) -or 'git command failed.') }
+        if ($process.ExitCode -ne 0) {
+            $detail = $stderr.Trim()
+            if (-not $detail) { $detail = 'git command failed.' }
+            throw $detail
+        }
         return $bytes.ToArray()
     }
     finally {
@@ -328,7 +332,11 @@ function Invoke-ChildJson([string]$Repository, [string]$RelativeScript, [string[
     try { $output = @(& pwsh -NoProfile -File $RelativeScript @Arguments 2>&1); $exitCode = $LASTEXITCODE }
     finally { Pop-Location }
     $text = ($output | ForEach-Object { [string]$_ }) -join "`n"
-    if ($exitCode -ne 0) { throw (($text.Trim()) -or "Child script failed with exit $exitCode.") }
+    if ($exitCode -ne 0) {
+        $detail = $text.Trim()
+        if (-not $detail) { $detail = "Child script failed with exit $exitCode." }
+        throw $detail
+    }
     try { return ($text.Trim() | ConvertFrom-Json -Depth 64) } catch { throw "Child script did not return JSON: $text" }
 }
 function Get-BootstrapIdentity([string]$Repository) {

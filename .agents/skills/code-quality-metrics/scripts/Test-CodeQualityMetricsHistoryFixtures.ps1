@@ -136,6 +136,84 @@ function Test-BaseCommitHistoryBinding([string]$Root) {
     Assert-Fixture ($contract.ExitCode -eq 0) "BaseCommit Contract failed: $($contract.Text)"; $json = $contract.Text.Trim() | ConvertFrom-Json -Depth 64; $baseBytes = [IO.File]::ReadAllBytes($historyPath); $baseBytes = [byte[]]($baseBytes[0..($baseBytes.Length - $workingRowBytes.Length - 1)]); $expectedHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($baseBytes)).ToLowerInvariant()
     Assert-Fixture ($json.series.lastIndex -eq 647 -and $json.series.lastDate -eq '2026-08-20' -and $json.series.historyBytesSha256 -eq $expectedHash) 'Contract did not bind to the exact BaseCommit history bytes.'
 }
+function Test-ErrorDiagnostics([string]$Root) {
+    $gitFixtureRoot = Join-Path $Root ("Temp/history-fixture-missing-history-$([guid]::NewGuid().ToString('N'))")
+    New-Item -ItemType Directory -Force -Path (Join-Path $gitFixtureRoot '.agents/skills/code-quality-metrics/scripts'), (Join-Path $gitFixtureRoot '.agents/skills/code-quality-metrics/references/history'), (Join-Path $gitFixtureRoot 'Temp') | Out-Null
+    Copy-Item (Join-Path $Root '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1') (Join-Path $gitFixtureRoot '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1')
+    git -C $gitFixtureRoot init -q; git -C $gitFixtureRoot config user.email fixture@example.invalid; git -C $gitFixtureRoot config user.name Fixture; git -C $gitFixtureRoot add .; git -C $gitFixtureRoot commit -qm fixture-base
+    $gitBase = (git -C $gitFixtureRoot rev-parse HEAD).Trim()
+    $gitSourceBytes = [IO.File]::ReadAllBytes((Join-Path $Root '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl')); [IO.File]::WriteAllBytes((Join-Path $gitFixtureRoot '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'), [byte[]]$gitSourceBytes[0..133322])
+    git -C $gitFixtureRoot add .; git -C $gitFixtureRoot commit -qm fixture-history
+    $gitTip = (git -C $gitFixtureRoot rev-parse HEAD).Trim()
+    $gitFailure = Invoke-FixtureChild $gitFixtureRoot @('-Mode', 'Contract', '-RepositoryRoot', $gitFixtureRoot, '-BaseCommit', $gitBase, '-TipCommit', $gitTip)
+    Assert-Fixture ($gitFailure.ExitCode -eq 2) "missing-history Contract returned exit $($gitFailure.ExitCode): $($gitFailure.Text)"
+    Assert-Fixture ($gitFailure.Text -match 'fatal: path .*CodeQualityMetricsHistory\.jsonl') "missing-history Contract lost Git's diagnostic: $($gitFailure.Text)"
+    Assert-Fixture ($gitFailure.Text.Trim() -notmatch '^\s*\{') 'missing-history Contract emitted JSON text.'
+    Assert-Fixture ($gitFailure.Text -notmatch 'broken-engine-code-quality-history-contract/v1') 'missing-history Contract emitted typed JSON.'
+    Assert-Fixture ($gitFailure.Text -notmatch '(?im)^CodeQualityMetricsHistory:\s*True\s*$') 'missing-history Contract reduced Git diagnostics to Boolean True.'
+
+    $childFixtureRoot = Join-Path $Root ("Temp/history-fixture-missing-bootstrap-$([guid]::NewGuid().ToString('N'))")
+    New-Item -ItemType Directory -Force -Path (Join-Path $childFixtureRoot '.agents/skills/code-quality-metrics/scripts'), (Join-Path $childFixtureRoot '.agents/skills/code-quality-metrics/references/history'), (Join-Path $childFixtureRoot 'Temp/CodeQualityMetrics'), (Join-Path $childFixtureRoot 'Engine/Source') | Out-Null
+    Copy-Item (Join-Path $Root '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1') (Join-Path $childFixtureRoot '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1')
+    Copy-Item (Join-Path $Root '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1') (Join-Path $childFixtureRoot '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1')
+    $childSource = Join-Path $Root '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'
+    $childSourceBytes = [IO.File]::ReadAllBytes($childSource); $childSourcePrefix = [byte[]]$childSourceBytes[0..133322]; $childSourceRows = @([Text.UTF8Encoding]::new($false, $true).GetString($childSourcePrefix)) -split "`n"; $childLast = $childSourceRows[-2] | ConvertFrom-Json
+    $childLive = [ordered]@{ index = 647; date = '2026-08-20'; captureMode = 'catch-up'; verbosity = [double]$childLast.verbosity; structuralErosion = [double]$childLast.structuralErosion; supported = [int]$childLast.supported; parsed = [int]$childLast.parsed }
+    $childLiveBytes = [Text.UTF8Encoding]::new($false).GetBytes(($childLive | ConvertTo-Json -Compress) + "`n")
+    $childHistoryPath = Join-Path $childFixtureRoot '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; [IO.File]::WriteAllBytes($childHistoryPath, [byte[]]($childSourcePrefix + $childLiveBytes))
+    $childCppPath = Join-Path $childFixtureRoot 'Engine/Source/HistoryFixture.cpp'; [IO.File]::WriteAllText($childCppPath, "int historyFixtureValue = 1;`n", [Text.UTF8Encoding]::new($false))
+    git -C $childFixtureRoot init -q; git -C $childFixtureRoot config user.email fixture@example.invalid; git -C $childFixtureRoot config user.name Fixture; git -C $childFixtureRoot add .; git -C $childFixtureRoot commit -qm fixture-base
+    $childBase = (git -C $childFixtureRoot rev-parse HEAD).Trim()
+    [IO.File]::WriteAllText($childCppPath, "int historyFixtureValue = 2;`n", [Text.UTF8Encoding]::new($false)); git -C $childFixtureRoot add .; git -C $childFixtureRoot commit -qm fixture-cpp-change
+    $childTip = (git -C $childFixtureRoot rev-parse HEAD).Trim()
+    $childFailure = Invoke-FixtureChild $childFixtureRoot @('-Mode', 'Contract', '-RepositoryRoot', $childFixtureRoot, '-BaseCommit', $childBase, '-TipCommit', $childTip)
+    Assert-Fixture ($childFailure.ExitCode -eq 2) "missing-bootstrap Contract returned exit $($childFailure.ExitCode): $($childFailure.Text)"
+    Assert-Fixture ($childFailure.Text -match 'CodeQualityMetrics:' -and $childFailure.Text -match 'ThirdParty[\\/]scb-check[\\/]requirements\.lock' -and $childFailure.Text -match 'does not exist') "missing-bootstrap Contract lost the substantive child diagnostic: $($childFailure.Text)"
+    Assert-Fixture ($childFailure.Text.Trim() -notmatch '^\s*\{') 'missing-bootstrap Contract emitted JSON text.'
+    Assert-Fixture ($childFailure.Text -notmatch 'broken-engine-code-quality-history-contract/v1') 'missing-bootstrap Contract emitted typed JSON.'
+    Assert-Fixture ($childFailure.Text -notmatch '(?im)^CodeQualityMetricsHistory:\s*True\s*$') 'missing-bootstrap Contract reduced child diagnostics to Boolean True.'
+
+    $historyScript = (Get-Content -Raw (Join-Path $Root '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1')) -replace "`r`n", "`n"
+    $gitBytesFallback = @(
+        'function Invoke-GitBytes([string]$Repository, [string[]]$Arguments) {'
+        '    $start = [Diagnostics.ProcessStartInfo]::new()'
+        '    $start.FileName = ''git.exe'''
+        '    $start.WorkingDirectory = $Repository'
+        '    $start.UseShellExecute = $false'
+        '    $start.CreateNoWindow = $true'
+        '    $start.RedirectStandardOutput = $true'
+        '    $start.RedirectStandardError = $true'
+        '    foreach ($argument in (@(''-C'', $Repository) + $Arguments)) { [void]$start.ArgumentList.Add($argument) }'
+        '    $process = [Diagnostics.Process]::new()'
+        '    $process.StartInfo = $start'
+        '    if (-not $process.Start()) { throw ''Could not start git.exe.'' }'
+        '    $bytes = [IO.MemoryStream]::new()'
+        '    try {'
+        '        $process.StandardOutput.BaseStream.CopyTo($bytes)'
+        '        $stderr = $process.StandardError.ReadToEnd()'
+        '        $process.WaitForExit()'
+        '        if ($process.ExitCode -ne 0) {'
+        '            $detail = $stderr.Trim()'
+        '            if (-not $detail) { $detail = ''git command failed.'' }'
+        '            throw $detail'
+        '        }'
+    ) -join "`n"
+    Assert-Fixture ($historyScript.Contains($gitBytesFallback)) 'Invoke-GitBytes does not retain its exact trim, empty-detail fallback, and throw branch.'
+    $childFallback = @(
+        'function Invoke-ChildJson([string]$Repository, [string]$RelativeScript, [string[]]$Arguments) {'
+        '    $output = @()'
+        '    Push-Location $Repository'
+        '    try { $output = @(& pwsh -NoProfile -File $RelativeScript @Arguments 2>&1); $exitCode = $LASTEXITCODE }'
+        '    finally { Pop-Location }'
+        '    $text = ($output | ForEach-Object { [string]$_ }) -join "`n"'
+        '    if ($exitCode -ne 0) {'
+        '        $detail = $text.Trim()'
+        '        if (-not $detail) { $detail = "Child script failed with exit $exitCode." }'
+        '        throw $detail'
+        '    }'
+    ) -join "`n"
+    Assert-Fixture ($historyScript.Contains($childFallback)) 'Invoke-ChildJson does not retain its exact trim, empty-detail fallback, and throw branch.'
+}
 function Test-CaptureRaceAndScbGuards([string]$Root) {
     $bootstrap = Get-Content -Raw (Join-Path $Root '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1')
     $history = Get-Content -Raw (Join-Path $Root '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1')
@@ -154,6 +232,7 @@ try {
     Test-CarryForwardZeroRuntime $root
     Test-CarryDateContainmentAndRepeat $root
     Test-BaseCommitHistoryBinding $root
+    Test-ErrorDiagnostics $root
     Test-CaptureRaceAndScbGuards $root
     Test-GeneratedOutput $root
     if ($RunCapture) {

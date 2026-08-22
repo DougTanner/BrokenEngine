@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T22:37:53.442Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T22:37:53.442Z","dependsOn":["Documents/Plans/Skills/CodeQualityHistoryFixturePrefixContract.md"]} -->
 # Update the code-quality history files only for C++ changes
 
 ## Context
@@ -502,6 +502,26 @@ Invariants that must hold unchanged:
   acceptance evidence.
 - `reviewer` — one fresh `/progressive-disclosure-review`, ordered after the prose
   edits, because the session changes `AGENTS.md` and `.agents/skills/**/*.md`.
+
+## Coordination
+
+`Documents/Plans/Skills/CodeQualityHistoryFixturePrefixContract.md` is this
+Plan's directional prerequisite and is carried in the metadata. It owns the
+metrics fixture's source-shape and validator contract across
+`Test-PrefixAndSuffix`, `Test-CarryDateContainmentAndRepeat`, and
+`Test-BaseCommitHistoryBinding`: prefix-only synthetic construction,
+complete-source `Contract` acceptance, explicit zero-suffix evidence, and
+malformed UTF-8/schema/noncontiguous-index rejection through the production
+validator. This Plan remains the owner of producer/finalizer no-overlay
+behavior and its overlapping carry-forward/Generate and landing assertions in
+the same fixture file. Implement the prerequisite fixture regions first, then
+rebase this Plan's fixture edits, preserve both responsibilities, and re-derive
+line numbers after either edit. Neither Plan edits history data or the immutable
+prefix. The prerequisite Plan also owns a prose-only correction to this Plan's
+`## Context`: replace its volatile live-suffix row/count/index example with
+wording that describes a valid suffix which may grow from later receipt-verified
+overlays. That correction does not change this Plan's producer/finalizer
+behavior or its other sections.
 
 ## Acceptance criteria
 
