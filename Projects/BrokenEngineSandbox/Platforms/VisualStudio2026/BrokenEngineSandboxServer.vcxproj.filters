@@ -70,7 +70,7 @@
     <Filter Include="Game\Save">
       <UniqueIdentifier>{7f3a1b2c-4d5e-4a6b-9c8d-0e1f2a3b4c5d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Game\Server">
+    <Filter Include="Engine\Server">
       <UniqueIdentifier>{8a4b2c3d-5e6f-4b7c-8d9e-1f2a3b4c5d6e}</UniqueIdentifier>
     </Filter>
     <Filter Include="Game\Frame">
@@ -549,8 +549,11 @@
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Server\ServerDisplay.h">
-      <Filter>Game\Server</Filter>
+    <ClInclude Include="..\..\..\..\Engine\Source\Server\ServerDisplay.h">
+      <Filter>Engine\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\ServerCellStats.h">
+      <Filter>Game\Frame</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -855,8 +858,11 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Server\ServerDisplay.cpp">
-      <Filter>Game\Server</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Server\ServerDisplay.cpp">
+      <Filter>Engine\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\ServerCellStats.cpp">
+      <Filter>Game\Frame</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

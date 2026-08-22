@@ -2,7 +2,7 @@
 
 #if defined(BT_SERVER)
 
-namespace game
+namespace engine
 {
 
 void ServerUpdateDisplayStats();
@@ -10,6 +10,6 @@ bool ServerDisplayContentChanged();
 void PaintServerDisplay(HWND hWnd);
 void HandleServerClick(HWND hWnd, int64_t iX, int64_t iY);
 
-} // namespace game
+} // namespace engine
 
 #endif // BT_SERVER

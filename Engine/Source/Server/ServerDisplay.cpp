@@ -5,15 +5,14 @@
 #include "Server/ServerDisplay.h"
 
 #include "Network/Server/Server.h"
-
-#include "Game.h"
-#include "Frame/Collections/Players/Players.h"
-#include "Frame/Collections/Blasters/Blasters.h"
-#include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Profile/ProfileManager.h"
 
-namespace game
+// Direct include, deliberately outside the Engine.h aggregation: this is the one game header the display reads,
+// and routing it through the aggregation would put a game type in the shared PCH.
+#include "Frame/ServerCellStats.h"
+#include "Game.h"
+
+namespace engine
 {
 
 enum class ServerTab : uint8_t { kMap, kProfile };
@@ -34,6 +33,14 @@ static std::string sProfileText;
 // Dirty-check state for the throttled repaint: coarse hash of the last content the window drew.
 static uint64_t suLastContentHash = 0;
 static bool sbHasLastContentHash = false;
+
+// Entity totals the left panel draws, summed once per tick from the game cell-stat seam. File-static like the
+// rest of the display state (one window per process). Aggregation is skipped when profiling is compiled out,
+// so these stay zero and the entity rows read empty exactly as they did before.
+static int64_t siTotalPlayers = 0;
+static int64_t siTotalSpaceships = 0;
+static int64_t siTotalBlasters = 0;
+static int64_t siTotalMissiles = 0;
 
 // Persistent GDI objects (one window per process): the back-buffer DC/bitmap and font are created on first
 // paint and the bitmap is recreated only when the client size changes; the palette brushes/pens are a fixed
@@ -86,27 +93,23 @@ void ServerUpdateDisplayStats()
 		return;
 	}
 
-	int64_t iTotalPlayers = 0;
-	int64_t iTotalSpaceships = 0;
-	int64_t iTotalBlasters = 0;
-	int64_t iTotalMissiles = 0;
+	siTotalPlayers = 0;
+	siTotalSpaceships = 0;
+	siTotalBlasters = 0;
+	siTotalMissiles = 0;
 	int64_t iTotalExplosions = 0;
 
-	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
+	for (const GridCoord& rCoord : game::gpGame->mActiveCoords)
 	{
-		const game::Frame& rFrame = game::gpGame->CurrentFrame(rCoord);
-		iTotalPlayers += rFrame.interpolate.pPlayers->iCount;
-		iTotalSpaceships += rFrame.interpolate.pSpaceships->iCount;
-		iTotalBlasters += rFrame.interpolate.pBlasters->iCount;
-		iTotalMissiles += rFrame.interpolate.pMissiles->iCount;
-		iTotalExplosions += rFrame.interpolate.explosions.iCount;
+		game::ServerCellStats cellStats = game::GetServerCellStats(game::gpGame->CurrentFrame(rCoord));
+		siTotalPlayers += cellStats.iPlayers;
+		siTotalSpaceships += cellStats.iSpaceships;
+		siTotalBlasters += cellStats.iBlasters;
+		siTotalMissiles += cellStats.iMissiles;
+		iTotalExplosions += cellStats.iExplosions;
 	}
 
-	gpProfileManager->SetCount(game::kCpuCounterPlayers, iTotalPlayers);
-	gpProfileManager->SetCount(game::kCpuCounterSpaceships, iTotalSpaceships);
-	gpProfileManager->SetCount(game::kCpuCounterBlasters, iTotalBlasters);
-	gpProfileManager->SetCount(game::kCpuCounterMissiles, iTotalMissiles);
-	gpProfileManager->SetCount(engine::kCpuCounterExplosions, iTotalExplosions);
+	gpProfileManager->SetCount(kCpuCounterExplosions, iTotalExplosions);
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
 	mi_stats_merge();
@@ -140,26 +143,26 @@ bool ServerDisplayContentChanged()
 
 	Mix(static_cast<int64_t>(seActiveTab));
 
-	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
+	for (const GridCoord& rCoord : game::gpGame->mActiveCoords)
 	{
 		Mix(rCoord.x);
 		Mix(rCoord.y);
 
 		// Mix each count separately — summing would alias conversions (e.g. spaceship death -1 spaceship
 		// +1 explosion leaves the sum unchanged) and skip a repaint whose displayed numbers did change.
-		const game::Frame& rFrame = game::gpGame->CurrentFrame(rCoord);
-		Mix(rFrame.interpolate.pPlayers->iCount);
-		Mix(rFrame.interpolate.pSpaceships->iCount);
-		Mix(rFrame.interpolate.pBlasters->iCount);
-		Mix(rFrame.interpolate.pMissiles->iCount);
-		Mix(rFrame.interpolate.explosions.iCount);
+		game::ServerCellStats cellStats = game::GetServerCellStats(game::gpGame->CurrentFrame(rCoord));
+		Mix(cellStats.iPlayers);
+		Mix(cellStats.iSpaceships);
+		Mix(cellStats.iBlasters);
+		Mix(cellStats.iMissiles);
+		Mix(cellStats.iExplosions);
 	}
 
-	const std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
+	const std::vector<ClientConnection>& rClients = gpServer->mClients;
 	Mix(static_cast<int64_t>(rClients.size()));
-	for (const engine::ClientConnection& rClient : rClients)
+	for (const ClientConnection& rClient : rClients)
 	{
-		for (const engine::GridCoord& rOwnedCoord : rClient.authorizedCoords)
+		for (const GridCoord& rOwnedCoord : rClient.authorizedCoords)
 		{
 			Mix(rOwnedCoord.x);
 			Mix(rOwnedCoord.y);
@@ -167,7 +170,7 @@ bool ServerDisplayContentChanged()
 
 		for (int64_t i = 0; i < std::ssize(rClient.slots); ++i)
 		{
-			if (rClient.slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive)
+			if (rClient.slots.at(i).subscription.flags & SubscriptionFlags::kActive)
 			{
 				Mix(rClient.slots.at(i).subscription.coord.x);
 				Mix(rClient.slots.at(i).subscription.coord.y);
@@ -190,7 +193,7 @@ bool ServerDisplayContentChanged()
 	return true;
 }
 
-static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMapLeft, int iMapTop, int iMapWidth, int iMapHeight, const std::vector<engine::ClientConnection>& rClients)
+static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMapLeft, int iMapTop, int iMapWidth, int iMapHeight, const std::vector<ClientConnection>& rClients)
 {
 	if (game::gpGame->mActiveCoords.empty())
 	{
@@ -203,7 +206,7 @@ static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMap
 	int32_t iMinY = game::gpGame->mActiveCoords.at(0).y;
 	int32_t iMaxY = iMinY;
 
-	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
+	for (const GridCoord& rCoord : game::gpGame->mActiveCoords)
 	{
 		iMinX = std::min(iMinX, rCoord.x);
 		iMaxX = std::max(iMaxX, rCoord.x);
@@ -241,12 +244,12 @@ static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMap
 			int iCellTop = iMapTop + iOffsetY + (iMaxY - gy) * iCellSize;
 			RECT cellRect {iCellLeft, iCellTop, iCellLeft + iCellSize, iCellTop + iCellSize};
 
-			engine::GridCoord coord {gx, gy};
+			GridCoord coord {gx, gy};
 			bool bIsActive = false;
 			bool bIsSubscribed = false;
 			int64_t iClientsInCell = 0;
 
-			for (const engine::GridCoord& rActiveCoord : game::gpGame->mActiveCoords)
+			for (const GridCoord& rActiveCoord : game::gpGame->mActiveCoords)
 			{
 				if (rActiveCoord == coord)
 				{
@@ -255,9 +258,9 @@ static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMap
 				}
 			}
 
-			for (const engine::ClientConnection& rClient : rClients)
+			for (const ClientConnection& rClient : rClients)
 			{
-				for (const engine::GridCoord& rOwnedCoord : rClient.authorizedCoords)
+				for (const GridCoord& rOwnedCoord : rClient.authorizedCoords)
 				{
 					if (rOwnedCoord == coord)
 					{
@@ -307,12 +310,8 @@ static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMap
 			// Cell labels for active cells
 			if (bIsActive && iCellSize >= 24)
 			{
-				const game::Frame& rFrame = game::gpGame->CurrentFrame(coord);
-				int64_t iEntityCount = rFrame.interpolate.pPlayers->iCount +
-				                       rFrame.interpolate.pSpaceships->iCount +
-				                       rFrame.interpolate.pBlasters->iCount +
-				                       rFrame.interpolate.pMissiles->iCount +
-				                       rFrame.interpolate.explosions.iCount;
+				game::ServerCellStats cellStats = game::GetServerCellStats(game::gpGame->CurrentFrame(coord));
+				int64_t iEntityCount = cellStats.iPlayers + cellStats.iSpaceships + cellStats.iBlasters + cellStats.iMissiles + cellStats.iExplosions;
 
 				SetTextColor(hdcBuffer, RGB(220, 220, 220));
 
@@ -444,7 +443,7 @@ static void PaintProfilePanel(HDC hdcBuffer, int iLeft, int iTop, [[maybe_unused
 	// CPU timers
 	{
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		engine::FormatCpuTimersText(rWorkbuffer, *gpProfileManager, bReevaluate);
+		FormatCpuTimersText(rWorkbuffer, *gpProfileManager, bReevaluate);
 		std::string_view svTimers = rWorkbuffer.View();
 		SetTextColor(hdcBuffer, RGB(220, 220, 220));
 		PaintWorkbufferText(hdcBuffer, svTimers, iTextX, iTextY, iLineHeight);
@@ -456,7 +455,7 @@ static void PaintProfilePanel(HDC hdcBuffer, int iLeft, int iTop, [[maybe_unused
 	// CPU counters
 	{
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		engine::FormatCpuCountersText(rWorkbuffer, *gpProfileManager, bReevaluate);
+		FormatCpuCountersText(rWorkbuffer, *gpProfileManager, bReevaluate);
 		std::string_view svCounters = rWorkbuffer.View();
 		SetTextColor(hdcBuffer, RGB(150, 220, 150));
 		PaintWorkbufferText(hdcBuffer, svCounters, iTextX, iTextY, iLineHeight);
@@ -578,12 +577,12 @@ void PaintServerDisplay(HWND hWnd)
 	SetBkMode(hdcBuffer, TRANSPARENT);
 
 	// Read frame data from origin coord
-	const game::Frame& rOriginFrame = game::gpGame->CurrentFrame(engine::kOriginCoord);
-	int64_t iTick = rOriginFrame.interpolate.iTick;
-	float fCurrentTime = rOriginFrame.interpolate.fCurrentTime;
+	game::ServerCellStats originStats = game::GetServerCellStats(game::gpGame->CurrentFrame(kOriginCoord));
+	int64_t iTick = originStats.iTick;
+	float fCurrentTime = originStats.fCurrentTime;
 
 	// Gather connected client info
-	const std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
+	const std::vector<ClientConnection>& rClients = gpServer->mClients;
 	int64_t iClientCount = static_cast<int64_t>(rClients.size());
 
 	int64_t iActiveCells = static_cast<int64_t>(game::gpGame->mActiveCoords.size());
@@ -621,11 +620,11 @@ void PaintServerDisplay(HWND hWnd)
 	// Entity counts
 	SetTextColor(hdcBuffer, RGB(150, 220, 150));
 
-	textLine("Players: %lld", gpProfileManager->GetCpuCounter(game::kCpuCounterPlayers).iCount);
-	textLine("Spaceships: %lld", gpProfileManager->GetCpuCounter(game::kCpuCounterSpaceships).iCount);
-	textLine("Blasters: %lld", gpProfileManager->GetCpuCounter(game::kCpuCounterBlasters).iCount);
-	textLine("Missiles: %lld", gpProfileManager->GetCpuCounter(game::kCpuCounterMissiles).iCount);
-	iTextLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "Explosions: %lld", gpProfileManager->GetCpuCounter(engine::kCpuCounterExplosions).iCount), static_cast<int>(sizeof(pcLine)) - 1);
+	textLine("Players: %lld", siTotalPlayers);
+	textLine("Spaceships: %lld", siTotalSpaceships);
+	textLine("Blasters: %lld", siTotalBlasters);
+	textLine("Missiles: %lld", siTotalMissiles);
+	iTextLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "Explosions: %lld", gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount), static_cast<int>(sizeof(pcLine)) - 1);
 	TextOutA(hdcBuffer, iTextX, iTextY, pcLine, iTextLength);
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
@@ -664,6 +663,6 @@ void PaintServerDisplay(HWND hWnd)
 	EndPaint(hWnd, &ps);
 }
 
-} // namespace game
+} // namespace engine
 
 #endif // BT_SERVER

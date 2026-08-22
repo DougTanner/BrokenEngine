@@ -6,6 +6,7 @@
 
 #include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
+#include "Frame/ServerCellStats.h"
 #include "Game.h"
 #include "Network/GamePacketType.h"
 #include "Network/PlayerEvents.h"
@@ -285,6 +286,9 @@ void ServerSession::FinalizeTickClients()
 	}
 	mpClientManager->DetectPlayerDeaths();
 	mpFleetManager->DetectDisconnectedPlayerDeaths();
+
+	// Post-swap, so the counters describe the tick that just finished, and once per advancing tick.
+	PublishServerEntityCounts();
 }
 
 void ServerSession::AddGameRequiredCoords()

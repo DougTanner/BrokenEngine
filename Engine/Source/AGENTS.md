@@ -51,4 +51,5 @@ The background DxDiag reader appends to its report string without a lock, and th
 - Memory (`Memory/AGENTS.md`) - Allocator and tracking
 - Network (`Network/AGENTS.md`) - ENet transport and discovery
 - Profile (`Profile/AGENTS.md`) - CPU/GPU profiling
+- Server (`Server/AGENTS.md`) - Headless server monitoring window
 - Ui (`Ui/AGENTS.md`) - Runtime settings and screens

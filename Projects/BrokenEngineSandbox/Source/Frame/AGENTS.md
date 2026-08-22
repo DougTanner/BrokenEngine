@@ -25,6 +25,8 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
 - `Frame::OwnershipLayer` maps the engine ownership layer onto the `PlayersPostRender` columns. Its by-value lifetime, its post-tick main-thread-only restriction, and the client-GUID write are engine contracts (`../../../../Engine/Source/Frame/AGENTS.md`).
 - The game phase overrides, not the engine base, clear the shared collision and area-damage queues, and they clear only after every collection has run that phase. A collection that consumes either queue must be registered so it runs ahead of that clear.
 - Bounds helpers use the `vecArea` lane convention expected by `common::InsideArea`. Seed coord-local RNG streams with distinct multipliers.
+- `GetServerCellStats` (`ServerCellStats.h`, server-only) is the whole game half of the engine-owned server monitoring window (`../../../../Engine/Source/Server/AGENTS.md`): it reads one cell's frame and returns its tick, time, and collection populations by value. Keep it observational — no stored state, no display knowledge — and add a field here rather than giving the display another way into game collections.
+- `PublishServerEntityCounts` (same header) is the server's only writer of the Players, Spaceships, Blasters, and Missiles profile counters, which on the client are published from the render path instead. It runs once per advancing tick from the post-tick client-finalize hook (`../Network/Server/AGENTS.md`) so the totals describe the tick that just finished; the monitoring window must not become a second writer, because a display is free to skip work and these counters are also what the agent profile query returns.
 
 ## See Also
 

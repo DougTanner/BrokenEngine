@@ -11,6 +11,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 - `Fleet` is the shared data model and uses persistent identifiers assigned by the server. `FleetSelection` is client-only focus and navigation UI state.
 - `ClientSession` and `ServerSession` are game-policy wrappers that compose engine-owned session runtimes. See `Network/AGENTS.md`.
 - `GameSaveLoad` is server-only and orchestrates save, load, reset, and autosave. Replay recording and playback are engine-owned (`../../../Engine/Source/File/AGENTS.md`); the game half of that contract and of the grid save lives in `Save/AGENTS.md`.
+- The server monitoring window is engine-owned (`../../../Engine/Source/Server/AGENTS.md`); the game reaches it only through the per-cell population snapshot in `Frame/AGENTS.md` and the profile counters it publishes for its own reasons.
 - Display input is engine-owned (`../../../Engine/Source/Input/AGENTS.md`). The game's only display-input entry point is `Game::ProcessGameMenuInput`, which `GameBase::ProcessInput` calls last, after engine menu policy: it polls its own keys through the borrowed `engine::InputPoll` and owns the game network transport for the generic save/replay/time/pause flags. Everything it does is `kbDebugInput`-only today.
 - Agent commands are game-dispatched, but transport, synthetic input, UI snapshots, the build-agnostic shared handlers, and the client-generic handlers are engine-owned; the dispatcher tries the engine shared handlers before its side-specific ones, and under `BT_CLIENT` tries the engine client-generic handler before its own client handlers. See `Agent/AGENTS.md`.
 
@@ -32,7 +33,6 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 - `Network/AGENTS.md` - Game protocol and sessions
 - `Profile/AGENTS.md` - Game profiling counters
 - `Save/AGENTS.md` - Server save/load orchestration and the game half of the replay contract
-- `Server/AGENTS.md` - Server monitoring window
 - `Ui/AGENTS.md` - HUD and settings
 
 ## See Also

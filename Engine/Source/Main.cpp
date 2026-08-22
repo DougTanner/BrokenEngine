@@ -234,6 +234,20 @@ void MainThread(HINSTANCE hinstance)
 	}
 	common::ScopedLambda destroyWindow([]()
 	{
+#if defined(BT_SERVER)
+		// Shutdown has definitely begun by here on every path, including an exception unwinding out of the main
+		// loop, so the WM_LBUTTONDOWN guard below this drain holds even when nothing set the flag earlier.
+		sbQuit = true;
+
+		// Drop any paint region an external event (uncover, resize, DPI change) added after the main loop's final
+		// drain: the server display reads game state, and by here the game object is already gone. ValidateRect
+		// leaves nothing for this drain to dispatch WM_PAINT for, and nothing invalidates the window afterwards.
+		// The null check is required, not defensive — ValidateRect(nullptr) redraws every window in the system.
+		if (sHwnd != nullptr)
+		{
+			ValidateRect(sHwnd, nullptr);
+		}
+#endif
 		ProcessMessages();
 
 		if (sHwnd != nullptr)
@@ -425,7 +439,7 @@ void MainThread(HINSTANCE hinstance)
 		{
 			// Heap: Win32 InvalidateRect may trigger internal GDI allocations
 			ScopedSuppressAllocationTracking suppress;
-			game::ServerUpdateDisplayStats();
+			ServerUpdateDisplayStats();
 
 			// Throttle full-window GDI repaint to a fraction of the tick rate — paint cost dwarfs stat aggregation, and the window shows only coarse stats/map. Clicks still repaint immediately via WM_LBUTTONDOWN.
 			static constexpr int64_t kiServerDisplayRepaintTicks = 8;
@@ -441,7 +455,7 @@ void MainThread(HINSTANCE hinstance)
 				if (!IsIconic(sHwnd) && IsWindowVisible(sHwnd))
 				{
 					bool bHeartbeat = ++siServerDisplayHeartbeatCounter >= kiServerDisplayHeartbeatWindows;
-					if (game::ServerDisplayContentChanged() || bHeartbeat)
+					if (ServerDisplayContentChanged() || bHeartbeat)
 					{
 						siServerDisplayHeartbeatCounter = 0;
 						InvalidateRect(sHwnd, nullptr, FALSE);
@@ -652,7 +666,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			// Heap: GDI painting creates/destroys kernel objects that may trigger CRT allocations
 			ScopedSuppressAllocationTracking suppress;
-			game::PaintServerDisplay(hWnd);
+			PaintServerDisplay(hWnd);
 			return 0;
 		}
 
@@ -670,7 +684,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		case WM_LBUTTONDOWN:
 		{
-			game::HandleServerClick(hWnd, LOWORD(lParam), HIWORD(lParam));
+			// Once shutdown has begun, ignore the click instead of invalidating: the teardown drain after the game
+			// object is gone would dispatch the resulting WM_PAINT into the game-state-reading server display.
+			// Losing a repaint from a click during shutdown is fine.
+			if (sbQuit)
+			{
+				return 0;
+			}
+
+			HandleServerClick(hWnd, LOWORD(lParam), HIWORD(lParam));
 			InvalidateRect(hWnd, nullptr, FALSE);
 			return 0;
 		}

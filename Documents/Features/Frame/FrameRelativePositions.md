@@ -112,7 +112,7 @@ Everything the GPU or render path sees must be in the same camera-frame-relative
 
 ### 9. Server GDI monitoring window (server)
 
-The server-only GDI monitor (`Source/Server/`) is the one position consumer with no camera frame to rebase into. Audit its position reads at execution; wherever it plots entities or cells in a world layout, convert per cell with `world = local + FrameOrigin(coord)` (display-only, non-CRC, trivially cheap at monitor refresh rates).
+The server-only GDI monitor (`Engine/Source/Server/ServerDisplay.cpp`) is the one position consumer with no camera frame to rebase into. Audit its position reads at execution; wherever it plots entities or cells in a world layout, convert per cell with `world = local + FrameOrigin(coord)` (display-only, non-CRC, trivially cheap at monitor refresh rates).
 
 ### 10. Serialization / CRC / determinism
 
