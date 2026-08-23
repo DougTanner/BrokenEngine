@@ -201,11 +201,7 @@ Keep the runtime-generated `node_repl` command and environment values intact; ed
 
 ## Compile
 
-- You can verify that everything is set up correctly by opening BrokenEnginePublic/DataPacker/Platforms/VisualStudio2026/DataPacker.sln
-	- Compile it in Release
-
-- Open BrokenEnginePublic/Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/BrokenEngineSandbox.sln
-    - Build in either Debug or Profile or Release (Build -> Build Solution)
-	    - The first time you compile, a pre-build event will build the Data Packer at BrokenEnginePublic/DataPacker/Platforms/VisualStudio2026/Output/DataPacker.exe
-	    - Any time data is changed, a pre-build event will run the Data Packer to export and package the data to BrokenEngineSandbox/Platforms/VisualStudio2026/Output/Data.bin
-	- Run with Visual Studio (Debug -> Start Debugging)
+Use [Documents/FreshMachineSetup.md](Documents/FreshMachineSetup.md) for
+new-machine bootstrap, [`/compile`](.agents/skills/compile/SKILL.md) for builds,
+and [`/agent-harness`](.agents/skills/agent-harness/SKILL.md) for live
+client/server verification.

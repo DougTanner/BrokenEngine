@@ -1,4 +1,5 @@
 # External show me your work
+Revisit When: a long-running session produces a documented important decision that cannot be reconstructed from its execution card, approved Plan, handoffs, and transcript, and the local opt-in ledger would have prevented the failure.
 
 ## Context
 

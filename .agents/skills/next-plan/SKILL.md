@@ -47,10 +47,8 @@ up only after the claim script below fast-forwards the session. For a tier-const
 prose of the top eligible candidates in that order until one matches, then claim
 that path.
 
-Keep the process current directory at the session worktree root for every
-bundled script invocation; never change into `.agents/skills/next-plan` or
-treat its `scripts/...` path as a working-directory instruction. For bare
-selection, run this command with no `-Plan` argument:
+Use the root AGENTS.md canonical invocation form. For bare selection, run this
+command with no `-Plan` argument:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1`
 For a requested normalized path or partial pattern, append `-Plan` and quote
 that value, for example:

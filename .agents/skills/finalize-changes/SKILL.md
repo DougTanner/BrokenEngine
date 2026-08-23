@@ -40,9 +40,7 @@ trigger.
 Every script this skill runs lives under `scripts/`; load `references/scripts.md`
 for their exact commands, contracts, result handling, and lease rules.
 
-Use the root AGENTS.md canonical invocation form, one script invocation per shell
-call — never sequenced with another command through `;`, `&&`, `||`, or a
-newline, and never followed by an exit-code echo.
+Use the root AGENTS.md canonical invocation form.
 
 Invoke them directly, exactly as documented; never write a wrapper,
 orchestrator, or replacement around them, and never reconstruct their steps by
