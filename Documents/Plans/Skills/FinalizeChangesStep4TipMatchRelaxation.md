@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T13:38:36.335Z","dependsOn":["Documents/Plans/Skills/FinalizeCandidateStaleBaseHistoryBlock.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-21T13:38:36.335Z","dependsOn":[]} -->
 # Fix: /finalize-changes step 4 — relax the exact PrimaryTip match to disjoint foreign movement
 
 ## Context

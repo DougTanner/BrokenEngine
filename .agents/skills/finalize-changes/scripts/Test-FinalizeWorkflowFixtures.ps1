@@ -440,6 +440,64 @@ $run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-Current
 Assert-Outcome $run 'session-blocks-dirty-reserved-history' 2 'blocked' 'history.source-dirty'
 [IO.File]::WriteAllBytes($sessionReservedHistoryPath, $sessionReservedHistoryBytes)
 
+# A primary-only reserved-history commit must not be attributed to the session patch. The
+# session remains at the validated baseline while primary advances, then the candidate adds
+# only an ordinary caller-owned path. The same topology still rejects committed session-side
+# history modification and deletion without changing either checkout's refs, indexes, or status.
+Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
+Invoke-ScratchGit $session @('clean','-fd') | Out-Null
+Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
+$primaryOverlay = New-ReservedHistoryCommit $primary $baseline $historyJsonFixturePath $false 'primary-only history overlay`n'
+Invoke-ScratchGit $primary @('update-ref','refs/heads/main',$primaryOverlay.Commit) | Out-Null
+Invoke-ScratchGit $primary @('reset','--hard',$primaryOverlay.Commit) | Out-Null
+[IO.File]::WriteAllText((Join-Path $session 'overlay-owned.txt'), 'session overlay candidate', [Text.UTF8Encoding]::new($false))
+$run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$baseline,'-ExpectedPrimaryTip',$primaryOverlay.Commit,'-OwnedPaths','overlay-owned.txt','-CommitMessageFile',$candidateMessage)
+Assert-Outcome $run 'session-candidate-allows-primary-only-history-overlay' 0 'pass' 'candidate.created'
+if ($null -ne $run.Json) {
+	$overlayChangedPaths = @(@(Invoke-ScratchGit $session @('diff-tree','--no-commit-id','--name-only','-r',$baseline,$run.Json.candidate.commit)) | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrEmpty($_) })
+	Assert-True ($overlayChangedPaths.Count -eq 1 -and $overlayChangedPaths[0] -ceq 'overlay-owned.txt') 'primary-only history overlay candidate changes exactly the owned path'
+	Assert-True (@($overlayChangedPaths | Where-Object { $_ -ceq $historyJsonFixturePath -or $_ -ceq $historySvgFixturePath }).Count -eq 0) 'primary-only history overlay candidate introduces no reserved history path'
+}
+foreach ($overlayReservedCase in @(
+	[pscustomobject]@{ Name = 'modify'; Path = $historyJsonFixturePath; Delete = $false; Content = 'session overlay history modification`n' },
+	[pscustomobject]@{ Name = 'delete'; Path = $historySvgFixturePath; Delete = $true; Content = $null }
+)) {
+	Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
+	Invoke-ScratchGit $session @('clean','-fd') | Out-Null
+	[IO.File]::WriteAllText((Join-Path $session 'overlay-owned.txt'), 'session overlay candidate', [Text.UTF8Encoding]::new($false))
+	$overlayBadSource = New-ReservedHistoryCommit $session $baseline $overlayReservedCase.Path $overlayReservedCase.Delete $overlayReservedCase.Content
+	Invoke-ScratchGit $session @('update-ref',"refs/heads/$sessionBranch",$overlayBadSource.Commit) | Out-Null
+	Invoke-ScratchGit $session @('reset','--hard',$overlayBadSource.Commit) | Out-Null
+	$overlaySessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+	$overlayPrimaryRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+	$overlaySessionIndexBefore = (@(Invoke-ScratchGit $session @('ls-files','-s')) -join "`n")
+	$overlayPrimaryIndexBefore = (@(Invoke-ScratchGit $primary @('ls-files','-s')) -join "`n")
+	$overlaySessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join "`n")
+	$overlayPrimaryStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join "`n")
+	$overlaySessionHistoryPath = Join-Path $session ($overlayReservedCase.Path.Replace('/','\'))
+	$overlayOwnedPath = Join-Path $session 'overlay-owned.txt'
+	$overlayPrimaryHistoryJsonPath = Join-Path $primary ($historyJsonFixturePath.Replace('/','\'))
+	$overlayPrimaryHistorySvgPath = Join-Path $primary ($historySvgFixturePath.Replace('/','\'))
+	$overlaySessionHistoryExistsBefore = Test-Path -LiteralPath $overlaySessionHistoryPath -PathType Leaf
+	$overlaySessionHistoryBytesBefore = if ($overlaySessionHistoryExistsBefore) { [IO.File]::ReadAllBytes($overlaySessionHistoryPath) } else { @() }
+	$overlayOwnedBytesBefore = [IO.File]::ReadAllBytes($overlayOwnedPath)
+	$overlayPrimaryHistoryJsonBytesBefore = [IO.File]::ReadAllBytes($overlayPrimaryHistoryJsonPath)
+	$overlayPrimaryHistorySvgBytesBefore = [IO.File]::ReadAllBytes($overlayPrimaryHistorySvgPath)
+	$run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$overlayBadSource.Commit,'-ExpectedPrimaryTip',$primaryOverlay.Commit,'-OwnedPaths','overlay-owned.txt','-CommitMessageFile',$candidateMessage)
+	Assert-Outcome $run "session-candidate-blocks-primary-overlay-session-history-$($overlayReservedCase.Name)" 2 'blocked' 'history.source-changed'
+	Assert-True ($overlaySessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $overlayPrimaryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim())) "primary-overlay-session-history-$($overlayReservedCase.Name) preserves session and primary refs"
+	Assert-True ($overlaySessionIndexBefore -ceq (@(Invoke-ScratchGit $session @('ls-files','-s')) -join "`n") -and $overlayPrimaryIndexBefore -ceq (@(Invoke-ScratchGit $primary @('ls-files','-s')) -join "`n")) "primary-overlay-session-history-$($overlayReservedCase.Name) preserves session and primary indexes"
+	Assert-True ($overlaySessionStatusBefore -ceq (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join "`n") -and $overlayPrimaryStatusBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join "`n")) "primary-overlay-session-history-$($overlayReservedCase.Name) preserves session and primary worktree status"
+	$overlaySessionHistoryExistsAfter = Test-Path -LiteralPath $overlaySessionHistoryPath -PathType Leaf
+	$overlaySessionHistoryBytesAfter = if ($overlaySessionHistoryExistsAfter) { [IO.File]::ReadAllBytes($overlaySessionHistoryPath) } else { @() }
+	Assert-True ($overlaySessionHistoryExistsBefore -eq $overlaySessionHistoryExistsAfter -and ((-not $overlaySessionHistoryExistsBefore) -or [Linq.Enumerable]::SequenceEqual([byte[]]$overlaySessionHistoryBytesBefore,[byte[]]$overlaySessionHistoryBytesAfter))) "primary-overlay-session-history-$($overlayReservedCase.Name) preserves session history worktree bytes"
+	Assert-True ([Linq.Enumerable]::SequenceEqual([byte[]]$overlayOwnedBytesBefore,[byte[]](Get-Content -LiteralPath $overlayOwnedPath -AsByteStream))) "primary-overlay-session-history-$($overlayReservedCase.Name) preserves owned worktree bytes"
+	Assert-True ([Linq.Enumerable]::SequenceEqual([byte[]]$overlayPrimaryHistoryJsonBytesBefore,[byte[]](Get-Content -LiteralPath $overlayPrimaryHistoryJsonPath -AsByteStream)) -and [Linq.Enumerable]::SequenceEqual([byte[]]$overlayPrimaryHistorySvgBytesBefore,[byte[]](Get-Content -LiteralPath $overlayPrimaryHistorySvgPath -AsByteStream))) "primary-overlay-session-history-$($overlayReservedCase.Name) preserves primary history worktree bytes"
+}
+Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
+Invoke-ScratchGit $session @('clean','-fd') | Out-Null
+Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
+
 # A reserved history path in the approved source commit is a source-change blocker, not a
 # recoverable landing. Exercise both modification and deletion while keeping primary and the
 # source checkout at the old tree after each rejection.
