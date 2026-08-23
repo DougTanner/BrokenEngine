@@ -54,7 +54,8 @@ its Git-history path.
 2. Reconcile the diff paths against the caller-declared owned paths. Each
    changed region must name its authorizing Plan clause or user instruction.
    Extra, missing without a recorded no-change decision, or unauthorized bytes block.
-   The sole postconfirmation exception is the history overlay of exactly
+   When the landed mode requires a history update, the sole postconfirmation
+   exception is the history overlay of exactly
    `.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl`
    and `.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg`,
    which `## Acceptance table` governs.
@@ -123,10 +124,13 @@ confirm the reviewed source diff leaves the two reserved generated paths
 untouched and treats the PNG deletion as an ordinary source deletion. Root
 `AGENTS.md` and `/finalize-changes` alone authorize and validate the
 postconfirmation Generate receipt under the landing lock; it does not exist
-during this read-only pass. Current-primary corpus/history data is permitted
-input and may regenerate without re-review; any other generated path, byte, or
-contract mismatch, and any changed reviewed contract or reachable source patch,
-is unauthorized and requires focused review and a fresh confirmation.
+during this read-only pass.
+
+The [root `AGENTS.md` Step 8 landing invariant](../../../AGENTS.md) owns
+`carry-forward`. For this read-only pass, verify that the reviewed source diff
+carries no history overlay.
+All other landing-path and review/reconfirmation rules are defined by [root
+`AGENTS.md` Step 8](../../../AGENTS.md).
 
 ## Executable Plan check
 

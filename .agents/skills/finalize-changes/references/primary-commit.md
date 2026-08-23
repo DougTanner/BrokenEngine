@@ -27,9 +27,9 @@ confirmation` section. Only its affirmative response permits claiming the normal
 `-AdvancePrimary`, `-OwnerToken`, `-SessionLabel`, and the approved Contract
 scalars. The direct-primary route never performs omitted-token implicit mutation.
 Under that lease it re-evaluates Contract/mode, requires the primary tip and aggregate
-Contract digest to remain exactly equal to the approved values, permits no catch-up
-narrowing or uncommitted history suffix, generates into a new ignored Temp child,
-overlays exactly the repository-relative JSONL/SVG pair, and advances a deterministic
-sole-parent replacement commit by guarded CAS with guarded rollback on postcondition failure.
+Contract digest to remain exactly equal to the approved values, and follows the [root
+`AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and exact primary/landing
+mode mechanics in [`references/scripts.md`](scripts.md). The direct-primary route
+advances by guarded CAS with guarded rollback on postcondition failure.
 When the commit changes
 `Documents/Plans/**`, run WorktreeCli `plan validate` afterwards.

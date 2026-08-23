@@ -52,8 +52,9 @@ report it.
 
 Approval preparation invokes the read-only history producer in Contract mode,
 and its receipt and compact generator/capture/patch identities pass to landing
-as frozen scalars. Under its landing lease, landing invokes Generate into
-ignored `Temp` and may overlay only the reserved JSONL/SVG pair. The separately
+as frozen scalars. Under its landing lease, finalization follows the [root
+`AGENTS.md` Step 8 landing invariant](../../../AGENTS.md) and the exact mode
+mechanics in [`references/scripts.md`](references/scripts.md). The separately
 requested primary-commit route follows the same ceremony, as
 `references/primary-commit.md` states.
 
@@ -130,19 +131,19 @@ every other lease is foreign.
    lock and invoke landing with that owner token, in the order
    `## Bundled scripts` states. Under the landing lease, landing freezes the
    approved commit message, complete author/committer identities and dates, and
-   the non-history patch identity, rechecks the approved Contract against current
-   history/mode, and runs Generate, whose only permitted overlay is the
-   receipt-verified JSONL and SVG history pair. Every other generated path or
-   contract/source mismatch blocks and returns for focused review and
-   confirmation. Dynamic corpus/history data changes alone regenerate without
-   re-review. Landing then advances primary by compare-and-swap with
+   the non-history patch identity and rechecks the approved Contract against
+   current history/mode. It follows the [root `AGENTS.md` Step 8 landing
+   invariant](../../../AGENTS.md) and exact mode mechanics in
+   [`references/scripts.md`](references/scripts.md). Landing then advances
+   primary by compare-and-swap with
    rollback, resets and verifies both checkouts, releases the lock, and deletes
    the machine-local claim. For a claimed Plan pass `-ReleasePlanClaim` so the
    machine-local claim is deleted best-effort; a failed claim delete is a reported
    residual, never a landing blocker.
 6. If primary advanced before the advance succeeds, landing does its own bounded
-   rebase and retry and lands only a byte-identical non-history patch plus a valid
-   regenerated history overlay. Never rebase or resolve by hand. Act on the
+   rebase and retry, following the [root `AGENTS.md` Step 8 landing
+   invariant](../../../AGENTS.md) and [`references/scripts.md`](references/scripts.md)
+   for the resulting mode and disposition. Never rebase or resolve by hand. Act on the
    blocked result's reported `disposition` and `lock` projection exactly as
    `references/scripts.md` specifies, never a memorized list of codes. A
    `terminal` result stops this caller; one reporting a changed reviewed contract
@@ -211,10 +212,11 @@ the affected regions and requires a refreshed summary and a fresh confirmation.
   determine a valid resolution; otherwise resolve rather than abort.
 - Process died after primary advanced: re-invoke
   `scripts/Invoke-FinalizeLanding.ps1` with the original approved arguments.
-  When a structured result survived, also pass its complete row-date, JSONL/SVG
-  hash, byte-count, and embedded-digest tuple; a partial tuple is rejected. A
-  hard crash may omit the entire tuple. `references/scripts.md` states the
-  bounded recovery search, what it never changes, and what blocks it.
+  Choose the second form in [`references/scripts.md`](references/scripts.md) only
+  when a surviving structured result provides the complete active-overlay
+  history tuple; choose the first form for a carry-forward source-only result or
+  a hard crash with no result. That reference owns the tuple, source-match, and
+  mode mechanics.
   If the primary ref advanced before its checkout reset, recovery recognizes the
   ref/tree mismatch, acquires or adopts the landing lease, resets and verifies the
   primary checkout, then continues ordinary recovery; initial non-recovery sanity

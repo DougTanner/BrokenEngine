@@ -252,20 +252,25 @@ $historyFixtureScript = @'
 [CmdletBinding()]
 param([Parameter(Mandatory)][ValidateSet('Contract','Generate')][string]$Mode,[Parameter(Mandatory)][string]$RepositoryRoot,[string]$BaseCommit,[string]$TipCommit,[string]$DateUtc,[string]$OutputDirectory)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
-$generator='0000000000000000000000000000000000000000000000000000000000000000'; $prefix=[ordered]@{bytes=133323;lines=648;sha256='5a39debf4be41abebd8496b9f25ee4023d109813788e95b30da8f74474fe75ed'}
+$generator='0000000000000000000000000000000000000000000000000000000000000000'; $zero40='0000000000000000000000000000000000000000'; $zero64='0000000000000000000000000000000000000000000000000000000000000000'; $prefix=[ordered]@{bytes=133323;lines=648;sha256='5a39debf4be41abebd8496b9f25ee4023d109813788e95b30da8f74474fe75ed'}
 $jsonRelative='.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgRelative='.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
-$changes=@(& git -C $RepositoryRoot diff --name-only $BaseCommit $TipCommit 2>$null); $cpp=(@($changes | Where-Object { $_ -match '\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$' })).Count -gt 0
-$captureMode=if($cpp){'cpp-change'}else{'carry-forward'}; $reason=if($cpp){'metric-supported-cpp-change'}else{'no-metric-supported-cpp-change'}
+$rawChanges=@(& git -C $RepositoryRoot diff --name-status --find-renames=50% $BaseCommit $TipCommit 2>$null); $changeRows=[Collections.Generic.List[object]]::new(); foreach($line in $rawChanges){if([string]::IsNullOrWhiteSpace([string]$line)){continue}; $parts=([string]$line) -split "`t"; $status=([string]$parts[0]).Substring(0,1); $path=([string]$parts[$parts.Count-1]).Replace('\','/'); $oldPath=$null; if($status -in @('R','C')){$oldPath=([string]$parts[1]).Replace('\','/')}; $metric=($path -match '\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$') -or ($oldPath -and $oldPath -match '\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$'); $changeRows.Add([ordered]@{status=$status;path=$path;oldPath=$oldPath;metricSupported=[bool]$metric})}; $metricCount=@($changeRows|Where-Object{$_.metricSupported}).Count; $cpp=$metricCount -gt 0
+$captureMode=if($cpp){'cpp-change'}else{'carry-forward'}; $reason=if($cpp){'metric-supported-cpp-change'}else{'no-metric-supported-cpp-change'}; $capture=$null; $snapshot=$null
+if($cpp){$manifest=[ordered]@{gitlinkCommit=$zero40;resolvedHead=$zero40;clean=$true;entries=@([ordered]@{relativePath='fixture.txt';gitMode='100644';type='file';length=0;rawSha256=$zero64})}; $manifestDigest=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes(($manifest|ConvertTo-Json -Compress -Depth 32)))).ToLowerInvariant(); $capture=[ordered]@{digest=$zero64;bootstrapIdentityDigest=$zero64;scbContentDigest=$zero64;manifest=$manifest;manifestDigest=$manifestDigest}; $snapshot=[ordered]@{target='Engine/Source';scope='Recursive';coverageRequired=$true}}
+if($env:BROKEN_ENGINE_FINALIZE_HISTORY_MODE -eq 'cpp-change' -and -not $cpp){$captureMode='cpp-change';$reason='metric-supported-cpp-change';$manifest=[ordered]@{gitlinkCommit=$zero40;resolvedHead=$zero40;clean=$true;entries=@([ordered]@{relativePath='fixture.txt';gitMode='100644';type='file';length=0;rawSha256=$zero64})};$manifestDigest=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes(($manifest|ConvertTo-Json -Compress -Depth 32)))).ToLowerInvariant();$capture=[ordered]@{digest=$zero64;bootstrapIdentityDigest=$zero64;scbContentDigest=$zero64;manifest=$manifest;manifestDigest=$manifestDigest};$snapshot=[ordered]@{target='Engine/Source';scope='Recursive';coverageRequired=$true}}
+$patch=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit;changes=@($changeRows);metricSupportedChanges=$metricCount;cppChanged=[bool]$cpp}; $decision=[ordered]@{captureMode=$captureMode;reason=$reason;forceSnapshot=[bool]($captureMode -ne 'carry-forward')}; $source=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit}; $seriesContract=[ordered]@{rows=1;liveRows=1;lastIndex=0;lastDate='2026-08-10';historyBytesSha256=$zero64}
 if($Mode -eq 'Contract') {
-  $contract=[ordered]@{schemaVersion='broken-engine-code-quality-history-contract/v1';mode='Contract';source=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit};prefix=$prefix;series=[ordered]@{rows=1;liveRows=1;lastIndex=0;lastDate='2026-08-10';historyBytesSha256=('0'*64)};patch=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit;changes=@();metricSupportedChanges=0;cppChanged=$false};decision=[ordered]@{captureMode='carry-forward';reason='no-metric-supported-cpp-change';forceSnapshot=$false};generator=[ordered]@{relativePath='.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1';sha256=$generator};capture=$null;snapshot=$null}
+  $contract=[ordered]@{schemaVersion='broken-engine-code-quality-history-contract/v1';mode='Contract';source=$source;prefix=$prefix;series=$seriesContract;patch=$patch;decision=$decision;generator=[ordered]@{relativePath='.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1';sha256=$generator};capture=$capture;snapshot=$snapshot}
   if($env:BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT -eq 'contract-nested-unknown'){$contract.source=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit;unexpected='malformed'}}
   [Console]::Out.WriteLine(($contract|ConvertTo-Json -Compress -Depth 32)); exit 0
 }
 if(-not $OutputDirectory){throw 'Generate requires OutputDirectory.'}; if(Test-Path -LiteralPath $OutputDirectory){throw 'OutputDirectory must not already exist.'}; New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
- $date=if($DateUtc){$DateUtc}else{[DateTime]::UtcNow.ToString('yyyy-MM-dd')}; $historyPath=Join-Path $RepositoryRoot ($jsonRelative -replace '/','\'); $prefixText=if(Test-Path -LiteralPath $historyPath){[IO.File]::ReadAllText($historyPath,[Text.UTF8Encoding]::new($false,$true))}else{''}; $prefixRows=@($prefixText -split [char]10 | Where-Object { $_ }); $row=[ordered]@{index=[Math]::Max(0,$prefixRows.Count-1);date=$date;captureMode='carry-forward';verbosity=0.1;structuralErosion=0.1;supported=1;parsed=1}; $rowText=(($row|ConvertTo-Json -Compress)+[char]10); $jsonText=$prefixText+$rowText; $jsonBytes=[Text.UTF8Encoding]::new($false).GetBytes($jsonText); $series=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant(); $svgText="<svg xmlns='http://www.w3.org/2000/svg'><desc>seriesDigest=$series generatorDigest=$generator</desc></svg>"+[char]10; $jsonPath=Join-Path $OutputDirectory 'CodeQualityMetricsHistory.jsonl'; $svgPath=Join-Path $OutputDirectory 'CodeQualityMetricsHistory.svg'; [IO.File]::WriteAllBytes($jsonPath,$jsonBytes); [IO.File]::WriteAllText($svgPath,$svgText,[Text.UTF8Encoding]::new($false)); $relJson=([IO.Path]::GetRelativePath($RepositoryRoot,$jsonPath).Replace([char]92,[char]47)); $relSvg=([IO.Path]::GetRelativePath($RepositoryRoot,$svgPath).Replace([char]92,[char]47)); $update=[ordered]@{schemaVersion='broken-engine-code-quality-history-update/v1';mode='Generate';date=$date;captureMode='carry-forward';source=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit};prefix=$prefix;patch=[ordered]@{baseCommit=$BaseCommit;tipCommit=$TipCommit;changes=@();metricSupportedChanges=0;cppChanged=$false};generator=[ordered]@{relativePath='.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1';sha256=$generator};capture=$null;series=[ordered]@{index=$row.index;digest=$series;historyBytesSha256=('0'*64);row=$row;coverage=$null};outputs=[ordered]@{jsonl=[ordered]@{path=$relJson;bytes=$jsonBytes.Length;sha256=([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant())};svg=[ordered]@{path=$relSvg;bytes=([IO.File]::ReadAllBytes($svgPath)).Length;sha256=(Get-FileHash $svgPath -Algorithm SHA256).Hash.ToLowerInvariant()}}}; if($env:BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT -eq 'update-row-unknown'){$update.series.row=[ordered]@{index=$row.index;date=$date;captureMode='carry-forward';verbosity=0.1;structuralErosion=0.1;supported=1;parsed=1;unexpected='malformed'}}; [Console]::Out.WriteLine(($update|ConvertTo-Json -Compress -Depth 32)); exit 0
+if($env:BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER){[IO.File]::AppendAllText($env:BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER,"Generate`n")}
+$date=if($DateUtc){$DateUtc}else{[DateTime]::UtcNow.ToString('yyyy-MM-dd')}; $historyPath=Join-Path $RepositoryRoot ($jsonRelative -replace '/','\'); $prefixText=if(Test-Path -LiteralPath $historyPath){[IO.File]::ReadAllText($historyPath,[Text.UTF8Encoding]::new($false,$true))}else{''}; $prefixRows=@($prefixText -split [char]10 | Where-Object { $_ }); $row=[ordered]@{index=[Math]::Max(0,$prefixRows.Count-1);date=$date;captureMode=$captureMode;verbosity=0.1;structuralErosion=0.1;supported=1;parsed=1}; $rowText=(($row|ConvertTo-Json -Compress)+[char]10); $jsonText=$prefixText+$rowText; $jsonBytes=[Text.UTF8Encoding]::new($false).GetBytes($jsonText); $series=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant(); $svgDescription="seriesDigest=$series generatorDigest=$generator"; if($capture){$svgDescription += " captureDigest=$($capture.digest) identityDigest=$($capture.bootstrapIdentityDigest) scbDigest=$($capture.scbContentDigest)"}; $svgText="<svg xmlns='http://www.w3.org/2000/svg'><desc>$svgDescription</desc></svg>"+[char]10; $jsonPath=Join-Path $OutputDirectory 'CodeQualityMetricsHistory.jsonl'; $svgPath=Join-Path $OutputDirectory 'CodeQualityMetricsHistory.svg'; [IO.File]::WriteAllBytes($jsonPath,$jsonBytes); [IO.File]::WriteAllText($svgPath,$svgText,[Text.UTF8Encoding]::new($false)); $relJson=([IO.Path]::GetRelativePath($RepositoryRoot,$jsonPath).Replace([char]92,[char]47)); $relSvg=([IO.Path]::GetRelativePath($RepositoryRoot,$svgPath).Replace([char]92,[char]47)); $jsonHash=([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant()); $svgHash=(Get-FileHash $svgPath -Algorithm SHA256).Hash.ToLowerInvariant(); $coverage=if($capture){[ordered]@{corpusCounts=[ordered]@{supported=1;parsed=1;omitted=0};targetCounts=[ordered]@{supported=1;parsed=1;omitted=0}}}else{$null}; $update=[ordered]@{schemaVersion='broken-engine-code-quality-history-update/v1';mode='Generate';date=$date;captureMode=$captureMode;source=$source;prefix=$prefix;patch=$patch;generator=[ordered]@{relativePath='.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1';sha256=$generator};capture=$capture;series=[ordered]@{index=$row.index;digest=$series;historyBytesSha256=$zero64;row=$row;coverage=$coverage};outputs=[ordered]@{jsonl=[ordered]@{path=$relJson;bytes=$jsonBytes.Length;sha256=$jsonHash};svg=[ordered]@{path=$relSvg;bytes=([IO.File]::ReadAllBytes($svgPath)).Length;sha256=$svgHash}}}; if($env:BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT -eq 'update-row-unknown'){$update.series.row=[ordered]@{index=$row.index;date=$date;captureMode=$captureMode;verbosity=0.1;structuralErosion=0.1;supported=1;parsed=1;unexpected='malformed'}}; [Console]::Out.WriteLine(($update|ConvertTo-Json -Compress -Depth 32)); exit 0
 '@
 [IO.File]::WriteAllText((Join-Path $historyScriptRoot 'Invoke-CodeQualityMetricsHistory.ps1'), $historyFixtureScript, [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $historyDataRoot 'CodeQualityMetricsHistory.jsonl'), "{`"schema`":`"code-quality-metrics-history/v1`"}`n{`"index`":0,`"date`":`"2026-08-10`",`"captureMode`":`"catch-up`",`"verbosity`":0.1,`"structuralErosion`":0.1,`"supported`":1,`"parsed`":1}`n", [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $historyDataRoot 'CodeQualityMetricsHistory.svg'), "<svg xmlns='http://www.w3.org/2000/svg'><desc>fixture baseline</desc></svg>`n", [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $primary '.gitignore'), "Temp/`nTools/WorktreeCli/Platforms/VisualStudio2026/Output/`n", [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $primary 'base.txt'), 'base', [Text.UTF8Encoding]::new($false))
 $gitlinkSource = Join-Path $scratchBase 'gitlink-source'
@@ -301,6 +306,69 @@ $baseline = (@(Invoke-ScratchGit $primary @('rev-parse', 'HEAD')))[0].Trim()
 $candidateMessage = Join-Path $scratchBase 'candidate-message.txt'
 [IO.File]::WriteAllText($candidateMessage, "fixture candidate`n", [Text.UTF8Encoding]::new($false))
 $literalBracketPath = 'Engine/Data/Textures/Water/[BC4]FoamNoiseAbstract.png'
+$historyJsonFixturePath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'
+$historySvgFixturePath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
+
+function New-ReservedHistoryCommit([string] $Root, [string] $Parent, [string] $Path, [bool] $Delete, [string] $Content) {
+	$fullPath = Join-Path $Root ($Path.Replace('/', '\'))
+	if ($Delete) {
+		Remove-Item -LiteralPath $fullPath -Force -ErrorAction SilentlyContinue
+	}
+	else {
+		$parentDirectory = Split-Path -Parent $fullPath
+		New-Item -ItemType Directory -Force $parentDirectory | Out-Null
+		[IO.File]::WriteAllText($fullPath, $Content, [Text.UTF8Encoding]::new($false))
+	}
+	$temporaryIndex = Join-Path $scratchBase ('reserved-history-' + [guid]::NewGuid().ToString('N') + '.index')
+	$oldIndex = $env:GIT_INDEX_FILE
+	try {
+		$env:GIT_INDEX_FILE = $temporaryIndex
+		Invoke-ScratchGit $Root @('read-tree', $Parent) | Out-Null
+		Invoke-ScratchGit $Root @('add', '-A', '--', $Path) | Out-Null
+		$tree = (@(Invoke-ScratchGit $Root @('write-tree')))[0].Trim()
+		$commit = (@(Invoke-ScratchGit $Root @('commit-tree', $tree, '-p', $Parent, '-F', $candidateMessage)))[0].Trim()
+		return [pscustomobject]@{ Commit = $commit; Tree = $tree }
+	}
+	finally {
+		if ($null -eq $oldIndex) { Remove-Item Env:GIT_INDEX_FILE -ErrorAction SilentlyContinue } else { $env:GIT_INDEX_FILE = $oldIndex }
+		Remove-Item -LiteralPath $temporaryIndex -Force -ErrorAction SilentlyContinue
+	}
+}
+
+function Get-FixtureJsonDigest($Value) {
+	$bytes = [Text.UTF8Encoding]::new($false).GetBytes(($Value | ConvertTo-Json -Compress -Depth 64))
+	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+}
+
+# Session candidates do not produce a history Contract; approval preparation obtains it from the
+# read-only producer after candidate creation. Reconstruct that same compact identity for each
+# carry-forward or recovery invocation.
+function Get-FixtureHistoryContract([string] $BaseCommit, [string] $TipCommit) {
+	$contractRun = Invoke-JsonScript (Join-Path $historyScriptRoot 'Invoke-CodeQualityMetricsHistory.ps1') @('-Mode', 'Contract', '-RepositoryRoot', $primary, '-BaseCommit', $BaseCommit, '-TipCommit', $TipCommit)
+	if ($contractRun.ExitCode -ne 0 -or $null -eq $contractRun.Json) {
+		throw "Fixture history Contract failed for '$BaseCommit' to '$TipCommit'."
+	}
+	$receipt = $contractRun.Json
+	$patchIdentity = [ordered]@{ changes = $receipt.patch.changes; metricSupportedChanges = $receipt.patch.metricSupportedChanges; cppChanged = $receipt.patch.cppChanged }
+	return [pscustomobject]@{
+		digest = Get-FixtureJsonDigest $receipt
+		generatorDigest = [string]$receipt.generator.sha256
+		captureDigest = $(if ($null -ne $receipt.capture) { [string]$receipt.capture.digest } else { $null })
+		runtimeDigest = $(if ($null -ne $receipt.capture) { [string]$receipt.capture.bootstrapIdentityDigest } else { $null })
+		patchDigest = Get-FixtureJsonDigest $patchIdentity
+		mode = [string]$receipt.decision.captureMode
+	}
+}
+
+function Add-FixtureHistoryParameters([Collections.IDictionary] $Parameters, $Contract) {
+	$Parameters.HistoryContractDigest = $Contract.digest
+	$Parameters.HistoryContractGeneratorDigest = $Contract.generatorDigest
+	$Parameters.HistoryContractCaptureDigest = $Contract.captureDigest
+	$Parameters.HistoryContractRuntimeDigest = $Contract.runtimeDigest
+	$Parameters.HistoryContractPatchDigest = $Contract.patchDigest
+	$Parameters.HistoryContractMode = $Contract.mode
+	return $Parameters
+}
 
 # Candidate construction is deliberately before verification. This isolated coverage
 # exercises the Git boundary and its guarded rollbacks.
@@ -371,6 +439,35 @@ $sessionReservedHistoryBytes = [IO.File]::ReadAllBytes($sessionReservedHistoryPa
 $run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$baseline,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','candidate-session.txt','-CommitMessageFile',$candidateMessage)
 Assert-Outcome $run 'session-blocks-dirty-reserved-history' 2 'blocked' 'history.source-dirty'
 [IO.File]::WriteAllBytes($sessionReservedHistoryPath, $sessionReservedHistoryBytes)
+
+# A reserved history path in the approved source commit is a source-change blocker, not a
+# recoverable landing. Exercise both modification and deletion while keeping primary and the
+# source checkout at the old tree after each rejection.
+Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
+Invoke-ScratchGit $session @('clean','-fd') | Out-Null
+$sessionHistoryRefBefore = (@(Invoke-ScratchGit $session @('rev-parse', "refs/heads/$sessionBranch")))[0].Trim()
+$primaryHistoryRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse', 'refs/heads/main')))[0].Trim()
+$primaryJsonBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$primaryHistoryRefBefore`:$historyJsonFixturePath")))[0].Trim()
+$primarySvgBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$primaryHistoryRefBefore`:$historySvgFixturePath")))[0].Trim()
+foreach ($reservedCase in @(
+	[pscustomobject]@{ Name = 'modify'; Path = $historyJsonFixturePath; Delete = $false; Content = 'approved source history modification`n' },
+	[pscustomobject]@{ Name = 'delete'; Path = $historySvgFixturePath; Delete = $true; Content = $null }
+)) {
+	Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
+	Invoke-ScratchGit $session @('clean','-fd') | Out-Null
+	$badSource = New-ReservedHistoryCommit $session $baseline $reservedCase.Path $reservedCase.Delete $reservedCase.Content
+	Invoke-ScratchGit $session @('update-ref', "refs/heads/$sessionBranch", $badSource.Commit) | Out-Null
+	Invoke-ScratchGit $session @('reset','--hard',$badSource.Commit) | Out-Null
+	$badLandingParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$badSource.Commit; ExpectedPrimaryTip=$baseline; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$badSource.Commit; ApprovedCandidateTree=$badSource.Tree; HistoryContractMode='carry-forward' }
+	$badLanding = Invoke-JsonScriptWithSplat $landingScript $badLandingParameters $scratchBase
+	Assert-Outcome $badLanding "session-approved-reserved-$($reservedCase.Name)" 2 'blocked' 'history.source-changed'
+	Assert-True ($primaryHistoryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $primaryHistoryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) "session-approved-reserved-$($reservedCase.Name) leaves primary ref and checkout unchanged"
+	Assert-True ($primaryJsonBlobBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse', "$primaryHistoryRefBefore`:$historyJsonFixturePath")))[0].Trim()) -and $primarySvgBlobBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse', "$primaryHistoryRefBefore`:$historySvgFixturePath")))[0].Trim())) "session-approved-reserved-$($reservedCase.Name) leaves primary history blobs unchanged"
+	Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
+	Invoke-ScratchGit $session @('clean','-fd') | Out-Null
+	Assert-True ($sessionHistoryRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse', "refs/heads/$sessionBranch")))[0].Trim()) -and $baseline -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim())) "session-approved-reserved-$($reservedCase.Name) restores source branch and checkout"
+}
+
 [IO.File]::WriteAllText((Join-Path $session 'staged-unrelated.txt'), 'staged unrelated', [Text.UTF8Encoding]::new($false))
 Invoke-ScratchGit $session @('add','staged-unrelated.txt') | Out-Null
 [IO.File]::WriteAllText((Join-Path $session 'base.txt'), 'unstaged unrelated', [Text.UTF8Encoding]::new($false))
@@ -449,7 +546,7 @@ $reservedHistoryFixtureBytes = [IO.File]::ReadAllBytes($reservedHistoryFixturePa
 $run = Invoke-JsonScript $candidateScript @('-Route','primary-commit','-CurrentWorktree',$primary,'-PrimaryWorktree',$primary,'-CurrentBranch','main','-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$baseline,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','base.txt','-CommitMessageFile',$candidateMessage)
 Assert-Outcome $run 'direct-primary-blocks-dirty-reserved-history' 2 'blocked' 'history.source-dirty'
 [IO.File]::WriteAllBytes($reservedHistoryFixturePath, $reservedHistoryFixtureBytes)
-[IO.File]::WriteAllText((Join-Path $primary 'primary-active-owned.txt'), 'primary candidate', [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $primary 'primary-active-owned.cpp'), 'primary candidate', [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $primary 'primary-staged-owned.txt'), 'primary staged', [Text.UTF8Encoding]::new($false))
 Invoke-ScratchGit $primary @('add','primary-staged-owned.txt') | Out-Null
 [IO.File]::WriteAllText((Join-Path $primary 'primary-disjoint-staged.txt'), 'staged', [Text.UTF8Encoding]::new($false))
@@ -459,13 +556,13 @@ Invoke-ScratchGit $primary @('add','primary-disjoint-staged.txt') | Out-Null
 $primaryDisjointBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','--untracked-files=all')) -join "`n")
 $beforePrimaryIndex = (@(Invoke-ScratchGit $primary @('ls-files','-s')) -join "`n")
 $primaryStagedOwnedIndex = (@(Invoke-ScratchGit $primary @('ls-files','--stage','--','primary-staged-owned.txt')) -join "`n")
-$primaryActiveOwnedWorktree = [IO.File]::ReadAllText((Join-Path $primary 'primary-active-owned.txt'), [Text.UTF8Encoding]::new($false,$true))
+$primaryActiveOwnedWorktree = [IO.File]::ReadAllText((Join-Path $primary 'primary-active-owned.cpp'), [Text.UTF8Encoding]::new($false,$true))
 $primaryStagedOwnedWorktree = [IO.File]::ReadAllText((Join-Path $primary 'primary-staged-owned.txt'), [Text.UTF8Encoding]::new($false,$true))
 $primaryUnrelatedWorktree = [IO.File]::ReadAllText((Join-Path $primary 'primary-disjoint-untracked.txt'), [Text.UTF8Encoding]::new($false,$true))
 # `pwsh -File` binds only the first token of a multi-value parameter, so this two-owned-path route is invoked
 # through the splat wrapper, which passes the array intact.
 function New-PrimaryCandidateParameters([Collections.IDictionary] $Extra = @{}) {
-	$parameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@('primary-active-owned.txt','primary-staged-owned.txt'); CommitMessageFile=$candidateMessage }
+	$parameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@('primary-active-owned.cpp','primary-staged-owned.txt'); CommitMessageFile=$candidateMessage }
 	if ($null -ne $script:PrimaryAdvanceOwner) { $parameters.OwnerToken=$script:PrimaryAdvanceOwner; $parameters.SessionLabel='finalize-fixture'; $parameters.HistoryContractDigest=$script:PrimaryHistoryContract.digest; $parameters.HistoryContractGeneratorDigest=$script:PrimaryHistoryContract.generatorDigest; $parameters.HistoryContractCaptureDigest=$script:PrimaryHistoryContract.captureDigest; $parameters.HistoryContractRuntimeDigest=$script:PrimaryHistoryContract.runtimeDigest; $parameters.HistoryContractPatchDigest=$script:PrimaryHistoryContract.patchDigest; $parameters.HistoryContractMode=$script:PrimaryHistoryContract.mode; $parameters.WorktreeCliExecutable=(Join-Path $primaryOutput 'WorktreeCli.exe') }
 	foreach ($entry in $Extra.GetEnumerator()) { $parameters[$entry.Key] = $entry.Value }
 	return $parameters
@@ -486,7 +583,7 @@ if ($null -ne $run.Json) {
 	Assert-True ($beforePrimaryIndex -ceq ((@(Invoke-ScratchGit $primary @('ls-files','-s')) -join "`n"))) 'primary post-index rollback restores owned and unrelated index entries'
 	Assert-True ($primaryDisjointBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','--untracked-files=all')) -join "`n")) 'primary post-index rollback restores owned and unrelated status'
 	Assert-True ($primaryStagedOwnedIndex -ceq (@(Invoke-ScratchGit $primary @('ls-files','--stage','--','primary-staged-owned.txt')) -join "`n")) 'primary post-index rollback restores staged owned mode object and stage exactly'
-	Assert-True ($primaryActiveOwnedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-active-owned.txt'), [Text.UTF8Encoding]::new($false,$true)) -and $primaryStagedOwnedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-staged-owned.txt'), [Text.UTF8Encoding]::new($false,$true))) 'primary post-index rollback preserves owned worktree bytes'
+	Assert-True ($primaryActiveOwnedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-active-owned.cpp'), [Text.UTF8Encoding]::new($false,$true)) -and $primaryStagedOwnedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-staged-owned.txt'), [Text.UTF8Encoding]::new($false,$true))) 'primary post-index rollback preserves owned worktree bytes'
 	Assert-True ($primaryUnrelatedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-disjoint-untracked.txt'), [Text.UTF8Encoding]::new($false,$true))) 'primary post-index rollback preserves unrelated worktree bytes'
 	$advance = Invoke-JsonScriptWithSplat $candidateScript (New-PrimaryCandidateParameters @{ VerifiedCandidateCommit=$verifiedCandidate; VerifiedCandidateTree=$verifiedTree; AdvancePrimary=$true }) $scratchBase
 	Assert-Outcome $advance 'primary-candidate-atomic-advance' 0 'pass' 'candidate.advanced'
@@ -495,7 +592,81 @@ if ($null -ne $run.Json) {
 }
 Invoke-WorktreeCli @('lock','release','--repo',$primaryCommonDirectory,'--owner',$script:PrimaryAdvanceOwner) | Out-Null
 Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
-Remove-Item -LiteralPath (Join-Path $primary 'primary-active-owned.txt'),(Join-Path $primary 'primary-staged-owned.txt'),(Join-Path $primary 'primary-disjoint-staged.txt'),(Join-Path $primary 'primary-disjoint-untracked.txt') -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath (Join-Path $primary 'primary-active-owned.cpp'),(Join-Path $primary 'primary-staged-owned.txt'),(Join-Path $primary 'primary-disjoint-staged.txt'),(Join-Path $primary 'primary-disjoint-untracked.txt') -Force -ErrorAction SilentlyContinue
+
+# A verified primary candidate is also rejected when its tree changes a reserved history path.
+# Build those two candidate objects through a temporary fixture index, restore the real checkout,
+# then resume the primary route under a real landing lease so the rejection is before CAS/Temp.
+foreach ($reservedCase in @(
+	[pscustomobject]@{ Name = 'modify'; Path = $historyJsonFixturePath; Delete = $false; Content = 'verified primary history modification`n' },
+	[pscustomobject]@{ Name = 'delete'; Path = $historySvgFixturePath; Delete = $true; Content = $null }
+)) {
+	Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
+	Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
+	$badCandidate = New-ReservedHistoryCommit $primary $baseline $reservedCase.Path $reservedCase.Delete $reservedCase.Content
+	Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
+	Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
+	$contractRun = Invoke-JsonScript (Join-Path $historyScriptRoot 'Invoke-CodeQualityMetricsHistory.ps1') @('-Mode','Contract','-RepositoryRoot',$primary,'-BaseCommit',$baseline,'-TipCommit',$badCandidate.Commit)
+	Assert-True ($contractRun.ExitCode -eq 0 -and $null -ne $contractRun.Json) "primary-reserved-$($reservedCase.Name)-contract is valid"
+	if ($null -ne $contractRun.Json) {
+		$badContract = $contractRun.Json
+		$badPatchDigest = Get-FixtureJsonDigest ([ordered]@{ changes = $badContract.patch.changes; metricSupportedChanges = $badContract.patch.metricSupportedChanges; cppChanged = $badContract.patch.cppChanged })
+		$badPrimaryCommon = ((@(Invoke-ScratchGit $primary @('rev-parse','--path-format=absolute','--git-common-dir')))[0].Trim())
+		$badOwner = [guid]::NewGuid().ToString()
+		Invoke-WorktreeCli @('lock','claim','--repo',$badPrimaryCommon,'--owner',$badOwner,'--session','finalize-fixture','--worktree',$primary,'--lease-seconds','3600') | Out-Null
+		$badPrimaryRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+		$badPrimaryStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+		$badSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+		$badSessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+		$badAdvanceParameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@($reservedCase.Path); CommitMessageFile=$candidateMessage; VerifiedCandidateCommit=$badCandidate.Commit; VerifiedCandidateTree=$badCandidate.Tree; HistoryContractDigest=(Get-FixtureJsonDigest $badContract); HistoryContractGeneratorDigest=$badContract.generator.sha256; HistoryContractCaptureDigest=$null; HistoryContractRuntimeDigest=$null; HistoryContractPatchDigest=$badPatchDigest; HistoryContractMode=$badContract.decision.captureMode; WorktreeCliExecutable=(Join-Path $primaryOutput 'WorktreeCli.exe'); SessionLabel='finalize-fixture'; OwnerToken=$badOwner; AdvancePrimary=$true }
+		$badAdvance = Invoke-JsonScriptWithSplat $candidateScript $badAdvanceParameters $scratchBase
+		Assert-Outcome $badAdvance "primary-verified-reserved-$($reservedCase.Name)" 2 'blocked' 'history.source-changed'
+		Assert-True ($badPrimaryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $badPrimaryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) "primary-verified-reserved-$($reservedCase.Name) leaves primary ref and checkout unchanged"
+		Assert-True ($badPrimaryStatusBefore -ceq ((@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join ''))) "primary-verified-reserved-$($reservedCase.Name) leaves primary index and worktree unchanged"
+		Assert-True ($badSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $badSessionStatusBefore -ceq ((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join ''))) "primary-verified-reserved-$($reservedCase.Name) leaves session checkout unchanged"
+		Invoke-WorktreeCli @('lock','release','--repo',$badPrimaryCommon,'--owner',$badOwner) | Out-Null
+	}
+	Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
+	Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
+}
+
+# The direct primary-commit route carries a non-C++ candidate through the same source-only path.
+$primaryCarryMarker = Join-Path $scratchBase 'primary-carry-forward-generate.marker'
+$previousPrimaryCarryMarker = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER')
+Remove-Item -LiteralPath $primaryCarryMarker -Force -ErrorAction SilentlyContinue
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER', $primaryCarryMarker)
+[IO.File]::WriteAllText((Join-Path $primary 'primary-carry-forward.txt'), 'primary carry-forward source', [Text.UTF8Encoding]::new($false))
+$primaryCarryParameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@('primary-carry-forward.txt'); CommitMessageFile=$candidateMessage }
+$primaryCarryCandidate = Invoke-JsonScriptWithSplat $candidateScript $primaryCarryParameters $scratchBase
+Assert-Outcome $primaryCarryCandidate 'primary-carry-forward-candidate' 0 'pass' 'candidate.created'
+if ($null -ne $primaryCarryCandidate.Json) {
+	$primaryCarryContract = $primaryCarryCandidate.Json.historyContract
+	$primaryCarryOwner = [guid]::NewGuid().ToString()
+	$primaryCarryCommon = ((@(Invoke-ScratchGit $primary @('rev-parse','--path-format=absolute','--git-common-dir')))[0].Trim())
+	Invoke-WorktreeCli @('lock','claim','--repo',$primaryCarryCommon,'--owner',$primaryCarryOwner,'--session','finalize-fixture','--worktree',$primary,'--lease-seconds','3600') | Out-Null
+	$primaryCarryParameters.VerifiedCandidateCommit = $primaryCarryCandidate.Json.candidate.commit
+	$primaryCarryParameters.VerifiedCandidateTree = $primaryCarryCandidate.Json.candidate.tree
+	$primaryCarryParameters = Add-FixtureHistoryParameters $primaryCarryParameters $primaryCarryContract
+	$primaryCarryParameters.WorktreeCliExecutable = Join-Path $primaryOutput 'WorktreeCli.exe'
+	$primaryCarryParameters.SessionLabel = 'finalize-fixture'
+	$primaryCarryParameters.OwnerToken = $primaryCarryOwner
+	$primaryCarryParameters.AdvancePrimary = $true
+	$primaryCarryJsonBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$baseline`:$historyJsonFixturePath")))[0].Trim()
+	$primaryCarrySvgBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$baseline`:$historySvgFixturePath")))[0].Trim()
+	$primaryCarryAdvance = Invoke-JsonScriptWithSplat $candidateScript $primaryCarryParameters $scratchBase
+	Assert-Outcome $primaryCarryAdvance 'primary-carry-forward-advance' 0 'pass' 'candidate.advanced'
+	if ($null -ne $primaryCarryAdvance.Json) {
+		Assert-True ($primaryCarryAdvance.Json.final.commit -ceq $primaryCarryCandidate.Json.candidate.commit -and $primaryCarryAdvance.Json.final.tree -ceq $primaryCarryCandidate.Json.candidate.tree -and -not $primaryCarryAdvance.Json.final.replacement -and $primaryCarryAdvance.Json.historyUpdate.status -ceq 'skipped') 'primary carry-forward advances the source candidate without replacement or history update'
+		Assert-True (-not (Test-Path -LiteralPath $primaryCarryMarker) -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $primaryCarryCandidate.Json.candidate.commit) 'primary carry-forward skips Generate and advances the source candidate'
+		$primaryCarryJsonBlobAfter = (@(Invoke-ScratchGit $primary @('rev-parse', "$($primaryCarryCandidate.Json.candidate.commit):$historyJsonFixturePath")))[0].Trim()
+		$primaryCarrySvgBlobAfter = (@(Invoke-ScratchGit $primary @('rev-parse', "$($primaryCarryCandidate.Json.candidate.commit):$historySvgFixturePath")))[0].Trim()
+		Assert-True ($primaryCarryJsonBlobBefore -ceq $primaryCarryJsonBlobAfter -and $primaryCarrySvgBlobBefore -ceq $primaryCarrySvgBlobAfter) 'primary carry-forward preserves both reserved history blobs'
+	}
+	Invoke-WorktreeCli @('lock','release','--repo',$primaryCarryCommon,'--owner',$primaryCarryOwner) | Out-Null
+}
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER', $previousPrimaryCarryMarker)
+Invoke-ScratchGit $primary @('reset','--hard',$baseline) | Out-Null
+Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
 
 # A resumed invocation carries the whole caller-owned landing set, so both routes must
 # accept an authorized path this session already committed as a deletion and still stage
@@ -654,8 +825,8 @@ Invoke-WorktreeCli @('lock', 'release', '--repo', $commonDirectory, '--owner', $
 # failures, the landing itself, and idempotent post-advance recovery.
 Invoke-ScratchGit $session @('reset','--hard',$baseline) | Out-Null
 Invoke-ScratchGit $session @('clean','-fd') | Out-Null
-[IO.File]::WriteAllText((Join-Path $session 'landing-change.txt'), 'landing change', [Text.UTF8Encoding]::new($false))
-$run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$baseline,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','landing-change.txt','-CommitMessageFile',$candidateMessage)
+[IO.File]::WriteAllText((Join-Path $session 'landing-change.cpp'), 'landing change', [Text.UTF8Encoding]::new($false))
+$run = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$baseline,'-ExpectedCurrentTip',$baseline,'-ExpectedPrimaryTip',$baseline,'-OwnedPaths','landing-change.cpp','-CommitMessageFile',$candidateMessage)
 Assert-Outcome $run 'landing-candidate-created' 0 'pass' 'candidate.created'
 if ($null -ne $run.Json) {
 	$approvalParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$run.Json.candidate.commit; ExpectedPrimaryTip=$baseline; VerifiedCandidateCommit=$run.Json.candidate.commit; VerifiedCandidateTree=$run.Json.candidate.tree }
@@ -700,7 +871,7 @@ if ($null -ne $run.Json) {
 		Assert-True ($overrideCommitMessage -ceq ([IO.File]::ReadAllText($overrideMessagePath, [Text.UTF8Encoding]::new($false,$true)).TrimEnd("`r","`n"))) 'message override commit carries the supplied message'
 	}
 	Invoke-ScratchGit $session @('reset','--hard',$run.Json.candidate.commit) | Out-Null
-	$landingParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$run.Json.candidate.commit; ExpectedPrimaryTip=$baseline; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$run.Json.candidate.commit; ApprovedCandidateTree=$run.Json.candidate.tree }
+	$landingParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$run.Json.candidate.commit; ExpectedPrimaryTip=$baseline; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$run.Json.candidate.commit; ApprovedCandidateTree=$run.Json.candidate.tree; HistoryContractDigest=$approval.Json.historyContract.digest; HistoryContractGeneratorDigest=$approval.Json.historyContract.generatorDigest; HistoryContractCaptureDigest=$approval.Json.historyContract.captureDigest; HistoryContractRuntimeDigest=$approval.Json.historyContract.runtimeDigest; HistoryContractPatchDigest=$approval.Json.historyContract.patchDigest; HistoryContractMode=$approval.Json.historyContract.mode }
 	[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_RECEIPT', 'update-row-unknown')
 	$malformedUpdate = Invoke-JsonScriptWithSplat $landingScript $landingParameters $scratchBase
 	Assert-Outcome $malformedUpdate 'landing-rejects-malformed-nested-update-receipt' 2 'blocked' 'history.update-invalid'
@@ -788,6 +959,313 @@ if ($null -ne $run.Json) {
 	}
 }
 
+function New-CarryForwardCandidate([string] $FileName, [string] $Content, [string] $Case) {
+	$tip = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+	Invoke-ScratchGit $session @('reset','--hard',$tip) | Out-Null
+	Invoke-ScratchGit $session @('clean','-fd') | Out-Null
+	[IO.File]::WriteAllText((Join-Path $session $FileName), $Content, [Text.UTF8Encoding]::new($false))
+	$candidate = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$tip,'-ExpectedCurrentTip',$tip,'-ExpectedPrimaryTip',$tip,'-OwnedPaths',$FileName,'-CommitMessageFile',$candidateMessage)
+	Assert-Outcome $candidate "$Case-candidate" 0 'pass' 'candidate.created'
+	return [pscustomobject]@{ PrimaryTip = $tip; Commit = $candidate.Json.candidate.commit; Tree = $candidate.Json.candidate.tree; Contract = Get-FixtureHistoryContract $tip $candidate.Json.candidate.commit }
+}
+
+# Active-overlay recovery must not let a foreign ref advance between its post-lock checkout
+# precheck and the ref-neutral reconciliation overwrite that newer ref.
+$activeRecoveryRaceCandidate = New-CarryForwardCandidate 'active-recovery-primary-race.cpp' 'active recovery primary race source' 'active-recovery-primary-race'
+$activeRecoveryRaceParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$activeRecoveryRaceCandidate.Commit; ExpectedPrimaryTip=$activeRecoveryRaceCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$activeRecoveryRaceCandidate.Commit; ApprovedCandidateTree=$activeRecoveryRaceCandidate.Tree; FixtureFailure='post-update-ref' }
+$activeRecoveryRaceParameters = Add-FixtureHistoryParameters $activeRecoveryRaceParameters $activeRecoveryRaceCandidate.Contract
+$activeRecoveryRaceCrash = Invoke-JsonScriptWithSplat $landingScript $activeRecoveryRaceParameters $scratchBase
+Assert-Outcome $activeRecoveryRaceCrash 'active-recovery-primary-race-crash' 1 'error' 'fixture.crash-after-update-ref'
+if ($null -ne $activeRecoveryRaceCrash.Json) {
+	$activeRecoveryRaceRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+	$activeRecoveryRaceStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+	$activeRecoveryRaceSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+	$activeRecoveryRaceSessionHeadBefore = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+	$activeRecoveryRaceSessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+	$activeRecoveryRaceParameters.FixtureFailure = 'history-recovery-active-primary-race'
+	$activeRecoveryRaceRecovery = Invoke-JsonScriptWithSplat $landingScript $activeRecoveryRaceParameters $scratchBase
+	Assert-Outcome $activeRecoveryRaceRecovery 'active-recovery-primary-race-blocked' 2 'blocked' 'history.recovery-primary-race'
+	if ($null -ne $activeRecoveryRaceRecovery.Json) {
+		$activeRecoveryRaceForeignRef = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+		Assert-True ($activeRecoveryRaceForeignRef -cne $activeRecoveryRaceRefBefore -and -not $activeRecoveryRaceRecovery.Json.primaryAdvanced -and $null -eq $activeRecoveryRaceRecovery.Json.final.commit) 'active recovery primary race preserves the foreign ref and reports no landing'
+		Assert-True ($activeRecoveryRaceStatusBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '') -and $activeRecoveryRaceSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $activeRecoveryRaceSessionHeadBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()) -and $activeRecoveryRaceSessionStatusBefore -ceq (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) 'active recovery primary race preserves both stale checkout states'
+	}
+	$activeRecoveryRaceLock = ((@(Invoke-WorktreeCli @('lock','status','--repo',$commonDirectory) 2) -join '') | ConvertFrom-Json -Depth 16)
+	if ($activeRecoveryRaceLock.held) { Invoke-WorktreeCli @('lock','release','--repo',$commonDirectory,'--owner',[string]$activeRecoveryRaceLock.owner) | Out-Null }
+}
+Invoke-ScratchGit $primary @('reset','--hard',$activeRecoveryRaceCandidate.Commit) | Out-Null
+Invoke-ScratchGit $session @('reset','--hard',$activeRecoveryRaceCandidate.Commit) | Out-Null
+
+# The two-tree transition must also refuse a late primary edit instead of hard-resetting over it.
+$activeRecoveryEditCandidate = New-CarryForwardCandidate 'active-recovery-primary-edit.cpp' 'active recovery primary edit source' 'active-recovery-primary-edit'
+$activeRecoveryEditParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$activeRecoveryEditCandidate.Commit; ExpectedPrimaryTip=$activeRecoveryEditCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$activeRecoveryEditCandidate.Commit; ApprovedCandidateTree=$activeRecoveryEditCandidate.Tree; FixtureFailure='post-update-ref' }
+$activeRecoveryEditParameters = Add-FixtureHistoryParameters $activeRecoveryEditParameters $activeRecoveryEditCandidate.Contract
+$activeRecoveryEditCrash = Invoke-JsonScriptWithSplat $landingScript $activeRecoveryEditParameters $scratchBase
+Assert-Outcome $activeRecoveryEditCrash 'active-recovery-primary-edit-crash' 1 'error' 'fixture.crash-after-update-ref'
+if ($null -ne $activeRecoveryEditCrash.Json) {
+	$activeRecoveryEditRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+	$activeRecoveryEditSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+	$activeRecoveryEditSessionHeadBefore = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+	$activeRecoveryEditParameters.FixtureFailure = 'history-recovery-active-primary-edit'
+	$activeRecoveryEditRecovery = Invoke-JsonScriptWithSplat $landingScript $activeRecoveryEditParameters $scratchBase
+	Assert-Outcome $activeRecoveryEditRecovery 'active-recovery-primary-edit-blocked' 2 'blocked' 'history.recovery-primary-reset-failed'
+	if ($null -ne $activeRecoveryEditRecovery.Json) {
+		Assert-True (-not $activeRecoveryEditRecovery.Json.primaryAdvanced -and $null -eq $activeRecoveryEditRecovery.Json.final.commit -and $activeRecoveryEditRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $activeRecoveryEditSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $activeRecoveryEditSessionHeadBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim())) 'active recovery primary edit leaves refs unchanged and reports no landing'
+		Assert-True ([IO.File]::ReadAllText((Join-Path $primary 'base.txt'), [Text.UTF8Encoding]::new($false,$true)) -ceq 'fixture recovery active primary edit' -and (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '').Length -gt 0) 'active recovery primary edit preserves the late bytes'
+	}
+	$activeRecoveryEditLock = ((@(Invoke-WorktreeCli @('lock','status','--repo',$commonDirectory) 2) -join '') | ConvertFrom-Json -Depth 16)
+	if ($activeRecoveryEditLock.held) { Invoke-WorktreeCli @('lock','release','--repo',$commonDirectory,'--owner',[string]$activeRecoveryEditLock.owner) | Out-Null }
+}
+Invoke-ScratchGit $primary @('reset','--hard',$activeRecoveryEditCandidate.Commit) | Out-Null
+Invoke-ScratchGit $session @('reset','--hard',$activeRecoveryEditCandidate.Commit) | Out-Null
+
+# A clean active-overlay crash still completes through the ref-neutral two-tree transition.
+$activeRecoveryStaleCandidate = New-CarryForwardCandidate 'active-recovery-stale.cpp' 'active recovery stale checkout source' 'active-recovery-stale'
+$activeRecoveryStaleParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$activeRecoveryStaleCandidate.Commit; ExpectedPrimaryTip=$activeRecoveryStaleCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$activeRecoveryStaleCandidate.Commit; ApprovedCandidateTree=$activeRecoveryStaleCandidate.Tree; FixtureFailure='post-update-ref' }
+$activeRecoveryStaleParameters = Add-FixtureHistoryParameters $activeRecoveryStaleParameters $activeRecoveryStaleCandidate.Contract
+$activeRecoveryStaleCrash = Invoke-JsonScriptWithSplat $landingScript $activeRecoveryStaleParameters $scratchBase
+Assert-Outcome $activeRecoveryStaleCrash 'active-recovery-stale-crash' 1 'error' 'fixture.crash-after-update-ref'
+if ($null -ne $activeRecoveryStaleCrash.Json) {
+	$activeRecoveryStaleParameters.FixtureFailure = 'none'
+	$activeRecoveryStaleRecovery = Invoke-JsonScriptWithSplat $landingScript $activeRecoveryStaleParameters $scratchBase
+	Assert-Outcome $activeRecoveryStaleRecovery 'active-recovery-stale-landed' 0 'landed' 'ok'
+	if ($null -ne $activeRecoveryStaleRecovery.Json) {
+		Assert-True ($activeRecoveryStaleRecovery.Json.final.replacement -and $activeRecoveryStaleRecovery.Json.primaryAdvanced -and $activeRecoveryStaleRecovery.Json.final.commit -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -and $activeRecoveryStaleRecovery.Json.final.commit -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim())) 'active recovery stale checkout lands the replacement through the guarded transition'
+		Assert-True ([string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join ''))) 'active recovery stale checkout finishes with both checkouts clean'
+	}
+}
+Invoke-ScratchGit $primary @('reset','--hard',$activeRecoveryStaleCandidate.Commit) | Out-Null
+Invoke-ScratchGit $session @('reset','--hard',$activeRecoveryStaleCandidate.Commit) | Out-Null
+
+# Carry-forward landing advances the reviewed source commit directly. It does not invoke Generate,
+# create a replacement commit, or change either reserved history blob.
+$generateMarker = Join-Path $scratchBase 'carry-forward-generate.marker'
+$previousGenerateMarker = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER')
+Remove-Item -LiteralPath $generateMarker -Force -ErrorAction SilentlyContinue
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER', $generateMarker)
+$carryCandidate = New-CarryForwardCandidate 'carry-forward-session.txt' 'carry-forward session source' 'carry-forward-session'
+$carryParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$carryCandidate.Commit; ExpectedPrimaryTip=$carryCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$carryCandidate.Commit; ApprovedCandidateTree=$carryCandidate.Tree }
+$carryParameters = Add-FixtureHistoryParameters $carryParameters $carryCandidate.Contract
+$carryJsonBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$($carryCandidate.PrimaryTip):$historyJsonFixturePath")))[0].Trim()
+$carrySvgBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$($carryCandidate.PrimaryTip):$historySvgFixturePath")))[0].Trim()
+$carryLanding = Invoke-JsonScriptWithSplat $landingScript $carryParameters $scratchBase
+Assert-Outcome $carryLanding 'carry-forward-session-landing' 0 'landed' 'ok'
+if ($null -ne $carryLanding.Json) {
+	Assert-True ($carryLanding.Json.final.commit -ceq $carryCandidate.Commit -and $carryLanding.Json.final.tree -ceq $carryCandidate.Tree -and $carryLanding.Json.final.parent -ceq $carryCandidate.PrimaryTip -and -not $carryLanding.Json.final.replacement -and $carryLanding.Json.historyUpdate.status -ceq 'skipped') 'carry-forward session lands the reviewed source without replacement or history update'
+	Assert-True ($null -eq $carryLanding.Json.historyUpdate.receipt -and $null -eq $carryLanding.Json.historyUpdate.jsonl -and $null -eq $carryLanding.Json.historyUpdate.svg) 'carry-forward session leaves history receipt and output projections null'
+	Assert-True (-not (Test-Path -LiteralPath $generateMarker) -and $carryLanding.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $carryCandidate.Commit) 'carry-forward session does not invoke Generate and advances primary to the source commit'
+	$carryJsonBlobAfter = (@(Invoke-ScratchGit $primary @('rev-parse', "$($carryCandidate.Commit):$historyJsonFixturePath")))[0].Trim()
+	$carrySvgBlobAfter = (@(Invoke-ScratchGit $primary @('rev-parse', "$($carryCandidate.Commit):$historySvgFixturePath")))[0].Trim()
+	Assert-True ($carryJsonBlobBefore -ceq $carryJsonBlobAfter -and $carrySvgBlobBefore -ceq $carrySvgBlobAfter) 'carry-forward session preserves both reserved history blobs'
+	Assert-True ([string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join ''))) 'carry-forward session reconciles both checkouts cleanly'
+}
+
+# A plain post-update-ref crash leaves the primary ref at the source commit while the checkout is
+# stale. Recovery starts from that primary ref and must report the same source-only landing.
+$plainRecoveryCandidate = New-CarryForwardCandidate 'carry-forward-plain-recovery.txt' 'plain recovery source' 'carry-forward-plain-recovery'
+$plainRecoveryParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$plainRecoveryCandidate.Commit; ExpectedPrimaryTip=$plainRecoveryCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$plainRecoveryCandidate.Commit; ApprovedCandidateTree=$plainRecoveryCandidate.Tree; FixtureFailure='post-update-ref' }
+$plainRecoveryParameters = Add-FixtureHistoryParameters $plainRecoveryParameters $plainRecoveryCandidate.Contract
+Remove-Item -LiteralPath $generateMarker -Force -ErrorAction SilentlyContinue
+$plainCrash = Invoke-JsonScriptWithSplat $landingScript $plainRecoveryParameters $scratchBase
+Assert-Outcome $plainCrash 'carry-forward-plain-post-update-ref-crash' 1 'error' 'fixture.crash-after-update-ref'
+$plainRefAfterCrash = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+$plainPrimaryStatus = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+Assert-True ($plainRefAfterCrash -ceq $plainRecoveryCandidate.Commit -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and $plainPrimaryStatus.Length -gt 0) "plain carry-forward crash leaves the source ref advanced and primary checkout stale (status=$plainPrimaryStatus)"
+$plainRecoveryParameters.FixtureFailure = 'none'
+$plainOlderPrimaryRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+$plainOlderPrimaryHeadBefore = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+$plainOlderPrimaryStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+Invoke-ScratchGit $session @('reset','--hard',$plainRecoveryCandidate.PrimaryTip) | Out-Null
+$plainOlderSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+$plainOlderSessionHeadBefore = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+$plainOlderSessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+$plainOlderRecovery = Invoke-JsonScriptWithSplat $landingScript $plainRecoveryParameters $scratchBase
+Assert-Outcome $plainOlderRecovery 'carry-forward-clean-older-session-recovery-blocked' 2 'blocked' 'history.recovery-session-changed'
+if ($null -ne $plainOlderRecovery.Json) {
+	Assert-True (-not $plainOlderRecovery.Json.primaryAdvanced -and $null -eq $plainOlderRecovery.Json.final.commit -and $plainOlderRecovery.Json.historyUpdate.status -ceq 'not-run') 'clean older session recovery does not report a landed source-only result'
+	Assert-True ($plainOlderPrimaryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $plainOlderPrimaryHeadBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -and $plainOlderPrimaryStatusBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '') -and $plainOlderSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $plainOlderSessionHeadBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()) -and $plainOlderSessionStatusBefore -ceq (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) 'clean older session recovery preserves both refs and checkouts'
+}
+Invoke-ScratchGit $session @('reset','--hard',$plainRecoveryCandidate.Commit) | Out-Null
+$plainRecovery = Invoke-JsonScriptWithSplat $landingScript $plainRecoveryParameters $scratchBase
+Assert-Outcome $plainRecovery 'carry-forward-plain-post-update-ref-recovery' 0 'landed' 'ok'
+if ($null -ne $plainRecovery.Json) {
+	Assert-True ($plainRecovery.Json.final.commit -ceq $plainRecoveryCandidate.Commit -and -not $plainRecovery.Json.final.replacement -and $plainRecovery.Json.historyUpdate.status -ceq 'skipped' -and $plainRecovery.Json.primaryAdvanced) 'plain carry-forward recovery reports source-only landing'
+	Assert-True (((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $plainRecoveryCandidate.Commit -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join ''))) 'plain carry-forward recovery reconciles both checkouts cleanly'
+	Assert-True (-not (Test-Path -LiteralPath $generateMarker)) 'plain carry-forward recovery does not invoke Generate'
+}
+
+# Recovery must not treat a user edit made after the ref update as the stale parent checkout.
+$plainPrimaryEditCandidate = New-CarryForwardCandidate 'carry-forward-primary-edit.txt' 'primary edit recovery source' 'carry-forward-primary-edit'
+$plainPrimaryEditParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$plainPrimaryEditCandidate.Commit; ExpectedPrimaryTip=$plainPrimaryEditCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$plainPrimaryEditCandidate.Commit; ApprovedCandidateTree=$plainPrimaryEditCandidate.Tree; FixtureFailure='post-update-ref' }
+$plainPrimaryEditParameters = Add-FixtureHistoryParameters $plainPrimaryEditParameters $plainPrimaryEditCandidate.Contract
+$plainPrimaryEditCrash = Invoke-JsonScriptWithSplat $landingScript $plainPrimaryEditParameters $scratchBase
+Assert-Outcome $plainPrimaryEditCrash 'carry-forward-primary-edit-crash' 1 'error' 'fixture.crash-after-update-ref'
+$plainPrimaryEditRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+$plainPrimaryEditHeadBefore = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+$plainPrimaryEditSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+$plainPrimaryEditSessionHeadBefore = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+[IO.File]::WriteAllText((Join-Path $primary 'base.txt'), 'user primary recovery edit', [Text.UTF8Encoding]::new($false))
+$plainPrimaryEditStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+$plainPrimaryEditSessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+$plainPrimaryEditParameters.FixtureFailure = 'none'
+$plainPrimaryEditRecovery = Invoke-JsonScriptWithSplat $landingScript $plainPrimaryEditParameters $scratchBase
+Assert-Outcome $plainPrimaryEditRecovery 'carry-forward-primary-edit-recovery-blocked' 2 'blocked' 'history.recovery-checkout-changed'
+if ($null -ne $plainPrimaryEditRecovery.Json) {
+	Assert-True ($plainPrimaryEditRecovery.Json.message -ceq 'Recovery checkout does not match the expected post-update-ref state; no checkout or ref was modified.') 'primary recovery edit reports the stable no-mutation message'
+	Assert-True ($plainPrimaryEditRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $plainPrimaryEditHeadBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -and $plainPrimaryEditSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $plainPrimaryEditSessionHeadBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim())) 'primary recovery edit leaves both refs and checkout heads unchanged'
+	Assert-True ($plainPrimaryEditStatusBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '') -and $plainPrimaryEditSessionStatusBefore -ceq (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '') -and ([IO.File]::ReadAllText((Join-Path $primary 'base.txt'), [Text.UTF8Encoding]::new($false,$true)) -ceq 'user primary recovery edit')) 'primary recovery edit preserves both checkout states and user bytes'
+}
+$plainPrimaryEditLock = ((@(Invoke-WorktreeCli @('lock','status','--repo',$commonDirectory) 2) -join '') | ConvertFrom-Json -Depth 16)
+if ($plainPrimaryEditLock.held) { Invoke-WorktreeCli @('lock','release','--repo',$commonDirectory,'--owner',[string]$plainPrimaryEditLock.owner) | Out-Null }
+Invoke-ScratchGit $primary @('reset','--hard',$plainPrimaryEditCandidate.Commit) | Out-Null
+Invoke-ScratchGit $session @('reset','--hard',$plainPrimaryEditCandidate.Commit) | Out-Null
+
+# The session checkout is also guarded before primary reconciliation, so an edit there cannot be
+# erased after a source-only crash even when the primary still has the exact expected stale tree.
+$plainSessionEditCandidate = New-CarryForwardCandidate 'carry-forward-session-edit.txt' 'session edit recovery source' 'carry-forward-session-edit'
+$plainSessionEditParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$plainSessionEditCandidate.Commit; ExpectedPrimaryTip=$plainSessionEditCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$plainSessionEditCandidate.Commit; ApprovedCandidateTree=$plainSessionEditCandidate.Tree; FixtureFailure='post-update-ref' }
+$plainSessionEditParameters = Add-FixtureHistoryParameters $plainSessionEditParameters $plainSessionEditCandidate.Contract
+$plainSessionEditCrash = Invoke-JsonScriptWithSplat $landingScript $plainSessionEditParameters $scratchBase
+Assert-Outcome $plainSessionEditCrash 'carry-forward-session-edit-crash' 1 'error' 'fixture.crash-after-update-ref'
+$plainSessionEditRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+$plainSessionEditHeadBefore = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+$plainSessionEditSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+$plainSessionEditSessionHeadBefore = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+[IO.File]::WriteAllText((Join-Path $session 'base.txt'), 'user session recovery edit', [Text.UTF8Encoding]::new($false))
+$plainSessionEditStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+$plainSessionEditSessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+$plainSessionEditParameters.FixtureFailure = 'none'
+$plainSessionEditRecovery = Invoke-JsonScriptWithSplat $landingScript $plainSessionEditParameters $scratchBase
+Assert-Outcome $plainSessionEditRecovery 'carry-forward-session-edit-recovery-blocked' 2 'blocked' 'history.recovery-checkout-changed'
+if ($null -ne $plainSessionEditRecovery.Json) {
+	Assert-True ($plainSessionEditRecovery.Json.message -ceq 'Recovery checkout does not match the expected post-update-ref state; no checkout or ref was modified.') 'session recovery edit reports the stable no-mutation message'
+	Assert-True ($plainSessionEditRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $plainSessionEditHeadBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -and $plainSessionEditSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $plainSessionEditSessionHeadBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim())) 'session recovery edit leaves both refs and checkout heads unchanged'
+	Assert-True ($plainSessionEditStatusBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '') -and $plainSessionEditSessionStatusBefore -ceq (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '') -and ([IO.File]::ReadAllText((Join-Path $session 'base.txt'), [Text.UTF8Encoding]::new($false,$true)) -ceq 'user session recovery edit')) 'session recovery edit preserves both checkout states and user bytes'
+}
+$plainSessionEditLock = ((@(Invoke-WorktreeCli @('lock','status','--repo',$commonDirectory) 2) -join '') | ConvertFrom-Json -Depth 16)
+if ($plainSessionEditLock.held) { Invoke-WorktreeCli @('lock','release','--repo',$commonDirectory,'--owner',[string]$plainSessionEditLock.owner) | Out-Null }
+Invoke-ScratchGit $primary @('reset','--hard',$plainSessionEditCandidate.Commit) | Out-Null
+Invoke-ScratchGit $session @('reset','--hard',$plainSessionEditCandidate.Commit) | Out-Null
+
+# A tracked edit arriving after recovery's checkout precheck must make the guarded session reset
+# refuse/rollback, rather than letting the old hard reset overwrite the user's bytes.
+$sessionRaceCandidate = New-CarryForwardCandidate 'carry-forward-session-race.cpp' 'session race recovery source' 'carry-forward-session-race'
+$sessionRaceParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$sessionRaceCandidate.Commit; ExpectedPrimaryTip=$sessionRaceCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$sessionRaceCandidate.Commit; ApprovedCandidateTree=$sessionRaceCandidate.Tree; FixtureFailure='post-update-ref' }
+$sessionRaceParameters = Add-FixtureHistoryParameters $sessionRaceParameters $sessionRaceCandidate.Contract
+$sessionRaceCrash = Invoke-JsonScriptWithSplat $landingScript $sessionRaceParameters $scratchBase
+Assert-Outcome $sessionRaceCrash 'carry-forward-session-race-crash' 1 'error' 'fixture.crash-after-update-ref'
+if ($null -ne $sessionRaceCrash.Json) {
+	$sessionRaceSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+	$sessionRaceSessionHeadBefore = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+	$sessionRaceParameters.FixtureFailure = 'history-recovery-session-race'
+	$sessionRaceRecovery = Invoke-JsonScriptWithSplat $landingScript $sessionRaceParameters $scratchBase
+	Assert-Outcome $sessionRaceRecovery 'carry-forward-session-race-recovery-blocked' 2 'blocked' 'history.recovery-session-reset-failed'
+	if ($null -ne $sessionRaceRecovery.Json) {
+		Assert-True ($sessionRaceSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $sessionRaceSessionHeadBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim())) 'session race rollback restores the prior session ref and checkout head'
+		Assert-True ([IO.File]::ReadAllText((Join-Path $session 'base.txt'), [Text.UTF8Encoding]::new($false,$true)) -ceq 'fixture recovery session race' -and (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '').Length -gt 0) 'session race preserves the late tracked edit after guarded reset refusal'
+	}
+	$sessionRaceLock = ((@(Invoke-WorktreeCli @('lock','status','--repo',$commonDirectory) 2) -join '') | ConvertFrom-Json -Depth 16)
+	if ($sessionRaceLock.held) { Invoke-WorktreeCli @('lock','release','--repo',$commonDirectory,'--owner',[string]$sessionRaceLock.owner) | Out-Null }
+	Invoke-ScratchGit $session @('reset','--hard',$sessionRaceCandidate.Commit) | Out-Null
+}
+
+# A staged edit arriving after recovery's checkout precheck must remain staged when the guarded
+# session transition refuses or rolls back; reset --keep used to silently turn this into an unstaged
+# edit when the old and new session revisions were equal.
+$sessionStagedRaceCandidate = New-CarryForwardCandidate 'carry-forward-session-staged-race.cpp' 'session staged race recovery source' 'carry-forward-session-staged-race'
+$sessionStagedRaceParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$sessionStagedRaceCandidate.Commit; ExpectedPrimaryTip=$sessionStagedRaceCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$sessionStagedRaceCandidate.Commit; ApprovedCandidateTree=$sessionStagedRaceCandidate.Tree; FixtureFailure='post-update-ref' }
+$sessionStagedRaceParameters = Add-FixtureHistoryParameters $sessionStagedRaceParameters $sessionStagedRaceCandidate.Contract
+$sessionStagedRaceCrash = Invoke-JsonScriptWithSplat $landingScript $sessionStagedRaceParameters $scratchBase
+Assert-Outcome $sessionStagedRaceCrash 'carry-forward-session-staged-race-crash' 1 'error' 'fixture.crash-after-update-ref'
+if ($null -ne $sessionStagedRaceCrash.Json) {
+	$sessionStagedRacePrimaryRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+	$sessionStagedRaceSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+	$sessionStagedRaceSessionHeadBefore = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+	$sessionStagedRaceSessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+	$sessionStagedRaceParameters.FixtureFailure = 'history-recovery-session-staged-race'
+	$sessionStagedRaceRecovery = Invoke-JsonScriptWithSplat $landingScript $sessionStagedRaceParameters $scratchBase
+	Assert-Outcome $sessionStagedRaceRecovery 'carry-forward-session-staged-race-recovery-blocked' 2 'blocked' 'history.recovery-session-reset-failed'
+	if ($null -ne $sessionStagedRaceRecovery.Json) {
+		$sessionStagedRaceStatusAfter = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+		$sessionStagedRaceCachedAfter = (@(Invoke-ScratchGit $session @('diff','--cached','--name-status','--')) -join '').Trim()
+		$sessionStagedRaceUnstagedAfter = (@(Invoke-ScratchGit $session @('diff','--name-status','--')) -join '').Trim()
+		$sessionStagedRaceUntrackedAfter = (@(Invoke-ScratchGit $session @('ls-files','--others','--exclude-standard','-z')) -join '')
+		Assert-True ($sessionStagedRacePrimaryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $sessionStagedRaceSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $sessionStagedRaceSessionHeadBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim())) 'staged session race rollback preserves prior refs and session checkout head'
+		Assert-True ($sessionStagedRaceSessionStatusBefore.Length -eq 0 -and $sessionStagedRaceStatusAfter -ceq "M  base.txt$([char]0)" -and $sessionStagedRaceCachedAfter -ceq "M`tbase.txt" -and $sessionStagedRaceUnstagedAfter.Length -eq 0 -and $sessionStagedRaceUntrackedAfter.Length -eq 0) 'staged session race preserves the exact late index/status state'
+		Assert-True ([IO.File]::ReadAllText((Join-Path $session 'base.txt'), [Text.UTF8Encoding]::new($false,$true)) -ceq 'fixture recovery session staged race') 'staged session race preserves the late staged bytes'
+	}
+	$sessionStagedRaceLock = ((@(Invoke-WorktreeCli @('lock','status','--repo',$commonDirectory) 2) -join '') | ConvertFrom-Json -Depth 16)
+	if ($sessionStagedRaceLock.held) { Invoke-WorktreeCli @('lock','release','--repo',$commonDirectory,'--owner',[string]$sessionStagedRaceLock.owner) | Out-Null }
+	Invoke-ScratchGit $primary @('reset','--hard',$sessionStagedRaceCandidate.Commit) | Out-Null
+	Invoke-ScratchGit $session @('reset','--hard',$sessionStagedRaceCandidate.Commit) | Out-Null
+}
+
+# An internally rebased carry-forward crash has a primary ref that is neither the approved source
+# nor its original parent. Recovery must match the rebased source commit from the primary ref.
+$rebasedRecoveryCandidate = New-CarryForwardCandidate 'carry-forward-rebased-recovery.txt' 'internally rebased recovery source' 'carry-forward-rebased-recovery'
+$rebasedRecoveryParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$rebasedRecoveryCandidate.Commit; ExpectedPrimaryTip=$rebasedRecoveryCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$rebasedRecoveryCandidate.Commit; ApprovedCandidateTree=$rebasedRecoveryCandidate.Tree; FixtureFailure='post-update-ref' }
+$rebasedRecoveryParameters = Add-FixtureHistoryParameters $rebasedRecoveryParameters $rebasedRecoveryCandidate.Contract
+[IO.File]::WriteAllText((Join-Path $primary 'carry-forward-recovery-upstream.txt'), 'upstream primary source', [Text.UTF8Encoding]::new($false))
+Invoke-ScratchGit $primary @('add','carry-forward-recovery-upstream.txt') | Out-Null
+Invoke-ScratchGit $primary @('commit','-m','carry-forward recovery upstream') | Out-Null
+$rebasedUpstream = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+Remove-Item -LiteralPath $generateMarker -Force -ErrorAction SilentlyContinue
+$rebasedCrash = Invoke-JsonScriptWithSplat $landingScript $rebasedRecoveryParameters $scratchBase
+Assert-Outcome $rebasedCrash 'carry-forward-rebased-post-update-ref-crash' 1 'error' 'fixture.crash-after-update-ref'
+$rebasedCrashRef = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+$rebasedPrimaryStatus = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+Assert-True ($rebasedCrashRef -cne $rebasedUpstream -and $rebasedCrashRef -cne $rebasedRecoveryCandidate.Commit -and $rebasedPrimaryStatus.Length -gt 0) "internally rebased carry-forward crash leaves the rebased source ref ahead of the stale checkout (status=$rebasedPrimaryStatus)"
+$rebasedRecoveryParameters.FixtureFailure = 'none'
+$rebasedRecovery = Invoke-JsonScriptWithSplat $landingScript $rebasedRecoveryParameters $scratchBase
+Assert-Outcome $rebasedRecovery 'carry-forward-rebased-post-update-ref-recovery' 0 'landed' 'ok'
+if ($null -ne $rebasedRecovery.Json) {
+	Assert-True ($rebasedRecovery.Json.final.commit -ceq $rebasedCrashRef -and -not $rebasedRecovery.Json.final.replacement -and $rebasedRecovery.Json.historyUpdate.status -ceq 'skipped') 'internally rebased carry-forward recovery reports source-only landing'
+	Assert-True (((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $rebasedCrashRef -and ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -ceq $rebasedCrashRef -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join ''))) 'internally rebased carry-forward recovery reconciles both checkouts cleanly'
+	Assert-True (-not (Test-Path -LiteralPath $generateMarker)) 'internally rebased carry-forward recovery does not invoke Generate'
+}
+
+# A carry-forward crash that is reclassified as an active capture after the internal rebase must not
+# fall through to the old head/patch-only recovery result. The approved catch-up identity permits the
+# current active Contract to be re-evaluated, while the source-only result still requires carry-forward.
+$reclassCandidate = New-CarryForwardCandidate 'carry-forward-reclassified-recovery.txt' 'reclassified recovery source' 'carry-forward-reclassified-recovery'
+$reclassParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$reclassCandidate.Commit; ExpectedPrimaryTip=$reclassCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$reclassCandidate.Commit; ApprovedCandidateTree=$reclassCandidate.Tree; FixtureFailure='post-update-ref' }
+$reclassParameters = Add-FixtureHistoryParameters $reclassParameters $reclassCandidate.Contract
+$previousHistoryMode = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_MODE')
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_MODE', 'cpp-change')
+$reclassActiveContract = Get-FixtureHistoryContract $reclassCandidate.PrimaryTip $reclassCandidate.Commit
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_MODE', $previousHistoryMode)
+$reclassParameters.HistoryContractMode = 'catch-up'
+$reclassParameters.HistoryContractDigest = $reclassActiveContract.digest
+$reclassParameters.HistoryContractCaptureDigest = $reclassActiveContract.captureDigest
+$reclassParameters.HistoryContractRuntimeDigest = $reclassActiveContract.runtimeDigest
+[IO.File]::WriteAllText((Join-Path $primary 'carry-forward-reclassified-upstream.txt'), 'reclassified upstream source', [Text.UTF8Encoding]::new($false))
+Invoke-ScratchGit $primary @('add','carry-forward-reclassified-upstream.txt') | Out-Null
+Invoke-ScratchGit $primary @('commit','-m','carry-forward reclassified upstream') | Out-Null
+$reclassUpstream = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+$reclassCrash = Invoke-JsonScriptWithSplat $landingScript $reclassParameters $scratchBase
+Assert-Outcome $reclassCrash 'carry-forward-reclassified-post-update-ref-crash' 1 'error' 'fixture.crash-after-update-ref'
+$reclassCrashRef = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+$reclassCrashSessionRef = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+Assert-True ($reclassCrashRef -cne $reclassUpstream -and $reclassCrashRef -cne $reclassCandidate.Commit -and $reclassCrashSessionRef -ceq $reclassCrashRef) 'reclassification crash leaves the internally rebased source on both refs'
+$reclassPrimaryRefBefore = (@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()
+$reclassPrimaryHeadBefore = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+$reclassPrimaryStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+$reclassSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
+$reclassSessionHeadBefore = (@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()
+$reclassSessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
+$reclassParameters.FixtureFailure = 'none'
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_MODE', 'cpp-change')
+$reclassRecovery = Invoke-JsonScriptWithSplat $landingScript $reclassParameters $scratchBase
+Assert-Outcome $reclassRecovery 'carry-forward-reclassified-recovery-blocked' 2 'blocked' 'sanity.git.session-tip-changed'
+if ($null -ne $reclassRecovery.Json) {
+	Assert-True (-not $reclassRecovery.Json.primaryAdvanced -and $null -eq $reclassRecovery.Json.final.commit -and $reclassRecovery.Json.historyUpdate.status -ceq 'not-run') 'reclassified carry-forward recovery cannot report a source-only landed result'
+	Assert-True ($reclassPrimaryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $reclassPrimaryHeadBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -and $reclassPrimaryStatusBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '') -and $reclassSessionRefBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -and $reclassSessionHeadBefore -ceq ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()) -and $reclassSessionStatusBefore -ceq (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) 'reclassified recovery leaves both checkouts and refs unchanged'
+}
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_MODE', $previousHistoryMode)
+Invoke-ScratchGit $primary @('reset','--hard',$reclassCandidate.Commit) | Out-Null
+Invoke-ScratchGit $session @('reset','--hard',$reclassCandidate.Commit) | Out-Null
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER', $previousGenerateMarker)
+
 # Lease continuity and the single internal rebase-and-retry. Every scenario below changes the last
 # line of one twenty-line tracked file, so an upstream commit can touch a distant line of the same
 # file and produce a clean rebase, or the same line and produce a conflict.
@@ -798,17 +1276,18 @@ function New-RetryCandidate([string] $Text, [string] $Case) {
 	$tip = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
 	Invoke-ScratchGit $session @('reset','--hard',$tip) | Out-Null
 	Invoke-ScratchGit $session @('clean','-fd') | Out-Null
-	[IO.File]::WriteAllText((Join-Path $session 'retry-file.txt'), $Text, [Text.UTF8Encoding]::new($false))
-	$candidate = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$tip,'-ExpectedCurrentTip',$tip,'-ExpectedPrimaryTip',$tip,'-OwnedPaths','retry-file.txt','-CommitMessageFile',$candidateMessage)
+	[IO.File]::WriteAllText((Join-Path $session 'retry-file.cpp'), $Text, [Text.UTF8Encoding]::new($false))
+	$candidate = Invoke-JsonScript $candidateScript @('-Route','session-landing','-CurrentWorktree',$session,'-PrimaryWorktree',$primary,'-CurrentBranch',$sessionBranch,'-PrimaryBranch','main','-Baseline',$tip,'-ExpectedCurrentTip',$tip,'-ExpectedPrimaryTip',$tip,'-OwnedPaths','retry-file.cpp','-CommitMessageFile',$candidateMessage)
 	Assert-Outcome $candidate "$Case-candidate" 0 'pass' 'candidate.created'
-	return [pscustomobject]@{ PrimaryTip = $tip; Commit = $candidate.Json.candidate.commit; Tree = $candidate.Json.candidate.tree }
+	return [pscustomobject]@{ PrimaryTip = $tip; Commit = $candidate.Json.candidate.commit; Tree = $candidate.Json.candidate.tree; Contract = Get-FixtureHistoryContract $tip $candidate.Json.candidate.commit }
 }
 function New-RetryLandingParameters($Candidate) {
-	return [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$Candidate.Commit; ExpectedPrimaryTip=$Candidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$Candidate.Commit; ApprovedCandidateTree=$Candidate.Tree }
+	$parameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$Candidate.Commit; ExpectedPrimaryTip=$Candidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$Candidate.Commit; ApprovedCandidateTree=$Candidate.Tree }
+	return Add-FixtureHistoryParameters $parameters $Candidate.Contract
 }
 function Add-UpstreamPrimaryCommit([string] $Text) {
-	[IO.File]::WriteAllText((Join-Path $primary 'retry-file.txt'), $Text, [Text.UTF8Encoding]::new($false))
-	Invoke-ScratchGit $primary @('add','retry-file.txt') | Out-Null
+	[IO.File]::WriteAllText((Join-Path $primary 'retry-file.cpp'), $Text, [Text.UTF8Encoding]::new($false))
+	Invoke-ScratchGit $primary @('add','retry-file.cpp') | Out-Null
 	Invoke-ScratchGit $primary @('commit','-m','upstream change') | Out-Null
 	return (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
 }
@@ -821,8 +1300,8 @@ function Test-SessionRebaseMarkersAbsent {
 
 $retryHead = 'line 1'
 $retryTail = 'line 20'
-[IO.File]::WriteAllText((Join-Path $primary 'retry-file.txt'), (New-RetryFileText $retryHead $retryTail), [Text.UTF8Encoding]::new($false))
-Invoke-ScratchGit $primary @('add','retry-file.txt') | Out-Null
+[IO.File]::WriteAllText((Join-Path $primary 'retry-file.cpp'), (New-RetryFileText $retryHead $retryTail), [Text.UTF8Encoding]::new($false))
+Invoke-ScratchGit $primary @('add','retry-file.cpp') | Out-Null
 Invoke-ScratchGit $primary @('commit','-m','retry fixture base') | Out-Null
 
 $retryTail = 'continuity tail'
@@ -935,7 +1414,7 @@ $nearExpiryRefreshed = $false
 $nearExpiryCompleted = $false
 $nearExpiryExitCode = $null
 try {
-	$nearExpiryDeadline = [DateTime]::UtcNow.AddSeconds(10)
+	$nearExpiryDeadline = [DateTime]::UtcNow.AddSeconds(60)
 	while ([DateTime]::UtcNow -lt $nearExpiryDeadline) {
 		if (Test-Path -LiteralPath $nearExpiryLease.Path) {
 			try {
@@ -984,7 +1463,7 @@ if ($null -ne $identicalRetry.Json) {
 	Assert-True ($identicalRetry.Json.landed.rebaseAttempts -eq 1 -and $identicalRetry.Json.landed.commit -cne $identicalCandidate.Commit -and $identicalRetry.Json.landed.commit -ceq $rebasedTip) 'one internal rebase lands the rebased commit instead of the stale candidate'
 	Assert-True ($identicalRetry.Json.landed.tree -ceq ((@(Invoke-ScratchGit $primary @('rev-parse',"$rebasedTip^{tree}")))[0].Trim())) 'the landed tree is the rebased commit tree'
 	Assert-True (((@(Invoke-ScratchGit $primary @('rev-parse',"$rebasedTip^")))[0].Trim()) -ceq $identicalUpstream) 'the rebased tip descends from the upstream commit that advanced primary'
-	Assert-True (([IO.File]::ReadAllText((Join-Path $primary 'retry-file.txt'), [Text.UTF8Encoding]::new($false,$true))) -ceq (New-RetryFileText $retryHead $retryTail)) 'the landed primary content carries both the upstream and the confirmed change'
+	Assert-True (([IO.File]::ReadAllText((Join-Path $primary 'retry-file.cpp'), [Text.UTF8Encoding]::new($false,$true))) -ceq (New-RetryFileText $retryHead $retryTail)) 'the landed primary content carries both the upstream and the confirmed change'
 	Assert-True ([string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and (Test-SessionRebaseMarkersAbsent)) 'the internal rebase leaves the session worktree clean with no rebase markers'
 }
 
@@ -1178,7 +1657,7 @@ Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
 # first-attempt failure, so an unwritable tracked file is never retried.
 $openFileCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'open file tail') 'open-file-checkout'
 $openFilePrimaryBefore = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
-$openFileHandle = [IO.FileStream]::new((Join-Path $primary 'retry-file.txt'), [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+$openFileHandle = [IO.FileStream]::new((Join-Path $primary 'retry-file.cpp'), [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
 try { $openFile = Invoke-JsonScriptWithSplat $landingScript (New-RetryLandingParameters $openFileCandidate) $scratchBase }
 finally { $openFileHandle.Dispose() }
 Assert-True ($null -ne $openFile.Json) 'open-file checkout failure emitted JSON'

@@ -6,6 +6,13 @@ message, next-stage state, short counts/paths, and retry or authority
 outcome when applicable. Never return a nested tool response or
 file/XML/log body. Exit/result/schema mismatches block.
 
+## Contents
+
+- [Invocation](#invocation)
+- [Contracts](#contracts)
+  - [Landing and recovery](#landing-and-recovery)
+- [Fixture suites](#fixture-suites)
+
 ## Invocation
 
 Use the root AGENTS.md canonical form — from the session worktree root, one
@@ -43,10 +50,11 @@ A landing claim's `-Worktree` is the route's own worktree —
 `'<current-worktree>'` on the session route and `'<primary-worktree>'` on the
 separately requested primary-commit route — because landing accepts the lease
 only when its recorded worktree matches the landing identity.
-The second landing form is the recovery invocation when a structured result
-survived: map all six history values from its `historyUpdate` fields exactly as
-shown. After a hard crash with no result, use the first form and omit all six;
-never pass a partial recovery tuple.
+The second landing form is the recovery invocation only when a surviving
+structured active-overlay result provides all six history values; map them from
+its `historyUpdate` fields exactly as shown. A carry-forward source-only result
+and a hard crash with no result use the first form and omit all six; never pass
+a partial recovery tuple.
 
 ## Contracts
 
@@ -66,9 +74,11 @@ never pass a partial recovery tuple.
   `-AdvancePrimary` resume, `-OwnerToken` is mandatory and must name the caller's
   live 3600-second landing lease; no omitted-token primary mutation is allowed.
   The result is `broken-engine-finalize-candidate/v3` with `historyContract`,
-  `historyUpdate`, and `final` fields. The final commit is the deterministic
-  sole-parent replacement, while `candidate.commit` remains the reviewed source
-  candidate.
+  `historyUpdate`, and `final` fields. For active history modes, the final
+  commit is the deterministic sole-parent replacement, while `candidate.commit`
+  remains the reviewed source candidate. On the carry-forward primary-commit
+  route, the verified source candidate advances directly and `final.replacement`
+  is `false`; its history update is skipped.
 - `Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract -RepositoryRoot <root>
   -BaseCommit <primary-tip> -TipCommit <source-tip>` is read-only and writes no
   tracked file. Generate uses the same exact `RepositoryRoot,BaseCommit,TipCommit,DateUtc,OutputDirectory`
@@ -118,6 +128,9 @@ never pass a partial recovery tuple.
   compare-and-swap against the recorded owner, run only when no registered
   worktree has a Git operation in progress; unverifiable state requires user
   authority and is never overridden.
+
+### Landing and recovery
+
 - `Invoke-FinalizeLanding.ps1` exclusively advances primary by
   compare-and-swap under the landing lock, rolls back on postcondition failure,
   and releases the lock. Its guarded primary checkout — the advance to the
@@ -150,8 +163,13 @@ never pass a partial recovery tuple.
   no rebase or advance; foreign, mismatched, and unverifiable claims are untouched.
   Under the held 3600-second lease it re-runs Contract against current primary and
   source, permits only dynamic corpus/history data plus the documented
-  `catch-up`/`cpp-change`/`carry-forward` mode reclassification, and runs Generate
-  with one captured UTC date into a unique ignored `Temp` directory. Generate must
+  `catch-up`/`cpp-change`/`carry-forward` mode reclassification, and branches on
+  the re-evaluated mode. A `carry-forward` landing skips Generate and overlay and
+  advances the approved source commit when unchanged; otherwise it advances an
+  internally rebased or recovery-accepted commit proven to carry the approved
+  patch identity and change list with unchanged reserved history blobs. Other
+  modes run Generate with one captured UTC date into a unique ignored `Temp`
+  directory. Generate must
   classify the mode before capture comparison: only an approved `catch-up` that
   narrows to `carry-forward` may lose its active capture/runtime identity; every
   other missing or changed active identity blocks. Generate must return
@@ -167,9 +185,11 @@ never pass a partial recovery tuple.
   `approvedSource`, `rebasedSource`, `historyUpdate`, and `final` commit/tree
   fields. The reviewed PNG deletion remains an ordinary source change; only the
   two reserved generated paths are allowed after confirmation. When primary
-  advanced first it makes at most one internal rebase and lands only a provably
-  byte-identical non-history patch plus a valid regenerated overlay, so report the
-  commit from the result's `landed` block rather than `candidate`. A blocked result reports its
+  advanced first it makes at most one internal rebase; active modes require a
+  provably byte-identical non-history patch plus a valid regenerated overlay,
+  while `carry-forward` reports the rebased source commit/tree without an
+  overlay. Report the commit from the result's `landed` block rather than
+  `candidate`. A blocked result reports its
   `disposition` and a `lock` projection; act on those, never a memorized code
   list. A `retryable-wait` result may be re-invoked with the approval-bound
   arguments after its reported `retryAfterMilliseconds`. When it acquired no lock
@@ -184,15 +204,33 @@ never pass a partial recovery tuple.
   and always retains the lease; `landing.retry-exhausted` is retryable and leaves
   the confirmed session commit restored. Re-invoking it with the original approved
   arguments after a crash is idempotent, including against a tip its own internal
-  rebase produced. Recovery searches only first-parent descendants back to the
-  approved ancestor for exactly one replacement matching frozen metadata, the
-  approved non-history patch digest, one valid committed row date, and exact
-  JSONL/SVG plus embedded SVG digests. It never assigns indices or reruns
-  historical Snapshot, never changes newer primary, and resets only the original
-  session branch/worktree; zero, multiple, or non-ancestor matches block. When a
-  structured result survived, pass its complete row-date/hash/size/embedded-digest
-  tuple for an additional exact match; omit the whole tuple after a hard crash,
-  because a partial tuple is invalid.
+  rebase produced. Recovery first searches for a carry-forward source-only match:
+  the approved source commit is accepted when unchanged; otherwise a single-
+  parent internally rebased or recovery-accepted commit must be proven to carry
+  the approved patch identity and change list with unchanged reserved history
+  blobs. After the recovery lock, guarded checkout reconciliation re-reads the
+  ref and proves the expected primary and session checkouts before resetting
+  them. Before resetting the session checkout, its branch ref must be exactly
+  the approved source/recovered commit or a proven single-parent
+  patch-equivalent; an arbitrary ancestor is never a valid reset target. For
+  active overlay modes, recovery separately searches only first-parent
+  descendants of the approved primary tip, walking back from current primary to
+  that tip, for exactly one replacement matching frozen metadata, the approved
+  non-history patch digest and change list, one valid committed row date, and
+  exact JSONL/SVG plus embedded SVG digests. It never assigns indices or reruns
+  historical Snapshot, never rewrites a newer primary ref, and reconciles a
+  proven-stale primary checkout plus the original session branch/worktree only
+  after guarded checks prove each expected state; it never overwrites a mismatched
+  checkout state. Zero, multiple, or non-ancestor active-overlay matches block.
+  Source-only and active-overlay recovery paths each own their complete mode and
+  result handling:
+  a carry-forward path must revalidate carry-forward, while an active
+  reclassification must find the complete overlay match; no legacy rebase
+  fallback may report landed. For an active-overlay structured result that
+  survived, pass its complete row-date/hash/size/embedded-digest tuple for an
+  additional exact match. Carry-forward recovery has `historyUpdate.status`
+  `skipped` with null `receipt`, `rowDate`, `jsonl`, and `svg`, so omit the tuple;
+  after a hard crash, omit the whole tuple because a partial tuple is invalid.
   Pass `-ReleasePlanClaim` when a claimed Plan reached final preparation; the
   script then deletes the claim best-effort. Without the switch it invokes no
   `plan` command at all.
