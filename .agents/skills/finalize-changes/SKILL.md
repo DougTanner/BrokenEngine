@@ -102,29 +102,62 @@ every other lease is foreign.
    every typed receipt verbatim, each `broken-engine-build-result/v1` envelope
    included, never summarized. A meaningful change to that diff re-runs review
    of the changed regions only.
-4. Re-resolve `PrimaryTip` through `Get-AgentWorktreeSessionContext` and compare
-   it against the approval-preparation result's `candidate.parent`. On mismatch,
-   open no review window, return no landing summary, and return a blocker naming
-   both values, so main re-reconciles before the confirmation is asked. On match,
-   proceed and state that verified live tip in the landing summary's `## Landing`
-   section.
-   Invoke `scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` only after
-   the step-3 `/verify-changes` pass on the final diff has returned PASS, and
-   immediately before the landing summary — never alongside step-2 preparation —
-   so the user reviews the SmartGit window with verification already complete,
-   right before being asked to confirm, and the review window is open whenever
-   SmartGit is available. Exit-0 statuses `opened`, `unavailable`, and `failed`
-   are non-blocking: surface status, the authoritative `manualCommand`, and the
-   message for `unavailable`/`failed`. Any exit `1`, `error` status, malformed
-   result, or schema mismatch blocks. Do not reinvoke after a clean identical
-   post-confirmation rebase that preserves the existing confirmation; a meaningful
-   change requiring a refreshed confirmation launches it again against the newly
-   reviewed landing commit before that refreshed confirmation. Then return a landing
-   summary: `## Context`, outcome-focused `## What landed`, and `## Landing`
-   stating `Primary has not advanced.`, both branches, objective decisions,
-   changed-file count/kind, and the exact remaining operation. Main presents it
-   immediately before the authoritative confirmation question. That summary is a
-   terminal return: the worker ends its turn with it as its final answer.
+4. After the step-3 `/verify-changes` PASS on the `session-landing` route, invoke
+   the read-only primary-movement checker using the canonical command in
+   [`references/scripts.md#invocation`](references/scripts.md#invocation), and
+   consume its fixed result and terminal table in
+   [`references/scripts.md#primary-movement-check`](references/scripts.md#primary-movement-check).
+   A `pass` result continues
+   to `Show-FinalizeApprovalReview.ps1` and the existing landing summary. A
+   `blocked` or `error` result, or a malformed result or schema/exit mismatch,
+   opens no review window and returns no landing summary; return a blocker that
+   names the candidate parent and live primary whenever either is available.
+   A `needs-review` result, including
+   `primary.disjoint-needs-review`, follows the documented lossless
+   checker-result handoff in
+   [`references/scripts.md#bundled-scripts`](references/scripts.md#bundled-scripts),
+   and returns control to main without a terminal summary or lease. Main
+   dispatches one fresh focused reviewer over the exact candidate commit,
+   candidate tree, candidate diff and inventory and the handoff's complete
+   movement evidence. That reviewer checks direct and transitive
+   include, call, data, configuration, producer, and consumer dependencies in
+   both directions and returns
+   `independent`, `reachable`, or `unknown`, bound to the candidate commit,
+   candidate tree, candidate parent, and live primary it reviewed. `reachable`
+   and `unknown` block. For `independent`, resume this same finalizer; it reruns
+   the checker and accepts the verdict only when the result is still
+   `needs-review` and all four identities match exactly. A candidate/session
+   change returns its changed bytes through normal review. A live-primary
+   change discards the verdict and follows the new checker result.
+   No lease is held across the reviewer or user wait.
+   On the `session-landing` route, invoke
+   `scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` only after the
+   checker and the step-3 `/verify-changes` pass on the final diff have returned
+   usable results. On the separately requested direct-primary (`primary-commit`)
+   route, invoke it only after `/verify-changes` has returned PASS on the final
+   diff, without invoking this checker, and immediately before the landing
+   summary — never alongside step-2 preparation — so the user reviews the
+   SmartGit window with verification already complete, right before being asked
+   to confirm, and the review window is open whenever SmartGit is available.
+   Exit-0 statuses
+   `opened`, `unavailable`, and `failed` are non-blocking: surface status, the
+   authoritative `manualCommand`, and the message for `unavailable`/`failed`.
+   Any exit `1`, `error` status, malformed result, or schema mismatch blocks. Do
+   not reinvoke after a clean identical post-confirmation rebase that preserves
+   the existing confirmation; a meaningful change requiring a refreshed
+   confirmation launches it again against the newly reviewed landing commit
+   before that refreshed confirmation. Then return a landing summary: `## Context`,
+   outcome-focused `## What landed`, and `## Landing` stating the
+   checked candidate parent and live primary (and, after harmless primary
+   movement, that any internal rebase can land only a byte-identical patch),
+   both branches, objective decisions, changed-file count/kind, and the exact
+   remaining operation. Retain all existing summary fields and do not state
+   `Primary has not advanced.` when the live tip is newer. Main presents it
+   immediately before the authoritative confirmation question. That summary is
+   a terminal return: the worker ends its turn with it as its final answer.
+   For the separately requested direct-primary (`primary-commit`) route, preserve
+   the exact-tip verification-to-summary flow in `references/primary-commit.md:23-28`
+   and do not invoke this checker.
 5. Only that affirmative response permits the same worker to claim the landing
    lock and invoke landing with that owner token, in the order
    `## Bundled scripts` states. Under the landing lease, landing freezes the

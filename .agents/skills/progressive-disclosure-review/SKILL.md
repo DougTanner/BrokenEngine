@@ -49,7 +49,14 @@ affected files receive a focused re-review.
    mechanics, or a long example in a `SKILL.md` body instead of `references/`
    or a script; a subsystem constraint narrated in a skill instead of the
    owning `AGENTS.md`; local rationale in an `AGENTS.md` instead of a code
-   comment.
+   comment. This includes changed skill prose that computes a repeatable
+   verdict from explicit machine-readable inputs through Git/range/path
+   parsing, set operations, schema-field mechanics, or exit/status/retry
+   algorithms. Each such finding names the changed prose, its deterministic
+   inputs and result, and the script/reference that owns the computation or
+   where it should be extracted. Keep when-to-invoke rules, ordering, typed-
+   result branching, roles, authority, user interaction, and irreducible
+   judgment in the skill; those are orchestration, not misplaced mechanics.
 4. Size: measure each changed skill markdown file with `pwsh -NoProfile -File
    .agents/scripts/Measure-Tokens.ps1 -Path <file>`. A `SKILL.md` body over
    10,000 `bt-token-v1` needs a stated reason why the detail cannot move to a

@@ -4,7 +4,20 @@ Use the bundled scripts; never reconstruct their Git, lock, or WorktreeCli
 operations. Parse their single fixed-shape JSON result and show only status, code,
 message, next-stage state, short counts/paths, and retry or authority
 outcome when applicable. Never return a nested tool response or
-file/XML/log body. Exit/result/schema mismatches block. For
+file/XML/log body. The public `Invoke-FinalizePrimaryMovementCheck.ps1`
+invocation below redirects its complete stdout losslessly to the ignored
+repository-relative `Temp/finalize-primary-movement-result.json` artifact.
+The caller parses that artifact for every result. For the exact result with
+`status` `needs-review` and `code` `primary.disjoint-needs-review`, the
+finalizer handoff returns the artifact path and selector `$`; main and the
+focused dependency reviewer read the complete typed
+`broken-engine-finalize-primary-movement/v1` result, including the
+foreign-commit manifest, losslessly from that artifact. Never inline-copy,
+summarize, or reconstruct it. For a `needs-review` result, the artifact remains
+byte-identical and available to main and the focused dependency reviewer
+throughout that review; only after its verdict returns may the finalizer's rerun
+overwrite the artifact. Other results surface only short status, code,
+message, counts, and paths after parsing. Exit/result/schema mismatches block. For
 `Invoke-FinalizeApprovalPreparation.ps1`, preserve the complete command stdout
 losslessly in the ignored repository-relative
 `Temp/finalize-approval-preparation-result.json` artifact during the invocation
@@ -17,6 +30,7 @@ restate the selected receipt.
 
 - [Invocation](#invocation)
 - [Contracts](#contracts)
+  - [Primary movement check](#primary-movement-check)
   - [Landing and recovery](#landing-and-recovery)
 - [Fixture suites](#fixture-suites)
 
@@ -37,6 +51,7 @@ pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCan
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<primary-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<candidate-parent>' -ExpectedPrimaryTip '<candidate-parent>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>' -VerifiedCandidateCommit '<candidate-commit>' -VerifiedCandidateTree '<candidate-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -WorktreeCliExecutable '<worktreecli-exe>' -SessionLabel '<session-label>' -OwnerToken '<owner-token>' -AdvancePrimary
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeApprovalPreparation.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' > 'Temp/finalize-approval-preparation-result.json'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizePrimaryMovementCheck.ps1 -CurrentWorktree '<session>' -PrimaryWorktree '<primary>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -CandidateCommit '<candidate-commit>' -CandidateTree '<candidate-tree>' -CandidateParent '<candidate-parent>' -OwnedPaths '<path>,<path>' > 'Temp/finalize-primary-movement-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
@@ -64,6 +79,49 @@ and a hard crash with no result use the first form and omit all six; never pass
 a partial recovery tuple.
 
 ## Contracts
+
+### Primary movement check
+
+`Invoke-FinalizePrimaryMovementCheck.ps1` is read-only: it takes no lease and
+does not change a ref, checkout, index, or worktree. It emits one fixed-shape
+JSON result. The schema version is
+`broken-engine-finalize-primary-movement/v1`. Its top-level fields are
+`schemaVersion`, `status`, `code`, `message`, `candidate`, `tips`,
+`ownedPaths`, `foreignCommits`, and `changes`:
+
+- `status` is exactly `pass`, `needs-review`, `blocked`, or `error`.
+- `candidate` is `{commit,tree,parent}`, with each member individually nullable.
+  `tips` is `{session,livePrimary,relation}`.
+- `ownedPaths` and `foreignCommits` are evidence objects
+  `{totalCount,items,truncated}`. `ownedPaths.items` contains normalized
+  relative POSIX paths. `foreignCommits.items` contains foreign commit
+  identities ordered oldest-to-newest; the aggregate changed-path manifest is
+  in `changes`.
+- `changes` is
+  `{totalCount,items,truncated,historyPaths,nonHistoryPaths,overlapPaths}`.
+  Each evidence collection has `{totalCount,items,truncated}`. Each `items`
+  row has exactly the tuple fields `(path,status,oldMode,newMode)`, and the
+  three named path collections contain the history, non-history, and overlap
+  paths respectively.
+- Path collections are ordinal-sorted and deduplicated. Foreign commit items
+  retain oldest-to-newest order, and change rows sort by the tuple
+  `(path,status,oldMode,newMode)`. Every bounded collection has a cap of 500;
+  truncation sets its `truncated` field and blocks the result with
+  `primary.evidence-truncated` rather than allowing partial evidence to
+  proceed.
+
+The fixed terminal mapping is:
+
+| Exit | Status | Codes | Finalizer action |
+| ---: | --- | --- | --- |
+| 0 | `pass` | `ok`, `primary.tree-identical`, `primary.history-only` | Continue to SmartGit review and the landing summary. |
+| 0 | `needs-review` | `primary.disjoint-needs-review` | Return the complete result to main for one focused dependency review; hold no lease and show no terminal summary. |
+| 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.owned-history-path`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
+| 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
+
+Malformed JSON, a schema mismatch, or an exit/status mismatch is itself a
+blocker. `code` and `message` are retained verbatim for the caller; no caller
+reconstructs the assessment from Git output.
 
 - `Invoke-FinalizeCandidateCommit.ps1` stages only the authorized caller
   paths, preserves disjoint state, and blocks mixed owned paths with a message
@@ -272,7 +330,8 @@ for `<worktreecli-exe>` and
 
 - `Test-FinalizeWorkflowFixtures.ps1` runs when
   `Invoke-FinalizeCandidateCommit.ps1`,
-  `Invoke-FinalizeApprovalPreparation.ps1`, `Invoke-FinalizeLockClaim.ps1`,
+  `Invoke-FinalizeApprovalPreparation.ps1`,
+  `Invoke-FinalizePrimaryMovementCheck.ps1`, `Invoke-FinalizeLockClaim.ps1`,
   `Invoke-FinalizeLanding.ps1`, `Show-FinalizeApprovalReview.ps1`,
   `.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1`,
   `.agents/scripts/AgentScriptCommon.psm1`,
@@ -280,6 +339,9 @@ for `<worktreecli-exe>` and
   `.agents/scripts/FinalizeWorkflowCommon.psm1`,
   `.agents/scripts/WorktreeCliSessionExclusion.psm1`, or the suite itself
   changes.
+  The suite may pass the checker-only `-FixtureFailure unexpected` input only
+  while `BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE=1`; public finalization never
+  passes that input.
 - `Test-LandingLockStatusFixtures.ps1` exercises WorktreeCli's `lock` CLI
   directly rather than a bundled script, so it runs when WorktreeCli's
   landing-lock implementation, `.agents/scripts/FinalizeWorkflowCommon.psm1`, or

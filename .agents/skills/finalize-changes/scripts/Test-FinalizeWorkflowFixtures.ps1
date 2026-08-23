@@ -21,6 +21,7 @@ $script:Failures = [Collections.Generic.List[string]]::new()
 $landingScript = Join-Path $PSScriptRoot 'Invoke-FinalizeLanding.ps1'
 $approvalPreparationScript = Join-Path $PSScriptRoot 'Invoke-FinalizeApprovalPreparation.ps1'
 $candidateScript = Join-Path $PSScriptRoot 'Invoke-FinalizeCandidateCommit.ps1'
+$primaryMovementScript = Join-Path $PSScriptRoot 'Invoke-FinalizePrimaryMovementCheck.ps1'
 $lockClaimScript = Join-Path $PSScriptRoot 'Invoke-FinalizeLockClaim.ps1'
 $approvalReviewScript = Join-Path $PSScriptRoot 'Show-FinalizeApprovalReview.ps1'
 $moduleSource = $sharedScripts
@@ -1725,6 +1726,266 @@ if ($null -ne $openFile.Json) {
 }
 Invoke-ScratchGit $primary @('reset','--hard',$openFilePrimaryBefore) | Out-Null
 Invoke-ScratchGit $primary @('clean','-fd') | Out-Null
+
+# Primary movement is assessed by a read-only checker.  These fixtures use a fresh disposable
+# repository for every case so the before/after proof covers both worktrees, their real indexes,
+# tracked bytes, porcelain, and the claim ledger independently of the older landing fixtures.
+function New-MovementState([bool] $IncludeHistory = $false, [bool] $IncludeRenameSource = $false) {
+	$root = Join-Path $scratchBase ('pm-' + [guid]::NewGuid().ToString('N'))
+	$primaryRoot = Join-Path $root 'p'
+	$sessionRoot = Join-Path $root 's'
+	New-Item -ItemType Directory -Force $primaryRoot | Out-Null
+	Invoke-ScratchGit $primaryRoot @('init', '-b', 'main') | Out-Null
+	Invoke-ScratchGit $primaryRoot @('config', 'core.autocrlf', 'false') | Out-Null
+	$basePath = Join-Path $primaryRoot 'base.txt'
+	[IO.File]::WriteAllText($basePath, 'base', [Text.UTF8Encoding]::new($false))
+	if ($IncludeHistory) {
+		$historyDirectory = Join-Path $primaryRoot '.agents\skills\code-quality-metrics\references\history'
+		New-Item -ItemType Directory -Force $historyDirectory | Out-Null
+		[IO.File]::WriteAllText((Join-Path $historyDirectory 'CodeQualityMetricsHistory.jsonl'), 'history', [Text.UTF8Encoding]::new($false))
+	}
+	if ($IncludeRenameSource) {
+		[IO.File]::WriteAllText((Join-Path $primaryRoot 'rename-old.txt'), 'rename', [Text.UTF8Encoding]::new($false))
+	}
+	Invoke-ScratchGit $primaryRoot @('add', '--all') | Out-Null
+	Invoke-ScratchGit $primaryRoot @('commit', '-m', 'movement base') | Out-Null
+	$parent = ((@(Invoke-ScratchGit $primaryRoot @('rev-parse', 'HEAD')))[0]).Trim()
+	Invoke-ScratchGit $primaryRoot @('worktree', 'add', '-b', 'movement-session', $sessionRoot, $parent) | Out-Null
+	[IO.File]::WriteAllText((Join-Path $sessionRoot 'owned.txt'), 'owned', [Text.UTF8Encoding]::new($false))
+	Invoke-ScratchGit $sessionRoot @('add', 'owned.txt') | Out-Null
+	Invoke-ScratchGit $sessionRoot @('commit', '-m', 'movement candidate') | Out-Null
+	$candidate = ((@(Invoke-ScratchGit $sessionRoot @('rev-parse', 'HEAD')))[0]).Trim()
+	$tree = ((@(Invoke-ScratchGit $sessionRoot @('rev-parse', 'HEAD^{tree}')))[0]).Trim()
+	return [pscustomobject]@{
+		Root = $root
+		Primary = $primaryRoot
+		Session = $sessionRoot
+		CurrentBranch = 'movement-session'
+		PrimaryBranch = 'main'
+		Parent = $parent
+		Candidate = $candidate
+		Tree = $tree
+	}
+}
+
+function Get-MovementTrackedBytes([string] $Root) {
+	$raw = ((Invoke-ScratchGit $Root @('ls-files', '-z')) -join "`n")
+	$paths = @($raw.Split([char] 0) | Where-Object { -not [string]::IsNullOrEmpty($_) })
+	$ordered = [ordered]@{}
+	$sorted = [Collections.Generic.List[string]]::new()
+	foreach ($path in $paths) { $sorted.Add([string] $path) }
+	$sorted.Sort([StringComparer]::Ordinal)
+	foreach ($path in $sorted) {
+		$full = Join-Path $Root ($path.Replace('/', '\'))
+		if (Test-Path -LiteralPath $full -PathType Leaf) {
+			$ordered[$path] = [Convert]::ToBase64String([IO.File]::ReadAllBytes($full))
+		}
+	}
+	return $ordered | ConvertTo-Json -Compress -Depth 16
+}
+
+function Get-MovementClaimsSnapshot {
+	$files = @(Get-ChildItem -LiteralPath $localAppData -Recurse -File -Force -ErrorAction SilentlyContinue | Sort-Object FullName)
+	$entries = [Collections.Generic.List[object]]::new()
+	foreach ($file in $files) {
+		$entries.Add([ordered]@{
+			path = [IO.Path]::GetRelativePath($localAppData, $file.FullName).Replace('\', '/')
+			bytes = [Convert]::ToBase64String([IO.File]::ReadAllBytes($file.FullName))
+		})
+	}
+	return @($entries) | ConvertTo-Json -Compress -Depth 16
+}
+
+function Get-MovementState([pscustomobject] $State) {
+	return [pscustomobject]@{
+		SessionRef = ((@(Invoke-ScratchGit $State.Session @('rev-parse', "refs/heads/$($State.CurrentBranch)")))[0]).Trim()
+		SessionHead = ((@(Invoke-ScratchGit $State.Session @('rev-parse', 'HEAD')))[0]).Trim()
+		SessionTree = ((@(Invoke-ScratchGit $State.Session @('rev-parse', 'HEAD^{tree}')))[0]).Trim()
+		PrimaryRef = ((@(Invoke-ScratchGit $State.Primary @('rev-parse', "refs/heads/$($State.PrimaryBranch)")))[0]).Trim()
+		PrimaryHead = ((@(Invoke-ScratchGit $State.Primary @('rev-parse', 'HEAD')))[0]).Trim()
+		PrimaryTree = ((@(Invoke-ScratchGit $State.Primary @('rev-parse', 'HEAD^{tree}')))[0]).Trim()
+		SessionIndex = ((Invoke-ScratchGit $State.Session @('ls-files', '--stage')) -join "`n")
+		PrimaryIndex = ((Invoke-ScratchGit $State.Primary @('ls-files', '--stage')) -join "`n")
+		SessionPorcelain = ((Invoke-ScratchGit $State.Session @('status', '--porcelain=v1', '-z', '--untracked-files=all')) -join "`n")
+		PrimaryPorcelain = ((Invoke-ScratchGit $State.Primary @('status', '--porcelain=v1', '-z', '--untracked-files=all')) -join "`n")
+		SessionBytes = Get-MovementTrackedBytes $State.Session
+		PrimaryBytes = Get-MovementTrackedBytes $State.Primary
+		Claims = Get-MovementClaimsSnapshot
+	}
+}
+
+function Assert-MovementStateUnchanged([pscustomobject] $Before, [pscustomobject] $After, [string] $Case) {
+	$properties = @('SessionRef', 'SessionHead', 'SessionTree', 'PrimaryRef', 'PrimaryHead', 'PrimaryTree', 'SessionIndex', 'PrimaryIndex', 'SessionPorcelain', 'PrimaryPorcelain', 'SessionBytes', 'PrimaryBytes', 'Claims')
+	foreach ($property in $properties) {
+		Assert-True ($Before.$property -ceq $After.$property) "$Case preserves $property"
+	}
+}
+
+function New-MovementParameters([pscustomobject] $State, [string] $Owned = 'owned.txt') {
+	return [ordered]@{
+		CurrentWorktree = $State.Session
+		PrimaryWorktree = $State.Primary
+		CurrentBranch = $State.CurrentBranch
+		PrimaryBranch = $State.PrimaryBranch
+		CandidateCommit = $State.Candidate
+		CandidateTree = $State.Tree
+		CandidateParent = $State.Parent
+		OwnedPaths = $Owned
+	}
+}
+
+function Invoke-MovementCase([string] $Case, [pscustomobject] $State, [Collections.IDictionary] $Parameters, [int] $ExpectedExit, [string] $ExpectedStatus, [string] $ExpectedCode) {
+	$before = Get-MovementState $State
+	$run = Invoke-JsonScriptWithSplat $primaryMovementScript $Parameters $scratchBase
+	Assert-Outcome $run $Case $ExpectedExit $ExpectedStatus $ExpectedCode
+	if ($null -ne $run.Json) {
+		Assert-True ($run.Json.schemaVersion -ceq 'broken-engine-finalize-primary-movement/v1') "$Case schema version"
+		Assert-ExactProperties $run.Json @('schemaVersion', 'status', 'code', 'message', 'candidate', 'tips', 'ownedPaths', 'foreignCommits', 'changes') "$Case root schema"
+		Assert-ExactProperties $run.Json.candidate @('commit', 'tree', 'parent') "$Case candidate schema"
+		Assert-ExactProperties $run.Json.tips @('session', 'livePrimary', 'relation') "$Case tips schema"
+		Assert-ExactProperties $run.Json.ownedPaths @('totalCount', 'items', 'truncated') "$Case owned evidence schema"
+		Assert-ExactProperties $run.Json.foreignCommits @('totalCount', 'items', 'truncated') "$Case foreign evidence schema"
+		Assert-ExactProperties $run.Json.changes @('totalCount', 'items', 'truncated', 'historyPaths', 'nonHistoryPaths', 'overlapPaths') "$Case changes schema"
+		Assert-ExactProperties $run.Json.changes.historyPaths @('totalCount', 'items', 'truncated') "$Case history evidence schema"
+		Assert-ExactProperties $run.Json.changes.nonHistoryPaths @('totalCount', 'items', 'truncated') "$Case non-history evidence schema"
+		Assert-ExactProperties $run.Json.changes.overlapPaths @('totalCount', 'items', 'truncated') "$Case overlap evidence schema"
+		if (@($run.Json.changes.items).Count -gt 0) {
+			Assert-ExactProperties @($run.Json.changes.items)[0] @('oldMode', 'newMode', 'status', 'path') "$Case change row schema"
+		}
+	}
+	$after = Get-MovementState $State
+	Assert-MovementStateUnchanged $before $after $Case
+	return $run
+}
+
+$movement = New-MovementState
+$movementRun = Invoke-MovementCase 'primary-movement-equal' $movement (New-MovementParameters $movement) 0 'pass' 'ok'
+if ($null -ne $movementRun.Json) { Assert-True ($movementRun.Json.tips.relation -ceq 'equal' -and $movementRun.Json.foreignCommits.totalCount -eq 0) 'primary-movement-equal relation and empty range' }
+
+$movement = New-MovementState
+Invoke-ScratchGit $movement.Primary @('commit', '--allow-empty', '-m', 'foreign empty') | Out-Null
+$movementRun = Invoke-MovementCase 'primary-movement-empty-commit' $movement (New-MovementParameters $movement) 0 'pass' 'primary.tree-identical'
+if ($null -ne $movementRun.Json) { Assert-True ($movementRun.Json.tips.relation -ceq 'descendant' -and $movementRun.Json.foreignCommits.totalCount -eq 1 -and $movementRun.Json.changes.totalCount -eq 0) 'primary-movement-empty-commit is tree-identical' }
+
+$movement = New-MovementState
+[IO.File]::WriteAllText((Join-Path $movement.Primary 'reverted.txt'), 'temporary', [Text.UTF8Encoding]::new($false)); Invoke-ScratchGit $movement.Primary @('add', 'reverted.txt') | Out-Null; Invoke-ScratchGit $movement.Primary @('commit', '-m', 'foreign add') | Out-Null; $revertedAdd = ((@(Invoke-ScratchGit $movement.Primary @('rev-parse', 'HEAD')))[0]).Trim()
+Remove-Item -LiteralPath (Join-Path $movement.Primary 'reverted.txt') -Force; Invoke-ScratchGit $movement.Primary @('add', '--all') | Out-Null; Invoke-ScratchGit $movement.Primary @('commit', '-m', 'foreign revert') | Out-Null; $revertedRevert = ((@(Invoke-ScratchGit $movement.Primary @('rev-parse', 'HEAD')))[0]).Trim()
+$movementRun = Invoke-MovementCase 'primary-movement-reverted-range' $movement (New-MovementParameters $movement) 0 'pass' 'primary.tree-identical'
+if ($null -ne $movementRun.Json) {
+	$revertedForeignCommits = @($movementRun.Json.foreignCommits.items | ForEach-Object { [string] $_ })
+	Assert-True ($movementRun.Json.foreignCommits.totalCount -eq 2 -and $movementRun.Json.changes.totalCount -eq 0) 'primary-movement-reverted-range has no net paths'
+	Assert-True (($revertedForeignCommits -join '|') -ceq "$revertedAdd|$revertedRevert") 'primary-movement-reverted-range preserves oldest-to-newest commit hashes'
+}
+
+$movement = New-MovementState -IncludeHistory $true
+[IO.File]::WriteAllText((Join-Path $movement.Primary '.agents\skills\code-quality-metrics\references\history\CodeQualityMetricsHistory.jsonl'), 'history changed', [Text.UTF8Encoding]::new($false)); Invoke-ScratchGit $movement.Primary @('add', '--all') | Out-Null; Invoke-ScratchGit $movement.Primary @('commit', '-m', 'foreign history') | Out-Null
+$movementRun = Invoke-MovementCase 'primary-movement-history-only' $movement (New-MovementParameters $movement) 0 'pass' 'primary.history-only'
+if ($null -ne $movementRun.Json) { Assert-True ($movementRun.Json.changes.historyPaths.totalCount -eq 1 -and $movementRun.Json.changes.nonHistoryPaths.totalCount -eq 0) 'primary-movement-history-only partitions reserved paths' }
+
+$movement = New-MovementState
+[IO.File]::WriteAllText((Join-Path $movement.Primary 'foreign.txt'), 'foreign', [Text.UTF8Encoding]::new($false)); Invoke-ScratchGit $movement.Primary @('add', 'foreign.txt') | Out-Null; Invoke-ScratchGit $movement.Primary @('commit', '-m', 'foreign disjoint') | Out-Null
+$movementRun = Invoke-MovementCase 'primary-movement-disjoint' $movement (New-MovementParameters $movement) 0 'needs-review' 'primary.disjoint-needs-review'
+if ($null -ne $movementRun.Json) { Assert-True ($movementRun.Json.changes.overlapPaths.totalCount -eq 0 -and $movementRun.Json.changes.nonHistoryPaths.totalCount -eq 1) 'primary-movement-disjoint has no owned overlap' }
+
+$movement = New-MovementState
+[IO.File]::WriteAllText((Join-Path $movement.Primary 'owned.txt'), 'foreign owned', [Text.UTF8Encoding]::new($false)); Invoke-ScratchGit $movement.Primary @('add', 'owned.txt') | Out-Null; Invoke-ScratchGit $movement.Primary @('commit', '-m', 'foreign overlap') | Out-Null
+$movementRun = Invoke-MovementCase 'primary-movement-overlap' $movement (New-MovementParameters $movement) 2 'blocked' 'primary.path-overlap'
+if ($null -ne $movementRun.Json) { Assert-True ($movementRun.Json.changes.overlapPaths.items -contains 'owned.txt') 'primary-movement-overlap reports owned path' }
+
+$movement = New-MovementState -IncludeHistory $true
+$movementRun = Invoke-MovementCase 'primary-movement-reserved-owned' $movement (New-MovementParameters $movement $historyJsonFixturePath) 2 'blocked' 'primary.owned-history-path'
+
+$movement = New-MovementState
+$orphanTree = ((@(Invoke-ScratchGit $movement.Primary @('rev-parse', 'HEAD^{tree}')))[0]).Trim()
+$orphan = ((@(Invoke-ScratchGit $movement.Primary @('commit-tree', $orphanTree, '-m', 'foreign root')))[0]).Trim()
+Invoke-ScratchGit $movement.Primary @('update-ref', 'refs/heads/main', $orphan) | Out-Null; Invoke-ScratchGit $movement.Primary @('reset', '--hard', 'main') | Out-Null
+$movementRun = Invoke-MovementCase 'primary-movement-nonancestor' $movement (New-MovementParameters $movement) 2 'blocked' 'primary.not-descendant'
+if ($null -ne $movementRun.Json) { Assert-True ($movementRun.Json.tips.relation -ceq 'not-descendant') 'primary-movement-nonancestor relation' }
+
+$movement = New-MovementState -IncludeRenameSource $true
+Invoke-ScratchGit $movement.Primary @('mv', 'rename-old.txt', 'rename-new.txt') | Out-Null; Invoke-ScratchGit $movement.Primary @('commit', '-m', 'foreign rename') | Out-Null
+$movementRun = Invoke-MovementCase 'primary-movement-rename' $movement (New-MovementParameters $movement) 0 'needs-review' 'primary.disjoint-needs-review'
+if ($null -ne $movementRun.Json) {
+	Assert-True (@($movementRun.Json.changes.items | Where-Object { $_.status -ceq 'A' }).Count -eq 1 -and @($movementRun.Json.changes.items | Where-Object { $_.status -ceq 'D' }).Count -eq 1) 'primary-movement-rename reports D+A records'
+	$renameTuples = @($movementRun.Json.changes.items | ForEach-Object { "$($_.oldMode)|$($_.newMode)|$($_.status)|$($_.path)" })
+	Assert-True (($renameTuples -join '|') -ceq '000000|100644|A|rename-new.txt|100644|000000|D|rename-old.txt') 'primary-movement-rename orders complete change tuples and modes'
+}
+
+$movement = New-MovementState
+$invalidParameters = New-MovementParameters $movement 'bad/../path'
+$invalidRun = Invoke-MovementCase 'primary-movement-invalid-input' $movement $invalidParameters 1 'error' 'input.invalid'
+
+$movement = New-MovementState
+$oldFixtureGuard = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE')
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE', $null)
+try {
+	$guardParameters = New-MovementParameters $movement
+	$guardParameters.FixtureFailure = 'unexpected'
+	$guardRun = Invoke-MovementCase 'primary-movement-fixture-guard' $movement $guardParameters 1 'error' 'input.invalid'
+}
+finally { [Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE', $oldFixtureGuard) }
+
+$movement = New-MovementState
+$missingIdentityParameters = New-MovementParameters $movement
+$missingIdentityParameters.CurrentWorktree = Join-Path $movement.Root 'missing-session'
+$missingIdentityRun = Invoke-MovementCase 'primary-movement-missing-identity' $movement $missingIdentityParameters 1 'error' 'input.invalid'
+
+$movement = New-MovementState
+$missingCommitParameters = New-MovementParameters $movement
+$missingCommitParameters.CandidateCommit = '0000000000000000000000000000000000000000'
+$missingCommitRun = Invoke-MovementCase 'primary-movement-missing-commit' $movement $missingCommitParameters 1 'error' 'assessment.failed'
+
+$movement = New-MovementState
+$oldCandidate = $movement.Candidate
+[IO.File]::WriteAllText((Join-Path $movement.Session 'later.txt'), 'later', [Text.UTF8Encoding]::new($false)); Invoke-ScratchGit $movement.Session @('add', 'later.txt') | Out-Null; Invoke-ScratchGit $movement.Session @('commit', '-m', 'later session') | Out-Null
+$tipParameters = New-MovementParameters $movement
+$tipParameters.CandidateCommit = $oldCandidate
+$tipRun = Invoke-MovementCase 'primary-movement-session-tip-mismatch' $movement $tipParameters 2 'blocked' 'candidate.session-tip-changed'
+
+$movement = New-MovementState
+$treeParameters = New-MovementParameters $movement
+$treeParameters.CandidateTree = '0000000000000000000000000000000000000000'
+$treeRun = Invoke-MovementCase 'primary-movement-tree-mismatch' $movement $treeParameters 2 'blocked' 'candidate.tree-mismatch'
+
+$movement = New-MovementState
+$parentParameters = New-MovementParameters $movement
+$parentParameters.CandidateParent = '0000000000000000000000000000000000000000'
+$parentRun = Invoke-MovementCase 'primary-movement-parent-mismatch' $movement $parentParameters 2 'blocked' 'candidate.parent-mismatch'
+
+$movement = New-MovementState
+$unexpectedParameters = New-MovementParameters $movement
+$unexpectedParameters.FixtureFailure = 'unexpected'
+$unexpectedRun = Invoke-MovementCase 'primary-movement-guarded-unexpected' $movement $unexpectedParameters 1 'error' 'assessment.failed'
+
+$movement = New-MovementState
+$manyOwned = @()
+for ($index = 0; $index -lt 501; $index++) { $manyOwned += "evidence-$index.txt" }
+$evidenceParameters = New-MovementParameters $movement ($manyOwned -join ',')
+$evidenceRun = Invoke-MovementCase 'primary-movement-evidence-truncated' $movement $evidenceParameters 2 'blocked' 'primary.evidence-truncated'
+if ($null -ne $evidenceRun.Json) { Assert-True ($evidenceRun.Json.ownedPaths.totalCount -eq 501 -and $evidenceRun.Json.ownedPaths.items.Count -eq 500 -and $evidenceRun.Json.ownedPaths.truncated) 'primary-movement-evidence-truncated caps owned evidence' }
+
+$movement = New-MovementState
+$foreignTree = ((@(Invoke-ScratchGit $movement.Primary @('rev-parse', 'HEAD^{tree}')))[0]).Trim()
+$foreignTip = $movement.Parent
+for ($index = 0; $index -lt 501; $index++) {
+	$foreignTip = ((@(Invoke-ScratchGit $movement.Primary @('commit-tree', $foreignTree, '-p', $foreignTip, '-m', "foreign empty $index")))[0]).Trim()
+}
+Invoke-ScratchGit $movement.Primary @('update-ref', 'refs/heads/main', $foreignTip, $movement.Parent) | Out-Null; Invoke-ScratchGit $movement.Primary @('reset', '--hard', 'main') | Out-Null
+$foreignEvidenceRun = Invoke-MovementCase 'primary-movement-foreign-evidence-truncated' $movement (New-MovementParameters $movement) 2 'blocked' 'primary.evidence-truncated'
+if ($null -ne $foreignEvidenceRun.Json) {
+	Assert-True ($foreignEvidenceRun.Json.foreignCommits.totalCount -eq 501 -and $foreignEvidenceRun.Json.foreignCommits.items.Count -eq 500 -and $foreignEvidenceRun.Json.foreignCommits.truncated) 'primary-movement-foreign-evidence-truncated caps foreign commits'
+}
+
+$movement = New-MovementState
+for ($index = 0; $index -lt 501; $index++) {
+	$path = "foreign-$index.txt"
+	[IO.File]::WriteAllText((Join-Path $movement.Primary $path), $path, [Text.UTF8Encoding]::new($false))
+}
+Invoke-ScratchGit $movement.Primary @('add', '--all') | Out-Null; Invoke-ScratchGit $movement.Primary @('commit', '-m', 'foreign paths') | Out-Null
+$changeEvidenceRun = Invoke-MovementCase 'primary-movement-change-evidence-truncated' $movement (New-MovementParameters $movement) 2 'blocked' 'primary.evidence-truncated'
+if ($null -ne $changeEvidenceRun.Json) {
+	Assert-True ($changeEvidenceRun.Json.changes.totalCount -eq 501 -and $changeEvidenceRun.Json.changes.items.Count -eq 500 -and $changeEvidenceRun.Json.changes.truncated) 'primary-movement-change-evidence-truncated caps changed paths'
+}
 
 Write-Host ''
 if ($script:Failures.Count -gt 0) {
