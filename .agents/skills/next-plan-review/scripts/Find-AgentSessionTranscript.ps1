@@ -572,7 +572,12 @@ try {
 	}
 	if ($orderedCandidates.Count -eq 0) {
 		$result.code = 'transcript.not-found'
-		$result.message = 'No transcript matched the commit time and an eligible retained worktree.'
+		$result.message = if ($selection -eq 'explicit-session-id') {
+			'No Codex transcript matched the requested session ID; commit-time and eligible-worktree gates were not applied.'
+		}
+		else {
+			'No transcript matched the commit time and an eligible retained worktree.'
+		}
 		Write-Result $result 2
 	}
 	if ($orderedCandidates.Count -ne 1) {
