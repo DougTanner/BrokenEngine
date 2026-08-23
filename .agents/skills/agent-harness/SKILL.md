@@ -11,7 +11,7 @@ allowed-tools: [PowerShell]
 
 # Agent Interaction Harness
 
-Drive the local headless server and rendered client through loopback, length-prefixed JSON. Use server port `27100`, client port `27101`, and the absolute adopted worktree. A scenario needing a second simultaneous client adds port `27102` (see Additional simultaneous client below). A local server is a development instance, not an Azure production server.
+Drive the local headless server and rendered client through loopback, length-prefixed JSON. Use server port `27100`, client port `27101`, and the absolute adopted worktree. A scenario needing a second simultaneous client adds port `27102` (see the project's [Additional simultaneous client](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/launch.md#additional-simultaneous-client) recipe). A local server is a development instance, not an Azure production server.
 
 Each fenced PowerShell block is an independent shell call unless it is explicitly labeled
 as temporary-script contents. Variables and functions are fence-local and do not survive
@@ -25,19 +25,19 @@ shell call.
 
 Read the focused references only when applicable:
 
-- Read the command reference (`references/command-reference.md`) for the five engine-shared command schemas (`ping`, `quit`, `get_logs`, `set_log_level`, `crash_report_fixture`) and the `params`/`result` placement convention; the request/response envelope itself is defined in the Invoke commands section below. The selected project's `Projects/<Project>/Documents/AgentHarness.md` owns every game command schema, verification recipe, and game caveat.
+- Read the command reference (`references/command-reference.md`) for the five engine-shared command schemas (`ping`, `quit`, `get_logs`, `set_log_level`, `crash_report_fixture`) and the `params`/`result` placement convention; the request/response envelope itself is defined in the Invoke commands section below. The selected project's `Projects/<Project>/Documents/AgentHarness.md` hub routes every game command schema, launch recipe, verification scenario, and game caveat to a focused reference.
 - Read the private-LAN firewall reference (`references/private-lan-firewall.md`) only for an explicitly requested cross-machine or private-Wi-Fi scenario. Ordinary same-machine runs stay loopback-only and never inspect or change firewall state.
 - Read the RenderDoc capture reference (`references/renderdoc.md`) only for a GPU frame-capture or capture-analysis scenario; it owns the `--renderdoc` launch, `renderdoc_capture`, and the headless `rdc_*` analysis scripts.
 
 ## Select the project
 
-Target the project the latest `/compile` result built, unless the user or plan names a different one. Default today: BrokenEngineSandbox. Before launching, read `Projects/<Project>/Documents/AgentHarness.md`; it owns the executable names, output directory, extra launch arguments, game command schemas, and authoritative verification recipes referenced throughout this skill.
+Target the project the latest `/compile` result built, unless the user or plan names a different one. Default today: BrokenEngineSandbox. Before launching, read the selected project's `Projects/<Project>/Documents/AgentHarness.md` hub; its machine-readable launch configuration owns the executable names and output directory, while its linked `launch.md` owns the executable launch recipe and project launch arguments; the root hub routes project command schemas and verification scenarios to focused children.
 
 ## Provision and claim
 
 Provision the checkout and use only its provisioned primary AgentHarness output. Wrapper sessions use their existing WorktreeCli session owner; a non-worktree checkout may let the provisioner create a transient provisioning session.
 
-Claim through `scripts/Invoke-HarnessClaim.ps1`. It requires the selected project's server and client executables (reading their names and `Output` directory from the project harness doc's launch block), proves that the pack version this worktree's source expects matches the version the supplied data directory's `.manifest` files carry, provisions the checkout, requires the resolved `AgentHarness.exe`, mints the owner token, and claims the lock, printing one compact `broken-engine-harness-claim/v1` JSON object. When another session holds the lock, it provisions once and then retries only the claim until it succeeds or its 500-second wait budget expires, so the invocation below is itself the wait — never hand-write a poll loop, invent a sleep window, or pass a wait budget of your own. Pass the latest `/compile` result's normalized `GameDataDirectory` verbatim as `-GameDataDirectory` — the same packed data the launch below selects with `--data-directory`. Add `-Configuration <name>` only for a build other than `Debug`. Run this from the session worktree root:
+Claim through `scripts/Invoke-HarnessClaim.ps1`. It requires the selected project's server and client executables (reading their names and `Output` directory from the project's root `## Machine-readable launch configuration`, not from the human `launch.md` recipe), proves that the pack version this worktree's source expects matches the version the supplied data directory's `.manifest` files carry, provisions the checkout, requires the resolved `AgentHarness.exe`, mints the owner token, and claims the lock, printing one compact `broken-engine-harness-claim/v1` JSON object. When another session holds the lock, it provisions once and then retries only the claim until it succeeds or its 500-second wait budget expires, so the invocation below is itself the wait — never hand-write a poll loop, invent a sleep window, or pass a wait budget of your own. Pass the latest `/compile` result's normalized `GameDataDirectory` verbatim as `-GameDataDirectory` — the same packed data the launch below selects with `--data-directory`. Add `-Configuration <name>` only for a build other than `Debug`. Run this from the session worktree root:
 
 ```powershell
 pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session '<short task label>' -GameDataDirectory '<normalized Data path>'
@@ -89,7 +89,7 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessPr
 
 Every action prints one compact `broken-engine-harness-process-check/v1` JSON object with `status`, `code`, and `message`; `Check` adds `findings`, each naming its `role`, `reportPath`, `headline`, and `evidencePath` (the retained evidence directory). Exit `0` means every registered role still holds its registered exact identity — the registered PID plus its registered start time, never a process-name search. Exit `2` means a registered role exited unexpectedly — a zero exit code never makes a disappearance intentional — and its findings carry any crash report written since that role's pre-launch baseline; a report unchanged since that baseline is stale and is never announced as a new crash, and a role that exited without changing any report reports `reportPath` and `headline` as `null` rather than inventing evidence. Exit `1` is a setup or state failure. Never delete, move, or rewrite a reported crash report or its retained evidence; report it by path. The checker reports only through the command, poll, or check that is already active and never promises out-of-band notification while none is.
 
-The selected project's harness doc owns the concrete launch block — the server/client executable paths beneath its `Output` directory and any extra project launch arguments — plus its game-specific connect and fresh-state notes. A server-side reset command resets server state only, so a comparison requiring fresh client state must launch under an app-data directory that did not exist before that launch; the project doc owns the concrete recipe. The `--agent-port` values are the fixed ports above and are embedded in that launch block.
+The selected project's hub owns the machine-readable executable paths, while its linked `launch.md` owns the concrete launch block — extra project launch arguments, game-specific connect notes, and fresh-state choices. A server-side reset command resets server state only, so a comparison requiring fresh client state must launch under an app-data directory that did not exist before that launch; use the `launch.md` recipe. The `--agent-port` values are the fixed ports above and are embedded in that recipe.
 
 Agent-mode executables start minimized without activation. Capture commands temporarily restore the client without activation and re-minimize it. A criterion that depends on render progression must hold a visible window for its duration — capture restores an iconic window only for the readback and re-minimizes it, so a capture taken mid-scenario silently returns the client to the non-rendering state. Use `window_state` to hold visibility across such a scenario. Omit `--windowed` only when native-resolution UI sizing/readability is part of acceptance. Add the optional `--renderdoc` client argument only for GPU frame capture; it force-loads renderdoc.dll and drops the Vulkan validation layer, so keep it off ordinary runs (see the RenderDoc capture reference `references/renderdoc.md`).
 
@@ -116,7 +116,7 @@ Before relinking or relaunching, send `quit` and wait for the exact numeric PID 
 
 A criterion that needs two clients connected at once — a late joiner beside a client that must stay connected — launches an additional client after the standard pair. Disconnecting and reconnecting the one client is not a substitute when the criterion depends on state the server drops when its last client leaves.
 
-The additional client is the documented client launch with three changes: its own fixed agent port above, its own `--app-data-directory` root, and its own `--log-file`. Every other argument is unchanged, including the same `--data-directory` — all processes of one run must select the same asset data root. Each additional client needs its own app-data root because of how one root separates client and server state (`Engine/Source/File/AGENTS.md`). The project harness doc owns the concrete launch block.
+The additional client is the documented client launch with three changes: its own fixed agent port above, its own `--app-data-directory` root, and its own `--log-file`. Every other argument is unchanged, including the same `--data-directory` — all processes of one run must select the same asset data root. Each additional client needs its own app-data root because of how one root separates client and server state (`Engine/Source/File/AGENTS.md`). The project `launch.md` owns the concrete launch block.
 
 It joins this run's process-identity flow as its own role in the same state path: `Baseline` with its own `-ConfiguredAppDataRoot` and the client `-GameName`, then `Register` and the immediate `Check`, exactly as for the first client. Wait for its readiness with `Wait-HarnessPing.ps1 -Port 27102` after the standard `27100` then `27101` waits.
 
@@ -129,6 +129,8 @@ Prefer stdin JSON and always capture stdout even when exit is nonzero:
 ```powershell
 '{"cmd":"ping"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port 27100 -
 ```
+
+For server-window verification, read the project-owned [server-window recipe](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/server-window.md#server-gdi-monitoring-window-capture-and-click).
 
 Use `--timeout-ms N` for a deferred client command; default is 15000 and maximum is 600000. The CLI retries the loopback connect until this same deadline rather than making a single short attempt, so a probe against a dead port consumes the full budget — give a quick negative probe a small `--timeout-ms` (e.g. `1000`). Exit `0` means parsed `ok:true`, exit `2` means parsed `ok:false`, and exit `1` means transport, usage, or OS failure.
 
@@ -147,7 +149,7 @@ Write any multi-line PowerShell driver — anything with `function` definitions,
 
 ## Authoritative verification
 
-The selected project's harness doc owns the concrete setup recipe (which commands seed server state, confirm client connection, and address UI) and its replay determinism acceptance sequence. Regardless of project, hold these verification-evidence principles:
+The selected project's hub routes the concrete setup recipe — [common verification](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/verification.md), endpoint commands, and [replay determinism](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md) or [cross-cell](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/cross-cell.md) scenario material — including the commands that seed server state, confirm client connection, and address UI. Regardless of project, hold these verification-evidence principles:
 
 - Verify with the narrowest observable combination of the project's scene, UI, screenshot, server-query, and log commands. `describe_ui`, scene/server queries, and `get_logs` close a criterion more cheaply than pixels; reach for a capture only when the criterion is genuinely about what was rendered. Stable counts such as players should agree exactly; allow bounded tick drift for collections whose entries are being added and removed rapidly.
 - Release through the lifecycle and release section below.
@@ -194,7 +196,7 @@ Return the complete report inline. A failed or blocked in-scope criterion remain
 
 ## Durable caveats
 
-The selected project's harness doc owns game-specific caveats (injection/pause/replay timing, queued-update semantics, and command source-file ownership). These engine-generic caveats hold for every project:
+The selected project's focused verification, replay, and endpoint references own game-specific caveats (injection/pause/replay timing, queued-update semantics, and command source-file ownership). These engine-generic caveats hold for every project:
 
 - Physical mouse, keyboard, wheel, and gamepad input is suppressed for an agent-mode client. Synthetic input is the sole game/ImGui source; Alt+F4 and window Close still quit. Focus messages remain real, and audio requires real OS focus.
 - Keep ownership warm during long soaks. Never leave a background heartbeat/poll process after the session.

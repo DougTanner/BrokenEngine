@@ -1,8 +1,8 @@
 # Agent Harness Command Reference
 
-Engine-shared commands, identical for every game project. Each project's own command schemas — server, client, and client command behavior — live in `Projects/<Project>/Documents/AgentHarness.md` (default `Projects/BrokenEngineSandbox/Documents/AgentHarness.md`).
+Engine-shared commands, identical for every game project. Each project's hub routes its project-specific command schemas; see the [BrokenEngineSandbox project hub](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness.md).
 
-Every field below belongs under request `params`; every returned field belongs under response `result`. Sending a side-specific command to the other executable returns `unknown command`.
+Every field below belongs under request `params`; every returned field belongs under response `result`. Sending a side-specific command to the other executable still returns `unknown command`. The five shared commands below do not capture or drive desktop windows. The BrokenEngineSandbox server monitor is a project-owned GDI window, not a protocol command surface; use the [project's server-window recipe](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/server-window.md#server-gdi-monitoring-window-capture-and-click) when that window must be observed or clicked.
 
 ## Shared commands
 
