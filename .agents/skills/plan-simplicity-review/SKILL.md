@@ -39,16 +39,42 @@ must not become its own source of over-engineering.
 
 ## Inputs and Snapshot
 
-- Immutable complete plan supplied inline or by exact file path. Inline plans
-  require a stable snapshot identifier and stable heading IDs so findings can
-  cite `<snapshot>#<heading-id>`.
+- `/save-plan`: the final unsaved Plan body snapshot, supplied inline or by
+  exact file path.
+- Change Workflow preparation or a bounded final rerun: the manager supplies
+  the final complete plan presented for implementation, including the
+  execution card and exact refinements when they carry resolved work, inline
+  or by exact file path, with its immutable identity; on a bounded final
+  rerun, treat that supplied final plan as the review input.
+- For either inline form, require a stable snapshot identifier and stable
+  heading IDs so findings can cite `<snapshot>#<heading-id>`.
+- For an exact-file-path snapshot, derive a deterministic SHA-256 identifier
+  from the loaded bytes immediately after loading and use it for the review
+  and output; inline forms keep their supplied stable identifier and heading
+  IDs.
 - The manager's trigger evidence: which plan steps add code or modify
   non-documentation artifacts.
+- On a bounded final rerun, the manager's trigger evidence and classification
+  also identify which steps materially enlarge the solution.
 - User intent and known residuals.
 
-Load the plan bytes once and retain that immutable snapshot for the whole
-review; ignore later edits. If an input above is missing, return `BLOCKED`
-naming the exact missing input.
+Classify occurrence and likelihood evidence explicitly:
+
+- `observed` — a concrete incident, reproduction, log, diagnostic, capture, or
+  output from executing a named current workflow that demonstrates the reviewed
+  state or failure.
+- `credible exposure` — a named current workflow, a concrete trigger or timing
+  window, and a likelihood signal such as measured cadence, bounded timing,
+  multiplicity, or an analogous incident. An analogous incident counts only
+  when it shares the relevant failure mechanism, trigger or window, and
+  affected consumer.
+- `hypothetical` — static code or specification reachability, or a possible
+  consequence without the evidence above. Code reachability alone never counts
+  as occurrence evidence.
+
+Load the supplied snapshot bytes once and retain that
+immutable snapshot for the whole review; ignore later edits. If an input above
+is missing, return `BLOCKED` naming the exact missing input.
 
 ## Execution Context
 
@@ -63,23 +89,35 @@ reviewer is unavailable, the manager reports a blocker.
 
 ## Review
 
-Apply questions 1-5, 8, and 9 only to the steps that add code; apply question 6
-to every step that changes a non-documentation artifact; apply question 7 to a
-plan whose steps change product, user interface, tooling, or public interface
-behavior.
+Apply questions 1 and 2 to every step that adds code or modifies
+non-documentation behavior; apply questions 3-5, 8, and 9 to every step that
+adds code or materially enlarges the solution; apply question 6 to every step
+that changes a non-documentation artifact; apply question 7 to a plan whose
+steps change product, user interface, tooling, or public interface behavior.
 
-1. Reachability. Establish that the addition handles a failure or state that
-   actually occurs. Report it when the condition is ultra-rare, self-healing, or
-   already answered by an existing ordered fallback — idempotent re-run, lease
-   expiry, claim healing, Git state. Canonical examples: hardening a repository
-   script against power loss mid-execution; solving stale export-artifact files
-   with new tracking machinery when cleaning the export directory on final
-   release builds would do.
-2. Problem worth solving. State who is hurt and when in every finding; a
-   hypothetical cost is not a problem.
-3. Simpler mechanism. For each added-code step, name the plainly
-   simpler alternative when one exists: reuse of an existing mechanism, a
-   narrower change, deleting the requirement, or fixing at the origin.
+1. Reachability and evidence. Classify the reviewed state or failure as
+   `observed`, `credible exposure`, or `hypothetical` using the evidence rules
+   above. Report it when the condition is ultra-rare, self-healing, or already
+   answered by an existing ordered fallback — idempotent re-run, lease expiry,
+   claim healing, Git state. Canonical examples: hardening a repository script
+   against power loss mid-execution; solving stale export-artifact files with
+   new tracking machinery when cleaning the export directory on final release
+   builds would do.
+2. Problem worth solving. State who is hurt and when in every finding, tie that
+   harm to the occurrence or likelihood evidence, and compare the proposed
+   prevention's implementation, maintenance, runtime, and integration cost with
+   the simpler alternative's cost and with accepting or deferring the problem's
+   likelihood, impact, and recovery cost. Use qualitative bands when exact
+   measurements are unavailable; never invent precision. A merely hypothetical
+   cost is not itself a problem. When the problem remains `hypothetical`, and
+   no stronger `simplify` or whole-plan `plan-not-worth-executing` finding
+   applies, emit `speculative-hardening` with `user-judgment` regardless of
+   prevention cost or severity. Retain the cost comparison and present options
+   with a recommendation; severity alone is neither occurrence evidence nor
+   grounds for a clean `PASS`.
+3. Simpler mechanism. For each applicable step, name the plainly simpler
+   alternative when one exists: reuse of an existing mechanism, a narrower
+   change, deleting the requirement, or fixing at the origin.
 4. ASSERT-and-defer floor. Weigh the minimal fallback every time — an ASSERT or
    clear failure at the point the rare condition would manifest, dealt with
    later if it ever occurs. Honor the repository's no-useless-ASSERT rule (root
@@ -147,11 +185,16 @@ For each finding:
 > `PSR-F-###` — `plan-path:line` or `snapshot#heading-id` — class:
 > rare-edge-case | speculative-hardening | overbuilt-mechanism |
 > assert-and-defer | bandaid-fix | plan-not-worth-executing — concrete problem
-> — evidence: `repository-path:line` — simpler alternative(s), which for
-> `bandaid-fix` carries the root-cause fix sketch and for
-> `plan-not-worth-executing` states what happens instead of the plan (nothing,
-> or a much smaller change) — disposition: simplify | user-judgment
-> (options + recommendation)
+> — evidence: `<stable locator: repository-path:line, plan-path:line,
+> snapshot#heading-id, supplied artifact selector, or named command/output;
+> "none supplied" only when Q1 classifies the case as hypothetical because
+> occurrence evidence is missing>` — occurrence/likelihood: `<Q1
+> classification and supporting evidence>` —
+> simpler alternative(s): `<applicable Q3-Q9 result; for bandaid-fix include
+> Q6's root-cause fix sketch, and for plan-not-worth-executing state what
+> replaces the plan (nothing or a much smaller change)>` — cost comparison:
+> `<Q2 comparison>` — disposition: `<Q2
+> disposition: simplify | user-judgment (options + recommendation)>`
 
 A `plan-not-worth-executing` finding cites the plan's goal or title line and is
 always the only finding in the report.
