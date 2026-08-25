@@ -302,7 +302,12 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		alignas(int64_t) std::byte pScratch[128] = {};
 		auto BuildContext = [&](std::span<engine::RegistrySourceLayer> layers, std::span<const engine::RegistrySubscriptionLayer> subscriptions)
 		{
-			const int64_t iScratchBytes = engine::RegistryScratchBytes(layers);
+			int64_t iEligibleRows = 0;
+			for (const engine::RegistrySourceLayer& rLayer : layers)
+			{
+				iEligibleRows += static_cast<int64_t>(rLayer.rows.size());
+			}
+			const int64_t iScratchBytes = engine::RegistryScratchBytes(iEligibleRows);
 			if (iScratchBytes > static_cast<int64_t>(sizeof(pScratch)))
 			{
 				throw std::runtime_error("registry_fixture scratch buffer too small");
@@ -429,6 +434,73 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		rResult["reacquiredId"] = puiConsumerTargets[3].ToUuid().Value();
 		const bool bReacquireCorrect = puiConsumerTargets[3] == Id(1);
 
+		// Counts use uint16_t storage, so prove that 256 existing subscriptions remain representable and that
+		// ranking still prefers the less-subscribed source. Releasing one source-A handle must clear that handle
+		// and decrement only source A to 255 while the context is live.
+		constexpr int64_t kiHighSourceCount = 2;
+		constexpr int64_t kiHighExistingSubscriptionCount = 257;
+		constexpr int64_t kiHighConsumerCount = kiHighExistingSubscriptionCount + 1;
+		const engine::registry_id_t puiHighSourceIds[kiHighSourceCount] = {Id(21), Id(22)};
+		const XMVECTOR pVecHighSourcePositions[kiHighSourceCount] =
+		{
+			XMVectorSet(100.0f, 0.0f, 0.0f, 1.0f),
+			XMVectorSet(100.0f, 10.0f, 0.0f, 1.0f),
+		};
+		const engine::alignment_t pHighSourceAlignments[kiHighSourceCount] = {kSourceAlignment, kSourceAlignment};
+		const int64_t piHighSourceRows[kiHighSourceCount] = {0, 1};
+		engine::registry_id_t puiHighConsumerTargets[kiHighConsumerCount] = {};
+		int64_t piHighSubscriptionRows[kiHighExistingSubscriptionCount] = {};
+		for (int64_t i = 0; i < kiHighExistingSubscriptionCount - 1; ++i)
+		{
+			puiHighConsumerTargets[i] = Id(21);
+			piHighSubscriptionRows[i] = i;
+		}
+		puiHighConsumerTargets[kiHighExistingSubscriptionCount - 1] = Id(22);
+		piHighSubscriptionRows[kiHighExistingSubscriptionCount - 1] = kiHighExistingSubscriptionCount - 1;
+		const int64_t piHighAcquireRow[1] = {kiHighConsumerCount - 1};
+		XMVECTOR pVecHighConsumerOrigins[kiHighConsumerCount] = {};
+		XMVECTOR pVecHighConsumerDirections[kiHighConsumerCount] = {};
+		engine::alignment_t pHighConsumerAlignments[kiHighConsumerCount] = {};
+		for (int64_t i = 0; i < kiHighConsumerCount; ++i)
+		{
+			pVecHighConsumerOrigins[i] = vecConsumerOrigin;
+			pVecHighConsumerDirections[i] = vecConsumerDirection;
+			pHighConsumerAlignments[i] = kConsumerAlignment;
+		}
+		engine::RegistryResult pHighResults[1] = {};
+		bool bHighCountRankingCorrect = false;
+		bool bHighCountReleaseCleared = false;
+		bool bHighCountReleaseCountCorrect = false;
+		{
+			engine::RegistrySourceLayer highSourceLayer {};
+			highSourceLayer.puiIds = puiHighSourceIds;
+			highSourceLayer.pVecCurrentPositions = pVecHighSourcePositions;
+			highSourceLayer.pAlignments = pHighSourceAlignments;
+			highSourceLayer.rows = std::span<const int64_t>(piHighSourceRows, kiHighSourceCount);
+			highSourceLayer.iSourceCount = kiHighSourceCount;
+
+			engine::RegistrySubscriptionLayer highSubscriptionLayer {};
+			highSubscriptionLayer.puiTargets = puiHighConsumerTargets;
+			highSubscriptionLayer.rows = std::span<const int64_t>(piHighSubscriptionRows, kiHighExistingSubscriptionCount);
+			highSubscriptionLayer.iSourceCount = kiHighConsumerCount;
+
+			engine::RegistryBatch highBatch {};
+			highBatch.puiTargets = puiHighConsumerTargets;
+			highBatch.pVecOrigins = pVecHighConsumerOrigins;
+			highBatch.pVecDirections = pVecHighConsumerDirections;
+			highBatch.pAlignments = pHighConsumerAlignments;
+			highBatch.rows = std::span<const int64_t>(piHighAcquireRow, 1);
+			highBatch.results = std::span<engine::RegistryResult>(pHighResults, 1);
+			highBatch.iSourceCount = kiHighConsumerCount;
+
+			engine::RegistryQueryContext context = BuildContext(std::span<engine::RegistrySourceLayer>(&highSourceLayer, 1), std::span<const engine::RegistrySubscriptionLayer>(&highSubscriptionLayer, 1));
+			engine::AcquireRegistryTargets(context, highBatch, kfRadius);
+			bHighCountRankingCorrect = puiHighConsumerTargets[kiHighConsumerCount - 1] == Id(22);
+			engine::ReleaseRegistryTarget(context, puiHighConsumerTargets[0]);
+			bHighCountReleaseCleared = !puiHighConsumerTargets[0].IsValid();
+			bHighCountReleaseCountCorrect = context.subscriberCounts[0] == 255;
+		}
+
 		// Exact tie: three candidates share one position, so the lowest layer and row must win.
 		const engine::registry_id_t puiTieIdsA[2] = {Id(11), Id(12)};
 		const engine::registry_id_t puiTieIdsB[1] = {Id(13)};
@@ -534,6 +606,9 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		rResult["removedIdResolves"] = bRemovedIdResolves;
 		rResult["releaseClearedHandle"] = bReleaseClearedHandle;
 		rResult["reacquireCorrect"] = bReacquireCorrect;
+		rResult["highCountRankingCorrect"] = bHighCountRankingCorrect;
+		rResult["highCountReleaseCleared"] = bHighCountReleaseCleared;
+		rResult["highCountReleaseCountCorrect"] = bHighCountReleaseCountCorrect;
 		rResult["tieCorrect"] = bTieCorrect;
 		rResult["ownershipCountCorrect"] = bOwnershipCountCorrect;
 		rResult["foreignLookupMatches"] = bForeignLookupMatches;
@@ -546,7 +621,8 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		rResult["assignMissChangedNothing"] = bAssignMissChangedNothing;
 
 		rResult["passed"] = bRadiusRejected && bAlignmentRejected && bRankingCorrect && bResolveStableAfterPermutation
-			&& !bRemovedIdResolves && bReleaseClearedHandle && bReacquireCorrect && bTieCorrect
+			&& !bRemovedIdResolves && bReleaseClearedHandle && bReacquireCorrect
+			&& bHighCountRankingCorrect && bHighCountReleaseCleared && bHighCountReleaseCountCorrect && bTieCorrect
 			&& bOwnershipCountCorrect && bForeignLookupMatches && bUuidLookupHit && bUuidLookupMiss
 			&& bUuidLookupWithoutGlobalIds && bAssignHitReturnedTrue && bAssignHitIsolated
 			&& bAssignMissReturnedFalse && bAssignMissChangedNothing;

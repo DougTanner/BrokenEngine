@@ -125,15 +125,12 @@ struct FramePostRender : public engine::FramePostRenderBase
 [[nodiscard]] bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest);
 void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rRequest);
 
-// One registry query window: the context plus the workbuffer reservations its spans point into. The owner keeps
-// the whole object alive for the window; the reservations pop in reverse creation order when it dies, so nothing
-// the context spans can outlive the handle that owns it.
+// One registry query window: the context plus the single workbuffer allocation its spans point into. The owner
+// keeps the whole object alive for the window; the allocation pops when it dies, so no context span outlives it.
 struct RegistryWindow
 {
+	common::ScopedWorkbufferAllocation<std::byte*> buffer;
 	engine::RegistryQueryContext context {};
-	common::ScopedWorkbufferAllocation<int64_t*> ascendingRows;
-	common::ScopedWorkbufferAllocation<std::byte*> scratch;
-	common::ScopedWorkbufferAllocation<engine::RegistrySourceLayer*> layers;
 };
 
 struct Frame

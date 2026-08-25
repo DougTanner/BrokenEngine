@@ -31,6 +31,7 @@ class InputPoll;
 #if defined(BT_SERVER)
 // File/Replay.h names game types, so it stays out of Engine.h and out of this header; GameBase.cpp includes it.
 class Replay;
+struct ActiveFrameRef;
 #endif // BT_SERVER
 
 enum class MenuFlags : uint64_t
@@ -288,6 +289,9 @@ public:
 
 	// Owns gpReplay for this game's lifetime; every user reaches it through that global.
 	std::unique_ptr<Replay> mpReplay;
+
+	// Reusable server-side dispatch references; capacity persists across ticks as the active-cell count changes.
+	std::vector<ActiveFrameRef> mActiveFrameRefs;
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)

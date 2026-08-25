@@ -458,35 +458,41 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 	const int64_t iActiveCount = static_cast<int64_t>(rActiveCoords.size());
 
 	// Pre-resolve frame references to avoid repeated map lookups across all phases
-	common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
-	for (int64_t j = 0; j < iActiveCount; ++j)
 	{
-		const GridCoord& rCoord = rActiveCoords[static_cast<size_t>(j)];
-		auto& rFrames = mCoordFrames.at(rCoord);
-		if (rFrames.pCurrent == nullptr || rFrames.pNext == nullptr)
+		// Heap: mActiveFrameRefs persists across ticks and may grow with the unbounded active-cell count;
+		// retain its capacity while rebuilding the per-tick references.
+		ScopedSuppressAllocationTracking suppress;
+		mActiveFrameRefs.clear();
+		mActiveFrameRefs.reserve(static_cast<size_t>(iActiveCount));
+		for (int64_t j = 0; j < iActiveCount; ++j)
 		{
-			LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}",
-				rCoord.x, rCoord.y, rFrames.pCurrent != nullptr, rFrames.pNext != nullptr);
-			continue;
+			const GridCoord& rCoord = rActiveCoords[static_cast<size_t>(j)];
+			CoordFrames& rFrames = mCoordFrames.at(rCoord);
+			if (rFrames.pCurrent == nullptr || rFrames.pNext == nullptr)
+			{
+				LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}",
+					rCoord.x, rCoord.y, rFrames.pCurrent != nullptr, rFrames.pNext != nullptr);
+				continue;
+			}
+			mActiveFrameRefs.push_back({
+				.pNext = &NextFrame(rCoord),
+				.pCurrent = &CurrentFrame(rCoord),
+				.pFrameInput = &mFrameInputs.at(rCoord),
+				.pStaticData = &rFrames.staticData,
+			});
 		}
-		common::gpThreadLocal->mWorkbuffer.PushBack<ActiveFrameRef>({
-			.pNext = &NextFrame(rCoord),
-			.pCurrent = &CurrentFrame(rCoord),
-			.pFrameInput = &mFrameInputs.at(rCoord),
-			.pStaticData = &rFrames.staticData,
-		});
 	}
-	std::span<const ActiveFrameRef> activeFrameRefs = common::gpThreadLocal->mWorkbuffer.Span<ActiveFrameRef>();
+	const std::vector<ActiveFrameRef>& rActiveFrameRefs = mActiveFrameRefs;
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameInterpolate);
 	gpProfileManager->CpuStart(game::kCpuTimerFramePostRender);
 
-	const int64_t iFrameRefCount = static_cast<int64_t>(activeFrameRefs.size());
+	const int64_t iFrameRefCount = static_cast<int64_t>(rActiveFrameRefs.size());
 	auto processRange = [&](int64_t iBegin, int64_t iEnd)
 	{
 		for (int64_t j = iBegin; j < iEnd; ++j)
 		{
-			RunFrameTick(activeFrameRefs[j], miTickCounter, mfCurrentTime);
+			RunFrameTick(rActiveFrameRefs.at(static_cast<size_t>(j)), miTickCounter, mfCurrentTime);
 		}
 	};
 	if constexpr (kbFrameDispatch)

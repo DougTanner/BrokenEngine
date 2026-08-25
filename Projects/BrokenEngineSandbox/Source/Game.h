@@ -115,7 +115,7 @@ public:
 #endif
 
 #if defined(BT_CLIENT)
-	void CaptureClientStateAndSaveIfChanged();
+	void CaptureClientStateIfChanged();
 #endif
 
 #if defined(BT_CLIENT)
@@ -129,7 +129,7 @@ public:
 
 	FleetSelection mFleetSelection;
 
-	// In-memory mirror of ClientState.bin; loaded at startup, written through whenever any tracked field changes.
+	// In-memory mirror of ClientState.bin; loaded at startup, refreshed whenever any tracked field changes, and written on orderly exit.
 	game::FleetGuid mRememberedFleetGuid {};
 	engine::global_id_t mRememberedFocusedShipId {};
 	float mfRememberedCameraEyeHeightTarget = engine::Camera::kfCameraEyeHeightInitial;

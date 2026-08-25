@@ -15,7 +15,7 @@ using enum GameFlags;
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 126 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
+const int64_t Frame::kiVersion = 127 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
 
 // FrameInterpolate
 FrameInterpolate::FrameInterpolate()
@@ -498,28 +498,34 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 	// flag used to carry — and while it still publishes a registry id.
 	auto IsEligible = [&](int64_t i) { return rSpaceships.puiRegistryIds[i].IsValid() && pfArrivalGracePeriods[i] <= 0.0f; };
 
-	// Ascending row indices, shared by the subscription layer (every subscriber row participates) and by the
-	// eligible-row span the registry scratch is sized against before that span has storage of its own.
-	int64_t iAscendingCount = std::max(iSpaceshipCount, iSubscriberCount);
-	auto pAscendingRows = rWorkbuffer.PushBuffer<int64_t*>(iAscendingCount * static_cast<int64_t>(sizeof(int64_t)));
-	for (int64_t i = 0; i < iAscendingCount; ++i)
-	{
-		pAscendingRows[i] = i;
-	}
-
 	int64_t iEligibleCount = 0;
 	for (int64_t i = 0; i < iSpaceshipCount; ++i)
 	{
 		iEligibleCount += IsEligible(i) ? 1 : 0;
 	}
 
-	engine::RegistrySourceLayer sizingLayer {.rows = std::span<const int64_t>(static_cast<int64_t*>(pAscendingRows), static_cast<size_t>(iEligibleCount))};
-	int64_t iScratchBytes = engine::RegistryScratchBytes(std::span<const engine::RegistrySourceLayer>(&sizingLayer, 1));
-	auto pScratch = rWorkbuffer.PushBuffer<std::byte*>(iScratchBytes);
+	// Reserve all window storage together. PushBuffer may grow the workbuffer, so no pointer is published until
+	// the combined reservation has returned. The source rows, registry scratch, padding, and layer descriptor
+	// then remain in one allocation for the context's lifetime.
+	const int64_t iAscendingCount = std::max(iSpaceshipCount, iSubscriberCount);
+	const int64_t iAscendingBytes = iAscendingCount * static_cast<int64_t>(sizeof(int64_t));
+	const int64_t iScratchBytes = engine::RegistryScratchBytes(iEligibleCount);
+	const int64_t iLayerOffset = common::RoundUp(iAscendingBytes + iScratchBytes, static_cast<int64_t>(16));
+	const int64_t iTotalBytes = iLayerOffset + static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
+	auto pBuffer = rWorkbuffer.PushBuffer<std::byte*>(iTotalBytes);
+	std::byte* pBufferBytes = static_cast<std::byte*>(pBuffer);
+	int64_t* pAscendingRows = reinterpret_cast<int64_t*>(pBufferBytes);
+	std::byte* pScratch = pBufferBytes + iAscendingBytes;
+	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iLayerOffset);
+
+	for (int64_t i = 0; i < iAscendingCount; ++i)
+	{
+		pAscendingRows[i] = i;
+	}
 
 	// The registry block starts with the eligible rows the caller fills and binds; the derived subscriber counts
 	// follow them. Ascending row order is what makes the fixed ranking's exact ties resolve as they did before.
-	int64_t* pEligibleRows = reinterpret_cast<int64_t*>(static_cast<std::byte*>(pScratch));
+	int64_t* pEligibleRows = reinterpret_cast<int64_t*>(pScratch);
 	int64_t iEligibleRow = 0;
 	for (int64_t i = 0; i < iSpaceshipCount; ++i)
 	{
@@ -529,7 +535,6 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 		}
 	}
 
-	auto pLayers = rWorkbuffer.PushBuffer<engine::RegistrySourceLayer*>(static_cast<int64_t>(sizeof(engine::RegistrySourceLayer)));
 	pLayers[0] =
 	{
 		.puiIds = rSpaceships.puiRegistryIds,
@@ -550,10 +555,8 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 
 	return
 	{
-		.context = engine::BuildRegistryQueryContext(rFrame.postRender.alignments, sourceLayers, std::span<const engine::RegistrySubscriptionLayer>(&subscriptionLayer, 1), std::span<std::byte>(static_cast<std::byte*>(pScratch), static_cast<size_t>(iScratchBytes))),
-		.ascendingRows = std::move(pAscendingRows),
-		.scratch = std::move(pScratch),
-		.layers = std::move(pLayers),
+		.buffer = std::move(pBuffer),
+		.context = engine::BuildRegistryQueryContext(rFrame.postRender.alignments, sourceLayers, std::span<const engine::RegistrySubscriptionLayer>(&subscriptionLayer, 1), std::span<std::byte>(pScratch, static_cast<size_t>(iScratchBytes))),
 	};
 }
 

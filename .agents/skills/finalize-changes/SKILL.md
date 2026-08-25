@@ -14,6 +14,14 @@ worker after main obtains the authoritative confirmation in `## Landing
 confirmation`. The worker never prompts, delegates, pushes, creates/removes
 worktrees, or disturbs unrelated changes. Keep history linear: reconcile with
 `git rebase`, never merge or use `--rebase-merges`.
+If approval preparation reports stale-base (`git.primary-not-ancestor`), stop
+and report the result to the manager. After the manager classifies it, if
+recovery is authorized, this same finalizer performs the documented ordinary
+linear `git rebase` and re-invokes approval preparation. Keep existing conflict,
+caller-owned-path, confirmation, lock, and primary-advance boundaries: do not
+invent conflict behavior, alter caller-owned paths or scope; the detailed
+recovery mechanics remain in
+[`references/scripts.md`](references/scripts.md).
 
 ## Inputs and ownership
 

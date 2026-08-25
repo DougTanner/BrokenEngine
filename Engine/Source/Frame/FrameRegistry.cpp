@@ -105,9 +105,9 @@ static void ValidateSourceLayers(std::span<const RegistrySourceLayer> sourceLaye
 
 #endif // BT_DEBUG
 
-int64_t RegistryScratchBytes(std::span<const RegistrySourceLayer> sourceLayers)
+int64_t RegistryScratchBytes(int64_t iEligibleRows)
 {
-	return TotalEligibleRows(sourceLayers) * static_cast<int64_t>(sizeof(int64_t) + sizeof(uint8_t));
+	return iEligibleRows * static_cast<int64_t>(sizeof(int64_t) + sizeof(uint16_t));
 }
 
 RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, std::span<const RegistrySourceLayer> sourceLayers, std::span<const RegistrySubscriptionLayer> subscriptionLayers, std::span<std::byte> scratch)
@@ -121,7 +121,7 @@ RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, st
 #endif
 
 	const int64_t iEligibleRows = TotalEligibleRows(sourceLayers);
-	ASSERT(static_cast<int64_t>(scratch.size()) >= RegistryScratchBytes(sourceLayers));
+	ASSERT(static_cast<int64_t>(scratch.size()) >= RegistryScratchBytes(iEligibleRows));
 
 	RegistryQueryContext context {};
 	context.sourceLayers = sourceLayers;
@@ -130,9 +130,9 @@ RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, st
 	if (iEligibleRows > 0)
 	{
 		// The row indices already bound into RegistrySourceLayer::rows occupy the front of the block.
-		uint8_t* puiCounts = reinterpret_cast<uint8_t*>(scratch.data() + iEligibleRows * sizeof(int64_t));
-		std::memset(puiCounts, 0, static_cast<size_t>(iEligibleRows));
-		context.subscriberCounts = std::span<uint8_t>(puiCounts, static_cast<size_t>(iEligibleRows));
+		uint16_t* puiCounts = reinterpret_cast<uint16_t*>(scratch.data() + iEligibleRows * sizeof(int64_t));
+		std::memset(puiCounts, 0, static_cast<size_t>(iEligibleRows) * sizeof(uint16_t));
+		context.subscriberCounts = std::span<uint16_t>(puiCounts, static_cast<size_t>(iEligibleRows));
 	}
 
 	for (const RegistrySubscriptionLayer& rLayer : subscriptionLayers)
@@ -142,6 +142,7 @@ RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, st
 			const EligibleRowRef found = FindEligibleRow(sourceLayers, rLayer.puiTargets[iRow]);
 			if (found.pLayer != nullptr)
 			{
+				ASSERT(context.subscriberCounts[found.iEligibleIndex] < std::numeric_limits<uint16_t>::max());
 				++context.subscriberCounts[found.iEligibleIndex];
 			}
 		}
@@ -169,7 +170,7 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 		const RegistrySourceLayer* pBestLayer = nullptr;
 		int64_t iBestRow = 0;
 		int64_t iBestEligibleIndex = 0;
-		uint8_t uiBestSubscribers = std::numeric_limits<uint8_t>::max();
+		uint16_t uiBestSubscribers = std::numeric_limits<uint16_t>::max();
 		float fBestAngle = std::numeric_limits<float>::max();
 
 		int64_t iEligibleIndex = 0;
@@ -192,7 +193,7 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 				}
 
 				const float fAngle = std::abs(XMVectorGetX(XMVector3AngleBetweenNormals(vecDirection, XMVector3Normalize(vecToSource))));
-				const uint8_t uiSubscribers = rContext.subscriberCounts[iCandidateIndex];
+				const uint16_t uiSubscribers = rContext.subscriberCounts[iCandidateIndex];
 
 				// Strictly better wins, so an exact tie leaves the earlier layer and row in place.
 				if (uiSubscribers < uiBestSubscribers || (uiSubscribers == uiBestSubscribers && fAngle < fBestAngle))
@@ -211,6 +212,7 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 		if (pBestLayer != nullptr)
 		{
 			// Later entries in this same batch see the subscription this one just took.
+			ASSERT(rContext.subscriberCounts[iBestEligibleIndex] < std::numeric_limits<uint16_t>::max());
 			++rContext.subscriberCounts[iBestEligibleIndex];
 		}
 

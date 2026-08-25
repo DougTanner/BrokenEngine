@@ -647,7 +647,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-void Game::CaptureClientStateAndSaveIfChanged()
+void Game::CaptureClientStateIfChanged()
 {
 	// When no fleet is focused (boot before first sync, or post-disconnect cleared fleets), preserve the remembered fleet/ship —
 	// don't overwrite the just-loaded saved state with zeros. The next valid focus (user click or post-sync auto-activate) updates it.
@@ -677,7 +677,6 @@ void Game::CaptureClientStateAndSaveIfChanged()
 	mRememberedFleetGuid              = newFleetGuid;
 	mRememberedFocusedShipId          = newShipId;
 	mfRememberedCameraEyeHeightTarget = fNewCameraEyeHeightTarget;
-	SaveClientState();
 }
 #endif // BT_CLIENT
 

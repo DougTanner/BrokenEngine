@@ -52,15 +52,15 @@ struct RegistryBatch
 struct RegistryQueryContext
 {
 	std::span<const RegistrySourceLayer> sourceLayers {};
-	std::span<uint8_t> subscriberCounts {};
+	std::span<uint16_t> subscriberCounts {};
 	const Alignments* pAlignments = nullptr;
 };
 
-// Size of the registry-internal scratch block for one query window, laid out as the eligible row indices the
+// Size of the registry-internal scratch block for one query window's eligible rows, laid out as the row indices the
 // caller writes and binds into RegistrySourceLayer::rows, followed by the subscriber counts
 // BuildRegistryQueryContext derives. It cannot size RegistryBatch::rows or RegistryBatch::results, which scale
 // with the caller's consumer count rather than with the source layers.
-[[nodiscard]] int64_t RegistryScratchBytes(std::span<const RegistrySourceLayer> sourceLayers);
+[[nodiscard]] int64_t RegistryScratchBytes(int64_t iEligibleRows);
 
 // scratch is the whole RegistryScratchBytes block, including the row prefix the caller already filled.
 [[nodiscard]] RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, std::span<const RegistrySourceLayer> sourceLayers, std::span<const RegistrySubscriptionLayer> subscriptionLayers, std::span<std::byte> scratch);

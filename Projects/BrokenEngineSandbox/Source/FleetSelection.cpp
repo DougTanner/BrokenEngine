@@ -41,7 +41,7 @@ void FleetSelection::FocusNextFleet()
 	{
 		++miFocusedFleetIndex;
 		AutoSelectFirstAliveMember();
-		gpGame->CaptureClientStateAndSaveIfChanged();
+		gpGame->CaptureClientStateIfChanged();
 	}
 }
 
@@ -51,7 +51,7 @@ void FleetSelection::FocusPrevFleet()
 	{
 		--miFocusedFleetIndex;
 		AutoSelectFirstAliveMember();
-		gpGame->CaptureClientStateAndSaveIfChanged();
+		gpGame->CaptureClientStateIfChanged();
 	}
 }
 
@@ -99,7 +99,7 @@ void FleetSelection::SelectPlayerInFleet(int64_t iPlayerIndex)
 		}
 	}
 
-	gpGame->CaptureClientStateAndSaveIfChanged();
+	gpGame->CaptureClientStateIfChanged();
 }
 
 int64_t FleetSelection::FocusedPlayerInFleetIndex() const
@@ -261,8 +261,8 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 		gpGame->SetClientGridCoord({});
 	}
 
-	// Persist whatever final focus state SyncFleets settled on (covers server-driven changes the user didn't trigger directly).
-	gpGame->CaptureClientStateAndSaveIfChanged();
+	// Capture whatever final focus state SyncFleets settled on (covers server-driven changes the user didn't trigger directly).
+	gpGame->CaptureClientStateIfChanged();
 }
 
 void FleetSelection::Clear()

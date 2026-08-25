@@ -480,6 +480,7 @@ void MainThread(HINSTANCE hinstance)
 	SaveSoundSettings();
 	SaveGraphicsSettings();
 	SaveGameSettings();
+	game::SaveClientState();
 #endif
 
 	PostQuitMessage(0);

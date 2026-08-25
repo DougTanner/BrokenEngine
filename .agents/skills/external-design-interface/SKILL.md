@@ -1,8 +1,9 @@
 ---
 name: external-design-interface
 description: >-
-  Generate three radically different C++ interface designs, compare them, and
-  synthesize the user's choice into a reviewed implementation plan. Use when
+  Generate three radically different C++ interface designs through a read-only
+  workflow, compare them, and synthesize the user's choice into a reviewed
+  implementation plan. Use when
   the user explicitly asks to design an API, explore interface options, or
   design a system multiple ways, or when interface design for a new Collection,
   manager, or subsystem API is implicitly detected (ask before running); adding
@@ -16,6 +17,22 @@ Run from the main invoking context. A delegated worker never dispatches another
 worker; if this skill is entered where delegation is forbidden, return a
 main-context dispatch requirement instead of approximating the independent
 designs inline.
+
+## Current mutation boundary
+
+This workflow is Option 1: read-only proposals. The manager, researcher, and
+planners may inspect the repository and return declarations or evidence, but
+they do not create, edit, or remove scratch source, build output, branches, or
+worktrees, and they do not compile candidates. The manager owns the comparison
+packet, user interaction, exact selection, and the selected design carried into
+the implementation plan; workers return evidence and declarations only.
+
+The workflow ends at the decision and plan gate. Follow root `AGENTS.md` for
+delegation, plan, review, and landing mechanics rather than restating them
+here. Options 2 and 3 are separate future Features, not modes of this skill:
+[ScratchInterfacePrototypes.md](../../../Documents/Features/Agents/ScratchInterfacePrototypes.md)
+and
+[IsolatedInterfacePrototypeWorktrees.md](../../../Documents/Features/Agents/IsolatedInterfacePrototypeWorktrees.md).
 
 ## Establish the Design Brief
 
