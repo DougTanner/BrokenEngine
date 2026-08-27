@@ -7,7 +7,6 @@
 #include "File/Replay.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Game.h"
 #include "Network/Server/ServerFleetManager.h"
@@ -31,7 +30,7 @@ static bool IsDestinationLive(engine::GridCoord destination)
 {
 	auto destinationIt = game::gpGame->mCoordFrames.find(destination);
 	if (destinationIt != game::gpGame->mCoordFrames.end() && destinationIt->second.pCurrent != nullptr &&
-		destinationIt->second.pCurrent->postRender.pPlayers->iCount > 0)
+		engine::CountRegistryRows(game::Frame::OwnershipLayer(*destinationIt->second.pCurrent)) > 0)
 	{
 		return true;
 	}
@@ -204,7 +203,7 @@ void ServerTransferManager::ApplyPreparedTransfers(std::span<const ClientTransfe
 
 		if (iPlayerIdCount > 0)
 		{
-			LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {} PlayerIds: [{}]", rCoord.x, rCoord.y, rTransfers.size(), rDestFrame.postRender.pPlayers->iCount, rDestFrame.postRender.pBlasters->iCount, rDestFrame.postRender.pSpaceships->iCount, rDestFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost, acPlayerIds);
+			LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {} PlayerIds: [{}]", rCoord.x, rCoord.y, rTransfers.size(), engine::CountRegistryRows(game::Frame::OwnershipLayer(rDestFrame)), rDestFrame.postRender.pBlasters->iCount, rDestFrame.postRender.pSpaceships->iCount, rDestFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost, acPlayerIds);
 		}
 		else
 		{
@@ -219,7 +218,7 @@ void ServerTransferManager::ApplyPreparedTransfers(std::span<const ClientTransfe
 			}
 			if (bAnySubscribed)
 			{
-				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {}", rCoord.x, rCoord.y, rTransfers.size(), rDestFrame.postRender.pPlayers->iCount, rDestFrame.postRender.pBlasters->iCount, rDestFrame.postRender.pSpaceships->iCount, rDestFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost);
+				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {}", rCoord.x, rCoord.y, rTransfers.size(), engine::CountRegistryRows(game::Frame::OwnershipLayer(rDestFrame)), rDestFrame.postRender.pBlasters->iCount, rDestFrame.postRender.pSpaceships->iCount, rDestFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost);
 			}
 		}
 	}
@@ -232,19 +231,10 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 	for (const ClientTransferInfo& rClientTransfer : clientTransfers)
 	{
 		game::Frame& rDestFrame = *game::gpGame->mCoordFrames.at(rClientTransfer.destination).pNext;
-		game::PlayersPostRender& rDestPlayers = *rDestFrame.postRender.pPlayers;
+		const engine::RegistryOwnershipLayer destinationLayer = game::Frame::OwnershipLayer(rDestFrame);
 
-		// Find the transferred player in destination by scanning pGlobalPlayerIds
-		int64_t iNewIndex = -1;
-		for (int64_t i = 0; i < rDestPlayers.iCount; ++i)
-		{
-			if (rDestPlayers.pGlobalPlayerIds[i] == rClientTransfer.globalPlayerId)
-			{
-				iNewIndex = i;
-				break;
-			}
-		}
-		if (iNewIndex < 0)
+		// An invalid uuid means the transferred player never landed in the destination, so there is nothing to bind.
+		if (!engine::RegistryUuidByGlobalId(destinationLayer, rClientTransfer.globalPlayerId).IsValid())
 		{
 			continue;
 		}
@@ -266,7 +256,7 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 					});
 
 					// Copy client GUID to the new player entity in the destination frame
-					rDestPlayers.pClientGuids[iNewIndex] = rClient.clientGuid;
+					engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalPlayerId, rClient.clientGuid);
 
 					game::gpServerSession->mpFleetManager->OnPlayerTransferred(rClient.clientGuid, rClientTransfer.globalPlayerId, rClientTransfer.destination);
 
@@ -283,7 +273,7 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 		// Orphaned players (client disconnected): preserve GUID and update fleet
 		if (!bFoundClient && !rClientTransfer.clientGuid.IsEmpty())
 		{
-			rDestPlayers.pClientGuids[iNewIndex] = rClientTransfer.clientGuid;
+			engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalPlayerId, rClientTransfer.clientGuid);
 			game::gpServerSession->mpFleetManager->OnPlayerTransferred(rClientTransfer.clientGuid, rClientTransfer.globalPlayerId, rClientTransfer.destination);
 		}
 	}

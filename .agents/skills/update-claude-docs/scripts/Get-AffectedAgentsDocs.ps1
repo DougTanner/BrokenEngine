@@ -41,6 +41,9 @@ $script:DocumentFileNames = @('AGENTS.md', 'CLAUDE.md', 'CLAUDE.local.md')
 $script:StubBody = '@AGENTS.md'
 $script:LeafTokenTarget = 2000
 $script:HubTokenTarget = 4000
+# The repository-root AGENTS.md is imported into every session and keeps its
+# workflow rules front and center, so it carries a higher budget than other hubs.
+$script:RootHubTokenTarget = 8000
 $script:ChainTokenTarget = 15000
 $script:ChainTokenWarning = 20000
 
@@ -392,7 +395,7 @@ try
 	{
 		$tokens = $measured[$document]
 		$isHub = Test-HubDocument $document
-		$target = if ($isHub) { $script:HubTokenTarget } else { $script:LeafTokenTarget }
+		$target = if ($document -ceq 'AGENTS.md') { $script:RootHubTokenTarget } elseif ($isHub) { $script:HubTokenTarget } else { $script:LeafTokenTarget }
 		$sizeItems.Add([ordered]@{
 			path = $document
 			kind = if ($isHub) { 'hub' } else { 'leaf' }

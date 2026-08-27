@@ -15,6 +15,8 @@ Shared logging, formatting, diagnostic-file, and difference-reporting implementa
 
 Logging may run during exception handling. Do not introduce recursive logging, heap-dependent crash formatting, or unsynchronized DbgHelp use. The engine's debug-string emission is marked so the vectored exception handler does not re-log it.
 
+`Log.cpp` initializes in the library phase (`init_seg(lib)`), so ordinary static initializers and destructors may log; outside even that window emission continues without the log mutex and without the file sink, with a debugger-only break flagging the call.
+
 When adding a category, update the enum, names, per-project compile floors, runtime-level storage, and any agent-facing parsing together.
 
 ## See Also

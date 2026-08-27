@@ -160,7 +160,7 @@ namespace toolcli::landing
 		for (const std::wstring& rWorktree : worktrees)
 		{
 			std::error_code error;
-			if (!std::filesystem::is_directory(rWorktree, error) || error)
+			if (!std::filesystem::is_directory(ExtendedLengthPath(rWorktree), error) || error)
 			{
 				return false;
 			}
@@ -174,13 +174,14 @@ namespace toolcli::landing
 				gitDirectoryText->pop_back();
 			}
 			std::filesystem::path gitDirectory = Utf8ToWide(*gitDirectoryText);
-			if (!std::filesystem::is_directory(gitDirectory, error) || error)
+			const std::filesystem::path extendedGitDirectory = ExtendedLengthPath(gitDirectory);
+			if (!std::filesystem::is_directory(extendedGitDirectory, error) || error)
 			{
 				return false;
 			}
 			for (const std::filesystem::path& rMarker : pMarkers)
 			{
-				if (std::filesystem::exists(gitDirectory / rMarker, error) || error)
+				if (std::filesystem::exists(extendedGitDirectory / rMarker, error) || error)
 				{
 					return false;
 				}

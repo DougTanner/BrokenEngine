@@ -267,8 +267,6 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 				.uiPlayerFlags = static_cast<uint16_t>(std::to_underlying(rCurrentPostRender.pFlags[i].meFlags) & ~std::to_underlying(kTransfer)),
 				.fNavigationDelay = rCurrentPostRender.pfNavigationDelays[i],
 			},
-			.iEntityId = rCurrentPostRender.puiIds[i].ToUuid().Value(),
-			.iPushedTick = rFrame.interpolate.iTick,
 		};
 		request.data.globalPlayerId = rCurrentPostRender.pGlobalPlayerIds[i];
 		request.data.fleetWantedCoord = rCurrentPostRender.pFleetWantedCoords[i];

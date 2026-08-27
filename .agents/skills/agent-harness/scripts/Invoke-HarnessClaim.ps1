@@ -12,6 +12,9 @@ param(
 	[Parameter(Mandatory)][string] $GameDataDirectory,
 	[string] $Key = 'default',
 	[string] $Configuration = 'Debug',
+	# The caller declares that this session's scenario launches only the server, which narrows the
+	# existence check below to the server executable. It is never inferred from the command document.
+	[switch] $ServerOnly,
 	# Agents use the default; a short budget exists only so a test or scenario can reach the
 	# expired-wait outcome without waiting out the standard budget.
 	[ValidateRange(1, 500)][int] $WaitSeconds = 500
@@ -247,8 +250,10 @@ try {
 	}
 	$outputRelative = $outputMatch.Groups[1].Value
 	$outputDirectory = Join-Path $root $outputRelative
+	$requiredExecutables = @($serverMatch.Groups[1].Value)
+	if (-not $ServerOnly) { $requiredExecutables += $clientMatch.Groups[1].Value }
 	$missingExecutables = @()
-	foreach ($executable in @($serverMatch.Groups[1].Value, $clientMatch.Groups[1].Value)) {
+	foreach ($executable in $requiredExecutables) {
 		$configured = [regex]::Replace($executable, '\.Debug\.exe$', ".$Configuration.exe")
 		if (-not (Test-Path -LiteralPath (Join-Path $outputDirectory $configured) -PathType Leaf)) {
 			$missingExecutables += $configured

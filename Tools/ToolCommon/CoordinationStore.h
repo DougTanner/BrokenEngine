@@ -51,6 +51,10 @@ namespace toolcli::coordination
 	bool EnsureParentDirectory(const std::filesystem::path& rPath);
 	bool ReadMetadata(const std::filesystem::path& rPath, nlohmann::json& rMetadata);
 	// Durable byte replacement for small coordination artifacts, including paths beyond MAX_PATH.
+	// The staging pair splits that replacement so a caller can prepare several files before publishing any of them;
+	// both halves discard the temporary on failure, so a failed call leaves nothing behind.
+	bool StageBytesAtomic(const std::filesystem::path& rPath, std::string_view contents, std::filesystem::path& rStagedPath);
+	bool CommitStagedBytes(const std::filesystem::path& rStagedPath, const std::filesystem::path& rPath);
 	bool WriteBytesAtomic(const std::filesystem::path& rPath, std::string_view contents);
 	bool WriteMetadataAtomic(const std::filesystem::path& rPath, const nlohmann::json& rMetadata);
 	void PrintMetadata(const nlohmann::json& rMetadata);

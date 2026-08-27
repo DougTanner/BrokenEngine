@@ -121,7 +121,8 @@ along unless it is the smallest positive fork and gives a concrete reason
 authoritative conversation text could not safely be summarized. Require it to
 answer this one question as part of the same analysis:
 `Which reasonable alternative explanation for the recorded workflow outcome is not tested by the current evidence, and what existing artifact would confirm or refute it? Return none when every material explanation is already covered.`
-Require the standard handoff:
+Require the shared handoff form in `../../references/subagent-reporting.md`,
+extended with:
 
 ```text
 Status: PASS | BLOCKED

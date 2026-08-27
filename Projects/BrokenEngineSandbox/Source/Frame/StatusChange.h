@@ -95,10 +95,9 @@ struct TransferData
 			rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity,
 			rSelf.alignment,
 			rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex,
-			rSelf.fWindTrailIntensity, rSelf.fWindTrailWidth, rSelf.fWindTrailLengthMultiplier,
 			rSelf.fAcceleration,
 			rSelf.fNextBlasterFireTime, rSelf.fNextSecondarySpawnTime, rSelf.fShieldCooldown, rSelf.fShieldDownSoundCooldown,
-			rSelf.fAnimationTime, rSelf.fShieldRotation, rSelf.fShieldShrink, rSelf.uiPlayerFlags,
+			rSelf.fAnimationTime, rSelf.uiPlayerFlags,
 			rSelf.fNextBlasterSpawnTime,
 			rSelf.fNavigationDelay,
 			rSelf.fDeltaRotationDelay, rSelf.fTime, rSelf.fNextJitter,
@@ -121,9 +120,6 @@ struct TransferData
 	float fHealth = 0.0f;
 	float fShield = 0.0f;
 	uint8_t uiTypeIndex = 0;
-	float fWindTrailIntensity = 0.0f;
-	float fWindTrailWidth = 0.0f;
-	float fWindTrailLengthMultiplier = 1.0f;
 	float fAcceleration = 0.0f;
 
 	// Player timers
@@ -134,8 +130,6 @@ struct TransferData
 
 	// Player interpolate state
 	float fAnimationTime = 0.0f;
-	float fShieldRotation = 0.0f;
-	float fShieldShrink = 1.0f;
 	uint16_t uiPlayerFlags = 0;
 
 	// Spaceship timers

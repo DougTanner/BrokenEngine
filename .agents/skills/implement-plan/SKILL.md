@@ -111,12 +111,10 @@ verification passed.
 
 ## Handoff
 
-Return the concise delegated-reporting handoff with these required fields:
+Return the shared handoff form in `../../references/subagent-reporting.md`,
+extended with these fields:
 
 ```text
-Status: PASS | NEEDS_ACTION | BLOCKED
-Changed files: <path — exact functions/types/sections, or none>
-Decisive checks: <read/search/trace/static command and result>
 Self-audit resolved: <Claim -> Check -> Result; fix/recheck, or none>
 Affected-site triggers: <kind — symbol/pattern and search scope, or none found>
 Propagation required: /update-affected-code — <code scope> | N/A — no code changed

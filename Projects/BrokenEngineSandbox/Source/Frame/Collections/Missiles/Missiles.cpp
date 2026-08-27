@@ -363,7 +363,6 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.fDeltaRotationMax = rCurrentPostRender.pfDeltaRotationMax[i],
 				.fPitch = rCurrentPostRender.pfPitches[i],
 			},
-			.iPushedTick = rFrame.interpolate.iTick,
 		};
 		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{

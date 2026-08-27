@@ -250,6 +250,31 @@ try {
 	$heldAfterCompletion = Invoke-ClaimOperation 0 'claim-status' $session 'owner-a' 'session-a'
 	Assert-True ($heldAfterCompletion.code -cin @('claimed', 'existing')) 'Completion released the claim before landing.'
 
+	# Cycle healing: a claim whose Plan becomes cycle-excluded at the primary tip is healed by `plan validate`, so no
+	# stale claim blocks selection. `--lint-only` must heal nothing, and an unrelated live claim must survive the heal.
+	Set-Plan $primary 'Documents/Plans/Test/CycleHealA.md' '2024-02-01T00:00:00.000Z'
+	Set-Plan $primary 'Documents/Plans/Test/CycleHealB.md' '2024-02-02T00:00:00.000Z'
+	Set-Plan $primary 'Documents/Plans/Test/Survivor.md' '2024-02-03T00:00:00.000Z'
+	Commit $primary 'add the cycle-healing plans'
+	$cycleHeld = Invoke-ClaimNext 0 $primary 'main' 'owner-cycleheal' 'session-cycleheal' 'Documents/Plans/Test/CycleHealA.md'
+	Assert-Code $cycleHeld 'ok' 'claimed'
+	$survivorHeld = Invoke-ClaimNext 0 $primary 'main' 'owner-survivor' 'session-survivor' 'Documents/Plans/Test/Survivor.md'
+	Assert-Code $survivorHeld 'ok' 'claimed'
+	Set-Plan $primary 'Documents/Plans/Test/CycleHealA.md' '2024-02-01T00:00:00.000Z' @('Documents/Plans/Test/CycleHealB.md')
+	Set-Plan $primary 'Documents/Plans/Test/CycleHealB.md' '2024-02-02T00:00:00.000Z' @('Documents/Plans/Test/CycleHealA.md')
+	Commit $primary 'peer landing introduces a cycle over the claimed plan'
+	$stateBeforeLint = Get-SchedulerState
+	$lintOnly = Invoke-Cli 0 @('plan', 'validate', '--repo', $repo, '--worktree', $primary, '--lint-only')
+	Assert-True (@($lintOnly.healedClaims).Count -eq 0) 'Lint-only validation healed a claim.'
+	Assert-True ((Get-SchedulerState) -ceq $stateBeforeLint) 'Lint-only validation changed machine-local scheduler state.'
+	$cycleValidate = Invoke-Cli 0 @('plan', 'validate', '--repo', $repo, '--worktree', $primary)
+	Assert-True (@($cycleValidate.diagnostics | Where-Object { $_.plan -ceq 'Documents/Plans/Test/CycleHealA.md' -and $_.code -ceq 'dependency-cycle' }).Count -eq 1) 'Validation did not report the new cycle over the claimed Plan.'
+	Assert-True (@($cycleValidate.healedClaims | Where-Object { $_ -clike '*.json' }).Count -ge 1) 'Validation did not heal the claim on the cycle-excluded Plan.'
+	$afterCycleHeal = Invoke-ClaimOperation 0 'claim-status' $primary 'owner-cycleheal' 'session-cycleheal'
+	Assert-Code $afterCycleHeal 'ok' 'none'
+	$survivorAfterHeal = Invoke-ClaimOperation 0 'claim-status' $primary 'owner-survivor' 'session-survivor'
+	Assert-True ($survivorAfterHeal.code -cin @('claimed', 'existing') -and $survivorAfterHeal.plan -ceq 'Documents/Plans/Test/Survivor.md') 'Cycle healing deleted an unrelated live claim.'
+
 	[pscustomobject]@{ schemaVersion = 'broken-engine-plan-scheduler-fixtures/v1'; status = 'pass'; code = 'ok'; cases = @(
 		'lint envelope, cycle exclusion, marker-less loudness, and directory-guidance exemption',
 		'retired-option usage error and targeted validation',
@@ -265,7 +290,8 @@ try {
 		'primary-tip dependency edge landed after the session baseline blocks the claim',
 		'rejection authorization gate and target deletion',
 		'terminal operation from a non-claim worktree is a state conflict that mutates nothing',
-		'completion child rewrite, target deletion, idempotent rerun, and claim retention') } | ConvertTo-Json -Depth 5 -Compress
+		'completion child rewrite, target deletion, idempotent rerun, and claim retention',
+		'validate heals a claim whose Plan became cycle-excluded at the primary tip while lint-only heals nothing and an unrelated claim survives') } | ConvertTo-Json -Depth 5 -Compress
 }
 finally {
 	[Environment]::SetEnvironmentVariable('LOCALAPPDATA', $originalLocalAppData)

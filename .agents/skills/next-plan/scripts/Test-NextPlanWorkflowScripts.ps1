@@ -97,6 +97,9 @@ try {
 	$listedPaths = @($listing.plans | ForEach-Object { $_.path })
 	Assert-True ($listedPaths -ccontains $plan -and $listedPaths -ccontains $uniqueFilenamePlan) 'Listing did not report every executable Plan.'
 	Assert-True (@($listing.plans | Where-Object { $_.state -cne 'eligible' }).Count -eq 0) 'Listing did not report the unclaimed Plans as eligible.'
+	Assert-True ($listing.planCount -eq $listedPaths.Count -and -not $listing.truncated -and $listing.stateCounts.eligible -eq $listedPaths.Count) 'Listing projection counts did not match its rows.'
+	$boundedListing = Invoke-WorkflowScript 'Get-NextPlanList.ps1' @('-Top','1') 0
+	Assert-True (@($boundedListing.plans).Count -eq 1 -and $boundedListing.truncated -and $boundedListing.planCount -eq $listedPaths.Count) 'Listing -Top did not bound the projection.'
 	Assert-True ([string]::IsNullOrWhiteSpace((Invoke-Git $script:session @('status','--porcelain=v1','--untracked-files=all')))) 'Listing changed the session worktree.'
 	$listingNoClaim = Invoke-WorkflowScript 'Defer-NextPlan.ps1' @() 0
 	Assert-True ($listingNoClaim.code -ceq 'no-claim') 'Listing created a Plan claim.'
@@ -172,7 +175,7 @@ try {
 
 	# A live claim is visible in the listing, which still leaves that claim untouched.
 	$claimedListing = Invoke-WorkflowScript 'Get-NextPlanList.ps1' @() 0
-	$claimedRow = @($claimedListing.plans | Where-Object { $_.path -ceq $plan })[0]
+	$claimedRow = @($claimedListing.claimed | Where-Object { $_.path -ceq $plan })[0]
 	Assert-True ($claimedRow.state -ceq 'claimed') 'Listing did not report the live claim.'
 	$listedClaim = Invoke-WorkflowScript 'Invoke-NextPlanClaim.ps1' @('-Plan',$plan) 0
 	Assert-True ($listedClaim.code -ceq 'reused' -and $listedClaim.claim.plan -ceq $plan) 'Listing changed the live claim.'

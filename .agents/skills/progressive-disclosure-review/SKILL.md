@@ -107,10 +107,15 @@ Residuals: <pre-existing excess or none>
 
 `Changed files` and `Build required` are `none` because this findings-only
 review never edits a file; the remaining shared lines follow
-`../../references/subagent-reporting.md`, `## Handoffs`. The `Skill:` and
-`Files checked:` lines are the markers `/codex-review` prompt assembly requires
-before it will assemble a `/verify-changes` prompt over changed instruction
-prose, so neither may be dropped or reworded.
+`../../references/subagent-reporting.md`, `## Handoffs`. Before `/codex-review`
+prompt assembly will assemble a `/verify-changes` prompt over changed
+instruction prose, this block must carry four things, none of which may be
+dropped or reworded: the `Skill: progressive-disclosure-review` marker line, the
+`Files checked:` line, a `Status: PASS` verdict, and a `Baseline:` line whose
+SHA equals the `/verify-changes` dispatch baseline. A `NEEDS_ACTION` or
+`BLOCKED` handoff, and a passing one produced against an earlier baseline, are
+gated exactly like a missing handoff — so re-run this review against the final
+baseline rather than reusing the earlier handoff.
 
 The manager decides each finding on whether the failure is concrete and
 meaningful under the standard defaults; this review adds no extra rounds.

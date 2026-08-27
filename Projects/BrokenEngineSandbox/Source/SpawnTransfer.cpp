@@ -85,7 +85,6 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.fShieldCooldown = rData.fShieldCooldown,
 				.fShieldDownSoundCooldown = rData.fShieldDownSoundCooldown,
 				.fAnimationTime = rData.fAnimationTime,
-				// Shield rotation/shrink are client-only visual animation state; reset to canonical defaults while gameplay transfer fields restore verbatim.
 				.flags = PlayerFlags_t {static_cast<PlayerFlags>(rData.uiPlayerFlags)},
 				.fTransferLockTimer = 1.0f,
 				.fArrivalGracePeriod = kfArrivalGracePeriod,

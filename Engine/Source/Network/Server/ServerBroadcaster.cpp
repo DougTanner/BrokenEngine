@@ -4,7 +4,6 @@
 
 #if defined(BT_SERVER)
 
-#include "Frame/Collections/Players/Players.h"
 #include "Game.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
@@ -265,21 +264,12 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 			continue;
 		}
 
-		// Find the frame-local player ID by scanning pGlobalPlayerIds
+		// Find the frame-local player ID for this global player ID
 		if (!game::gpGame->mCoordFrames.contains(updateCoord))
 		{
 			continue;
 		}
-		const game::PlayersPostRender& rPlayers = *game::gpGame->CurrentFrame(updateCoord).postRender.pPlayers;
-		int64_t iPlayerUuid = 0;
-		for (int64_t j = 0; j < rPlayers.iCount; ++j)
-		{
-			if (rPlayers.pGlobalPlayerIds[j] == rRequest.globalId)
-			{
-				iPlayerUuid = rPlayers.puiIds[j].ToUuid().Value();
-				break;
-			}
-		}
+		const int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer(game::gpGame->CurrentFrame(updateCoord)), rRequest.globalId).Value();
 		if (iPlayerUuid == 0)
 		{
 			continue;

@@ -15,6 +15,7 @@ root [AGENTS.md](../../../AGENTS.md) role table) — `plan-audit`,
 `plan-simplicity-review`,
 `repo-code-review`, `glsl-review`, `scope-review`,
 `progressive-disclosure-review`, `adversarial-review`,
+`context-efficiency-review`,
 `session-audit`, and external review lenses — on Codex/Sol through this skill.
 Parent/manager orchestrators that dispatch their own child reviewer, including
 `/next-plan-review`, are excluded, and so is the child reviewer they dispatch:

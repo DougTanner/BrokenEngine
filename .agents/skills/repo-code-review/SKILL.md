@@ -50,6 +50,11 @@ only the targets bytes; `blocked` (exit 2) or `error` (exit 1) leaves stdout
 empty and reports the envelope on stderr, which counts as a missing targets file
 below. Never rebuild the targets file or restate the class decision inline.
 
+`.agents/scripts/Test-SessionChangeInventoryFixtures.ps1` owns
+`Get-SessionChangeInventory.ps1`'s executable fixture coverage and takes no
+parameters: `pwsh -NoProfile -File
+.agents/scripts/Test-SessionChangeInventoryFixtures.ps1`.
+
 Return `BLOCKED` when the session baseline, diff boundary, targets file, intent,
 or invariants are missing or moving. Do not reconstruct them from a mutable merge
 base, derive a broader target selection from checkout changes, or expand a supplied

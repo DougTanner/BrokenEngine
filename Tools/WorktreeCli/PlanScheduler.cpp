@@ -540,6 +540,11 @@ namespace toolcli
 				std::map<std::wstring, Plan> primaryPlans;
 				if (BuildPrimaryTipPlans(repo, worktree, primaryPlans))
 				{
+					// Healing must classify the primary tip exactly as claim-next does, so a cycle there invalidates the
+					// same plans.  Its diagnostics go to a separate sink because the reported ones describe only the
+					// working tree.
+					nlohmann::json primaryDiagnostics = nlohmann::json::array();
+					MarkCycles(primaryPlans, primaryDiagnostics);
 					HealClaims(*schedulerRoot, repo, primaryPlans, healed);
 				}
 			}
@@ -960,11 +965,15 @@ namespace toolcli
 			{
 				return Failure("scan-failed");
 			}
-			if (!RemovePlanAtomicTemporarySiblings(worktree, target))
+			// Every check that can reject the operation runs before the first path changes, so a later invalid child or
+			// untracked target can no longer leave an earlier child marker already rewritten.
+			struct ChildRewrite
 			{
-				return Failure("orphan-cleanup-failed");
-			}
-			nlohmann::json changedChildren = nlohmann::json::array();
+				std::wstring path;
+				std::string before;
+				std::string after;
+			};
+			std::vector<ChildRewrite> rewrites;
 			for (const auto& [path, plan] : plans)
 			{
 				if (path == target || std::find(plan.dependencies.begin(), plan.dependencies.end(), target) == plan.dependencies.end())
@@ -975,41 +984,85 @@ namespace toolcli
 				{
 					return Failure("child-invalid", kiExitStateConflict);
 				}
-				std::string after;
-				if (!RenderDependencies(plan, target, after))
+				ChildRewrite rewrite { .path = path, .before = plan.bytes, .after = {} };
+				if (!RenderDependencies(plan, target, rewrite.after))
 				{
 					return Failure("child-invalid", kiExitStateConflict);
 				}
-				if (!RemovePlanAtomicTemporarySiblings(worktree, path))
-				{
-					return Failure("orphan-cleanup-failed");
-				}
-				if (!coordination::WriteBytesAtomic(worktree / path, after))
-				{
-					return Failure("rewrite-failed");
-				}
-				changedChildren.push_back(WideToUtf8(path));
+				rewrites.push_back(std::move(rewrite));
 			}
-			nlohmann::json changed = nlohmann::json::array();
 			const std::filesystem::path targetDiskPath = worktree / target;
 			std::error_code targetError;
-			if (std::filesystem::exists(targetDiskPath, targetError) && !targetError)
-			{
-				if (plans.find(target) == plans.end())
-				{
-					return Failure("plan-untracked", kiExitStateConflict);
-				}
-				if (::DeleteFileW(ExtendedLengthPath(targetDiskPath).c_str()) == FALSE)
-				{
-					return Failure("delete-failed");
-				}
-				changed.push_back(WideToUtf8(target));
-			}
-			else if (targetError)
+			const bool bTargetPresent = std::filesystem::exists(targetDiskPath, targetError);
+			if (targetError)
 			{
 				return Failure("target-read-failed");
 			}
-			changed.insert(changed.end(), changedChildren.begin(), changedChildren.end());
+			if (bTargetPresent && plans.find(target) == plans.end())
+			{
+				return Failure("plan-untracked", kiExitStateConflict);
+			}
+			// The sweep matches the same temporary filename shape the staging below creates, so it has to finish
+			// before anything is staged or it would delete this operation's own pending files.
+			if (!RemovePlanAtomicTemporarySiblings(worktree, target))
+			{
+				return Failure("orphan-cleanup-failed");
+			}
+			for (const ChildRewrite& rRewrite : rewrites)
+			{
+				if (!RemovePlanAtomicTemporarySiblings(worktree, rRewrite.path))
+				{
+					return Failure("orphan-cleanup-failed");
+				}
+			}
+			std::vector<std::filesystem::path> stagedPaths(rewrites.size());
+			auto discardStaged = [&stagedPaths](size_t uiFirst, size_t uiLast)
+			{
+				for (size_t i = uiFirst; i < uiLast; ++i)
+				{
+					::DeleteFileW(stagedPaths.at(i).c_str());
+				}
+			};
+			for (size_t i = 0; i < rewrites.size(); ++i)
+			{
+				if (!coordination::StageBytesAtomic(worktree / rewrites.at(i).path, rewrites.at(i).after, stagedPaths.at(i)))
+				{
+					discardStaged(0, i);
+					return Failure("rewrite-failed");
+				}
+			}
+			auto restorePublished = [&rewrites, &worktree](size_t uiCount)
+			{
+				bool bRestored = true;
+				for (size_t i = 0; i < uiCount; ++i)
+				{
+					bRestored = coordination::WriteBytesAtomic(worktree / rewrites.at(i).path, rewrites.at(i).before) && bRestored;
+				}
+				return bRestored;
+			};
+			for (size_t i = 0; i < rewrites.size(); ++i)
+			{
+				if (!coordination::CommitStagedBytes(stagedPaths.at(i), worktree / rewrites.at(i).path))
+				{
+					restorePublished(i);
+					discardStaged(i + 1, rewrites.size());
+					return Failure("rewrite-failed");
+				}
+			}
+			nlohmann::json changed = nlohmann::json::array();
+			if (bTargetPresent)
+			{
+				// The target is deleted last, so no failure path ever has to bring a deleted Plan file back.
+				if (::DeleteFileW(ExtendedLengthPath(targetDiskPath).c_str()) == FALSE)
+				{
+					return restorePublished(rewrites.size()) ? Failure("delete-failed") : Failure("rewrite-failed");
+				}
+				changed.push_back(WideToUtf8(target));
+			}
+			for (const ChildRewrite& rRewrite : rewrites)
+			{
+				changed.push_back(WideToUtf8(rRewrite.path));
+			}
 			PrintResult({ { "status", "ok" }, { "code", bReject ? "rejected" : "completed" }, { "plan", WideToUtf8(target) }, { "changedPaths", changed } }, 2);
 			return kiExitOk;
 		}

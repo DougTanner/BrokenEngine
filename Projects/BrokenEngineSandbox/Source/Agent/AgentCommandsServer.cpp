@@ -48,6 +48,16 @@ bool IsWindowsReservedDeviceBasename(std::string_view utf8)
 		return true;
 	}
 
+	// Win32 also resolves the superscript spellings COM¹/COM²/COM³ and LPT¹/LPT²/LPT³ to the same devices.
+	// Those trailing characters are the two UTF-8 bytes 0xC2 0xB9/0xB2/0xB3, so match the bytes directly.
+	if (basename.size() == 5 &&
+		(basename.starts_with("COM") || basename.starts_with("LPT")) &&
+		basename[3] == '\xC2' &&
+		(basename[4] == '\xB9' || basename[4] == '\xB2' || basename[4] == '\xB3'))
+	{
+		return true;
+	}
+
 	return basename.size() == 4 &&
 		(basename.starts_with("COM") || basename.starts_with("LPT")) &&
 		basename[3] >= '1' && basename[3] <= '9';

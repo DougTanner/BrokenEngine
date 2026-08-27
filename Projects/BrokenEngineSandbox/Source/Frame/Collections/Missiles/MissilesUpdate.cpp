@@ -279,6 +279,9 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			continue;
 		}
 
+		// /analyze loses the iAcquireCount reset because it happens inside AcquireChunk: the flush below runs on
+		// every write, so the counter is always below the chunk size here.
+		_Analysis_assume_(iAcquireCount >= 0 && iAcquireCount < kiAcquireChunk);
 		piAcquireRows[iAcquireCount++] = i;
 		if (iAcquireCount == kiAcquireChunk)
 		{

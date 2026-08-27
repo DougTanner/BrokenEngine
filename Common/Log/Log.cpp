@@ -2,6 +2,13 @@
 
 #include "AllocationTracking.h"
 
+// Library-phase dynamic initialization: this TU is constructed before every default-phase (user) static and destroyed
+// after them, so ordinary static initializers and destructors are inside the window where logging is safe.
+#pragma warning(push)
+#pragma warning(disable : 4073) // "initializers put in library initialization area": that placement is the point here
+#pragma init_seg(lib)
+#pragma warning(pop)
+
 namespace common
 {
 
@@ -25,8 +32,28 @@ std::atomic<LogLevel> gLogRuntimeLevels[kiLogCategoryCount]
 };
 static_assert(std::size(gLogRuntimeLevels) == kiLogCategoryCount, "gLogRuntimeLevels out of sync with LogCategory");
 
+// Constant-initialized, so it reads false before this TU's dynamic initialization and after its destruction.
+static std::atomic<bool> sbLogAlive = false;
+
 // Whole-stream file sink (Log.h EnableLogFile); teed by LogWrite under gLogMutex.
 static std::ofstream sLogFileStream;
+
+// Declaration order relative to sLogFileStream is load-bearing: dynamic init runs in declaration order within a TU and
+// destruction in reverse, so declaring the guard after the stream opens the flag once the stream exists and closes it
+// again before the stream is destroyed.
+struct LogAliveGuard
+{
+	LogAliveGuard()
+	{
+		sbLogAlive.store(true, std::memory_order_relaxed);
+	}
+
+	~LogAliveGuard()
+	{
+		sbLogAlive.store(false, std::memory_order_relaxed);
+	}
+};
+static LogAliveGuard sLogAliveGuard;
 
 void SetLogRuntimeLevel(LogCategory eCategory, LogLevel eLevel)
 {
@@ -118,6 +145,21 @@ char* LogPrefix(char* pLogBuffer, char* pEnd)
 
 void LogWrite(char* pLogBuffer)
 {
+	if (!sbLogAlive.load(std::memory_order_relaxed)) [[unlikely]]
+	{
+		// Outside this TU's lifetime gLogMutex and sLogFileStream may not exist, so emit without them: giMyOutputDebugString
+		// is constant-initialized and EnableLogFile only ever runs inside the window, so the sink cannot be open here.
+		DEBUG_BREAK_NO_LOG();
+		++giMyOutputDebugString;
+		OutputDebugString(pLogBuffer);
+		--giMyOutputDebugString;
+		if constexpr (kbAlsoLogToPrintf)
+		{
+			std::printf("%s", pLogBuffer);
+		}
+		return;
+	}
+
 	std::unique_lock lockGuard(gLogMutex);
 	++giMyOutputDebugString;
 	OutputDebugString(pLogBuffer);

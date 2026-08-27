@@ -15,7 +15,7 @@ Score each criterion from zero through its weight, for a total of 100.
 | Commands and workflows | 20 | Are applicable workflows current and executable? A leaf with no local commands earns full credit; builds route to `/compile`. |
 | Architecture clarity | 20 | Can a reader understand subsystem purpose, ownership, and relationships in one read? |
 | Non-obvious patterns | 15 | Are relevant allocation, determinism, guard, SOA, coordinate, ordering, or hardware constraints present? |
-| Conciseness | 15 | Are inventories and duplicated prose absent? Is a leaf at most 2,000 and a cross-cutting hub at most 4,000 `bt-token-v1`; is the effective chain below the 15,000 target, with a warning above 20,000? |
+| Conciseness | 15 | Are inventories and duplicated prose absent? Is a leaf at most 2,000 and a cross-cutting hub at most 4,000 `bt-token-v1`, with the root `AGENTS.md` at most 8,000; is the effective chain below the 15,000 target, with a warning above 20,000? |
 | Currency | 15 | Do paths, APIs, imports, and present-tense behavior match the current tree without changelog narration? |
 | Actionability | 15 | Does each instruction enable a concrete decision or check? |
 

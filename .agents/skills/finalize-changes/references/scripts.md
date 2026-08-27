@@ -55,8 +55,8 @@ pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizePri
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -OwnerToken '<owner-token>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -HistoryContractRowDate '<historyUpdate.rowDate>' -HistoryJsonSha256 '<historyUpdate.jsonl.sha256>' -HistoryJsonBytes '<historyUpdate.jsonl.bytes>' -HistorySvgSha256 '<historyUpdate.svg.sha256>' -HistorySvgBytes '<historyUpdate.svg.bytes>' -HistorySvgEmbeddedSha256 '<historyUpdate.svg.embeddedSha256>' -OwnerToken '<owner-token>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -OwnerToken '<owner-token>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -HistoryContractRowDate '<historyUpdate.rowDate>' -HistoryJsonSha256 '<historyUpdate.jsonl.sha256>' -HistoryJsonBytes '<historyUpdate.jsonl.bytes>' -HistorySvgSha256 '<historyUpdate.svg.sha256>' -HistorySvgBytes '<historyUpdate.svg.bytes>' -HistorySvgEmbeddedSha256 '<historyUpdate.svg.embeddedSha256>' -OwnerToken '<owner-token>'
 pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract -RepositoryRoot '<current-worktree>' -BaseCommit '<primary-tip>' -TipCommit '<approved-commit>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
@@ -232,7 +232,13 @@ reconstructs the assessment from Git output.
   the re-evaluated mode. A `carry-forward` landing skips Generate and overlay and
   advances the approved source commit when unchanged; otherwise it advances an
   internally rebased or recovery-accepted commit proven to carry the approved
-  patch identity and change list with unchanged reserved history blobs. Other
+  patch identity and change list with unchanged reserved history blobs. Landing
+  measures the approved source patch from the confirmed candidate's own parent,
+  so a candidate whose parent is behind live primary — including one where the
+  intervening commits only rewrote the reserved history outputs — is the ordinary
+  bounded internal rebase case rather than a blocked result, and
+  `-ExpectedPrimaryTip` remains the approved primary ancestor used for recovery
+  matching. Other
   modes run Generate with one captured UTC date into a unique ignored `Temp`
   directory. Generate must
   classify the mode before capture comparison: only an approved `catch-up` that
@@ -267,9 +273,17 @@ reconstructs the assessment from Git output.
   returns for re-review and a refreshed confirmation; `rebase.conflicted` leaves
   the session branch restored; `rebase.abort-failed` leaves restoration unproven
   and always retains the lease; `landing.retry-exhausted` is retryable and leaves
-  the confirmed session commit restored. Re-invoking it with the original approved
-  arguments after a crash is idempotent, including against a tip its own internal
-  rebase produced. Recovery first searches for a carry-forward source-only match:
+  the confirmed session commit restored. Blocked `history.source-changed` means
+  the approved source patch itself — measured from that candidate's own parent —
+  rewrites a reserved history output path, or that patch changed after
+  confirmation; it is a genuine block that returns for re-review and a refreshed
+  confirmation, never a condition a rebase can cure. A rolled-back
+  `candidate.postcondition-failed` landing likewise leaves the session branch and
+  worktree at the approved tip — not at the commit its own internal rebase
+  produced — so re-invoking it with the original approved arguments passes strict
+  sanity and needs no fresh approval preparation. Re-invoking a crashed landing
+  that left primary advanced, with the original approved arguments, is idempotent,
+  including against a tip its own internal rebase produced. Recovery first searches for a carry-forward source-only match:
   the approved source commit is accepted when unchanged; otherwise a single-
   parent internally rebased or recovery-accepted commit must be proven to carry
   the approved patch identity and change list with unchanged reserved history

@@ -221,7 +221,13 @@ namespace toolcli
 			const std::string_view entry(listing->data() + uiOffset, uiEnd - uiOffset);
 			uiOffset = uiEnd + 1;
 			const size_t uiTab = entry.find('\t');
-			if (uiTab == std::string::npos || !entry.starts_with("100644 blob "))
+			if (uiTab == std::string::npos)
+			{
+				continue;
+			}
+
+			// Both ordinary regular-file modes hold Plan documents.  Symlinks, gitlinks, and trees stay excluded.
+			if (!entry.starts_with("100644 blob ") && !entry.starts_with("100755 blob "))
 			{
 				continue;
 			}

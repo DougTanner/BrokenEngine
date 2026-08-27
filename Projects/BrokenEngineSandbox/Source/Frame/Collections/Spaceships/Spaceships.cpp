@@ -395,7 +395,6 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 				.fNextBlasterSpawnTime = rCurrentPostRender.pfNextBlasterSpawnTimes[i],
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
 			},
-			.iPushedTick = rFrame.interpolate.iTick,
 		};
 		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{

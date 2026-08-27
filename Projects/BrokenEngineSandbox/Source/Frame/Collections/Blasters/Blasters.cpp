@@ -187,12 +187,10 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 			.eType = StatusChangeType::kTransferBlaster,
 			.data = {
 				.vecPosition = vecPosition,
-				.vecDirection = rCurrentInterpolate.pVecDirections[i],
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.uiTypeIndex = rCurrentInterpolate.puiTypeIndices[i],
 			},
-			.iPushedTick = rFrame.interpolate.iTick,
 		};
 		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{

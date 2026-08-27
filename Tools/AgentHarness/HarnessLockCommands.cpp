@@ -82,6 +82,17 @@ namespace toolcli
 				Fail("harness lock requires --key");
 				return std::nullopt;
 			}
+			// WideToUtf8 rejects malformed UTF-16 instead of substituting, so an empty result for a nonempty value means the
+			// conversion failed. These values reach the lock path and metadata, so reject them before anything is written.
+			// --expect is only compared against stored metadata and never persisted, so a failed conversion there just fails the match.
+			for (const std::wstring* pValue : {&key, &rOwner, &rSession, &rWorktree})
+			{
+				if (!pValue->empty() && WideToUtf8(*pValue).empty())
+				{
+					Fail("lock option value is not valid text");
+					return std::nullopt;
+				}
+			}
 			return MakeHarnessLocator(key);
 		}
 

@@ -96,6 +96,9 @@ these inputs from conversation history.
 
 ## Output
 
+Return the shared handoff form in `../../references/subagent-reporting.md`,
+extended with the audit result block and these narrowed lines:
+
 ```markdown
 ## Session Audit Results
 
@@ -110,7 +113,6 @@ these inputs from conversation history.
 ### Traced Clean
 <Only when clean: hypotheses traced, decisive refutations, and `PASS — audit complete; stop.`>
 
-Status: PASS | NEEDS_ACTION | BLOCKED
 Changed files: none
 Decisive checks: <inventory plus trace/read and result per authorized hypothesis>
 Build required: none

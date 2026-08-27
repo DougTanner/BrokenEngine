@@ -77,11 +77,8 @@ struct TransferRequest
 {
 	StatusChangeType eType {};
 	TransferData data {};
-	int64_t iEntityId = 0;
 	int8_t iDeltaX = 0;
 	int8_t iDeltaY = 0;
-	// Tick the request was pushed on. Every live entry should match the current tick.
-	int64_t iPushedTick = 0;
 };
 
 struct FramePostRender : public engine::FramePostRenderBase

@@ -209,7 +209,9 @@ inline constexpr LogLevel keLogLevels[]
 };
 static_assert(std::size(keLogLevels) == common::kiLogCategoryCount, "keLogLevels out of sync with LogCategory");
 
-// Compile-time log filtering: if constexpr eliminates filtered-out calls entirely
+// Compile-time log filtering: if constexpr eliminates filtered-out calls entirely.
+// Safe from static initializers and destructors: Log.cpp initializes in the library phase, and LogWrite guards the rare
+// remaining out-of-window case (Log/AGENTS.md).
 #define LOG(category, level, format, ...) \
 do { \
 	if constexpr (kbLogging && (level) >= keLogLevels[static_cast<int64_t>(category)]) \

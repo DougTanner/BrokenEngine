@@ -253,11 +253,22 @@ namespace toolcli
 				nlohmann::json metadata;
 				int64_t iSleepMilliseconds = iPollMilliseconds;
 				{
+					const std::chrono::steady_clock::duration remaining = deadline - std::chrono::steady_clock::now();
+					if (remaining <= std::chrono::steady_clock::duration::zero())
+					{
+						return EmitLandingConflict(rLocator, metadata, LandingRecordState::kUnverifiable);
+					}
 					bool bContentionObserved = false;
 					std::string failureReason;
-					Guard guard(rLocator.path.wstring() + L".guard", bContentionObserved, failureReason);
+					// Round the guard budget up: a floored one could expire just before the deadline and report a bounded
+					// conflict for a wait that still had time left.
+					Guard guard(rLocator.path.wstring() + L".guard", bContentionObserved, failureReason, std::chrono::ceil<std::chrono::milliseconds>(remaining).count());
 					if (!guard.IsValid())
 					{
+						if (std::chrono::steady_clock::now() >= deadline)
+						{
+							return EmitLandingConflict(rLocator, metadata, LandingRecordState::kUnverifiable);
+						}
 						Fail("could not acquire lock transition guard (" + failureReason + ")");
 						return kiExitFailure;
 					}
@@ -271,6 +282,10 @@ namespace toolcli
 					}
 					if (!bExists)
 					{
+						if (std::chrono::steady_clock::now() >= deadline)
+						{
+							return EmitLandingConflict(rLocator, metadata, LandingRecordState::kAbsent);
+						}
 						return HandleClaim(rLocator, metadata, false, rOwner, rSession, rWorktree, iLeaseSeconds);
 					}
 					if (!ReadMetadata(rLocator.path, metadata))
@@ -290,6 +305,10 @@ namespace toolcli
 						// A refused recovery (a registered worktree is mid Git operation) is not final: keep waiting.
 						if (landing::AllRegisteredWorktreesClear(rLocator))
 						{
+							if (std::chrono::steady_clock::now() >= deadline)
+							{
+								return EmitLandingConflict(rLocator, metadata, LandingRecordState::kReadable);
+							}
 							// The standalone recover verb re-reads to revalidate metadata it was handed; here the metadata was
 							// read inside this same guard scope, which serializes every lock transition, so it cannot have moved.
 							metadata = landing::NewLandingMetadata(rLocator, rOwner, rSession, rWorktree, iLeaseSeconds);
@@ -315,11 +334,13 @@ namespace toolcli
 				}
 
 				const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-				if (now >= deadline)
+				const int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
+				// A sleep that reaches the deadline leaves no attempt after it, so report the lease this attempt read
+				// rather than waking past the deadline with nothing left to classify.
+				if (now >= deadline || iSleepMilliseconds >= iRemainingMilliseconds)
 				{
 					return EmitLandingConflict(rLocator, metadata, LandingRecordState::kReadable);
 				}
-				const int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
 				std::this_thread::sleep_for(std::chrono::milliseconds(std::max<int64_t>(1, std::min<int64_t>(iSleepMilliseconds, iRemainingMilliseconds))));
 			}
 		}

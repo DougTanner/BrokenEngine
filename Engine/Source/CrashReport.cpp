@@ -71,7 +71,6 @@ void HandleException(std::optional<const std::exception*> pException)
 			else
 			{
 				// OS failure on the SIGABRT-reachable crash path (allocator-free): never copy from null. Fall back to the Desktop (fixed-buffer, like the IDYES branch) so the report still lands somewhere writable; if that also fails spcPath stays zero-initialized.
-				LOG(kDefault, kError, "SHGetKnownFolderPath(FOLDERID_RoamingAppData) failed (hresult {}); writing crash report to Desktop", static_cast<int32_t>(hresult));
 				SHGetSpecialFolderPathW(HWND_DESKTOP, spcPath, CSIDL_DESKTOP, FALSE);
 			}
 			CoTaskMemFree(pWideChar);
@@ -176,6 +175,11 @@ void ReadDxDiag()
 				pChild->GetProp(pcPropName, &variant);
 				if (variant.vt == VT_BSTR && variant.bstrVal != nullptr)
 				{
+					// Heap: one-shot background startup enumeration on this dedicated thread, not main-loop work — it builds a
+					// persistent crash-report string whose length depends on the machine's device properties, so neither the
+					// ToString conversions nor sDxDiag's growth can be sized up front or moved to a Workbuffer.
+					ScopedSuppressAllocationTracking suppress;
+
 					sDxDiag += common::ToString(pcPropName);
 					sDxDiag += ": ";
 					sDxDiag += common::ToString(variant.bstrVal);

@@ -37,21 +37,15 @@ leave them there; post-implementation diff minimality belongs to
 `/scope-review`. A clean pass is the expected common outcome, because this pass
 must not become its own source of over-engineering.
 
-## Inputs and Snapshot
+## Inputs
 
 - `/save-plan`: the final unsaved Plan body snapshot, supplied inline or by
   exact file path.
 - Change Workflow preparation or a bounded final rerun: the manager supplies
   the final complete plan presented for implementation, including the
   execution card and exact refinements when they carry resolved work, inline
-  or by exact file path, with its immutable identity; on a bounded final
-  rerun, treat that supplied final plan as the review input.
-- For either inline form, require a stable snapshot identifier and stable
-  heading IDs so findings can cite `<snapshot>#<heading-id>`.
-- For an exact-file-path snapshot, derive a deterministic SHA-256 identifier
-  from the loaded bytes immediately after loading and use it for the review
-  and output; inline forms keep their supplied stable identifier and heading
-  IDs.
+  or by exact file path; on a bounded final rerun, treat that supplied final
+  plan as the review input.
 - The manager's trigger evidence: which plan steps add code or modify
   non-documentation artifacts.
 - On a bounded final rerun, the manager's trigger evidence and classification
@@ -182,11 +176,12 @@ spawn another agent.
 
 For each finding:
 
-> `PSR-F-###` — `plan-path:line` or `snapshot#heading-id` — class:
+> `PSR-F-###` — `plan-path:line` (for an inline plan, the line in the
+> supplied plan text) — class:
 > rare-edge-case | speculative-hardening | overbuilt-mechanism |
 > assert-and-defer | bandaid-fix | plan-not-worth-executing — concrete problem
 > — evidence: `<stable locator: repository-path:line, plan-path:line,
-> snapshot#heading-id, supplied artifact selector, or named command/output;
+> supplied artifact selector, or named command/output;
 > "none supplied" only when Q1 classifies the case as hypothetical because
 > occurrence evidence is missing>` — occurrence/likelihood: `<Q1
 > classification and supporting evidence>` —
@@ -202,7 +197,6 @@ always the only finding in the report.
 If clean, state `PASS — plan changes are minimally scoped.` Return:
 
 ```text
-Plan snapshot: <immutable identifier>
 Steps reviewed: <added-code and modified-artifact steps>
 Findings: <entries or none>
 ```

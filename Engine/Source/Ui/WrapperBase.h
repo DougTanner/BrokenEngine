@@ -29,9 +29,23 @@ public:
 	, mfCurrent(mfDefault)
 	, mfPrevious(mfCurrent)
 	{
-		ASSERT(fStep >= 0.0f);
-		ASSERT(mfMin != mfMax);
-		ASSERT(mfDefault >= mfMin && mfDefault <= mfMax);
+		// 500+ wrappers are file-scope globals built before main(), and these arguments are compile-time literals from
+		// trusted internal callers: ASSERT here would throw out of a static initializer (immediate terminate, no
+		// unwinding), so break instead — it logs a warning naming the site and never throws.
+		if (fStep < 0.0f)
+		{
+			DEBUG_BREAK();
+		}
+
+		if (mfMin == mfMax)
+		{
+			DEBUG_BREAK();
+		}
+
+		if (mfDefault < mfMin || mfDefault > mfMax)
+		{
+			DEBUG_BREAK();
+		}
 	}
 
 	explicit Wrapper(bool bValue)
@@ -58,7 +72,11 @@ public:
 			mfMax = std::max(static_cast<float>(rValue), mfMax);
 		}
 
-		ASSERT(mfMin != mfMax);
+		// Break for the same static-initialization reason as the float constructor above.
+		if (mfMin == mfMax)
+		{
+			DEBUG_BREAK();
+		}
 	}
 
 	~Wrapper() = default;

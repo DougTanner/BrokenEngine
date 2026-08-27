@@ -58,17 +58,15 @@ the handoff `NEEDS_ACTION`.
 
 ## Handoff
 
-Return one compact item table followed by handoff prose:
+Return the shared handoff form in `../../references/subagent-reporting.md`,
+extended with one compact item table and these fields:
 
 ```markdown
 | Item | Result | Confirmed root cause and evidence | Fixed region | Focused check |
 |---|---|---|---|---|
 | <item> | FIXED or UNRESOLVED | <file:line or log evidence> | <region or none> | <check and result> |
 
-Status: PASS | NEEDS_ACTION | BLOCKED
-Changed files: <path — exact functions/types/sections, or none>
 PLAN DELTA REQUIRED: no | yes — <reason and manager action>
-Decisive checks: <read/search/trace/static command and result>
 Self-audit resolved: <Claim -> Check -> Result; fix/recheck, or none>
 Affected-site triggers: <kind — symbol/pattern and search scope, or none found>
 Propagation required: /update-affected-code — <code scope> | N/A — no code changed

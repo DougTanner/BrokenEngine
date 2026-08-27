@@ -371,6 +371,18 @@ function Add-FixtureHistoryParameters([Collections.IDictionary] $Parameters, $Co
 	return $Parameters
 }
 
+# The non-fixture landing route reads the Contract identity from the approval preparation result
+# file; this writes the minimal passing artifact shape that route requires.
+function Write-FixtureApprovalResultFile([string] $Path, $Contract) {
+	$artifact = [ordered]@{
+		schemaVersion = 'broken-engine-finalize-approval-preparation/v3'
+		status = 'pass'
+		historyContract = [ordered]@{ digest = $Contract.digest; generatorDigest = $Contract.generatorDigest; captureDigest = $Contract.captureDigest; runtimeDigest = $Contract.runtimeDigest; patchDigest = $Contract.patchDigest; mode = $Contract.mode }
+	}
+	[IO.File]::WriteAllText($Path, ($artifact | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+	return $Path
+}
+
 # Candidate construction is deliberately before verification. This isolated coverage
 # exercises the Git boundary and its guarded rollbacks.
 [IO.File]::WriteAllText((Join-Path $session 'candidate-session.txt'), 'session candidate', [Text.UTF8Encoding]::new($false))
@@ -1028,6 +1040,13 @@ function New-CarryForwardCandidate([string] $FileName, [string] $Content, [strin
 	return [pscustomobject]@{ PrimaryTip = $tip; Commit = $candidate.Json.candidate.commit; Tree = $candidate.Json.candidate.tree; Contract = Get-FixtureHistoryContract $tip $candidate.Json.candidate.commit }
 }
 
+function Test-SessionRebaseMarkersAbsent {
+	foreach ($marker in @('rebase-merge','rebase-apply')) {
+		if (Test-Path -LiteralPath (@(Invoke-ScratchGit $session @('rev-parse','--path-format=absolute','--git-path',$marker)))[0].Trim()) { return $false }
+	}
+	return $true
+}
+
 # Active-overlay recovery must not let a foreign ref advance between its post-lock checkout
 # precheck and the ref-neutral reconciliation overwrite that newer ref.
 $activeRecoveryRaceCandidate = New-CarryForwardCandidate 'active-recovery-primary-race.cpp' 'active recovery primary race source' 'active-recovery-primary-race'
@@ -1104,7 +1123,25 @@ Remove-Item -LiteralPath $generateMarker -Force -ErrorAction SilentlyContinue
 [Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_HISTORY_GENERATE_MARKER', $generateMarker)
 $carryCandidate = New-CarryForwardCandidate 'carry-forward-session.txt' 'carry-forward session source' 'carry-forward-session'
 $carryParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$carryCandidate.Commit; ExpectedPrimaryTip=$carryCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$carryCandidate.Commit; ApprovedCandidateTree=$carryCandidate.Tree }
-$carryParameters = Add-FixtureHistoryParameters $carryParameters $carryCandidate.Contract
+# This success case exercises the non-fixture file route end to end instead of scalar injection.
+$carryParameters.ApprovalPreparationResultFile = Write-FixtureApprovalResultFile (Join-Path $scratchBase 'carry-approval-result.json') $carryCandidate.Contract
+
+# The file route and scalar injection are mutually exclusive, and hand-supplied Contract scalars
+# are rejected outside the fixture environment before any identity or Git work.
+$conflictParameters = [ordered]@{} + $carryParameters
+$conflictParameters.HistoryContractMode = 'carry-forward'
+$conflictRun = Invoke-JsonScriptWithSplat $landingScript $conflictParameters $scratchBase
+Assert-Outcome $conflictRun 'landing-rejects-file-and-scalar-conflict' 1 'error' 'input.history-contract-conflict'
+$scalarGateParameters = [ordered]@{} + $carryParameters
+$scalarGateParameters.Remove('ApprovalPreparationResultFile')
+$scalarGateParameters = Add-FixtureHistoryParameters $scalarGateParameters $carryCandidate.Contract
+$oldLandingFixtureGuard = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE')
+[Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE', $null)
+try {
+	$scalarGateRun = Invoke-JsonScriptWithSplat $landingScript $scalarGateParameters $scratchBase
+	Assert-Outcome $scalarGateRun 'landing-rejects-non-fixture-scalars' 1 'error' 'input.fixture-forbidden'
+}
+finally { [Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE', $oldLandingFixtureGuard) }
 $carryJsonBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$($carryCandidate.PrimaryTip):$historyJsonFixturePath")))[0].Trim()
 $carrySvgBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$($carryCandidate.PrimaryTip):$historySvgFixturePath")))[0].Trim()
 $carryLanding = Invoke-JsonScriptWithSplat $landingScript $carryParameters $scratchBase
@@ -1118,6 +1155,34 @@ if ($null -ne $carryLanding.Json) {
 	Assert-True ($carryJsonBlobBefore -ceq $carryJsonBlobAfter -and $carrySvgBlobBefore -ceq $carrySvgBlobAfter) 'carry-forward session preserves both reserved history blobs'
 	Assert-True ([string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join ''))) 'carry-forward session reconciles both checkouts cleanly'
 }
+
+# The approved source patch is measured from the candidate's own parent, not from the caller's
+# expected primary tip. A candidate whose parent is behind live primary because the intervening
+# foreign commit rewrote a reserved history output is the ordinary bounded internal rebase case,
+# and that rebase must publish the foreign reserved history bytes unchanged.
+$staleParentCandidate = New-CarryForwardCandidate 'carry-forward-stale-parent.txt' 'carry-forward stale parent source' 'carry-forward-stale-parent'
+$staleParentForeign = New-ReservedHistoryCommit $primary $staleParentCandidate.PrimaryTip $historyJsonFixturePath $false 'foreign history overlay ahead of the candidate parent`n'
+Invoke-ScratchGit $primary @('update-ref','refs/heads/main',$staleParentForeign.Commit) | Out-Null
+Invoke-ScratchGit $primary @('reset','--hard',$staleParentForeign.Commit) | Out-Null
+$staleParentForeignJsonBlob = (@(Invoke-ScratchGit $primary @('rev-parse', "$($staleParentForeign.Commit):$historyJsonFixturePath")))[0].Trim()
+$staleParentForeignSvgBlob = (@(Invoke-ScratchGit $primary @('rev-parse', "$($staleParentForeign.Commit):$historySvgFixturePath")))[0].Trim()
+$staleParentParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$staleParentCandidate.Commit; ExpectedPrimaryTip=$staleParentForeign.Commit; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$staleParentCandidate.Commit; ApprovedCandidateTree=$staleParentCandidate.Tree }
+$staleParentParameters = Add-FixtureHistoryParameters $staleParentParameters $staleParentCandidate.Contract
+Remove-Item -LiteralPath $generateMarker -Force -ErrorAction SilentlyContinue
+$staleParentLanding = Invoke-JsonScriptWithSplat $landingScript $staleParentParameters $scratchBase
+Assert-Outcome $staleParentLanding 'carry-forward-stale-parent-landing' 0 'landed' 'ok'
+if ($null -ne $staleParentLanding.Json) {
+	$staleParentPrimaryHead = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+	Assert-True ($staleParentLanding.Json.landed.rebaseAttempts -eq 1 -and $staleParentLanding.Json.landed.commit -ceq $staleParentPrimaryHead -and $staleParentLanding.Json.landed.commit -cne $staleParentCandidate.Commit -and -not $staleParentLanding.Json.final.replacement -and $staleParentLanding.Json.historyUpdate.status -ceq 'skipped') 'carry-forward stale parent lands through exactly one internal rebase without a replacement or history update'
+	Assert-True (((@(Invoke-ScratchGit $primary @('rev-parse',"$staleParentPrimaryHead^")))[0].Trim()) -ceq $staleParentForeign.Commit) 'carry-forward stale parent rebases the confirmed candidate onto the foreign primary tip'
+	Assert-True (((@(Invoke-ScratchGit $primary @('rev-parse',"${staleParentPrimaryHead}:$historyJsonFixturePath")))[0].Trim()) -ceq $staleParentForeignJsonBlob -and ((@(Invoke-ScratchGit $primary @('rev-parse',"${staleParentPrimaryHead}:$historySvgFixturePath")))[0].Trim()) -ceq $staleParentForeignSvgBlob) 'carry-forward stale parent publishes the foreign reserved history blobs unchanged'
+	Assert-True (-not (Test-Path -LiteralPath $generateMarker)) 'carry-forward stale parent does not invoke Generate'
+	Assert-True ([string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and [string]::IsNullOrWhiteSpace((@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')) -and (Test-SessionRebaseMarkersAbsent)) 'carry-forward stale parent finishes with both checkouts clean and no rebase markers'
+}
+# The foreign commit deliberately holds non-generatable reserved history bytes, so both checkouts
+# return to the pre-case tip before any later case regenerates history from primary.
+Invoke-ScratchGit $primary @('reset','--hard',$carryCandidate.Commit) | Out-Null
+Invoke-ScratchGit $session @('reset','--hard',$carryCandidate.Commit) | Out-Null
 
 # A plain post-update-ref crash leaves the primary ref at the source commit while the checkout is
 # stale. Recovery starts from that primary ref and must report the same source-only landing.
@@ -1350,12 +1415,6 @@ function Add-UpstreamPrimaryCommit([string] $Text) {
 	Invoke-ScratchGit $primary @('commit','-m','upstream change') | Out-Null
 	return (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
 }
-function Test-SessionRebaseMarkersAbsent {
-	foreach ($marker in @('rebase-merge','rebase-apply')) {
-		if (Test-Path -LiteralPath (@(Invoke-ScratchGit $session @('rev-parse','--path-format=absolute','--git-path',$marker)))[0].Trim()) { return $false }
-	}
-	return $true
-}
 
 $retryHead = 'line 1'
 $retryTail = 'line 20'
@@ -1582,6 +1641,30 @@ if ($null -ne $exhausted.Json) {
 	Assert-True ($exhausted.Json.disposition -ceq 'retryable-wait' -and $exhausted.Json.landed.rebaseAttempts -eq 1 -and -not $exhausted.Json.primaryAdvanced) 'a real rebase that then loses the advance stays retryable after its one attempt'
 	Assert-True (((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -ceq $exhaustedCandidate.Commit -and ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()) -ceq $exhaustedCandidate.Commit) 'retry exhaustion after a real rebase restores the confirmed session commit'
 	Assert-True (((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $exhaustedPrimaryBefore -and (Test-SessionRebaseMarkersAbsent)) 'retry exhaustion after a real rebase leaves primary unchanged with no rebase markers'
+}
+
+# A landing that fails its postcondition after its own internal rebase must roll the session branch
+# back to the confirmed commit, not to the rebased one it created, so the documented re-invocation
+# with the original approved arguments still passes strict sanity.
+$postRebaseCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'post-rebase rollback tail') 'post-rebase-rollback'
+$retryHead = 'upstream post-rebase head'
+[void] (Add-UpstreamPrimaryCommit (New-RetryFileText $retryHead $retryTail))
+$postRebasePrimaryBefore = (@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()
+$postRebaseParameters = New-RetryLandingParameters $postRebaseCandidate
+$postRebaseParameters.FixtureFailure = 'post-reset'
+$postRebase = Invoke-JsonScriptWithSplat $landingScript $postRebaseParameters $scratchBase
+Assert-Outcome $postRebase 'landing-restores-confirmed-tip-after-internal-rebase' 2 'blocked' 'candidate.postcondition-failed'
+if ($null -ne $postRebase.Json) {
+	Assert-True ($postRebase.Json.landed.rebaseAttempts -eq 1 -and -not $postRebase.Json.primaryAdvanced) 'a rolled-back landing reports its one rebase and advances nothing'
+	Assert-True (((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $postRebasePrimaryBefore -and (Test-SessionRebaseMarkersAbsent)) 'a rolled-back landing leaves primary unchanged with no rebase markers'
+	Assert-True (((@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()) -ceq $postRebaseCandidate.Commit -and ((@(Invoke-ScratchGit $session @('rev-parse','HEAD')))[0].Trim()) -ceq $postRebaseCandidate.Commit) 'a rolled-back landing restores the confirmed session commit after its internal rebase'
+}
+$postRebaseParameters.FixtureFailure = 'none'
+$postRebaseRetry = Invoke-JsonScriptWithSplat $landingScript $postRebaseParameters $scratchBase
+Assert-Outcome $postRebaseRetry 'landing-re-invocation-after-rollback-lands' 0 'landed' 'ok'
+if ($null -ne $postRebaseRetry.Json) {
+	Assert-True ($postRebaseRetry.Json.landed.rebaseAttempts -eq 1 -and $postRebaseRetry.Json.landed.commit -ceq $postRebaseRetry.Json.final.commit) 're-invoking the original approved arguments lands after one internal rebase'
+	Assert-True ($postRebaseRetry.Json.primaryAdvanced -and ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim()) -ceq $postRebaseRetry.Json.final.commit) 're-invocation after a rollback advances primary to its final commit'
 }
 
 $conflictCandidate = New-RetryCandidate (New-RetryFileText $retryHead 'conflict session tail') 'rebase-conflict'

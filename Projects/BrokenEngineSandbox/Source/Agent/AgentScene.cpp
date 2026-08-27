@@ -137,8 +137,45 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 	{
 		throw std::runtime_error("describe_scene 'maxUnits' must be an integer");
 	}
+	if (rParams.contains("unitTypes") && !rParams.at("unitTypes").is_array())
+	{
+		throw std::runtime_error("describe_scene 'unitTypes' must be an array of strings");
+	}
 	bool bIncludeUnits = !rParams.contains("includeUnits") || rParams.at("includeUnits").get<bool>();
 	int64_t iMaxUnits = std::max<int64_t>(0, rParams.contains("maxUnits") ? rParams.at("maxUnits").get<int64_t>() : 200);
+
+	// Absent 'unitTypes' means every type; a present list (including an empty one) selects exactly what it names.
+	bool bHasUnitTypes = rParams.contains("unitTypes");
+	bool bIncludePlayers = !bHasUnitTypes;
+	bool bIncludeSpaceships = !bHasUnitTypes;
+	bool bIncludeBlasters = !bHasUnitTypes;
+	if (bHasUnitTypes)
+	{
+		for (const nlohmann::json& rUnitType : rParams.at("unitTypes"))
+		{
+			if (!rUnitType.is_string())
+			{
+				throw std::runtime_error("describe_scene 'unitTypes' must be an array of strings");
+			}
+			const std::string unitType = rUnitType.get<std::string>();
+			if (unitType == "player")
+			{
+				bIncludePlayers = true;
+			}
+			else if (unitType == "spaceship")
+			{
+				bIncludeSpaceships = true;
+			}
+			else if (unitType == "blaster")
+			{
+				bIncludeBlasters = true;
+			}
+			else
+			{
+				throw std::runtime_error("describe_scene 'unitTypes' entries must be 'player', 'spaceship', or 'blaster'");
+			}
+		}
+	}
 
 	// Camera / UI / game state — always present (graceful empty state: no subscribed coords still returns these).
 	XMFLOAT4 f4VisibleArea = engine::gpCamera->f4RenderVisibleArea;
@@ -204,60 +241,98 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 			continue;
 		}
 
-		const PlayersInterpolate& rPlayersInterp = *rFrame.interpolate.pPlayers;
-		const PlayersPostRender& rPlayersPost = *rFrame.postRender.pPlayers;
-		for (int64_t i = 0; i < rPlayersPost.iCount; ++i)
+		if (bIncludePlayers)
 		{
-			XMVECTOR vecPosition = rPlayersInterp.pVecPositions[i];
-			if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+			const PlayersInterpolate& rPlayersInterp = *rFrame.interpolate.pPlayers;
+			const PlayersPostRender& rPlayersPost = *rFrame.postRender.pPlayers;
+			for (int64_t i = 0; i < rPlayersPost.iCount; ++i)
 			{
-				continue;
+				XMVECTOR vecPosition = rPlayersInterp.pVecPositions[i];
+				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+				{
+					continue;
+				}
+				if (iUnitCount >= iMaxUnits)
+				{
+					bTruncated = true;
+					break;
+				}
+				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
+				units.push_back(
+				{
+					{"type", "player"},
+					{"globalId", rPlayersPost.pGlobalPlayerIds[i].iValue},
+					{"world", Vec3ToJson(vecPosition)},
+					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
+					{"armor", rPlayersPost.pfArmors[i]},
+					{"shield", rPlayersPost.pfShields[i]},
+					{"alignment", rPlayersPost.pAlignments[i].Value()},
+					{"flags", PlayerFlagNames(rPlayersPost.pFlags[i])},
+				});
+				++iUnitCount;
 			}
-			if (iUnitCount >= iMaxUnits)
-			{
-				bTruncated = true;
-				break;
-			}
-			XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
-			units.push_back(
-			{
-				{"type", "player"},
-				{"globalId", rPlayersPost.pGlobalPlayerIds[i].iValue},
-				{"world", Vec3ToJson(vecPosition)},
-				{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
-				{"armor", rPlayersPost.pfArmors[i]},
-				{"shield", rPlayersPost.pfShields[i]},
-				{"alignment", rPlayersPost.pAlignments[i].Value()},
-				{"flags", PlayerFlagNames(rPlayersPost.pFlags[i])},
-			});
-			++iUnitCount;
 		}
 
-		const SpaceshipsInterpolate& rShipsInterp = *rFrame.interpolate.pSpaceships;
-		const SpaceshipsPostRender& rShipsPost = *rFrame.postRender.pSpaceships;
-		for (int64_t i = 0; i < rShipsPost.iCount; ++i)
+		if (bIncludeSpaceships)
 		{
-			XMVECTOR vecPosition = rShipsInterp.pVecPositions[i];
-			if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+			const SpaceshipsInterpolate& rShipsInterp = *rFrame.interpolate.pSpaceships;
+			const SpaceshipsPostRender& rShipsPost = *rFrame.postRender.pSpaceships;
+			for (int64_t i = 0; i < rShipsPost.iCount; ++i)
 			{
-				continue;
+				XMVECTOR vecPosition = rShipsInterp.pVecPositions[i];
+				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+				{
+					continue;
+				}
+				if (iUnitCount >= iMaxUnits)
+				{
+					bTruncated = true;
+					break;
+				}
+				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
+				units.push_back(
+				{
+					{"type", "spaceship"},
+					{"world", Vec3ToJson(vecPosition)},
+					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
+					{"health", rShipsPost.pfHealths[i]},
+					{"alignment", rShipsPost.pAlignments[i].Value()},
+					{"flags", SpaceshipFlagNames(rShipsPost.pFlags[i])},
+				});
+				++iUnitCount;
 			}
-			if (iUnitCount >= iMaxUnits)
+		}
+
+		// Blasters stay last so a cell over the unit budget truncates these rows instead of displacing the others.
+		if (bIncludeBlasters)
+		{
+			const BlastersInterpolate& rBlastersInterp = *rFrame.interpolate.pBlasters;
+			const BlastersPostRender& rBlastersPost = *rFrame.postRender.pBlasters;
+			for (int64_t i = 0; i < rBlastersPost.iCount; ++i)
 			{
-				bTruncated = true;
-				break;
+				XMVECTOR vecPosition = rBlastersInterp.pVecPositions[i];
+				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+				{
+					continue;
+				}
+				if (iUnitCount >= iMaxUnits)
+				{
+					bTruncated = true;
+					break;
+				}
+				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
+				units.push_back(
+				{
+					{"type", "blaster"},
+					{"world", Vec3ToJson(vecPosition)},
+					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
+					{"alignment", rBlastersPost.pAlignments[i].Value()},
+					{"windTrailIntensity", rBlastersInterp.pfWindTrailIntensities[i]},
+					{"windTrailWidth", rBlastersInterp.pfWindTrailWidths[i]},
+					{"windTrailLengthMultiplier", rBlastersInterp.pfWindTrailLengthMultipliers[i]},
+				});
+				++iUnitCount;
 			}
-			XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
-			units.push_back(
-			{
-				{"type", "spaceship"},
-				{"world", Vec3ToJson(vecPosition)},
-				{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
-				{"health", rShipsPost.pfHealths[i]},
-				{"alignment", rShipsPost.pAlignments[i].Value()},
-				{"flags", SpaceshipFlagNames(rShipsPost.pFlags[i])},
-			});
-			++iUnitCount;
 		}
 	}
 

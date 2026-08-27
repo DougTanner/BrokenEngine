@@ -12,6 +12,9 @@ Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn` i
 
 WorktreeCli is the only component that parses the scheduler and changes claims. It selects the oldest eligible executable plan by `(createdUtc, normalized path)`. Existing valid dependencies block a child; a missing dependency is a satisfied stale edge reported as a notice. Invalid metadata and dependency cycles exclude only the affected plans from selection, so unrelated plans remain claimable. An excluded plan is one left out of selection — because its metadata is invalid, its dependencies form a cycle, or it is not present and valid at the primary tip — without affecting other plans.
 
+For a scheduler health check, run
+`pwsh -NoProfile -File .agents/scripts/Test-PlanSchedulerState.ps1` — it folds `plan validate` into a compact status/diagnostics result; never run a raw whole-tree `plan validate`, whose result lists every Plan and floods a session context.
+
 `/next-plan` validates then uses `plan claim-next`. Claims are PC-local, one per session, fixed at 48 hours, and self-heal after expiry/orphaning. An orphaned claim is one whose owning session or worktree no longer exists; self-healing means such a claim is released automatically after expiry. Deferral is `plan unclaim`, which makes the plan immediately eligible again.
 
 Completion uses `plan complete`; explicit rejection uses `plan reject --user-authorized-rejection`. Preparation removes direct child metadata edges and deletes the target in the Git worktree. After landing succeeds, the claim is deleted.

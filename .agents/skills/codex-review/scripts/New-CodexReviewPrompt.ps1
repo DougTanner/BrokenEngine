@@ -454,8 +454,33 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 	if ($skillTouched -and -not $script:ScopeText.Contains('Validation: PASS')) { $missing.Add('Validation: PASS') }
 	# Both markers, and both as that handoff's summary block emits them: the bare skill name also
 	# appears in an ordinary changed-file list, while 'Files checked:' heads no other gated handoff.
-	if ($instructionDocTouched -and -not ($script:ScopeText.Contains('Skill: progressive-disclosure-review') -and $script:ScopeText.Contains('Files checked:'))) {
-		$missing.Add("the /progressive-disclosure-review handoff, marked by 'Skill: progressive-disclosure-review' and 'Files checked:'")
+	# Everything after the marker is read as that handoff's own block, ending at the next handoff's
+	# 'Skill: ' line, so a PASS verdict or a baseline belonging to some other handoff in the same scope
+	# cannot stand in for this one's.
+	if ($instructionDocTouched) {
+		# Both matches are anchored to a line start, because ordinary scope prose quotes the marker text
+		# inline while describing this gate: an unanchored match reads that sentence as the handoff and
+		# hides the real block below it. The terminator is searched from the end of the marker match, so
+		# it can only land on a later line's own start.
+		$markerMatch = [Regex]::Match($script:ScopeText, '(?m)^Skill: progressive-disclosure-review')
+		$block = ''
+		if ($markerMatch.Success) {
+			$blockStart = $markerMatch.Index + $markerMatch.Length
+			$nextSkill = [Regex]::new('(?m)^Skill: ').Match($script:ScopeText, $blockStart)
+			$blockEnd = $(if ($nextSkill.Success) { $nextSkill.Index } else { $script:ScopeText.Length })
+			$block = $script:ScopeText.Substring($blockStart, $blockEnd - $blockStart)
+		}
+		if (-not $markerMatch.Success -or -not $block.Contains('Files checked:')) {
+			$missing.Add("the /progressive-disclosure-review handoff, marked by 'Skill: progressive-disclosure-review' and 'Files checked:'")
+		}
+		else {
+			# A NEEDS_ACTION or BLOCKED handoff, or one produced against an earlier diff, says nothing about
+			# the prose this landing actually carries, so both are gated exactly like an absent handoff.
+			if (-not $block.Contains('Status: PASS')) { $missing.Add("'Status: PASS' in the /progressive-disclosure-review handoff") }
+			if (-not $block.Contains("Baseline: $($ChangeSet.baselineSha)")) {
+				$missing.Add("the reviewed baseline on the /progressive-disclosure-review handoff's own 'Baseline:' line")
+			}
+		}
 	}
 	# A diff carrying C++ or shader bytes was built, and the build envelope is the only authoritative
 	# result: acceptance prose alone cannot stand in for it. The JSON signature is matched rather than

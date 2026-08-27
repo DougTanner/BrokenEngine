@@ -1,5 +1,9 @@
 #pragma once
 
+#if defined(BT_SERVER)
+#include "Frame/Collections/Players/Players.h" // kfPlayerRadius/kfPushMargin, the inputs the constexpr navigation values below derive from.
+#endif // BT_SERVER
+
 namespace engine { struct FrameStaticData; }
 
 namespace game
@@ -23,8 +27,15 @@ float XM_CALLCONV ComputeTerrainAvoidance(const engine::FrameStaticData& rStatic
 // The game supplies navigation clearance and the elevation threshold to engine startup as runtime values,
 // so a game can derive them however it wants (per ship type, for example). The engine passes both straight
 // through to the nav bake and performs no arithmetic on them, which keeps the bake bit-identical.
-float NavClearanceMeters();
-float NavThresholdElevation(float fBaseHeight);
+constexpr float NavClearanceMeters()
+{
+	return kfPlayerRadius + kfPushMargin;
+}
+
+constexpr float NavThresholdElevation(float fBaseHeight)
+{
+	return fBaseHeight - kfPlayerRadius - kfPushMargin;
+}
 
 #endif // BT_SERVER
 

@@ -448,8 +448,14 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		};
 		const engine::alignment_t pHighSourceAlignments[kiHighSourceCount] = {kSourceAlignment, kSourceAlignment};
 		const int64_t piHighSourceRows[kiHighSourceCount] = {0, 1};
-		engine::registry_id_t puiHighConsumerTargets[kiHighConsumerCount] = {};
-		int64_t piHighSubscriptionRows[kiHighExistingSubscriptionCount] = {};
+		// The five high-count arrays live in the thread-local workbuffer: ~13 KiB of stack here would push this
+		// function past the 16 KiB the analysis build allows. Workbuffer frames start 16-byte aligned, so the
+		// XMVECTOR storage is SIMD-safe, and the fill loops below write every element the queries read, which is
+		// what makes the unzeroed reservations safe.
+		common::ScopedWorkbufferAllocation<engine::registry_id_t*> highConsumerTargetsAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<engine::registry_id_t*>(kiHighConsumerCount * static_cast<int64_t>(sizeof(engine::registry_id_t)));
+		engine::registry_id_t* puiHighConsumerTargets = highConsumerTargetsAllocation;
+		common::ScopedWorkbufferAllocation<int64_t*> highSubscriptionRowsAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>(kiHighExistingSubscriptionCount * static_cast<int64_t>(sizeof(int64_t)));
+		int64_t* piHighSubscriptionRows = highSubscriptionRowsAllocation;
 		for (int64_t i = 0; i < kiHighExistingSubscriptionCount - 1; ++i)
 		{
 			puiHighConsumerTargets[i] = Id(21);
@@ -458,9 +464,12 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		puiHighConsumerTargets[kiHighExistingSubscriptionCount - 1] = Id(22);
 		piHighSubscriptionRows[kiHighExistingSubscriptionCount - 1] = kiHighExistingSubscriptionCount - 1;
 		const int64_t piHighAcquireRow[1] = {kiHighConsumerCount - 1};
-		XMVECTOR pVecHighConsumerOrigins[kiHighConsumerCount] = {};
-		XMVECTOR pVecHighConsumerDirections[kiHighConsumerCount] = {};
-		engine::alignment_t pHighConsumerAlignments[kiHighConsumerCount] = {};
+		common::ScopedWorkbufferAllocation<XMVECTOR*> highConsumerOriginsAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMVECTOR*>(kiHighConsumerCount * static_cast<int64_t>(sizeof(XMVECTOR)));
+		XMVECTOR* pVecHighConsumerOrigins = highConsumerOriginsAllocation;
+		common::ScopedWorkbufferAllocation<XMVECTOR*> highConsumerDirectionsAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMVECTOR*>(kiHighConsumerCount * static_cast<int64_t>(sizeof(XMVECTOR)));
+		XMVECTOR* pVecHighConsumerDirections = highConsumerDirectionsAllocation;
+		common::ScopedWorkbufferAllocation<engine::alignment_t*> highConsumerAlignmentsAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<engine::alignment_t*>(kiHighConsumerCount * static_cast<int64_t>(sizeof(engine::alignment_t)));
+		engine::alignment_t* pHighConsumerAlignments = highConsumerAlignmentsAllocation;
 		for (int64_t i = 0; i < kiHighConsumerCount; ++i)
 		{
 			pVecHighConsumerOrigins[i] = vecConsumerOrigin;

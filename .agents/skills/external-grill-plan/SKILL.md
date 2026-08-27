@@ -173,8 +173,8 @@ change. `Plan delta` is relative to the frozen plan text; any behavior, scope,
 architecture, acceptance, or verification change is meaningful.
 
 ```text
-Plan snapshot: <inline identifier or exact path>
-Plan-audit evidence: <audited revision identifier and result>
+Plan: <exact path or inline plan title>
+Plan-audit evidence: <audited plan revision and result>
 Plan delta: none | not meaningful | meaningful
 Decisions and exact refinements:
 - <decision ID> — <selected choice> — <section and exact refinement>

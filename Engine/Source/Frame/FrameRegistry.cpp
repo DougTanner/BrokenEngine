@@ -12,7 +12,7 @@ struct EligibleRowRef
 	int64_t iEligibleIndex = 0;
 };
 
-static int64_t TotalEligibleRows(std::span<const RegistrySourceLayer> sourceLayers)
+static constexpr int64_t TotalEligibleRows(std::span<const RegistrySourceLayer> sourceLayers)
 {
 	int64_t iTotal = 0;
 	for (const RegistrySourceLayer& rLayer : sourceLayers)
@@ -104,11 +104,6 @@ static void ValidateSourceLayers(std::span<const RegistrySourceLayer> sourceLaye
 }
 
 #endif // BT_DEBUG
-
-int64_t RegistryScratchBytes(int64_t iEligibleRows)
-{
-	return iEligibleRows * static_cast<int64_t>(sizeof(int64_t) + sizeof(uint16_t));
-}
 
 RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, std::span<const RegistrySourceLayer> sourceLayers, std::span<const RegistrySubscriptionLayer> subscriptionLayers, std::span<std::byte> scratch)
 {

@@ -544,12 +544,12 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 		.rows = std::span<const int64_t>(pEligibleRows, static_cast<size_t>(iEligibleCount)),
 		.iSourceCount = iSpaceshipCount,
 	};
-	std::span<const engine::RegistrySourceLayer> sourceLayers(static_cast<engine::RegistrySourceLayer*>(pLayers), 1);
+	std::span<const engine::RegistrySourceLayer> sourceLayers(pLayers, 1);
 
 	engine::RegistrySubscriptionLayer subscriptionLayer
 	{
 		.puiTargets = rSubscribers.puiRegistryTargets,
-		.rows = std::span<const int64_t>(static_cast<int64_t*>(pAscendingRows), static_cast<size_t>(iSubscriberCount)),
+		.rows = std::span<const int64_t>(pAscendingRows, static_cast<size_t>(iSubscriberCount)),
 		.iSourceCount = iSubscriberCount,
 	};
 

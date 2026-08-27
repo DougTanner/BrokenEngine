@@ -295,3 +295,13 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 	}
 
 63. Do not use XMVector3Rotate() or XMVector3InverseRotate() in "DirectX Math", they return a rounding-residue W that violates the W invariant (positions W=1.0, directions W=0.0). Both raw names are compile-poisoned in ExternalHeaders.h: Use XMVector3RotateSafe(), not XMVector3Rotate()
+
+64. Comments describe the present code: the constraint, invariant, required ordering, or consequence the code as it now stands cannot say itself. Never describe the previous implementation, the change that produced the current code, or a comparison against replaced code:
+
+	Bad (narrates the replaced implementation):
+	// 258 XMVECTORs on the stack push this function past the 16 KiB the analysis build allows, so the origins
+	// live in the workbuffer instead; its frames start 16-byte aligned, so XMVECTOR storage is safe there.
+
+	Good (states the present constraint):
+	// This function's locals must fit the 16 KiB stack budget the analysis build allows, so the 258 origins
+	// live in the workbuffer; its frames start 16-byte aligned, so XMVECTOR storage is safe there.

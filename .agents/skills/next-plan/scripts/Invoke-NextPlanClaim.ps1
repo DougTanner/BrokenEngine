@@ -1,13 +1,40 @@
 [CmdletBinding()]
 param([string] $Plan,[switch] $ResumeRetained)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
-$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v3';status='error';code='internal.error';message='Claim did not run.';claim=$null}
+$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v4';status='error';code='internal.error';message='Claim did not run.';claim=$null}
 function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message){$result.status=$Status;$result.code=$Code;$result.message=$Message;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
 # NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
 # a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
 # are worktree paths a fast-forward could touch.
 function Get-DirtyPath([string]$Porcelain){$paths=[Collections.Generic.List[string]]::new();$fields=@($Porcelain -split "`0");$index=0;while($index -lt $fields.Count){$record=$fields[$index];$index++;if($record.Length -lt 4){continue};$paths.Add($record.Substring(3));$state=$record.Substring(0,2);if($state.Contains('R') -or $state.Contains('C')){if($index -lt $fields.Count){$paths.Add($fields[$index]);$index++}}};return $paths}
 function Format-DirtyPath([string[]]$Paths){$text=@($Paths|Select-Object -First 10) -join ', ';if($Paths.Count -gt 10){$text+=" (+$($Paths.Count-10) more)"};return $text}
+# `--parents` keeps each commit's parent count in the same walk, and a commit without exactly one parent - a root
+# commit or a merge - has no single parent-relative patch, so it can neither be classified safe nor be a match.
+function Get-DivergenceCommit([string]$Worktree,[string]$Range){$revList=Invoke-NextPlanProcess 'git.exe' @('-C',$Worktree,'rev-list','--parents',$Range) $Worktree;if($revList.ExitCode -ne 0){throw "git rev-list $Range failed. $($revList.Stderr.Trim())"};$commits=[Collections.Generic.List[object]]::new();foreach($line in ($revList.Stdout -split "`n")){$fields=@(($line.Trim() -split ' ')|Where-Object{$_.Length -gt 0});if($fields.Count -eq 0){continue};$commits.Add([pscustomobject]@{Commit=$fields[0];ParentCount=$fields.Count-1})};return $commits}
+# A session commit is a safe stranded duplicate only when its filtered patch bytes equal those of a primary commit
+# that landed after the merge-base, matched one-to-one so one primary commit can never cover two session commits.
+function Get-SessionDivergence($Context){
+ $worktree=$Context.Worktree
+ $mergeBase=Invoke-NextPlanProcess 'git.exe' @('-C',$worktree,'merge-base',$Context.SessionHead,$Context.PrimaryTip) $worktree
+ if($mergeBase.ExitCode -ne 0){throw "git merge-base failed. $($mergeBase.Stderr.Trim())"}
+ $sessionCommits=Get-DivergenceCommit $worktree "$($Context.PrimaryTip)..$($Context.SessionHead)"
+ # A stranded duplicate can only have landed after the session branched, so the candidate walk stops at the merge-base.
+ $candidates=Get-DivergenceCommit $worktree "$($mergeBase.Stdout.Trim())..$($Context.PrimaryTip)"
+ $available=[Collections.Generic.List[object]]::new()
+ foreach($candidate in $candidates){if($candidate.ParentCount -eq 1){$available.Add([pscustomobject]@{Commit=$candidate.Commit;Hash=(Get-NextPlanFilteredPatchHash $worktree $candidate.Commit)})}}
+ $rows=[Collections.Generic.List[object]]::new();$safe=$sessionCommits.Count -gt 0
+ foreach($commit in $sessionCommits){
+  $match=$null
+  if($commit.ParentCount -eq 1){
+   $hash=Get-NextPlanFilteredPatchHash $worktree $commit.Commit
+   $index=-1;for($position=0;$position -lt $available.Count;$position++){if($available[$position].Hash -ceq $hash){$index=$position;break}}
+   if($index -ge 0){$match=$available[$index].Commit;$available.RemoveAt($index)}
+  }
+  if($null -eq $match){$safe=$false}
+  $rows.Add([ordered]@{commit=$commit.Commit;verdict=$(if($null -eq $match){'unlanded'}else{'stranded-duplicate'});matchedPrimaryCommit=$match})
+ }
+ return [pscustomobject]@{Safe=$safe;Rows=$rows}
+}
 try {
  Import-Module (Join-Path $PSScriptRoot 'NextPlanWorkflowCommon.psm1') -Force -DisableNameChecking
  $targeted=-not [string]::IsNullOrWhiteSpace($Plan)
@@ -50,7 +77,24 @@ try {
   # holding any commit the primary tip lacks stops here instead of reaching a confusing claim rejection.
   $behind=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'merge-base','--is-ancestor',$context.SessionHead,$context.PrimaryTip) $context.Worktree
   if($behind.ExitCode -gt 1){throw "git merge-base --is-ancestor failed. $($behind.Stderr.Trim())"}
-  if($behind.ExitCode -ne 0){Complete-Claim 2 'blocked' 'claim.session-diverged' "Session HEAD $($context.SessionHead) has commits the primary tip $($context.PrimaryTip) does not, so the session cannot be fast-forwarded; no Plan was claimed and the session branch was not moved."}
+  if($behind.ExitCode -ne 0){
+   $diverged="Session HEAD $($context.SessionHead) has commits the primary tip $($context.PrimaryTip) does not, so the session cannot be fast-forwarded; no Plan was claimed and the session branch was not moved."
+   # A classification failure must never look like a safe verdict, so it reports the plain divergence with no verdict at all.
+   try{
+    $divergence=Get-SessionDivergence $context
+    $recovery=$null
+    if($divergence.Safe){
+     $recovery="git reset --hard $($context.PrimaryTip)"
+     $duplicates=@($divergence.Rows|ForEach-Object{"$($_.commit) duplicates $($_.matchedPrimaryCommit)"}) -join '; '
+     $diverged+=" Every session commit is a stranded duplicate of a commit already on primary ($duplicates), differing only in the metrics-history overlay the landing flow regenerates, so the session holds no unlanded work. Recovery: run '$recovery' from the session worktree root, then rerun this script."
+    }else{
+     $unlanded=@($divergence.Rows|Where-Object{$_.verdict -ceq 'unlanded'})
+     $diverged+=" $($unlanded.Count) of $($divergence.Rows.Count) session commit(s) hold work that is not on primary ($(@($unlanded|ForEach-Object{$_.commit}) -join ', ')), so the session branch must not be reset; report this to the user."
+    }
+    $result.divergence=[ordered]@{verdict=$(if($divergence.Safe){'safe-reset'}else{'unlanded-work'});commits=@($divergence.Rows);recovery=$recovery}
+   }catch{$result.divergence=$null}
+   Complete-Claim 2 'blocked' 'claim.session-diverged' $diverged
+  }
   $merge=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'merge','--ff-only',$context.PrimaryTip) $context.Worktree
   if($merge.ExitCode -ne 0){$mergeDetail=(($merge.Stdout,$merge.Stderr) -join "`n").Trim();Complete-Claim 1 'error' 'claim.session-sync-failed' "Fast-forwarding the session branch from $($context.SessionHead) to the primary tip $($context.PrimaryTip) failed; no Plan was claimed, and the worktree may be partially updated, so inspect it before retrying. git reported: $mergeDetail"}
   $result.sync=[ordered]@{fastForwarded=$true;from=$context.SessionHead;to=$context.PrimaryTip}

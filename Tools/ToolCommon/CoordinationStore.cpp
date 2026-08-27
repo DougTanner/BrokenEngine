@@ -186,12 +186,14 @@ namespace toolcli::coordination
 	std::optional<std::wstring> CanonicalizeDirectoryPath(const std::wstring& rValue)
 	{
 		std::error_code error;
-		std::filesystem::path path = std::filesystem::canonical(rValue, error);
-		if (error || !std::filesystem::is_directory(path, error))
+		std::filesystem::path path = std::filesystem::canonical(ExtendedLengthPath(rValue), error);
+		// canonical() strips the extended-length prefix from its result, so re-apply it for the remaining OS calls.
+		const std::filesystem::path osPath = ExtendedLengthPath(path);
+		if (error || !std::filesystem::is_directory(osPath, error))
 		{
 			return std::nullopt;
 		}
-		Handle hDirectory(::CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+		Handle hDirectory(::CreateFileW(osPath.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
 		if (!hDirectory.IsValid())
 		{
 			return std::nullopt;
@@ -203,6 +205,14 @@ namespace toolcli::coordination
 			return std::nullopt;
 		}
 		finalPath.resize(uiWritten);
+		// A network share normalizes to \\?\UNC\server\share\..., which the prefix strip below would turn into a
+		// mangled relative key that is then persisted, hashed, and handed to Git.  No logical key form covers a UNC
+		// checkout, so canonicalization fails here where the reason is still visible.
+		if (finalPath.starts_with(L"\\\\?\\UNC\\"))
+		{
+			Fail("network-share (UNC) checkouts are unsupported by the coordination tooling: " + WideToUtf8(finalPath));
+			return std::nullopt;
+		}
 		if (finalPath.starts_with(L"\\\\?\\"))
 		{
 			finalPath.erase(0, 4);
@@ -304,11 +314,12 @@ namespace toolcli::coordination
 		return WriteBytesAtomic(rPath, rMetadata.dump(2) + "\n");
 	}
 
-	bool WriteBytesAtomic(const std::filesystem::path& rPath, std::string_view contents)
+	bool StageBytesAtomic(const std::filesystem::path& rPath, std::string_view contents, std::filesystem::path& rStagedPath)
 	{
+		// Every staged write in the process shares this sequence, so a temporary still waiting to be committed can
+		// never be overwritten by a later write to the same path.
 		static uint32_t suiSequence = 0;
-		const std::filesystem::path targetPath = ExtendedLengthPath(rPath);
-		std::filesystem::path temporaryPath = targetPath;
+		std::filesystem::path temporaryPath = ExtendedLengthPath(rPath);
 		temporaryPath += L".tmp." + std::to_wstring(::GetCurrentProcessId()) + L"." + std::to_wstring(++suiSequence);
 		Handle hFile(::CreateFileW(temporaryPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_TEMPORARY, nullptr));
 		if (!hFile.IsValid())
@@ -316,17 +327,31 @@ namespace toolcli::coordination
 			return false;
 		}
 		DWORD uiWritten = 0;
-		bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE && uiWritten == contents.size() && ::FlushFileBuffers(hFile.Get()) != FALSE;
+		const bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE && uiWritten == contents.size() && ::FlushFileBuffers(hFile.Get()) != FALSE;
 		hFile.Reset();
-		if (bSucceeded)
-		{
-			bSucceeded = ::MoveFileExW(temporaryPath.c_str(), targetPath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
-		}
 		if (!bSucceeded)
 		{
 			::DeleteFileW(temporaryPath.c_str());
+			return false;
 		}
-		return bSucceeded;
+		rStagedPath = std::move(temporaryPath);
+		return true;
+	}
+
+	bool CommitStagedBytes(const std::filesystem::path& rStagedPath, const std::filesystem::path& rPath)
+	{
+		if (::MoveFileExW(rStagedPath.c_str(), ExtendedLengthPath(rPath).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE)
+		{
+			return true;
+		}
+		::DeleteFileW(rStagedPath.c_str());
+		return false;
+	}
+
+	bool WriteBytesAtomic(const std::filesystem::path& rPath, std::string_view contents)
+	{
+		std::filesystem::path stagedPath;
+		return StageBytesAtomic(rPath, contents, stagedPath) && CommitStagedBytes(stagedPath, rPath);
 	}
 
 	void PrintMetadata(const nlohmann::json& rMetadata)

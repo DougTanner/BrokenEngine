@@ -18,18 +18,15 @@ and the landing confirmation belongs to `/finalize-changes`.
 ## Preconditions and selection
 
 Require a clean wrapper-created session worktree, except for the retained-work
-resume documented under Claim lifecycle below, and derive the authoritative
-primary, owner, and provisioned WorktreeCli from
-`Get-NextPlanContext`, run from the session worktree root as one shell call:
+resume documented under Claim lifecycle, and derive the authoritative primary,
+owner, and provisioned WorktreeCli from `Get-NextPlanContext`, run from the
+session worktree root as one shell call:
 `Import-Module ./.agents/skills/next-plan/scripts/NextPlanWorkflowCommon.psm1; Get-NextPlanContext`
-Its baseline is provisional until a claim runs: every claim result carrying the
-`sync` object described below records that result's `sync.to` as the session
-baseline, and a result without one leaves the recorded baseline unchanged, so
-the `Get-NextPlanContext` baseline holds only until the first claim reports a
-`sync` object.
-Missing tooling requires explicitly authorized primary
-maintenance through `/compile`. Never create/adopt a worktree or inspect
-machine-local claims directly.
+The context baseline is provisional until a claim reports a `sync` object;
+[references/claim-results.md](references/claim-results.md) owns how each claim,
+listing, and claim-exit result is read. Missing tooling requires explicitly
+authorized primary maintenance through `/compile`. Never create/adopt a
+worktree or inspect machine-local claims directly.
 
 - Bare invocation selects the oldest eligible Plan by immutable `createdUtc`,
   then normalized UTF-8 path.
@@ -40,12 +37,10 @@ machine-local claims directly.
 
 See the queue before selecting, whether the invocation is bare or names a Plan:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Get-NextPlanList.ps1`
-is read-only, takes no arguments, and reports every executable Plan with its
-state and creation order. It deliberately reads the session worktree's own tree
-and never moves it, so a Plan landed on primary after this session started shows
-up only after the claim script below fast-forwards the session. For a tier-constrained request, read the `Risk tier`
-prose of the top eligible candidates in that order until one matches, then claim
-that path.
+It is read-only and reports a bounded point-in-time projection — widen with
+`-Top <n>` only when a decision needs more. Its snapshot limits and the
+tier-constrained reading procedure are in
+[references/claim-results.md](references/claim-results.md).
 
 Use the root AGENTS.md canonical invocation form. For bare selection, run this
 command with no `-Plan` argument:
@@ -56,22 +51,27 @@ that value, for example:
 (`-Plan 'example.md'` forwards a partial pattern.) Run the bundled script as its
 own shell call, never combined with other commands, so its single JSON object
 stays parseable and the mutation-capable script is never re-run just to
-disambiguate its output. Do not reconstruct the script's transitions. Before it
-validates and claims, the script brings the session branch up to the primary tip
-by fast-forward only when the session is behind, reporting a `sync` object that
-names the old and new commits; a session holding any commit the primary tip lacks
-cannot be fast-forwarded, so it stops with `claim.session-diverged` and leaves the
-branch untouched. Because selection therefore reads a tree at the primary tip as
-of that invocation, `none-available` means the Plan is genuinely ineligible rather
-than merely absent from a stale worktree; a Plan that lands on primary afterwards
-is picked up by the next invocation. On
-`status: pass`, act on the code: `ok` and `reused` both mean this session holds
-the named claim. For a bare selection, `none-available` is a normal whole-skill
-stop with nothing to claim, and selection is not re-run to look again. For a
-`-Plan`-targeted invocation it is the same whole-skill stop, reported to the
-user: the requested Plan is ineligible and the manager never selects or claims a
-different candidate in that run. Any
-other status stops the skill without repair, reordering, or retry.
+disambiguate its output. Do not reconstruct the script's transitions.
+
+The script fast-forwards the session branch to the primary tip first, and a
+session holding any commit primary lacks instead stops with
+`claim.session-diverged` and a `divergence` object. When that object reports
+`verdict: safe-reset`, `divergence.recovery` then names the exact
+`git reset --hard <primary tip>` command to run once from the session worktree
+root before rerunning the claim script, and that reset is the only case in which
+a session branch may be moved by hand. `verdict: unlanded-work` names the
+commits carrying work primary does not have: never reset, and report them to the
+user. A null `divergence` means the classification could not run, which is
+treated exactly like `unlanded-work`. The `sync` and `divergence` field detail is
+in [references/claim-results.md](references/claim-results.md).
+
+On `status: pass`, act on the code: `ok` and `reused` both mean this session
+holds the named claim. For a bare selection, `none-available` is a normal
+whole-skill stop with nothing to claim, and selection is not re-run to look
+again. For a `-Plan`-targeted invocation it is the same whole-skill stop,
+reported to the user: the requested Plan is ineligible and the manager never
+selects or claims a different candidate in that run. Any other status stops the
+skill without repair, reordering, or retry.
 
 ## Preparation and execution card
 
@@ -90,14 +90,16 @@ or modifies non-documentation behavior per Step 2's trigger in root
 `AGENTS.md` also gets one fresh `/plan-simplicity-review` reviewer on the same
 snapshot, parallel to `/plan-audit` where that runs. Tier 3 follows
 `/external-grill-plan`, whose authoritative workflow reference owns its
-iterative preparation. Missing a
-mandatory reviewer blocks.
+iterative preparation. Missing a mandatory reviewer blocks.
 
 Invoke the claim script idempotently immediately before the final preparation
-handoff; the preparation worker must never run that mutation-capable claim
-script. Every delegation uses the single task brief in
-`../../references/subagent-reporting.md` and states that Plan and card statements are
-hypotheses: return contradictions to main.
+handoff; skip that re-invocation on the straight-through path below, where
+preparation continues into implementation, so the tree already carries the
+implementation edit by that handoff and a claim run refuses a dirty tree — the
+selection claim still holds. The preparation worker must never run that
+mutation-capable claim script. Every delegation uses the single task brief in
+`../../references/subagent-reporting.md` and states that Plan and card
+statements are hypotheses: return contradictions to main.
 
 ## Implementation approval
 
@@ -135,30 +137,24 @@ Before landing-commit creation, an `implementer` runs
 with no arguments for completion or appends `-Reject` only after explicit
 user-authorized rejection. Success removes only direct-child dependency edges,
 deletes the selected Plan in the worktree, reports the changed paths the landing
-commit must contain as `changes.items[].path` (counted by `changes.totalCount`,
-with `changes.truncated` flagging more paths than the listed items), and returns
-`nextAction: finalize-changes`. The claim stays held until landing succeeds.
+commit must contain and returns `nextAction: finalize-changes`; the result-field
+shapes are in [references/claim-results.md](references/claim-results.md). The
+claim stays held until landing succeeds.
 
 Deferral uses
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Defer-NextPlan.ps1`
 and only an ordinary live claim. After final preparation has run, deferral
 requires an explicit user instruction given in the current session, recorded in
-the handoff; nothing else unlocks it.
+the handoff; nothing else unlocks it. Deferral never touches the worktree, so
+uncommitted implementation work stays exactly as it is.
 
-Deferral never touches the worktree, so uncommitted implementation work stays
-exactly as it is; the deferral result reports those paths as `retained`
-(a bounded `paths` list with the full `count`). Any dirty session worktree
-otherwise blocks a claim with `claim.worktree-dirty`, naming the dirty paths and
-leaving the tree and the scheduler untouched. Resuming retained work needs an
-explicit user resume instruction given in the current session, recorded in the
-handoff, and then the targeted claim with `-ResumeRetained` appended:
+Resuming retained work needs an explicit user resume instruction given in the
+current session, recorded in the handoff, and then the targeted claim with
+`-ResumeRetained` appended:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md' -ResumeRetained`
-That switch is valid only with `-Plan`, never stages, stashes, or reverts
-anything, leaves every retained file byte-identical, and reports those paths as
-`retained` on the pass result. It still blocks with `claim.worktree-dirty` when
-a dirty path is under `Documents/Plans/`, because selection reads that scheduler
-input from this tree, or when the fast-forward to the primary tip would touch a
-retained path.
+That switch is valid only with `-Plan` and changes no file; its retained-path
+guarantees and the `claim.worktree-dirty` cases that still block are in
+[references/claim-results.md](references/claim-results.md).
 
 `/finalize-changes` deletes the claim after primary advances. Run
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Test-NextPlanWorkflowScripts.ps1 -Executable '<worktree-cli-path>'`
@@ -166,11 +162,7 @@ only when `Complete-NextPlan.ps1`, `Defer-NextPlan.ps1`, `Get-NextPlanList.ps1`,
 `Invoke-NextPlanClaim.ps1`, `NextPlanWorkflowCommon.psm1`, or
 `Test-NextPlanWorkflowScripts.ps1` itself changes; substitute the provisioned
 `WorktreeCli` path that `Get-NextPlanContext` returns for `<worktree-cli-path>`
-and never pass the placeholder literally. That function is exported by
-`.agents/skills/next-plan/scripts/NextPlanWorkflowCommon.psm1`; import it from
-the session worktree root the same way
-`../../references/subagent-reporting.md` imports its module, leading `./`
-included.
+and never pass the placeholder literally.
 
 ## Tooling friction follow-ups
 
@@ -188,45 +180,66 @@ above are themselves in scope: review once before running them, and again inside
 `/finalize-changes` once the landing commit is prepared and before the landing
 `/verify-changes` acceptance review is dispatched.
 
-For each distinct issue, an `implementer` routes it through
-`/create-follow-up-plans` as a tooling-friction proposal, supplying the observed
-symptom with its citation plus the provenance block: client (the session-branch
-`claude`/`codex` prefix), worktree/branch UUID, session branch, a
-profile-relative worktree locator with the user-profile prefix stripped, and, on
-Claude, the conversation session ID. Take the client, worktree/branch UUID,
-session branch, and worktree locator from the `Get-NextPlanContext` result
-already resolved in Preconditions and selection, or from
-`git branch --show-current` and `git rev-parse --show-toplevel`; those sources
-name the worktree only, so none of them yields the conversation session ID
-`/next-plan-review` needs to find a transcript. On Claude, main reads that
-conversation session ID from the `CLAUDE_CODE_SESSION_ID` environment variable
-in its own session shell when the friction is recorded — the value differs per
-conversation and resume, and a subagent shell reports that subagent's own ID —
-and passes it to the `implementer`. Codex sessions record no conversation
-session ID, because `/next-plan-review` discovers Codex transcripts by bounded
-commit window. When the friction was observed in a different session than the
-one recording it — the shape a `/next-plan-review`-driven follow-up takes — main
-supplies that observing session's identity fields in place of the current
-session's, including its landed commit or branch, labelled as the observing
-session's per the provenance block in `/create-follow-up-plans`, which owns how
-the recording session's own landing ref is stated. Never record a transcript
-file path or transcript text; reference the session by client, worktree/branch
-UUID, on Claude the conversation session ID, and, for an earlier observing
-session, its landed commit or branch only.
+Root [AGENTS.md](../../../AGENTS.md) Step 7 owns this routing timing split. In a
+`/next-plan` run, friction first observed before the Step 5 review dispatch is
+routed at that point, ahead of the dispatch; friction first observed at or after
+that dispatch is routed at the checkpoints above.
+
+For each distinct issue that Step 7's rule does not fix inside this session, an
+`implementer` routes it through `/create-follow-up-plans` as a tooling-friction
+proposal, supplying the observed symptom with its citation plus the provenance
+block, sourced per
+[references/follow-up-provenance.md](references/follow-up-provenance.md). On
+Claude, main reads the conversation session ID from `CLAUDE_CODE_SESSION_ID` in
+its own session shell — a subagent shell reports that subagent's own ID — and
+passes it to the `implementer`.
 
 On completion or rejection, a friction Plan authored at that second checkpoint
 joins the landing commit alongside the changed paths the claim-exit script
 reported in `changes.items[].path`: one further candidate commit for that Plan
 path and one further approval-preparation run carrying `-CommitMessageFile` so
 the rebuilt commit's message describes the enlarged content, both invoked
-exactly as `/finalize-changes` documents them and with no hand-run Git, then
-re-review of the affected regions and a re-run of the landing `/verify-changes`
-acceptance review on the new final diff. That rerun happens at most once per
-landing, so friction first observed during it never joins this landing commit: an
-`implementer` records it through `/create-follow-up-plans` and it lands at a
-later gate as its own content, exactly as the deferral case does. On deferral, or
-when the run ends without a claim, the friction Plan is itself the landed content
-and the landing gate applies to it.
+exactly as `/finalize-changes` documents them and with no hand-run Git. Root
+[AGENTS.md](../../../AGENTS.md) Step 8 owns what that join costs in re-review
+and `/verify-changes` runs. Friction first observed after that second
+checkpoint's friction review — including friction the join mechanics themselves
+produce — is recorded through `/create-follow-up-plans` by an `implementer` and
+lands at a later gate as its own content, exactly as the deferral case does. On
+deferral, or when the run ends without a claim, the friction Plan is itself the
+landed content and the landing gate applies to it.
+
+## Context-efficiency review
+
+Main also measures how much tool output and subagent handoff text entered its
+own context, at the same two checkpoints as the friction review above, in Claude
+sessions only. A Codex session skips this review and records `none (codex)`;
+Codex coverage of the same concern stays with `/next-plan-review`'s post-landing
+token-efficiency lens.
+
+Main reads `CLAUDE_CODE_SESSION_ID` in its own session shell, subject to the
+subagent-ID warning under Tooling friction follow-ups, and runs
+`pwsh -NoProfile -File .agents/skills/context-efficiency-review/scripts/Measure-SessionContext.ps1 -SessionId <id>`
+from the session worktree root. Run it at both checkpoints even when the first
+one passed, because the second also measures the finalization phase's output.
+
+The envelope's verdict decides what follows. On `pass`, main records `none` and
+dispatches no reviewer. On `needs-review`, main dispatches one fresh `reviewer`
+for `/context-efficiency-review` through `/codex-review`, with the envelope text,
+the checkpoint name, and the claimed Plan path or `no claim` in the scope file. A blocked or error exit
+records `blocked (<code>)` on the handoff line instead, and a
+`breachRowsTruncated: true` envelope records `blocked (breach-rows-truncated)`;
+both dispatch no reviewer and need no recovery machinery of their own, because
+each is itself tooling friction handled by the Tooling friction follow-ups
+review.
+
+For each accepted fixable-defect finding that Step 7's rule does not fix inside
+this session, an `implementer` routes it through `/create-follow-up-plans` as a
+tooling-friction proposal carrying the same provenance block
+([references/follow-up-provenance.md](references/follow-up-provenance.md)), and
+a Plan authored at the second checkpoint joins the landing commit exactly as the
+friction section above documents. An
+`active-change-blocker` finding never becomes a follow-up Plan: it returns to the
+current change as a blocker.
 
 ## Preparation handoff
 
@@ -236,6 +249,7 @@ Classification: Tier 1 | Tier 2 | Tier 3 and trigger
 Approval pause: skipped (proven Tier-1) | required
 Residuals: <blocker or none>
 Friction follow-ups: <Plan path(s) or none>
+Context-efficiency follow-ups: <Plan path(s) or none | none (codex) | blocked (<code>)>
 
 Execution card:
 ### What does this plan do?

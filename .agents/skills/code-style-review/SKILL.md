@@ -47,7 +47,8 @@ applicable rule, not only grep-friendly examples below.
    template, float, null, and override rules (15, 19, 27-29); container access
    and types (16, 21, 32); namespace and member access rules (41, 49); pointer
    conditions, argument layout, initializers, preprocessor form, braces, and
-   early-return guards (50-52, 58, 61, 62).
+   early-return guards (50-52, 58, 61, 62); comments describing the present
+   code rather than change history (64).
 2. Auto-fix only when the resulting C++ meaning is demonstrably unchanged.
    Examples include whitespace, argument layout, an exact deduced type replacing
    disallowed `auto`, and `NULL` replaced where it is a null pointer constant.
@@ -103,6 +104,12 @@ all code references can be propagated. For every rename:
   implementing caller; the constraint comment stays until that enforcement
   exists. A constraint that legitimately lives only as a comment, such as a
   platform or driver quirk code cannot check, is preserved with nothing routed.
+  Flag text that describes change history rather than the present code
+  (Rule 64). When the surviving present-tense constraint is evident from the
+  comment and the surrounding code, rewrite the comment to state that
+  constraint; the reader's meaning is unchanged, so this stays inside the
+  auto-fix boundary above. When it is not evident, route the comment as a
+  finding rather than guessing at it.
 
 The scanner is `pwsh -NoProfile -File
 .agents/scripts/Find-SessionDebugResidue.ps1 -RepositoryRoot <absolute
@@ -120,6 +127,9 @@ than reconstructing these scans inline, and treat `truncated` `true` as hits the
 run did not list.
 
 ## Output
+
+Return the shared handoff form in `../../references/subagent-reporting.md`,
+extended with the style-review result block:
 
 ```markdown
 ## Style Review Results
@@ -140,8 +150,6 @@ Build required:
 ### Documentation Residuals
 - identifier — file:line — `/update-claude-docs` or caller
 
-Files changed:
-- path, or none
 Functions/regions touched:
 - function or region, or none
 Residuals:

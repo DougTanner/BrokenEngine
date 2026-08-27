@@ -16,9 +16,6 @@ static void SerializeBlasterTransfer(uint8_t*& pCursor, const game::TransferData
 	WriteVec4(pCursor, rData.vecVelocity);
 	WriteUint8(pCursor, rData.uiTypeIndex);
 	WriteUint32(pCursor, rData.alignment.uiValue);
-	WriteFloat(pCursor, rData.fWindTrailIntensity);
-	WriteFloat(pCursor, rData.fWindTrailWidth);
-	WriteFloat(pCursor, rData.fWindTrailLengthMultiplier);
 }
 
 static void SerializeSpaceshipTransfer(uint8_t*& pCursor, const game::TransferData& rData)
@@ -60,8 +57,6 @@ static void SerializePlayerTransfer(uint8_t*& pCursor, const game::TransferData&
 	WriteFloat(pCursor, rData.fShieldCooldown);
 	WriteFloat(pCursor, rData.fShieldDownSoundCooldown);
 	WriteFloat(pCursor, rData.fAnimationTime);
-	WriteFloat(pCursor, rData.fShieldRotation);
-	WriteFloat(pCursor, rData.fShieldShrink);
 	WriteUint16(pCursor, rData.uiPlayerFlags);
 	WriteFloat(pCursor, rData.fNavigationDelay);
 	WriteInt64(pCursor, rData.globalPlayerId.iValue);
@@ -77,9 +72,6 @@ static void DeserializeBlasterTransfer(const uint8_t*& pCursor, game::TransferDa
 	rData.vecVelocity = ReadVec4(pCursor);
 	rData.uiTypeIndex = ReadUint8(pCursor);
 	rData.alignment = alignment_t(ReadUint32(pCursor));
-	rData.fWindTrailIntensity = ReadFloat(pCursor);
-	rData.fWindTrailWidth = ReadFloat(pCursor);
-	rData.fWindTrailLengthMultiplier = ReadFloat(pCursor);
 }
 
 static void DeserializeSpaceshipTransfer(const uint8_t*& pCursor, game::TransferData& rData)
@@ -121,8 +113,6 @@ static void DeserializePlayerTransfer(const uint8_t*& pCursor, game::TransferDat
 	rData.fShieldCooldown = ReadFloat(pCursor);
 	rData.fShieldDownSoundCooldown = ReadFloat(pCursor);
 	rData.fAnimationTime = ReadFloat(pCursor);
-	rData.fShieldRotation = ReadFloat(pCursor);
-	rData.fShieldShrink = ReadFloat(pCursor);
 	rData.uiPlayerFlags = ReadUint16(pCursor);
 	rData.fNavigationDelay = ReadFloat(pCursor);
 	rData.globalPlayerId.iValue = ReadInt64(pCursor);
@@ -150,10 +140,10 @@ static int64_t StatusChangeItemWireSize(game::StatusChangeType eType)
 	{
 		case game::StatusChangeType::kSpawnPlayer:       return kiI64 + kiU8 + kiCoord + kiU8 + 2 * kiF32;
 		case game::StatusChangeType::kRespawnPlayer:     return 0;
-		case game::StatusChangeType::kTransferBlaster:   return 2 * kiVec4 + kiU8 + kiU32 + 3 * kiF32;
+		case game::StatusChangeType::kTransferBlaster:   return 2 * kiVec4 + kiU8 + kiU32;
 		case game::StatusChangeType::kTransferSpaceship: return 3 * kiVec4 + kiU32 + 3 * kiF32;
 		case game::StatusChangeType::kTransferMissile:   return 3 * kiVec4 + kiU32 + 7 * kiF32;
-		case game::StatusChangeType::kTransferPlayer:    return 3 * kiVec4 + kiU32 + 10 * kiF32 + kiU16 + kiI64 + kiCoord + 2 * kiU8;
+		case game::StatusChangeType::kTransferPlayer:    return 3 * kiVec4 + kiU32 + 8 * kiF32 + kiU16 + kiI64 + kiCoord + 2 * kiU8;
 		case game::StatusChangeType::kDestroyPlayer:     return kiI64;
 		case game::StatusChangeType::kUpdatePlayer:      return kiI64 + kiU8 + kiF32 + kiU8;
 		case game::StatusChangeType::kUpdateFleet:       return kiI64 + kiU8 + kiCoord + kiU8;

@@ -134,20 +134,22 @@ function Invoke-PromptScript([string[]] $Arguments) {
 $script:BinaryMarker = 'BINARY-PAYLOAD-MARKER'
 $script:ScopeText = "Files and regions: Engine/Source/Keep.cpp lines 1-5.`nFocus: the changed bytes only.`nResiduals: none.`n"
 # A verbatim instance of the summary block .agents/skills/progressive-disclosure-review/SKILL.md
-# documents, so the gate is exercised against the bytes a real handoff carries.
-$script:DisclosureHandoff = @(
-	'Skill: progressive-disclosure-review'
-	'Baseline: 3c7f1b9a2d4e6f8017253649a8b0c2d4e6f80917'
-	'Files checked: 1 (.agents/references/shared.md)'
-	'Findings: none'
-	'Status: PASS'
-	'Changed files: none'
-	'Decisive checks: pwsh -NoProfile -File .agents/scripts/Measure-Tokens.ps1 -Path .agents/references/shared.md = 118 bt-token-v1'
-	'Build required: none'
-	'Executor: gpt-5.6-sol medium'
-	'Residuals: none'
-) -join "`n"
-$script:DisclosureHandoff += "`n"
+# documents, so the gate is exercised against the bytes a real handoff carries. The baseline and the
+# status are per-case, because the gate binds the handoff to the reviewed diff and to a PASS verdict.
+function New-DisclosureHandoff([string] $Baseline, [string] $Status = 'PASS') {
+	return (@(
+		'Skill: progressive-disclosure-review'
+		"Baseline: $Baseline"
+		'Files checked: 1 (.agents/references/shared.md)'
+		'Findings: none'
+		"Status: $Status"
+		'Changed files: none'
+		'Decisive checks: pwsh -NoProfile -File .agents/scripts/Measure-Tokens.ps1 -Path .agents/references/shared.md = 118 bt-token-v1'
+		'Build required: none'
+		'Executor: gpt-5.6-sol medium'
+		'Residuals: none'
+	) -join "`n") + "`n"
+}
 
 # One compact build envelope line, the shape `WorktreeCli build` emits, whose own target names the
 # game project. Only the fixtures whose reviewed diff carries C++ append it, so a docs-only diff keeps
@@ -444,7 +446,7 @@ function Test-VerifyChangesTypedArtifacts() {
 
 	# The same game build envelope with the /validate-skill artifact present and no plan validate receipt,
 	# so a touched Plan assembles on the identity values alone and the game build demands nothing further.
-	$artifactText = $missingText + "Skill validation: Validation: PASS`n" + $script:DisclosureHandoff
+	$artifactText = $missingText + "Skill validation: Validation: PASS`n" + (New-DisclosureHandoff $baseline)
 	$presentPath = New-ScratchPath 'artifacts'
 	$present = Invoke-PromptScript @(
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
@@ -459,7 +461,7 @@ function Test-VerifyChangesTypedArtifacts() {
 	}
 
 	# The same complete artifacts bound to a revision that is not the reviewed one.
-	$mismatchText = $script:ScopeText + "Baseline: $('0' * 40)`nHead: $('1' * 40)`nSkill validation: Validation: PASS`n" + $script:DisclosureHandoff
+	$mismatchText = $script:ScopeText + "Baseline: $('0' * 40)`nHead: $('1' * 40)`nSkill validation: Validation: PASS`n" + (New-DisclosureHandoff ('0' * 40))
 	$mismatchPath = New-ScratchPath 'artifactidentity'
 	$mismatch = Invoke-PromptScript @(
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
@@ -525,12 +527,43 @@ function Test-InstructionDocCase([string] $Name, [bool] $Gated, [scriptblock] $C
 	if ($null -ne $pathOnly.Json) { Assert-Equal 'prompt.typed-artifacts-required' $pathOnly.Json.code "$Name with the skill path but neither handoff marker code" }
 	else { Assert-True $false "$Name with the skill path but neither handoff marker emitted JSON" }
 	# One marker of the conjunctive gate: the handoff body without its 'Skill:' identifying line.
-	$partial = Invoke-InstructionDocPrompt $fixture "$Name-partial" ($scopeText + ($script:DisclosureHandoff -replace '(?m)^Skill: progressive-disclosure-review\r?\n', ''))
+	$partial = Invoke-InstructionDocPrompt $fixture "$Name-partial" ($scopeText + ((New-DisclosureHandoff $fixture.Baseline) -replace '(?m)^Skill: progressive-disclosure-review\r?\n', ''))
 	Assert-Equal 2 $partial.ExitCode "$Name with 'Files checked:' but no 'Skill:' line exit code"
 	if ($null -ne $partial.Json) { Assert-Equal 'prompt.typed-artifacts-required' $partial.Json.code "$Name with 'Files checked:' but no 'Skill:' line code" }
 	else { Assert-True $false "$Name with 'Files checked:' but no 'Skill:' line emitted JSON" }
-	$complete = Invoke-InstructionDocPrompt $fixture "$Name-complete" ($scopeText + $script:DisclosureHandoff)
+	$complete = Invoke-InstructionDocPrompt $fixture "$Name-complete" ($scopeText + (New-DisclosureHandoff $fixture.Baseline))
 	Assert-Equal 0 $complete.ExitCode "$Name with the complete /progressive-disclosure-review handoff exit code"
+}
+
+function Test-DisclosureHandoffFreshness() {
+	# One instruction-doc diff decides all three cases, so only the handoff's own status and baseline vary.
+	$fixture = New-InstructionDocFixture 'disclosurefreshness' { param($Root) Set-FixtureText $Root '.agents/references/shared.md' "landed shared reference`n" }
+	$scopeText = New-VerifyScopeText $fixture.Baseline $fixture.Head
+
+	$unresolved = Invoke-InstructionDocPrompt $fixture 'disclosureneedsaction' ($scopeText + (New-DisclosureHandoff $fixture.Baseline 'NEEDS_ACTION'))
+	Assert-Equal 2 $unresolved.ExitCode 'NEEDS_ACTION /progressive-disclosure-review handoff exit code'
+	if ($null -ne $unresolved.Json) {
+		Assert-Equal 'blocked' $unresolved.Json.status 'NEEDS_ACTION /progressive-disclosure-review handoff status'
+		Assert-Equal 'prompt.typed-artifacts-required' $unresolved.Json.code 'NEEDS_ACTION /progressive-disclosure-review handoff code'
+		Assert-True ($unresolved.Json.message.Contains('Status: PASS')) 'NEEDS_ACTION handoff names the missing PASS status'
+	}
+	else { Assert-True $false 'NEEDS_ACTION /progressive-disclosure-review handoff emitted JSON' }
+
+	# A PASS produced against some earlier diff: the scope still carries the reviewed identity values, so
+	# only the handoff's own 'Baseline:' line can decide this case.
+	$stale = Invoke-InstructionDocPrompt $fixture 'disclosurestale' ($scopeText + (New-DisclosureHandoff ('0' * 40)))
+	Assert-Equal 2 $stale.ExitCode 'stale-baseline /progressive-disclosure-review handoff exit code'
+	if ($null -ne $stale.Json) {
+		Assert-Equal 'blocked' $stale.Json.status 'stale-baseline /progressive-disclosure-review handoff status'
+		Assert-Equal 'prompt.typed-artifacts-required' $stale.Json.code 'stale-baseline /progressive-disclosure-review handoff code'
+		Assert-True ($stale.Json.message.Contains("handoff's own 'Baseline:' line")) 'stale-baseline handoff names the unbound handoff baseline'
+	}
+	else { Assert-True $false 'stale-baseline /progressive-disclosure-review handoff emitted JSON' }
+
+	$fresh = Invoke-InstructionDocPrompt $fixture 'disclosurefresh' ($scopeText + (New-DisclosureHandoff $fixture.Baseline))
+	Assert-Equal 0 $fresh.ExitCode 'PASS handoff bound to the dispatch baseline exit code'
+	if ($null -ne $fresh.Json) { Assert-Equal 'pass' $fresh.Json.status 'PASS handoff bound to the dispatch baseline status' }
+	else { Assert-True $false 'PASS handoff bound to the dispatch baseline emitted JSON' }
 }
 
 function Test-VerifyChangesInstructionDocs() {
@@ -1005,6 +1038,7 @@ try {
 	Test-PlanAuditExecutionCard $repositoryA
 	Test-VerifyChangesTypedArtifacts
 	Test-VerifyChangesInstructionDocs
+	Test-DisclosureHandoffFreshness
 	Test-VerifyChangesBuildEnvelope
 	Test-HeadHonoured
 	Test-ZeroTargets

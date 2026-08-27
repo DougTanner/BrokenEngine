@@ -123,6 +123,7 @@ struct MemoryInitializer
 
 		int64_t iPeakCommittedMb = stats.committed.peak / (1024 * 1024);
 
+		// May log during static destruction: Log.cpp initializes via init_seg(lib), so it is destroyed after this default-phase object.
 		LOG(kDefault, kInfo, "Mimalloc peak heap usage: {} MiB, peak committed: {} MiB (arena reserve: {} MiB)", stats.page_committed.peak / (1024 * 1024), iPeakCommittedMb, kiMimallocArenaReserveMb);
 
 		if (iPeakCommittedMb > kiMimallocArenaReserveMb)

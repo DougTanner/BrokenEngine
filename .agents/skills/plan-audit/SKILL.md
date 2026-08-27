@@ -23,11 +23,10 @@ provides. The audit is findings-only work and never creates an approval gate; a
 implementation-approval contract (`../next-plan/SKILL.md`, "Implementation
 approval").
 
-## Inputs and Snapshot
+## Inputs
 
 - Immutable complete plan supplied inline, by exact file path, or as the exact
-  claimed-plan revision. Inline plans require a stable snapshot identifier and
-  stable heading IDs so findings can cite `<snapshot>#<heading-id>`.
+  claimed-plan revision.
 - Draft execution card for every Tier-2 and Tier-3 plan: proposed
   tier and triggers, roles, and each acceptance criterion with its decisive
   check, expected result, and independent signal when a check is duplicated.
@@ -127,12 +126,11 @@ clean pass, proceeds to `/external-grill-plan`; Tier 2 returns to the manager.
 
 For each finding:
 
-> `PA-F-###` — `plan-path:line` or `snapshot#heading-id` — category — concrete problem — evidence: `repository-path:line` — proposed improvement
+> `PA-F-###` — `plan-path:line` (for an inline plan, the line in the supplied plan text) — category — concrete problem — evidence: `repository-path:line` — proposed improvement
 
 If clean, state `PASS — no meaningful plan flaws found.` Return:
 
 ```text
-Plan snapshot: <immutable identifier>
 Findings: <entries or none>
 API Verification Requests: <single checkable requests or none>
 Traceability checked: <requirements/invariants <-> implementation sites/checks>
