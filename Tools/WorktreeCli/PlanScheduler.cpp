@@ -993,7 +993,7 @@ namespace toolcli
 			}
 			const std::filesystem::path targetDiskPath = worktree / target;
 			std::error_code targetError;
-			const bool bTargetPresent = std::filesystem::exists(targetDiskPath, targetError);
+			const bool bTargetPresent = std::filesystem::exists(ExtendedLengthPath(targetDiskPath), targetError);
 			if (targetError)
 			{
 				return Failure("target-read-failed");

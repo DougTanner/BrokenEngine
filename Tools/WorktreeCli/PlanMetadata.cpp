@@ -135,7 +135,7 @@ namespace toolcli
 			if (!ReadBytes(rPlan.diskPath, rPlan.bytes))
 			{
 				std::error_code error;
-				rPlan.diagnostic = !std::filesystem::exists(rPlan.diskPath, error) && !error ? "missing" : "could not read plan bytes";
+				rPlan.diagnostic = !std::filesystem::exists(ExtendedLengthPath(rPlan.diskPath), error) && !error ? "missing" : "could not read plan bytes";
 				return false;
 			}
 			return ParsePlanBytes(rPlan);
