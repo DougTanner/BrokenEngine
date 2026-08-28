@@ -134,12 +134,12 @@ namespace toolcli
 		bool IsPathBelow(const std::filesystem::path& rChild, const std::filesystem::path& rParent)
 		{
 			std::error_code error;
-			const std::filesystem::path child = std::filesystem::weakly_canonical(rChild, error);
+			const std::filesystem::path child = std::filesystem::weakly_canonical(ExtendedLengthPath(rChild), error);
 			if (error)
 			{
 				return false;
 			}
-			const std::filesystem::path parent = std::filesystem::weakly_canonical(rParent, error);
+			const std::filesystem::path parent = std::filesystem::weakly_canonical(ExtendedLengthPath(rParent), error);
 			if (error)
 			{
 				return false;
