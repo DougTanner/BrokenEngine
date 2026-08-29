@@ -27,7 +27,7 @@ Scene export is two-phase. A versioned `.PreExport` marker governs generation of
 
 Scene texture pre-export deduplicates workers by source and output format. Each worker writes a private, untagged stage; all workers must finish before any final intermediate is published. Keep cleanup ownership separate for stages from this attempt and final paths published by it, because a failure during encoding or publication must not classify one kind of path as the other.
 
-When multiple mesh nodes reuse one glTF material, preserve distinct material entries while retaining the source material index used for texture lookup.
+When multiple mesh nodes reuse one glTF material, or primitives under one material differ in deformation mode (skinned versus not), preserve distinct material entries while retaining the source material index used for texture lookup, so no draw mixes deformation modes.
 
 ## Cubemap Pre-pass
 

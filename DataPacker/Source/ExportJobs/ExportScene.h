@@ -23,7 +23,7 @@ public:
 	// Payload-struct sizes fold in so size-changing layout edits auto-dirty cached chunks and the .PreExport marker; same-size reorders need the raw version bumped
 	virtual int64_t GetVersion() const override
 	{
-		return Version(57
+		return Version(58
 			+ sizeof(common::MaterialShaderData)
 			+ sizeof(common::AnimationHeader)
 			+ sizeof(common::Skeleton)

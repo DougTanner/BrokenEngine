@@ -2,14 +2,16 @@
 
 namespace tinygltf { class Model; class Node; struct Material; }
 
-// Hash function for std::pair<int, int> to use with std::unordered_map
-struct PairHash
+// Hash function for the (originalMaterial, nodeIndex, hasSkinning) effective-material key
+struct MaterialNodeKeyHash
 {
-	size_t operator()(const std::pair<int, int>& rPair) const
+	size_t operator()(const std::tuple<int, int, bool>& rKey) const
 	{
-		return std::hash<int>()(rPair.first) ^ (std::hash<int>()(rPair.second) << 1);
+		return std::hash<int>()(std::get<0>(rKey)) ^ (std::hash<int>()(std::get<1>(rKey)) << 1) ^ (std::get<2>(rKey) ? 0x9e3779b9u : 0u);
 	}
 };
+
+using MaterialNodeMap = std::unordered_map<std::tuple<int, int, bool>, int, MaterialNodeKeyHash>;
 
 struct Material
 {
@@ -26,7 +28,7 @@ struct Parent
 // Tracks per-material skinning metadata during export
 struct MaterialNodeInfo
 {
-	bool bHasSkinning = false;  // True if any primitive has JOINTS_0 attribute
+	bool bHasSkinning = false;  // Deformation mode of every primitive routed to this material
 	int iNodeIndex = -1;        // Node index of the mesh contributing to this material
 	XMMATRIX matMeshWorld = XMMatrixIdentity();  // World transform of mesh at bind pose (accumulated matLocal)
 	int iOriginalMaterialIndex = -1;  // Original glTF material index (for split materials)
@@ -35,13 +37,14 @@ struct MaterialNodeInfo
 XMMATRIX ComputeNodeWorldTransform(int iNodeIndex, const tinygltf::Model& rModel, const std::unordered_map<int, int>& rNodeParentMap);
 
 // Per-scene state threaded through every recursive LoadVertices call.
-// rMaterialNodeMap: tracks (originalMaterial, nodeIndex) -> effectiveMaterialIndex for handling primitives from different mesh nodes that share a material
+// rMaterialNodeMap: tracks (originalMaterial, nodeIndex, hasSkinning) -> effectiveMaterialIndex for handling primitives that share a material but come from
+// different mesh nodes; the deformation bit is part of the identity because one draw must not mix deformation modes
 struct LoadVerticesContext
 {
 	std::vector<common::ModelVertex>& rVertices;
 	std::vector<Material>& rMaterials;
 	std::vector<MaterialNodeInfo>& rMaterialNodeInfos;
-	std::unordered_map<std::pair<int, int>, int, PairHash>& rMaterialNodeMap;
+	MaterialNodeMap& rMaterialNodeMap;
 	bool bHasSkeleton;
 };
 

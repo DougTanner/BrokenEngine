@@ -563,7 +563,7 @@ bool ExportScene::SetupSkeletonAndMaterials(tinygltf::Model& rGltfModel)
 void ExportScene::LoadVerticesAndOptimizeMeshes(tinygltf::Model& rGltfModel, bool bHasSkeleton, std::vector<Material>& rMaterials, std::vector<MaterialNodeInfo>& rMaterialNodeInfos, std::vector<common::ModelVertex>& rVertices)
 {
 	const tinygltf::Scene& rScene = rGltfModel.scenes.at(rGltfModel.defaultScene > -1 ? rGltfModel.defaultScene : 0);
-	std::unordered_map<std::pair<int, int>, int, PairHash> materialNodeMap;
+	MaterialNodeMap materialNodeMap;
 	LoadVerticesContext loadContext {.rVertices = rVertices, .rMaterials = rMaterials, .rMaterialNodeInfos = rMaterialNodeInfos, .rMaterialNodeMap = materialNodeMap, .bHasSkeleton = bHasSkeleton};
 	for (size_t i = 0; i < rScene.nodes.size(); ++i)
 	{
@@ -574,7 +574,7 @@ void ExportScene::LoadVerticesAndOptimizeMeshes(tinygltf::Model& rGltfModel, boo
 	}
 	if (rMaterials.size() > rGltfModel.materials.size())
 	{
-		LOG(kDefault, kDebug, "  Split {} materials into {} to handle primitives from different mesh nodes", rGltfModel.materials.size(), rMaterials.size());
+		LOG(kDefault, kDebug, "  Split {} materials into {} to handle primitives from different mesh nodes or deformation modes", rGltfModel.materials.size(), rMaterials.size());
 	}
 
 	// Optimize triangle order per material for GPU vertex cache and overdraw

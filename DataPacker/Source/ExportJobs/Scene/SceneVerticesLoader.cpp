@@ -58,21 +58,22 @@ XMMATRIX NodeLocalMatrix(const tinygltf::Node& rNode)
 	return XMMatrixIdentity();
 }
 
-// Resolves the effective material index for a primitive's (originalMaterial, nodeIndex) pair. Primitives
-// from different mesh nodes that share a glTF material need separate entries so each carries its own mesh
-// world transform at runtime; this caches the mapping in rContext and mints split materials as needed.
+// Resolves the effective material index for a primitive's (originalMaterial, nodeIndex, hasSkinning) key. Primitives
+// sharing a glTF material need separate entries when they come from different mesh nodes, so each carries its own mesh
+// world transform at runtime, or when they deform differently, so no draw mixes skinned and non-skinned vertices; this
+// caches the mapping in rContext and mints split materials as needed.
 int ResolveEffectiveMaterial(LoadVerticesContext& rContext, int iOriginalMaterial, int iCurrentNodeIndex, bool bHasSkinning, const XMMATRIX& rMatMeshWorld)
 {
 	std::vector<Material>& rMaterials = rContext.rMaterials;
 	std::vector<MaterialNodeInfo>& rMaterialNodeInfos = rContext.rMaterialNodeInfos;
-	std::unordered_map<std::pair<int, int>, int, PairHash>& rMaterialNodeMap = rContext.rMaterialNodeMap;
+	MaterialNodeMap& rMaterialNodeMap = rContext.rMaterialNodeMap;
 
-	std::pair<int, int> key = std::make_pair(iOriginalMaterial, iCurrentNodeIndex);
+	std::tuple<int, int, bool> key = std::make_tuple(iOriginalMaterial, iCurrentNodeIndex, bHasSkinning);
 	auto it = rMaterialNodeMap.find(key);
 
 	if (it != rMaterialNodeMap.end())
 	{
-		// Already have a material entry for this (originalMaterial, nodeIndex) combination
+		// Already have a material entry for this (originalMaterial, nodeIndex, hasSkinning) combination
 		return it->second;
 	}
 
@@ -80,20 +81,14 @@ int ResolveEffectiveMaterial(LoadVerticesContext& rContext, int iOriginalMateria
 	{
 		// Original material not yet used - use it directly
 		rMaterialNodeMap.insert_or_assign(key, iOriginalMaterial);
+		rMaterialNodeInfos.at(iOriginalMaterial).bHasSkinning = bHasSkinning;
 		rMaterialNodeInfos.at(iOriginalMaterial).iNodeIndex = iCurrentNodeIndex;
 		rMaterialNodeInfos.at(iOriginalMaterial).matMeshWorld = rMatMeshWorld;
 		rMaterialNodeInfos.at(iOriginalMaterial).iOriginalMaterialIndex = iOriginalMaterial;
 		return iOriginalMaterial;
 	}
 
-	if (rMaterialNodeInfos.at(iOriginalMaterial).iNodeIndex == iCurrentNodeIndex)
-	{
-		// Original material already used by this same node - use it
-		rMaterialNodeMap.insert_or_assign(key, iOriginalMaterial);
-		return iOriginalMaterial;
-	}
-
-	// Original material used by a different node - create a new split material
+	// Original material claimed by another node or deformation mode - create a new split material
 	int iEffectiveMaterial = static_cast<int>(rMaterials.size());
 	rMaterialNodeMap.insert_or_assign(key, iEffectiveMaterial);
 	rMaterials.emplace_back();
@@ -290,7 +285,6 @@ void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& 
 {
 	std::vector<common::ModelVertex>& rVertices = rContext.rVertices;
 	std::vector<Material>& rMaterials = rContext.rMaterials;
-	std::vector<MaterialNodeInfo>& rMaterialNodeInfos = rContext.rMaterialNodeInfos;
 
 	XMMATRIX matNode = NodeLocalMatrix(rNode);
 
@@ -337,12 +331,6 @@ void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& 
 
 		int iEffectiveMaterial = ResolveEffectiveMaterial(rContext, iOriginalMaterial, iCurrentNodeIndex, bHasSkinning, matMeshWorld);
 		Material& rMaterial = rMaterials.at(iEffectiveMaterial);
-		MaterialNodeInfo& rMaterialNodeInfo = rMaterialNodeInfos.at(iEffectiveMaterial);
-
-		if (bHasSkinning)
-		{
-			rMaterialNodeInfo.bHasSkinning = true;
-		}
 
 		std::vector<uint32_t> indexRemap;
 		BuildVertices(rVertices, indexRemap, rPrimitive, rModel, bHasSkinning, rContext.bHasSkeleton, matMeshWorld);
