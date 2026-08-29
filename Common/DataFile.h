@@ -298,7 +298,8 @@ struct IslandHeader
 	// [float2 positions[iMeshVertexCount]][uint32 indices[iMeshIndexCount]][float2 valid-area hull verts[iValidAreaVertexCount]].
 	// Mesh Z is omitted — Terrain.vert re-derives world Z from the composite elevation sampler. The
 	// valid-area hull is the CCW convex hull (island-local meters, centered) of pixels at or above
-	// kfUnderwaterMaskThresholdMeters; consumed client-only by debug render.
+	// kfUnderwaterMaskThresholdMeters; consumed by IslandChainPlacement's SAT overlap test on client
+	// and server, and by client-only debug render.
 	int32_t iMeshVertexCount = 0;
 	int32_t iMeshIndexCount = 0;
 	int32_t iValidAreaVertexCount = 0;
