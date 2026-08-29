@@ -115,13 +115,33 @@ exit $LASTEXITCODE
 function Stop-JsonScript($Started) {
 	try {
 		if (-not $Started.Process.WaitForExit(0)) {
+			# Kill($true) terminates descendants but neither it nor WaitForExit reports their status, so the
+			# descendants are snapshotted before the kill and waited on after it under the one reap deadline.
+			# A git.exe still tearing down holds index.lock open, and deleting it before that completes leaves
+			# the lock stranded for the rest of the suite with no live holder to release it.
+			# A recorded ParentProcessId outlives its parent and Windows recycles the pid, so a candidate older
+			# than the parent it names is an unrelated survivor this kill never touched, and waiting on one would
+			# time out the reap. Only a candidate created at or after its claimed parent's row is a descendant.
+			$deadline = [Diagnostics.Stopwatch]::StartNew()
+			$snapshot = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate -ErrorAction Stop)
+			$byId = @{}
+			foreach ($row in $snapshot) { $byId[[int]$row.ProcessId] = $row }
+			$descendants = @()
+			$frontier = @($Started.Process.Id)
+			while ($frontier.Count -gt 0) {
+				$frontier = @($snapshot | Where-Object { $frontier -contains [int]$_.ParentProcessId -and $descendants -notcontains [int]$_.ProcessId -and $null -ne $_.CreationDate -and $null -ne $byId[[int]$_.ParentProcessId] -and $null -ne $byId[[int]$_.ParentProcessId].CreationDate -and $_.CreationDate -ge $byId[[int]$_.ParentProcessId].CreationDate } | ForEach-Object { [int]$_.ProcessId })
+				$descendants += $frontier
+			}
 			try { $Started.Process.Kill($true) } catch {
 				if (-not $Started.Process.HasExited) { try { $Started.Process.Kill() } catch { } }
 			}
-			if (-not $Started.Process.WaitForExit(5000)) { throw "Timed out reaping JSON script process $($Started.Process.Id)." }
-			# A killed child can die inside 'git status' on the scratch primary or its linked session worktree, leaving an
-			# index.lock with no live holder. Nothing would ever release it, so every later scratch git command would fail.
-			Remove-Item -Force -ErrorAction SilentlyContinue -Path (Join-Path $primary '.git\index.lock'), (Join-Path $primary '.git\worktrees\*\index.lock')
+			foreach ($process in @($Started.Process) + @($descendants | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })) {
+				$remaining = [Math]::Max(0, 5000 - [int]$deadline.ElapsedMilliseconds)
+				if (-not $process.WaitForExit($remaining)) { throw "Timed out reaping process $($process.Id) of JSON script process $($Started.Process.Id)." }
+			}
+			foreach ($lock in @(Get-ChildItem -Force -ErrorAction SilentlyContinue -Path (Join-Path $primary '.git\index.lock'), (Join-Path $primary '.git\worktrees\*\index.lock'))) {
+				Remove-Item -LiteralPath $lock.FullName -Force -ErrorAction Stop
+			}
 		}
 		$Started.StdoutTask.GetAwaiter().GetResult() | Out-Null
 		$Started.StderrTask.GetAwaiter().GetResult() | Out-Null
