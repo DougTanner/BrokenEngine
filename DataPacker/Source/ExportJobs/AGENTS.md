@@ -23,7 +23,7 @@ Texture encoding and chunk routing are described in `Texture/AGENTS.md`. Island/
 
 ## Scene and Model
 
-Scene export is two-phase. A versioned `.PreExport` marker governs generation of model and block-compressed texture intermediates; the main phase writes scene metadata and optional animation data. Pre-export also removes orphaned scene texture intermediates so recursive texture discovery cannot ship stale assets. Generated assets are referenced by relative-path CRC.
+Scene export is two-phase. A versioned `.PreExport` marker governs generation of model and block-compressed texture intermediates; the main phase writes scene metadata and optional animation data. Pre-export also removes orphaned scene texture intermediates so recursive texture discovery cannot ship stale assets. Generated assets are referenced by relative-path CRC. A scene's dirty check covers the `.gltf` plus every external file it references, so editing a referenced texture or buffer re-runs pre-export; a reference the scene names but disk does not have keeps the scene dirty, leaving that failure to the per-asset export rather than aborting the whole run.
 
 Scene texture pre-export deduplicates workers by source and output format. Each worker writes a private, untagged stage; all workers must finish before any final intermediate is published. Keep cleanup ownership separate for stages from this attempt and final paths published by it, because a failure during encoding or publication must not classify one kind of path as the other.
 

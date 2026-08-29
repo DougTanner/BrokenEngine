@@ -40,6 +40,7 @@ public:
 
 protected:
 
+	virtual std::string GetInputFingerprint() const override;
 	virtual void Export() override;
 
 private:

@@ -1,5 +1,6 @@
 #include "ExportScene.h"
 
+#include "FileManager.h"
 #include "Scene/SceneAnimationLoader.h"
 #include "Scene/SceneSkeletonLoader.h"
 #include "SourceReadValidation.h"
@@ -158,7 +159,74 @@ bool HasSurvivingAnimationClip(const tinygltf::Model& rGltfModel)
 	return !animations.empty();
 }
 
+// Collects the glTF's external file references (images[].uri and buffers[].uri) by reading the JSON directly:
+// going through tinygltf would re-read every .bin and stb-decode every texture on each dirty check. Reading
+// "uri" is exact, because tinygltf only treats it as an external file here too - bufferView-backed and
+// data-URI images leave the loaded image's uri empty.
+std::vector<std::string> ReadExternalUris(const std::filesystem::path& rGltfPath)
+{
+	std::vector<std::string> uris;
+
+	std::fstream fileStreamIn(rGltfPath, std::ios::in | std::ios::binary);
+	// Non-throwing parse: CheckDirty runs outside the per-asset try/catch, so a throw here would abort the
+	// whole run instead of failing one asset. An unreadable or malformed .gltf contributes no dependencies
+	// and still fails per-asset later through Export().
+	nlohmann::json gltfJson = nlohmann::json::parse(fileStreamIn, nullptr, false);
+	if (gltfJson.is_discarded())
+	{
+		return uris;
+	}
+
+	for (const char* pcArrayName : {"images", "buffers"})
+	{
+		auto arrayIterator = gltfJson.find(pcArrayName);
+		if (arrayIterator == gltfJson.end() || !arrayIterator->is_array())
+		{
+			continue;
+		}
+
+		for (const nlohmann::json& rElement : *arrayIterator)
+		{
+			if (!rElement.is_object())
+			{
+				continue;
+			}
+
+			auto uriIterator = rElement.find("uri");
+			if (uriIterator == rElement.end() || !uriIterator->is_string())
+			{
+				continue;
+			}
+
+			const std::string& rUri = uriIterator->get_ref<const std::string&>();
+			if (!rUri.empty() && !tinygltf::IsDataURI(rUri))
+			{
+				uris.push_back(rUri);
+			}
+		}
+	}
+
+	return uris;
+}
+
 } // namespace
+
+std::string ExportScene::GetInputFingerprint() const
+{
+	nlohmann::json fingerprint;
+	fingerprint["gltf"] = gpFileManager->GetFingerprint(mInputPath);
+	for (const std::string& rUri : ReadExternalUris(mInputPath))
+	{
+		std::string decodedUri;
+		tinygltf::URIDecode(rUri, &decodedUri, nullptr);
+		std::filesystem::path dependencyPath = mInputPath.parent_path() / decodedUri;
+		// A missing dependency records null rather than calling GetFingerprint, which throws on a missing file
+		// and would kill the run from CheckDirty. Null never equals a stored hash, so the scene stays dirty and
+		// the failure surfaces per-asset in Export().
+		fingerprint["uris"][rUri] = std::filesystem::exists(dependencyPath) ? nlohmann::json(gpFileManager->GetFingerprint(dependencyPath)) : nlohmann::json();
+	}
+	return fingerprint.dump();
+}
 
 std::filesystem::path ExportScene::GetPreExportMarkerPath() const
 {
