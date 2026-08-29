@@ -491,17 +491,20 @@ static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std
 		rpExportJob->mFuture = std::async(std::launch::async, &T::RunExport, rpExportJob.get());
 	}
 
-	std::filesystem::path temporaryManifestFile = gpFileManager->mCacheDirectory;
+	// Stage beside the finals, never in the cache: the cache lives under LocalAppData and can be on another
+	// volume, where the publish renames below degrade to copy-then-delete and a kill mid-copy leaves a
+	// truncated manifest/pack/header where a complete one used to be. Same-directory renames stay atomic.
+	std::filesystem::path temporaryManifestFile = gpFileManager->mOutputDirectory;
 	temporaryManifestFile /= T::kName;
-	temporaryManifestFile += ".manifest";
+	temporaryManifestFile += ".manifest.tmp";
 
-	std::filesystem::path temporaryPackFile = gpFileManager->mCacheDirectory;
+	std::filesystem::path temporaryPackFile = gpFileManager->mOutputDirectory;
 	temporaryPackFile /= T::kName;
-	temporaryPackFile += ".pack";
+	temporaryPackFile += ".pack.tmp";
 
-	std::filesystem::path temporaryHeaderFile = gpFileManager->mCacheDirectory;
+	std::filesystem::path temporaryHeaderFile = gpFileManager->mOutputDirectory;
 	temporaryHeaderFile /= T::kName;
-	temporaryHeaderFile += ".h";
+	temporaryHeaderFile += ".h.tmp";
 
 	std::vector<diagnostic::ExportFailure> failures = WriteTemporaryExportFiles(temporaryManifestFile, temporaryPackFile, rExportJobs);
 
