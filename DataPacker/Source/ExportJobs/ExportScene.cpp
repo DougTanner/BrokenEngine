@@ -587,7 +587,8 @@ void ExportScene::BuildMaterialInfos(tinygltf::Model& rGltfModel, bool bHasSkele
 		{
 			LOG(kDefault, kWarning, "WARNING: Model has {} joints, exceeding shader limit of {}. Skinning will use first {} joints only.", uiJointCount, common::kiMaxJointsPerMesh, common::kiMaxJointsPerMesh);
 		}
-		uiSkinJointCount = static_cast<uint8_t>(uiJointCount);
+		// Clamp before the byte narrowing: an accepted skin may hold up to Skeleton::kiMaxSkinJoints (256), which would wrap to 0 and silently disable skinning
+		uiSkinJointCount = static_cast<uint8_t>(std::min(uiJointCount, static_cast<size_t>(common::kiMaxJointsPerMesh)));
 	}
 
 	for (int64_t i = 0; i < static_cast<int64_t>(rMaterialNodeInfos.size()); ++i)
