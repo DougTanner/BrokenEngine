@@ -153,7 +153,9 @@ other evidence for the missing run.
 Return `Verification: PASS` only when ownership, authorization, and every row
 pass. Otherwise return `Verification: BLOCKED` once with all decisive items; do
 not retry any judgment check. A PASS binds the reviewed diff; if that diff
-later changes meaningfully, re-review only the changed regions.
+later changes meaningfully, re-review only the changed regions. Every result,
+initial or resumed, states the full 40-character baseline and head SHAs it
+binds.
 
 A later pass may resume a `BLOCKED` result only when its sole blocking rows are
 missing typed artifacts and the baseline and head SHAs are unchanged. That pass
@@ -161,7 +163,7 @@ reads the prior report and every citation it would carry forward, re-establishes
 the session-change inventory and every row whose evidence is not bound to the
 immutable committed diff, and carries forward only rows that evidence binds to
 that diff; any identity or state mismatch requires a fresh full verification.
-Restate the full table and the baseline and head SHAs it binds.
+Restate the full table.
 
 Follow `../../references/subagent-reporting.md`: route, checkout, the reviewed
 diff, Git-derived inventory, acceptance/review/API tables, Plan check,

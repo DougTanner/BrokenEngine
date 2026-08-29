@@ -113,9 +113,12 @@ every other lease is foreign.
    change discards the verdict and follows the new checker result.
    No lease is held across the reviewer or user wait.
    On the `session-landing` route, invoke
-   `../scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` only after the
-   checker and the step-3 `/verify-changes` pass on the final diff have returned
-   usable results. Redirect its stdout to
+   `../scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` with the
+   `/verify-changes` prompt and output paths main hands over when it resumes
+   this worker, and only after this checker has returned a usable terminal
+   result. Its gate codes are in
+   [`scripts.md#approval-review-receipt`](scripts.md#approval-review-receipt).
+   Redirect its stdout to
    `Temp/finalize-approval-review-result.json` exactly as
    [`scripts.md`](scripts.md) shows: that artifact is a required landing input,
    not a record of one. On the separately requested direct-primary (`primary-commit`)

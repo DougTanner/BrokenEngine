@@ -57,9 +57,21 @@ The finalizer worker loads [`references/workflow.md`](references/workflow.md) on
 entry: it holds the bundled-script invocation order and lease-ownership rules,
 the normal workflow steps, recovery, and the AgentTools reference trigger. Main
 needs only this file to dispatch the worker and to give the confirmation below.
-Dispatch the worker to run through the landing summary: "stop before any primary
-change" names the confirmation pause below, never an earlier stop, so the worker
-still runs the primary-movement check and the SmartGit review window.
+
+Before the confirmation the worker runs in two phases. The first runs through
+approval preparation and returns the prepared diff. Main then does everything
+that must precede the review window: the `/next-plan` second-checkpoint friction
+review and context measurement, any rebuild that foreign primary movement
+requires, and the single `/verify-changes` dispatch. On PASS main resumes that
+same worker for step 4, handing it the prompt and output paths of that
+dispatch; the worker runs the primary-movement check and, only once that check
+reaches a usable terminal result, opens the SmartGit review window and returns
+the landing summary. Main presents that summary and asks the confirmation below
+immediately, with no tool call in between. A stale-base result or a verification
+finding loops back to main before any window opens.
+
+"Stop before any primary change" names the confirmation pause below, never an
+earlier stop.
 
 ## Landing confirmation
 

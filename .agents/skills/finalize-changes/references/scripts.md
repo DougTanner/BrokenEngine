@@ -28,7 +28,9 @@ restate the selected receipt. The `Show-FinalizeApprovalReview.ps1` invocation
 below likewise redirects its single-line stdout to the ignored repository-relative
 `Temp/finalize-approval-review-result.json` artifact, and that artifact path is
 what the landing invocations pass as `-ApprovalReviewResultFile`; its values are
-never re-typed by hand.
+never re-typed by hand. Its `-VerificationPromptFile` and `-VerificationOutFile`
+are the prompt and the retained reviewer output of main's `/verify-changes`
+dispatch on the final diff.
 
 ## Contents
 
@@ -67,7 +69,7 @@ pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLoc
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -HistoryContractRowDate '<historyUpdate.rowDate>' -HistoryJsonSha256 '<historyUpdate.jsonl.sha256>' -HistoryJsonBytes '<historyUpdate.jsonl.bytes>' -HistorySvgSha256 '<historyUpdate.svg.sha256>' -HistorySvgBytes '<historyUpdate.svg.bytes>' -HistorySvgEmbeddedSha256 '<historyUpdate.svg.embeddedSha256>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
 pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract -RepositoryRoot '<current-worktree>' -BaseCommit '<primary-tip>' -TipCommit '<approved-commit>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit > 'Temp/finalize-approval-review-result.json'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -VerificationPromptFile '<verify-prompt>' -VerificationOutFile '<verify-out>' -LaunchSmartGit > 'Temp/finalize-approval-review-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
 ```
@@ -214,11 +216,22 @@ reconstructs the assessment from Git output.
 
 `Show-FinalizeApprovalReview.ps1` emits one JSON line whose schema version is
 `broken-engine-finalize-approval-review/v1`, carrying `schemaVersion`, `status`,
-`code`, `message`, `approvedTip`, `executable`, `arguments`, `manualCommand`, and
-`processId`. `approvedTip` is the full 40-character reviewed commit, expanded from
-an abbreviated `-ApprovedTip`. The redirected artifact is that receipt: both
-advance routes read `approvedTip` and `status` from the file named by
-`-ApprovalReviewResultFile`.
+`code`, `message`, `approvedTip`, `executable`, `arguments`, `manualCommand`,
+`processId`, and `verification`. `approvedTip` is the full 40-character reviewed
+commit, expanded from an abbreviated `-ApprovedTip`. `verification` is
+`{ promptFile, outFile, head, verdict }` with absolute paths, and is null in
+preview. The redirected artifact is that receipt: both
+advance routes read `approvedTip`, `status`, and `verification` from the file
+named by `-ApprovalReviewResultFile`.
+
+`-VerificationPromptFile` and `-VerificationOutFile` are required whenever
+`-LaunchSmartGit` is passed, and the script checks them before any launch. Each
+failure exits 1 with status `error`: `verification.missing` when either path is
+absent or unreadable, `verification.tip-mismatch` when the prompt is not a
+`/verify-changes` prompt whose script-generated evidence binds the expanded
+`approvedTip` or the output never restates that commit, and
+`verification.not-pass` when the output's final verdict is not `PASS` or the
+output is older than the prompt.
 
 The review outcome stays non-blocking — `opened`, `unavailable`, and `failed` all
 satisfy the gate, because only an attempted launch is required, not a successful
@@ -226,8 +239,10 @@ one. `preview` and every error status do not. A receipt that is absent,
 unreadable, not valid JSON, or not a `broken-engine-finalize-approval-review/v1`
 result carrying `status` and `approvedTip` blocks with `approval-review.missing`,
 one whose `approvedTip` is not the commit being landed blocks with
-`approval-review.candidate-mismatch`, and one recording no attempted launch blocks
-with `approval-review.not-launched`. All three are exit 2, `blocked`, `terminal`,
+`approval-review.candidate-mismatch`, one recording no attempted launch blocks
+with `approval-review.not-launched`, and one whose `verification.head` is not the
+commit being landed or whose `verification.verdict` is not `PASS` blocks with
+`approval-review.unverified`. All four are exit 2, `blocked`, `terminal`,
 and happen before the landing changes anything on primary. On the session route
 the caller-owned lease claimed in the invocation order above is already live, and
 the worker releases it with `-Release` exactly as for any other blocked landing.
@@ -242,9 +257,9 @@ and overwrites the artifact; the stale receipt is never reused, because its
   compare-and-swap under the landing lock, rolls back on postcondition failure,
   and releases the lock. Before it registers the session, scans recovery, or
   claims or refreshes any lock itself, it
-  refuses a landing whose `-ApprovalReviewResultFile` receipt does not prove the
-  SmartGit review was attempted for the exact approved commit, with the
-  [approval review receipt](#approval-review-receipt) codes. Its guarded primary checkout — the advance to the
+  enforces the [approval review receipt](#approval-review-receipt) contract on
+  the receipt named by `-ApprovalReviewResultFile`.
+  Its guarded primary checkout — the advance to the
   candidate and the rollback restore alike — waits out a foreign
   `.git/index.lock` on the primary repository, re-running the same checkout every
   500 milliseconds while git reports that lock. That waiting is bounded by a
