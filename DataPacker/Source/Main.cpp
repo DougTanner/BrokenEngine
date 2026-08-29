@@ -54,6 +54,27 @@ static void WriteIfChanged(const std::string& rContent, const std::filesystem::p
 	}
 }
 
+// Generated symbol name -> the relative file that produced it. PathToCppVariable strips every non-identifier byte, so
+// distinct paths can collapse onto one name and silently emit a duplicate constant. The table is shared by every type
+// in the run and is filled for clean types too, so a cross-type collision is caught even when only one type regenerates
+// its header.
+static std::unordered_map<std::string, std::string> sGeneratedCrcNames;
+
+template <IsExportJob T>
+static void RegisterGeneratedCrcNames(const std::vector<std::unique_ptr<T>>& rJobs)
+{
+	for (const std::unique_ptr<T>& rpJob : rJobs)
+	{
+		std::string name = common::PathToCppVariable(rpJob->mRelativeFile);
+		auto [it, bInserted] = sGeneratedCrcNames.try_emplace(name, rpJob->mRelativeFile);
+		if (!bInserted)
+		{
+			LOG(kDefault, kError, "\"{}\" generates duplicate symbol \"k{}Crc\" for \"{}\" and \"{}\"", T::kName, name, it->second, rpJob->mRelativeFile);
+		}
+		ASSERT(bInserted);
+	}
+}
+
 template <IsExportJob T>
 static void WriteCrcHeader(const std::filesystem::path& rOutPath, const std::vector<std::unique_ptr<T>>& rJobs)
 {
@@ -586,6 +607,7 @@ bool RunExportJobs()
 	bDirty |= !std::filesystem::exists(headerFile);
 
 	std::vector<std::unique_ptr<T>> exportJobs = DiscoverExportJobsAndAggregateDirty<T>(packFile, manifestChunkLocations, bDirty);
+	RegisterGeneratedCrcNames(exportJobs);
 
 	if (!bDirty && !ValidatePublishedPackLayout(packFile, manifestChunkLocations))
 	{

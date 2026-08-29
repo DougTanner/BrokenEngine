@@ -26,7 +26,11 @@ std::string ToLower(std::string_view chars)
 std::string PathToCppVariable(std::string_view path)
 {
 	std::string out(path);
-	std::erase_if(out, [](char c) { return c == '\\' || c == '.' || c == ' ' || c == '[' || c == ']' || c == '-' || c == ','; });
+	std::erase_if(out, [](char c)
+	{
+		unsigned char uiChar = static_cast<unsigned char>(c);
+		return !((uiChar >= 'A' && uiChar <= 'Z') || (uiChar >= 'a' && uiChar <= 'z') || (uiChar >= '0' && uiChar <= '9') || uiChar == '_');
+	});
 	return out;
 }
 

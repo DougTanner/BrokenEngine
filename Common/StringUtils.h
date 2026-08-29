@@ -55,10 +55,10 @@ std::vector<T> Split(const T& rString, const T& rDelimiter)
 // Returns: Lowercase version of the input string
 std::string ToLower(std::string_view chars);
 
-// Sanitizes file paths to be valid C++ variable names by removing special characters
-// Removes: backslash, dot, space, brackets, hyphen, comma
+// Sanitizes file paths to be valid C++ variable names by keeping ASCII letters, digits and underscore
+// Removes: every other byte (locale-independent); the mapping is many-to-one, so the caller must check uniqueness
 // Parameters: rIn - Path string to sanitize
-// Returns: Sanitized string suitable for use as a C++ variable name
+// Returns: Sanitized string, a valid C++ identifier once the caller prefixes it (for example with 'k')
 std::string PathToCppVariable(std::string_view path);
 
 } // namespace common
