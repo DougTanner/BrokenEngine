@@ -209,6 +209,8 @@ void IslandTerrain::WaitForElevationMaps()
 		rTemplate.miMeshIndexCount = rIslandHeader.iMeshIndexCount;
 		rTemplate.miValidAreaVertexCount = rIslandHeader.iValidAreaVertexCount;
 		const std::byte* pAfterHeightmap = rLazyChunk.pData + iHeightmapBytes;
+		// Not validated here: DataPacker's VerifyHullCcwConvex (ExportIsland.cpp) already fails the bake on a
+		// non-CCW or non-convex hull, which is what ConvexHullsOverlap's SAT requires of these vertices.
 		rTemplate.mpf2ValidAreaVertices = reinterpret_cast<const XMFLOAT2*>(pAfterHeightmap + iMeshBytes);
 
 #if defined(BT_CLIENT)
