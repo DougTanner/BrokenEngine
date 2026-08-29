@@ -22,7 +22,7 @@ PackChunks::~PackChunks()
 	// Drain the eager-load task first: the loading threads are assigned inside it (see LoadPackFiles), so a join
 	// before the task runs would hit not-yet-joinable threads. On the client GetEagerChunkMap() already
 	// drained it during boot (valid() is then false); on the server nothing else ever drains it. get()
-	// rethrows if the task threw (corrupt-pack ASSERT, OOM, thread-create failure); swallow it so a
+	// rethrows if the task threw (OOM, thread-create failure); swallow it so a
 	// destructor never terminates the process, and let the joinable() guard below skip never-started threads.
 	if (mLoadingFuture.valid())
 	{
@@ -142,8 +142,89 @@ static constexpr data::DataTypes DataTypeFromFlags(const common::ChunkFlags_t& r
 	message += "\n\n";
 	message += reason;
 	message += "\n\nPlease reinstall or verify your game files.";
-	MessageBox(nullptr, message.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+	if (!AgentLaunched())
+	{
+		MessageBox(nullptr, message.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+	}
 	ExitProcess(0);
+}
+
+// External-data trust boundary: every pointer, slice, and decoder argument built below comes from a manifest
+// location or a chunk header, so one corrupt value would address memory outside the real pack file. Both helpers
+// run before a chunk is published, so corrupt data is never consumed. Each returns nullptr when the data is
+// valid, or the reason to report through FailMissingRequiredAsset.
+static const char* ValidateChunkLocation(uint64_t uiPackFileSize, const common::ChunkLocation& rChunkLocation)
+{
+	if (rChunkLocation.uiOffset % static_cast<uint64_t>(common::kiAlignmentBytes) != 0)
+	{
+		return "chunk offset not aligned";
+	}
+	if (rChunkLocation.uiSize < static_cast<uint64_t>(common::kiChunkDataOffset))
+	{
+		return "chunk smaller than its header";
+	}
+	if (rChunkLocation.uiOffset > uiPackFileSize)
+	{
+		return "chunk range outside pack file";
+	}
+	if (rChunkLocation.uiSize > uiPackFileSize - rChunkLocation.uiOffset)
+	{
+		return "chunk range outside pack file";
+	}
+	return nullptr;
+}
+
+// Call only after ValidateChunkLocation for the same location: the payload bounds here are relative to uiSize.
+static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const common::ChunkLocation& rChunkLocation, const common::ChunkHeader& rChunkHeader)
+{
+	if (rChunkHeader.iMagic != common::ChunkHeader::kiMagic)
+	{
+		return "chunk header magic mismatch";
+	}
+	// Consumers pick the pack file handle/path from these flags, but the offset and size above were validated
+	// against eExpectedDataType's pack, so a mismatched (or flagless) type would address a different file.
+	if (DataTypeFromFlags(rChunkHeader.flags) != eExpectedDataType)
+	{
+		return "chunk header data type mismatch";
+	}
+	if (rChunkHeader.crc != rChunkLocation.crc)
+	{
+		return "chunk header CRC mismatch";
+	}
+	// Every consumer reads pcPath as a C string, so an unterminated path would read past the field.
+	if (std::memchr(rChunkHeader.pcPath, 0, std::size(rChunkHeader.pcPath)) == nullptr)
+	{
+		return "chunk path is not NUL-terminated";
+	}
+	// iSize is the exact LZ4 compressed length passed to LZ4_decompress_safe as an int; zlib reads iOnDiskSize instead.
+	if (rChunkHeader.flags & common::ChunkFlags::kLz4Compressed)
+	{
+		if (rChunkHeader.iSize < 0)
+		{
+			return "chunk header size outside chunk";
+		}
+		if (rChunkHeader.iSize > static_cast<int64_t>(rChunkLocation.uiSize) - common::kiChunkDataOffset)
+		{
+			return "chunk header size outside chunk";
+		}
+		if (rChunkHeader.iSize > std::numeric_limits<int>::max())
+		{
+			return "chunk header size outside chunk";
+		}
+	}
+	// iUncompressedSize sizes the lazy pool slot and caps the decoder output for both codecs.
+	if (common::IsCompressed(rChunkHeader.flags))
+	{
+		if (rChunkHeader.iUncompressedSize <= 0)
+		{
+			return "chunk uncompressed size invalid";
+		}
+		if (rChunkHeader.iUncompressedSize > std::numeric_limits<int>::max())
+		{
+			return "chunk uncompressed size invalid";
+		}
+	}
+	return nullptr;
 }
 
 void PackChunks::LoadPackFiles()
@@ -210,12 +291,26 @@ void PackChunks::LoadPackFiles()
 		{
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file missing or unreadable");
 		}
+		packStream.seekg(0, std::ios::end);
+		uint64_t uiPackFileSize = static_cast<uint64_t>(packStream.tellg());
+		if (!packStream.good())
+		{
+			FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
+		}
 		for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
 		{
+			if (const char* pcReason = ValidateChunkLocation(uiPackFileSize, rChunkLocation); pcReason != nullptr)
+			{
+				FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
+			}
 			// Read the header
 			common::ChunkHeader chunkHeader {};
 			packStream.seekg(rChunkLocation.uiOffset);
 			packStream.read(reinterpret_cast<char*>(&chunkHeader), sizeof(chunkHeader));
+			if (const char* pcReason = ValidateChunkHeader(static_cast<data::DataTypes>(i), rChunkLocation, chunkHeader); pcReason != nullptr)
+			{
+				FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
+			}
 
 			// Add to lazy chunk map. iDataSize is the size of the data in pData after any decompression
 			// (i.e., what consumers see). For compressed chunks, that's the uncompressed size; otherwise
@@ -333,14 +428,24 @@ void PackChunks::LoadPackFiles()
 			packStream.close();
 
 			// Process chunks from pack file
+			uint64_t uiPackFileSize = rPackBytes.size();
 			for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
 			{
 				// Add to eager chunk map
-				common::ChunkHeader* pChunkHeader = reinterpret_cast<common::ChunkHeader*>(&rPackBytes[rChunkLocation.uiOffset]);
-				ASSERT(pChunkHeader->iMagic == common::ChunkHeader::kiMagic && pChunkHeader->crc == rChunkLocation.crc);
+				// Exit rather than throw: a throw here skips starting the loading threads below, so the main thread
+				// would block on its first chunk request before anything reads the future that rethrows.
+				if (const char* pcReason = ValidateChunkLocation(uiPackFileSize, rChunkLocation); pcReason != nullptr)
+				{
+					FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
+				}
+				common::ChunkHeader* pChunkHeader = reinterpret_cast<common::ChunkHeader*>(rPackBytes.data() + rChunkLocation.uiOffset);
+				if (const char* pcReason = ValidateChunkHeader(static_cast<data::DataTypes>(i), rChunkLocation, *pChunkHeader); pcReason != nullptr)
+				{
+					FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
+				}
 				uint64_t uiDataOffset = rChunkLocation.uiOffset + common::kiChunkDataOffset;
 
-				auto [it, bInserted] = mEagerChunkMap.try_emplace(rChunkLocation.crc, EagerChunk { .pHeader = pChunkHeader, .pData = &rPackBytes[uiDataOffset], .iDataSize = static_cast<int64_t>(rChunkLocation.uiSize - common::kiChunkDataOffset), });
+				auto [it, bInserted] = mEagerChunkMap.try_emplace(rChunkLocation.crc, EagerChunk { .pHeader = pChunkHeader, .pData = rPackBytes.data() + uiDataOffset, .iDataSize = static_cast<int64_t>(rChunkLocation.uiSize - common::kiChunkDataOffset), });
 				if (!bInserted)
 				{
 					LOG(kLoading, kDebug, "Duplicate chunk CRC {} found in {}", rChunkLocation.crc, data::kpcDataTypeNames[i]);
@@ -405,7 +510,16 @@ void PackChunks::RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPrior
 
 		for (common::crc_t crc : crcs)
 		{
-			LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
+			// A requested CRC can be absent: these come from pack data as cross-pack references (scene texture
+			// lists, island channel headers), so a mixed pack generation can name a chunk this set never published.
+			// Requesting is not the place to classify that — each consumer decides (developer error vs. soft failure).
+			auto it = mLazyChunkMap.find(crc);
+			if (it == mLazyChunkMap.end())
+			{
+				continue;
+			}
+
+			LazyChunk& rLazyChunk = it->second;
 			if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 			{
 				continue;

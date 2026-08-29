@@ -197,6 +197,8 @@ void StreamingVoices::FillReadyBuffers()
 void StreamingVoices::CreateStream(common::crc_t uiAudioCrc)
 {
 	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunkMap().at(uiAudioCrc);
+	AssertValidPackedAudio(rLazyChunk.header.audioHeader.waveFormat, rLazyChunk.header.iSize, rLazyChunk.iDataSize);
+
 	IXAudio2SourceVoice* pVoice = nullptr;
 	mpAudioEngine->AllocateVoice(&rLazyChunk.header.audioHeader.waveFormat, SoundEffectInstance_Default, false, &pVoice);
 	if (pVoice != nullptr)

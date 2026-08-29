@@ -14,7 +14,11 @@
 #
 # Contract: schema broken-engine-finalize-approval-review/v1. Unlike the mutating
 # scripts, every preview/launch outcome exits 0 and none report status pass — the
-# review tool is non-blocking and never gates a landing. preview is the default;
+# review outcome is non-blocking, but the attempt is not: the caller redirects this
+# single-line stdout to Temp/finalize-approval-review-result.json and passes that
+# receipt to the landing scripts, which read approvedTip and status from it and
+# refuse to change primary when it does not prove a launch attempt for the exact
+# commit being landed. preview is the default;
 # opened is the launch success path; unavailable/failed are non-blocking,
 # and the caller copies message and the exact manualCommand into the approval response while keeping the landing gate in
 # force. Only invalid input exits 1, with status error and a code naming the cause
@@ -47,6 +51,7 @@ $result = [ordered]@{
 	status = 'error'
 	code = 'internal.error'
 	message = 'Review-tool launch did not complete.'
+	approvedTip = $null
 	executable = $null
 	arguments = @()
 	manualCommand = $null
@@ -164,6 +169,7 @@ try
 		Assert-Input ($expansion.ExitCode -eq 0 -and $expandedTip -cmatch '^[0-9a-f]{40}\z') "ApprovedTip '$ApprovedTip' does not resolve to exactly one commit."
 		$ApprovedTip = $expandedTip
 	}
+	$result.approvedTip = $ApprovedTip
 
 	Invoke-SmartGit
 }

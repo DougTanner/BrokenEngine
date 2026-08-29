@@ -78,4 +78,41 @@ inline std::vector<std::byte> ReadEntireFile(const std::filesystem::path& rPath)
 	return data;
 }
 
+// Crash-report file sink: a raw OS handle with no buffering and no formatting state.
+// Reachable from the SIGABRT handler during heap corruption, where std::ofstream cannot be used at all — its
+// construction allocates (new locale), which re-enters allocation tracking and can deadlock on the non-recursive log mutex.
+struct CrashFileWriter
+{
+	// Deny-none sharing: a reader already holding the crash report open must not block this handle's creation.
+	explicit CrashFileWriter(const wchar_t* pcPath)
+	: Handle(CreateFileW(pcPath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr))
+	{
+	}
+
+	~CrashFileWriter()
+	{
+		if (Handle != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(Handle);
+		}
+	}
+
+	CrashFileWriter(const CrashFileWriter&) = delete;
+	CrashFileWriter& operator=(const CrashFileWriter&) = delete;
+
+	void Write(const char* pcText)
+	{
+		if (Handle == INVALID_HANDLE_VALUE)
+		{
+			return;
+		}
+
+		DWORD uiWritten = 0;
+		// Result deliberately ignored: nothing on the crash path may recover or log a failed write.
+		WriteFile(Handle, pcText, static_cast<DWORD>(std::strlen(pcText)), &uiWritten, nullptr);
+	}
+
+	HANDLE Handle = INVALID_HANDLE_VALUE;
+};
+
 } // namespace common

@@ -19,6 +19,9 @@ param(
 	# Approval preparation result artifact ('broken-engine-finalize-approval-preparation/v3'); the
 	# landing reads the approved Contract identity from it so no digest is ever hand-copied.
 	[string] $ApprovalPreparationResultFile,
+	# Approval review receipt artifact ('broken-engine-finalize-approval-review/v1'); the landing
+	# reads the reviewed tip and launch status from it so the SmartGit review cannot be skipped.
+	[string] $ApprovalReviewResultFile,
 	# Fixture-only Contract identity scalars: fixtures inject crafted identities directly; outside the
 	# fixture environment the identity always comes from -ApprovalPreparationResultFile.
 	[string] $HistoryContractDigest,
@@ -1213,6 +1216,27 @@ try {
 	$result.tips.expectedCurrent = $ExpectedCurrentTip
 	$result.tips.expectedPrimary = $ExpectedPrimaryTip
 	$result.candidate.commit = $ApprovedSessionCommit
+	# The SmartGit approval review is a required landing input, not prose: this receipt proves the
+	# launch was attempted for exactly this commit. The gate sits after full-ID normalization and
+	# before session registration, the recovery scan, and this script's own lock claims, so it blocks
+	# like every other pre-landing check: the caller-owned lease is still live and the caller releases
+	# it. The outcome stays non-blocking; only a missing attempt blocks.
+	if ([string]::IsNullOrWhiteSpace($ApprovalReviewResultFile)) {
+		if ($env:BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE -cne '1') { Throw-Landing 2 'approval-review.missing' 'A broken-engine-finalize-approval-review/v1 receipt from -ApprovalReviewResultFile is required for postconfirmation landing.' }
+	}
+	else {
+		$reviewItem = Get-Item -LiteralPath $ApprovalReviewResultFile -Force -ErrorAction SilentlyContinue
+		if ($null -eq $reviewItem -or $reviewItem.PSIsContainer) { Throw-Landing 2 'approval-review.missing' "ApprovalReviewResultFile '$ApprovalReviewResultFile' is not a readable file." }
+		try { $reviewResult = [IO.File]::ReadAllText($reviewItem.FullName) | ConvertFrom-Json -Depth 64 -ErrorAction Stop }
+		catch { Throw-Landing 2 'approval-review.missing' "ApprovalReviewResultFile is not valid JSON: $($_.Exception.Message)" }
+		if ($null -eq $reviewResult) { Throw-Landing 2 'approval-review.missing' 'ApprovalReviewResultFile carries no result object.' }
+		$reviewProperties = @($reviewResult.PSObject.Properties.Name)
+		if ($reviewProperties -cnotcontains 'schemaVersion' -or $reviewProperties -cnotcontains 'status' -or $reviewProperties -cnotcontains 'approvedTip' -or [string]$reviewResult.schemaVersion -cne 'broken-engine-finalize-approval-review/v1') {
+			Throw-Landing 2 'approval-review.missing' "ApprovalReviewResultFile must be a 'broken-engine-finalize-approval-review/v1' result carrying status and approvedTip."
+		}
+		if ([string]$reviewResult.approvedTip -cne $ApprovedSessionCommit) { Throw-Landing 2 'approval-review.candidate-mismatch' 'ApprovalReviewResultFile records a different reviewed commit than the approved session commit. Rerun Show-FinalizeApprovalReview.ps1 -LaunchSmartGit for the approved session commit with the documented stdout redirect so the receipt is overwritten.' }
+		if ([string]$reviewResult.status -cnotin @('opened', 'unavailable', 'failed')) { Throw-Landing 2 'approval-review.not-launched' 'ApprovalReviewResultFile does not record an attempted SmartGit launch for the approved session commit. Rerun Show-FinalizeApprovalReview.ps1 -LaunchSmartGit for the approved session commit with the documented stdout redirect so the receipt is overwritten.' }
+	}
 	$approvedParents = @((Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $ApprovedSessionCommit)).Trim() -split ' ' | Where-Object { $_ })
 	if ($approvedParents.Count -ne 1) { Throw-Landing 1 'input.commit-invalid' 'Approved session commit must have exactly one parent.' }
 	$script:ApprovedSourceParent = $approvedParents[0]

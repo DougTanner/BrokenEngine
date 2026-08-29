@@ -51,7 +51,7 @@ namespace
 		};
 		for (common::crc_t textureCrc : residencyCrcs)
 		{
-			if (gpFileManager->GetLazyChunk(textureCrc).eState.load(std::memory_order_acquire) < ChunkState::kReady)
+			if (!gpFileManager->IsChunkReady(textureCrc))
 			{
 				return false;
 			}

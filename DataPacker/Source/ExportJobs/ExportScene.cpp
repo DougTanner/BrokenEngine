@@ -145,6 +145,19 @@ void LogFilteredChannelDiagnostics(const tinygltf::Model& rGltfModel)
 	}
 }
 
+// Mirrors WriteAnimationSection's emission rule (a clip reaches the pack only when a channel survives
+// filtering) by running the same loader, so the two cannot drift apart.
+bool HasSurvivingAnimationClip(const tinygltf::Model& rGltfModel)
+{
+	std::vector<common::AnimationClip> animations;
+	std::vector<common::AnimationChannel> channels;
+	std::vector<common::AnimationKeyframe> keyframes;
+	std::vector<common::AnimationKeyframeCubic> cubicKeyframes;
+	AnimationOutput animationOut {.rAnimations = animations, .rChannels = channels, .rKeyframes = keyframes, .rCubicKeyframes = cubicKeyframes};
+	LoadAnimations(rGltfModel, animationOut);
+	return !animations.empty();
+}
+
 } // namespace
 
 std::filesystem::path ExportScene::GetPreExportMarkerPath() const
@@ -229,6 +242,14 @@ void ExportScene::PreExport(tinygltf::Model& rGltfModel)
 	std::vector<Material> materials(rGltfModel.materials.size());
 	std::vector<MaterialNodeInfo> materialNodeInfos(rGltfModel.materials.size());
 	bool bHasSkeleton = SetupSkeletonAndMaterials(rGltfModel);
+
+	// A skin alone makes bHasSkeleton true, but MainExport emits the skeleton only inside WriteAnimationSection,
+	// which runs only for a surviving clip. Without one the vertices stay mesh-local and the material transforms
+	// node-relative with no node matrices at runtime, so the model would render mispositioned in silence.
+	if (!rGltfModel.skins.empty() && !HasSurvivingAnimationClip(rGltfModel))
+	{
+		throw std::runtime_error("ExportScene model declares a skin but no animation clip survives export");
+	}
 
 	std::vector<common::ModelVertex> vertices;
 	LoadVerticesAndOptimizeMeshes(rGltfModel, bHasSkeleton, materials, materialNodeInfos, vertices);
@@ -432,10 +453,12 @@ void ExportScene::ProcessTextures(tinygltf::Model& rGltfModel)
 
 bool ExportScene::SetupSkeletonAndMaterials(tinygltf::Model& rGltfModel)
 {
-	// Skeleton data loads whenever a skin exists (skeletal) or any animation exists (node-based); when
-	// neither holds the model is static and bHasSkeleton stays false (load-bearing for the static-model
-	// vertex transform in LoadVertices). DetermineAnimationPath now only selects the log label.
-	bool bHasSkeleton = !rGltfModel.skins.empty() || !rGltfModel.animations.empty();
+	// Skeleton data loads whenever a skin exists (skeletal) or at least one channel survives
+	// SceneAnimationLoader filtering (node-based); the test must match what WriteAnimationSection emits, or
+	// vertices stay unbaked with no skeleton section to interpret them. When neither holds the model is
+	// static and bHasSkeleton stays false (load-bearing for the static-model vertex transform in
+	// LoadVertices). DetermineAnimationPath now only selects the log label.
+	bool bHasSkeleton = !rGltfModel.skins.empty() || HasSurvivingAnimationClip(rGltfModel);
 	if (bHasSkeleton)
 	{
 		SkeletonData skeletonData = LoadSkeletonData(rGltfModel);
@@ -842,8 +865,6 @@ void ExportScene::WriteAnimationSection(tinygltf::Model& rGltfModel, const std::
 	}
 	LOG(kDefault, kDebug, "  Total animation channels in glTF: {}", iTotalChannels);
 
-	pHeader->sceneHeader.bHasAnimation = true;
-
 	bool bUseSkeletalAnimation = DetermineAnimationPath(rGltfModel);
 
 	LOG(kDefault, kDebug, "  Using {} animation path", bUseSkeletalAnimation ? "SKELETAL" : "NODE-BASED");
@@ -861,11 +882,16 @@ void ExportScene::WriteAnimationSection(tinygltf::Model& rGltfModel, const std::
 	LoadAnimations(rGltfModel, animationOut);
 	LOG(kDefault, kDebug, "  {} animations, {} channels, {} keyframes, {} cubic keyframes", animations.size(), channels.size(), keyframes.size(), cubicKeyframes.size());
 
-	// Warn if all animation channels were filtered out
-	if (animations.empty() && rGltfModel.animations.size() > 0)
+	// Every animation channel was filtered out: export as a static scene rather than an empty clip section
+	if (animations.empty())
 	{
 		LogFilteredChannelDiagnostics(rGltfModel);
+		return;
 	}
+
+	// The marker implies a clip section holding at least one animation: the runtime rejects a count of 0 as a corrupt
+	// stream (AnimationData::Load). Must stay before mHeaderAndData grows below, which invalidates pHeader.
+	pHeader->sceneHeader.bHasAnimation = true;
 
 	for (const common::AnimationClip& rAnim : animations)
 	{

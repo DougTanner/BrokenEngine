@@ -71,7 +71,7 @@ struct SmokeTrailsPostRender : public Collection<SmokeTrailsPostRender>
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
 	// Add trail
-	static void Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, uint8_t uiTypeIndex, smoke_trails_t reuseId = {});
+	static void Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, uint8_t uiTypeIndex);
 
 	// Remove trail by ID
 	static void Remove(game::Frame& __restrict rFrame, smoke_trails_t& rId);

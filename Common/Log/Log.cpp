@@ -192,17 +192,21 @@ void LogWriteRingBuffers(const char* pLogBuffer, int64_t iLength, LogCategory eC
 	copyToLine(gLogAgentBuffer.AcquireLine());
 }
 
-void LogDumpBuffers(std::ofstream& rOfstream)
+void LogDumpBuffers(CrashFileWriter& rWriter)
 {
-	rOfstream << "\n\n\n<Begin Global Log>\n" << std::flush;
-	gLogGlobalBuffer.Dump(rOfstream);
-	rOfstream << "<End Global Log>\n" << std::flush;
+	rWriter.Write("\n\n\n<Begin Global Log>\n");
+	gLogGlobalBuffer.Dump(rWriter);
+	rWriter.Write("<End Global Log>\n");
 
 	for (int64_t i = 0; i < kiLogCategoryCount; ++i)
 	{
-		rOfstream << "\n\n\n<Begin " << kpcLogCategoryNames[i] << " Log>\n" << std::flush;
-		gLogRingBuffers[i].Dump(rOfstream);
-		rOfstream << "<End " << kpcLogCategoryNames[i] << " Log>\n" << std::flush;
+		rWriter.Write("\n\n\n<Begin ");
+		rWriter.Write(kpcLogCategoryNames[i]);
+		rWriter.Write(" Log>\n");
+		gLogRingBuffers[i].Dump(rWriter);
+		rWriter.Write("<End ");
+		rWriter.Write(kpcLogCategoryNames[i]);
+		rWriter.Write(" Log>\n");
 	}
 }
 

@@ -87,23 +87,29 @@ try {
 		# otherwise turn an advisory problem into an error exit. The checker runs in its own process so
 		# that its own exit code cannot end this run.
 		$findings = $null
-		$detail = 'no result'
+		$note = 'process check produced no result.'
 		try {
 			$check = Invoke-NativeCapture 'pwsh' @(
 				'-NoProfile', '-File', (Join-Path $PSScriptRoot 'Invoke-AgentHarnessProcessCheck.ps1'),
 				'-Action', 'Check', '-StatePath', $ProcessCheckStatePath)
-			$detail = "exit $($check.ExitCode): " + (($check.Stdout, $check.Stderr) -join ' ')
-			$findings = (ConvertFrom-Json $check.Stdout).findings
+			$parsed = ConvertFrom-Json $check.Stdout
+			# The checker adds 'findings' only when Check completed, so its absence is the checker's
+			# own failure report and the note carries that report instead of a missing-property error.
+			if ($parsed.PSObject.Properties['findings']) {
+				$findings = $parsed.findings
+			}
+			else {
+				$note = "process check reported no findings: exit $($check.ExitCode), status '$($parsed.status)', code '$($parsed.code)': $($parsed.message)"
+			}
 		}
 		catch {
-			$findings = $null
-			$detail = $_.Exception.Message
+			$note = "process check could not be run: $($_.Exception.Message)"
 		}
 		if ($null -ne $findings) {
 			$result.crashFindings = @($findings)
 		}
 		else {
-			$result.processCheckNote = Limit-Text "process check returned no findings ($detail)" $MaximumMessageLength
+			$result.processCheckNote = Limit-Text $note $MaximumMessageLength
 		}
 	}
 

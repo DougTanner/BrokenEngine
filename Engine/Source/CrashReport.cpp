@@ -8,6 +8,9 @@ namespace engine
 static std::string sDxDiag;
 static std::atomic<bool> sbDxDiagComplete { false };
 static wchar_t spcAppDataOverride[MAX_PATH + 1] {};
+static wchar_t spcDesktopReportPath[MAX_PATH + 1] {};
+static wchar_t spcUserReportPath[MAX_PATH + 1] {};
+static constexpr wchar_t kpcFallbackReportPath[] = L"Crash-Report.txt";
 
 void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 {
@@ -36,6 +39,74 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 	}
 }
 
+// Appends only after proving the result fits: wcscat_s on an overflowing input invokes the invalid-parameter handler,
+// which would terminate this otherwise healthy process at startup. A non-fitting append empties the candidate so its
+// buffer is either the complete intended path or empty, never a partial one the crash handler would write to.
+static bool AppendReportPath(wchar_t (&rBuffer)[MAX_PATH + 1], const wchar_t* pcText)
+{
+	const size_t uiUsedLength = wcsnlen_s(rBuffer, std::size(rBuffer));
+	const size_t uiTextLength = wcsnlen_s(pcText, std::size(rBuffer));
+	if (uiTextLength >= std::size(rBuffer) - uiUsedLength)
+	{
+		rBuffer[0] = L'\0';
+		return false;
+	}
+
+	wcscat_s(rBuffer, std::size(rBuffer), pcText);
+	return true;
+}
+
+void ResolveCrashReportPaths()
+{
+	spcDesktopReportPath[0] = L'\0';
+	spcUserReportPath[0] = L'\0';
+
+	wchar_t pcGameName[64] {};
+	swprintf_s(pcGameName, std::size(pcGameName), L"%hs", game::kGameName.data());
+	wchar_t pcCrashReportFile[128] {};
+	swprintf_s(pcCrashReportFile, std::size(pcCrashReportFile), L"%s-Crash-Report.txt", pcGameName);
+	std::replace(std::begin(pcCrashReportFile), std::end(pcCrashReportFile), L' ', L'-');
+
+	wchar_t pcDesktopDirectory[MAX_PATH + 1] {};
+	const bool bDesktopFound = SHGetSpecialFolderPathW(HWND_DESKTOP, pcDesktopDirectory, CSIDL_DESKTOP, FALSE) != FALSE;
+	if (bDesktopFound && AppendReportPath(spcDesktopReportPath, pcDesktopDirectory) && AppendReportPath(spcDesktopReportPath, L"\\"))
+	{
+		AppendReportPath(spcDesktopReportPath, pcCrashReportFile);
+	}
+
+	if (spcAppDataOverride[0] != L'\0')
+	{
+		AppendReportPath(spcUserReportPath, spcAppDataOverride);
+	}
+	else
+	{
+		PWSTR pWideChar = nullptr;
+		HRESULT hresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
+		if (SUCCEEDED(hresult) && pWideChar != nullptr)
+		{
+			AppendReportPath(spcUserReportPath, pWideChar);
+		}
+		else if (bDesktopFound)
+		{
+			// OS failure on the roaming lookup: fall back to the Desktop so the report still lands somewhere writable.
+			AppendReportPath(spcUserReportPath, pcDesktopDirectory);
+		}
+		CoTaskMemFree(pWideChar);
+	}
+
+	if (spcUserReportPath[0] != L'\0' && AppendReportPath(spcUserReportPath, L"\\") && AppendReportPath(spcUserReportPath, pcGameName))
+	{
+		// Allocator-free single-level create (parent guaranteed present above): FileManager creates the same directory but
+		// is constructed later, so a crash before that still needs it. Ignore the result — ERROR_ALREADY_EXISTS is fine.
+		CreateDirectoryW(spcUserReportPath, nullptr);
+
+		if (AppendReportPath(spcUserReportPath, L"\\"))
+		{
+			AppendReportPath(spcUserReportPath, pcCrashReportFile);
+		}
+	}
+}
+
 void HandleException(std::optional<const std::exception*> pException)
 {
 	// Non-logging break: this runs from the SIGABRT handler during heap corruption, possibly while this thread already
@@ -43,83 +114,53 @@ void HandleException(std::optional<const std::exception*> pException)
 	DEBUG_BREAK_NO_LOG();
 
 	// An agent-launched instance must never block on a modal dialog — take the unprompted branch so the report still saves.
-	int iResult = gLaunchOptions.iAgentPort != 0 ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
+	int iResult = AgentLaunched() ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
 
-	// Fixed-buffer formatting (no heap allocation): reachable from the SIGABRT handler on heap corruption, so re-entering the allocator could re-fault.
-	wchar_t pcGameName[64] {};
-	swprintf_s(pcGameName, std::size(pcGameName), L"%hs", game::kGameName.data());
-
-	static wchar_t spcPath[MAX_PATH + 1] {};
-	if (iResult == IDYES)
+	// Select an already-resolved path: this runs from the SIGABRT handler during heap corruption, so no path lookup,
+	// directory creation, or string building may happen here — ResolveCrashReportPaths did all of it at startup.
+	const wchar_t* pcPath = iResult == IDYES ? spcDesktopReportPath : spcUserReportPath;
+	if (pcPath[0] == L'\0')
 	{
-		SHGetSpecialFolderPathW(HWND_DESKTOP, spcPath, CSIDL_DESKTOP, FALSE);
-	}
-	else
-	{
-		if (spcAppDataOverride[0] != L'\0')
-		{
-			wcscpy_s(spcPath, std::size(spcPath), spcAppDataOverride);
-		}
-		else
-		{
-			PWSTR pWideChar = nullptr;
-			HRESULT hresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
-			if (SUCCEEDED(hresult) && pWideChar != nullptr)
-			{
-				wcscpy_s(spcPath, std::size(spcPath), pWideChar);
-			}
-			else
-			{
-				// OS failure on the SIGABRT-reachable crash path (allocator-free): never copy from null. Fall back to the Desktop (fixed-buffer, like the IDYES branch) so the report still lands somewhere writable; if that also fails spcPath stays zero-initialized.
-				SHGetSpecialFolderPathW(HWND_DESKTOP, spcPath, CSIDL_DESKTOP, FALSE);
-			}
-			CoTaskMemFree(pWideChar);
-		}
-
-		wcscat_s(spcPath, std::size(spcPath), L"\\");
-		wcscat_s(spcPath, std::size(spcPath), pcGameName);
-
-		// Allocator-free single-level create (parent guaranteed present above): the SIGABRT-reachable crash path must not re-enter the heap, which std::filesystem::create_directories would. Ignore the result — ERROR_ALREADY_EXISTS is fine, mirroring create_directories' no-op on an existing dir.
-		CreateDirectoryW(spcPath, nullptr);
+		// Startup resolution failed for this candidate: write beside the working directory rather than nowhere.
+		pcPath = kpcFallbackReportPath;
 	}
 
-	wchar_t pcCrashReportFile[128] {};
-	swprintf_s(pcCrashReportFile, std::size(pcCrashReportFile), L"\\%s-Crash-Report.txt", pcGameName);
-	std::replace(std::begin(pcCrashReportFile), std::end(pcCrashReportFile), L' ', L'-');
-	wcscat_s(spcPath, std::size(spcPath), pcCrashReportFile);
+	common::CrashFileWriter writer(pcPath);
 
-	std::ofstream ofstream(spcPath);
+	writer.Write("\n\n\nPlease send this crash report to brokenteapotstudios@gmail.com, and if possible describe exactly what you were doing when it occurred.\n");
 
-	ofstream << "\n\n\nPlease send this crash report to brokenteapotstudios@gmail.com, and if possible describe exactly what you were doing when it occurred.\n" << std::flush;
-	ofstream << "Game name: " << game::kGameName << "\n" << std::flush;
-	ofstream << "Game version: " << game::kiGameVersion << "\n" << std::flush;
+	char pcLine[256] {};
+	std::snprintf(pcLine, std::size(pcLine), "Game name: %.*s\n", static_cast<int>(game::kGameName.size()), game::kGameName.data());
+	writer.Write(pcLine);
+	std::snprintf(pcLine, std::size(pcLine), "Game version: %lld\n", static_cast<long long>(game::kiGameVersion));
+	writer.Write(pcLine);
 
+	writer.Write("\n\n\n");
 	if (pException.has_value())
 	{
-		ofstream << "\n\n\n" << pException.value()->what() << "\n" << std::flush;
+		writer.Write(pException.value()->what());
 	}
 	else
 	{
-		ofstream << "\n\n\nUnknown exception\n" << std::flush;
+		writer.Write("Unknown exception");
 	}
+	writer.Write("\n");
 
-	ofstream << "\n\n\n<Begin callstack>\n" << std::flush;
-	common::OfstreamStackWalker ofstreamStackWalker(StackWalker::AfterCatch, &ofstream);
-	ofstreamStackWalker.ShowCallstack();
-	ofstream << "<End callstack>\n" << std::flush;
+	writer.Write("\n\n\n<Begin callstack>\n");
+	common::CrashFileStackWalker crashFileStackWalker(StackWalker::AfterCatch, &writer);
+	crashFileStackWalker.ShowCallstack();
+	writer.Write("<End callstack>\n");
 
-	ofstream << "\n\n\n<Begin DxDiag>\n" << std::flush;
+	writer.Write("\n\n\n<Begin DxDiag>\n");
 	// The DxDiag thread appends to sDxDiag without a lock. The real crash path always joins it first, but the agent crash-report
 	// fixture calls this mid-main-loop, so skip the still-growing string rather than race it; the markers are always written.
 	if (sbDxDiagComplete.load(std::memory_order_acquire))
 	{
-		ofstream << sDxDiag;
+		writer.Write(sDxDiag.c_str());
 	}
-	ofstream << "<End DxDiag>\n" << std::flush;
+	writer.Write("<End DxDiag>\n");
 
-	common::LogDumpBuffers(ofstream);
-
-	ofstream.close();
+	common::LogDumpBuffers(writer);
 }
 
 void ReadDxDiag()

@@ -349,7 +349,10 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 		std::string errorMessage = "Failed to create Vulkan instance.\n\nVulkan 1.2 or higher is required.\n\nError: ";
 		errorMessage += pcResult;
 
-		MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+		if (!AgentLaunched())
+		{
+			MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+		}
 
 		throw std::runtime_error("Vulkan 1.2 not available");
 	}
@@ -511,7 +514,13 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 			errorMessage += " is required for ";
 			errorMessage += rRequiredFeature.pcReason;
 			errorMessage += ".";
-			MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+
+			LOG(kGraphics, kError, "Required Vulkan feature {} not supported ({})", rRequiredFeature.pcName, rRequiredFeature.pcReason);
+
+			if (!AgentLaunched())
+			{
+				MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+			}
 
 			std::string throwMessage = rRequiredFeature.pcName;
 			throwMessage += " not supported";

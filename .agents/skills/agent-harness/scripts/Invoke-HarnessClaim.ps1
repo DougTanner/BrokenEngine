@@ -265,7 +265,8 @@ try {
 	}
 
 	# Executables expecting one pack version and data carrying another fail deep inside the launch, at
-	# the runtime manifest trust boundary, as a hidden modal dialog and then a ping timeout. Proving the
+	# the runtime manifest trust boundary, exiting before the harness ping: reported as an unexpected
+	# process exit when process checking is active, otherwise only as a ping timeout. Proving the
 	# pairing here — before provisioning and before the lock — blocks with no owner token or claim left
 	# behind, and the caller supplies the same data directory the launch will pass to the game.
 	$dataDirectory = Get-AgentCanonicalPath $GameDataDirectory

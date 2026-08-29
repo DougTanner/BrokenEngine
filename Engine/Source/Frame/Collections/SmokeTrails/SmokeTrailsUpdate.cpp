@@ -38,7 +38,7 @@ void SmokeTrailsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFra
 {
 }
 
-void SmokeTrailsPostRender::Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, uint8_t uiTypeIndex, smoke_trails_t reuseId)
+void SmokeTrailsPostRender::Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, uint8_t uiTypeIndex)
 {
 	ASSERT(!rId.IsValid());
 
@@ -47,29 +47,13 @@ void SmokeTrailsPostRender::Add(game::Frame& __restrict rFrame, smoke_trails_t& 
 
 	GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 
-	smoke_trails_t id;
-	int64_t iSpawnIndex = 0;
-	if (reuseId.IsValid())
-	{
-		auto [index, reusedId] = AddIndexableElementWithId(rInterpolate, rPostRender, reuseId);
-		iSpawnIndex = index;
-		id = reusedId;
-	}
-	else
-	{
-		auto [index, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
-		iSpawnIndex = index;
-		id = newId;
-	}
+	auto [iSpawnIndex, id] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
 
 	rId = id;
 	rPostRender.puiIds[iSpawnIndex] = id;
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
 	rInterpolate.puiTypeIndices[iSpawnIndex] = uiTypeIndex;
-	if (!reuseId.IsValid())
-	{
-		rInterpolate.pfStartTimes[iSpawnIndex] = rFrame.interpolate.fCurrentTime;
-	}
+	rInterpolate.pfStartTimes[iSpawnIndex] = rFrame.interpolate.fCurrentTime;
 }
 
 void SmokeTrailsPostRender::Remove(game::Frame& __restrict rFrame, smoke_trails_t& rId)

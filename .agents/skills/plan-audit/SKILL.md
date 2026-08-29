@@ -25,8 +25,10 @@ approval").
 
 ## Inputs
 
-- Immutable complete plan supplied inline, by exact file path, or as the exact
-  claimed-plan revision.
+- Immutable complete plan as a file path readable from the worktree root — the
+  exact claimed-Plan path or a scratch snapshot the manager wrote (a gitignored
+  `Temp/` path is fine). Never inline text: step 1's citation check takes only a
+  path.
 - Draft execution card for every Tier-2 and Tier-3 plan: proposed
   tier and triggers, roles, and each acceptance criterion with its decisive
   check, expected result, and independent signal when a check is duplicated.
@@ -126,7 +128,7 @@ clean pass, proceeds to `/external-grill-plan`; Tier 2 returns to the manager.
 
 For each finding:
 
-> `PA-F-###` — `plan-path:line` (for an inline plan, the line in the supplied plan text) — category — concrete problem — evidence: `repository-path:line` — proposed improvement
+> `PA-F-###` — `plan-path:line` — category — concrete problem — evidence: `repository-path:line` — proposed improvement
 
 If clean, state `PASS — no meaningful plan flaws found.` Return:
 

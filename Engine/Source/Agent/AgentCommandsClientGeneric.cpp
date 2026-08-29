@@ -609,6 +609,14 @@ void CommandWindowState(const nlohmann::json& rParams, nlohmann::json& rResult)
 	});
 }
 
+// audio_resume: resume client audio, which an agent launch boots suspended (Main.cpp) and which only a real OS focus
+// gain would otherwise resume — something the harness never produces. Runs on the client main thread via Drain(), the
+// thread AudioManager::Update runs on. Repeat calls re-apply the same state. No parameters; no result fields.
+void CommandAudioResume([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+{
+	engine::gpAudioManager->Resume();
+}
+
 // dump_render_target: read back an offscreen render target and encode it (normalized grayscale PNG for
 // single-channel, direct PNG for 4x8-bit, optional raw .bin). Schema: {"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}.
 void CommandDumpRenderTarget(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
@@ -1127,6 +1135,11 @@ bool ExecuteClientAgentCommand(std::string_view cmd, const nlohmann::json& rPara
 	if (cmd == "window_state")
 	{
 		CommandWindowState(rParams, rResult);
+		return true;
+	}
+	if (cmd == "audio_resume")
+	{
+		CommandAudioResume(rParams, rResult);
 		return true;
 	}
 	if (cmd == "dump_render_target")

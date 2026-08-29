@@ -101,7 +101,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 
 	// Heap: the std::async shared-state + worker thread (and the previous future's teardown) escape into the
 	// screenshot save thread, so the workbuffer cannot hold them. Suppression is thread-local and covers the rest
-	// of this (synchronous) function; the lambda body runs on the screenshot thread (own ThreadLocal, untracked).
+	// of this (synchronous) function; the lambda body runs on the screenshot thread and suppresses tracking itself.
 	// Main-loop-reachable per frame via the kbScreenshots trigger (Graphics::RenderMainPresentAcquire -> here).
 	// (CopyImageToHostMemory's data.resize + staging buffer are already suppressed in TextureCache.)
 	ScopedSuppressAllocationTracking suppress;
@@ -113,6 +113,10 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 	sSaveScreenshot = std::async(std::launch::async, [data = std::move(data), vkExtent3D, iScreenshot, rRequest, bSwapRedBlue]() mutable
 	{
 		common::ThreadLocal threadLocal(0, common::kThreadScreenshot);
+
+		// Heap: the encoder runs off the main loop on its own ThreadLocal, which still participates in tracking. Its
+		// buffers are image-sized and the result path/JSON escape to the main thread, so none of it fits a workbuffer.
+		ScopedSuppressAllocationTracking suppress;
 
 		try
 		{
@@ -391,8 +395,9 @@ float SingleChannelToFloat(const std::byte* pData, int64_t iTexel, VkFormat vkFo
 }
 
 // Async body: encode readback bytes to PNG (+ optional raw .bin) and publish the capture result. Runs on the
-// screenshot thread (own untracked ThreadLocal). Only formats pre-validated in ValidateDumpRenderTargetRequest
-// reach the PNG paths; any unexpected failure publishes an error result so the deferred poll never hangs.
+// screenshot thread (own ThreadLocal; the lambda suppresses tracking). Only formats pre-validated in
+// ValidateDumpRenderTargetRequest reach the PNG paths; any unexpected failure publishes an error result so the
+// deferred poll never hangs.
 void EncodeAndWriteDump(std::vector<std::byte>& rData, VkExtent3D vkExtent3D, VkFormat vkFormat, const DumpRenderTargetRequest& rRequest)
 {
 	try
@@ -578,6 +583,9 @@ void DumpRenderTarget(int64_t iFramebufferIndex, const DumpRenderTargetRequest& 
 	sDump = std::async(std::launch::async, [data = std::move(data), vkExtent3D, vkFormat, rRequest]() mutable
 	{
 		common::ThreadLocal threadLocal(0, common::kThreadScreenshot);
+
+		// Heap: as SaveScreenshot's encoder.
+		ScopedSuppressAllocationTracking suppress;
 		EncodeAndWriteDump(data, vkExtent3D, vkFormat, rRequest);
 	});
 }

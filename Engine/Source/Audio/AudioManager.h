@@ -14,10 +14,11 @@ namespace engine
 
 enum class AudioManagerFlags : uint8_t
 {
-	// True once a live output graph produced a pinned format with real native channels. False for a
-	// silent-start engine (no device at construction, or a startup pin that left the graph silent):
-	// mPinnedOutputFormat holds no valid channel count yet, so Update recovery must reset to the device
-	// default to discover native channels before it can pin.
+	// True only while the live output graph runs at the pinned mastering rate, so mPinnedOutputFormat holds a
+	// channel count valid for the current endpoint and Update's device-loss path may re-apply it directly.
+	// False for every other state — a silent-start engine, a device-default fallback graph (audible but
+	// resampled), or a pin the device rejected — where Update recovery must first reset to the device default
+	// to discover the endpoint's native channels before it can pin.
 	kPinnedFormatValid = 0x01,
 
 	// Silent-start recovery log-once gate: emits the "device absent" warning a single time until a device
@@ -90,8 +91,9 @@ private:
 	std::atomic<bool> mbClearVoicesRequested = false;
 	int64_t miMasteringVoiceChannels = 0;
 
-	// Mastering voice pinned to this format (native channels, kiMasteringSampleRate). Reused by the
-	// device-reset path so the rate pin survives Reset — DirectXTK does not cache the ctor wfx.
+	// Format the mastering voice was pinned to (native channels, kiMasteringSampleRate); its channel count
+	// matches the current endpoint only while kPinnedFormatValid is set. Reused by the device-reset path so
+	// the rate pin survives Reset — DirectXTK does not cache the ctor wfx.
 	WAVEFORMATEX mPinnedOutputFormat {};
 
 	// State bits (pinned-format validity, silent-recovery log-once, expected-reset suppression); see the

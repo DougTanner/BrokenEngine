@@ -6,9 +6,13 @@
 # Process identity is always the registered PID plus its start time: a live PID whose start time
 # does not match the registered one is a recycled PID, not the registered process, and a live value
 # alone never establishes identity. There is no process-name search anywhere.
+# Register also starts a detached watcher that holds a limited-query handle on the registered
+# process, because only a handle opened while the process is still alive lets a separate process
+# read its exit code; a watcher that cannot bind the registered identity records no exit code and
+# Check then reports the code as unknown.
 [CmdletBinding()]
 param(
-	# Baseline | Register | Check.
+	# Baseline | Register | Check, plus Watch (internal, spawned by Register).
 	[Parameter(Mandatory)][string] $Action,
 	# Absolute path of this run's JSON state file. Callers place it under the worktree's ignored
 	# Temp directory; state is never written into tracked repository content.
@@ -30,6 +34,10 @@ Set-StrictMode -Version Latest
 
 $MaximumMessageLength = 256
 $StateSchemaVersion = 'broken-engine-harness-process-check-state/v1'
+$ExitSchemaVersion = 'broken-engine-harness-process-exit/v1'
+$PollIntervalMilliseconds = 100
+$WatcherBindTimeoutSeconds = 5
+$ExitCodeWaitSeconds = 2
 $NoExceptionText = '(no exception text)'
 $CallstackMarker = '<Begin callstack>'
 $VersionPrefix = 'Game version:'
@@ -204,6 +212,63 @@ function Write-CheckState([string] $Path, $Roles) {
 	[IO.File]::WriteAllText($Path, ($state | ConvertTo-Json -Depth 32), [Text.UTF8Encoding]::new($false))
 }
 
+# One sidecar per registered PID, so a watcher left over from an earlier launch of the same role can
+# never be read as the current one.
+function Get-ExitSidecarPath([string] $EvidencePath, [string] $Role, [int] $ProcessId) {
+	return Join-Path $EvidencePath "$Role-$ProcessId-exit.json"
+}
+
+function Read-ExitSidecar([string] $Path) {
+	try {
+		if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+		$parsed = [IO.File]::ReadAllText($Path) | ConvertFrom-Json -Depth 32
+		foreach ($name in @('schemaVersion', 'role', 'processId', 'startTimeUtc', 'bound', 'exitCode')) {
+			if ($null -eq $parsed.PSObject.Properties[$name]) { return $null }
+		}
+		if ([string]$parsed.schemaVersion -cne $ExitSchemaVersion) { return $null }
+		return $parsed
+	}
+	catch {
+		# An unreadable sidecar is treated as absent, and the caller retries within its own budget.
+		return $null
+	}
+}
+
+# Only the sidecar of the exact registered identity may speak for a registration. The sidecar
+# directory outlives a run, so after PID reuse a sidecar left by an earlier run can carry the
+# registered PID while belonging to a different process; the start time separates them.
+function Test-SidecarIdentity($Sidecar, [int] $ProcessId, [string] $StartTimeUtc) {
+	if ($null -eq $Sidecar) { return $false }
+	if ([int]$Sidecar.processId -ne $ProcessId) { return $false }
+	return ((ConvertTo-TimestampText $Sidecar.startTimeUtc) -ceq $StartTimeUtc)
+}
+
+function Write-ExitSidecar([string] $Path, $Record) {
+	$directory = Split-Path -Parent $Path
+	if ($directory) { [IO.Directory]::CreateDirectory($directory) | Out-Null }
+	$temporaryPath = "$Path.tmp"
+	[IO.File]::WriteAllText($temporaryPath, ($Record | ConvertTo-Json -Depth 32), [Text.UTF8Encoding]::new($false))
+	# Publishing by move means a reader never observes a partially written sidecar.
+	[IO.File]::Move($temporaryPath, $Path, $true)
+}
+
+# The watcher publishes the exit code just after the process disappears, so a gone process gets a
+# bounded wait before its code is reported as unknown. A watcher that never bound the registered
+# identity ends the wait immediately: no code will ever arrive.
+function Get-RegisteredExitCode([string] $EvidencePath, $Record) {
+	$sidecarPath = Get-ExitSidecarPath $EvidencePath ([string]$Record.role) ([int]$Record.processId)
+	$deadline = [datetime]::UtcNow.AddSeconds($ExitCodeWaitSeconds)
+	while ($true) {
+		$sidecar = Read-ExitSidecar $sidecarPath
+		if (Test-SidecarIdentity $sidecar ([int]$Record.processId) ([string]$Record.startTimeUtc)) {
+			if (-not [bool]$sidecar.bound) { return $null }
+			if ($null -ne $sidecar.exitCode) { return [int]$sidecar.exitCode }
+		}
+		if ([datetime]::UtcNow -ge $deadline) { return $null }
+		Start-Sleep -Milliseconds $PollIntervalMilliseconds
+	}
+}
+
 try {
 	$statePath = [IO.Path]::GetFullPath($StatePath)
 	$result.statePath = $statePath
@@ -247,7 +312,34 @@ try {
 			$record[0].startTimeUtc = $startTime.ToString('o', [cultureinfo]::InvariantCulture)
 			$record[0].registeredUtc = [datetime]::UtcNow.ToString('o', [cultureinfo]::InvariantCulture)
 			Write-CheckState $statePath $roles
-			Complete-ProcessCheck 0 'pass' 'ok' "Registered role '$Role' as PID $ProcessId started $($record[0].startTimeUtc)."
+			# Start-Process joins ArgumentList items, so every path-valued argument is quoted.
+			Start-Process pwsh -ArgumentList @(
+				'-NoProfile', '-File', ('"' + $PSCommandPath + '"'),
+				'-Action', 'Watch',
+				'-StatePath', ('"' + $statePath + '"'),
+				'-Role', ('"' + $Role + '"'),
+				'-ProcessId', $ProcessId,
+				'-StartTimeUtc', ('"' + $record[0].startTimeUtc + '"')
+			) -WindowStyle Hidden
+			# The watcher publishes its sidecar as soon as it has bound or failed to bind, so a short
+			# wait here tells the caller whether an exit code can be expected at all.
+			$sidecarPath = Get-ExitSidecarPath $evidencePath $Role $ProcessId
+			$bindDeadline = [datetime]::UtcNow.AddSeconds($WatcherBindTimeoutSeconds)
+			$sidecar = $null
+			while ($true) {
+				$sidecar = Read-ExitSidecar $sidecarPath
+				# A sidecar carrying any other identity is an earlier run's leftover, so keep polling for
+				# this watcher's own publication instead of answering from it.
+				if (Test-SidecarIdentity $sidecar $ProcessId $record[0].startTimeUtc) { break }
+				if ([datetime]::UtcNow -ge $bindDeadline) { $sidecar = $null; break }
+				Start-Sleep -Milliseconds $PollIntervalMilliseconds
+			}
+			$watcherBound = ($null -ne $sidecar -and [bool]$sidecar.bound)
+			$result.watcherBound = $watcherBound
+			$watcherText = 'exit-code watcher not bound'
+			if ($watcherBound) { $watcherText = 'exit-code watcher bound' }
+			Complete-ProcessCheck 0 'pass' 'ok' ("Registered role '$Role' as PID $ProcessId started " +
+				"$($record[0].startTimeUtc) ($watcherText).")
 		}
 		'Check' {
 			$roles = Read-CheckState $statePath
@@ -260,8 +352,13 @@ try {
 				Complete-ProcessCheck 1 'error' 'check.no-registered-roles' "No role in '$statePath' has a registered process; Register must run before Check."
 			}
 			$findings = @()
+			$exitedRoles = @()
 			foreach ($record in $registered) {
 				if (Test-RegisteredProcessAlive ([int]$record.processId) $record.startTimeUtc) { continue }
+				$exitCode = Get-RegisteredExitCode $evidencePath $record
+				$exitCodeText = 'unknown'
+				if ($null -ne $exitCode) { $exitCodeText = [string]$exitCode }
+				$exitedRoles += "$($record.role) (exit code $exitCodeText)"
 				# The registered process is gone. Only a candidate that differs from the pre-launch
 				# baseline is this run's report; an unchanged one predates the launch and is stale.
 				$changed = @(foreach ($candidate in @($record.candidates)) {
@@ -270,7 +367,7 @@ try {
 				})
 				if ($changed.Count -eq 0) {
 					# No report changed, so the exit is reported with no report evidence rather than invented evidence.
-					$findings += [ordered]@{ role = $record.role; reportPath = $null; headline = $null; evidencePath = $evidencePath }
+					$findings += [ordered]@{ role = $record.role; reportPath = $null; headline = $null; exitCode = $exitCode; evidencePath = $evidencePath }
 					continue
 				}
 				foreach ($report in $changed) {
@@ -278,6 +375,7 @@ try {
 						role = $record.role
 						reportPath = $report.path
 						headline = Get-ReportHeadline ([string]$report.path)
+						exitCode = $exitCode
 						evidencePath = $evidencePath
 					}
 				}
@@ -291,11 +389,60 @@ try {
 				}
 				$reportDetail = ' No crash report changed since launch.'
 				if ($reported.Count -gt 0) { $reportDetail = " Crash report(s): $($reported -join '; ')." }
-				$exitedRoles = @($findings | ForEach-Object { $_.role } | Select-Object -Unique) -join ', '
-				Complete-ProcessCheck 2 'blocked' 'check.unexpected-exit' ("Registered role(s) $exitedRoles " +
+				Complete-ProcessCheck 2 'blocked' 'check.unexpected-exit' ("Registered role(s) $($exitedRoles -join ', ') " +
 					"exited unexpectedly.$reportDetail Evidence: '$evidencePath'.")
 			}
 			Complete-ProcessCheck 0 'pass' 'ok' "All $($registered.Count) registered role(s) are alive with their registered process identity."
+		}
+		'Watch' {
+			# Spawned detached by Register, and the only reader of its result is Check's sidecar read,
+			# so this branch writes nothing to stdout and reports no failure.
+			$sidecarPath = Get-ExitSidecarPath $evidencePath $Role $ProcessId
+			$exitRecord = [ordered]@{
+				schemaVersion = $ExitSchemaVersion
+				role = $Role
+				processId = $ProcessId
+				startTimeUtc = $StartTimeUtc
+				bound = $false
+				exitCode = $null
+				exitedUtc = $null
+			}
+			try {
+				Add-Type -Namespace BrokenEngineHarness -Name NativeProcess -MemberDefinition @'
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern IntPtr OpenProcess(uint desiredAccess, bool inheritHandle, uint processId);
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+[DllImport("kernel32.dll", SetLastError = true)]
+[return: MarshalAs(UnmanagedType.Bool)]
+public static extern bool GetExitCodeProcess(IntPtr handle, out int exitCode);
+[DllImport("kernel32.dll", SetLastError = true)]
+[return: MarshalAs(UnmanagedType.Bool)]
+public static extern bool CloseHandle(IntPtr handle);
+'@
+				# PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE. Opening the handle before the
+				# identity is verified keeps the PID from being recycled between that check and the
+				# wait, and the open handle keeps the exit code readable after the process ends.
+				$handle = [BrokenEngineHarness.NativeProcess]::OpenProcess(0x1000 -bor 0x00100000, $false, [uint32]$ProcessId)
+				if ($handle -ne [IntPtr]::Zero) {
+					if (Test-RegisteredProcessAlive $ProcessId $StartTimeUtc) {
+						$exitRecord.bound = $true
+						Write-ExitSidecar $sidecarPath $exitRecord
+						[void][BrokenEngineHarness.NativeProcess]::WaitForSingleObject($handle, [uint32]::MaxValue)
+						$observedExitCode = 0
+						if ([BrokenEngineHarness.NativeProcess]::GetExitCodeProcess($handle, [ref]$observedExitCode)) {
+							$exitRecord.exitCode = $observedExitCode
+							$exitRecord.exitedUtc = [datetime]::UtcNow.ToString('o', [cultureinfo]::InvariantCulture)
+						}
+					}
+					[void][BrokenEngineHarness.NativeProcess]::CloseHandle($handle)
+				}
+				Write-ExitSidecar $sidecarPath $exitRecord
+			}
+			catch {
+				# Nothing reads a watcher failure; Check reports the exit code as unknown instead.
+			}
+			exit 0
 		}
 		default {
 			Complete-ProcessCheck 1 'error' 'action.unknown' "Action '$Action' is not one of Baseline, Register, or Check."

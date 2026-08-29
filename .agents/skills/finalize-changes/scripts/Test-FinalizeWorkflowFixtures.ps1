@@ -119,6 +119,9 @@ function Stop-JsonScript($Started) {
 				if (-not $Started.Process.HasExited) { try { $Started.Process.Kill() } catch { } }
 			}
 			if (-not $Started.Process.WaitForExit(5000)) { throw "Timed out reaping JSON script process $($Started.Process.Id)." }
+			# A killed child can die inside 'git status' on the scratch primary or its linked session worktree, leaving an
+			# index.lock with no live holder. Nothing would ever release it, so every later scratch git command would fail.
+			Remove-Item -Force -ErrorAction SilentlyContinue -Path (Join-Path $primary '.git\index.lock'), (Join-Path $primary '.git\worktrees\*\index.lock')
 		}
 		$Started.StdoutTask.GetAwaiter().GetResult() | Out-Null
 		$Started.StderrTask.GetAwaiter().GetResult() | Out-Null
@@ -221,6 +224,7 @@ $fixtureEnvironment = $null
 $fixtureExitCode = 0
 $script:PrimaryAdvanceOwner = $null
 $script:PrimaryHistoryContract = $null
+$script:PrimaryApprovalReviewFile = $null
 $historyProducerText = Get-Content -Raw (Join-Path $PSScriptRoot '..\..\code-quality-metrics\scripts\Invoke-CodeQualityMetricsHistory.ps1')
 $approvalProducerText = Get-Content -Raw (Join-Path $PSScriptRoot 'Invoke-FinalizeApprovalPreparation.ps1')
 $landingProducerText = Get-Content -Raw (Join-Path $PSScriptRoot 'Invoke-FinalizeLanding.ps1')
@@ -378,6 +382,24 @@ function Write-FixtureApprovalResultFile([string] $Path, $Contract) {
 		schemaVersion = 'broken-engine-finalize-approval-preparation/v3'
 		status = 'pass'
 		historyContract = [ordered]@{ digest = $Contract.digest; generatorDigest = $Contract.generatorDigest; captureDigest = $Contract.captureDigest; runtimeDigest = $Contract.runtimeDigest; patchDigest = $Contract.patchDigest; mode = $Contract.mode }
+	}
+	[IO.File]::WriteAllText($Path, ($artifact | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+	return $Path
+}
+
+# Both advance routes read the SmartGit approval review receipt from a file; this writes the minimal
+# 'broken-engine-finalize-approval-review/v1' shape those gates require for the supplied candidate.
+function Write-FixtureApprovalReviewResultFile([string] $Path, [string] $ApprovedTip, [string] $Status = 'opened') {
+	$artifact = [ordered]@{
+		schemaVersion = 'broken-engine-finalize-approval-review/v1'
+		status = $Status
+		code = 'ok'
+		message = 'Fixture approval review receipt.'
+		approvedTip = $ApprovedTip
+		executable = $null
+		arguments = @()
+		manualCommand = $null
+		processId = $null
 	}
 	[IO.File]::WriteAllText($Path, ($artifact | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
 	return $Path
@@ -634,14 +656,14 @@ $primaryUnrelatedWorktree = [IO.File]::ReadAllText((Join-Path $primary 'primary-
 # through the splat wrapper, which passes the array intact.
 function New-PrimaryCandidateParameters([Collections.IDictionary] $Extra = @{}) {
 	$parameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@('primary-active-owned.cpp','primary-staged-owned.txt'); CommitMessageFile=$candidateMessage }
-	if ($null -ne $script:PrimaryAdvanceOwner) { $parameters.OwnerToken=$script:PrimaryAdvanceOwner; $parameters.SessionLabel='finalize-fixture'; $parameters.HistoryContractDigest=$script:PrimaryHistoryContract.digest; $parameters.HistoryContractGeneratorDigest=$script:PrimaryHistoryContract.generatorDigest; $parameters.HistoryContractCaptureDigest=$script:PrimaryHistoryContract.captureDigest; $parameters.HistoryContractRuntimeDigest=$script:PrimaryHistoryContract.runtimeDigest; $parameters.HistoryContractPatchDigest=$script:PrimaryHistoryContract.patchDigest; $parameters.HistoryContractMode=$script:PrimaryHistoryContract.mode; $parameters.WorktreeCliExecutable=(Join-Path $primaryOutput 'WorktreeCli.exe') }
+	if ($null -ne $script:PrimaryAdvanceOwner) { $parameters.OwnerToken=$script:PrimaryAdvanceOwner; $parameters.SessionLabel='finalize-fixture'; $parameters.HistoryContractDigest=$script:PrimaryHistoryContract.digest; $parameters.HistoryContractGeneratorDigest=$script:PrimaryHistoryContract.generatorDigest; $parameters.HistoryContractCaptureDigest=$script:PrimaryHistoryContract.captureDigest; $parameters.HistoryContractRuntimeDigest=$script:PrimaryHistoryContract.runtimeDigest; $parameters.HistoryContractPatchDigest=$script:PrimaryHistoryContract.patchDigest; $parameters.HistoryContractMode=$script:PrimaryHistoryContract.mode; $parameters.WorktreeCliExecutable=(Join-Path $primaryOutput 'WorktreeCli.exe'); $parameters.ApprovalReviewResultFile=$script:PrimaryApprovalReviewFile }
 	foreach ($entry in $Extra.GetEnumerator()) { $parameters[$entry.Key] = $entry.Value }
 	return $parameters
 }
 $run = Invoke-JsonScriptWithSplat $candidateScript (New-PrimaryCandidateParameters) $scratchBase
 Assert-Outcome $run 'primary-candidate-temporary-index' 0 'pass' 'candidate.created'
 if ($null -ne $run.Json) {
-	$verifiedCandidate = $run.Json.candidate.commit; $verifiedTree = $run.Json.candidate.tree; $script:PrimaryHistoryContract = $run.Json.historyContract; $script:PrimaryAdvanceOwner = [guid]::NewGuid().ToString(); $primaryCommonDirectory = ((@(Invoke-ScratchGit $primary @('rev-parse','--path-format=absolute','--git-common-dir')))[0].Trim()); Invoke-WorktreeCli @('lock','claim','--repo',$primaryCommonDirectory,'--owner',$script:PrimaryAdvanceOwner,'--session','finalize-fixture','--worktree',$primary,'--lease-seconds','3600') | Out-Null
+	$verifiedCandidate = $run.Json.candidate.commit; $verifiedTree = $run.Json.candidate.tree; $script:PrimaryHistoryContract = $run.Json.historyContract; $script:PrimaryAdvanceOwner = [guid]::NewGuid().ToString(); $primaryCommonDirectory = ((@(Invoke-ScratchGit $primary @('rev-parse','--path-format=absolute','--git-common-dir')))[0].Trim()); Invoke-WorktreeCli @('lock','claim','--repo',$primaryCommonDirectory,'--owner',$script:PrimaryAdvanceOwner,'--session','finalize-fixture','--worktree',$primary,'--lease-seconds','3600') | Out-Null; $script:PrimaryApprovalReviewFile = Write-FixtureApprovalReviewResultFile (Join-Path $scratchBase 'primary-approval-review-result.json') $verifiedCandidate 'opened'
 	Assert-True ($beforePrimaryIndex -ceq ((@(Invoke-ScratchGit $primary @('ls-files','-s')) -join "`n"))) 'temporary index preserves real index'
 	Assert-True ($primaryDisjointBefore -ceq (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','--untracked-files=all')) -join "`n")) 'primary candidate preserves disjoint staged unstaged and untracked state'
 	$rollback = Invoke-JsonScriptWithSplat $candidateScript (New-PrimaryCandidateParameters @{ VerifiedCandidateCommit=$verifiedCandidate; VerifiedCandidateTree=$verifiedTree; AdvancePrimary=$true; FixtureFailure='postcondition' }) $scratchBase
@@ -656,6 +678,10 @@ if ($null -ne $run.Json) {
 	Assert-True ($primaryStagedOwnedIndex -ceq (@(Invoke-ScratchGit $primary @('ls-files','--stage','--','primary-staged-owned.txt')) -join "`n")) 'primary post-index rollback restores staged owned mode object and stage exactly'
 	Assert-True ($primaryActiveOwnedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-active-owned.cpp'), [Text.UTF8Encoding]::new($false,$true)) -and $primaryStagedOwnedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-staged-owned.txt'), [Text.UTF8Encoding]::new($false,$true))) 'primary post-index rollback preserves owned worktree bytes'
 	Assert-True ($primaryUnrelatedWorktree -ceq [IO.File]::ReadAllText((Join-Path $primary 'primary-disjoint-untracked.txt'), [Text.UTF8Encoding]::new($false,$true))) 'primary post-index rollback preserves unrelated worktree bytes'
+	$previewReviewFile = Write-FixtureApprovalReviewResultFile (Join-Path $scratchBase 'primary-approval-review-preview.json') $verifiedCandidate 'preview'
+	$notLaunched = Invoke-JsonScriptWithSplat $candidateScript (New-PrimaryCandidateParameters @{ VerifiedCandidateCommit=$verifiedCandidate; VerifiedCandidateTree=$verifiedTree; AdvancePrimary=$true; ApprovalReviewResultFile=$previewReviewFile }) $scratchBase
+	Assert-Outcome $notLaunched 'primary-candidate-blocks-approval-review-not-launched' 2 'blocked' 'approval-review.not-launched'
+	Assert-True ($baseline -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) 'primary approval review gate leaves primary unchanged'
 	$advance = Invoke-JsonScriptWithSplat $candidateScript (New-PrimaryCandidateParameters @{ VerifiedCandidateCommit=$verifiedCandidate; VerifiedCandidateTree=$verifiedTree; AdvancePrimary=$true }) $scratchBase
 	Assert-Outcome $advance 'primary-candidate-atomic-advance' 0 'pass' 'candidate.advanced'
 	Assert-True ($advance.Json.final.replacement -and $advance.Json.final.commit -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) 'primary branch equals deterministic history replacement'
@@ -689,7 +715,7 @@ foreach ($reservedCase in @(
 		$badPrimaryStatusBefore = (@(Invoke-ScratchGit $primary @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
 		$badSessionRefBefore = (@(Invoke-ScratchGit $session @('rev-parse',"refs/heads/$sessionBranch")))[0].Trim()
 		$badSessionStatusBefore = (@(Invoke-ScratchGit $session @('status','--porcelain=v1','-z','--untracked-files=all')) -join '')
-		$badAdvanceParameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@($reservedCase.Path); CommitMessageFile=$candidateMessage; VerifiedCandidateCommit=$badCandidate.Commit; VerifiedCandidateTree=$badCandidate.Tree; HistoryContractDigest=(Get-FixtureJsonDigest $badContract); HistoryContractGeneratorDigest=$badContract.generator.sha256; HistoryContractCaptureDigest=$null; HistoryContractRuntimeDigest=$null; HistoryContractPatchDigest=$badPatchDigest; HistoryContractMode=$badContract.decision.captureMode; WorktreeCliExecutable=(Join-Path $primaryOutput 'WorktreeCli.exe'); SessionLabel='finalize-fixture'; OwnerToken=$badOwner; AdvancePrimary=$true }
+		$badAdvanceParameters = [ordered]@{ Route='primary-commit'; CurrentWorktree=$primary; PrimaryWorktree=$primary; CurrentBranch='main'; PrimaryBranch='main'; Baseline=$baseline; ExpectedCurrentTip=$baseline; ExpectedPrimaryTip=$baseline; OwnedPaths=@($reservedCase.Path); CommitMessageFile=$candidateMessage; VerifiedCandidateCommit=$badCandidate.Commit; VerifiedCandidateTree=$badCandidate.Tree; HistoryContractDigest=(Get-FixtureJsonDigest $badContract); HistoryContractGeneratorDigest=$badContract.generator.sha256; HistoryContractCaptureDigest=$null; HistoryContractRuntimeDigest=$null; HistoryContractPatchDigest=$badPatchDigest; HistoryContractMode=$badContract.decision.captureMode; WorktreeCliExecutable=(Join-Path $primaryOutput 'WorktreeCli.exe'); SessionLabel='finalize-fixture'; OwnerToken=$badOwner; AdvancePrimary=$true; ApprovalReviewResultFile=(Write-FixtureApprovalReviewResultFile (Join-Path $scratchBase "primary-reserved-$($reservedCase.Name)-approval-review.json") $badCandidate.Commit 'opened') }
 		$badAdvance = Invoke-JsonScriptWithSplat $candidateScript $badAdvanceParameters $scratchBase
 		Assert-Outcome $badAdvance "primary-verified-reserved-$($reservedCase.Name)" 2 'blocked' 'history.source-changed'
 		Assert-True ($badPrimaryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','refs/heads/main')))[0].Trim()) -and $badPrimaryRefBefore -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) "primary-verified-reserved-$($reservedCase.Name) leaves primary ref and checkout unchanged"
@@ -722,6 +748,8 @@ if ($null -ne $primaryCarryCandidate.Json) {
 	$primaryCarryParameters.SessionLabel = 'finalize-fixture'
 	$primaryCarryParameters.OwnerToken = $primaryCarryOwner
 	$primaryCarryParameters.AdvancePrimary = $true
+	# A non-'opened' receipt still lands: the review outcome is non-blocking, only a missing attempt blocks.
+	$primaryCarryParameters.ApprovalReviewResultFile = Write-FixtureApprovalReviewResultFile (Join-Path $scratchBase 'primary-carry-approval-review-result.json') $primaryCarryCandidate.Json.candidate.commit 'failed'
 	$primaryCarryJsonBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$baseline`:$historyJsonFixturePath")))[0].Trim()
 	$primaryCarrySvgBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$baseline`:$historySvgFixturePath")))[0].Trim()
 	$primaryCarryAdvance = Invoke-JsonScriptWithSplat $candidateScript $primaryCarryParameters $scratchBase
@@ -791,6 +819,7 @@ $run = Invoke-JsonScript $approvalReviewScript @('-PrimaryWorktree',$primary,'-A
 Assert-Outcome $run 'approval-review-explicit-launch' 0 'opened' 'ok'
 if ($null -ne $run.Json) {
 	Assert-True ($null -ne $run.Json.processId) 'approval-review fixture launch reaches Start-Process'
+	Assert-True ($run.Json.approvedTip -ceq $baseline -and -not $run.Text.Contains("`n")) 'approval-review explicit launch records the reviewed tip on one stdout line'
 	$deadline = [DateTime]::UtcNow.AddSeconds(5)
 	while (-not (Test-Path -LiteralPath $reviewArguments) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 25 }
 	Assert-True (Test-Path -LiteralPath $reviewArguments) 'approval-review fixture launch completes boundedly'
@@ -1125,6 +1154,8 @@ $carryCandidate = New-CarryForwardCandidate 'carry-forward-session.txt' 'carry-f
 $carryParameters = [ordered]@{ CurrentWorktree=$session; PrimaryWorktree=$primary; CurrentBranch=$sessionBranch; PrimaryBranch='main'; ExpectedCurrentTip=$carryCandidate.Commit; ExpectedPrimaryTip=$carryCandidate.PrimaryTip; SessionLabel='finalize-fixture'; ApprovedSessionCommit=$carryCandidate.Commit; ApprovedCandidateTree=$carryCandidate.Tree }
 # This success case exercises the non-fixture file route end to end instead of scalar injection.
 $carryParameters.ApprovalPreparationResultFile = Write-FixtureApprovalResultFile (Join-Path $scratchBase 'carry-approval-result.json') $carryCandidate.Contract
+# A non-'opened' receipt still lands: the review outcome is non-blocking, only a missing attempt blocks.
+$carryParameters.ApprovalReviewResultFile = Write-FixtureApprovalReviewResultFile (Join-Path $scratchBase 'carry-approval-review-result.json') $carryCandidate.Commit 'unavailable'
 
 # The file route and scalar injection are mutually exclusive, and hand-supplied Contract scalars
 # are rejected outside the fixture environment before any identity or Git work.
@@ -1140,8 +1171,25 @@ $oldLandingFixtureGuard = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_F
 try {
 	$scalarGateRun = Invoke-JsonScriptWithSplat $landingScript $scalarGateParameters $scratchBase
 	Assert-Outcome $scalarGateRun 'landing-rejects-non-fixture-scalars' 1 'error' 'input.fixture-forbidden'
+	# The exact live hole: outside the fixture environment an omitted receipt cannot be bypassed.
+	$omittedReviewParameters = [ordered]@{} + $carryParameters
+	$omittedReviewParameters.Remove('ApprovalReviewResultFile')
+	$omittedReviewRun = Invoke-JsonScriptWithSplat $landingScript $omittedReviewParameters $scratchBase
+	Assert-Outcome $omittedReviewRun 'landing-blocks-approval-review-omitted-outside-fixture' 2 'blocked' 'approval-review.missing'
+	Assert-True ($carryCandidate.PrimaryTip -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) 'landing-blocks-approval-review-omitted-outside-fixture leaves primary unchanged'
 }
 finally { [Environment]::SetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE', $oldLandingFixtureGuard) }
+foreach ($reviewGateCase in @(
+	[pscustomobject]@{ Name = 'landing-blocks-approval-review-missing'; Code = 'approval-review.missing'; File = (Join-Path $scratchBase 'absent-approval-review-result.json') },
+	[pscustomobject]@{ Name = 'landing-blocks-approval-review-not-launched'; Code = 'approval-review.not-launched'; File = (Write-FixtureApprovalReviewResultFile (Join-Path $scratchBase 'carry-approval-review-preview.json') $carryCandidate.Commit 'preview') },
+	[pscustomobject]@{ Name = 'landing-blocks-approval-review-candidate-mismatch'; Code = 'approval-review.candidate-mismatch'; File = (Write-FixtureApprovalReviewResultFile (Join-Path $scratchBase 'carry-approval-review-mismatch.json') $carryCandidate.PrimaryTip 'opened') }
+)) {
+	$reviewGateParameters = [ordered]@{} + $carryParameters
+	$reviewGateParameters.ApprovalReviewResultFile = $reviewGateCase.File
+	$reviewGateRun = Invoke-JsonScriptWithSplat $landingScript $reviewGateParameters $scratchBase
+	Assert-Outcome $reviewGateRun $reviewGateCase.Name 2 'blocked' $reviewGateCase.Code
+	Assert-True ($carryCandidate.PrimaryTip -ceq ((@(Invoke-ScratchGit $primary @('rev-parse','HEAD')))[0].Trim())) "$($reviewGateCase.Name) leaves primary unchanged"
+}
 $carryJsonBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$($carryCandidate.PrimaryTip):$historyJsonFixturePath")))[0].Trim()
 $carrySvgBlobBefore = (@(Invoke-ScratchGit $primary @('rev-parse', "$($carryCandidate.PrimaryTip):$historySvgFixturePath")))[0].Trim()
 $carryLanding = Invoke-JsonScriptWithSplat $landingScript $carryParameters $scratchBase

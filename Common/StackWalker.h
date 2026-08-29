@@ -100,12 +100,12 @@ protected:
 	}
 };
 
-class OfstreamStackWalker : public FilteredStackWalker
+class CrashFileStackWalker : public FilteredStackWalker
 {
 public:
-	OfstreamStackWalker(ExceptType eExceptType, std::ofstream* pOfstream)
+	CrashFileStackWalker(ExceptType eExceptType, CrashFileWriter* pWriter)
 	: FilteredStackWalker(eExceptType)
-	, mpOfstream(pOfstream)
+	, mpWriter(pWriter)
 	{
 	}
 
@@ -113,10 +113,11 @@ protected:
 
 	void Emit(const char* pcText) override
 	{
-		*mpOfstream << pcText << std::endl;
+		mpWriter->Write(pcText);
+		mpWriter->Write("\n");
 	}
 
-	std::ofstream* mpOfstream = nullptr;
+	CrashFileWriter* mpWriter = nullptr;
 };
 
 } // namespace common

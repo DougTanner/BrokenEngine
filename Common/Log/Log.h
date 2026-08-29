@@ -76,7 +76,7 @@ struct LogBuffer
 		return iFilled;
 	}
 
-	void Dump(std::ofstream& rOfstream) const
+	void Dump(CrashFileWriter& rWriter) const
 	{
 		int64_t iWritePos = miWritePosition.load(std::memory_order_relaxed);
 		if constexpr (WRAP)
@@ -88,7 +88,7 @@ struct LogBuffer
 				const char* pLine = mLines[(iStart + i) % kiLineCount];
 				if (pLine[0] != '\0')
 				{
-					rOfstream << pLine;
+					rWriter.Write(pLine);
 				}
 			}
 		}
@@ -99,7 +99,7 @@ struct LogBuffer
 			{
 				if (mLines[i][0] != '\0')
 				{
-					rOfstream << mLines[i];
+					rWriter.Write(mLines[i]);
 				}
 			}
 		}
@@ -133,7 +133,7 @@ void LogIndent(int64_t iIndent);
 char* LogPrefix(char* pLogBuffer, char* pEnd);
 void LogWrite(char* pLogBuffer);
 void LogWriteRingBuffers(const char* pLogBuffer, int64_t iLength, LogCategory eCategory);
-void LogDumpBuffers(std::ofstream& rOfstream);
+void LogDumpBuffers(CrashFileWriter& rWriter);
 
 // Single per-thread fallback buffer for threads without a ThreadLocal (early startup; OS / driver / COM / gamepad
 // threads). Hoisted out of the Log() template so there is exactly one kiLogBufferSize thread_local per thread rather

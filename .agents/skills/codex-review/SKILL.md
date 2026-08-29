@@ -75,17 +75,18 @@ resolves to Sol.
    skill file — the Tier-2 coherence review, for one — pass a descriptive role
    name as `-AssignedSkill` together with `-AdHocRole`, and put that role's full
    review contract in `-ScopeFile`. `-RiskTier` adds one
-   `Risk tier: <n>` line above that text. `-PromptPath` must not already exist;
-   `-UntrackedPath` names every untracked file the review needs, and does not
-   combine with `-Head`. Every named value must be untracked *and not
-   gitignored*, because the inventory the script consults never reports an
-   ignored path: a file under `Temp/` can never be named, since `Temp` is
-   gitignored, even though `-ScopeFile` and `-PromptPath` may live there. Put
-   review-evidence files the reviewer must read at the session worktree root
-   instead — untracked and outside any ignored directory — and name each one in
-   `-UntrackedPath`; remove them once the review no longer needs them, because
-   any such file left behind stays a mandatory `-UntrackedPath` member.
-2. Read the receipt, one compact JSON object on stdout. Exit `0` carries
+   `Risk tier: <n>` line above that text. `-PromptPath` must not already exist.
+   `-UntrackedPath` names every visible, non-gitignored untracked file in the
+   worktree — step 2 lists the blocks an unnamed, unknown, or ignored path
+   produces — and does not combine with `-Head`. A file the reviewer only needs
+   to read — a plan snapshot for `plan-audit` or `plan-simplicity-review`, for
+   one — is not change evidence: keep it under `Temp/` (gitignored, so never
+   named), give its repo-relative path in `-ScopeFile`, and the reviewer reads
+   it from the worktree like any other file, because the read-only Codex run is
+   rooted at the worktree.
+2. Read the receipt, one compact JSON object on stdout. Every receipt carries
+   `messageLength` and `messageTruncated`, because `message` is capped at 256
+   characters and the flag says when it was cut. Exit `0` carries
    `promptPath`, `promptBytes`, `fileCount`, `binaryExcluded`,
    `sectionsWritten`, and `targetsPath`. For `repo-code-review`,
    `targetsPath` is the newly created targets file next to the prompt and that
@@ -103,11 +104,12 @@ resolves to Sol.
    `prompt.head-required` — `verify-changes` needs a commit-valued `-Head` whose
    reviewed paths' working-tree bytes match that commit's tree;
    `prompt.execution-card-required` — a `plan-audit` scope carries no
-   `execution card` marker; `prompt.typed-artifacts-required` — a `verify-changes` scope is
-   missing the baseline or head SHA, or a typed artifact the reviewed diff
-   triggers, and the message names each one. Exit `1` is a
-   script error: stop and report its `code` and `message` rather than
-   hand-assembling a prompt.
+   `execution card` marker; `prompt.typed-artifacts-required` — a
+   `verify-changes` scope is missing the baseline or head SHA, or a typed
+   artifact the reviewed diff triggers, and the `missing` array lists every
+   missing item, with `message` as the readable summary. Exit `1` is a script
+   error: stop and report its `code` and `message` rather than hand-assembling
+   a prompt.
 3. Run the review with one bare blocking script call, issued with a call timeout
    of at least `600000` ms and never wrapped in a loop or chained with another
    command:

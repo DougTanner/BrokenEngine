@@ -12,11 +12,6 @@ namespace engine
 
 constexpr AUDIO_ENGINE_FLAGS kAudioEngineFlags = AudioEngine_UseMasteringLimiter;
 
-// Pinned mastering-voice sample rate. Must match DataPacker's audiorepair::kiAudioExportSampleRate
-// (packed audio is resampled to this) so source rate == mastering rate and XAudio2 bypasses per-voice
-// SRC. Windows shared-mode does any final device-rate conversion once at the mastering output.
-constexpr int kiMasteringSampleRate = 48000;
-
 // Silent-start recovery probe interval, in Update frames. A deviceless machine holds the silent engine
 // forever, so an unthrottled probe would warn + full-reset every frame; ~2 s at 60 fps latency to pick up
 // a newly attached device is imperceptible against that cost.
@@ -181,9 +176,11 @@ void AudioManager::ConfigureLiveGraph(const std::wstring& rSelectedDeviceId)
 	{
 		LOG(kAudio, kInfo, "  Pinning mastering voice to {} Hz (device native {} Hz)", kiMasteringSampleRate, mpAudioEngine->GetOutputSampleRate());
 		// Reset goes silent before migrating (AudioEngine.cpp SetSilentMode), so a failed pin leaves the
-		// graph silent — fall back to the device-default format to restore a usable graph. DirectXTK reports
-		// failure two ways: false for a missing/busy device, a throw for other failures (e.g. the pinned
-		// channel count exceeding the device's); guard both at this trust boundary.
+		// graph silent — fall back to the device-default format to restore an audible (resampled, unpinned)
+		// graph. That fallback graph is never recorded as pinned: kPinnedFormatValid below stays false unless
+		// the live rate really is kiMasteringSampleRate. DirectXTK reports failure two ways: false for a
+		// missing/busy device, a throw for other failures (e.g. the pinned channel count exceeding the
+		// device's); guard both at this trust boundary.
 		bool bPinned = false;
 		try
 		{
@@ -191,11 +188,14 @@ void AudioManager::ConfigureLiveGraph(const std::wstring& rSelectedDeviceId)
 		}
 		catch (const std::exception&)
 		{
-			LOG(kAudio, kWarning, "  Pinned mastering format Reset threw; falling back to device-default format");
+			LOG(kAudio, kWarning, "  Pinned mastering format Reset threw");
 		}
 		if (!bPinned)
 		{
-			LOG(kAudio, kWarning, "  Mastering-rate pin failed; falling back to device-default format");
+			// The 48 kHz contract this subsystem documents cannot be honored on this device; every source
+			// voice pays SRC from here on, so surface it loudly rather than degrading silently.
+			LOG(kAudio, kError, "  Mastering-rate pin failed; falling back to device-default format (audio resampled, not pinned)");
+			DEBUG_BREAK();
 			try
 			{
 				mpAudioEngine->Reset(nullptr, rSelectedDeviceId.empty() ? nullptr : rSelectedDeviceId.c_str());
@@ -242,7 +242,11 @@ void AudioManager::ConfigureLiveGraph(const std::wstring& rSelectedDeviceId)
 	}
 
 	CacheMasteringVoiceChannels();
-	mFlags.Set(AudioManagerFlags::kPinnedFormatValid);
+
+	// Pinned only when the live graph really runs at the mastering rate — the native-48 kHz skip above or a
+	// successful pin. A device-default fallback graph stays unpinned, so the device-loss path in Update will
+	// not re-apply mPinnedOutputFormat from it.
+	mFlags.Set(AudioManagerFlags::kPinnedFormatValid, mpAudioEngine->GetOutputSampleRate() == kiMasteringSampleRate);
 }
 
 void AudioManager::InitializeAudioSubsystems(const std::wstring& rSelectedDeviceId)
@@ -396,9 +400,10 @@ void AudioManager::FinishDeviceReset()
 
 void AudioManager::AttemptSilentEngineRecovery()
 {
-	// No device was present when the engine was constructed (or a startup pin left it silent), so native
-	// channels were never discovered. Reset to the OS default to bring up a live graph and learn its channel
-	// count, then derive + pin the 48 kHz format. Reset guards match the trust boundary elsewhere.
+	// The engine is silent with no format known to be pinned: no device at construction, a startup pin that
+	// left it silent, or a device-loss pin failure whose stored channel count is now stale. In every case the
+	// current endpoint's channel count is unknown, so reset to the OS default to bring up a live graph and
+	// learn it, then derive + pin the 48 kHz format. Reset guards match the trust boundary elsewhere.
 	if (!(mFlags & AudioManagerFlags::kSilentRecoveryLogged))
 	{
 		LOG(kAudio, kWarning, "Audio device absent; probing for a device to recover");
@@ -422,7 +427,8 @@ void AudioManager::AttemptSilentEngineRecovery()
 
 	// A live graph exists now. Derive the pinned format from the discovered native channels and pin to
 	// 48 kHz — unless the device is already native 48 kHz (mirror startup's skip to avoid a needless graph
-	// teardown/rebuild). A failed pin goes silent, so restore the device-default graph on false/throw.
+	// teardown/rebuild). A failed pin goes silent, so restore the device-default graph on false/throw; that
+	// restored graph is audible but unpinned and is not recorded as pinned below.
 	mPinnedOutputFormat = MakePinnedOutputFormat(static_cast<WORD>(mpAudioEngine->GetOutputChannels()));
 	if (mpAudioEngine->GetOutputSampleRate() != kiMasteringSampleRate)
 	{
@@ -438,10 +444,14 @@ void AudioManager::AttemptSilentEngineRecovery()
 		}
 		catch (const std::exception&)
 		{
-			LOG(kAudio, kWarning, "Pinned mastering format Reset threw during silent recovery; restoring device-default graph");
+			LOG(kAudio, kWarning, "Pinned mastering format Reset threw during silent recovery");
 		}
 		if (!bPinned)
 		{
+			// Same contract loss as the startup pin failure: the recovered graph will resample every source
+			// voice, so report it loudly instead of recovering silently into an unpinned graph.
+			LOG(kAudio, kError, "Mastering-rate pin failed during silent recovery; restoring device-default graph (audio resampled, not pinned)");
+			DEBUG_BREAK();
 			try
 			{
 				mpAudioEngine->Reset(nullptr, nullptr);
@@ -454,10 +464,12 @@ void AudioManager::AttemptSilentEngineRecovery()
 		mFlags.Clear(AudioManagerFlags::kExpectedResetInProgress);
 	}
 
-	// Only claim recovery — pinned-format validity, re-armed warning, voice reset — when the graph is live.
+	// Only claim recovery — re-armed warning, voice reset — when the graph is live, and claim the pin only
+	// when that live graph runs at the mastering rate. A device-default fallback graph is audible but
+	// unpinned, so Update's device-loss path must not re-apply mPinnedOutputFormat from it.
 	if (mpAudioEngine->IsAudioDevicePresent())
 	{
-		mFlags.Set(AudioManagerFlags::kPinnedFormatValid);
+		mFlags.Set(AudioManagerFlags::kPinnedFormatValid, mpAudioEngine->GetOutputSampleRate() == kiMasteringSampleRate);
 		mFlags.Clear(AudioManagerFlags::kSilentRecoveryLogged);
 		LOG(kAudio, kInfo, "Audio device recovered; live graph established");
 		FinishDeviceReset();
@@ -492,9 +504,9 @@ void AudioManager::Update(const game::Frame* pFrame)
 			// SRC bypass; Reset(nullptr) would otherwise recreate it at the new default device's rate. DirectXTK reports
 			// failure two ways: Reset returns false for a missing/busy device, but THROWS for any other failure — including
 			// CreateMasteringVoice failing when the pinned channel count exceeds the new device's (e.g. a 7.1 -> stereo
-			// hot-swap). Guard both at this trust boundary (the ctor guards Reset the same way) and fall back to the
-			// device-default format, which requests the device's own channels/rate and so cannot mismatch (only the SRC
-			// bypass is lost until the next launch re-pins).
+			// hot-swap). Guard both at this trust boundary (the ctor guards Reset the same way). The stale channel count
+			// is what a hot-swap invalidates, so a failure drops the pin claim and leaves the engine silent: the else
+			// branch below then probes the new endpoint, rediscovers its channel count, and re-pins from it.
 			bool bMasteringReset = false;
 			try
 			{
@@ -502,29 +514,24 @@ void AudioManager::Update(const game::Frame* pFrame)
 			}
 			catch (const std::exception&)
 			{
-				LOG(kAudio, kWarning, "Pinned mastering format Reset threw (device incompatible with the pinned channel count); falling back to device-default format");
+				LOG(kAudio, kWarning, "Pinned mastering format Reset threw (device incompatible with the pinned channel count)");
 			}
-
 			if (!bMasteringReset)
 			{
-				try
-				{
-					mpAudioEngine->Reset(nullptr, nullptr);
-				}
-				catch (const std::exception&)
-				{
-					// Device fully unusable; the IsAudioDevicePresent() retry loop below re-enters the reset path next frame.
-					LOG(kAudio, kWarning, "Device-default format Reset also failed; audio stays off until the device recovers");
-				}
+				LOG(kAudio, kWarning, "Pinned mastering format Reset failed; staying silent until the device probe re-pins");
 			}
+
+			// A failed Reset leaves masterRate zero (AudioEngine.cpp), so this records the pin only on success.
+			mFlags.Set(AudioManagerFlags::kPinnedFormatValid, mpAudioEngine->IsAudioDevicePresent() && mpAudioEngine->GetOutputSampleRate() == kiMasteringSampleRate);
 
 			FinishDeviceReset();
 		}
 		else
 		{
-			// Silent-start engine: mPinnedOutputFormat was never validated against a live graph (kPinnedFormatValid
-			// false — a silent start, or a startup pin whose Resets both failed), so the pinned-first path above
-			// cannot run. Throttle the probe so a permanently-deviceless machine does not
+			// No graph is known to be pinned (kPinnedFormatValid false — a silent start, a startup or recovery
+			// fallback graph running at the device rate, or a device-loss pin failure that invalidated the stored
+			// channel count), so the pinned-first path above cannot run: the probe below resets to the OS default
+			// to rediscover the endpoint's channels and re-pin. Throttle it so a permanently-deviceless machine does not
 			// warn + full-reset every frame (a stable silent engine makes this branch true every frame).
 			if (++miSilentRecoveryFrameCounter >= kiSilentRecoveryRetryFrames)
 			{

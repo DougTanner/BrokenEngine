@@ -317,7 +317,16 @@ void BuildCellNavData(NavData& rNavData, const std::vector<IslandPlacement>& rPl
 	// world-positioned around the placement's center. Topology offsets are rebased per island.
 	for (const IslandPlacement& rPlacement : rPlacements)
 	{
-		const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
+		const auto islandIt = gpIslandTerrain->mIslands.find(rPlacement.islandCrc);
+		if (islandIt == gpIslandTerrain->mIslands.end())
+		{
+			// Save and replay grids arrive with unvalidated placement CRCs by design; terminating here is
+			// the intended detection.
+			LOG(kNavData, kError, "BuildCellNavData: placement islandCrc={} has no loaded island template", rPlacement.islandCrc);
+			throw std::out_of_range("placement islandCrc has no loaded island template");
+		}
+
+		const IslandTemplate& rTemplate = islandIt->second;
 		const NavContour& rContour = rTemplate.mNavContour;
 		int32_t iVertexCount = static_cast<int32_t>(rContour.vertices.size());
 		if (iVertexCount == 0)

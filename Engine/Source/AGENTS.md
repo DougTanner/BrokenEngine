@@ -17,13 +17,14 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 ## Startup and Main Loop
 
-- `LaunchOptions` owns command-line parsing. `--loopback-only` is independent of `--agent-port`; `--data-directory` and `--app-data-directory` must each resolve to an existing absolute directory; port values are validated before conversion.
+- `LaunchOptions` owns command-line parsing. `--loopback-only` is independent of `--agent-port`; `--data-directory` and `--app-data-directory` must each resolve to an existing absolute directory; port values are validated before conversion. The `--log-file` sink opens in `wWinMain` immediately after a successful parse, so `FileManager`-constructor diagnostics reach the file while parse rejections do not.
 - Agent launches stay minimized and suppress physical client input while preserving the close/Alt+F4 escape path. Synthetic input and command transport live in Agent (`Agent/AGENTS.md`).
+- A startup failure that ends the process logs at `kError` and puts up its modal dialog only when `AgentLaunched()` (`LaunchOptions.h`) is false, wherever in the runtime the failure is detected.
 - Client sound settings load before `Game` construction. A checked `Mute in background` setting suspends audio on focus loss and focus gain always resumes it; agent launches suspend audio before `Game` construction regardless of the setting so harness clients boot silent.
 - Effective fullscreen resolves in one fixed order: the agent runtime override wins, then `--windowed WxH` forces windowed, then the saved `gFullscreen` preference applies. None of the three writes the saved preference, so an agent command or launch flag never rewrites what the user chose.
 - Client startup waits for terrain elevation and priority textures before renderer construction, then primes each framebuffer before showing the window.
 - `TextureUploadManager` and `FileManager` outlive `MainThread` so crash handling and teardown can use them. Device loss recreates `Graphics` in place.
-- Client COM uses `RO_INIT_MULTITHREADED`. Process and worker priorities, worker counts, and the single-instance policy are set in `Main.cpp`; keep agent mode non-modal.
+- Client COM uses `RO_INIT_MULTITHREADED`. Process and worker priorities, worker counts, and the single-instance policy are set in `Main.cpp`.
 
 ## Frame Ownership
 
@@ -36,7 +37,7 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 ## Crash Reporting
 
-The exception path writes from fixed buffers because it is reachable during heap corruption. Do not add allocator-dependent formatting or path construction there, and do not log from it. Nothing on that path may allocate or follow a pointer the heap owns, so `--app-data-directory` reaches crash handling through a fixed buffer populated during startup rather than through the launch options' heap-owned path storage; reading an inline scalar of the statically allocated launch options, such as the agent port that selects the unprompted non-modal branch, stays within the rule. The override is used only when the complete report path fits the fixed path buffer; otherwise the existing per-user report location remains.
+The exception path writes from fixed buffers because it is reachable during heap corruption. Do not add allocator-dependent formatting or path construction there, and do not log from it. Nothing on that path may allocate or follow a pointer the heap owns, so `--app-data-directory` reaches crash handling through a fixed buffer populated during startup rather than through the launch options' heap-owned path storage; reading an inline scalar of the statically allocated launch options, such as the agent port that selects the unprompted non-modal branch, stays within the rule. The override is used only when the complete report path fits the fixed path buffer; otherwise the existing per-user report location remains. Both report file paths — the Desktop one and the per-user one — are resolved once at startup into fixed buffers, after launch options are parsed, by `ResolveCrashReportPaths`, which also creates the per-user report directory. The exception path only picks one of those buffers, and falls back to a fixed working-directory-relative file name when the picked buffer is empty because its startup resolution failed.
 
 The background DxDiag reader appends to its report string without a lock, and the agent crash-report fixture can enter the exception path while that reader is still running. The report always writes the DxDiag begin/end markers but includes the collected text only once the reader publishes completion.
 

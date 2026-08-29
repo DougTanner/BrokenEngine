@@ -167,21 +167,25 @@ it through the same two-or-three-choice interaction contract.
 
 ## Handoff
 
-Return the complete result inline. `Exact refinements` must preserve one entry
-per decision, including the selected choice and precise plan text/section
-change. `Plan delta` is relative to the frozen plan text; any behavior, scope,
-architecture, acceptance, or verification change is meaningful.
+Return the block below inline. Interview questions carry their full wording in
+the block, because the manager runs the interview from that text and must not
+read a file mid-question. The decision-and-refinement rows, the execution-card
+rows, the execution card itself, the refined implementation plan, reproduction
+recipes, and any other bulk evidence go to one file under `Temp/`, returned as
+that path plus a per-section selector per
+`../../references/subagent-reporting.md`, never as inline text. `Plan delta` is
+relative to the frozen plan text; any behavior, scope, architecture,
+acceptance, or verification change is meaningful.
 
 ```text
 Plan: <exact path or inline plan title>
 Plan-audit evidence: <audited plan revision and result>
 Plan delta: none | not meaningful | meaningful
-Decisions and exact refinements:
-- <decision ID> — <selected choice> — <section and exact refinement>
+Interview questions:
+- <full question in the `## Decision Interaction` shape, or none>
 External claim verdicts:
 - <stable claim ID> — VERIFIED | REFUTED | UNRESOLVED — <direct implication>
-Execution-card decisions:
-- <Tier-3 trigger/role/criterion -> decisive check -> expected result; independent signal when duplicated>
+Decision detail file: <Temp/ path> — <decision-rows selector> — <execution-card-rows selector>
 Required next step: none | incorporate refinements | incorporate library integration pivot and run fresh /plan-audit | run /external-design-interface, incorporate its design pivot, and run fresh /plan-audit
 Files changed: none
 Functions/regions touched: none
@@ -189,5 +193,10 @@ Residuals:
 - <unresolved decision or none>
 ```
 
+That file keeps one row per decision
+(`<decision ID> — <selected choice> — <section and exact refinement>`) and one
+row per execution-card decision
+(`<Tier-3 trigger/role/criterion -> decisive check -> expected result; independent signal when duplicated>`).
+
 Questions, answers, exact refinements, pivots, and claim verdicts remain live
-handoff data. Never collapse them into a prose summary.
+handoff data, inline or in that file. Never collapse them into a prose summary.

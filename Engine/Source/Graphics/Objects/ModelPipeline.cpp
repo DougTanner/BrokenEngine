@@ -191,7 +191,16 @@ void ModelPipeline::WriteIndirectBuffer(int64_t iCommandBuffer, int64_t iCount)
 		mFlags.Set(ModelPipelineFlags::kTexturesRequested);
 		const EagerChunk& rChunk = gpFileManager->GetEagerChunkMap().at(mSceneCrc);
 		const common::crc_t* pTextureCrcs = reinterpret_cast<const common::crc_t*>(rChunk.pData);
-		gpFileManager->RequestChunkLoad(std::span(pTextureCrcs, rChunk.pHeader->sceneHeader.uiTextureCount));
+		std::span<const common::crc_t> textureCrcs(pTextureCrcs, rChunk.pHeader->sceneHeader.uiTextureCount);
+
+		// A scene's texture references come from shared header definitions built alongside it, so a missing one is a
+		// data-build error, not a runtime condition. Island channel references are the soft-failing case instead.
+		for (common::crc_t textureCrc : textureCrcs)
+		{
+			ASSERT(gpFileManager->GetLazyChunkMap().contains(textureCrc));
+		}
+
+		gpFileManager->RequestChunkLoad(textureCrcs);
 	}
 
 	for (int64_t i = 0; i < miMaterialCount; ++i)

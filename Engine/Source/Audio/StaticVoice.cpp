@@ -27,6 +27,7 @@ bool StaticVoice::LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2Sour
 	}
 
 	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunkMap().at(audioCrc);
+	AssertValidPackedAudio(rLazyChunk.header.audioHeader.waveFormat, rLazyChunk.header.iSize, rLazyChunk.iDataSize);
 
 	// 3d sounds should have only one channel, re-export the sound as mono
 	ASSERT(!b3d || rLazyChunk.header.audioHeader.waveFormat.nChannels == 1);

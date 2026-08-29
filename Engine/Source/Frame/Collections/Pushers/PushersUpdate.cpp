@@ -88,7 +88,6 @@ void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] game::Frame& __
 				int64_t iPushersPerZone = gppuiPushersPerZone[x][y];
 				if (iPushersPerZone >= kiMaxPushersPerZone) [[unlikely]]
 				{
-					DEBUG_BREAK();
 					++iDroppedRegistrations;
 					continue;
 				}
@@ -102,6 +101,7 @@ void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] game::Frame& __
 	if (iDroppedRegistrations > 0) [[unlikely]]
 	{
 		LOG(kDefault, kWarning, "PushersInterpolate::SetupZones dropped {} pusher zone registrations (cap {} per zone)", iDroppedRegistrations, kiMaxPushersPerZone);
+		DEBUG_BREAK();
 	}
 }
 

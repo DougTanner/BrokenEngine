@@ -105,7 +105,13 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 		{
 			engine::GridCoord coord;
 			coord.Read(fileStream);
-			engine::CoordFrames& rSub = rStagedGrid.coordFrames.try_emplace(coord).first->second;
+			auto [itFrames, bInserted] = rStagedGrid.coordFrames.try_emplace(coord);
+			if (!bInserted)
+			{
+				throw common::CorruptStreamException("duplicate grid coord");
+			}
+
+			engine::CoordFrames& rSub = itFrames->second;
 			rSub.staticData.Read(fileStream, /*bIncludeNavData=*/false);
 			rSub.staticData.coord = coord;
 			auto pFrame = std::make_unique<game::Frame>();

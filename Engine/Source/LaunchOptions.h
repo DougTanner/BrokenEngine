@@ -36,6 +36,12 @@ inline bool PhysicalInputSuppressed()
 	return kbAgent && gLaunchOptions.iAgentPort != 0;
 }
 
+// An agent-launched process has no one to answer a modal dialog, so startup failures log and exit instead.
+inline bool AgentLaunched()
+{
+	return gLaunchOptions.iAgentPort != 0;
+}
+
 #if defined(BT_CLIENT)
 // Agent-only runtime fullscreen override. std::nullopt clears it (restores launch behavior); a set value forces
 // windowed/fullscreen mid-run, consulted ahead of --windowed in WantedFullscreen(). Never mutates the persisted

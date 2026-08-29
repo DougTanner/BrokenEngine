@@ -24,13 +24,18 @@ losslessly in the ignored repository-relative
 below. The finalizer handoff returns that artifact path and the exact selector
 `$.historyContract.receipt`; the manager resolves the selector from the artifact
 before dispatching `/verify-changes`. Never generatively copy, summarize, or
-restate the selected receipt.
+restate the selected receipt. The `Show-FinalizeApprovalReview.ps1` invocation
+below likewise redirects its single-line stdout to the ignored repository-relative
+`Temp/finalize-approval-review-result.json` artifact, and that artifact path is
+what the landing invocations pass as `-ApprovalReviewResultFile`; its values are
+never re-typed by hand.
 
 ## Contents
 
 - [Invocation](#invocation)
 - [Contracts](#contracts)
   - [Primary movement check](#primary-movement-check)
+  - [Approval review receipt](#approval-review-receipt)
   - [Landing and recovery](#landing-and-recovery)
 - [Fixture suites](#fixture-suites)
 
@@ -43,22 +48,26 @@ canonical lowercase GUID in `8-4-4-4-12` form. For the lock claim, either omit
 `-LandingOwner` so `Invoke-FinalizeLockClaim.ps1` creates and returns one, or
 create one explicitly with `WorktreeCli lock token`; later commands that supply
 the already-held token, including `-AdvancePrimary`, carry it and do not create
-one.
+one. `<baseline>` is the `Baseline` that `Get-AgentWorktreeSessionContext`
+reports when run from the command's `<current-worktree>` after that branch's
+most recent rebase; a rebase invalidates an earlier-resolved value, so
+re-resolve it from a fresh run, never from earlier command text or the dispatch
+brief.
 
 ```text
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route session-landing -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<primary-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<primary-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<candidate-parent>' -ExpectedPrimaryTip '<candidate-parent>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>' -VerifiedCandidateCommit '<candidate-commit>' -VerifiedCandidateTree '<candidate-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -WorktreeCliExecutable '<worktreecli-exe>' -SessionLabel '<session-label>' -OwnerToken '<owner-token>' -AdvancePrimary
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<candidate-parent>' -ExpectedPrimaryTip '<candidate-parent>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>' -VerifiedCandidateCommit '<candidate-commit>' -VerifiedCandidateTree '<candidate-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -WorktreeCliExecutable '<worktreecli-exe>' -SessionLabel '<session-label>' -OwnerToken '<owner-token>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -AdvancePrimary
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeApprovalPreparation.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' > 'Temp/finalize-approval-preparation-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizePrimaryMovementCheck.ps1 -CurrentWorktree '<session>' -PrimaryWorktree '<primary>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -CandidateCommit '<candidate-commit>' -CandidateTree '<candidate-tree>' -CandidateParent '<candidate-parent>' -OwnedPaths '<path>,<path>' > 'Temp/finalize-primary-movement-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -OwnerToken '<owner-token>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -HistoryContractRowDate '<historyUpdate.rowDate>' -HistoryJsonSha256 '<historyUpdate.jsonl.sha256>' -HistoryJsonBytes '<historyUpdate.jsonl.bytes>' -HistorySvgSha256 '<historyUpdate.svg.sha256>' -HistorySvgBytes '<historyUpdate.svg.bytes>' -HistorySvgEmbeddedSha256 '<historyUpdate.svg.embeddedSha256>' -OwnerToken '<owner-token>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -HistoryContractRowDate '<historyUpdate.rowDate>' -HistoryJsonSha256 '<historyUpdate.jsonl.sha256>' -HistoryJsonBytes '<historyUpdate.jsonl.bytes>' -HistorySvgSha256 '<historyUpdate.svg.sha256>' -HistorySvgBytes '<historyUpdate.svg.bytes>' -HistorySvgEmbeddedSha256 '<historyUpdate.svg.embeddedSha256>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
 pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract -RepositoryRoot '<current-worktree>' -BaseCommit '<primary-tip>' -TipCommit '<approved-commit>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit > 'Temp/finalize-approval-review-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
 ```
@@ -158,12 +167,19 @@ reconstructs the assessment from Git output.
 - `Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
   one commit on the current primary tip, and blocks with
   `git.primary-not-ancestor` when the session tip does not already contain that
-  primary tip; the caller rebases and re-invokes. It returns the only
-  landing commit sent to verification. That commit inherits the oldest session
-  commit's message unless the optional `-CommitMessageFile` supplies an existing
-  non-empty file whose text replaces it; the override also rebuilds the commit
-  when the session range holds a single commit, so a candidate that gained
-  content after creation can be re-messaged to describe it.
+  primary tip; the caller recovers it from the session worktree root with the
+  ordinary linear `git rebase refs/heads/<primary-branch>` — never the `--onto`
+  form and never another ref — and then re-invokes this script with
+  `-ExpectedCurrentTip` re-resolved to the rebased session tip and
+  `-ExpectedPrimaryTip` re-resolved to the live primary tip, its other arguments
+  unchanged; that rebase also invalidates any `<baseline>` already resolved for
+  `Invoke-FinalizeCandidateCommit.ps1`, which `## Invocation` requires
+  re-resolving. It returns the only landing commit sent to verification. That
+  commit inherits the oldest session commit's message unless the optional
+  `-CommitMessageFile` supplies an existing non-empty file whose text replaces
+  it; the override also rebuilds the commit when the session range holds a
+  single commit, so a candidate that gained content after creation can be
+  re-messaged to describe it.
 - `Invoke-FinalizeLockClaim.ps1` makes one blocking lease claim —
   WorktreeCli owns the bounded wait and the guarded expiry recovery — and
   separately performs standalone release through `-Release` with the held
@@ -184,7 +200,7 @@ reconstructs the assessment from Git output.
   Invoke it successfully before approval preparation begins
   reconciliation, retain or refresh the lease throughout agent-driven
   reconciliation, and release it with `-Release` before any user wait, in the
-  order `SKILL.md` `## Bundled scripts` states; a release of an already-absent
+  order `workflow.md` `## Bundled scripts` states; a release of an already-absent
   lease passes. The post-confirmation landing claim uses the landing lease
   duration — `-LeaseSeconds 3600`, its default, so omitting the parameter is
   correct; a refresh keeps a lease's original duration, so landing refuses to
@@ -194,11 +210,41 @@ reconstructs the assessment from Git output.
   worktree has a Git operation in progress; unverifiable state requires user
   authority and is never overridden.
 
+### Approval review receipt
+
+`Show-FinalizeApprovalReview.ps1` emits one JSON line whose schema version is
+`broken-engine-finalize-approval-review/v1`, carrying `schemaVersion`, `status`,
+`code`, `message`, `approvedTip`, `executable`, `arguments`, `manualCommand`, and
+`processId`. `approvedTip` is the full 40-character reviewed commit, expanded from
+an abbreviated `-ApprovedTip`. The redirected artifact is that receipt: both
+advance routes read `approvedTip` and `status` from the file named by
+`-ApprovalReviewResultFile`.
+
+The review outcome stays non-blocking — `opened`, `unavailable`, and `failed` all
+satisfy the gate, because only an attempted launch is required, not a successful
+one. `preview` and every error status do not. A receipt that is absent,
+unreadable, not valid JSON, or not a `broken-engine-finalize-approval-review/v1`
+result carrying `status` and `approvedTip` blocks with `approval-review.missing`,
+one whose `approvedTip` is not the commit being landed blocks with
+`approval-review.candidate-mismatch`, and one recording no attempted launch blocks
+with `approval-review.not-launched`. All three are exit 2, `blocked`, `terminal`,
+and happen before the landing changes anything on primary. On the session route
+the caller-owned lease claimed in the invocation order above is already live, and
+the worker releases it with `-Release` exactly as for any other blocked landing.
+
+A refreshed confirmation reruns the review against the newly reviewed candidate
+and overwrites the artifact; the stale receipt is never reused, because its
+`approvedTip` no longer matches the commit being landed.
+
 ### Landing and recovery
 
 - `Invoke-FinalizeLanding.ps1` exclusively advances primary by
   compare-and-swap under the landing lock, rolls back on postcondition failure,
-  and releases the lock. Its guarded primary checkout — the advance to the
+  and releases the lock. Before it registers the session, scans recovery, or
+  claims or refreshes any lock itself, it
+  refuses a landing whose `-ApprovalReviewResultFile` receipt does not prove the
+  SmartGit review was attempted for the exact approved commit, with the
+  [approval review receipt](#approval-review-receipt) codes. Its guarded primary checkout — the advance to the
   candidate and the rollback restore alike — waits out a foreign
   `.git/index.lock` on the primary repository, re-running the same checkout every
   500 milliseconds while git reports that lock. That waiting is bounded by a
@@ -215,7 +261,7 @@ reconstructs the assessment from Git output.
   catch-up/C++ path — so a caller raising that budget must raise its host timeout
   by the same amount. Pass the post-confirmation claim's owner token as
   `-OwnerToken` so landing continues under that same lease, which it accepts only
-  as a same-actor continuation under the `SKILL.md` `## Bundled scripts` ownership
+  as a same-actor continuation under the `workflow.md` `## Bundled scripts` ownership
   rule, preserving the raw `$SessionLabel`. Without `-OwnerToken`, it derives
   `$SessionLabel/landing`, first inspects the lock, and adopts a live owner only
   when that exact derived session and the same canonical worktree match and the

@@ -41,9 +41,10 @@ affected files receive a focused re-review.
 1. Take the changed regions from the read-only inventory rather than
    re-deriving hunks, using the invocation and result contract in
    `../scope-review/SKILL.md` step 1, filtered to instruction-doc paths.
-2. Duplication: flag changed prose that near-verbatim restates content another
-   layer already owns — a reference doc, a script's own documented usage, a
-   parent `AGENTS.md`, another skill, or the code itself. Cite the changed
+2. Duplication: flag changed prose that restates or paraphrases content another
+   location already owns — a reference doc, a script's own documented usage, a
+   parent `AGENTS.md`, another skill, elsewhere in the same file, or code and
+   comments reached through pointers in the changed prose. Cite the changed
    location and the owning location, and give the reference that replaces it.
 3. Layer misplacement: flag detail sitting above its owning layer — a schema,
    mechanics, or a long example in a `SKILL.md` body instead of `references/`
@@ -112,10 +113,13 @@ prompt assembly will assemble a `/verify-changes` prompt over changed
 instruction prose, this block must carry four things, none of which may be
 dropped or reworded: the `Skill: progressive-disclosure-review` marker line, the
 `Files checked:` line, a `Status: PASS` verdict, and a `Baseline:` line whose
-SHA equals the `/verify-changes` dispatch baseline. A `NEEDS_ACTION` or
-`BLOCKED` handoff, and a passing one produced against an earlier baseline, are
-gated exactly like a missing handoff — so re-run this review against the final
-baseline rather than reusing the earlier handoff.
+SHA is either the `/verify-changes` dispatch baseline or another resolvable
+commit at which the instruction docs that diff changes do not differ from the
+dispatch baseline, which is what makes those docs' reviewed bytes the bytes
+this review read. A `NEEDS_ACTION` or `BLOCKED` handoff, and one whose
+`Baseline:` is absent, unresolvable, or a commit at which those docs differ,
+are gated exactly like a missing handoff — so re-run only when those docs
+differ at the two baselines.
 
 The manager decides each finding on whether the failure is concrete and
 meaningful under the standard defaults; this review adds no extra rounds.

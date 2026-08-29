@@ -58,12 +58,15 @@ $result = [ordered]@{
 	status = 'error'
 	code = 'internal.error'
 	message = 'Codex review prompt assembly did not run.'
+	messageLength = 0
+	messageTruncated = $false
 	promptPath = $null
 	targetsPath = $null
 	promptBytes = 0
 	fileCount = 0
 	binaryExcluded = 0
 	sectionsWritten = 0
+	missing = @()
 }
 
 function Write-PromptStderr([string] $Text) {
@@ -87,6 +90,8 @@ function Complete-CodexReviewPrompt([int] $ExitCode, [string] $Status, [string] 
 	}
 	$result.status = $Status
 	$result.code = $Code
+	$result.messageLength = $Message.Length
+	$result.messageTruncated = $Message.Length -gt $script:MaximumMessageLength
 	$result.message = if ($Message.Length -gt $script:MaximumMessageLength) { $Message.Substring(0, $script:MaximumMessageLength) } else { $Message }
 	$result.promptPath = if ($script:PromptCreated) { $script:PromptFile } else { $null }
 	$result.targetsPath = if ($ExitCode -eq 0 -and $script:TargetsAvailable) { $script:TargetsFile } else { $null }
@@ -433,21 +438,22 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.execution-card-required' "/plan-audit needs the draft execution card in -ScopeFile, which carries no 'execution card' marker."
 	}
 	if ($AssignedSkill -ne 'verify-changes') { return }
+	# Exact-case names and prefixes, matching Test-InstructionDocPath in
+	# Get-SessionChangeInventory.ps1: the two skills must gate on the same path set, and a
+	# case-insensitive match here would gate a plain 'agents.md' the inventory never routes.
+	function Test-InstructionDocPath([string] $Path) {
+		$leaf = [IO.Path]::GetFileName($Path)
+		if ($leaf -ceq 'AGENTS.md' -or $leaf -ceq 'CLAUDE.md') { return $true }
+		return ($leaf.EndsWith('.md', [StringComparison]::OrdinalIgnoreCase) -and
+			($Path.StartsWith('.agents/skills/', [StringComparison]::Ordinal) -or $Path.StartsWith('.agents/references/', [StringComparison]::Ordinal)))
+	}
 	$skillTouched = $false
-	$instructionDocTouched = $false
+	$reviewedDocPaths = [Collections.Generic.List[string]]::new()
 	foreach ($entry in @($ChangeSet.entries)) {
 		foreach ($path in @($entry.path, $entry.oldPath)) {
 			if ([string]::IsNullOrEmpty($path)) { continue }
-			$leaf = [IO.Path]::GetFileName($path)
-			if ($leaf -eq 'SKILL.md') { $skillTouched = $true }
-			# Exact-case names and prefixes, matching Test-InstructionDocPath in
-			# Get-SessionChangeInventory.ps1: the two skills must gate on the same path set, and a
-			# case-insensitive match here would gate a plain 'agents.md' the inventory never routes.
-			if ($leaf -ceq 'AGENTS.md' -or $leaf -ceq 'CLAUDE.md') { $instructionDocTouched = $true }
-			if ($leaf.EndsWith('.md', [StringComparison]::OrdinalIgnoreCase) -and
-				($path.StartsWith('.agents/skills/', [StringComparison]::Ordinal) -or $path.StartsWith('.agents/references/', [StringComparison]::Ordinal))) {
-				$instructionDocTouched = $true
-			}
+			if ([IO.Path]::GetFileName($path) -eq 'SKILL.md') { $skillTouched = $true }
+			if ((Test-InstructionDocPath $path) -and -not $reviewedDocPaths.Contains($path)) { $reviewedDocPaths.Add($path) }
 		}
 	}
 	$missing = [Collections.Generic.List[string]]::new()
@@ -457,7 +463,7 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 	# Everything after the marker is read as that handoff's own block, ending at the next handoff's
 	# 'Skill: ' line, so a PASS verdict or a baseline belonging to some other handoff in the same scope
 	# cannot stand in for this one's.
-	if ($instructionDocTouched) {
+	if ($reviewedDocPaths.Count -gt 0) {
 		# Both matches are anchored to a line start, because ordinary scope prose quotes the marker text
 		# inline while describing this gate: an unanchored match reads that sentence as the handoff and
 		# hides the real block below it. The terminator is searched from the end of the marker match, so
@@ -474,11 +480,28 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 			$missing.Add("the /progressive-disclosure-review handoff, marked by 'Skill: progressive-disclosure-review' and 'Files checked:'")
 		}
 		else {
-			# A NEEDS_ACTION or BLOCKED handoff, or one produced against an earlier diff, says nothing about
-			# the prose this landing actually carries, so both are gated exactly like an absent handoff.
+			# A NEEDS_ACTION or BLOCKED handoff says nothing about the prose this landing actually carries,
+			# so it is gated exactly like an absent handoff. Another 'Baseline:' is accepted only when it is
+			# a resolvable commit at which the reviewed instruction docs do not differ from the dispatch
+			# baseline, which is exactly what makes the reviewed diff's doc bytes the bytes that reviewer
+			# read; movement in other docs is root AGENTS.md Step 8's reachability re-review, decided by
+			# the manager rather than by this gate. An unresolvable commit fails the same git call and
+			# stays blocked.
 			if (-not $block.Contains('Status: PASS')) { $missing.Add("'Status: PASS' in the /progressive-disclosure-review handoff") }
-			if (-not $block.Contains("Baseline: $($ChangeSet.baselineSha)")) {
-				$missing.Add("the reviewed baseline on the /progressive-disclosure-review handoff's own 'Baseline:' line")
+			$baselineMatch = [Regex]::Match($block, '(?m)^Baseline: ([0-9a-f]{40})')
+			$baselineAccepted = $false
+			if ($baselineMatch.Success) {
+				$handoffBaseline = $baselineMatch.Groups[1].Value
+				if ($handoffBaseline -ceq $ChangeSet.baselineSha) {
+					$baselineAccepted = $true
+				}
+				else {
+					$docDiff = Invoke-PromptGit (@('diff', '--quiet', $handoffBaseline, $ChangeSet.baselineSha, '--') + $reviewedDocPaths.ToArray()) $true
+					$baselineAccepted = $docDiff.ExitCode -eq 0
+				}
+			}
+			if (-not $baselineAccepted) {
+				$missing.Add("a /progressive-disclosure-review handoff whose 'Baseline:' is the dispatch baseline or a resolvable commit whose reviewed instruction docs do not differ from it")
 			}
 		}
 	}
@@ -494,6 +517,9 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 	if (-not $script:ScopeText.Contains($ChangeSet.baselineSha)) { $missing.Add('the baseline SHA') }
 	if (-not [string]::IsNullOrEmpty($ChangeSet.headSha) -and -not $script:ScopeText.Contains($ChangeSet.headSha)) { $missing.Add('the head SHA') }
 	if ($missing.Count -gt 0) {
+		# The capped message can drop tail items, so the array carries the complete list and the message
+		# is only its readable summary.
+		$result.missing = [string[]] $missing.ToArray()
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.typed-artifacts-required' "/verify-changes needs evidence -ScopeFile does not carry: $($missing -join ', ')."
 	}
 }

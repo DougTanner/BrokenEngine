@@ -20,12 +20,17 @@ uncommitted by design, so a reviewed path the landing inventory reports dirty
 whose bytes match the reviewed `-Head` tree is expected state and classifies as
 `intentionally persisted`.
 
-After `/verify-changes` binds acceptance to that diff, present the primary
-summary and the authoritative confirmation from the skill's `## Landing
+After `/verify-changes` binds acceptance to that diff, invoke
+`../scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` with the stdout
+redirect [`references/scripts.md`](scripts.md) documents, then present the
+primary summary and the authoritative confirmation from the skill's `## Landing
 confirmation` section. Only its affirmative response permits claiming the normal
 3600-second landing lease and resuming the same candidate script with
-`-AdvancePrimary`, `-OwnerToken`, `-SessionLabel`, and the approved Contract
-scalars. The direct-primary route never performs omitted-token implicit mutation.
+`-AdvancePrimary`, `-OwnerToken`, `-SessionLabel`, `-ApprovalReviewResultFile`,
+and the approved Contract scalars. The receipt is mandatory on this route and the
+candidate script checks it before `Invoke-PrimaryHistoryAdvance`, under the
+[approval review receipt](scripts.md#approval-review-receipt) gate.
+The direct-primary route never performs omitted-token implicit mutation.
 Under that lease it re-evaluates Contract/mode, requires the primary tip and aggregate
 Contract digest to remain exactly equal to the approved values, and follows the [root
 `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and exact primary/landing

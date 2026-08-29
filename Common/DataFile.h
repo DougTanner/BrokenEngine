@@ -44,6 +44,10 @@ struct ChunkLocation
 	crc_t crc = 0;
 	uint64_t uiOffset = 0;
 	uint64_t uiSize = 0;
+	// Hash of the chunk's stored bytes [uiOffset, uiOffset + uiSize), written by DataPacker. The runtime
+	// deliberately never re-hashes payloads to check it — that would slow startup. It exists so the
+	// Islands location table folded into mPackIntegrityToken tracks island content rather than only
+	// names, offsets, and sizes, letting the client/server handshake reject differing island data.
 	crc_t contentCrc = 0;
 };
 static_assert(sizeof(ChunkLocation) == 32, "ChunkLocation layout changed — bump DataHeader::kiVersion");

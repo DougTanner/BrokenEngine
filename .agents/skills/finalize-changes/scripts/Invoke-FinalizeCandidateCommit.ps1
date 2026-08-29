@@ -24,6 +24,9 @@ param(
 	[string] $SessionLabel,
 	[string] $OwnerToken,
 	[switch] $AdvancePrimary,
+	# Approval review receipt artifact ('broken-engine-finalize-approval-review/v1') proving the SmartGit
+	# review was attempted for this exact candidate; mandatory on the -AdvancePrimary primary-commit route.
+	[string] $ApprovalReviewResultFile,
 	[ValidateSet('none', 'tree-mismatch', 'expected-tip-mismatch', 'postcondition', 'post-index-mutation', 'history-contract', 'history-generate', 'post-update-ref')][string] $FixtureFailure = 'none'
 )
 $ErrorActionPreference = 'Stop'; Set-StrictMode -Version Latest
@@ -117,6 +120,15 @@ try {
 		if($declared.Count -eq 0){Stop-Candidate 1 'input.owned-paths-empty' 'At least one caller-owned path is required.'}
 		if($head -ne $ExpectedPrimaryTip -or $primaryHead -ne $ExpectedPrimaryTip){Stop-Candidate 2 'git.tip-changed' 'Primary candidate route must start at the expected primary tip.'}
 		Assert-Candidate $primary $VerifiedCandidateCommit $VerifiedCandidateTree $ExpectedPrimaryTip;$result.candidate.commit=$VerifiedCandidateCommit;$result.candidate.tree=$VerifiedCandidateTree;$result.candidate.parent=$ExpectedPrimaryTip;$result.candidate.singleParent=$true;$result.candidate.reconciled=$false;$result.primaryAdvance.attempted=$true
+		# The SmartGit approval review is a required input on this route: the receipt proves the launch was
+		# attempted for exactly this candidate. Checked before any status read, Temp work, or primary change.
+		if([string]::IsNullOrWhiteSpace($ApprovalReviewResultFile)){Stop-Candidate 2 'approval-review.missing' 'AdvancePrimary requires the SmartGit approval review receipt from -ApprovalReviewResultFile.'}
+		$reviewItem=Get-Item -LiteralPath $ApprovalReviewResultFile -Force -ErrorAction SilentlyContinue;if($null-eq$reviewItem-or$reviewItem.PSIsContainer){Stop-Candidate 2 'approval-review.missing' "ApprovalReviewResultFile '$ApprovalReviewResultFile' is not a readable file."}
+		try{$reviewResult=[IO.File]::ReadAllText($reviewItem.FullName)|ConvertFrom-Json -Depth 64 -ErrorAction Stop}catch{Stop-Candidate 2 'approval-review.missing' "ApprovalReviewResultFile is not valid JSON: $($_.Exception.Message)"}
+		if($null-eq$reviewResult){Stop-Candidate 2 'approval-review.missing' 'ApprovalReviewResultFile carries no result object.'};$reviewProperties=@($reviewResult.PSObject.Properties.Name)
+		if($reviewProperties-cnotcontains'schemaVersion'-or$reviewProperties-cnotcontains'status'-or$reviewProperties-cnotcontains'approvedTip'-or[string]$reviewResult.schemaVersion-cne'broken-engine-finalize-approval-review/v1'){Stop-Candidate 2 'approval-review.missing' "ApprovalReviewResultFile must be a 'broken-engine-finalize-approval-review/v1' result carrying status and approvedTip."}
+		if([string]$reviewResult.approvedTip-cne$VerifiedCandidateCommit){Stop-Candidate 2 'approval-review.candidate-mismatch' 'ApprovalReviewResultFile records a different reviewed commit than the verified candidate. Rerun Show-FinalizeApprovalReview.ps1 -LaunchSmartGit for the verified candidate with the documented stdout redirect so the receipt is overwritten.'}
+		if([string]$reviewResult.status-cnotin@('opened','unavailable','failed')){Stop-Candidate 2 'approval-review.not-launched' 'ApprovalReviewResultFile does not record an attempted SmartGit launch for the verified candidate. Rerun Show-FinalizeApprovalReview.ps1 -LaunchSmartGit for the verified candidate with the documented stdout redirect so the receipt is overwritten.'}
 		$before=Get-Status $primary;$result.state.before=$before;Assert-HistoryPathsClean $primary;Assert-OwnedNotMixed $before $declared
 		$common=(Invoke-Git $primary @('rev-parse','--path-format=absolute','--git-common-dir')).Trim();$result.historyContract=[ordered]@{schemaVersion='broken-engine-code-quality-history-contract/v1';status='pass';contractDigest=$HistoryContractDigest;generatorDigest=$HistoryContractGeneratorDigest;captureDigest=$HistoryContractCaptureDigest;runtimeDigest=$HistoryContractRuntimeDigest;patchDigest=$HistoryContractPatchDigest;mode=$HistoryContractMode}
 		Invoke-PrimaryHistoryAdvance $primary $common $VerifiedCandidateCommit $VerifiedCandidateTree $ExpectedPrimaryTip $declared $before;Complete 0 'pass' 'candidate.advanced' 'Primary advanced to the verified candidate commit.'

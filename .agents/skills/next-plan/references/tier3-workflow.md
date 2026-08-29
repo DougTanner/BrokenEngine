@@ -28,10 +28,9 @@ Main dispatches `/plan-audit`, plus `/plan-simplicity-review` when the plan adds
 new code or modifies non-documentation behavior per Step 2's trigger in root
 `AGENTS.md`, to one `reviewer` each,
 then returns their accepted findings to the preparation `implementer`. That
-worker performs every repository read and search `/external-grill-plan`
-requires and returns an immutable decision brief in that skill's question format,
-plus its external-claim requests and unresolved residuals; it never interviews,
-chooses, or delegates.
+worker performs every repository read and search `/external-grill-plan` requires
+and returns an immutable decision brief in the shape that skill's `## Handoff`
+defines; it never interviews, chooses, or delegates.
 Main routes external-claim requests to a `locator` through
 `/verify-external-claims`, resumes the same worker with the exact verdicts and
 with each answer that unlocks dependent repository-backed work, and receives the
@@ -39,8 +38,8 @@ next brief. Main alone interviews the user and decides, recording the exact
 questions, answers, decisions, and refinements; it performs no repository read or
 search work, and the idempotent claim invocation `/next-plan` assigns to main is
 the one scheduler command it still runs. The final handoff preserves that record
-and the worker updates the card. A decision-complete plan yields a PASS audit and
-a no-question brief; do not manufacture findings or interview questions to
+and the worker updates the card. A decision-complete plan yields a PASS audit
+and a no-question brief; do not manufacture findings or interview questions to
 justify the review.
 
 ## Implementation and stop rule

@@ -150,7 +150,8 @@ untracked paths do not become findings merely because they allocate.
 
 Use `gpThreadLocal->mWorkbuffer` for tracked temporary data. Follow
 `GameBase::BuildAndDispatchFrameTicks` (`/Engine/Source/GameBase.cpp`) for a
-scoped workbuffer-backed list whose lifetime covers synchronous dispatch. For
+persistent member rebuilt under `ScopedSuppressAllocationTracking` for
+synchronous dispatch. For
 loop-built dynamic log text, follow the current
 `CrcValidateLoop` (`/Engine/Source/Network/Client/ReconcileReplayCrc.cpp`)
 `ScopedWorkbufferArena` construction. Verify changed tracked logs use the

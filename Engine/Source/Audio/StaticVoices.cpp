@@ -401,8 +401,30 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 		// live in the FadeOutPool overflow capacity above the primary cap.
 		if (static_cast<int64_t>(mVoices.size()) - miFadeOutCount >= kiMaxStaticVoices)
 		{
-			LOG(kAudio, kDebug, "Max static voices reached ({}), deferring add", kiMaxStaticVoices);
-			continue;
+			// Reclaim the first inactive entry rather than deferring forever: an inactive entry holds
+			// no XAudio2 voice (RetireVoice already returned it to the pool) and no fade state, so
+			// dropping it costs nothing and its owner re-enters through this same new-voice path.
+			// kInactive and kFadingOut never coexist on an entry across passes, so miFadeOutCount
+			// needs no adjustment here.
+			int64_t iInactive = -1;
+			for (int64_t iVoice = 0; iVoice < static_cast<int64_t>(mVoices.size()); ++iVoice)
+			{
+				if (mVoices.at(iVoice).mFlags & StaticVoiceFlags::kInactive)
+				{
+					iInactive = iVoice;
+					break;
+				}
+			}
+			if (iInactive < 0)
+			{
+				LOG(kAudio, kDebug, "Max static voices reached ({}), deferring add", kiMaxStaticVoices);
+				continue;
+			}
+			if (iInactive < static_cast<int64_t>(mVoices.size()) - 1)
+			{
+				mVoices.at(iInactive) = std::move(mVoices.back());
+			}
+			mVoices.pop_back();
 		}
 
 		common::crc_t uiCrc = rSoundsInterpolate.puiCrcs[iIndex];

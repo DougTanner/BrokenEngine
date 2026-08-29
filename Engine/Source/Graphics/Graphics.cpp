@@ -84,7 +84,13 @@ static void CheckVulkan12Support()
 	// If the function pointer is null, we're on Vulkan 1.0
 	if (vkEnumerateInstanceVersion == nullptr)
 	{
-		MessageBox(nullptr, "Vulkan 1.2 or higher is required.\n\nYour graphics driver only supports Vulkan 1.0.", game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+		LOG(kGraphics, kError, "Vulkan 1.2 required; vkEnumerateInstanceVersion is unavailable (Vulkan 1.0 driver)");
+
+		if (!AgentLaunched())
+		{
+			MessageBox(nullptr, "Vulkan 1.2 or higher is required.\n\nYour graphics driver only supports Vulkan 1.0.", game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+		}
+
 		throw std::runtime_error("Vulkan 1.2 not available");
 	}
 
@@ -96,13 +102,19 @@ static void CheckVulkan12Support()
 		uint32_t uiMajor = VK_VERSION_MAJOR(uiApiVersion);
 		uint32_t uiMinor = VK_VERSION_MINOR(uiApiVersion);
 
+		LOG(kGraphics, kError, "Vulkan 1.2 required; driver reports {}.{}", uiMajor, uiMinor);
+
 		std::string errorMessage = "Vulkan 1.2 or higher is required.\n\nYour graphics driver supports Vulkan ";
 		errorMessage += std::to_string(uiMajor);
 		errorMessage += ".";
 		errorMessage += std::to_string(uiMinor);
 		errorMessage += ".";
 
-		MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+		if (!AgentLaunched())
+		{
+			MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+		}
+
 		throw std::runtime_error("Vulkan 1.2 not available");
 	}
 }

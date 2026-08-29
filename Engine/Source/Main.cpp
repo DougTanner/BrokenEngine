@@ -77,12 +77,6 @@ void MainThread(HINSTANCE hinstance)
 {
 	common::ThreadLocal threadLocal(10 * 1024 * 1024);
 
-	// --log-file begins here, so earlier startup diagnostics remain debugger/ring-buffer only; the file opens before allocation tracking is enabled.
-	if (!gLaunchOptions.logFile.empty())
-	{
-		common::EnableLogFile(gLaunchOptions.logFile);
-	}
-
 	LOG(kDefault, kInfo, "\nGame name: {}", game::kGameName);
 	LOG(kDefault, kInfo, "Game version: {}", game::kiGameVersion);
 	LOG(kDefault, kInfo, "Compiled with Windows 10 SDK version: {}.{}", VER_PRODUCTBUILD, VER_PRODUCTBUILD_QFE);
@@ -807,10 +801,20 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANC
 	{
 		return 0; // Fatal launch-option error (e.g. --agent-port out of range); already logged kError.
 	}
+
+	if (!engine::gLaunchOptions.logFile.empty())
+	{
+		common::EnableLogFile(engine::gLaunchOptions.logFile);
+	}
+
 	if (!engine::gLaunchOptions.appDataDirectory.empty())
 	{
 		engine::SetCrashReportAppDataDirectory(engine::gLaunchOptions.appDataDirectory.c_str());
 	}
+
+	// Must follow the override above: the crash handler only selects between the buffers this fills, so it runs as early
+	// as the launch options allow.
+	engine::ResolveCrashReportPaths();
 
 	// Prevent multiple instances from running simultaneously
 	std::unique_ptr<void, decltype(&CloseHandle)> pMutex(nullptr, &CloseHandle);
@@ -821,7 +825,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANC
 		if (GetLastError() == ERROR_ALREADY_EXISTS)
 		{
 			// An agent-launched instance must never block on a modal dialog — fail fast so AgentHarness sees the exit.
-			if (engine::gLaunchOptions.iAgentPort != 0)
+			if (engine::AgentLaunched())
 			{
 				LOG(kDefault, kError, "Another instance is already running; --agent-port launch aborting");
 				return 0;
@@ -840,7 +844,11 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANC
 	HRESULT hresult = Windows::Foundation::Initialize(RO_INIT_MULTITHREADED);
 	if (hresult != S_OK) [[unlikely]]
 	{
-		MessageBox(nullptr, common::HresultToString(hresult).data(), "Windows::Foundation::Initialize", MB_OK | MB_SYSTEMMODAL);
+		LOG(kDefault, kError, "Windows::Foundation::Initialize failed: {:#x}", static_cast<uint32_t>(hresult));
+		if (!engine::AgentLaunched())
+		{
+			MessageBox(nullptr, common::HresultToString(hresult).data(), "Windows::Foundation::Initialize", MB_OK | MB_SYSTEMMODAL);
+		}
 		return 0;
 	}
 #endif

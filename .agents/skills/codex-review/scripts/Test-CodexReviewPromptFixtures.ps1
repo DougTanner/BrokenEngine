@@ -2,7 +2,8 @@
 # operating system temp directory. Every repository, scope file, and prompt path is created and
 # removed by this harness, and no case points the script at a real checkout. Scope files and prompt
 # paths live outside the fixture repository, because an unnamed untracked path inside it is itself a
-# blocked result. Exit 0 means every case passed.
+# blocked result. Exit 0 means every case passed. Only failing assertions and the final summary line are
+# printed, so a manager can run the whole suite without flooding a session.
 [CmdletBinding()]
 param()
 
@@ -18,11 +19,17 @@ $script:PwshPath = (Get-Process -Id $PID).Path
 $script:Scratch = Join-Path ([IO.Path]::GetTempPath()) ('codex-prompt-scratch-' + [Guid]::NewGuid().ToString('n').Substring(0, 8))
 
 function Assert-True([bool] $Condition, [string] $Name) {
-	if (-not $Condition) { $script:Failures.Add($Name); Write-Host "FAIL $Name" } else { Write-Host "pass $Name" }
+	if (-not $Condition) { $script:Failures.Add($Name); Write-Host "FAIL $Name" }
 }
 
 function Assert-Equal($Expected, $Actual, [string] $Name) {
 	Assert-True ("$Expected" -ceq "$Actual") "$Name (expected '$Expected', was '$Actual')"
+}
+
+function Test-MissingItem($Json, [string] $Fragment) {
+	# The gate's complete item list is the receipt's 'missing' array: the capped 'message' summary can
+	# drop tail items once the joined list passes the cap.
+	return @(@($Json.missing) | Where-Object { $_.Contains($Fragment) }).Count -gt 0
 }
 
 function Get-FragmentText([string] $Name) {
@@ -287,6 +294,7 @@ function Test-PromptPathExists($Fixture) {
 		Assert-Equal 'blocked' $run.Json.status 'existing prompt path status'
 		Assert-Equal 'prompt.path-exists' $run.Json.code 'existing prompt path code'
 		Assert-True ($null -eq $run.Json.promptPath) 'existing prompt path reports no written prompt'
+		Assert-True (@($run.Json.missing).Count -eq 0) 'existing prompt path reports an empty missing list'
 	}
 	else { Assert-True $false 'existing prompt path emitted JSON' }
 	Assert-True ($script:Utf8.GetString([IO.File]::ReadAllBytes($promptPath)) -ceq $existing) 'existing prompt path leaves the file byte-unchanged'
@@ -437,9 +445,9 @@ function Test-VerifyChangesTypedArtifacts() {
 	if ($null -ne $missing.Json) {
 		Assert-Equal 'blocked' $missing.Json.status 'verify-changes without typed artifacts status'
 		Assert-Equal 'prompt.typed-artifacts-required' $missing.Json.code 'verify-changes without typed artifacts code'
-		Assert-True ($missing.Json.message.Contains('Validation: PASS')) 'verify-changes names the missing /validate-skill marker'
-		Assert-True ($missing.Json.message.Contains('progressive-disclosure-review')) 'verify-changes names the missing /progressive-disclosure-review handoff for the changed SKILL.md'
-		Assert-True (-not $missing.Json.message.Contains('"operation":"validate"')) 'verify-changes never demands a plan validate receipt'
+		Assert-True (Test-MissingItem $missing.Json 'Validation: PASS') 'verify-changes names the missing /validate-skill marker'
+		Assert-True (Test-MissingItem $missing.Json 'progressive-disclosure-review') 'verify-changes names the missing /progressive-disclosure-review handoff for the changed SKILL.md'
+		Assert-True (-not (Test-MissingItem $missing.Json '"operation":"validate"')) 'verify-changes never demands a plan validate receipt'
 	}
 	else { Assert-True $false 'verify-changes without typed artifacts emitted JSON' }
 	Assert-True (-not (Test-Path -LiteralPath $missingPath)) 'verify-changes without typed artifacts creates no prompt file'
@@ -452,7 +460,11 @@ function Test-VerifyChangesTypedArtifacts() {
 		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
 		'-ScopeFile', (New-ScratchFile 'scope' $artifactText), '-PromptPath', $presentPath, '-Head', $head)
 	Assert-Equal 0 $present.ExitCode 'verify-changes with typed artifacts exit code'
-	if ($null -ne $present.Json) { Assert-Equal 'pass' $present.Json.status 'verify-changes with typed artifacts status' }
+	if ($null -ne $present.Json) {
+		Assert-Equal 'pass' $present.Json.status 'verify-changes with typed artifacts status'
+		Assert-Equal $false $present.Json.messageTruncated 'verify-changes with typed artifacts reports an uncut message'
+		Assert-Equal $present.Json.message.Length $present.Json.messageLength 'verify-changes with typed artifacts reports the full message length'
+	}
 	else { Assert-True $false 'verify-changes with typed artifacts emitted JSON' }
 	Assert-True (Test-Path -LiteralPath $presentPath) 'verify-changes with typed artifacts writes the prompt'
 	if (Test-Path -LiteralPath $presentPath) {
@@ -470,16 +482,60 @@ function Test-VerifyChangesTypedArtifacts() {
 	if ($null -ne $mismatch.Json) {
 		Assert-Equal 'blocked' $mismatch.Json.status 'verify-changes with mismatched identity status'
 		Assert-Equal 'prompt.typed-artifacts-required' $mismatch.Json.code 'verify-changes with mismatched identity code'
-		Assert-True ($mismatch.Json.message.Contains('the baseline SHA')) 'verify-changes names the unmatched baseline identity'
-		Assert-True ($mismatch.Json.message.Contains('the head SHA')) 'verify-changes names the unmatched head identity'
+		Assert-True (Test-MissingItem $mismatch.Json 'the baseline SHA') 'verify-changes names the unmatched baseline identity'
+		Assert-True (Test-MissingItem $mismatch.Json 'the head SHA') 'verify-changes names the unmatched head identity'
 	}
 	else { Assert-True $false 'verify-changes with mismatched identity emitted JSON' }
 	Assert-True (-not (Test-Path -LiteralPath $mismatchPath)) 'verify-changes with mismatched identity creates no prompt file'
 }
 
-function New-InstructionDocFixture([string] $Name, [scriptblock] $Change) {
+function Test-VerifyChangesMissingOverflow() {
+	# Every typed-artifacts item at once: a C++ file for the build envelope, a SKILL.md for the
+	# /validate-skill marker and the /progressive-disclosure-review handoff, an executable Plan for the
+	# receipt that must stay undemanded, and a scope naming neither identity value. The joined message
+	# passes the 256-character cap, so only the 'missing' array can still report all five items.
+	$root = New-FixtureRoot 'missingoverflow'
+	Add-FixtureSkill $root @('verify-changes')
+	Set-FixtureText $root 'Engine/Source/Thing.cpp' "int Thing() { return 0; }`n"
+	Set-FixtureText $root 'Documents/Plans/Area/Thing.md' "baseline plan`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	Set-FixtureText $root 'Engine/Source/Thing.cpp' "int Thing() { return 1; }`n"
+	Set-FixtureText $root 'Documents/Plans/Area/Thing.md' "landed plan`n"
+	Set-FixtureText $root '.agents/skills/verify-changes/SKILL.md' "# verify-changes`nlanded`n"
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'landed')
+	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+
+	$overflowText = $script:ScopeText + "Baseline: $('0' * 40)`nHead: $('1' * 40)`n"
+	$overflowPath = New-ScratchPath 'missingoverflow'
+	$run = Invoke-PromptScript @(
+		'-RepositoryRoot', $root, '-Baseline', $baseline, '-AssignedSkill', 'verify-changes',
+		'-ScopeFile', (New-ScratchFile 'scope' $overflowText), '-PromptPath', $overflowPath, '-Head', $head)
+	Assert-Equal 2 $run.ExitCode 'overflowing missing list exit code'
+	if ($null -ne $run.Json) {
+		Assert-Equal 'blocked' $run.Json.status 'overflowing missing list status'
+		Assert-Equal 'prompt.typed-artifacts-required' $run.Json.code 'overflowing missing list code'
+		Assert-Equal 5 (@($run.Json.missing).Count) 'overflowing missing list reports every item'
+		Assert-True (Test-MissingItem $run.Json 'Validation: PASS') 'overflowing missing list names the /validate-skill marker'
+		Assert-True (Test-MissingItem $run.Json 'progressive-disclosure-review') 'overflowing missing list names the /progressive-disclosure-review handoff'
+		Assert-True (Test-MissingItem $run.Json 'broken-engine-build-result/v1') 'overflowing missing list names the build envelope'
+		Assert-True (Test-MissingItem $run.Json 'the baseline SHA') 'overflowing missing list names the baseline SHA'
+		Assert-True (Test-MissingItem $run.Json 'the head SHA') 'overflowing missing list names the head SHA'
+		Assert-Equal $true $run.Json.messageTruncated 'overflowing missing list declares the cut message'
+		Assert-True ($run.Json.messageLength -gt 256) 'overflowing missing list reports the uncut message length'
+		Assert-Equal 256 $run.Json.message.Length 'overflowing missing list still caps the message'
+	}
+	else { Assert-True $false 'overflowing missing list emitted JSON' }
+	Assert-True (-not (Test-Path -LiteralPath $overflowPath)) 'overflowing missing list creates no prompt file'
+}
+
+function New-InstructionDocFixture([string] $Name, [scriptblock] $Change, [scriptblock] $Foreign = $null) {
 	# One landing diff per path shape, so the /progressive-disclosure-review gate is decided by that
 	# shape alone: no SKILL.md changes here, which would also demand the /validate-skill marker.
+	# A $Foreign block commits foreign movement between the first baseline and the session commit, the
+	# rebase shape where the handoff's own baseline predates the dispatch baseline.
 	$root = New-FixtureRoot $Name
 	Add-FixtureSkill $root @('verify-changes')
 	Set-FixtureText $root 'Engine/AGENTS.md' "baseline engine guidance`n"
@@ -491,12 +547,19 @@ function New-InstructionDocFixture([string] $Name, [scriptblock] $Change) {
 	Set-FixtureText $root 'Documents/agents.md' "baseline lower-case name`n"
 	Invoke-FixtureGit $root @('add', '--all')
 	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
-	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	$firstBaseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	$baseline = $firstBaseline
+	if ($null -ne $Foreign) {
+		& $Foreign $root
+		Invoke-FixtureGit $root @('add', '--all')
+		Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'foreign')
+		$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	}
 	& $Change $root
 	Invoke-FixtureGit $root @('add', '--all')
 	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'landed')
 	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
-	return [pscustomobject] @{ Root = $root; Baseline = $baseline; Head = $head }
+	return [pscustomobject] @{ Root = $root; Baseline = $baseline; FirstBaseline = $firstBaseline; Head = $head }
 }
 
 function Invoke-InstructionDocPrompt($Fixture, [string] $Name, [string] $ScopeText) {
@@ -545,7 +608,8 @@ function Test-DisclosureHandoffFreshness() {
 	if ($null -ne $unresolved.Json) {
 		Assert-Equal 'blocked' $unresolved.Json.status 'NEEDS_ACTION /progressive-disclosure-review handoff status'
 		Assert-Equal 'prompt.typed-artifacts-required' $unresolved.Json.code 'NEEDS_ACTION /progressive-disclosure-review handoff code'
-		Assert-True ($unresolved.Json.message.Contains('Status: PASS')) 'NEEDS_ACTION handoff names the missing PASS status'
+		Assert-True (@($unresolved.Json.missing).Count -eq 1) 'NEEDS_ACTION handoff reports its one missing item as an array'
+		Assert-True (Test-MissingItem $unresolved.Json 'Status: PASS') 'NEEDS_ACTION handoff names the missing PASS status'
 	}
 	else { Assert-True $false 'NEEDS_ACTION /progressive-disclosure-review handoff emitted JSON' }
 
@@ -556,7 +620,7 @@ function Test-DisclosureHandoffFreshness() {
 	if ($null -ne $stale.Json) {
 		Assert-Equal 'blocked' $stale.Json.status 'stale-baseline /progressive-disclosure-review handoff status'
 		Assert-Equal 'prompt.typed-artifacts-required' $stale.Json.code 'stale-baseline /progressive-disclosure-review handoff code'
-		Assert-True ($stale.Json.message.Contains("handoff's own 'Baseline:' line")) 'stale-baseline handoff names the unbound handoff baseline'
+		Assert-True (Test-MissingItem $stale.Json 'do not differ from it') 'stale-baseline handoff names the unbound handoff baseline'
 	}
 	else { Assert-True $false 'stale-baseline /progressive-disclosure-review handoff emitted JSON' }
 
@@ -564,6 +628,41 @@ function Test-DisclosureHandoffFreshness() {
 	Assert-Equal 0 $fresh.ExitCode 'PASS handoff bound to the dispatch baseline exit code'
 	if ($null -ne $fresh.Json) { Assert-Equal 'pass' $fresh.Json.status 'PASS handoff bound to the dispatch baseline status' }
 	else { Assert-True $false 'PASS handoff bound to the dispatch baseline emitted JSON' }
+}
+
+function Test-DisclosurePredatingBaseline([string] $Name, [bool] $Gated, [scriptblock] $Foreign, [scriptblock] $Change) {
+	# The rebase shape: the handoff was produced at the first baseline, then primary advanced and the
+	# dispatch baseline became the foreign commit. Only movement in the docs this diff reviews blocks.
+	$fixture = New-InstructionDocFixture $Name $Change $Foreign
+	$scopeText = New-VerifyScopeText $fixture.Baseline $fixture.Head
+	$result = Invoke-InstructionDocPrompt $fixture $Name ($scopeText + (New-DisclosureHandoff $fixture.FirstBaseline))
+	if (-not $Gated) {
+		Assert-Equal 0 $result.ExitCode "$Name predating handoff exit code"
+		if ($null -ne $result.Json) { Assert-Equal 'pass' $result.Json.status "$Name predating handoff status" }
+		else { Assert-True $false "$Name predating handoff emitted JSON" }
+		return
+	}
+	Assert-Equal 2 $result.ExitCode "$Name predating handoff exit code"
+	if ($null -ne $result.Json) {
+		Assert-Equal 'blocked' $result.Json.status "$Name predating handoff status"
+		Assert-Equal 'prompt.typed-artifacts-required' $result.Json.code "$Name predating handoff code"
+		Assert-True (Test-MissingItem $result.Json 'do not differ from it') "$Name predating handoff names the rejected baseline"
+	}
+	else { Assert-True $false "$Name predating handoff emitted JSON" }
+}
+
+function Test-DisclosurePredatingBaselines() {
+	Test-DisclosurePredatingBaseline 'disclosureforeignother' $false {
+		param($Root)
+		Set-FixtureText $Root 'Documents/Notes.md' "foreign note`n"
+		Set-FixtureText $Root '.agents/references/other.md' "foreign unrelated reference`n"
+	} { param($Root) Set-FixtureText $Root '.agents/references/shared.md' "landed shared reference`n" }
+	Test-DisclosurePredatingBaseline 'disclosureforeignreviewed' $true {
+		param($Root) Set-FixtureText $Root '.agents/references/shared.md' "foreign shared reference`n"
+	} { param($Root) Set-FixtureText $Root '.agents/references/shared.md' "landed shared reference`n" }
+	Test-DisclosurePredatingBaseline 'disclosureforeignrename' $true {
+		param($Root) Invoke-FixtureGit $Root @('mv', '.agents/references/shared.md', 'Documents/Moved.md')
+	} { param($Root) Set-FixtureText $Root '.agents/references/shared.md' "recreated shared reference`n" }
 }
 
 function Test-VerifyChangesInstructionDocs() {
@@ -1037,8 +1136,10 @@ try {
 	Test-MixedCaseAssignedSkill $repositoryA
 	Test-PlanAuditExecutionCard $repositoryA
 	Test-VerifyChangesTypedArtifacts
+	Test-VerifyChangesMissingOverflow
 	Test-VerifyChangesInstructionDocs
 	Test-DisclosureHandoffFreshness
+	Test-DisclosurePredatingBaselines
 	Test-VerifyChangesBuildEnvelope
 	Test-HeadHonoured
 	Test-ZeroTargets
