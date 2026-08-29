@@ -314,7 +314,7 @@ static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, 
 }
 
 template <IsExportJob T>
-static std::vector<std::unique_ptr<T>> DiscoverExportJobsAndAggregateDirty(const std::filesystem::path& rPackFile, int64_t iManifestChunkCount, bool& rbDirty)
+static std::vector<std::unique_ptr<T>> DiscoverExportJobsAndAggregateDirty(const std::filesystem::path& rPackFile, const std::vector<common::ChunkLocation>& rManifestChunkLocations, bool& rbDirty)
 {
 	std::vector<std::unique_ptr<T>> exportJobs;
 	for (const std::filesystem::path& rBaseDirectory : gpFileManager->mpInputDirectories)
@@ -330,12 +330,38 @@ static std::vector<std::unique_ptr<T>> DiscoverExportJobsAndAggregateDirty(const
 		}
 	}
 
-	// A deleted source asset shrinks the job list but dirties nothing above, so the stale chunk would
-	// persist in .pack/.manifest (and its constant in the generated header) until an unrelated edit.
-	// Comparing the manifest's chunk count against the live job count is the cheap deleted-asset
-	// detector (iManifestChunkCount stays -1 when the manifest was missing/invalid, but bDirty is
-	// already set in that case so the comparison is moot).
-	rbDirty |= iManifestChunkCount != static_cast<int64_t>(exportJobs.size());
+	// An added, deleted, or renamed source asset changes which paths the published .pack/.manifest (and
+	// the constants in the generated header) describe, but dirties nothing above: the per-job cache is
+	// keyed by path and shared across worktrees, so a path exported earlier under another branch checks
+	// clean the moment it comes back, and a rename that preserves the count hides behind an equal count.
+	// The manifest's chunk key and ExportJob::mCrc are the same quantity — Crc(relative path) — so
+	// comparing the two path-CRC sets catches every such difference, count changes included. Neither
+	// side is in numeric order (jobs follow directory iteration, manifest chunks follow lowered path),
+	// hence the sorts. Skipped when already dirty, which also covers a missing or invalid manifest.
+	if (!rbDirty)
+	{
+		std::vector<common::crc_t> manifestPathCrcs;
+		manifestPathCrcs.reserve(rManifestChunkLocations.size());
+		for (const common::ChunkLocation& rChunkLocation : rManifestChunkLocations)
+		{
+			manifestPathCrcs.push_back(rChunkLocation.crc);
+		}
+
+		std::vector<common::crc_t> jobPathCrcs;
+		jobPathCrcs.reserve(exportJobs.size());
+		for (const std::unique_ptr<T>& rpExportJob : exportJobs)
+		{
+			jobPathCrcs.push_back(rpExportJob->mCrc);
+		}
+
+		std::sort(manifestPathCrcs.begin(), manifestPathCrcs.end());
+		std::sort(jobPathCrcs.begin(), jobPathCrcs.end());
+		if (manifestPathCrcs != jobPathCrcs)
+		{
+			LOG(kDefault, kDebug, "\"{}\" asset path set differs from the published manifest ({} jobs, {} manifest chunks); re-exporting", T::kName, jobPathCrcs.size(), manifestPathCrcs.size());
+			rbDirty = true;
+		}
+	}
 
 	// Each job commits its .meta fingerprint at export time on a worker thread, but the pack/manifest
 	// rename below happens later on this thread — a kill in that window leaves every fingerprint clean
@@ -506,9 +532,8 @@ static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std
 		// fresh pack, and the header check above only tests existence, never staleness. Publishing first
 		// cannot strand it: the constants are Crc(mRelativeFile), path-derived only, so the header changes
 		// only when the asset path set changes, and every such cause re-dirties against the still-old pack
-		// next run — an added/removed asset trips the manifest chunk-count comparison, a count-preserving
-		// rename trips CheckDirty and the fingerprint-newer-than-pack check, and a regenerated missing
-		// header already matches the pack.
+		// next run — any add, removal, or rename trips the path-CRC set comparison in
+		// DiscoverExportJobsAndAggregateDirty, and a regenerated missing header already matches the pack.
 		if (!common::ContentsEqual(temporaryHeaderFile, rHeaderFile))
 		{
 			std::filesystem::rename(temporaryHeaderFile, rHeaderFile);
@@ -557,7 +582,7 @@ bool RunExportJobs()
 	headerFile += ".h";
 	bDirty |= !std::filesystem::exists(headerFile);
 
-	std::vector<std::unique_ptr<T>> exportJobs = DiscoverExportJobsAndAggregateDirty<T>(packFile, iManifestChunkCount, bDirty);
+	std::vector<std::unique_ptr<T>> exportJobs = DiscoverExportJobsAndAggregateDirty<T>(packFile, manifestChunkLocations, bDirty);
 
 	if (!bDirty && !ValidatePublishedPackLayout(packFile, manifestChunkLocations))
 	{
