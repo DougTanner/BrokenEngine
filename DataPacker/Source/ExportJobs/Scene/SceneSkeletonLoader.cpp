@@ -83,6 +83,13 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 		auto parentIt = parentMap.find(static_cast<int>(i));
 		if (parentIt != parentMap.end())
 		{
+			// Nodes ship in source order and the runtime builds world matrices in one forward pass, so a parent
+			// that follows its child would only be caught at load (AnimationData::Load, CorruptStreamException).
+			if (parentIt->second >= static_cast<int>(i))
+			{
+				throw std::runtime_error(std::format("ExportScene node {} has parent node {}, which does not precede it; glTF nodes must be ordered parent-before-child", i, parentIt->second));
+			}
+
 			rNode.iParentIndex = static_cast<int16_t>(parentIt->second);
 		}
 
