@@ -468,15 +468,18 @@ function Test-PromptScopeEvidence([object] $ChangeSet) {
 		# inline while describing this gate: an unanchored match reads that sentence as the handoff and
 		# hides the real block below it. The terminator is searched from the end of the marker match, so
 		# it can only land on a later line's own start.
-		$markerMatch = [Regex]::Match($script:ScopeText, '(?m)^Skill: progressive-disclosure-review')
+		# The last marker is the one read: a rebase round appends its handoff below the earlier ones, so the
+		# newest block governs and a superseded one can neither block this gate nor satisfy it.
+		$markerMatches = [Regex]::Matches($script:ScopeText, '(?m)^Skill: progressive-disclosure-review')
+		$markerMatch = $(if ($markerMatches.Count -gt 0) { $markerMatches[$markerMatches.Count - 1] } else { $null })
 		$block = ''
-		if ($markerMatch.Success) {
+		if ($null -ne $markerMatch) {
 			$blockStart = $markerMatch.Index + $markerMatch.Length
 			$nextSkill = [Regex]::new('(?m)^Skill: ').Match($script:ScopeText, $blockStart)
 			$blockEnd = $(if ($nextSkill.Success) { $nextSkill.Index } else { $script:ScopeText.Length })
 			$block = $script:ScopeText.Substring($blockStart, $blockEnd - $blockStart)
 		}
-		if (-not $markerMatch.Success -or -not $block.Contains('Files checked:')) {
+		if ($null -eq $markerMatch -or -not $block.Contains('Files checked:')) {
 			$missing.Add("the /progressive-disclosure-review handoff, marked by 'Skill: progressive-disclosure-review' and 'Files checked:'")
 		}
 		else {
