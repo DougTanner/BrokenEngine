@@ -103,9 +103,10 @@ int ResolveEffectiveMaterial(LoadVerticesContext& rContext, int iOriginalMateria
 }
 
 // Assembles deduplicated vertices for one primitive, appending unique vertices to rVertices and filling
-// rIndexRemap (original-vertex -> deduped-index). Static, non-skeleton meshes are baked to world space;
-// skinned / skeletal vertices stay in mesh-local space for the runtime skinning pipeline.
-void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<uint32_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkinning, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld)
+// rIndexRemap (original-vertex -> deduped-index). Vertices stay in mesh-local space only when the model has a
+// skeleton, because only then does the runtime pose them with skinning or node matrices; every primitive of a
+// model without a skeleton is baked to world space here.
+void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<uint32_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld)
 {
 	// Position (required) - accessor also supplies the vertex count that drives the loop below
 	const tinygltf::Accessor& rPositionAccessor = rModel.accessors[rPrimitive.attributes.find("POSITION")->second];
@@ -136,14 +137,14 @@ void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<uint
 		auto vecPosition = XMVectorSet(pfPositions[j * iPositionStride + 0], pfPositions[j * iPositionStride + 1], pfPositions[j * iPositionStride + 2], 1.0f);
 		auto vecNormal = pfNormals != nullptr ? XMVectorSet(pfNormals[j * iNormalStride], pfNormals[j * iNormalStride + 1], pfNormals[j * iNormalStride + 2], 0.0f) : XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
-		if (!bHasSkinning && !bHasSkeleton)
+		if (!bHasSkeleton)
 		{
-			// Only transform static models without skeleton data
-			// Skinned vertices must remain in local space for runtime skinning pipeline
+			// Without a skeleton nothing poses these vertices at runtime - the static shader applies no matrix -
+			// so every primitive bakes here, JOINTS_0 or not, or one model would ship two vertex-space conventions
 			vecPosition = XMVector4Transform(vecPosition, rMatMeshWorld);
 			vecNormal = XMVector3TransformNormal(vecNormal, rMatMeshWorld);
 		}
-		// Non-skinned vertices on animated models: keep in mesh-local space for runtime mesh matrix
+		// With a skeleton the vertices stay mesh-local: runtime skinning or node matrices place them
 
 		XMStoreFloat3(&rVertex.f3Pos, vecPosition);
 		XMStoreFloat3(&rVertex.f3Normal, XMVector3Normalize(vecNormal));
@@ -333,7 +334,7 @@ void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& 
 		Material& rMaterial = rMaterials.at(iEffectiveMaterial);
 
 		std::vector<uint32_t> indexRemap;
-		BuildVertices(rVertices, indexRemap, rPrimitive, rModel, bHasSkinning, rContext.bHasSkeleton, matMeshWorld);
+		BuildVertices(rVertices, indexRemap, rPrimitive, rModel, rContext.bHasSkeleton, matMeshWorld);
 
 		AppendIndices(rMaterial.indexBuffer, rPrimitive, rModel, indexRemap);
 	}
