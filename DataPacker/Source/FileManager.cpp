@@ -237,11 +237,12 @@ std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::
 		return std::nullopt;
 	}
 
-	std::filesystem::path expected = rRepositoryRoot / "Projects" / std::string(projectName) / "Platforms/VisualStudio2026/Output/Data";
-	if (!PathEqual(expected.lexically_normal(), rOutputDirectory))
+	std::filesystem::path expected = (rRepositoryRoot / "Projects" / std::string(projectName) / "Platforms/VisualStudio2026/Output/Data").lexically_normal();
+	if (!PathEqual(expected, rOutputDirectory))
 	{
-		rReject();
-		return std::nullopt;
+		// Exporting a linked worktree anywhere else leaves ThirdParty and the output roots on unvalidated
+		// worktree symlinks, which only fails hours later in attribution collection.
+		throw std::runtime_error(std::format("Linked worktree must export into its canonical output directory: supplied {}, expected {}", rOutputDirectory.string(), expected.string()));
 	}
 	return LinkedWorktreeIdentity { .primaryRoot = std::move(primaryRoot), .expectedOutput = std::move(expected), };
 }
