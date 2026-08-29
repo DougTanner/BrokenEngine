@@ -100,23 +100,41 @@ std::vector<VkFormat> ComputeTextureFormats(const tinygltf::Model& rModel)
 {
 	std::vector<VkFormat> textureFormats;
 	textureFormats.reserve(rModel.textures.size());
-	for (const tinygltf::Texture& rTexture : rModel.textures)
+	for (size_t i = 0; i < rModel.textures.size(); ++i)
 	{
-		VkFormat vkFormat = VK_FORMAT_BC7_UNORM_BLOCK;
-		for (const tinygltf::Material& rMaterial : rModel.materials)
+		// Textures sharing a source image share one generated intermediate, so a normal use through any of them
+		// forces the two-channel format: the shader samples .rg and reconstructs Z from them. The single-channel
+		// format likewise requires that no texture in the group carries a use needing more channels.
+		bool bNormal = false;
+		bool bOcclusion = false;
+		bool bNonOcclusionUse = false;
+		for (size_t j = 0; j < rModel.textures.size(); ++j)
 		{
-			if (IsOcclusion(rTexture.source, rMaterial))
+			if (rModel.textures.at(j).source != rModel.textures.at(i).source)
 			{
-				vkFormat = VK_FORMAT_BC4_UNORM_BLOCK;
-				break;
+				continue;
 			}
-			if (IsNormal(rTexture.source, rMaterial))
+
+			for (const tinygltf::Material& rMaterial : rModel.materials)
 			{
-				vkFormat = VK_FORMAT_BC5_UNORM_BLOCK;
-				break;
+				bNormal |= IsNormal(static_cast<int64_t>(j), rMaterial);
+				bOcclusion |= IsOcclusion(static_cast<int64_t>(j), rMaterial);
+				bNonOcclusionUse |= IsNonOcclusionUse(static_cast<int64_t>(j), rMaterial);
 			}
 		}
-		textureFormats.push_back(vkFormat);
+
+		if (bNormal)
+		{
+			textureFormats.push_back(VK_FORMAT_BC5_UNORM_BLOCK);
+		}
+		else if (bOcclusion && !bNonOcclusionUse)
+		{
+			textureFormats.push_back(VK_FORMAT_BC4_UNORM_BLOCK);
+		}
+		else
+		{
+			textureFormats.push_back(VK_FORMAT_BC7_UNORM_BLOCK);
+		}
 	}
 	return textureFormats;
 }

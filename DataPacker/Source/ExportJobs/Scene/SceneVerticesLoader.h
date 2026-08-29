@@ -47,5 +47,6 @@ struct LoadVerticesContext
 
 void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& rNode, const tinygltf::Model& rModel, LoadVerticesContext& rContext);
 
+bool IsNonOcclusionUse(int64_t iIndex, const tinygltf::Material& rMaterial);
 bool IsOcclusion(int64_t iIndex, const tinygltf::Material& rMaterial);
 bool IsNormal(int64_t iIndex, const tinygltf::Material& rMaterial);

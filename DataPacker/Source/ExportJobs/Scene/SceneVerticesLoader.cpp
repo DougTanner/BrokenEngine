@@ -362,12 +362,17 @@ bool UsesTexture(const tinygltf::ParameterMap& rParameters, const char* pcTextur
 
 } // namespace
 
+bool IsNonOcclusionUse(int64_t iIndex, const tinygltf::Material& rMaterial)
+{
+	return UsesTexture(rMaterial.values, "baseColorTexture", iIndex) || UsesTexture(rMaterial.additionalValues, "normalTexture", iIndex) || UsesTexture(rMaterial.values, "metallicRoughnessTexture", iIndex) || UsesTexture(rMaterial.additionalValues, "emissiveTexture", iIndex);
+}
+
 bool IsOcclusion(int64_t iIndex, const tinygltf::Material& rMaterial)
 {
 	bool bOcclusion = UsesTexture(rMaterial.additionalValues, "occlusionTexture", iIndex);
 
 	// Check if occlusion texture is shared with another texture type (if so, treat as non-occlusion)
-	if (bOcclusion && (UsesTexture(rMaterial.values, "baseColorTexture", iIndex) || UsesTexture(rMaterial.additionalValues, "normalTexture", iIndex) || UsesTexture(rMaterial.values, "metallicRoughnessTexture", iIndex) || UsesTexture(rMaterial.additionalValues, "emissiveTexture", iIndex)))
+	if (bOcclusion && IsNonOcclusionUse(iIndex, rMaterial))
 	{
 		bOcclusion = false;
 	}
