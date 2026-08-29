@@ -54,7 +54,7 @@ private:
 	};
 	bool DequeueNextUpload();
 	bool HandleUploadEarlyOut(LazyChunk& rLazyChunk);
-	// Trust boundary: throws common::CorruptStreamException if the on-disk TextureHeader dims/mips are implausible.
+	// Trust boundary: ASSERTs the on-disk TextureHeader dims/mips are plausible and fit the chunk data.
 	static void ValidateTextureDimensions(const LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions);
 	void CreateTransferImage(LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions);
 	void RecordStagingCopies(LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions);
@@ -62,7 +62,7 @@ private:
 
 	static constexpr int64_t kiByteBudgetPerFrame = 4 * 1024 * 1024;
 
-	// Zeroes the five "In-progress upload state" fields below (full reset between textures / on teardown / corruption)
+	// Zeroes the five "In-progress upload state" fields below (full reset between textures / on teardown)
 	void ResetUploadProgress();
 
 	// In-progress upload state (persists across frames for one texture at a time)

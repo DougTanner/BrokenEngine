@@ -139,7 +139,9 @@ the owning subsystem's established failure channel; there is no universal
   log the asset identity at `kError` and rethrow to the boot crash-report path.
 - For asynchronous per-chunk failures, trace the owning worker's published
   completion and waiter/progress contract before accepting any return, throw,
-  or skip path.
+  or skip path. Runtime `.pack` chunk data halts on corruption
+  (`/Engine/Source/File/AGENTS.md`); do not accept a soft-fail, skip, or
+  placeholder path there.
 
 ### Allocation-tracked paths and logging
 

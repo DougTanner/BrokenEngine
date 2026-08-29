@@ -90,6 +90,10 @@ struct MemoryInitializer
 {
 	MemoryInitializer()
 	{
+		// Write crash report on any abort() call (catches mimalloc assertions, std::terminate on a thread
+		// outside MainThread's try/catch, and other CRT aborts)
+		signal(SIGABRT, [](int) { engine::HandleException(); });
+
 #if defined(ENABLE_CRT_DEBUG_HEAP)
 		_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 		// Usage: set to the allocation number from the CRT leak report to break on that allocation (e.g., _crtBreakAlloc = 5374)
@@ -104,9 +108,6 @@ struct MemoryInitializer
 #if defined(DEBUG) || defined(_DEBUG)
 		// Route mimalloc output to VS Output window
 		mi_register_output([](const char* msg, [[maybe_unused]] void* arg) { OutputDebugStringA(msg); }, nullptr);
-
-		// Write crash report on any abort() call (catches mimalloc assertions and other CRT aborts)
-		signal(SIGABRT, [](int) { engine::HandleException(); });
 #endif
 #endif
 	}

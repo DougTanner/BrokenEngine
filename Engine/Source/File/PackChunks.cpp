@@ -124,15 +124,16 @@ static constexpr data::DataTypes DataTypeFromFlags(const common::ChunkFlags_t& r
 	{
 		return data::kDataTypeRaw;
 	}
-	// External-data trust boundary: flags come from .pack chunk headers; no type flag means a corrupt pack.
-	// kDataTypeCount is one past the last valid pack array index — callers must treat it as load failure.
+	// No type flag means a corrupt pack; ValidateChunkHeader rejects that at load, so lazy-map callers
+	// index with the result.
 	return data::kDataTypeCount;
 }
 
 // External-data trust boundary: a wholly missing or corrupt required .manifest/.pack is unrecoverable —
 // limping with an empty/garbage chunk set defers the failure to every later consumer and ships a broken game.
 // LoadPackFiles runs in the FileManager ctor (Main.cpp), constructed before MainThread's try/catch, so a thrown
-// ASSERT here std::terminates with no crash report. Fail loud (user-facing) and exit cleanly instead.
+// ASSERT here std::terminates into the SIGABRT crash-report hook, which tells the player nothing about the real
+// cause. Fail loud with the actionable reinstall message and exit cleanly instead.
 [[noreturn]] static void FailMissingRequiredAsset(const std::filesystem::path& rAssetPath, std::string_view reason)
 {
 	LOG(kLoading, kError, "Required asset \"{}\" is missing or corrupt: {}", rAssetPath.string(), reason);
@@ -208,6 +209,20 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 			return "chunk header size outside chunk";
 		}
 		if (rChunkHeader.iSize > std::numeric_limits<int>::max())
+		{
+			return "chunk header size outside chunk";
+		}
+	}
+	// For an uncompressed chunk iSize is the payload extent its consumers read against (audio streaming derives
+	// its whole read range from it), so a header that outruns its own chunk is a corrupt pack and fails here at
+	// load rather than mid-stream. Zlib chunks are excluded: they size their decode from the on-disk extent.
+	if (!common::IsCompressed(rChunkHeader.flags))
+	{
+		if (rChunkHeader.iSize < 0)
+		{
+			return "chunk header size outside chunk";
+		}
+		if (rChunkHeader.iSize > static_cast<int64_t>(rChunkLocation.uiSize) - common::kiChunkDataOffset)
 		{
 			return "chunk header size outside chunk";
 		}
@@ -713,17 +728,7 @@ void PackChunks::LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex)
 	std::byte* pReadBuffer = mpReadBuffers[iThreadIndex];
 	std::byte* pReadDst = bCompressed ? pDecompressScratch : rLazyChunk.pData;
 
-	// Corrupt chunk header (no type flag): fail the load instead of indexing past the handle array.
-	// Mark ready (pool data stays zero-filled) so WaitForChunks callers don't block forever on the chunk.
 	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
-	if (eDataType == data::kDataTypeCount) [[unlikely]]
-	{
-		LOG(kLoading, kError, "Corrupt chunk header flags for chunk {}", rRequest.crc);
-		DEBUG_BREAK();
-		rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-		NotifyChunkCompletion();
-		return;
-	}
 
 	// Read in sub-chunks, yielding between each to reduce main-thread scheduling latency
 	HANDLE hFile = mLazyPackFileHandles[eDataType];
@@ -748,16 +753,8 @@ void PackChunks::LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex)
 		static_cast<void>(ReadFile(hFile, pReadBuffer, uiReadSize, &uiBytesRead, &overlapped));
 
 		int64_t iCopySize = std::min(static_cast<int64_t>(uiBytesRead) - iSrcOffset, iOnDiskSize - iDataCopied);
-		// Trust boundary: a truncated/locked .pack can return a 0-byte read (non-positive copy) that never advances
-		// iDataCopied — an infinite loop on the loading thread. Fail the chunk soft (ready, pool stays zero-filled).
-		if (iCopySize <= 0) [[unlikely]]
-		{
-			LOG(kLoading, kError, "Truncated read for chunk {}; marking ready zero-filled", rRequest.crc);
-			DEBUG_BREAK();
-			rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-			NotifyChunkCompletion();
-			return;
-		}
+		// A truncated .pack returns a 0-byte read that never advances iDataCopied; halt rather than spin.
+		ASSERT(iCopySize > 0);
 		std::byte* pSrc = pReadBuffer + iSrcOffset;
 		std::byte* pDst = pReadDst + iDataCopied;
 
@@ -796,10 +793,9 @@ void PackChunks::LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex)
 
 	if (bCompressed)
 	{
-		// External-data trust boundary (both codecs): a corrupted .pack or a producer/runtime contract drift
-		// (e.g. a raw payload mistagged compressed) makes the decompress fail or under-fill. Fail the chunk
-		// soft (ready, pool stays zero-filled) instead of throwing on the loading thread, where there is no
-		// try/catch to catch it. Texture chunks are LZ4 today; kZlibCompressed stays a legal decode branch.
+		// Trust boundary (both codecs): a corrupted .pack or a raw payload mistagged compressed makes the
+		// decompress fail or under-fill; bad pack data halts.
+		// Texture chunks are LZ4 today; kZlibCompressed stays a legal decode branch.
 		if (rLazyChunk.header.flags & common::ChunkFlags::kLz4Compressed)
 		{
 			// LZ4_decompress_safe bounds writes to the pool-slot capacity and returns bytes produced (< 0 on
@@ -809,27 +805,14 @@ void PackChunks::LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex)
 			// header.iSize (the exact compressed payload byte count), not iOnDiskSize, which is rounded up to
 			// kiAlignmentBytes and so carries up to 15 trailing pad bytes.
 			int iLz4Result = LZ4_decompress_safe(reinterpret_cast<const char*>(pDecompressScratch), reinterpret_cast<char*>(rLazyChunk.pData), static_cast<int>(rLazyChunk.header.iSize), static_cast<int>(rLazyChunk.iDataSize));
-			if (iLz4Result < 0 || static_cast<int64_t>(iLz4Result) != rLazyChunk.iDataSize) [[unlikely]]
-			{
-				LOG(kLoading, kError, "LZ4 decompress failed for chunk {} (result {})", rRequest.crc, iLz4Result);
-				DEBUG_BREAK();
-				rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-				NotifyChunkCompletion();
-				return;
-			}
+			// A short or negative decode leaves the pool slot partly filled, and the upload would publish it.
+			ASSERT(static_cast<int64_t>(iLz4Result) == rLazyChunk.iDataSize);
 		}
 		else
 		{
 			uLongf uiUncompressedSize = static_cast<uLongf>(rLazyChunk.iDataSize);
 			int iZlibResult = uncompress(reinterpret_cast<Bytef*>(rLazyChunk.pData), &uiUncompressedSize, reinterpret_cast<const Bytef*>(pDecompressScratch), static_cast<uLong>(iOnDiskSize));
-			if (iZlibResult != Z_OK || static_cast<int64_t>(uiUncompressedSize) != rLazyChunk.iDataSize) [[unlikely]]
-			{
-				LOG(kLoading, kError, "Zlib decompress failed for chunk {} (result {})", rRequest.crc, iZlibResult);
-				DEBUG_BREAK();
-				rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-				NotifyChunkCompletion();
-				return;
-			}
+			ASSERT(iZlibResult == Z_OK && static_cast<int64_t>(uiUncompressedSize) == rLazyChunk.iDataSize);
 		}
 	}
 
@@ -990,14 +973,7 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 			return true;
 		}
 
-		// Corrupt chunk header (no type flag): fail the read instead of indexing past the path array
 		data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
-		if (eDataType == data::kDataTypeCount) [[unlikely]]
-		{
-			LOG(kLoading, kError, "Corrupt chunk header flags for chunk {}", crc);
-			DEBUG_BREAK();
-			return false;
-		}
 
 		// Chunk not loaded - read directly from pack file
 		// This path is used for streaming audio data without loading entire chunk
@@ -1022,10 +998,11 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 		// Seek and read requested data
 		packStream.seekg(iDataOffset + uiOffset);
 		packStream.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-		bool bSuccess = packStream.good();
+		// Past the bounds check above, a short read means the pack file itself is truncated.
+		ASSERT(packStream.good());
 		packStream.close();
 
-		return bSuccess;
+		return true;
 	}
 
 	// Chunk not found
@@ -1081,12 +1058,7 @@ bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffse
 	}
 	packStream.seekg(iDataOffset + static_cast<int64_t>(uiOffset));
 	packStream.read(reinterpret_cast<char*>(rLazyChunk.pData + uiOffset), static_cast<std::streamsize>(uiLength));
-	if (!packStream.good())
-	{
-		LOG(kLoading, kError, "Recommit reload short read for chunk {}", crc);
-		DEBUG_BREAK();
-		return false;
-	}
+	ASSERT(packStream.good());
 
 	return true;
 }

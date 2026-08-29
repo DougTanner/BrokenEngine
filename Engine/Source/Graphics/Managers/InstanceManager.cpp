@@ -49,7 +49,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebu
 		if (pCallbackData->pMessageIdName != nullptr && strstr(pCallbackData->pMessageIdName, "VkDescriptorSetAllocateInfo-descriptorCount") != nullptr)
 		{
 			LOG(kDefault, kError, "Double the number of descriptor sets in DeviceManager::DeviceManager() {}", pCallbackData->pMessage);
-			// DEBUG_BREAK, not ASSERT: throwing across the Vulkan C callback boundary would terminate without a crash report
+			// DEBUG_BREAK, not ASSERT: the Vulkan C callback frame is not a supported unwind path, so a throw here
+			// terminates the process over a validation-layer message instead of returning to the driver
 			DEBUG_BREAK();
 			return VK_FALSE;
 		}

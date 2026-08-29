@@ -208,7 +208,7 @@ public:
 	void DecommitChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
 	// Inverse of DecommitChunkRange: MEM_COMMITs the interior and re-reads [uiOffset, uiOffset + uiLength)
 	// straight from the pack file on disk into the pool (NOT via the decommitted resident copy). Uncompressed chunks only.
-	// Returns true on success; false on soft-fail (MEM_COMMIT failure / pack-open failure / short read). On false the
+	// Returns true on success; false on soft-fail (MEM_COMMIT failure / pack-open failure). On false the
 	// caller must NOT read the range — the interior may be decommitted or hold partial data.
 	[[nodiscard]] bool RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
 	// Queues a single uncompressed lazy-chunk range for background recommit/reload. Same-range requests deduplicate

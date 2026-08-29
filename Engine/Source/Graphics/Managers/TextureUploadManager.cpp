@@ -291,21 +291,8 @@ void TextureUploadManager::UploadThread()
 			};
 
 			// Trust boundary: TextureHeader dims/mips are on-disk pack bytes that drive a VkImageCreateInfo GPU
-			// allocation and the mip-iteration copy loop. Reject implausible values before allocating so a corrupt
-			// header cannot drive a hostile VkImage size or run the copy loop off rLazyChunk.pData.
-			try
-			{
-				ValidateTextureDimensions(rLazyChunk, dimensions);
-			}
-			catch (const common::CorruptStreamException& rException)
-			{
-				LOG(kLoading, kError, "Corrupt texture chunk {}: {}; marking ready zero-filled", mCurrentCrc, rException.what());
-				DEBUG_BREAK();
-				rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-				gpFileManager->NotifyChunkCompletion(); // No NotifyChunkAdoptable: nothing valid to adopt (no GPU image created)
-				ResetUploadProgress();
-				continue;
-			}
+			// allocation and the mip-iteration copy loop, so this halts on a corrupt header before either runs.
+			ValidateTextureDimensions(rLazyChunk, dimensions);
 
 			// First chunk: create VkImage via VMA
 			if (bFirstChunk)
@@ -354,7 +341,7 @@ void TextureUploadManager::UploadThread()
 		{
 			// Device lost during upload -- DestroyTransferResources will clean up GPU resources.
 			// Caught before the fatal catch-all below (DeviceLostException derives from std::exception)
-			// so device loss keeps its distinct re-upload recovery rather than the zero-fill soft-fail.
+			// so device loss keeps its distinct re-upload recovery rather than the fatal path below.
 			if (mCurrentCrc != 0)
 			{
 				LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(mCurrentCrc);
@@ -435,18 +422,12 @@ void TextureUploadManager::ValidateTextureDimensions(const LazyChunk& rLazyChunk
 	// dims/mips first keeps the ComputeImageByteSize math from overflowing on a hostile input.
 	static constexpr int64_t kiMaxTextureDimension = 16384; // VkPhysicalDeviceLimits::maxImageDimension2D guaranteed floor class
 	static constexpr int64_t kiMaxMipLevels = 15;           // log2(16384) + 1
-	if (rDimensions.uiBaseWidth == 0 || rDimensions.uiBaseHeight == 0 || rDimensions.uiMipLevels == 0
-		|| rDimensions.uiBaseWidth > kiMaxTextureDimension || rDimensions.uiBaseHeight > kiMaxTextureDimension
-		|| rDimensions.uiMipLevels > kiMaxMipLevels)
-	{
-		throw common::CorruptStreamException("TextureUploadManager dimensions");
-	}
+	ASSERT(rDimensions.uiBaseWidth != 0 && rDimensions.uiBaseHeight != 0 && rDimensions.uiMipLevels != 0
+		&& rDimensions.uiBaseWidth <= kiMaxTextureDimension && rDimensions.uiBaseHeight <= kiMaxTextureDimension
+		&& rDimensions.uiMipLevels <= kiMaxMipLevels);
 
 	int64_t iExpectedBytes = common::ComputeImageByteSize(rDimensions.vkFormat, rDimensions.uiBaseWidth, rDimensions.uiBaseHeight, rDimensions.uiMipLevels, rDimensions.uiArrayLayers, 1);
-	if (iExpectedBytes <= 0 || iExpectedBytes > rLazyChunk.iDataSize)
-	{
-		throw common::CorruptStreamException("TextureUploadManager size");
-	}
+	ASSERT(iExpectedBytes > 0 && iExpectedBytes <= rLazyChunk.iDataSize);
 }
 
 void TextureUploadManager::CreateTransferImage(LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions)

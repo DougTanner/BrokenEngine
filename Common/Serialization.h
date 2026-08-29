@@ -5,9 +5,10 @@ namespace common
 
 // Thrown by deserialization readers when a count/size/capacity field from a trust boundary
 // (save file, replay stream, network payload, .pack chunk) is implausible — negative, inverted
-// (count > capacity), or larger than the stream/chunk could possibly back. Caught at each
-// load/receive boundary (logged + payload skipped or load aborted) so malformed input degrades
-// gracefully instead of overrunning a buffer or driving an unbounded allocation. The message is a
+// (count > capacity), or larger than the stream/chunk could possibly back. Save, replay, and network
+// readers catch it at their load/receive boundary (logged + payload skipped or load aborted) instead of
+// overrunning a buffer or driving an unbounded allocation; pack readers do not catch it — bad .pack data
+// halts, so it reaches the crash-report path. The message is a
 // static reader-name literal (no std::format on the throw path; std::runtime_error's own string copy is
 // benign — every thrower runs under a load-path allocation-suppress scope).
 class CorruptStreamException : public std::runtime_error

@@ -550,19 +550,10 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			// Fallback: upload thread didn't GPU upload (same queue family)
 
 			// Trust boundary: the fallback copy loop below sizes its memcpy off rLazyChunk.pData using the on-disk
-			// TextureHeader dims stored in rTexture.mInfo. The upload thread bounds those via ValidateTextureDimensions
-			// before uploading, but the same-queue-family / no-transfer-pool early-out (HandleUploadEarlyOut) reaches
-			// kDiskLoaded unvalidated, so bound here too. Mirror the upload thread's iDataSize check; on violation
-			// soft-fail the chunk to kReady (leaving the borrowed white placeholder) rather than read off pData.
+			// TextureHeader dims stored in rTexture.mInfo, and the same-queue-family / no-transfer-pool early-out
+			// (HandleUploadEarlyOut) reaches kDiskLoaded without the upload thread's validation, so bound here too.
 			int64_t iExpectedBytes = common::ComputeImageByteSize(rTexture.mInfo.format, rTexture.mInfo.extent.width, rTexture.mInfo.extent.height, rTexture.mInfo.mipLevels, rTexture.mInfo.arrayLayers, rTexture.mInfo.extent.depth);
-			if (iExpectedBytes <= 0 || iExpectedBytes > rLazyChunk.iDataSize)
-			{
-				LOG(kLoading, kError, "Corrupt texture chunk {}: expected {} bytes exceeds chunk data {}; marking ready without adopt", rCrc, iExpectedBytes, rLazyChunk.iDataSize);
-				DEBUG_BREAK();
-				rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-				gpTextureUploadManager->NotifyChunkAdopted(); // adoptable -> kReady: disarm the pending-adoption counter armed when the chunk reached kDiskLoaded
-				continue;
-			}
+			ASSERT(iExpectedBytes > 0 && iExpectedBytes <= rLazyChunk.iDataSize);
 
 			rTexture.Create(rTexture.mInfo, [&](void* pData, int64_t iPosition, int64_t iSize)
 			{

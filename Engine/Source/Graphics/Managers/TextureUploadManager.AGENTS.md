@@ -12,6 +12,6 @@ Distinct transfer queues release image ownership for the matching graphics acqui
 
 ## Chunk Completion
 
-Pack dimensions and derived copy ranges are validated before image allocation. Corrupt dimensions soft-fail the chunk to ready without creating an image, preserving its existing placeholder. Other upload failures leave active ownership intact for the published fatal path.
+Pack dimensions and derived copy ranges are validated before image allocation. Corrupt dimensions `ASSERT` on the upload thread and travel the published fatal path (`../../File/AGENTS.md`). Other upload failures leave active ownership intact for the published fatal path.
 
 The pending-adoption counter belongs to this manager because it outlives `TextureManager` during device recreation. Keep file-state rearming and adoption completion synchronized with that counter.
