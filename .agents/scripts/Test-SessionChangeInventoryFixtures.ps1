@@ -75,7 +75,7 @@ function Set-FixtureBytes([string] $Root, [string] $RelativePath, [byte[]] $Byte
 	[IO.File]::WriteAllBytes($full, $Bytes)
 }
 
-function Invoke-Inventory([string[]] $Arguments) {
+function Invoke-Inventory([string[]] $Arguments, [hashtable] $Environment = @{}) {
 	$start = [Diagnostics.ProcessStartInfo]::new()
 	$start.FileName = $script:PwshPath
 	$start.WorkingDirectory = [IO.Path]::GetTempPath()
@@ -86,6 +86,8 @@ function Invoke-Inventory([string[]] $Arguments) {
 	$start.StandardOutputEncoding = $script:Utf8
 	$start.StandardErrorEncoding = $script:Utf8
 	foreach ($argument in @('-NoProfile', '-File', $script:Inventory) + $Arguments) { [void] $start.ArgumentList.Add($argument) }
+	[void] $start.Environment.Remove('GIT_NO_LAZY_FETCH')
+	foreach ($name in $Environment.Keys) { $start.Environment[$name] = [string] $Environment[$name] }
 	$process = [Diagnostics.Process]::new()
 	$process.StartInfo = $start
 	if (-not $process.Start()) { throw 'Could not start pwsh for the inventory script.' }
@@ -327,6 +329,188 @@ function Test-IndependentDualLanguageRoutes() {
 	}
 }
 
+# --- Frozen-tree C++ manifests -----------------------------------------------------------------
+
+function New-ManifestFixture() {
+	$root = New-FixtureRoot 'manifest'
+	$contents = @{
+		'Common/Alpha.cpp' = "int alpha = 1;`n"
+		'Common/Space Name.cpp' = "int spaceName = 2;`n"
+		'DataPacker/Pack.h' = "int pack = 4;`n"
+		'Engine/Source/Main.cpp' = "int mainValue = 5;`n"
+		'Engine/Source/ShaderLayoutsBase.h' = "layout base`n"
+		'Engine/Data/Shaders/ShaderGlobalLayout.h' = "layout global`n"
+		'Projects/Game.inl' = "int game = 6;`n"
+		'Tools/Tool.h' = "int tool = 7;`n"
+		'Tools/Executable.cpp' = "int executable = 8;`n"
+		'ThirdParty/Vendor.cpp' = "int vendor = 9;`n"
+		'.agents/scripts/Helper.cpp' = "int helper = 10;`n"
+		'.claude/Tool.cpp' = "int claudeTool = 11;`n"
+		'Temp/Scratch.cpp' = "int scratch = 12;`n"
+		'Documents/NotInCorpus.cpp' = "int document = 13;`n"
+		'Engine/Source/NotCpp.ps1' = "Write-Output 15`n"
+	}
+	foreach ($path in $contents.Keys) { Set-FixtureText $root $path $contents[$path] }
+	Invoke-FixtureGit $root @('add', '--all')
+	Invoke-FixtureGit $root @('update-index', '--chmod=+x', '--', 'Tools/Executable.cpp')
+	$linkSource = Join-Path ([IO.Path]::GetTempPath()) ('inventory-manifest-link-' + [Guid]::NewGuid().ToString('n').Substring(0, 8))
+	[IO.File]::WriteAllBytes($linkSource, $script:Utf8.GetBytes('Engine/Source/Missing.h'))
+	$linkBlob = (Get-FixtureGitText $root @('hash-object', '-w', '--', $linkSource)).Trim()
+	Remove-Item -LiteralPath $linkSource -Force
+	Invoke-FixtureGit $root @('update-index', '--add', '--cacheinfo', "120000,$linkBlob,Engine/Source/Link.h")
+	Invoke-FixtureGit $root @('update-index', '--add', '--cacheinfo', "160000,$script:GitlinkCommit,Engine/Source/Gitlink.h")
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	# These live bytes and this untracked target must not affect a manifest pinned to the commit.
+	Set-FixtureText $root 'Common/Alpha.cpp' "int alpha = 999;`n"
+	Set-FixtureText $root 'Engine/Source/Untracked.cpp' "int untracked = 1000;`n"
+	return [pscustomobject] @{ Root = $root; Baseline = $baseline; Contents = $contents }
+}
+
+function Test-ManifestInventory() {
+	$fixture = New-ManifestFixture
+	$before = Get-FixtureTreeSnapshot $fixture.Root
+	$first = Invoke-Inventory @('-RepositoryRoot', $fixture.Root, '-Baseline', $fixture.Baseline, '-EmitManifest')
+	Assert-True ((Get-FixtureTreeSnapshot $fixture.Root) -ceq $before) 'manifest run writes no file under the repository, including .git and ignored files'
+	Assert-Equal 0 $first.ExitCode 'manifest exit code'
+	Assert-True ([string]::IsNullOrEmpty($first.Stderr)) 'manifest pass writes nothing to stderr'
+	if ($null -eq $first.Json) { Assert-True $false 'manifest emitted JSON'; return }
+	Assert-Equal 'broken-engine-cpp-manifest/v1' $first.Json.schemaVersion 'manifest schemaVersion'
+	Assert-Equal $fixture.Baseline $first.Json.commitSha 'manifest commitSha'
+	$treeSha = (Get-FixtureGitText $fixture.Root @('rev-parse', "$($fixture.Baseline)^{tree}")).Trim()
+	Assert-Equal $treeSha $first.Json.treeSha 'manifest treeSha'
+	$scriptSha = Get-ByteSha256 ([IO.File]::ReadAllBytes($script:Inventory))
+	Assert-Equal $scriptSha $first.Json.classifierSha256 'manifest classifierSha256'
+	Assert-Equal 'schemaVersion,commitSha,treeSha,classifierSha256,entries' (@($first.Json.PSObject.Properties.Name) -join ',') 'manifest property order'
+	$expectedPaths = @(
+		'Common/Alpha.cpp'
+		'Common/Space Name.cpp'
+		'DataPacker/Pack.h'
+		'Engine/Data/Shaders/ShaderGlobalLayout.h'
+		'Engine/Source/Main.cpp'
+		'Engine/Source/ShaderLayoutsBase.h'
+		'Projects/Game.inl'
+		'Tools/Executable.cpp'
+		'Tools/Tool.h'
+	)
+	$entries = @($first.Json.entries)
+	Assert-Equal $expectedPaths.Count $entries.Count 'manifest target count and no entry cap'
+	Assert-Equal ($expectedPaths -join ' ; ') (($entries | ForEach-Object { $_.path }) -join ' ; ') 'manifest target path order'
+	$unique = [Collections.Generic.HashSet[string]]::new([string[]] $entries.path, [StringComparer]::Ordinal)
+	Assert-Equal $entries.Count $unique.Count 'manifest paths are unique without case-fold blocking'
+	$expectedClasses = @{
+		'Common/Alpha.cpp' = 'cpp'
+		'Common/Space Name.cpp' = 'cpp'
+		'DataPacker/Pack.h' = 'cpp'
+		'Engine/Data/Shaders/ShaderGlobalLayout.h' = 'dual-language-header'
+		'Engine/Source/Main.cpp' = 'cpp'
+		'Engine/Source/ShaderLayoutsBase.h' = 'dual-language-header'
+		'Projects/Game.inl' = 'cpp'
+		'Tools/Executable.cpp' = 'cpp'
+		'Tools/Tool.h' = 'cpp'
+	}
+	$expectedModes = @{ 'Tools/Executable.cpp' = '100755' }
+	foreach ($entry in $entries) {
+		Assert-Equal 'path,class,mode,sha256' (@($entry.PSObject.Properties.Name) -join ',') "manifest entry property order for $($entry.path)"
+		Assert-Equal $expectedClasses[$entry.path] $entry.class "manifest class for $($entry.path)"
+		$expectedMode = if ($expectedModes.ContainsKey($entry.path)) { $expectedModes[$entry.path] } else { '100644' }
+		Assert-Equal $expectedMode $entry.mode "manifest mode for $($entry.path)"
+		Assert-Equal (Get-TextSha256 $fixture.Contents[$entry.path]) $entry.sha256 "manifest blob hash for $($entry.path)"
+	}
+	Assert-True (-not ($entries.path -contains 'Common/Alpha.cpp' -and $first.Json.entries[0].sha256 -ceq (Get-TextSha256 "int alpha = 999;`n"))) 'manifest ignores dirty live bytes'
+	Assert-True (-not ($entries.path -contains 'Engine/Source/Untracked.cpp')) 'manifest ignores untracked live files'
+	foreach ($path in @('ThirdParty/Vendor.cpp', '.agents/scripts/Helper.cpp', '.claude/Tool.cpp', 'Temp/Scratch.cpp', 'Documents/NotInCorpus.cpp', 'Engine/Source/NotCpp.ps1', 'Engine/Source/Link.h', 'Engine/Source/Gitlink.h')) {
+		Assert-True (-not ($entries.path -contains $path)) "manifest excludes $path"
+	}
+	Assert-True ($first.Stdout.EndsWith("`n")) 'manifest ends with a final LF'
+	Assert-True (-not $first.Stdout.EndsWith("`n`n")) 'manifest has exactly one final LF'
+	Assert-True (-not $first.Stdout.EndsWith("`r`n")) 'manifest final newline is LF, not CRLF'
+	Assert-True ($script:Utf8.GetByteCount($first.Stdout) -le 131072) 'manifest output stays within the stdout budget'
+	$second = Invoke-Inventory @('-RepositoryRoot', $fixture.Root, '-Baseline', $fixture.Baseline, '-EmitManifest')
+	Assert-Equal 0 $second.ExitCode 'manifest repeat exit code'
+	Assert-True ($first.Stdout -ceq $second.Stdout) 'manifest repeat is byte-identical'
+}
+
+function Test-ManifestLargeTargetSet() {
+	$root = New-FixtureRoot 'manifest-large'
+	$blobSource = Join-Path ([IO.Path]::GetTempPath()) ('inventory-manifest-large-' + [Guid]::NewGuid().ToString('n').Substring(0, 8))
+	[IO.File]::WriteAllBytes($blobSource, $script:Utf8.GetBytes("int target = 1;`n"))
+	$blob = (Get-FixtureGitText $root @('hash-object', '-w', '--', $blobSource)).Trim()
+	Remove-Item -LiteralPath $blobSource -Force
+	$paths = @(0..500 | ForEach-Object { 'Engine/Source/Target{0:D3}.cpp' -f $_ })
+	Set-FixtureIndexEntry $root $blob $paths
+	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'baseline')
+	$baseline = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	$run = Invoke-Inventory @('-RepositoryRoot', $root, '-Baseline', $baseline, '-EmitManifest')
+	Assert-Equal 0 $run.ExitCode 'manifest more-than-500 exit code'
+	Assert-True ([string]::IsNullOrEmpty($run.Stderr)) 'manifest more-than-500 pass writes nothing to stderr'
+	if ($null -eq $run.Json) { Assert-True $false 'manifest more-than-500 emitted JSON'; return }
+	Assert-Equal 501 @($run.Json.entries).Count 'manifest does not cap entries at 500'
+	Assert-Equal ('Engine/Source/Target000.cpp ; Engine/Source/Target500.cpp') ((@($run.Json.entries)[0, 500] | ForEach-Object { $_.path }) -join ' ; ') 'manifest more-than-500 path endpoints'
+	Assert-True ($script:Utf8.GetByteCount($run.Stdout) -le 131072) 'manifest more-than-500 output stays within the stdout budget'
+}
+
+function Test-ManifestBlockedArguments($Fixture) {
+	$conflictNames = @('Regions', 'Landing', 'EmitTargets', 'Head', 'IncludeUntracked')
+	foreach ($name in $conflictNames) {
+		$arguments = @('-RepositoryRoot', $Fixture.Root, '-Baseline', $Fixture.Baseline, '-EmitManifest')
+		if ($name -ceq 'Head') { $arguments += @('-Head', $Fixture.Baseline) }
+		elseif ($name -ceq 'IncludeUntracked') { $arguments += @('-IncludeUntracked', 'Engine/Source/Untracked.cpp') }
+		else { $arguments += ('-' + $name) }
+		$run = Invoke-Inventory $arguments
+		Assert-Equal 2 $run.ExitCode "manifest mode conflict -$name exit code"
+		Assert-Equal 0 $run.Stdout.Length "manifest mode conflict -$name writes zero stdout bytes"
+		if ($null -ne $run.ErrorJson) { Assert-Equal 'inventory.mode-conflict' $run.ErrorJson.code "manifest mode conflict -$name code" }
+		else { Assert-True $false "manifest mode conflict -$name emits a structured stderr envelope" }
+	}
+	$missing = 'a' * 40
+	$invalid = Invoke-Inventory @('-RepositoryRoot', $Fixture.Root, '-Baseline', $missing, '-EmitManifest')
+	Assert-Equal 2 $invalid.ExitCode 'manifest invalid SHA exit code'
+	Assert-Equal 0 $invalid.Stdout.Length 'manifest invalid SHA writes zero stdout bytes'
+	if ($null -ne $invalid.ErrorJson) { Assert-Equal 'inventory.baseline-unresolved' $invalid.ErrorJson.code 'manifest invalid SHA code' }
+	else { Assert-True $false 'manifest invalid SHA emits a structured stderr envelope' }
+	$short = Invoke-Inventory @('-RepositoryRoot', $Fixture.Root, '-Baseline', 'HEAD', '-EmitManifest')
+	Assert-Equal 2 $short.ExitCode 'manifest non-SHA exit code'
+	Assert-Equal 0 $short.Stdout.Length 'manifest non-SHA writes zero stdout bytes'
+	if ($null -ne $short.ErrorJson) { Assert-Equal 'inventory.baseline-unresolved' $short.ErrorJson.code 'manifest non-SHA code' }
+	else { Assert-True $false 'manifest non-SHA emits a structured stderr envelope' }
+}
+
+function Test-ManifestCatFileFailure() {
+	$root = New-FixtureRoot 'manifest-missing-blob'
+	$missingBlob = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+	Invoke-FixtureGit $root @('update-index', '--add', '--info-only', '--cacheinfo', "100644,$missingBlob,Engine/Source/Missing.cpp")
+	$tree = (Get-FixtureGitText $root @('write-tree', '--missing-ok')).Trim()
+	$commit = (Get-FixtureGitText $root @('commit-tree', $tree, '-m', 'manifest failure baseline')).Trim()
+	Invoke-FixtureGit $root @('update-ref', 'refs/heads/main', $commit)
+	$before = Get-FixtureTreeSnapshot $root
+	$traceDirectory = Join-Path ([IO.Path]::GetTempPath()) ('inventory-manifest-trace-' + [Guid]::NewGuid().ToString('n').Substring(0, 8))
+	[void] (New-Item -ItemType Directory -Path $traceDirectory -Force)
+	$script:Roots.Add($traceDirectory)
+	$traceFile = Join-Path $traceDirectory 'git-trace2.jsonl'
+	$arguments = @('-RepositoryRoot', $root, '-Baseline', $commit, '-EmitManifest')
+	$run = Invoke-Inventory $arguments @{ GIT_TRACE2_EVENT = $traceFile; GIT_TRACE2_ENV_VARS = 'GIT_NO_LAZY_FETCH' }
+	Assert-True ((Get-FixtureTreeSnapshot $root) -ceq $before) 'manifest cat-file failure writes no file under the repository'
+	Assert-Equal 1 $run.ExitCode 'manifest cat-file failure exit code'
+	Assert-Equal 0 $run.Stdout.Length 'manifest cat-file failure writes zero stdout bytes'
+	Assert-True ($null -ne $run.ErrorJson) 'manifest cat-file failure emits a structured stderr envelope'
+	if ($null -ne $run.ErrorJson) {
+		Assert-Equal 'internal.error' $run.ErrorJson.code 'manifest cat-file failure error code'
+		$hasCapturedChildDiagnostic = $run.ErrorJson.message.Contains('fatal: Not a valid object name') -or $run.ErrorJson.message.Contains("fatal: git cat-file ${missingBlob}: bad file")
+		Assert-True $hasCapturedChildDiagnostic 'manifest cat-file failure carries captured child stderr in the envelope message'
+		Assert-True ($run.ErrorJson.message.Length -le 256) 'manifest cat-file failure message is bounded'
+	}
+	$stderrLines = @($run.Stderr -split "`n" | Where-Object { -not [string]::IsNullOrEmpty($_.TrimEnd("`r")) })
+	Assert-Equal 1 $stderrLines.Count 'manifest cat-file failure emits one stderr envelope line'
+	Assert-True (-not ($run.Stderr -match 'fatal: Not a valid object name[^\r\n]*\r?\n')) 'manifest cat-file failure does not append raw child stderr'
+	Assert-True (Test-Path -LiteralPath $traceFile) 'manifest cat-file failure writes the Git trace2 observation'
+	if (Test-Path -LiteralPath $traceFile) {
+		$traceEvents = @([IO.File]::ReadAllLines($traceFile) | ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $_ | ConvertFrom-Json -Depth 32 } } | Where-Object { $_.PSObject.Properties.Name -contains 'param' -and $_.param -ceq 'GIT_NO_LAZY_FETCH' })
+		Assert-Equal 1 @($traceEvents).Count 'manifest cat-file trace observes one GIT_NO_LAZY_FETCH parameter'
+		if (@($traceEvents).Count -gt 0) { Assert-Equal '1' $traceEvents[0].value 'manifest cat-file receives GIT_NO_LAZY_FETCH=1' }
+	}
+}
+
 # --- Repository B: cross-class renames ---------------------------------------------------------
 
 function Test-CrossClassRename() {
@@ -520,6 +704,14 @@ function Test-TargetsByteBudgetBlocked() {
 	Set-FixtureIndexEntry $root $headBlob $paths
 	Invoke-FixtureGit $root @('commit', '--quiet', '-m', 'head')
 	$head = (Get-FixtureGitText $root @('rev-parse', 'HEAD')).Trim()
+	$manifest = Invoke-Inventory @('-RepositoryRoot', $root, '-Baseline', $baseline, '-EmitManifest')
+	Assert-Equal 2 $manifest.ExitCode 'manifest byte budget exit code'
+	Assert-Equal 0 $manifest.Stdout.Length 'manifest byte budget writes zero stdout bytes'
+	if ($null -ne $manifest.ErrorJson) {
+		Assert-Equal 'inventory.manifest-cap-exceeded' $manifest.ErrorJson.code 'manifest byte budget code'
+		Assert-True ($manifest.ErrorJson.message.Contains('stdout budget')) 'manifest byte budget reports the stdout budget'
+	}
+	else { Assert-True $false 'manifest byte budget emits a structured stderr envelope' }
 	$run = Invoke-Inventory @('-RepositoryRoot', $root, '-Baseline', $baseline, '-Head', $head, '-EmitTargets')
 	Assert-Equal 2 $run.ExitCode 'targets byte budget exit code'
 	Assert-Equal 0 $run.Stdout.Length 'targets byte budget writes zero stdout bytes'
@@ -812,6 +1004,11 @@ try {
 	Test-RegionInventory $repositoryA
 	Test-TargetsInventory $repositoryA
 	Test-IndependentDualLanguageRoutes
+	Test-ManifestInventory
+	Test-ManifestLargeTargetSet
+	$manifestFixture = New-ManifestFixture
+	Test-ManifestBlockedArguments $manifestFixture
+	Test-ManifestCatFileFailure
 	Test-BlockedArgument $repositoryA
 	Test-CrossClassRename
 	$repositoryC = New-RepositoryC

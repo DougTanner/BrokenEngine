@@ -11,7 +11,8 @@ param(
 	[string[]] $IncludeUntracked,
 	[switch] $Regions,
 	[switch] $Landing,
-	[switch] $EmitTargets
+	[switch] $EmitTargets,
+	[switch] $EmitManifest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,6 +32,7 @@ $script:DualLanguageHeaders = @('shaderlayouts.h', 'shaderlayoutsbase.h', 'shade
 $script:CppClasses = @('cpp', 'dual-language-header')
 $script:ClassNames = @('dual-language-header', 'glsl', 'cpp', 'skill', 'plan', 'script', 'vcxproj', 'doc', 'binary', 'other')
 $script:ManifestModes = @('100644', '100755')
+$script:ManifestRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
 # EXCLUDED in .agents/skills/code-quality-metrics/scripts/Analyze-CodeQualityMetrics.py is the source of
 # truth for the analyzer corpus: a target path the analyzer finds in neither corpus fails there with exit
 # 2, so a path under one of these first path components is never emitted.
@@ -40,6 +42,7 @@ $script:ZeroOid = '0000000000000000000000000000000000000000'
 $script:Root = $null
 $script:BlobHashes = @{}
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
+$script:InventoryScriptPath = $PSCommandPath
 
 $result = [ordered]@{
 	schemaVersion = 'broken-engine-session-change-inventory/v1'
@@ -68,6 +71,12 @@ function Complete-SessionChangeInventory([int] $ExitCode, [string] $Status, [str
 	$result.status = $Status
 	$result.code = $Code
 	$result.message = if ($Message.Length -gt $script:MaximumMessageLength) { $Message.Substring(0, $script:MaximumMessageLength) } else { $Message }
+	if ($EmitManifest) {
+		# Manifest consumers reserve stdout for one complete frozen-tree document. Any blocked or
+		# error result therefore uses the existing structured envelope on stderr instead.
+		if ($ExitCode -ne 0) { Write-InventoryStream $true (($result | ConvertTo-Json -Depth 32 -Compress) + "`n") }
+		exit $ExitCode
+	}
 	if ($EmitTargets) {
 		# The targets consumer reads raw stdout: a non-pass run leaves stdout empty and reports
 		# the structured outcome on stderr, and a pass has already written the targets bytes.
@@ -118,18 +127,37 @@ function Get-InventoryBlobSha256([string] $Oid) {
 	$start.UseShellExecute = $false
 	$start.CreateNoWindow = $true
 	$start.RedirectStandardOutput = $true
+	$start.RedirectStandardError = $true
 	$start.Environment['GIT_OPTIONAL_LOCKS'] = '0'
+	$start.Environment['GIT_NO_LAZY_FETCH'] = '1'
+	$start.StandardErrorEncoding = $script:Utf8
 	foreach ($argument in @('-C', $script:Root, '--no-pager', 'cat-file', 'blob', $Oid)) { [void] $start.ArgumentList.Add($argument) }
 	$process = [Diagnostics.Process]::new()
 	$process.StartInfo = $start
 	if (-not $process.Start()) { throw "Could not start git cat-file for blob $Oid." }
+	$stderrTask = $process.StandardError.ReadToEndAsync()
 	$hash = [Security.Cryptography.SHA256]::HashData($process.StandardOutput.BaseStream)
 	$process.WaitForExit()
+	$stderr = $stderrTask.GetAwaiter().GetResult()
 	$exitCode = $process.ExitCode
 	$process.Dispose()
-	if ($exitCode -ne 0) { throw "git cat-file blob $Oid failed with exit $exitCode." }
+	if ($exitCode -ne 0) {
+		$prefix = "git cat-file blob $Oid failed with exit $exitCode"
+		$diagnostic = $stderr.Trim()
+		$remaining = $script:MaximumMessageLength - $prefix.Length - 2
+		if ($remaining -le 0) { throw $prefix.Substring(0, $script:MaximumMessageLength) }
+		if ($diagnostic.Length -gt $remaining) { $diagnostic = $diagnostic.Substring(0, $remaining) }
+		if ([string]::IsNullOrEmpty($diagnostic)) { throw $prefix }
+		throw "$prefix`: $diagnostic"
+	}
 	$script:BlobHashes[$Oid] = Get-InventoryHex $hash
 	return $script:BlobHashes[$Oid]
+}
+
+function Get-InventoryScriptSha256() {
+	$stream = [IO.File]::Open($script:InventoryScriptPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+	try { return Get-InventoryHex ([Security.Cryptography.SHA256]::HashData($stream)) }
+	finally { $stream.Dispose() }
 }
 
 function Get-InventoryFileSha256([string] $RelativePath) {
@@ -455,6 +483,59 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 	}
 }
 
+function Test-ManifestRootPath([string] $Path) {
+	$slash = $Path.IndexOf('/')
+	if ($slash -le 0) { return $false }
+	return $script:ManifestRoots -ccontains $Path.Substring(0, $slash)
+}
+
+function Get-ManifestTreeEntries([string] $CommitSha) {
+	# `-z` keeps the path unquoted and record-delimited; split only the fixed header/tab boundary
+	# so tabs and other path characters are never treated as delimiters.
+	$run = Invoke-InventoryGit @('ls-tree', '-r', '-z', '--full-tree', $CommitSha, '--')
+	$entries = [Collections.Generic.List[object]]::new()
+	foreach ($record in (($run.Stdout -split "`0") | Where-Object { -not [string]::IsNullOrEmpty($_) })) {
+		$separator = $record.IndexOf("`t")
+		if ($separator -le 0) { throw 'git ls-tree returned a malformed record without a header separator.' }
+		$header = $record.Substring(0, $separator)
+		$path = $record.Substring($separator + 1)
+		$fields = $header -split ' ', 3
+		if ($fields.Count -ne 3) { throw 'git ls-tree returned a malformed record header.' }
+		$mode = $fields[0]
+		if ($fields[1] -cne 'blob' -or $script:ManifestModes -cnotcontains $mode) { continue }
+		if (-not (Test-ManifestRootPath $path)) { continue }
+		$class = Get-PathClass $path $mode $false
+		if ($script:CppClasses -cnotcontains $class) { continue }
+		$entries.Add([ordered]@{
+			path = $path
+			class = $class
+			mode = $mode
+			sha256 = Get-InventoryBlobSha256 $fields[2]
+		})
+	}
+	$entries.Sort([Comparison[object]] {
+		param($left, $right)
+		return [string]::CompareOrdinal($left.path, $right.path)
+	})
+	return , $entries.ToArray()
+}
+
+function Write-SessionManifest([string] $CommitSha, [string] $TreeSha, [object[]] $Entries) {
+	$manifest = [ordered]@{
+		schemaVersion = 'broken-engine-cpp-manifest/v1'
+		commitSha = $CommitSha
+		treeSha = $TreeSha
+		classifierSha256 = Get-InventoryScriptSha256
+		entries = [object[]] $Entries
+	}
+	$text = ($manifest | ConvertTo-Json -Depth 32 -Compress) + "`n"
+	$bytes = $script:Utf8.GetBytes($text)
+	if ($bytes.Length -gt $script:MaximumOutputBytes) {
+		Complete-SessionChangeInventory 2 'blocked' 'inventory.manifest-cap-exceeded' "The manifest is $($bytes.Length) bytes, above the stdout budget of $($script:MaximumOutputBytes)."
+	}
+	Write-InventoryStream $false $text
+}
+
 function Test-ManifestCorpusPath([string] $Path) {
 	return $script:ManifestExcludedRoots -cnotcontains $Path.Split('/')[0]
 }
@@ -493,8 +574,10 @@ function Write-SessionTargets([object[]] $Entries) {
 
 try {
 	$modes = @(@($Regions.IsPresent, $Landing.IsPresent, $EmitTargets.IsPresent) | Where-Object { $_ })
-	if ($modes.Count -gt 1) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' 'Supply at most one of -Regions, -Landing, and -EmitTargets.'
+	$manifestConflict = $EmitManifest -and ($modes.Count -gt 0 -or $PSBoundParameters.ContainsKey('Head') -or $PSBoundParameters.ContainsKey('IncludeUntracked'))
+	if ($modes.Count -gt 1 -or $manifestConflict) {
+		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
+		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' $message
 	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
@@ -530,6 +613,14 @@ try {
 		}
 		$headSha = $headRun.Stdout.Trim()
 		$result.headSha = $headSha
+	}
+	if ($EmitManifest) {
+		$treeRun = Invoke-InventoryGit @('rev-parse', '--verify', "$baselineSha^{tree}")
+		$treeSha = $treeRun.Stdout.Trim()
+		if ($treeSha -notmatch '^[0-9a-fA-F]{40}$') { throw "The baseline tree did not resolve to a full Git SHA: '$treeSha'." }
+		$manifestEntries = Get-ManifestTreeEntries $baselineSha
+		Write-SessionManifest $baselineSha $treeSha ([object[]] $manifestEntries)
+		exit 0
 	}
 
 	$listed = [Collections.Generic.List[string]]::new()

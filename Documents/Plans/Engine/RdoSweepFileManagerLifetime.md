@@ -50,4 +50,11 @@ sweep mode has a valid guard owner before encoding and writes no assets.
 
 Origin: `CAI/shard-0008/001`, source selector
 `Temp/CppAdversarialInvariantAudit/76d303f0eeeb86c1ed241edc81634e60070ba5a5/shard-0008.md:38`.
+The later scope-boundary audit independently retained the same root cause as
+`CSB/shard-0005/001` (SERIOUS_CONFIRMED, HIGH) at durable source
+`80896f33661aaab99cf180a96db54600099be652`; its consolidated triage is
+`Temp/CppScopeBoundaryAudit/80896f33661aaab99cf180a96db54600099be652/triage-0001.md`
+(SHA-256 `ea32fd84e984dea3d14ed1993c62adf54b86b0c81fed41e3f0ff665c035a3150`).
+The current source still has the same bypass at `DataPacker/Source/Main.cpp:748-768`
+and guard dereference at `DataPacker/Source/ExportJobs/Texture/Texture.cpp:387-392`.
 No source fix, build, or DataPacker run was performed here.

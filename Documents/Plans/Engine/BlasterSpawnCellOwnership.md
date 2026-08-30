@@ -91,3 +91,12 @@ Preserve these invariants:
 
 The report distinguishes this late player-spawn boundary from normal Blaster
 collision handling and from the generic registry/type-index candidates.
+The later scope-boundary audit independently retained the same root cause as
+`CSB/shard-0048/001` (SERIOUS_CONFIRMED, HIGH) at durable source
+`80896f33661aaab99cf180a96db54600099be652`; its consolidated triage is
+`Temp/CppScopeBoundaryAudit/80896f33661aaab99cf180a96db54600099be652/triage-0001.md`
+(SHA-256 `ea32fd84e984dea3d14ed1993c62adf54b86b0c81fed41e3f0ff665c035a3150`).
+The current source still has the same late-spawn path at
+`Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/PlayersCombat.cpp:303-369`
+and the unbounded shared append at
+`Projects/BrokenEngineSandbox/Source/Frame/Collections/Blasters/Blasters.cpp:119-147`.
