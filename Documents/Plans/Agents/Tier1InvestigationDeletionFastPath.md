@@ -145,7 +145,3 @@ landing controls. The implementation must preserve:
 ## Notes
 
 - This Plan has no dependency and is independently executable.
-- The narrow class is intentionally a removal of existing obligations. The
-  broader question of which other Tier-1 gates can be removed or consolidated
-  is recorded separately in
-  `Documents/Investigations/Agents/Tier1WorkflowFastPath.md`.
