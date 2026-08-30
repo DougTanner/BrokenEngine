@@ -13,12 +13,12 @@ at `:171-187`. A client that times out and closes during a deferred command
 therefore cannot release the single active connection until the deferred
 result or the 1,800-drain timeout.
 
-The direct evidence is the source report
-`Temp/CppAdversarialInvariantAudit/76d303f0eeeb86c1ed241edc81634e60070ba5a5/shard-0010.md:35`
-and consolidated selector
-`Temp/CppAdversarialInvariantAudit/76d303f0eeeb86c1ed241edc81634e60070ba5a5/consolidated-index.md:516`. The report's frozen and live target hashes
-match baseline `76d303f0eeeb86c1ed241edc81634e60070ba5a5`; this routing session
-has not changed the source. `AgentHarness` uses a normal 15,000 ms receive
+The current generation-mismatch check is intentionally retained: it is
+unreachable before recovery because `ServeConnection` does not observe peer
+closure while deferred waiting. The recovery objective makes that existing
+invalidation path reachable by adding peer-close detection; deleting the
+generation identity or guard would remove the stale-response protection this
+Plan is meant to establish. `AgentHarness` uses a normal 15,000 ms receive
 deadline (`Tools/AgentHarness/AgentHarness.cpp:26-31`), shorter than the
 deferred drain bound, so the stale active connection is an ordinary supported
 path.
@@ -32,13 +32,17 @@ pending-response clear, and active-socket close used after
 `ServeConnection` returns. The main-thread-only `mDeferredPoll` must be
 discarded or explicitly cancelled through a narrow main-thread handoff when
 its generation becomes stale; it must never be bare-written by the listener
-thread. Preserve the shutdown response-flush deadline and the one-request,
-one-response-ID contract.
+thread. Keep `muiConnectionGeneration`, `muiDeferredGeneration`, the deferral
+snapshot, and the existing `Drain()` mismatch branch: peer-close detection is
+what makes that guard reachable during a deferred wait. Preserve the shutdown
+response-flush deadline and the one-request, one-response-ID contract.
 
 ## Critical files
 
 - `Engine/Source/Agent/AgentCommandServer.cpp:160-317` — active socket,
   deferred wait, generation, and response publication.
+- `Engine/Source/Agent/AgentCommandServer.h:71-87` — generation identity and
+  main-thread deferred state that must remain paired.
 - `Engine/Source/Agent/AGENTS.md` — connection-generation, one-flight, and
   bounded-deferred-liveness contracts.
 - `Tools/AgentHarness/AgentHarness.cpp:26-31,284-318,592-597` — ordinary
@@ -49,12 +53,17 @@ one-response-ID contract.
 - Releasing an active deferred `ServeConnection` when its peer closes.
 - Generation invalidation and stale deferred-response handling needed so a
   later connection cannot receive the abandoned response.
+- Retaining the existing generation fields, deferral snapshot, and
+  `Drain()` mismatch guard, and making that guard reachable from peer-close
+  detection during the deferred wait.
 - The existing shutdown flush and socket ownership transitions.
 
 ## Out of scope
 
 - Agent JSON framing, command payload validation, or deferred command behavior.
 - Changes to the harness timeout, wire format, or command protocol.
+- Deleting or bypassing the generation identity/invalidation guard; this Plan
+  is the sole owner of that recovery concern.
 - Graphics capture, input scripts, and unrelated listener performance work.
 
 ## Risk tier and invariants
@@ -69,11 +78,18 @@ Preserve these invariants:
   wait and cannot block acceptance of the next peer.
 - A response produced for an abandoned generation is never sent to a later
   connection.
+- The listener may invalidate the generation and wake the main-thread path,
+  but it never directly writes or destroys the main-thread-only
+  `mDeferredPoll`.
 - Socket close and response publication remain serialized with shutdown, and
   the existing bounded shutdown flush remains intact.
 
 ## Acceptance criteria
 
+- A source/lifecycle trace shows why the existing generation-mismatch branch
+  is unreachable before recovery today, and the implemented peer-close path
+  bumps the generation so `Drain()` reaches that retained guard during a
+  deferred wait.
 - A deferred command whose client closes before completion releases the active
   listener and allows a second client to connect and complete a command within
   the normal transport timeout.
@@ -85,6 +101,6 @@ Preserve these invariants:
 
 ## Notes
 
-Origin: `CAI/shard-0010/001`; source selector is the shard line above and the
-consolidated selector is `consolidated-index.md:516`. No source fix or build
-was performed during routing.
+Origin: `CAI/shard-0010/001`. The durable source and harness citations above
+record the deferred-wait, peer-close, and generation-invalidation evidence. No
+source fix or build was performed during routing.
