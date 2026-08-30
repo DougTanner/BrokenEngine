@@ -100,9 +100,7 @@ void ServerBroadcaster::BuildFrameInputs()
 				}
 				std::vector<game::StatusChange>& rStatusChanges = game::gpGame->mFrameInputs.try_emplace(rCoord).first->second.statusChanges;
 				rStatusChanges.insert(rStatusChanges.end(), it->second.begin(), it->second.end());
-				// Sort by type: the broadcast batch emits type-grouped ascending (SerializeStatusChangeBatch) and clients
-				// apply in that wire order, so the server must tick the same order or swap-pop indices diverge → CRC desync.
-				// Stable sort preserves within-type insertion order, matching the serializer's stable type-group scan.
+				// Keep pending entries in status-change codec order before this tick consumes them.
 				std::stable_sort(rStatusChanges.begin(), rStatusChanges.end(), [](const game::StatusChange& rLeft, const game::StatusChange& rRight)
 				{
 					return rLeft.eType < rRight.eType;

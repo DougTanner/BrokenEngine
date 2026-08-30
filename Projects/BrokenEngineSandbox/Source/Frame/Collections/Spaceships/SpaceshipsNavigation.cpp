@@ -167,9 +167,6 @@ void SpaceshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFram
 			continue;
 		}
 
-		// Skip terrain avoidance if close to nearest alive player and facing them. Reads current-frame players
-		// (race-free: Players update before Spaceships this tick). Deliberately differs from
-		// SpaceshipsPostRender::Update, which scans previous-frame players — see the rationale comment there.
 		XMVECTOR vecNearestPlayer = XMVectorZero();
 		if (NearestAlivePlayerPosition(*rFrame.interpolate.pPlayers, *rFrame.postRender.pPlayers, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer))
 		{

@@ -8,10 +8,6 @@ namespace engine
 namespace
 {
 
-// Independent deterministic RNG streams, each seeded from the grid coord with a distinct odd 64-bit
-// multiplier (SeedFromGridCoord mixes both x and y bits into the high half). Splitting crc / position /
-// rotation / anchor / curve lets one knob be retuned without reshuffling the others — the anchor and macro
-// chain heading stay stable in particular. Draw order within a stream is load-bearing.
 inline constexpr uint64_t kCrcPickSeedMultiplier = 0xD1B54A32D192ED03ull;
 inline constexpr uint64_t kPositionSeedMultiplier = 0xCBF29CE484222325ull;
 inline constexpr uint64_t kRotationSeedMultiplier = 0x9E3779B97F4A7C15ull;

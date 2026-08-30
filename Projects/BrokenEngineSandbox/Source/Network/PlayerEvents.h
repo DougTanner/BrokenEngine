@@ -5,14 +5,13 @@ namespace game
 
 struct Fleet;
 
-// Wire values for kServerPlayerState payload (must match server send order)
 enum class PlayerStateWireType : uint8_t
 {
 	kSpawned,
 	kChangedFrame,
 	kDied,
 
-	kCount, // Sentinel only — never serialized; bounds the player-state descriptor table (append wire values above it).
+	kCount,
 };
 
 enum class PlayerEventType : uint8_t
