@@ -74,6 +74,10 @@ Preserve these invariants:
 - A live request still admits the documented full-state-before-accept order and
   epoch-heal behavior.
 
+## Coordination
+
+- Coordinate with `Documents/Plans/Engine/LoadResetGenerationBarrier.md`: this Plan owns cancellation identity within a load generation, while that Plan owns identity across server loads. Whichever lands second must preserve both classifications and the shared slot receive paths; neither Plan depends on the other landing first.
+
 ## Acceptance criteria
 
 - With a delayed coord full state arriving before its control-channel accept
