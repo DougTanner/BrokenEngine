@@ -15,18 +15,24 @@ full-rollback retry (`Engine/Source/Network/Client/ReconcileReplay.cpp:201-217`)
 false (`Engine/Source/Network/Client/ClientDesyncCore.cpp:15-39`;
 `Projects/BrokenEngineSandbox/Source/Pch.h:5-7`).
 
-The originating candidate is `CPS/shard-0009/003`. The retained session Investigation
-`Documents/Investigations/Engine/ReplayDesyncFrameCapture.md` records the
-authority conflict and lifecycle evidence. The user explicitly directs the
-narrow implementation: gate clone production with `kbDesyncDebugFrames`, keep
-enabled diagnostic capture and fallback/retry semantics, and update the
-architecture to show conditional capture. This Plan resolves the former open
-decision; it does not authorize a new mode or recovery policy.
+Current source makes the ownership boundary explicit: replay reconciliation
+produces the snapshot, `ClientReconciler` forwards it, and `ClientDesyncCore`
+always reports the differing CRCs but consumes the snapshot only in the enabled
+branch. The disabled branch immediately follows the existing
+recovery/disconnect path, and `ReconcileReplay` clears the snapshot before a
+full-rollback retry. Guarding only the producer assignment therefore removes
+unused disabled-build work without changing CRC/reconciliation outcomes or the
+enabled consumer's frame identity and lifetime.
+
+The user explicitly directs the narrow implementation: gate clone production
+with `kbDesyncDebugFrames`, keep enabled diagnostic capture and fallback/retry
+semantics, and update the architecture to show conditional capture. This Plan
+is decision-complete; it does not authorize a new mode or recovery policy.
 
 ## Design
 
-The author's recommendation is to wrap only the assignment to
-`rScratch.pDesyncClientFrame` in `ReconcileValidateCrcCoord` with the existing
+Wrap only the assignment to `rScratch.pDesyncClientFrame` in
+`ReconcileValidateCrcCoord` with the existing
 `if constexpr (kbDesyncDebugFrames)` switch. Keep mismatch CRC recording,
 logging, `false` return, replay stack selection, and the fallback reset of
 `pDesyncClientFrame` unchanged. Keep `ClientReconciler` forwarding and the
@@ -35,11 +41,12 @@ recovery/disconnect behavior unchanged. The disabled path must continue
 straight to its current recovery/disconnect branch without requesting or
 stalling for a debug frame.
 
-Update `Documents/Architecture/GameReconciliation.md:129-160` so the deep-copy
-step appears inside the enabled-debug branch after the mismatch report (or in
-the equivalent conditional position), while the disabled branch explicitly
-shows immediate recovery/disconnect. Keep the CRC and reconciliation diagrams'
-other ordering and the separate Network architecture statement intact.
+Update `Documents/Architecture/GameReconciliation.md:129-160` so the
+conditional deep-copy step appears inside the enabled-debug branch before
+`SendDesyncReport`, while `SendDesyncReport` remains common to the enabled and
+disabled paths. The disabled branch must explicitly show immediate
+recovery/disconnect. Keep the CRC and reconciliation diagrams' other ordering
+and the separate Network architecture statement intact.
 
 ## Critical files
 
@@ -50,7 +57,7 @@ other ordering and the separate Network architecture statement intact.
 - `Projects/BrokenEngineSandbox/Source/Pch.h:5-7` — existing diagnostic switch values.
 - `Engine/Source/Network/Client/AGENTS.md:36-45` and `Projects/BrokenEngineSandbox/Source/Network/Client/AGENTS.md:19-30` — reconciliation/desync authorities.
 - `Documents/Architecture/GameReconciliation.md:129-160` — conditional capture sequence authority.
-- `Documents/Investigations/Engine/ReplayDesyncFrameCapture.md` — retained session evidence; do not delete or rewrite as part of this Plan.
+- `Documents/Architecture/Network.md:80` — existing disabled-buffering statement, which remains intact.
 
 ## In scope
 
@@ -74,9 +81,8 @@ other ordering and the separate Network architecture statement intact.
 - Changing replay rollback bases, fallback selection, ring/storage lifetime,
   CRC calculation, frame serialization format, wire messages, or recovery/
   disconnect policy.
-- Changing the retained Investigation's evidence record, synthetic agent
-  fixture snapshot, server debug-frame handling, or adding an instrumentation
-  seam, harness seam, or unit test.
+- Changing synthetic agent fixture snapshot, server debug-frame handling, or
+  adding an instrumentation seam, harness seam, or unit test.
 
 ## Risk tier and invariants
 
@@ -116,8 +122,3 @@ Preserve these invariants:
 - `GameReconciliation.md`'s sequence diagram places deep-copy only in the
   enabled branch and agrees with both Network/Client authorities.
 - Both compile configurations pass `/compile`; no unit tests are added.
-
-## Notes
-
-The retained Investigation is intentionally preserved as session evidence and
-the durable source/authority citations above settle the implementation choice.
