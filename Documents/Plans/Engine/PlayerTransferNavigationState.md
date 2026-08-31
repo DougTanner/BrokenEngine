@@ -65,14 +65,15 @@ collection columns rather than a `TransferData` payload, so they do not gain a
 new save surface.
 
 This is one current format: raise the Player item-width expression and shared
-maximum for the three added vectors (the Player payload becomes 152 bytes),
-bump `engine::kuiProtocolVersion` from 14 to 15 for the incompatible wire
-layout, and bump `FrameInput::kiVersion` from 17 to 18 because replay stores
-raw `StatusChange` payload bytes.  Bump `PlayersPostRender::kiVersion` from 19
-to 20 because its shared CRC inputs now participate in the corrected transfer
-state; `Frame::kiVersion` already composes that contributing version and does
-not need an independent base bump.  Do not add a compatibility shim or accept
-the old wire/replay payload under the new versions.
+maximum for the three added vectors (the Player payload remains 152 bytes),
+increment the current `engine::kuiProtocolVersion` once for the incompatible
+wire layout, and increment the current `FrameInput::kiVersion` once because
+replay stores raw `StatusChange` payload bytes.  Increment the current
+`PlayersPostRender::kiVersion` once because its shared CRC inputs now
+participate in the corrected transfer state; `Frame::kiVersion` already
+composes that contributing version and does not need an independent base bump.
+Do not add a compatibility shim or accept the old wire/replay payload under
+the new versions.
 
 ## Critical files
 
@@ -167,5 +168,19 @@ The investigation's frozen source candidate is `CPT/shard-0049/003` at audit
 commit `80896f33661aaab99cf180a96db54600099be652`.  A live-plan search found no
 duplicate owner for this transfer-verbatim navigation/aim root cause;
 `PlayerFireTimerValidation.md` and the other transfer Plans cover independent
-timer, ownership, or input-validation boundaries.  No dependency or reciprocal
-`## Coordination` section is required for this atomic Plan.
+timer, ownership, or input-validation boundaries.
+
+## Coordination
+
+`Documents/Plans/Engine/SpaceshipTransferBehaviorFlags.md` independently
+changes `TransferData`, the Spaceship per-arm codec width (65 bytes after its
+added flag), and the protocol/replay version gates; that arm does not by itself
+require raising the current 120-byte shared maximum.  No dependency is
+required.  Whichever Plan lands second must re-derive the current field order
+and each per-arm width from the then-current baseline, verify the shared
+`kiMaxStatusChangeBytesPerItem` remains sufficient for the resulting largest
+arm, and raise it only if that largest arm exceeds the then-current maximum,
+while preserving the fields and version changes from the first Plan.  This
+Plan's 152-byte Player arm independently requires and informs its shared-
+maximum change; it must not hard-code a next version or reorder the Spaceship
+arm's fields.
