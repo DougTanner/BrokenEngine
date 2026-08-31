@@ -61,14 +61,17 @@ needs only this file to dispatch the worker and to give the confirmation below.
 Before the confirmation the worker runs in two phases. The first runs through
 approval preparation and returns the prepared diff. Main then does everything
 that must precede the review window: the `/next-plan` second-checkpoint friction
-review and context measurement, any rebuild that foreign primary movement
-requires, and the single fresh full-head `/verify-changes` dispatch. On PASS main
-resumes that same worker for step 4; the worker runs the primary-movement check
-and, only once that check reaches a usable terminal result, opens the SmartGit
-review window and returns the landing summary. Main presents that summary and
-asks the confirmation below immediately, with no tool call in between. A
-stale-base result or a verification finding loops back to main before any
-window opens.
+review and context measurement, and the single fresh full-head `/verify-changes`
+dispatch. On PASS main resumes that same worker for step 4; the worker runs the
+primary-movement check and, only once that check reaches a usable terminal result,
+opens the SmartGit review window and returns the landing summary. A
+`primary.disjoint-needs-review` result is a usable non-conflict terminal; its
+primary-movement policy is defined by the [root `AGENTS.md` Step 8 landing
+invariant](../../../AGENTS.md), and its landing-lock handling by
+[`references/scripts.md#landing-and-recovery`](references/scripts.md#landing-and-recovery).
+Main presents that summary and asks the confirmation below immediately, with no
+tool call in between. A stale-base result or a verification finding loops back
+to main before any window opens.
 
 "Stop before any primary change" names the confirmation pause below, never an
 earlier stop.
@@ -120,9 +123,11 @@ the sole standing exception, and only when the change contains exactly the
 saved Plan file.
 
 Confirmation binds the reviewed diff, not commit hashes. A clean identical
-rebase onto an advanced primary lands without re-asking. A conflict resolution,
-a change to the session bytes, or a meaningful semantic change re-runs review of
-the affected regions and requires a refreshed summary and a fresh confirmation.
+rebase onto an advanced primary lands without re-asking. An actual rebase conflict
+requiring manual resolution, a change to the session bytes, or a meaningful
+semantic change re-runs review of the affected regions and requires a refreshed
+summary and a fresh confirmation; `references/workflow.md` defines the recovery
+transition after `rebase.conflicted`.
 
 ## Completion and output
 

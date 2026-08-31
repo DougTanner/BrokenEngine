@@ -8,16 +8,14 @@ file/XML/log body. The public `Invoke-FinalizePrimaryMovementCheck.ps1`
 invocation below redirects its complete stdout losslessly to the ignored
 repository-relative `Temp/finalize-primary-movement-result.json` artifact.
 The caller parses that artifact for every result. For the exact result with
-`status` `needs-review` and `code` `primary.disjoint-needs-review`, the
-finalizer handoff returns the artifact path and selector `$`; main and the
-focused dependency reviewer read the complete typed
+`status` `needs-review` and `code` `primary.disjoint-needs-review`, the finalizer
+handoff returns the artifact path and selector `$`; main reads the complete typed
 `broken-engine-finalize-primary-movement/v1` result, including the
 foreign-commit manifest, losslessly from that artifact. Never inline-copy,
-summarize, or reconstruct it. For a `needs-review` result, the artifact remains
-byte-identical and available to main and the focused dependency reviewer
-throughout that review; only after its verdict returns may the finalizer's rerun
-overwrite the artifact. Other results surface only short status, code,
-message, counts, and paths after parsing. Exit/result/schema mismatches block. For
+summarize, or reconstruct it; the artifact remains byte-identical and available
+through the SmartGit/summary handoff. Other results surface only short status,
+code, message, counts, and paths after parsing. Exit/result/schema mismatches
+block. For
 `Invoke-FinalizeApprovalPreparation.ps1`, preserve the complete command stdout
 losslessly in the ignored repository-relative
 `Temp/finalize-approval-preparation-result.json` artifact during the invocation
@@ -124,7 +122,7 @@ The fixed terminal mapping is:
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
 | 0 | `pass` | `ok`, `primary.tree-identical`, `primary.history-only` | Continue to SmartGit review and the landing summary. |
-| 0 | `needs-review` | `primary.disjoint-needs-review` | Return the complete result to main for one focused dependency review; hold no lease and show no terminal summary. |
+| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](../SKILL.md#worker-workflow) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) owns primary-movement policy. No conditional/preconfirmation landing lease is acquired; the normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
 | 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.owned-history-path`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 

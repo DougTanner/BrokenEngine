@@ -94,24 +94,16 @@ every other lease is foreign.
    `blocked` or `error` result, or a malformed result or schema/exit mismatch,
    opens no review window and returns no landing summary; return a blocker that
    names the candidate parent and live primary whenever either is available.
-   A `needs-review` result, including
-   `primary.disjoint-needs-review`, follows the documented lossless
-   checker-result handoff in
-   [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts),
-   and returns control to main without a terminal summary or lease. Main
-   dispatches one fresh focused reviewer over the exact candidate commit,
-   candidate tree, candidate diff and inventory and the handoff's complete
-   movement evidence. That reviewer checks direct and transitive
-   include, call, data, configuration, producer, and consumer dependencies in
-   both directions and returns
-   `independent`, `reachable`, or `unknown`, bound to the candidate commit,
-   candidate tree, candidate parent, and live primary it reviewed. `reachable`
-   and `unknown` block. For `independent`, resume this same finalizer; it reruns
-   the checker and accepts the verdict only when the result is still
-   `needs-review` and all four identities match exactly. A candidate/session
-   change returns its changed bytes through normal review. A live-primary
-   change discards the verdict and follows the new checker result.
-   No lease is held across the reviewer or user wait.
+   A `needs-review` result with code `primary.disjoint-needs-review` follows the
+   documented lossless checker-result handoff in
+   [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts) and is consumed as
+   a usable non-conflict terminal. It proceeds directly to
+   `Show-FinalizeApprovalReview.ps1` and the existing landing summary; apply the
+   [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and
+   [`scripts.md#landing-and-recovery`](scripts.md#landing-and-recovery) for the
+   movement and lease rules. A candidate/session change still returns its
+   changed bytes through normal review. Any later primary movement is handled by
+   landing's existing bounded internal rebase and terminal result.
    On the `session-landing` route, invoke
    `../scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` only after
    this checker has returned a usable terminal result. Its gate codes are in
@@ -183,11 +175,27 @@ every other lease is foreign.
 
 ## Recovery
 
-- Reconciliation conflict: resolve under the approved invariants, then re-review
-  the affected regions and re-ask the confirmation. Resolve hunk by hunk, tracing
-  each side's intent to its originating commit or Plan before choosing, and
-  preserve both intents where they are compatible. Keep the resolution to
-  behavior one side already had; never invent new behavior in a resolution.
+- Postconfirmation `rebase.conflicted`: the landing script has aborted the rebase,
+  restored the approved session commit, and released its normal postconfirmation
+  landing lease. The original landing arguments, candidate, baseline, expected
+  tips, verification evidence, SmartGit receipt, summary, and confirmation are
+  invalid. Only after abort, restoration, and lease release are proven, restart
+  preconfirmation reconciliation: re-resolve the current session and primary
+  tips, and a fresh candidate baseline; perform the ordinary linear rebase and
+  hunk resolution under the `Recovery` section, recreate and prepare a new
+  candidate, rerun the affected reviews and `/verify-changes`, reopen SmartGit,
+  produce a fresh summary, and obtain fresh user confirmation. If any abort,
+  restoration, or release is
+  unproven, retain the existing blocker and lease state and stop; do not begin
+  recovery or expose a user wait. No primary change is attempted until the
+  fresh review and confirmation complete. Never reuse the original approved
+  landing arguments.
+- Preconfirmation reconciliation conflict: resolve under the approved
+  invariants, then re-review the affected regions and re-ask the confirmation.
+  Resolve hunk by hunk, tracing each side's intent to its originating commit or
+  Plan before choosing, and preserve both intents where they are compatible.
+  Keep the resolution to behavior one side already had; never invent new
+  behavior in a resolution.
   Abort the rebase only to return a blocker when the approved decisions do not
   determine a valid resolution; otherwise resolve rather than abort.
 - Process died after primary advanced: re-invoke
