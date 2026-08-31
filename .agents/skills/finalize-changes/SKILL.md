@@ -62,13 +62,13 @@ Before the confirmation the worker runs in two phases. The first runs through
 approval preparation and returns the prepared diff. Main then does everything
 that must precede the review window: the `/next-plan` second-checkpoint friction
 review and context measurement, any rebuild that foreign primary movement
-requires, and the single `/verify-changes` dispatch. On PASS main resumes that
-same worker for step 4, handing it the prompt and output paths of that
-dispatch; the worker runs the primary-movement check and, only once that check
-reaches a usable terminal result, opens the SmartGit review window and returns
-the landing summary. Main presents that summary and asks the confirmation below
-immediately, with no tool call in between. A stale-base result or a verification
-finding loops back to main before any window opens.
+requires, and the single fresh full-head `/verify-changes` dispatch. On PASS main
+resumes that same worker for step 4; the worker runs the primary-movement check
+and, only once that check reaches a usable terminal result, opens the SmartGit
+review window and returns the landing summary. Main presents that summary and
+asks the confirmation below immediately, with no tool call in between. A
+stale-base result or a verification finding loops back to main before any
+window opens.
 
 "Stop before any primary change" names the confirmation pause below, never an
 earlier stop.

@@ -218,13 +218,22 @@ namespace toolcli
 			{
 				return std::nullopt;
 			}
-			const std::string hash = coordination::HashSha256(WideToUtf8(rRepository)).value_or("invalid");
-			return localApplicationData / L"BrokenEngineLocks" / L"plan-scheduler" / Utf8ToWide(hash);
+			const std::optional<std::string> hash = coordination::HashSha256(WideToUtf8(rRepository));
+			if (!hash)
+			{
+				return std::nullopt;
+			}
+			return localApplicationData / L"BrokenEngineLocks" / L"plan-scheduler" / Utf8ToWide(*hash);
 		}
 
-		std::filesystem::path ClaimPath(const std::filesystem::path& rRoot, const std::wstring& rPlan)
+		std::optional<std::filesystem::path> ClaimPath(const std::filesystem::path& rRoot, const std::wstring& rPlan)
 		{
-			return rRoot / L"claims" / Utf8ToWide(coordination::HashSha256(WideToUtf8(rPlan)).value_or("invalid") + ".json");
+			const std::optional<std::string> hash = coordination::HashSha256(WideToUtf8(rPlan));
+			if (!hash)
+			{
+				return std::nullopt;
+			}
+			return rRoot / L"claims" / Utf8ToWide(*hash + ".json");
 		}
 
 		bool ValidateClaim(const nlohmann::json& rClaim, const std::wstring& rRepository, const std::wstring& rPlan)
@@ -283,7 +292,7 @@ namespace toolcli
 			return coordination::ParseUtcTimestamp(rClaim.json["expiresAt"].get<std::string>(), uiExpiry) && uiExpiry > coordination::CurrentUtcTicks();
 		}
 
-		void HealClaims(const std::filesystem::path& rRoot, const std::wstring& rRepository, const std::map<std::wstring, Plan>& rPrimaryPlans, nlohmann::json& rHealed)
+		bool HealClaims(const std::filesystem::path& rRoot, const std::wstring& rRepository, const std::map<std::wstring, Plan>& rPrimaryPlans, nlohmann::json& rHealed)
 		{
 			const std::filesystem::path claims = rRoot / L"claims";
 			std::error_code error;
@@ -296,9 +305,14 @@ namespace toolcli
 				Claim claim;
 				std::wstring path;
 				bool bRemove = !ReadClaim(it->path(), claim) || !claim.json.contains("plan") || !claim.json["plan"].is_string() || !NormalizePlanPath(Utf8ToWide(claim.json["plan"].get<std::string>()), path) || !ValidateClaim(claim.json, rRepository, path);
-				if (!bRemove && it->path().filename() != ClaimPath(rRoot, path).filename())
+				if (!bRemove)
 				{
-					bRemove = true;
+					const std::optional<std::filesystem::path> claimPath = ClaimPath(rRoot, path);
+					if (!claimPath)
+					{
+						return false;
+					}
+					bRemove = it->path().filename() != claimPath->filename();
 				}
 				if (!bRemove && !ClaimIsLive(claim))
 				{
@@ -323,6 +337,7 @@ namespace toolcli
 					rHealed.push_back(WideToUtf8(it->path().filename().wstring()));
 				}
 			}
+			return true;
 		}
 
 
@@ -545,7 +560,10 @@ namespace toolcli
 					// working tree.
 					nlohmann::json primaryDiagnostics = nlohmann::json::array();
 					MarkCycles(primaryPlans, primaryDiagnostics);
-					HealClaims(*schedulerRoot, repo, primaryPlans, healed);
+					if (!HealClaims(*schedulerRoot, repo, primaryPlans, healed))
+					{
+						return Failure("local-app-data-unavailable");
+					}
 				}
 			}
 			nlohmann::json output = { { "operation", "validate" }, { "status", diagnostics.empty() ? "valid" : "invalid" }, { "code", diagnostics.empty() ? "ok" : "invalid-plans" }, { "message", diagnostics.empty() ? "plan metadata is valid" : "some plans are excluded from selection" }, { "diagnostics", diagnostics }, { "notices", nlohmann::json::array() }, { "healedClaims", healed }, { "plans", nlohmann::json::array() } };
@@ -641,7 +659,12 @@ namespace toolcli
 				}
 				nlohmann::json row = { { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", dependencies } };
 				Claim claim;
-				const bool bClaimed = ReadClaim(ClaimPath(root, pPlan->path), claim) && ValidateClaim(claim.json, repo, pPlan->path) && ClaimIsLive(claim) && coordination::CanonicalizeDirectoryPath(Utf8ToWide(claim.json["worktree"].get<std::string>())).has_value();
+				const std::optional<std::filesystem::path> claimPath = ClaimPath(root, pPlan->path);
+				if (!claimPath)
+				{
+					return Failure("local-app-data-unavailable");
+				}
+				const bool bClaimed = ReadClaim(*claimPath, claim) && ValidateClaim(claim.json, repo, pPlan->path) && ClaimIsLive(claim) && coordination::CanonicalizeDirectoryPath(Utf8ToWide(claim.json["worktree"].get<std::string>())).has_value();
 				if (bClaimed)
 				{
 					row["claim"] = { { "session", claim.json["session"] }, { "worktree", claim.json["worktree"] }, { "expiresAt", claim.json["expiresAt"] } };
@@ -747,7 +770,10 @@ namespace toolcli
 			}
 			MarkCycles(plans, diagnostics);
 			nlohmann::json healed = nlohmann::json::array();
-			HealClaims(root, repo, plans, healed);
+			if (!HealClaims(root, repo, plans, healed))
+			{
+				return Failure("local-app-data-unavailable");
+			}
 			std::map<std::wstring, Plan> sessionPlans; nlohmann::json sessionDiagnostics = nlohmann::json::array();
 			if (!BuildPlansAtCommit(worktree, Utf8ToWide(*sessionCommit), sessionPlans, sessionDiagnostics))
 			{
@@ -788,15 +814,19 @@ namespace toolcli
 			std::sort(candidates.begin(), candidates.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc < pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
 			for (const Plan* pPlan : candidates)
 			{
-				const std::filesystem::path claimPath = ClaimPath(root, pPlan->path);
+				const std::optional<std::filesystem::path> claimPath = ClaimPath(root, pPlan->path);
+				if (!claimPath)
+				{
+					return Failure("local-app-data-unavailable");
+				}
 				Claim occupied;
-				if (ReadClaim(claimPath, occupied))
+				if (ReadClaim(*claimPath, occupied))
 				{
 					continue; // claimed by another session, or an unhealable record
 				}
 				const uint64_t uiClaimedAt = coordination::CurrentUtcTicks();
 				nlohmann::json claim = { { "schemaVersion", 2 }, { "repository", WideToUtf8(repo) }, { "plan", WideToUtf8(pPlan->path) }, { "owner", WideToUtf8(rArguments.owner) }, { "session", WideToUtf8(rArguments.session) }, { "worktree", WideToUtf8(worktree.wstring()) }, { "branch", WideToUtf8(rArguments.branch) }, { "claimedAt", coordination::FormatUtcTimestamp(uiClaimedAt) }, { "expiresAt", coordination::FormatUtcTimestamp(uiClaimedAt + kClaimLifetimeTicks) } };
-				if (!coordination::EnsureParentDirectory(claimPath) || !coordination::WriteMetadataAtomic(claimPath, claim))
+				if (!coordination::EnsureParentDirectory(*claimPath) || !coordination::WriteMetadataAtomic(*claimPath, claim))
 				{
 					return Failure("claim-write-failed");
 				}

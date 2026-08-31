@@ -113,10 +113,8 @@ every other lease is foreign.
    change discards the verdict and follows the new checker result.
    No lease is held across the reviewer or user wait.
    On the `session-landing` route, invoke
-   `../scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` with the
-   `/verify-changes` prompt and output paths main hands over when it resumes
-   this worker, and only after this checker has returned a usable terminal
-   result. Its gate codes are in
+   `../scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` only after
+   this checker has returned a usable terminal result. Its gate codes are in
    [`scripts.md#approval-review-receipt`](scripts.md#approval-review-receipt).
    Redirect its stdout to
    `Temp/finalize-approval-review-result.json` exactly as
@@ -125,8 +123,8 @@ every other lease is foreign.
    route, invoke it only after `/verify-changes` has returned PASS on the final
    diff, without invoking this checker, and immediately before the landing
    summary — never alongside step-2 preparation — so the user reviews the
-   SmartGit window with verification already complete, right before being asked
-   to confirm, and the review window is open whenever SmartGit is available.
+   SmartGit window after verification is complete, right before being asked to
+   confirm, and the review window is open whenever SmartGit is available.
    Exit-0 statuses
    `opened`, `unavailable`, and `failed` are non-blocking: carry the status into
    the summary's `SmartGit review` line, and for `unavailable`/`failed` the

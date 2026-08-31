@@ -22,10 +22,9 @@ whose bytes match the reviewed `-Head` tree is expected state and classifies as
 
 After `/verify-changes` binds acceptance to that diff, invoke
 `../scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` exactly as
-[`references/scripts.md`](scripts.md#invocation) shows, supplying the
-verification files of this route's own `/verify-changes` dispatch above, then
-present the primary summary and the authoritative confirmation from the skill's
-`## Landing confirmation` section. Only its affirmative response permits
+[`references/scripts.md`](scripts.md#invocation) shows, then present the primary
+summary and the authoritative confirmation from the skill's `## Landing confirmation`
+section. Only its affirmative response permits
 claiming the normal 3600-second landing lease and resuming the same candidate
 script with `-AdvancePrimary`, `-OwnerToken`, `-SessionLabel`,
 `-ApprovalReviewResultFile`, and the approved Contract scalars. The receipt is mandatory on this route and the

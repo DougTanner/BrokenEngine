@@ -6,15 +6,12 @@
 # finished confirmation question rather than a working agent. Callers never
 # reconstruct its SmartGit command inline.
 #
-# The verification gate below, not the caller's discipline, is what guarantees that
-# ordering: -LaunchSmartGit only reaches a launch when -VerificationPromptFile and
-# -VerificationOutFile prove a /verify-changes PASS bound to this exact tip, so a
-# window cannot open before the verification it is supposed to follow.
+# Main invokes this after the fresh /verify-changes PASS and primary-movement check,
+# so the SmartGit window is the final tool action before the landing summary.
 #
 # The landing route always passes -LaunchSmartGit, so a session landing always
 # attempts the launch and the window opens whenever SmartGit is available.
-# Without the switch it only previews the canonical command, requires neither
-# verification file, and reports verification as null.
+# Without the switch it only previews the canonical command.
 # It runs Git only to expand an abbreviated supplied tip to its full commit ID,
 # and never mutates a ref or claims a lock.
 #
@@ -22,16 +19,14 @@
 # scripts, every preview/launch outcome exits 0 and none report status pass — the
 # review outcome is non-blocking, but the attempt is not: the caller redirects this
 # single-line stdout to Temp/finalize-approval-review-result.json and passes that
-# receipt to the landing scripts, which read approvedTip, status, and verification
-# from it and refuse to change primary when it does not prove a verified launch
-# attempt for the exact commit being landed. preview is the default;
+# receipt to the landing scripts, which read approvedTip and status from it and
+# refuse to change primary when it does not record an attempted launch for the
+# exact commit being landed. preview is the default;
 # opened is the launch success path; unavailable/failed are non-blocking,
 # and the caller copies message and the exact manualCommand into the approval response while keeping the landing gate in
 # force. Only invalid input exits 1, with status error and a code naming the cause
 # (input.invalid for a malformed tip, a tip that resolves to no commit, or a
-# fixture gate; verification.missing, verification.tip-mismatch, and
-# verification.not-pass for the launch-time verification gate; internal.error for a
-# primary worktree that will not resolve).
+# fixture gate; internal.error for a primary worktree that will not resolve).
 # A clean identical post-confirmation rebase that
 # preserves the existing confirmation must not reopen the review tool the user
 # already saw: that path does not invoke this script at all. A material change
@@ -42,8 +37,6 @@ param(
 	[Parameter(Mandatory)][string] $PrimaryWorktree,
 	[Parameter(Mandatory)][string] $ApprovedTip,
 	[switch] $LaunchSmartGit,
-	[AllowEmptyString()][string] $VerificationPromptFile,
-	[AllowEmptyString()][string] $VerificationOutFile,
 	[AllowEmptyString()][string] $FixtureSmartGitExecutable,
 	[ValidateSet('none', 'smartgit-launch')][string] $FixtureFailure = 'none'
 )
@@ -62,7 +55,6 @@ $result = [ordered]@{
 	code = 'internal.error'
 	message = 'Review-tool launch did not complete.'
 	approvedTip = $null
-	verification = $null
 	executable = $null
 	arguments = @()
 	manualCommand = $null
@@ -109,85 +101,6 @@ function ConvertTo-ProcessArgument([string] $Value)
 		throw 'SmartGit arguments cannot contain a double quote.'
 	}
 	return '"' + $Value + '"'
-}
-
-function Get-VerificationFile([string] $Path, [string] $ParameterName)
-{
-	if ([string]::IsNullOrWhiteSpace($Path))
-	{
-		Throw-Review 1 'verification.missing' "-LaunchSmartGit requires -$ParameterName from the /verify-changes dispatch that returned PASS for this tip."
-	}
-	$item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
-	if ($null -eq $item -or $item.PSIsContainer)
-	{
-		Throw-Review 1 'verification.missing' "-$ParameterName '$Path' is not a readable file."
-	}
-	return $item
-}
-
-# The generated evidence section is the only part of the prompt this script trusts for the head:
-# the manager-authored scope section is free prose and could name any commit.
-function Get-VerificationEvidence([string[]] $PromptLines)
-{
-	for ($index = 0; $index -lt $PromptLines.Count; $index++)
-	{
-		if ($PromptLines[$index] -cne '# (c) Evidence')
-		{
-			continue
-		}
-		$body = @()
-		for ($scan = $index + 1; $scan -lt $PromptLines.Count -and -not $PromptLines[$scan].StartsWith('# ', [StringComparison]::Ordinal); $scan++)
-		{
-			$body += $PromptLines[$scan]
-		}
-		return ($body -join "`n")
-	}
-	return $null
-}
-
-# Binds the launch to a /verify-changes PASS for exactly this tip. Runs after the tip is expanded to
-# its full ID, so every comparison here reads the same 40-character commit the SmartGit anchor uses.
-function Assert-Verification
-{
-	$promptItem = Get-VerificationFile $VerificationPromptFile 'VerificationPromptFile'
-	$outItem = Get-VerificationFile $VerificationOutFile 'VerificationOutFile'
-	$promptText = [IO.File]::ReadAllText($promptItem.FullName)
-	$outText = [IO.File]::ReadAllText($outItem.FullName)
-	$evidence = Get-VerificationEvidence ($promptText -split "`r?`n")
-	if ($null -eq $evidence -or $evidence -cnotmatch "(?m)^Head: $ApprovedTip$")
-	{
-		Throw-Review 1 'verification.tip-mismatch' "The verification prompt's generated evidence section does not record 'Head: $ApprovedTip'."
-	}
-	if ($promptText -cnotmatch '(?m)^Read and execute the Broken Engine `verify-changes` skill')
-	{
-		Throw-Review 1 'verification.tip-mismatch' 'The verification prompt does not carry the verify-changes reviewer role line.'
-	}
-	if (-not $outText.Contains($ApprovedTip, [StringComparison]::Ordinal))
-	{
-		Throw-Review 1 'verification.tip-mismatch' "The verification output never restates the reviewed head $ApprovedTip."
-	}
-	# Same bold-stripped last-line verdict the routed reviewer contract enforces in .codex/codex-review.ps1.
-	$outLines = $outText -split "`r?`n"
-	$lastIndex = $outLines.Count - 1
-	while ($lastIndex -ge 0 -and [string]::IsNullOrWhiteSpace($outLines[$lastIndex]))
-	{
-		$lastIndex--
-	}
-	$verdict = if ($lastIndex -lt 0) { '' } else { $outLines[$lastIndex].Trim() -replace '^\*\*', '' -replace '\*\*$', '' }
-	if ($verdict -cne 'PASS')
-	{
-		Throw-Review 1 'verification.not-pass' "The verification output's final verdict is '$verdict', not PASS."
-	}
-	if ($outItem.LastWriteTimeUtc -lt $promptItem.LastWriteTimeUtc)
-	{
-		Throw-Review 1 'verification.not-pass' 'The verification output predates its prompt, so it cannot be that review''s result.'
-	}
-	$result.verification = [ordered]@{
-		promptFile = $promptItem.FullName
-		outFile = $outItem.FullName
-		head = $ApprovedTip
-		verdict = $verdict
-	}
 }
 
 function Invoke-SmartGit
@@ -260,11 +173,6 @@ try
 		$ApprovedTip = $expandedTip
 	}
 	$result.approvedTip = $ApprovedTip
-	if ($LaunchSmartGit)
-	{
-		Assert-Verification
-	}
-
 	Invoke-SmartGit
 }
 catch

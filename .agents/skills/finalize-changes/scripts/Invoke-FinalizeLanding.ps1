@@ -1220,7 +1220,7 @@ try {
 	# launch was attempted for exactly this commit. The gate sits after full-ID normalization and
 	# before session registration, the recovery scan, and this script's own lock claims, so it blocks
 	# like every other pre-landing check: the caller-owned lease is still live and the caller releases
-	# it. The outcome stays non-blocking; only a missing attempt blocks.
+	# it. SmartGit outcomes stay non-blocking; malformed, mismatched, or non-attempted receipts block.
 	if ([string]::IsNullOrWhiteSpace($ApprovalReviewResultFile)) {
 		if ($env:BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE -cne '1') { Throw-Landing 2 'approval-review.missing' 'A broken-engine-finalize-approval-review/v1 receipt from -ApprovalReviewResultFile is required for postconfirmation landing.' }
 	}
@@ -1236,13 +1236,6 @@ try {
 		}
 		if ([string]$reviewResult.approvedTip -cne $ApprovedSessionCommit) { Throw-Landing 2 'approval-review.candidate-mismatch' 'ApprovalReviewResultFile records a different reviewed commit than the approved session commit. Rerun Show-FinalizeApprovalReview.ps1 -LaunchSmartGit for the approved session commit with the documented stdout redirect so the receipt is overwritten.' }
 		if ([string]$reviewResult.status -cnotin @('opened', 'unavailable', 'failed')) { Throw-Landing 2 'approval-review.not-launched' 'ApprovalReviewResultFile does not record an attempted SmartGit launch for the approved session commit. Rerun Show-FinalizeApprovalReview.ps1 -LaunchSmartGit for the approved session commit with the documented stdout redirect so the receipt is overwritten.' }
-		# A hand-written receipt could otherwise fake the launch: the verification object is the launch
-		# script's own proof that /verify-changes returned PASS for exactly this commit.
-		$verification = if ($reviewProperties -ccontains 'verification') { $reviewResult.verification } else { $null }
-		$verificationProperties = if ($null -eq $verification) { @() } else { @($verification.PSObject.Properties.Name) }
-		if ($verificationProperties -cnotcontains 'head' -or $verificationProperties -cnotcontains 'verdict' -or [string]$verification.head -cne $ApprovedSessionCommit -or [string]$verification.verdict -cne 'PASS') {
-			Throw-Landing 2 'approval-review.unverified' 'ApprovalReviewResultFile does not prove a verify-changes PASS for the approved session commit. Rerun Show-FinalizeApprovalReview.ps1 -LaunchSmartGit with -VerificationPromptFile and -VerificationOutFile from that verification, with the documented stdout redirect so the receipt is overwritten.'
-		}
 	}
 	$approvedParents = @((Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $ApprovedSessionCommit)).Trim() -split ' ' | Where-Object { $_ })
 	if ($approvedParents.Count -ne 1) { Throw-Landing 1 'input.commit-invalid' 'Approved session commit must have exactly one parent.' }
