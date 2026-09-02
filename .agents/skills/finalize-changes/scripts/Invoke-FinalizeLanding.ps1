@@ -16,34 +16,16 @@ param(
 	[Parameter(Mandatory)][string] $SessionLabel,
 	[Parameter(Mandatory)][string] $ApprovedSessionCommit,
 	[Parameter(Mandatory)][string] $ApprovedCandidateTree,
-	# Approval preparation result artifact ('broken-engine-finalize-approval-preparation/v3'); the
-	# landing reads the approved Contract identity from it so no digest is ever hand-copied.
-	[string] $ApprovalPreparationResultFile,
 	# Approval review receipt artifact ('broken-engine-finalize-approval-review/v1'); the landing
 	# reads the reviewed tip and launch status from it so the SmartGit review cannot be skipped.
 	[string] $ApprovalReviewResultFile,
-	# Fixture-only Contract identity scalars: fixtures inject crafted identities directly; outside the
-	# fixture environment the identity always comes from -ApprovalPreparationResultFile.
-	[string] $HistoryContractDigest,
-	[string] $HistoryContractGeneratorDigest,
-	[string] $HistoryContractCaptureDigest,
-	[string] $HistoryContractRuntimeDigest,
-	[string] $HistoryContractPatchDigest,
-	[string] $HistoryContractMode,
-	[string] $HistoryContractRowDate,
-	[string] $HistoryContractCoverage,
-	[string] $HistoryJsonSha256,
-	[string] $HistorySvgSha256,
-	[string] $HistorySvgEmbeddedSha256,
-	[int] $HistoryJsonBytes = 0,
-	[int] $HistorySvgBytes = 0,
 	# The caller's post-confirmation lease token. Supplied, the landing continues under that same
 	# lease instead of minting one; omitted, a matching retained landing claim may be adopted.
 	[string] $OwnerToken,
 	[switch] $ReleasePlanClaim,
 	# Total seconds this landing may spend waiting out foreign primary index.lock contention.
 	[ValidateRange(1, 3600)][int] $IndexLockWaitSeconds = 500,
-	[ValidateSet('none', 'compare-and-swap', 'post-reset', 'post-update-ref', 'bounded-diagnostic', 'retry-patch-mismatch', 'history-generate', 'history-invalid', 'history-source-race', 'history-recovery-primary-race', 'history-recovery-active-primary-race', 'history-recovery-active-primary-edit', 'history-recovery-session-race', 'history-recovery-session-staged-race')][string] $FixtureFailure = 'none'
+	[ValidateSet('none', 'compare-and-swap', 'post-reset', 'post-update-ref', 'bounded-diagnostic', 'retry-patch-mismatch', 'history-generate', 'recovery-primary-race', 'history-recovery-active-primary-edit', 'history-recovery-session-race', 'history-recovery-session-staged-race')][string] $FixtureFailure = 'none'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -62,7 +44,7 @@ if (-not (Test-Path -LiteralPath $exclusionModule)) {
 Import-Module $exclusionModule -Force
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-finalize-landing/v4'
+	schemaVersion = 'broken-engine-finalize-landing/v5'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Landing transaction did not complete.'
@@ -72,8 +54,7 @@ $result = [ordered]@{
 	candidate = [ordered]@{ commit = $ApprovedSessionCommit; tree = $ApprovedCandidateTree; treeVerified = $false }
 	approvedSource = [ordered]@{ commit = $ApprovedSessionCommit; tree = $ApprovedCandidateTree; parent = $null; patch = $null; metadata = $null }
 	rebasedSource = [ordered]@{ commit = $null; tree = $null; parent = $null; patch = $null }
-	historyContract = $null
-	historyUpdate = [ordered]@{ status = 'not-run'; receipt = $null; rowDate = $null; jsonl = $null; svg = $null }
+	historyUpdate = [ordered]@{ status = 'not-run'; rowDate = $null; jsonl = $null; svg = $null }
 	final = [ordered]@{ commit = $null; tree = $null; parent = $null; replacement = $false }
 	landed = [ordered]@{ commit = $null; tree = $null; rebaseAttempts = 0 }
 	locks = [ordered]@{ landingOwner = $null; landingClaimed = $false; landingReleased = $false; claim = $null }
@@ -102,6 +83,9 @@ $script:ApprovedPatchIdentity = $null
 $script:ApprovedSourceParent = $null
 $script:HistoryTempRoot = $null
 $script:HistoryTempParent = $null
+# The one UTC row date this landing records, frozen under the lease so an internal rebase cannot
+# shift the history point the user confirmed.
+$script:LandingHistoryDate = $null
 $script:LandingOwner = $null
 $script:LandingClaimed = $false
 # The lease duration this landing needs to hold through the whole advance. WorktreeCli's refresh
@@ -134,11 +118,6 @@ function Get-BoundedLandingText([AllowNull()] $Value, [int] $Limit) {
 function Get-LandingGitObjectId([AllowNull()] $Value) {
 	if ($null -ne $Value -and [string]$Value -cmatch '^[0-9a-f]{40}\z') { return [string]$Value }
 	return $null
-}
-
-function Get-HistoryReceiptDigest($Value) {
-	$json = $Value | ConvertTo-Json -Compress -Depth 64
-	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($json))).ToLowerInvariant()
 }
 
 function New-LandingCollection([object[]] $Values, [scriptblock] $Project, [string] $Requery) {
@@ -177,12 +156,12 @@ function New-LandingProjection {
 	} 'Invoke-FinalizeLanding'
 	$residuals = New-LandingCollection @($result.residuals) { param($residual); $text = Get-BoundedLandingText ([string]$residual) 512; [ordered]@{ message = $text.Text; messageLength = $text.Length; messageTruncated = $text.Truncated } } 'Invoke-FinalizeLanding'
 	return [ordered]@{
-		schemaVersion = 'broken-engine-finalize-landing/v4'; status = $result.status; code = $code.Text; message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
+		schemaVersion = 'broken-engine-finalize-landing/v5'; status = $result.status; code = $code.Text; message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
 		primaryAdvanced = [bool]$result.primaryAdvanced; candidate = [ordered]@{ commit = Get-LandingGitObjectId $result.candidate.commit; tree = Get-LandingGitObjectId $result.candidate.tree; treeVerified = [bool]$result.candidate.treeVerified }
 		landed = [ordered]@{ commit = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.landed.commit } else { $null }); tree = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.landed.tree } else { $null }); rebaseAttempts = [int]$result.landed.rebaseAttempts }
 		approvedSource = [ordered]@{ commit = Get-LandingGitObjectId $result.approvedSource.commit; tree = Get-LandingGitObjectId $result.approvedSource.tree; parent = Get-LandingGitObjectId $result.approvedSource.parent; patch = $result.approvedSource.patch; metadata = $result.approvedSource.metadata }
 		rebasedSource = [ordered]@{ commit = Get-LandingGitObjectId $result.rebasedSource.commit; tree = Get-LandingGitObjectId $result.rebasedSource.tree; parent = Get-LandingGitObjectId $result.rebasedSource.parent; patch = $result.rebasedSource.patch }
-		historyContract = $result.historyContract; historyUpdate = $result.historyUpdate
+		historyUpdate = $result.historyUpdate
 		final = [ordered]@{ commit = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.final.commit } else { $null }); tree = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.final.tree } else { $null }); parent = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.final.parent } else { $null }); replacement = [bool]$result.final.replacement }
 		planClaim = [ordered]@{ requested = [bool]$result.planClaim.requested; released = [bool]$result.planClaim.released }
 		lock = [ordered]@{ claimed = [bool]$result.locks.landingClaimed; released = [bool]$result.locks.landingReleased; claimCode = $(if ($null -ne $result.locks.claim) { [string]$result.locks.claim.code } else { $null }); disposition = $result.disposition; requiresUserAuthority = [bool]$result.requiresUserAuthority; retryAfterMilliseconds = [int]$result.retryAfterMilliseconds; attempts = $(if ($null -ne $result.locks.claim) { [int]$result.locks.claim.attempts } else { 0 }) }
@@ -213,29 +192,9 @@ function Get-JsonResponse($Response, [string] $Operation) {
 	}
 }
 
-function Get-HistoryArtifactPath($Artifact, [string] $Kind, [string] $TempRoot) {
-	if ($null -eq $Artifact -or [string]::IsNullOrWhiteSpace([string]$Artifact.path)) { Throw-Landing 2 'history.output-invalid' "Generate did not identify the $Kind output." }
-	$path = [string]$Artifact.path
-	if ([IO.Path]::IsPathRooted($path)) { Throw-Landing 2 'history.output-invalid' "Generate $Kind output path must be repository-relative." }
-	return [IO.Path]::GetFullPath((Join-Path $script:CurrentIdentity.Worktree ($path -replace '/', '\')))
-}
-
-function Assert-HistoryTempPath([string] $Path, [string] $TempRoot, [string] $Kind) {
-	$full = [IO.Path]::GetFullPath($Path)
-	$root = [IO.Path]::GetFullPath($TempRoot).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
-	if (-not $full.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { Throw-Landing 2 'history.output-invalid' "Generate $Kind output escaped ignored Temp." }
-	$item = Get-Item -LiteralPath $full -Force -ErrorAction Stop
-	if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { Throw-Landing 2 'history.output-invalid' "Generate $Kind output is not an ordinary file." }
-	if ($item.Name -ine "CodeQualityMetricsHistory.$Kind") { Throw-Landing 2 'history.output-invalid' "Generate $Kind output does not use the reserved CodeQualityMetricsHistory.$Kind filename." }
-	return $item
-}
-
-function Get-HistoryPatchDigest($Patch) {
-	$identity = [ordered]@{ changes = $Patch.changes; metricSupportedChanges = $Patch.metricSupportedChanges; cppChanged = $Patch.cppChanged }
-	$json = $identity | ConvertTo-Json -Compress -Depth 64
-	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($json))).ToLowerInvariant()
-}
-
+# Generation is a plain landing step: the producer decides on its own what the row contains, so this
+# only runs it against the final tree and hands back the two fixed paths it wrote into a fresh
+# ignored Temp child.
 function Invoke-HistoryGenerate([string] $SourceCommit, [string] $PrimaryTip) {
 	$script:HistoryTempParent = Join-Path $script:CurrentIdentity.Worktree 'Temp\FinalizeHistory'
 	New-Item -ItemType Directory -Path $script:HistoryTempParent -Force | Out-Null
@@ -246,85 +205,15 @@ function Invoke-HistoryGenerate([string] $SourceCommit, [string] $PrimaryTip) {
 	$historyScript = Join-Path $script:CurrentIdentity.Worktree '.agents\skills\code-quality-metrics\scripts\Invoke-CodeQualityMetricsHistory.ps1'
 	if (-not (Test-Path -LiteralPath $historyScript -PathType Leaf)) { Throw-Landing 1 'history.generate-unavailable' "The code-quality history Generate producer is missing: '$historyScript'." }
 	if ($FixtureFailure -ceq 'history-generate') { Throw-Landing 2 'history.generate-failed' 'Fixture forced history Generate failure.' }
-	$arguments = @('-NoProfile', '-File', $historyScript, '-Mode', 'Generate', '-RepositoryRoot', $script:CurrentIdentity.Worktree, '-BaseCommit', $PrimaryTip, '-TipCommit', $SourceCommit, '-DateUtc', $HistoryContractRowDate, '-OutputDirectory', $script:HistoryTempRoot)
+	$arguments = @('-NoProfile', '-File', $historyScript, '-Mode', 'Generate', '-RepositoryRoot', $script:CurrentIdentity.Worktree, '-BaseCommit', $PrimaryTip, '-TipCommit', $SourceCommit, '-DateUtc', $script:LandingHistoryDate, '-OutputDirectory', $script:HistoryTempRoot)
 	$response = Invoke-FinalizeNativeText "$PSHOME\pwsh.exe" $arguments $script:CurrentIdentity.Worktree
 	if ($response.ExitCode -ne 0) { Throw-Landing 2 'history.generate-failed' "History Generate failed: $($response.Stderr.Trim())" }
-	$lines = @($response.Stdout -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-	if ($lines.Count -ne 1) { Throw-Landing 2 'history.update-invalid' 'History Generate did not return exactly one JSON receipt.' }
-	try { $receipt = $lines[0] | ConvertFrom-Json -Depth 64 -ErrorAction Stop } catch { Throw-Landing 2 'history.update-invalid' "History Generate returned invalid JSON: $($_.Exception.Message)" }
-	return $receipt
-}
-
-function Validate-HistoryUpdate($Receipt, [string] $SourceCommit) {
-	try { [void](Assert-FinalizeHistoryUpdateReceipt $Receipt $script:LandingPrimaryTip $SourceCommit) }
-	catch { Throw-Landing 2 'history.update-invalid' $_.Exception.Message }
-	$actualDate = [string]$Receipt.date
-	$json = $Receipt.outputs.jsonl; $svg = $Receipt.outputs.svg
-	$jsonPath = Get-HistoryArtifactPath $json 'jsonl' $script:HistoryTempRoot; $svgPath = Get-HistoryArtifactPath $svg 'svg' $script:HistoryTempRoot
-	$jsonItem = Assert-HistoryTempPath $jsonPath $script:HistoryTempRoot 'JSONL'; $svgItem = Assert-HistoryTempPath $svgPath $script:HistoryTempRoot 'SVG'
-	$expectedJson = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $expectedSvg = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
-	$actualJsonHash = (Get-FileHash $jsonItem.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); $actualSvgHash = (Get-FileHash $svgItem.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-	if ([string]$json.sha256 -cne $actualJsonHash) { Throw-Landing 2 'history.update-invalid' 'History Generate JSONL hash does not match its bytes.' }
-	if ([string]$svg.sha256 -cne $actualSvgHash) { Throw-Landing 2 'history.update-invalid' 'History Generate SVG hash does not match its bytes.' }
-	if ([int64]$json.bytes -ne $jsonItem.Length) { Throw-Landing 2 'history.update-invalid' 'History Generate JSONL size does not match its bytes.' }
-	if ([int64]$svg.bytes -ne $svgItem.Length) { Throw-Landing 2 'history.update-invalid' 'History Generate SVG size does not match its bytes.' }
-	$series = $Receipt.series; $row = $series.row
-	$currentContractMode = if ($null -ne $result.historyContract.current) { [string]$result.historyContract.current.mode } else { $HistoryContractMode }
-	if ($currentContractMode -and [string]$row.captureMode -cne $currentContractMode) { Throw-Landing 2 'history.update-contract-mismatch' 'History Generate row capture mode differs from the re-evaluated Contract.' }
-	$svgText = [IO.File]::ReadAllText($svgItem.FullName, [Text.UTF8Encoding]::new($false, $true)); $seriesMatch = [regex]::Match($svgText, 'seriesDigest=([0-9a-f]{64})')
-	if (-not $seriesMatch.Success -or $seriesMatch.Groups[1].Value -cne $actualJsonHash) { Throw-Landing 2 'history.update-invalid' 'History Generate SVG embedded series digest does not match JSONL bytes.' }
-	if (-not [string]::IsNullOrWhiteSpace($HistorySvgEmbeddedSha256) -and $seriesMatch.Groups[1].Value -cne $HistorySvgEmbeddedSha256) { Throw-Landing 2 'history.update-contract-mismatch' 'History Generate SVG embedded digest differs from the approved recovery digest.' }
-	if ($HistoryContractGeneratorDigest) { $generatorMatch = [regex]::Match($svgText, 'generatorDigest=([0-9a-f]{64})'); if (-not $generatorMatch.Success -or $generatorMatch.Groups[1].Value -cne $HistoryContractGeneratorDigest) { Throw-Landing 2 'history.update-contract-mismatch' 'History Generate SVG embedded generator digest differs from the approved Contract.' } }
-	if ($null -ne $Receipt.capture) {
-		$captureDigest = [string]$Receipt.capture.digest; if ($captureDigest) { $captureMatch = [regex]::Match($svgText, 'captureDigest=([0-9a-f]{64})'); if (-not $captureMatch.Success -or $captureMatch.Groups[1].Value -cne $captureDigest) { Throw-Landing 2 'history.update-invalid' 'History Generate SVG embedded capture digest does not match the receipt.' } }
-		$identityDigest = [string]$Receipt.capture.bootstrapIdentityDigest; if ($identityDigest) { $identityMatch = [regex]::Match($svgText, 'identityDigest=([0-9a-f]{64})'); if (-not $identityMatch.Success -or $identityMatch.Groups[1].Value -cne $identityDigest) { Throw-Landing 2 'history.update-invalid' 'History Generate SVG embedded runtime identity digest does not match the receipt.' } }
-		$scbDigest = [string]$Receipt.capture.scbContentDigest; if ($scbDigest) { $scbMatch = [regex]::Match($svgText, 'scbDigest=([0-9a-f]{64})'); if (-not $scbMatch.Success -or $scbMatch.Groups[1].Value -cne $scbDigest) { Throw-Landing 2 'history.update-invalid' 'History Generate SVG embedded scb digest does not match the receipt.' } }
+	$artifacts = [pscustomobject]@{ JsonPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistory.jsonl'); SvgPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistory.svg') }
+	foreach ($path in @($artifacts.JsonPath, $artifacts.SvgPath)) {
+		$item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+		if ($null -eq $item -or $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { Throw-Landing 2 'history.output-invalid' "History Generate did not write an ordinary '$([IO.Path]::GetFileName($path))' output." }
 	}
-	if ($FixtureFailure -ceq 'history-source-race') { Throw-Landing 2 'history.source-changed' 'Fixture forced a source/history race.' }
-	$publicReceipt = $Receipt | ConvertTo-Json -Depth 64 -Compress | ConvertFrom-Json -Depth 64
-	$publicReceipt.outputs.jsonl.path = $expectedJson
-	$publicReceipt.outputs.svg.path = $expectedSvg
-	$result.historyUpdate = [ordered]@{ status = 'pass'; receipt = $publicReceipt; rowDate = $actualDate; jsonl = [ordered]@{ path = $expectedJson; bytes = [int64]$jsonItem.Length; sha256 = $actualJsonHash }; svg = [ordered]@{ path = $expectedSvg; bytes = [int64]$svgItem.Length; sha256 = $actualSvgHash; embeddedSha256 = $seriesMatch.Groups[1].Value } }
-	return [pscustomobject]@{ JsonPath = $jsonItem.FullName; SvgPath = $svgItem.FullName; JsonHash = $actualJsonHash; SvgHash = $actualSvgHash; JsonBytes = [int64]$jsonItem.Length; SvgBytes = [int64]$svgItem.Length }
-}
-
-function Invoke-HistoryContractForLanding([string] $BaseCommit, [string] $TipCommit) {
-	$historyScript = Join-Path $script:CurrentIdentity.Worktree '.agents\skills\code-quality-metrics\scripts\Invoke-CodeQualityMetricsHistory.ps1'
-	if (-not (Test-Path -LiteralPath $historyScript -PathType Leaf)) { Throw-Landing 1 'history.contract-unavailable' "The code-quality history Contract producer is missing: '$historyScript'." }
-	$arguments = @('-NoProfile', '-File', $historyScript, '-Mode', 'Contract', '-RepositoryRoot', $script:CurrentIdentity.Worktree, '-BaseCommit', $BaseCommit, '-TipCommit', $TipCommit)
-	$response = Invoke-FinalizeNativeText "$PSHOME\pwsh.exe" $arguments $script:CurrentIdentity.Worktree
-	if ($response.ExitCode -ne 0) { Throw-Landing 2 'history.contract-failed' "History Contract re-evaluation failed: $($response.Stderr.Trim())" }
-	$lines = @($response.Stdout -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-	if ($lines.Count -ne 1) { Throw-Landing 2 'history.contract-invalid' 'History Contract re-evaluation did not return exactly one JSON receipt.' }
-	try { $receipt = $lines[0] | ConvertFrom-Json -Depth 64 -ErrorAction Stop } catch { Throw-Landing 2 'history.contract-invalid' "History Contract re-evaluation returned invalid JSON: $($_.Exception.Message)" }
-	try { [void](Assert-FinalizeHistoryContractReceipt $receipt $BaseCommit $TipCommit) }
-	catch { Throw-Landing 2 'history.contract-invalid' $_.Exception.Message }
-	return $receipt
-}
-
-function Validate-HistoryContractForLanding([string] $BaseCommit, [string] $TipCommit) {
-	$receipt = Invoke-HistoryContractForLanding $BaseCommit $TipCommit
-	$generator = [string]$receipt.generator.sha256
-	if ($HistoryContractGeneratorDigest -and $generator -cne $HistoryContractGeneratorDigest) { Throw-Landing 2 'history.contract-changed' 'The reviewed history generator identity changed after confirmation.' }
-	$currentMode = [string]$receipt.decision.captureMode; $approvedMode = [string]$HistoryContractMode
-	$modeAllowed = $currentMode -ceq $approvedMode -or ($approvedMode -ceq 'catch-up' -and $currentMode -cin @('cpp-change', 'carry-forward'))
-	if (-not $modeAllowed) { Throw-Landing 2 'history.contract-changed' "History capture mode changed from '$approvedMode' to '$currentMode'." }
-	$currentCapture = if ($null -ne $receipt.capture) { [string]$receipt.capture.digest } else { $null }
-	$catchUpNarrowedToCarry = $approvedMode -ceq 'catch-up' -and $currentMode -ceq 'carry-forward' -and [string]::IsNullOrWhiteSpace($currentCapture)
-	if (-not $catchUpNarrowedToCarry) {
-		if ($currentMode -in @('catch-up', 'cpp-change') -and [string]::IsNullOrWhiteSpace($HistoryContractCaptureDigest)) { Throw-Landing 2 'history.contract-changed' 'An active history capture identity was not present in the approved Contract.' }
-		if ($HistoryContractCaptureDigest -and $currentCapture -cne $HistoryContractCaptureDigest) { Throw-Landing 2 'history.contract-changed' 'The reviewed history capture/runtime identity changed after confirmation.' }
-		if ($currentMode -in @('catch-up', 'cpp-change') -and [string]::IsNullOrWhiteSpace($currentCapture)) { Throw-Landing 2 'history.contract-changed' 'The current active history capture identity is missing.' }
-	}
-	$currentRuntime = if ($null -ne $receipt.capture) { [string]$receipt.capture.bootstrapIdentityDigest } else { $null }
-	if (-not $catchUpNarrowedToCarry -and $HistoryContractRuntimeDigest -and $currentRuntime -cne $HistoryContractRuntimeDigest) { Throw-Landing 2 'history.contract-changed' 'The reviewed history runtime identity changed after confirmation.' }
-	$currentPatchDigest = Get-HistoryPatchDigest $receipt.patch
-	if ($HistoryContractPatchDigest -and $currentPatchDigest -cne $HistoryContractPatchDigest) { Throw-Landing 2 'history.source-changed' "The current history Contract patch digest '$currentPatchDigest' differs from the approved source patch classification '$HistoryContractPatchDigest'." }
-	$currentIdentity = Get-LandingPatchIdentity $BaseCommit $TipCommit
-	if ($null -ne $script:ApprovedPatchIdentity -and ($currentIdentity.PatchId -cne $script:ApprovedPatchIdentity.PatchId -or $currentIdentity.Changes -cne $script:ApprovedPatchIdentity.Changes)) { Throw-Landing 2 'history.source-changed' 'The non-history source patch changed after confirmation.' }
-	if (-not $catchUpNarrowedToCarry -and $BaseCommit -ceq $script:ApprovedSourceParent -and $HistoryContractDigest -and (Get-HistoryReceiptDigest $receipt) -cne $HistoryContractDigest) { Throw-Landing 2 'history.contract-changed' 'History Contract aggregate digest changed while the approved candidate parent remained unchanged.' }
-	$result.historyContract.current = [ordered]@{ digest = Get-HistoryReceiptDigest $receipt; mode = $currentMode; generatorDigest = $generator; captureDigest = $currentCapture; patch = $receipt.patch; historyBytesSha256 = [string]$receipt.series.historyBytesSha256 }
-	return $receipt
+	return $artifacts
 }
 
 function Invoke-WorktreeCli([string[]] $Arguments) {
@@ -425,7 +314,6 @@ function Assert-PrimaryAdvanceState {
 	if ((Invoke-FinalizeGit $primary.Worktree @('status', '--porcelain', '-z', '--untracked-files=all')).Length -ne 0) {
 		Throw-Landing 2 'git.primary-dirty' 'Primary worktree is not clean immediately before landing.'
 	}
-	Assert-HistoryPathsClean $primary.Worktree
 	if ((Invoke-FinalizeGit $primary.Worktree @('rev-parse', "$script:LandingCommit^{tree}")).Trim() -cne $script:LandingTree) {
 		Throw-Landing 2 'candidate.tree-changed' 'Approved session commit no longer has the reviewed candidate tree.'
 	}
@@ -510,11 +398,6 @@ function Assert-NoHistorySourceChanges([string] $Base, [string] $Tip) {
 	return $guard
 }
 
-function Assert-HistoryPathsClean([string] $Worktree) {
-	$status = Invoke-FinalizeGit $Worktree @('status', '--porcelain=v1', '--untracked-files=all', '--', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg')
-	if ($status.Length -ne 0) { Throw-Landing 2 'history.source-dirty' 'Reserved history JSONL/SVG paths must be clean in the real index and worktree before verification or advance.' }
-}
-
 # Recovery uses blob identity to distinguish a source commit from a replacement commit. Missing or
 # differing reserved paths are a normal non-match here: the overlay recovery search owns that shape.
 function Test-HistoryPathsUnchanged([string] $BaseRevision, [string] $LandedRevision) {
@@ -576,23 +459,19 @@ function New-FrozenReplacementCommit([string] $Tree, [string] $Parent) {
 	finally { $process.Dispose(); Remove-Item -LiteralPath $messagePath -Force -ErrorAction SilentlyContinue }
 }
 
-function Prepare-HistoryReplacementCommit {
+# The landing commit: the approved source tree plus exactly the two generated history files, under
+# the frozen approved commit metadata. A failure here restores the branch the internal rebase moved,
+# so the documented re-invocation with the approved arguments still passes strict sanity.
+function New-LandingHistoryCommit {
 	try {
-		Assert-HistoryPathsClean $script:PrimaryIdentity.Worktree
-		[void](Validate-HistoryContractForLanding $script:LandingPrimaryTip $script:LandingCommit)
-		$currentMode = [string]$result.historyContract.current.mode
-		if ($currentMode -ceq 'carry-forward') {
-			$result.historyUpdate = [ordered]@{ status = 'skipped'; receipt = $null; rowDate = $null; jsonl = $null; svg = $null }
-			$result.final = [ordered]@{ commit = $script:LandingCommit; tree = $script:LandingTree; parent = $script:LandingPrimaryTip; replacement = $false }
-			return [pscustomobject]@{ Commit = $script:LandingCommit; Tree = $script:LandingTree; Parent = $script:LandingPrimaryTip }
-		}
-		$updateReceipt = Invoke-HistoryGenerate $script:LandingCommit $script:LandingPrimaryTip
-		$artifacts = Validate-HistoryUpdate $updateReceipt $script:LandingCommit
+		[void](Assert-NoHistorySourceChanges $script:LandingPrimaryTip $script:LandingCommit)
+		$artifacts = Invoke-HistoryGenerate $script:LandingCommit $script:LandingPrimaryTip
 		$finalTree = New-HistoryOverlayTree $artifacts $script:LandingCommit
 		$finalCommit = New-FrozenReplacementCommit $finalTree $script:LandingPrimaryTip
 		$finalParent = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $finalCommit)).Trim()
 		$actualTree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$finalCommit^{tree}")).Trim()
-		if ($finalParent -cne $script:LandingPrimaryTip -or $actualTree -cne $finalTree) { Throw-Landing 1 'history.replacement-invalid' 'History replacement commit does not have the current primary sole parent and validated tree.' }
+		if ($finalParent -cne $script:LandingPrimaryTip -or $actualTree -cne $finalTree) { Throw-Landing 1 'history.replacement-invalid' 'The landing commit does not have the current primary sole parent and validated tree.' }
+		$result.historyUpdate = [ordered]@{ status = 'pass'; rowDate = $script:LandingHistoryDate; jsonl = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; svg = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg' }
 		$result.final.commit = $finalCommit; $result.final.tree = $finalTree; $result.final.parent = $finalParent; $result.final.replacement = $true
 		return [pscustomobject]@{ Commit = $finalCommit; Tree = $finalTree; Parent = $finalParent }
 	}
@@ -601,7 +480,7 @@ function Prepare-HistoryReplacementCommit {
 			$restore = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity.Worktree, 'reset', '--hard', $ApprovedSessionCommit) $script:CurrentIdentity.Worktree
 			$restoredRef = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "refs/heads/$CurrentBranch")).Trim()
 			$restoredHead = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', 'HEAD')).Trim()
-			if ($restore.ExitCode -ne 0 -or $restoredRef -cne $ApprovedSessionCommit -or $restoredHead -cne $ApprovedSessionCommit -or (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('status', '--porcelain=v1', '-z', '--untracked-files=all')).Length -ne 0) { Throw-LandingRestorationUnproven "History replacement failed and the existing rebase could not be restored: $($_.Exception.Message)" }
+			if ($restore.ExitCode -ne 0 -or $restoredRef -cne $ApprovedSessionCommit -or $restoredHead -cne $ApprovedSessionCommit -or (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('status', '--porcelain=v1', '-z', '--untracked-files=all')).Length -ne 0) { Throw-LandingRestorationUnproven "The landing commit could not be built and the existing rebase could not be restored: $($_.Exception.Message)" }
 			$script:LandingCommit = $ApprovedSessionCommit; $script:LandingPrimaryTip = $script:ApprovedSourceParent; $script:LandingTree = $ApprovedCandidateTree
 		}
 		throw
@@ -613,7 +492,7 @@ function Prepare-HistoryReplacementCommit {
 function Advance-PrimaryExactCandidate {
 	$expectedCheckout = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', 'HEAD')).Trim()
 	$expectedStatus = Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('status', '--porcelain=v1', '-z', '--untracked-files=all')
-	$prepared = Prepare-HistoryReplacementCommit
+	$prepared = New-LandingHistoryCommit
 	$finalCommit = $prepared.Commit; $finalTree = $prepared.Tree
 	$expectedForCas = if ($FixtureFailure -ceq 'compare-and-swap') { '0000000000000000000000000000000000000000' } else { $script:LandingPrimaryTip }
 	$advance = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $finalCommit, $expectedForCas) $script:PrimaryIdentity.Worktree
@@ -800,20 +679,6 @@ function Invoke-LandingRebaseOntoPrimary {
 	$result.rebasedSource.patch = Assert-NoHistorySourceChanges $script:LandingPrimaryTip $script:LandingCommit
 }
 
-function Find-LandingSourceMatch([string] $PrimaryRefTip) {
-	if ([string]::IsNullOrWhiteSpace($PrimaryRefTip) -or $PrimaryRefTip -ceq $ExpectedPrimaryTip) { return $null }
-	if (-not (Test-FinalizeGitSuccess $script:PrimaryIdentity.Worktree @('merge-base', '--is-ancestor', $ExpectedPrimaryTip, $PrimaryRefTip))) { return $null }
-	$parents = @((Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $PrimaryRefTip)).Trim() -split ' ' | Where-Object { $_ })
-	if ($parents.Count -ne 1) { return $null }
-	$parent = $parents[0]
-	$approvedIdentity = if ($null -ne $script:ApprovedPatchIdentity) { $script:ApprovedPatchIdentity } else { Get-LandingPatchIdentity $script:ApprovedSourceParent $ApprovedSessionCommit }
-	if ($PrimaryRefTip -cne $ApprovedSessionCommit) {
-		$landedIdentity = Get-LandingPatchIdentity $parent $PrimaryRefTip
-		if ($landedIdentity.PatchId -cne $approvedIdentity.PatchId -or $landedIdentity.Changes -cne $approvedIdentity.Changes) { return $null }
-	}
-	return [pscustomobject]@{ Commit = $PrimaryRefTip; Parent = $parent; Tree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$PrimaryRefTip^{tree}")).Trim(); SourceOnly = Test-HistoryPathsUnchanged $parent $PrimaryRefTip }
-}
-
 function Assert-RecoveryCheckoutMatches([string] $Worktree, [string] $ExpectedRevision) {
 	$index = Invoke-FinalizeNativeText 'git.exe' @('-C', $Worktree, 'diff', '--quiet', '--cached', $ExpectedRevision) $Worktree
 	$working = Invoke-FinalizeNativeText 'git.exe' @('-C', $Worktree, 'diff', '--quiet', $ExpectedRevision) $Worktree
@@ -835,15 +700,14 @@ function Invoke-RecoveredSessionCheckoutTransition([string] $OldRevision, [strin
 	return Invoke-RecoveredCheckoutTransition $script:CurrentIdentity.Worktree $OldRevision $NewRevision
 }
 
-function Test-RecoveredSessionHead([string] $SessionHead, $Match, [bool] $SourceOnly) {
+function Test-RecoveredSessionHead([string] $SessionHead, $Match) {
 	if ($SessionHead -ceq $ApprovedSessionCommit -or $SessionHead -ceq $Match.Commit) { return $true }
 	$parents = @((Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $SessionHead)).Trim() -split ' ' | Where-Object { $_ })
 	if ($parents.Count -ne 1 -or $parents[0] -cne $Match.Parent) { return $false }
 	$approvedIdentity = if ($null -ne $script:ApprovedPatchIdentity) { $script:ApprovedPatchIdentity } else { Get-LandingNonHistoryPatchIdentity $script:ApprovedSourceParent $ApprovedSessionCommit }
 	$sessionIdentity = Get-LandingNonHistoryPatchIdentity $parents[0] $SessionHead
 	if ($sessionIdentity.PatchId -cne $approvedIdentity.PatchId -or $sessionIdentity.Changes -cne $approvedIdentity.Changes) { return $false }
-	if (-not (Test-HistoryPathsUnchanged $parents[0] $SessionHead)) { return $false }
-	return -not $SourceOnly -or $SessionHead -ceq $Match.Commit
+	return (Test-HistoryPathsUnchanged $parents[0] $SessionHead)
 }
 
 function Restore-RecoveredSessionCheckout([string] $SessionRef, [string] $PriorHead, [string] $LandedHead, [string] $FailureReason, [bool] $TransitionCompleted) {
@@ -873,24 +737,17 @@ function Restore-RecoveredSessionCheckout([string] $SessionRef, [string] $PriorH
 	Throw-Landing 2 'history.recovery-session-reset-failed' $FailureReason
 }
 
-# Reconciliation is shared by source-only and overlay recovery. The matcher and mode checks happen
-# before the lock; after the claim this function re-reads the primary ref and runs the same checkout,
-# session-branch, result, and postcondition path for either landed shape.
-function Complete-RecoveredLanding($InitialMatch, [bool] $SourceOnly, [string] $InitialPrimaryRef) {
+# Reconciliation for a landing that crashed after its advance. The matcher runs before the lock;
+# after the claim this function re-reads the primary ref and runs the checkout, session-branch,
+# result, and postcondition path.
+function Complete-RecoveredLanding($InitialMatch, [string] $InitialPrimaryRef) {
 	Acquire-RecoveryLandingLock
 	$claimedPrimaryRef = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim()
 	$claimedPrimaryIdentity = Get-FinalizeGitIdentity $PrimaryWorktree 'Primary worktree'
 	$match = $InitialMatch
-	if ($SourceOnly) {
-		$recheckedMatch = Find-LandingSourceMatch $claimedPrimaryRef
-		if ($null -eq $recheckedMatch -or -not $recheckedMatch.SourceOnly) { Throw-Landing 2 'history.recovery-not-found' 'Primary changed after recovery claim and no source-only landing matching the approved patch was found.' }
-		$match = $recheckedMatch
-		[void](Validate-HistoryContractForLanding $match.Parent $match.Commit)
-		if ([string]$result.historyContract.current.mode -cne 'carry-forward') { Throw-Landing 2 'history.contract-changed' 'Source-only recovery requires a carry-forward History Contract.' }
-	}
-	elseif ($claimedPrimaryRef -cne $InitialPrimaryRef) {
-		$recheckedMatch = Find-HistoryReplacementMatch $claimedPrimaryRef
-		if ($null -eq $recheckedMatch) { Throw-Landing 2 'history.recovery-not-found' 'Primary advanced after recovery claim and no replacement matching the frozen landing transaction was found.' }
+	if ($claimedPrimaryRef -cne $InitialPrimaryRef) {
+		$recheckedMatch = Find-LandedCommit $claimedPrimaryRef
+		if ($null -eq $recheckedMatch) { Throw-Landing 2 'history.recovery-not-found' 'Primary advanced after recovery claim and no landed commit matching the frozen landing transaction was found.' }
 		$match = $recheckedMatch
 	}
 	$script:PrimaryIdentity = $claimedPrimaryIdentity
@@ -898,7 +755,7 @@ function Complete-RecoveredLanding($InitialMatch, [bool] $SourceOnly, [string] $
 	$primaryNeedsReset = $script:PrimaryIdentity.Head -cne $claimedPrimaryRef -or $primaryStatus.Length -ne 0
 	if ($primaryNeedsReset) { Assert-RecoveryCheckoutMatches $script:PrimaryIdentity.Worktree $match.Parent }
 	$sessionHead = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "refs/heads/$CurrentBranch")).Trim()
-	if (-not (Test-RecoveredSessionHead $sessionHead $match $SourceOnly)) { Throw-Landing 2 'history.recovery-session-changed' 'The original session branch no longer points at the confirmed source or a proven equivalent rebase.' }
+	if (-not (Test-RecoveredSessionHead $sessionHead $match)) { Throw-Landing 2 'history.recovery-session-changed' 'The original session branch no longer points at the confirmed source or a proven equivalent rebase.' }
 	Assert-RecoveryCheckoutMatches $script:CurrentIdentity.Worktree $sessionHead
 	if ($FixtureFailure -ceq 'history-recovery-session-race') {
 		[IO.File]::WriteAllText((Join-Path $script:CurrentIdentity.Worktree 'base.txt'), 'fixture recovery session race', [Text.UTF8Encoding]::new($false))
@@ -911,7 +768,7 @@ function Complete-RecoveredLanding($InitialMatch, [bool] $SourceOnly, [string] $
 	elseif ($FixtureFailure -ceq 'history-recovery-active-primary-edit') {
 		[IO.File]::WriteAllText((Join-Path $script:PrimaryIdentity.Worktree 'base.txt'), 'fixture recovery active primary edit', [Text.UTF8Encoding]::new($false))
 	}
-	if (-not $SourceOnly -and $primaryNeedsReset -and $FixtureFailure -ceq 'history-recovery-active-primary-race') {
+	if ($primaryNeedsReset -and $FixtureFailure -ceq 'recovery-primary-race') {
 		$race = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, '-c', 'user.name=fixture recovery', '-c', 'user.email=fixture-recovery@example.invalid', 'commit-tree', "$claimedPrimaryRef^{tree}", '-p', $claimedPrimaryRef, '-m', 'fixture recovery active primary descendant') $script:PrimaryIdentity.Worktree
 		$raceCommit = $race.Stdout.Trim()
 		if ($race.ExitCode -ne 0 -or $raceCommit -cnotmatch '^[0-9a-f]{40}$') { Throw-Landing 1 'fixture.recovery-active-primary-race-failed' 'Fixture could not create its deterministic active recovery primary descendant.' }
@@ -919,33 +776,24 @@ function Complete-RecoveredLanding($InitialMatch, [bool] $SourceOnly, [string] $
 		if ($raceUpdate.ExitCode -ne 0) { Throw-Landing 1 'fixture.recovery-active-primary-race-failed' 'Fixture could not advance the primary ref for the active recovery race.' }
 	}
 	if ($script:PrimaryIdentity.Head -cne $claimedPrimaryRef -or $primaryStatus.Length -ne 0) {
-		if ($SourceOnly) {
-			# A checked-out branch reset also writes its branch ref. Guard the ref first, then update only
-			# the index/worktree so a foreign ref movement cannot be overwritten by recovery.
-			$primaryGuard = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $claimedPrimaryRef, $claimedPrimaryRef) $script:PrimaryIdentity.Worktree
-			if ($primaryGuard.ExitCode -ne 0) { Throw-Landing 2 'history.recovery-primary-race' 'Primary changed while recovery was preparing its source-only checkout.' }
-			$primaryReset = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'read-tree', '--reset', '-u', $claimedPrimaryRef) $script:PrimaryIdentity.Worktree
-		}
-		else {
-			# The replacement commit's parent is the exact stale checkout proven above. Guard the symbolic
-			# branch ref, then update only its index/worktree so a foreign ref movement cannot be rewritten
-			# by recovery; the postcondition below catches movement after this guard.
-			$primaryGuard = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $claimedPrimaryRef, $claimedPrimaryRef) $script:PrimaryIdentity.Worktree
-			if ($primaryGuard.ExitCode -ne 0) { Throw-Landing 2 'history.recovery-primary-race' 'Primary changed while recovery was preparing its overlay checkout.' }
-			$primaryReset = Invoke-RecoveredCheckoutTransition $script:PrimaryIdentity.Worktree $match.Parent $claimedPrimaryRef
-		}
+		# The landed commit's parent is the exact stale checkout proven above. Guard the symbolic branch
+		# ref, then update only its index/worktree so a foreign ref movement cannot be rewritten by
+		# recovery; the postcondition below catches movement after this guard.
+		$primaryGuard = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $claimedPrimaryRef, $claimedPrimaryRef) $script:PrimaryIdentity.Worktree
+		if ($primaryGuard.ExitCode -ne 0) { Throw-Landing 2 'history.recovery-primary-race' 'Primary changed while recovery was preparing its checkout.' }
+		$primaryReset = Invoke-RecoveredCheckoutTransition $script:PrimaryIdentity.Worktree $match.Parent $claimedPrimaryRef
 		$primaryRefAfterReset = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim()
 		if ($primaryReset.ExitCode -ne 0 -or $primaryRefAfterReset -cne $claimedPrimaryRef -or (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', 'HEAD')).Trim() -ne $claimedPrimaryRef -or (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('status', '--porcelain=v1', '-z', '--untracked-files=all')).Length -ne 0) { Throw-Landing 2 'history.recovery-primary-reset-failed' 'Recovered primary ref could not be reset and verified before session recovery.' }
 		$script:PrimaryIdentity = Get-FinalizeGitIdentity $PrimaryWorktree 'Primary worktree'
 	}
 	$sessionRef = "refs/heads/$CurrentBranch"
 	$update = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity.Worktree, 'update-ref', $sessionRef, $match.Commit, $sessionHead) $script:CurrentIdentity.Worktree
-	if ($update.ExitCode -ne 0) { Throw-Landing 2 'history.recovery-session-ref-failed' "Could not reset the original session branch to the recovered $(if ($SourceOnly) { 'source' } else { 'replacement' }) commit." }
+	if ($update.ExitCode -ne 0) { Throw-Landing 2 'history.recovery-session-ref-failed' 'Could not reset the original session branch to the recovered landed commit.' }
 	$reset = Invoke-RecoveredSessionCheckoutTransition $sessionHead $match.Commit
 	$resetHead = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', 'HEAD')).Trim()
 	$resetStatus = Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('status', '--porcelain=v1', '-z', '--untracked-files=all')
 	if ($reset.ExitCode -ne 0 -or $resetHead -cne $match.Commit -or $resetStatus.Length -ne 0) {
-		$failureReason = "Recovered session worktree could not be safely reset to the $(if ($SourceOnly) { 'source' } else { 'replacement' }) commit. $($reset.Stderr.Trim())".Trim()
+		$failureReason = "Recovered session worktree could not be safely reset to the landed commit. $($reset.Stderr.Trim())".Trim()
 		$transitionCompleted = $reset.ExitCode -eq 0 -and $resetHead -ceq $match.Commit
 		Restore-RecoveredSessionCheckout $sessionRef $sessionHead $match.Commit $failureReason $transitionCompleted
 	}
@@ -953,26 +801,11 @@ function Complete-RecoveredLanding($InitialMatch, [bool] $SourceOnly, [string] $
 	$script:FinalCommit = $match.Commit; $script:FinalTree = $match.Tree; $script:LandingPrimaryTip = $match.Parent; $script:LandingCommit = $match.Commit; $script:LandingTree = $match.Tree
 	$result.candidate.treeVerified = $true
 	$result.tips.current = $match.Commit; $result.tips.primary = $claimedPrimaryRef
-	$result.final = [ordered]@{ commit = $match.Commit; tree = $match.Tree; parent = $match.Parent; replacement = -not $SourceOnly }
-	if ($SourceOnly) {
-		$result.historyUpdate = [ordered]@{ status = 'skipped'; receipt = $null; rowDate = $null; jsonl = $null; svg = $null }
-	}
-	else {
-		$jsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
-		$result.historyUpdate = [ordered]@{ status = 'recovered'; rowDate = $match.RowDate; jsonl = [ordered]@{ path = $jsonPath; bytes = $match.JsonBytes; sha256 = $match.JsonSha256 }; svg = [ordered]@{ path = $svgPath; bytes = $match.SvgBytes; sha256 = $match.SvgSha256; embeddedSha256 = $match.EmbeddedDigest } }
-	}
-	$result.landed.commit = $match.Commit; $result.landed.tree = $match.Tree; $result.landed.rebaseAttempts = if ($SourceOnly -and $match.Commit -cne $ApprovedSessionCommit) { 1 } else { $result.landed.rebaseAttempts }; $result.primaryAdvanced = $true
+	$result.final = [ordered]@{ commit = $match.Commit; tree = $match.Tree; parent = $match.Parent; replacement = $true }
+	$jsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
+	$result.historyUpdate = [ordered]@{ status = 'recovered'; rowDate = $null; jsonl = $jsonPath; svg = $svgPath }
+	$result.landed.commit = $match.Commit; $result.landed.tree = $match.Tree; $result.primaryAdvanced = $true
 	return $true
-}
-
-function Test-LandingNoOverlayRecovery([string] $PrimaryRefTip) {
-	if ($HistoryContractMode -notin @('carry-forward', 'catch-up')) { return $false }
-	$match = Find-LandingSourceMatch $PrimaryRefTip
-	if ($null -eq $match -or -not $match.SourceOnly) { return $false }
-	[void](Validate-HistoryContractForLanding $match.Parent $match.Commit)
-	if ([string]$result.historyContract.current.mode -cne 'carry-forward') { return $false }
-	Assert-ApprovedCandidateTree
-	return (Complete-RecoveredLanding $match $true $PrimaryRefTip)
 }
 
 function Get-LandingCommitMetadata([string] $Commit) {
@@ -987,122 +820,36 @@ function Get-LandingCommitMetadata([string] $Commit) {
 	}
 }
 
-function Test-RecoveryHistoryFields($Row, [byte[]] $JsonBytes, [byte[]] $SvgBytes, [string] $EmbeddedDigest) {
-	$jsonSha = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($JsonBytes)).ToLowerInvariant()
-	$svgSha = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($SvgBytes)).ToLowerInvariant()
-	try { Assert-FinalizeHistoryRow $Row 'Recovery history row' } catch { return $false }
-	if ($EmbeddedDigest -cne $jsonSha) { return $false }
-	if (-not [string]::IsNullOrWhiteSpace($HistoryContractRowDate) -and [string]$Row.date -cne $HistoryContractRowDate) { return $false }
-	if (-not [string]::IsNullOrWhiteSpace($HistoryJsonSha256) -and $jsonSha -cne $HistoryJsonSha256) { return $false }
-	if (-not [string]::IsNullOrWhiteSpace($HistorySvgSha256) -and $svgSha -cne $HistorySvgSha256) { return $false }
-	if ($HistoryJsonBytes -gt 0 -and [int64]$JsonBytes.Length -ne [int64]$HistoryJsonBytes) { return $false }
-	if ($HistorySvgBytes -gt 0 -and [int64]$SvgBytes.Length -ne [int64]$HistorySvgBytes) { return $false }
-	if (-not [string]::IsNullOrWhiteSpace($HistorySvgEmbeddedSha256) -and $EmbeddedDigest -cne $HistorySvgEmbeddedSha256) { return $false }
-	return $true
+# The one matcher a crashed landing needs: walking first-parent back to the approved primary tip, the
+# landed commit is the single-parent commit carrying the frozen approved metadata, both generated
+# history paths, and the approved patch outside those two paths. No match at a primary head that does
+# not carry the frozen metadata is ordinary foreign movement, so this landing continues normally.
+function Test-LandingFrozenMetadata($Metadata) {
+	$expected = if ($null -ne $script:FrozenCommitMetadata) { $script:FrozenCommitMetadata } else { Get-FrozenCommitMetadata $ApprovedSessionCommit }
+	return $Metadata.message -ceq $expected.message -and $Metadata.authorName -ceq $expected.authorName -and $Metadata.authorEmail -ceq $expected.authorEmail -and $Metadata.authorDate -ceq $expected.authorDate -and $Metadata.committerName -ceq $expected.committerName -and $Metadata.committerEmail -ceq $expected.committerEmail -and $Metadata.committerDate -ceq $expected.committerDate
 }
 
-function Find-HistoryReplacementMatch([string] $PrimaryHead) {
+function Find-LandedCommit([string] $PrimaryHead) {
 	if ($PrimaryHead -ceq $ApprovedSessionCommit -or $PrimaryHead -ceq $ExpectedPrimaryTip) { return $null }
 	if (-not (Test-FinalizeGitSuccess $script:PrimaryIdentity.Worktree @('merge-base', '--is-ancestor', $ExpectedPrimaryTip, $PrimaryHead))) { Throw-Landing 2 'history.recovery-nonancestor' 'Current primary does not descend from the approved primary ancestor.' }
-	$expectedMetadata = if ($null -ne $script:FrozenCommitMetadata) { $script:FrozenCommitMetadata } else { Get-FrozenCommitMetadata $ApprovedSessionCommit }
-	$headMetadata = Get-LandingCommitMetadata $PrimaryHead
-	$headMatchesFrozen = $headMetadata.message -ceq $expectedMetadata.message -and $headMetadata.authorName -ceq $expectedMetadata.authorName -and $headMetadata.authorEmail -ceq $expectedMetadata.authorEmail -and $headMetadata.authorDate -ceq $expectedMetadata.authorDate -and $headMetadata.committerName -ceq $expectedMetadata.committerName -and $headMetadata.committerEmail -ceq $expectedMetadata.committerEmail -and $headMetadata.committerDate -ceq $expectedMetadata.committerDate
+	$headMatchesFrozen = Test-LandingFrozenMetadata (Get-LandingCommitMetadata $PrimaryHead)
+	$jsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
 	$commits = @((Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-list', '--first-parent', $PrimaryHead)).Split("`n") | Where-Object { $_ })
 	$recoveryMatches = [Collections.Generic.List[object]]::new()
 	foreach ($commit in $commits) {
 		if ($commit -ceq $ExpectedPrimaryTip) { break }
 		$parents = @((Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $commit)).Trim() -split ' ' | Where-Object { $_ })
 		if ($parents.Count -ne 1) { continue }
-		$metadata = Get-LandingCommitMetadata $commit
-		$expected = if ($null -ne $script:FrozenCommitMetadata) { $script:FrozenCommitMetadata } else { Get-FrozenCommitMetadata $ApprovedSessionCommit }
-		if ($metadata.message -cne $expected.message -or $metadata.authorName -cne $expected.authorName -or $metadata.authorEmail -cne $expected.authorEmail -or $metadata.authorDate -cne $expected.authorDate -or $metadata.committerName -cne $expected.committerName -or $metadata.committerEmail -cne $expected.committerEmail -or $metadata.committerDate -cne $expected.committerDate) { continue }
+		if (-not (Test-LandingFrozenMetadata (Get-LandingCommitMetadata $commit))) { continue }
+		if (-not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$jsonPath")) -or -not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$svgPath"))) { continue }
 		$patch = Get-LandingNonHistoryPatchIdentity $parents[0] $commit
 		$approved = if ($null -ne $script:ApprovedPatchIdentity) { $script:ApprovedPatchIdentity } else { [pscustomobject]@{ PatchId = Get-LandingPatchId $script:ApprovedSourceParent $ApprovedSessionCommit; Changes = Assert-NoHistorySourceChanges $script:ApprovedSourceParent $ApprovedSessionCommit } }
 		if ($patch.PatchId -cne $approved.PatchId -or $patch.Changes -cne $approved.Changes) { continue }
-		$jsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
-		if (-not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$jsonPath")) -or -not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$svgPath"))) { continue }
-		$jsonBlob = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "${commit}:$jsonPath")).Trim(); $svgBlob = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "${commit}:$svgPath")).Trim()
-		if ($jsonBlob -notmatch '^[0-9a-f]{40}$' -or $svgBlob -notmatch '^[0-9a-f]{40}$') { continue }
-		$jsonText = Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', "${commit}:$jsonPath")
-		$svgText = Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', "${commit}:$svgPath")
-		$jsonBytes = [Text.UTF8Encoding]::new($false).GetBytes($jsonText)
-		$svgBytes = [Text.UTF8Encoding]::new($false).GetBytes($svgText)
-		$seriesMatch = [regex]::Match($svgText, 'seriesDigest=([0-9a-f]{64})')
-		if (-not $seriesMatch.Success -or $seriesMatch.Groups[1].Value -cne ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant())) { continue }
-		if ($HistoryContractGeneratorDigest) {
-			$generatorMatch = [regex]::Match($svgText, 'generatorDigest=([0-9a-f]{64})')
-			if (-not $generatorMatch.Success -or $generatorMatch.Groups[1].Value -cne $HistoryContractGeneratorDigest) { continue }
-		}
-		$rows = @($jsonText -split "`n" | Where-Object { $_ })
-		if ($rows.Count -lt 2) { continue }
-		try { $last = $rows[-1] | ConvertFrom-Json -Depth 32 -ErrorAction Stop } catch { continue }
-		$parentCommit = $parents[0]
-		$parentJsonText = Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', "${parentCommit}:$jsonPath")
-		$parentRows = @($parentJsonText -split "`n" | Where-Object { $_ })
-		if ($last.captureMode -notin @('catch-up', 'cpp-change', 'carry-forward') -or [string]$last.date -notmatch '^\d{4}-\d{2}-\d{2}$' -or [int]$last.index -ne ($parentRows.Count - 1)) { continue }
-		if (-not (Test-RecoveryHistoryFields $last $jsonBytes $svgBytes $seriesMatch.Groups[1].Value)) { continue }
-		$recoveryMatches.Add([pscustomobject]@{ Commit = $commit; Parent = $parents[0]; Tree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$commit^{tree}")).Trim(); RowDate = [string]$last.date; JsonBlob = $jsonBlob; SvgBlob = $svgBlob; JsonBytes = [int64]$jsonBytes.Length; SvgBytes = [int64]$svgBytes.Length; EmbeddedDigest = $seriesMatch.Groups[1].Value; JsonSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant(); SvgSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($svgBytes)).ToLowerInvariant() })
+		$recoveryMatches.Add([pscustomobject]@{ Commit = $commit; Parent = $parents[0]; Tree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$commit^{tree}")).Trim() })
 	}
-	if ($recoveryMatches.Count -eq 0) { if (-not $headMatchesFrozen) { return $null }; Throw-Landing 2 'history.recovery-not-found' 'No first-parent replacement commit matches the frozen metadata, source patch, and exact history artifacts.' }
-	if ($recoveryMatches.Count -ne 1) { Throw-Landing 2 'history.recovery-ambiguous' "Found $($recoveryMatches.Count) first-parent replacement commits matching the frozen landing transaction." }
+	if ($recoveryMatches.Count -eq 0) { if (-not $headMatchesFrozen) { return $null }; Throw-Landing 2 'history.recovery-not-found' 'No first-parent commit matches the frozen metadata, the approved source patch, and the generated history pair.' }
+	if ($recoveryMatches.Count -ne 1) { Throw-Landing 2 'history.recovery-ambiguous' "Found $($recoveryMatches.Count) first-parent commits matching the frozen landing transaction." }
 	return $recoveryMatches[0]
-}
-
-function Test-HistoryReplacementRecovery {
-	$primaryHead = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim()
-	if ($primaryHead -ceq $ApprovedSessionCommit -or $primaryHead -ceq $ExpectedPrimaryTip) { return $false }
-	if (-not (Test-FinalizeGitSuccess $script:PrimaryIdentity.Worktree @('merge-base', '--is-ancestor', $ExpectedPrimaryTip, $primaryHead))) { Throw-Landing 2 'history.recovery-nonancestor' 'Current primary does not descend from the approved primary ancestor.' }
-	$expectedMetadata = if ($null -ne $script:FrozenCommitMetadata) { $script:FrozenCommitMetadata } else { Get-FrozenCommitMetadata $ApprovedSessionCommit }
-	$headMetadata = Get-LandingCommitMetadata $primaryHead
-	$headMatchesFrozen = $headMetadata.message -ceq $expectedMetadata.message -and $headMetadata.authorName -ceq $expectedMetadata.authorName -and $headMetadata.authorEmail -ceq $expectedMetadata.authorEmail -and $headMetadata.authorDate -ceq $expectedMetadata.authorDate -and $headMetadata.committerName -ceq $expectedMetadata.committerName -and $headMetadata.committerEmail -ceq $expectedMetadata.committerEmail -and $headMetadata.committerDate -ceq $expectedMetadata.committerDate
-	$commits = @((Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-list', '--first-parent', $primaryHead)).Split("`n") | Where-Object { $_ })
-	$recoveryMatches = [Collections.Generic.List[object]]::new()
-	foreach ($commit in $commits) {
-		if ($commit -ceq $ExpectedPrimaryTip) { break }
-		$parents = @((Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $commit)).Trim() -split ' ' | Where-Object { $_ })
-		if ($parents.Count -ne 1) { continue }
-		$metadata = Get-LandingCommitMetadata $commit
-		$expected = if ($null -ne $script:FrozenCommitMetadata) { $script:FrozenCommitMetadata } else { Get-FrozenCommitMetadata $ApprovedSessionCommit }
-		if ($metadata.message -cne $expected.message -or $metadata.authorName -cne $expected.authorName -or $metadata.authorEmail -cne $expected.authorEmail -or $metadata.authorDate -cne $expected.authorDate -or $metadata.committerName -cne $expected.committerName -or $metadata.committerEmail -cne $expected.committerEmail -or $metadata.committerDate -cne $expected.committerDate) { continue }
-		$patch = Get-LandingNonHistoryPatchIdentity $parents[0] $commit
-		$approved = if ($null -ne $script:ApprovedPatchIdentity) { $script:ApprovedPatchIdentity } else { [pscustomobject]@{ PatchId = Get-LandingPatchId $script:ApprovedSourceParent $ApprovedSessionCommit; Changes = Assert-NoHistorySourceChanges $script:ApprovedSourceParent $ApprovedSessionCommit } }
-		if ($patch.PatchId -cne $approved.PatchId -or $patch.Changes -cne $approved.Changes) { continue }
-		$jsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
-		if (-not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$jsonPath")) -or -not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$svgPath"))) { continue }
-		$jsonBlob = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "${commit}:$jsonPath")).Trim(); $svgBlob = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "${commit}:$svgPath")).Trim()
-		if ($jsonBlob -notmatch '^[0-9a-f]{40}$' -or $svgBlob -notmatch '^[0-9a-f]{40}$') { continue }
-		$jsonText = Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', "${commit}:$jsonPath")
-		$svgText = Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', "${commit}:$svgPath")
-		$jsonBytes = [Text.UTF8Encoding]::new($false).GetBytes($jsonText)
-		$svgBytes = [Text.UTF8Encoding]::new($false).GetBytes($svgText)
-		$seriesMatch = [regex]::Match($svgText, 'seriesDigest=([0-9a-f]{64})')
-		if (-not $seriesMatch.Success -or $seriesMatch.Groups[1].Value -cne ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant())) { continue }
-		if ($HistoryContractGeneratorDigest) {
-			$generatorMatch = [regex]::Match($svgText, 'generatorDigest=([0-9a-f]{64})')
-			if (-not $generatorMatch.Success -or $generatorMatch.Groups[1].Value -cne $HistoryContractGeneratorDigest) { continue }
-		}
-		$rows = @($jsonText -split "`n" | Where-Object { $_ })
-		if ($rows.Count -lt 2) { continue }
-		try { $last = $rows[-1] | ConvertFrom-Json -Depth 32 -ErrorAction Stop } catch { continue }
-		$parentCommit = $parents[0]
-		$parentJsonText = Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', "${parentCommit}:$jsonPath")
-		$parentRows = @($parentJsonText -split "`n" | Where-Object { $_ })
-		if ($last.captureMode -notin @('catch-up', 'cpp-change', 'carry-forward') -or [string]$last.date -notmatch '^\d{4}-\d{2}-\d{2}$' -or [int]$last.index -ne ($parentRows.Count - 1)) { continue }
-		if (-not (Test-RecoveryHistoryFields $last $jsonBytes $svgBytes $seriesMatch.Groups[1].Value)) { continue }
-		$recoveryMatches.Add([pscustomobject]@{ Commit = $commit; Parent = $parents[0]; Tree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$commit^{tree}")).Trim(); RowDate = [string]$last.date; JsonBlob = $jsonBlob; SvgBlob = $svgBlob; JsonBytes = [int64]$jsonBytes.Length; SvgBytes = [int64]$svgBytes.Length; EmbeddedDigest = $seriesMatch.Groups[1].Value; JsonSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($jsonBytes)).ToLowerInvariant(); SvgSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($svgBytes)).ToLowerInvariant() })
-	}
-	if ($recoveryMatches.Count -eq 0) { if (-not $headMatchesFrozen) { return $false }; Throw-Landing 2 'history.recovery-not-found' 'No first-parent replacement commit matches the frozen metadata, source patch, and exact history artifacts.' }
-	if ($recoveryMatches.Count -ne 1) { Throw-Landing 2 'history.recovery-ambiguous' "Found $($recoveryMatches.Count) first-parent replacement commits matching the frozen landing transaction." }
-	$match = $recoveryMatches[0]
-	if ($FixtureFailure -ceq 'history-recovery-primary-race') {
-		$race = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, '-c', 'user.name=fixture recovery', '-c', 'user.email=fixture-recovery@example.invalid', 'commit-tree', "$primaryHead^{tree}", '-p', $primaryHead, '-m', 'fixture recovery primary descendant') $script:PrimaryIdentity.Worktree
-		$raceCommit = $race.Stdout.Trim()
-		if ($race.ExitCode -ne 0 -or $raceCommit -cnotmatch '^[0-9a-f]{40}$') { Throw-Landing 1 'fixture.recovery-primary-race-failed' 'Fixture could not create its deterministic primary descendant.' }
-		$raceUpdate = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $raceCommit, $primaryHead) $script:PrimaryIdentity.Worktree
-		if ($raceUpdate.ExitCode -ne 0) { Throw-Landing 1 'fixture.recovery-primary-race-failed' 'Fixture could not advance the primary ref for the recovery race.' }
-		[IO.File]::WriteAllText((Join-Path $script:PrimaryIdentity.Worktree 'recovery-primary-race.txt'), 'fixture recovery race', [Text.UTF8Encoding]::new($false))
-	}
-	return (Complete-RecoveredLanding $match $false $primaryHead)
 }
 
 # Returns $false when primary moved under the held lease, either before the attempt or between the
@@ -1149,42 +896,6 @@ try {
 		Throw-Landing 1 'input.commit-invalid' 'Approved and expected commits must be 8 to 40 lowercase hexadecimal object ID characters.'
 	}
 	if ($ApprovedCandidateTree -cnotmatch '^[0-9a-f]{40}$') { Throw-Landing 1 'input.candidate-tree-invalid' 'ApprovedCandidateTree must be a lowercase 40-character object ID.' }
-	$historyScalarsSupplied = @(@($HistoryContractDigest, $HistoryContractGeneratorDigest, $HistoryContractCaptureDigest, $HistoryContractRuntimeDigest, $HistoryContractPatchDigest, $HistoryContractMode, $HistoryContractCoverage) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
-	if ($historyScalarsSupplied.Count -gt 0 -and $env:BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE -cne '1') { Throw-Landing 1 'input.fixture-forbidden' 'History Contract scalar arguments are fixture-only; pass -ApprovalPreparationResultFile from approval preparation.' }
-	if (-not [string]::IsNullOrWhiteSpace($ApprovalPreparationResultFile)) {
-		if ($historyScalarsSupplied.Count -gt 0) { Throw-Landing 1 'input.history-contract-conflict' 'ApprovalPreparationResultFile and history Contract scalar arguments are mutually exclusive.' }
-		$approvalItem = Get-Item -LiteralPath $ApprovalPreparationResultFile -Force -ErrorAction SilentlyContinue
-		if ($null -eq $approvalItem -or $approvalItem.PSIsContainer) { Throw-Landing 1 'input.approval-result-invalid' "ApprovalPreparationResultFile '$ApprovalPreparationResultFile' is not a readable file." }
-		try { $approvalResult = [IO.File]::ReadAllText($approvalItem.FullName) | ConvertFrom-Json -Depth 64 -ErrorAction Stop }
-		catch { Throw-Landing 1 'input.approval-result-invalid' "ApprovalPreparationResultFile is not valid JSON: $($_.Exception.Message)" }
-		if ($null -eq $approvalResult) { Throw-Landing 1 'input.approval-result-invalid' 'ApprovalPreparationResultFile carries no result object.' }
-		$approvalProperties = @($approvalResult.PSObject.Properties.Name)
-		if ($approvalProperties -cnotcontains 'schemaVersion' -or $approvalProperties -cnotcontains 'status' -or $approvalProperties -cnotcontains 'historyContract' -or [string]$approvalResult.schemaVersion -cne 'broken-engine-finalize-approval-preparation/v3' -or [string]$approvalResult.status -cne 'pass' -or $null -eq $approvalResult.historyContract) {
-			Throw-Landing 1 'input.approval-result-invalid' "ApprovalPreparationResultFile must be a passing 'broken-engine-finalize-approval-preparation/v3' result carrying a history Contract."
-		}
-		$approvalContract = $approvalResult.historyContract
-		foreach ($property in @('digest', 'generatorDigest', 'captureDigest', 'runtimeDigest', 'patchDigest', 'mode')) {
-			if (@($approvalContract.PSObject.Properties.Name) -cnotcontains $property) { Throw-Landing 1 'input.approval-result-invalid' "ApprovalPreparationResultFile history Contract is missing '$property'." }
-		}
-		$HistoryContractDigest = [string]$approvalContract.digest
-		$HistoryContractGeneratorDigest = [string]$approvalContract.generatorDigest
-		$HistoryContractCaptureDigest = [string]$approvalContract.captureDigest
-		$HistoryContractRuntimeDigest = [string]$approvalContract.runtimeDigest
-		$HistoryContractPatchDigest = [string]$approvalContract.patchDigest
-		$HistoryContractMode = [string]$approvalContract.mode
-	}
-	$historyArgumentsSupplied = @(@($HistoryContractDigest, $HistoryContractGeneratorDigest, $HistoryContractCaptureDigest, $HistoryContractPatchDigest, $HistoryContractMode) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
-	if ($historyArgumentsSupplied.Count -eq 0 -and $env:BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE -ne '1') { Throw-Landing 1 'input.history-contract-required' 'A passing history Contract identity from -ApprovalPreparationResultFile is required for postconfirmation landing.' }
-	foreach ($digest in @($HistoryContractDigest, $HistoryContractGeneratorDigest, $HistoryContractCaptureDigest, $HistoryContractRuntimeDigest, $HistoryContractPatchDigest)) {
-		if (-not [string]::IsNullOrWhiteSpace($digest) -and $digest -cnotmatch '^[0-9a-f]{64}$') { Throw-Landing 1 'input.history-digest-invalid' 'History Contract and artifact digests must be lowercase 64-character SHA-256 values.' }
-	}
-	foreach ($digest in @($HistoryJsonSha256, $HistorySvgSha256, $HistorySvgEmbeddedSha256)) {
-		if (-not [string]::IsNullOrWhiteSpace($digest) -and $digest -cnotmatch '^[0-9a-f]{64}$') { Throw-Landing 1 'input.history-digest-invalid' 'Recovery history artifact digests must be lowercase 64-character SHA-256 values.' }
-	}
-	if ($HistoryJsonBytes -lt 0 -or $HistorySvgBytes -lt 0) { Throw-Landing 1 'input.history-bytes-invalid' 'Recovery history artifact byte counts must be non-negative.' }
-	$recoveryTupleCount = @($HistoryContractRowDate, $HistoryJsonSha256, $HistorySvgSha256, $HistorySvgEmbeddedSha256) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Measure-Object | Select-Object -ExpandProperty Count
-	$recoveryBytesSupplied = ($HistoryJsonBytes -gt 0) -or ($HistorySvgBytes -gt 0)
-	if (($recoveryTupleCount -gt 0 -or $recoveryBytesSupplied) -and ($recoveryTupleCount -ne 4 -or $HistoryJsonBytes -le 0 -or $HistorySvgBytes -le 0)) { Throw-Landing 1 'input.history-recovery-incomplete' 'Recovery history evidence must be omitted entirely or supplied as the complete row-date, JSONL/SVG hash, byte-count, and embedded-digest tuple.' }
 	if (-not [string]::IsNullOrWhiteSpace($OwnerToken) -and $OwnerToken -cnotmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
 		Throw-Landing 1 'input.owner-token-invalid' 'OwnerToken must be a canonical WorktreeCli lock owner token.'
 	}
@@ -1249,8 +960,6 @@ try {
 	$result.identities.primaryBranch = $script:PrimaryIdentity.Branch
 	$result.tips.current = $script:CurrentIdentity.Head
 	$result.tips.primary = $script:PrimaryIdentity.Head
-	if ([string]::IsNullOrWhiteSpace($HistoryContractMode)) { $HistoryContractMode = 'carry-forward' }
-	$result.historyContract = [ordered]@{ schemaVersion = 'broken-engine-code-quality-history-contract/v1'; status = 'pass'; contractDigest = $HistoryContractDigest; generatorDigest = $HistoryContractGeneratorDigest; captureDigest = $HistoryContractCaptureDigest; runtimeDigest = $HistoryContractRuntimeDigest; patchDigest = $HistoryContractPatchDigest; mode = $HistoryContractMode; rowDate = $HistoryContractRowDate; coverage = $HistoryContractCoverage }
 	$result.approvedSource.commit = $ApprovedSessionCommit; $result.approvedSource.tree = $ApprovedCandidateTree; $result.approvedSource.parent = $script:ApprovedSourceParent
 	$approvedPatchChanges = Assert-NoHistorySourceChanges $script:ApprovedSourceParent $ApprovedSessionCommit
 	$script:ApprovedPatchIdentity = [pscustomobject]@{ PatchId = Get-LandingPatchId $script:ApprovedSourceParent $ApprovedSessionCommit; Changes = $approvedPatchChanges }
@@ -1262,32 +971,20 @@ try {
 	$landingOwner = [guid]::NewGuid().ToString()
 	Register-WorktreeCliSession -RepositoryRoot $script:CurrentIdentity.Worktree -Owner $landingOwner -Label 'session landing' -Worktree $script:CurrentIdentity.Worktree | Out-Null
 	$script:LandingTransientOwner = $landingOwner
-	# Post-advance recovery, idempotent for a crash at any point after the advance: the confirmed
-	# candidate is already on primary either as itself, or as the commit this landing's own internal
-	# rebase produced.
+	# Post-advance recovery, idempotent for a crash at any point after the advance: the landing commit
+	# is already on primary, built either on the confirmed candidate or on the one this landing's own
+	# internal rebase produced.
 	$recovered = $false
 	$primaryRefTip = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim()
-	$overlayPossible = $HistoryContractMode -cin @('catch-up', 'cpp-change')
 	if ($primaryRefTip -cne $ExpectedPrimaryTip) {
 		$primaryOutput = Join-Path $script:PrimaryIdentity.Worktree 'Tools\WorktreeCli\Platforms\VisualStudio2026\Output'
 		$recoveryWorktreeCli = Join-Path $primaryOutput 'WorktreeCli.exe'
 		$recoveryExecutable = Get-Item -LiteralPath $recoveryWorktreeCli -Force -ErrorAction SilentlyContinue
 		if ($null -eq $recoveryExecutable -or $recoveryExecutable.PSIsContainer -or ($recoveryExecutable.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $recoveryExecutable.Length -eq 0) { Throw-Landing 1 'worktreecli.executable-invalid' 'Recovery could not validate the canonical WorktreeCli executable.' }
 		$script:WorktreeCliPath = $recoveryExecutable.FullName
+		$landedMatch = Find-LandedCommit $primaryRefTip
+		if ($null -ne $landedMatch) { $recovered = Complete-RecoveredLanding $landedMatch $primaryRefTip }
 	}
-	if (-not $recovered -and $primaryRefTip -ceq $ApprovedSessionCommit -and
-		$script:CurrentIdentity.Head -ceq $script:LandingCommit -and
-		$script:PrimaryIdentity.Head -ceq $primaryRefTip -and
-		(Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('status', '--porcelain=v1', '-z', '--untracked-files=all')).Length -eq 0 -and
-		(Test-FinalizeGitSuccess $script:PrimaryIdentity.Worktree @('merge-base', '--is-ancestor', $script:LandingCommit, $script:PrimaryIdentity.Head))) {
-		[void](Validate-HistoryContractForLanding $script:ApprovedSourceParent $ApprovedSessionCommit)
-		$cheapMatch = Find-LandingSourceMatch $primaryRefTip
-		if ($null -ne $cheapMatch -and $cheapMatch.SourceOnly -and [string]$result.historyContract.current.mode -ceq 'carry-forward') {
-			$recovered = Complete-RecoveredLanding $cheapMatch $true $primaryRefTip
-		}
-	}
-	if (-not $recovered) { $recovered = Test-LandingNoOverlayRecovery $primaryRefTip }
-	if (-not $recovered -and $overlayPossible -and $primaryRefTip -cne $ApprovedSessionCommit) { $recovered = Test-HistoryReplacementRecovery }
 	if ($recovered) {
 		[void] (Assert-LandingSanity $script:LandingCommit $script:PrimaryIdentity.Head)
 		$result.primaryAdvanced = $true
@@ -1378,8 +1075,7 @@ try {
 	# rebase may change object IDs, but it must not change what the user approved or the history point.
 	$script:FrozenCommitMetadata = Get-FrozenCommitMetadata $ApprovedSessionCommit
 	$result.approvedSource.metadata = $script:FrozenCommitMetadata
-	if ([string]::IsNullOrWhiteSpace($HistoryContractRowDate)) { $HistoryContractRowDate = [DateTime]::UtcNow.ToString('yyyy-MM-dd') }
-	$result.historyContract.rowDate = $HistoryContractRowDate
+	$script:LandingHistoryDate = [DateTime]::UtcNow.ToString('yyyy-MM-dd')
 	$result.rebasedSource.commit = $script:LandingCommit
 	$result.rebasedSource.tree = $script:LandingTree
 	$result.rebasedSource.parent = $script:LandingPrimaryTip

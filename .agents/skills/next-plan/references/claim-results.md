@@ -42,17 +42,14 @@ passed-over Plans.
 For a tier-constrained request, read the `Risk tier` prose of the top eligible
 candidates in that order until one matches, then claim that path.
 
-## Divergence classification
+## Diverged sessions
 
-A `claim.session-diverged` result carries a `divergence` object classifying
-every commit the session holds and primary lacks. `verdict: safe-reset` means
-each of them is a byte-identical duplicate of a commit already landed on
-primary, apart from the metrics-history overlay a landing regenerates, so the
-session holds no unlanded work, and `divergence.recovery` names the exact
-`git reset --hard <primary tip>` command. `verdict: unlanded-work` names the
-commits carrying work primary does not have. A null `divergence` means the
-classification could not run. The Preconditions and selection section of
-[`/next-plan`](../SKILL.md) owns which verdict permits that reset.
+A `claim.session-diverged` result carries no `divergence` object: its `message`
+lists every commit the session holds and primary lacks. Under `-ResumeRetained`
+the blocked result may also carry the `retained` projection, because the script
+builds it before the divergence check
+(`Invoke-NextPlanClaim.ps1:44,53-57`). Report both the unlanded commits and any
+retained work to the user, who decides how to resolve it.
 
 ## Claim-exit result fields
 

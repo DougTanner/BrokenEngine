@@ -10,14 +10,14 @@ public:
 
 	static std::optional<common::ChunkFlags_t> Handles(const std::filesystem::directory_entry& rDirectoryEntry);
 
+	static constexpr int64_t kiVersion = Version(31);
+
 	ExportAudio(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
-	: ExportJob(rChunkFlags, rFile)
+	: ExportJob(rChunkFlags, rFile, kiVersion)
 	{
 	}
 
 	~ExportAudio() override = default;
-
-	int64_t GetVersion() const override { return Version(31); }
 
 protected:
 

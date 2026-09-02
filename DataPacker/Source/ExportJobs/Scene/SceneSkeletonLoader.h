@@ -12,5 +12,9 @@ struct SkeletonData
 
 std::unordered_map<int, int> BuildNodeParentMap(const tinygltf::Model& rModel);
 
+// The pack format carries one flattened skeleton and every downstream loader reads skin 0, so the skin the nodes
+// actually reference is moved into slot 0 here; a scene referencing more than one skin cannot be represented and is rejected.
+void CanonicalizeSceneSkin(tinygltf::Model& rModel);
+
 // Load skeleton from all nodes, conditionally loading skin data if skins exist
 SkeletonData LoadSkeletonData(const tinygltf::Model& rModel);

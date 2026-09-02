@@ -8,7 +8,7 @@ Solution and project that compile all compiled third-party library source into a
 
 - Output: Static library, per-configuration `TargetName` (`ThirdParty.Debug`, `ThirdParty.Profile`, `ThirdParty.Release`) in `Output/`; intermediates in `Build/<Config>/`
 - Configurations: Debug, Profile, Release (x64 only)
-- Compiler: C++23, `/fp:strict` (deterministic math, matching Engine/Game), static CRT (`/MTd` Debug, `/MT` otherwise — matches the executables), `/GL` in Profile/Release (codegen defers to the consumer's LTCG link), RTTI off, `/EHa`, OpenMP, `/bigobj`, `/Zc:__cplusplus`, no PCH, all warnings disabled (external code), MultiByte charset
+- Compiler: C++23, `/fp:strict` (deterministic math, matching Engine/Game), static CRT (`/MTd` Debug, `/MT` otherwise — matches the executables), `/GL` in Profile/Release (codegen defers to the consumer's LTCG link), `/Z7` (debug info embedded in each object; a single shared compiler PDB is rewritten by any partial recompile, orphaning every untouched object and producing LNK4099 in every consumer link), RTTI off, `/EHa`, OpenMP, `/bigobj`, `/Zc:__cplusplus`, no PCH, all warnings disabled (external code), MultiByte charset
 - Defines: `USING_XINPUT`, `VK_NO_PROTOTYPES`, `VK_USE_PLATFORM_WIN32_KHR`
 - Requires: `VK_SDK_PATH` environment variable for Vulkan SDK headers
 

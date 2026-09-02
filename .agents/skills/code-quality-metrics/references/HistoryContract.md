@@ -84,8 +84,7 @@ is sorted by ordinal relative path. Ordinary `__pycache__` directories are skipp
 consumption; every other ignored/untracked/reparse/symlink extra blocks the capture. Generate takes
 the BootstrapIdentity and manifest before Snapshot and again afterward; any identity, membership,
 or source drift fails the run. Contract exposes a frozen `generator.sha256` separately from the
-optional active `capture.digest`, allowing a later lock-time decision to narrow catch-up to
-carry-forward or to recapture a fixed C++ patch.
+optional active `capture.digest`.
 
 ## Receipt schemas
 

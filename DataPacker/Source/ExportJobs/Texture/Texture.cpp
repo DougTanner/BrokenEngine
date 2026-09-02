@@ -2,28 +2,13 @@
 
 #include "FileManager.h"
 
-// Aggressive lambda — well above bc7enc_rdo author's typical 0.5–1.0 examples. Full-grid
-// sweeps on 2K (Ship_baseColor) + 8K (island Color) showed lambda=4.0 strictly dominates
-// lower lambdas on BOTH speed and compression: the per-block RDO search converges sooner at
-// higher rate-bias and produces more LZ-friendly output. PSNR drop ~2-3 dB vs lambda=1.0,
-// invisible at top-down RTS camera distances on organic terrain / PBR content.
-inline constexpr float kfRdoLambdaBc4 = 4.0f;
-inline constexpr float kfRdoLambdaBc5 = 4.0f;
-inline constexpr float kfRdoLambdaBc7 = 4.0f;
-// 1024 B (64 BC7 blocks). ERT's inner loop is O(blocks × window) so this directly caps
-// encode time. Far smaller than deflate's 32 KB window, but at lambda=4.0 the speed/size
-// Pareto frontier collapses onto the smallest lookback — bigger windows buy proportionally
-// less compression for steeply-rising encode time, especially at 8K where they cross the
-// L3-cache cliff hard.
-inline constexpr uint32_t kuiRdoLookbackWindowSize = 1024;
-// bc7enc per-block search depth (default BC7ENC_MAX_UBER_LEVEL=6). 4 produced identical
-// output and timing to 6 in the OAT sweep at moderate lambdas; pinned explicitly so future
-// bc7enc upstream tuning changes don't silently shift our encoder behavior.
-inline constexpr int kiBc7UberLevel = 4;
+inline constexpr uint32_t kuiBc45SearchRadius = 5;
+inline constexpr uint32_t kuiBc7MaxPartitions = 64;
+inline constexpr uint32_t kuiBc7UberLevel = 4;
 
 std::mutex Texture::sEncodeMutex;
 
-// Tracks how many threads are inside EncodeWithRdo at once. The caller-held sEncodeMutex must
+// Tracks how many threads are inside EncodeBlocks at once. The caller-held sEncodeMutex must
 // keep this at 0 or 1 — anything higher means a call site forgot to take the lock.
 static std::atomic<int> sActiveEncodeCount {0};
 
@@ -370,28 +355,13 @@ uint32_t Texture::PixelToUint32(const std::vector<float>& rIn, int64_t iWidth, i
 	       static_cast<uint32_t>(rIn.at(4 * (iY * iWidth + iX) + 0));
 }
 
-static utils::image_u8 ToImageU8(const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)
-{
-	utils::image_u8 image(static_cast<uint32_t>(iWidth), static_cast<uint32_t>(iHeight));
-	utils::color_quad_u8* pDst = image.get_pixels().data();
-	const float* pfSrc = rIn.data();
-	int64_t iPixelCount = iWidth * iHeight;
-	for (int64_t i = 0; i < iPixelCount; ++i)
-	{
-		pDst[i].set(static_cast<uint8_t>(std::clamp(pfSrc[0], 0.0f, 255.0f)), static_cast<uint8_t>(std::clamp(pfSrc[1], 0.0f, 255.0f)), static_cast<uint8_t>(std::clamp(pfSrc[2], 0.0f, 255.0f)), static_cast<uint8_t>(std::clamp(pfSrc[3], 0.0f, 255.0f)));
-		pfSrc += 4;
-	}
-	return image;
-}
-
-void Texture::EncodeWithRdo(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, float fLambda, uint32_t uiLookbackWindowSize, int iBc7UberLevel, TextureOptions_t options)
+void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, TextureOptions_t options)
 {
 	if (gpFileManager->mbForbidExpensiveExport)
 	{
 		throw std::runtime_error("Texture encoding blocked by BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1");
 	}
 
-	const bool bVerifyNoAlpha = options & TextureOptions::kVerifyNoAlpha;
 	// Callers must hold Texture::sEncodeMutex — this function trusts the caller's lock.
 	int iActiveEncodes = sActiveEncodeCount.fetch_add(1, std::memory_order_relaxed) + 1;
 	common::ScopedLambda decrementActive([]()
@@ -399,68 +369,82 @@ void Texture::EncodeWithRdo(std::byte* puiOut, const std::vector<float>& rIn, in
 		sActiveEncodeCount.fetch_sub(1, std::memory_order_relaxed);
 	});
 	ASSERT(iActiveEncodes == 1);
-	LOG(kDefault, kVerbose, "RDO encode: {}x{} (concurrent={})", iWidth, iHeight, iActiveEncodes);
+	LOG(kDefault, kVerbose, "BC encode: {}x{} (concurrent={})", iWidth, iHeight, iActiveEncodes);
 
-	rdo_bc::rdo_bc_params params;
-	params.m_rdo_lambda = fLambda;
-	params.m_rdo_multithreading = true;
-	// Use physical-core-count - 2: leaves two physical cores idle (thermal headroom + OS responsiveness).
-	// Cross-machine note: bc7enc_rdo's ERT partitions the block stream into m_rdo_max_threads contiguous
-	// per-thread ranges and matches cannot cross partition boundaries, so encoded BCn bytes vary with core
-	// count (stable per host, different across hosts). Acceptable under the single-canonical-bake-machine
-	// assumption; pin this to a fixed
-	// constant if CI / multi-machine bakes are introduced.
-	params.m_rdo_max_threads = static_cast<int>(std::max<int64_t>(1, common::HardwareCoreCount() - 2));
-	params.m_status_output = false;
-	params.m_use_bc7e = false;
-	params.m_lookback_window_size = uiLookbackWindowSize;
-	params.m_custom_lookback_window_size = true;
-	params.m_bc7_uber_level = iBc7UberLevel;
+	bc7enc_compress_block_params bc7Parameters {};
+	bc7enc_compress_block_params_init(&bc7Parameters);
+	bc7enc_compress_block_params_init_linear_weights(&bc7Parameters);
+	bc7Parameters.m_max_partitions = kuiBc7MaxPartitions;
+	bc7Parameters.m_uber_level = kuiBc7UberLevel;
 
-	switch (vkFormat)
+	const int64_t iBlockColumns = (iWidth + 3) / 4;
+	const int64_t iBlockRows = (iHeight + 3) / 4;
+	const int64_t iBytesPerBlock = vkFormat == VK_FORMAT_BC4_UNORM_BLOCK ? 8 : 16;
+	std::atomic<bool> bHasAlpha(false);
+	auto encodeBlockRows = [&](int64_t iStart, int64_t iEnd)
 	{
-		case VK_FORMAT_BC4_UNORM_BLOCK:
-			params.m_dxgi_format = DXGI_FORMAT_BC4_UNORM;
-			break;
-		case VK_FORMAT_BC5_UNORM_BLOCK:
-			params.m_dxgi_format = DXGI_FORMAT_BC5_UNORM;
-			break;
-		case VK_FORMAT_BC7_UNORM_BLOCK:
-			params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
-			break;
-		default:
-			ASSERT(false);
-			return;
-	}
+		std::array<uint8_t, 4 * 4 * 4> pixels {};
+		for (int64_t iBlockY = iStart; iBlockY < iEnd; ++iBlockY)
+		{
+			for (int64_t iBlockX = 0; iBlockX < iBlockColumns; ++iBlockX)
+			{
+				for (int64_t iPixelY = 0; iPixelY < 4; ++iPixelY)
+				{
+					int64_t iSourceY = std::min(iBlockY * 4 + iPixelY, iHeight - 1);
+					for (int64_t iPixelX = 0; iPixelX < 4; ++iPixelX)
+					{
+						int64_t iSourceX = std::min(iBlockX * 4 + iPixelX, iWidth - 1);
+						const float* pfSource = rIn.data() + 4 * (iSourceY * iWidth + iSourceX);
+						uint8_t* puiPixel = pixels.data() + 4 * (iPixelY * 4 + iPixelX);
+						for (int64_t iChannel = 0; iChannel < 4; ++iChannel)
+						{
+							puiPixel[iChannel] = static_cast<uint8_t>(std::clamp(pfSource[iChannel], 0.0f, 255.0f));
+						}
+					}
+				}
 
-	utils::image_u8 image = ToImageU8(rIn, iWidth, iHeight);
-	rdo_bc::rdo_bc_encoder encoder;
-	bool bInit = encoder.init(image, params);
-	ASSERT(bInit);
-	bool bEncoded = encoder.encode();
-	ASSERT(bEncoded);
+				std::byte* puiBlock = puiOut + (iBlockY * iBlockColumns + iBlockX) * iBytesPerBlock;
+				switch (vkFormat)
+				{
+					case VK_FORMAT_BC4_UNORM_BLOCK:
+						rgbcx::encode_bc4_hq(puiBlock, pixels.data(), 4, kuiBc45SearchRadius, rgbcx::BC4_USE_ALL_MODES);
+						break;
+					case VK_FORMAT_BC5_UNORM_BLOCK:
+						rgbcx::encode_bc5_hq(puiBlock, pixels.data(), 0, 1, 4, kuiBc45SearchRadius, rgbcx::BC4_USE_ALL_MODES);
+						break;
+					case VK_FORMAT_BC7_UNORM_BLOCK:
+						if (bc7enc_compress_block(puiBlock, pixels.data(), &bc7Parameters))
+						{
+							bHasAlpha.store(true, std::memory_order_relaxed);
+						}
+						break;
+					default:
+						ASSERT(false);
+				}
+			}
+		}
+	};
+	common::gpMultithreading->Dispatch(iBlockRows, encodeBlockRows);
 
-	std::memcpy(puiOut, encoder.get_blocks(), encoder.get_total_blocks_size_in_bytes());
-
-	if (bVerifyNoAlpha && vkFormat == VK_FORMAT_BC7_UNORM_BLOCK)
+	if ((options & TextureOptions::kVerifyNoAlpha) && vkFormat == VK_FORMAT_BC7_UNORM_BLOCK)
 	{
-		ASSERT(!encoder.get_has_alpha());
+		ASSERT(!bHasAlpha.load(std::memory_order_relaxed));
 	}
 }
 
 void Texture::ToBc4(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)
 {
-	EncodeWithRdo(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC4_UNORM_BLOCK, kfRdoLambdaBc4, kuiRdoLookbackWindowSize, kiBc7UberLevel, {});
+	EncodeBlocks(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC4_UNORM_BLOCK, {});
 }
 
 void Texture::ToBc5(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)
 {
-	EncodeWithRdo(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC5_UNORM_BLOCK, kfRdoLambdaBc5, kuiRdoLookbackWindowSize, kiBc7UberLevel, {});
+	EncodeBlocks(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC5_UNORM_BLOCK, {});
 }
 
 void Texture::ToBc7(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, TextureOptions_t options)
 {
-	EncodeWithRdo(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC7_UNORM_BLOCK, kfRdoLambdaBc7, kuiRdoLookbackWindowSize, kiBc7UberLevel, options);
+	EncodeBlocks(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC7_UNORM_BLOCK, options);
 }
 
 void Texture::ToR8G8B8A8(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)

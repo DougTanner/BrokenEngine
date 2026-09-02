@@ -34,7 +34,7 @@ begins, tracked executable Plans and session-prepared plans alike; a plan for
 which that trigger does not fire skips it. Correctness, traceability, and
 citation verification belong to `/plan-audit`, running in parallel on the same snapshot where that review runs —
 leave them there; post-implementation diff minimality belongs to
-`/scope-review`. A clean pass is the expected common outcome, because this pass
+the Step-5 correctness reviews. A clean pass is the expected common outcome, because this pass
 must not become its own source of over-engineering.
 
 ## Inputs

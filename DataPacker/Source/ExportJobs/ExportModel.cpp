@@ -87,6 +87,16 @@ void ExportModel::Export()
 		indices32.resize(uiIndexCount);
 		ReadSourceBytes(fileStream, reinterpret_cast<char*>(indices32.data()), uiIndexBytes, kpcContext);
 	}
+	// Trust boundary: a decoded index at or past the vertex count would read outside the packed vertex
+	// buffer at draw time, and the runtime validates only counts and byte extents.
+	for (size_t i = 0; i < uiIndexCount; ++i)
+	{
+		const size_t uiIndex = bUsesU16Indices ? static_cast<size_t>(indices16.at(i)) : static_cast<size_t>(indices32.at(i));
+		if (uiIndex >= uiVertexCount)
+		{
+			throw std::runtime_error("ExportModel::Export index is out of range");
+		}
+	}
 	vertices.resize(static_cast<size_t>(uiVertexBytes));
 	ReadSourceBytes(fileStream, reinterpret_cast<char*>(vertices.data()), uiVertexBytes, kpcContext);
 	fileStream.close();

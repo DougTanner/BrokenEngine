@@ -13,28 +13,25 @@ public:
 
 	static std::optional<common::ChunkFlags_t> Handles(const std::filesystem::directory_entry& rDirectoryEntry);
 
+	// Payload-struct sizes fold in so size-changing layout edits auto-dirty cached chunks and the .PreExport marker; same-size reorders need the raw version bumped
+	static constexpr int64_t kiVersion = Version(61
+		+ sizeof(common::MaterialShaderData)
+		+ sizeof(common::AnimationHeader)
+		+ sizeof(common::Skeleton)
+		+ sizeof(common::ModelNode)
+		+ sizeof(common::AnimationClip)
+		+ sizeof(common::MaterialInfo)
+		+ sizeof(common::AnimationChannel)
+		+ sizeof(common::AnimationKeyframe)
+		+ sizeof(common::AnimationKeyframeCubic)
+		+ sizeof(common::ModelVertex));
+
 	ExportScene(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
-	: ExportJob(rChunkFlags, rFile)
+	: ExportJob(rChunkFlags, rFile, kiVersion)
 	{
 	}
 
 	virtual ~ExportScene() = default;
-
-	// Payload-struct sizes fold in so size-changing layout edits auto-dirty cached chunks and the .PreExport marker; same-size reorders need the raw version bumped
-	virtual int64_t GetVersion() const override
-	{
-		return Version(59
-			+ sizeof(common::MaterialShaderData)
-			+ sizeof(common::AnimationHeader)
-			+ sizeof(common::Skeleton)
-			+ sizeof(common::ModelNode)
-			+ sizeof(common::AnimationClip)
-			+ sizeof(common::MaterialInfo)
-			+ sizeof(common::AnimationChannel)
-			+ sizeof(common::AnimationKeyframe)
-			+ sizeof(common::AnimationKeyframeCubic)
-			+ sizeof(common::ModelVertex));
-	}
 
 	virtual bool CheckDirty(const std::filesystem::path& rPackFile) override;
 

@@ -327,9 +327,9 @@ inline constexpr bool XmIsInf(float fValue)
 	// DirectXTK - WAV parsing
 	#include "DirectXTK/Audio/WAVFileReader.h"
 
-	// bc7enc_rdo - BCn encode/decode (consumption only; RGBCX/implementation defined in the Prebuilts unity .cpp)
+	// bc7enc_rdo - base BCn encode/decode (consumption only; implementations defined in the Prebuilts unity .cpp)
 	#include "bc7enc_rdo/bc7decomp.h"
-	#include "bc7enc_rdo/rdo_bc_encoder.h"
+	#include "bc7enc_rdo/bc7enc.h"
 	#include "bc7enc_rdo/rgbcx.h"
 
 	// gli - texture image library (vendors glm)

@@ -113,7 +113,7 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 }
 
 // Idempotent migration: skips files already prefixed with kiTextureIntermediateMagic.
-// For legacy raw BCn files: decodes mip 0, re-encodes with current RDO knobs (Texture::Save
+// For legacy raw BCn files: decodes mip 0, re-encodes with the current base codecs (Texture::Save
 // regenerates the mip chain and writes the new format with magic). For legacy raw R16 files:
 // just zlib-wraps with magic — R16 has no encoding step.
 static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
@@ -262,7 +262,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	auto tMigrateEnd = std::chrono::steady_clock::now();
 	double fMigrateSeconds = std::chrono::duration<double>(tMigrateEnd - tMigrateStart).count();
 	int64_t iSizeAfter = std::filesystem::file_size(rPath);
-	LOG(kDefault, kInfo, "Migrated BCn (decode + re-encode with current knobs + magic): \"{}\" ({}x{}; {} -> {} bytes on-disk; {:.2f}s)", rPath.string(), iWidth, iHeight, iSizeBefore, iSizeAfter, fMigrateSeconds);
+	LOG(kDefault, kInfo, "Migrated BCn (decode + direct re-encode + magic): \"{}\" ({}x{}; {} -> {} bytes on-disk; {:.2f}s)", rPath.string(), iWidth, iHeight, iSizeBefore, iSizeAfter, fMigrateSeconds);
 }
 
 void MigrateLegacyIntermediates()

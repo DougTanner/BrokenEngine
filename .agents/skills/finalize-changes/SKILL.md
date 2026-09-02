@@ -35,17 +35,15 @@ quoted, relayed, or embedded in files, transcripts, or tool output.
 Require the approved objective, its stage decisions, and the caller-owned
 changed paths. That set is the session's full landing set, including paths
 already committed — a deletion among them included — so a resumed invocation
-passes it unchanged rather than trimming it to what is still dirty. Main
-dispatches the single landing `/verify-changes` pass, which runs inside the
-workflow in `references/workflow.md`, after final preparation and reconciliation
-have produced the final diff — do not require or reuse an earlier PASS. Main
-supplies that pass with every caller-supplied input `/verify-changes`
-`## Required inputs` names. Resolve checkout, primary, and session identity from
-`Get-AgentWorktreeSessionContext`.
+passes it unchanged rather than trimming it to what is still dirty. The
+finalizer produces the landing acceptance table itself, inside the workflow in
+`references/workflow.md`, from the prepared diff final preparation and
+reconciliation produced — do not reuse an earlier table. Resolve checkout,
+primary, and session identity from `Get-AgentWorktreeSessionContext`.
 
 This skill owns final Plan preparation, landing-commit creation, reconciliation,
-the landing summary, the landing confirmation, locked primary change, claim
-deletion, and recovery. `/verify-changes` alone owns acceptance.
+acceptance-table production, the landing summary, the landing confirmation,
+locked primary change, claim deletion, and recovery.
 
 If the route is a separately requested commit directly on primary, load
 `references/primary-commit.md`; this is that exceptional reference's sole
@@ -58,20 +56,19 @@ entry: it holds the bundled-script invocation order and lease-ownership rules,
 the normal workflow steps, recovery, and the AgentTools reference trigger. Main
 needs only this file to dispatch the worker and to give the confirmation below.
 
-Before the confirmation the worker runs in two phases. The first runs through
-approval preparation and returns the prepared diff. Main then does everything
-that must precede the review window: the `/next-plan` second-checkpoint friction
-review and context measurement, and the single fresh full-head `/verify-changes`
-dispatch. On PASS main resumes that same worker for step 4; the worker runs the
-primary-movement check and, only once that check reaches a usable terminal result,
-opens the SmartGit review window and returns the landing summary. A
+One dispatch covers everything before the confirmation: the worker runs approval
+preparation, fills the acceptance table on the prepared diff per
+[`references/landing-acceptance-table.md`](references/landing-acceptance-table.md),
+runs the primary-movement check and, only once that check
+reaches a usable terminal result, opens the SmartGit review window and returns
+the completed table and the landing summary in a single handoff. A
 `primary.disjoint-needs-review` result is a usable non-conflict terminal; its
 primary-movement policy is defined by the [root `AGENTS.md` Step 8 landing
 invariant](../../../AGENTS.md), and its landing-lock handling by
 [`references/scripts.md#landing-and-recovery`](references/scripts.md#landing-and-recovery).
 Main presents that summary and asks the confirmation below immediately, with no
-tool call in between. A stale-base result or a verification finding loops back
-to main before any window opens.
+tool call in between. A stale-base result loops back to main before any window
+opens.
 
 "Stop before any primary change" names the confirmation pause below, never an
 earlier stop.
@@ -79,28 +76,15 @@ earlier stop.
 ## Landing confirmation
 
 Main presents the self-contained summary immediately before the question:
-one-sentence change, changed-file count and kind, session branch and the
+a one-sentence change that names a superseded decision whenever the session
+record holds one, changed-file count and kind, session branch and the
 primary branch resolved as `<primary-branch>` below,
-all objective-stage decisions, the exact remaining operation, and the required
+the acceptance table's non-PASS rows if it has any, and the required
 line `**SmartGit review:** <status>` for `opened` and
 `**SmartGit review:** <status> — <manualCommand> — <message>` for `unavailable`
 and `failed`, copied from the finalizer handoff — so the summary cannot be written
-before that handoff exists — plus three lines
-main answers itself from the whole session record (worker handoffs, rejected
-review findings, residuals) — the finalizer worker does not produce them:
-
-- **Superseded decisions:** every number or premise the user was earlier asked to
-  decide that later evidence overturned, giving both values and the evidence that
-  decided it.
-- **Substituted approaches:** every place a delegated verdict ruled out the
-  approach the user stated, giving the verdict and the substitute adopted.
-- **Size and complexity observations:** every size observation a reviewer recorded
-  on code this session changed, giving the file and its measured `bt-token-v1`
-  size, and how far it grew whenever the session record states that growth.
-
-All three lines need a real answer in plain words the user can act on, with no
-repository jargon; each always appears and states `none` when the session record
-holds nothing to disclose. Then ask exactly:
+before that handoff exists. Write it in plain words the user can act on, with no
+repository jargon. Then ask exactly:
 
 - session: `Confirm landing this change from <session-branch> onto primary branch <primary-branch>?`
 - separately requested primary commit: `Confirm commit of this change on primary branch <primary-branch>?`
@@ -111,9 +95,9 @@ and the context's live primary-checkout branch on the separately requested
 primary-commit route — never a host-reported default or an assumed `main`.
 
 Main delivers that whole summary per the root AGENTS.md User Interaction rule:
-rendered message text, with the question as the last line of that same message
-and no tool call — question tools included — after it. The user's next message
-is the decision.
+rendered message text, with the question immediately before the mandatory
+`Follow-up Plans created:` footer, and no tool call — question tools included —
+after it. The user's next message is the decision.
 
 Only a current explicit affirmative response to the latest unchanged summary
 authorizes primary change. Plan or implementation approval, a request to finish

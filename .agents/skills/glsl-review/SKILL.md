@@ -55,6 +55,10 @@ Read the footgun reference (`references/shader-footguns.md`) on every review. It
 - Verify push-constant size/stage ranges, storage image formats, atomics, descriptor indexing, stage-specific built-ins, and optional shader extensions against the repository's Vulkan 1.2 target and enabled device features.
 - Treat debug-only extensions and printf paths according to their actual compile guards and shipping configuration.
 
+## Scope Authorization
+
+For a Tier-2+ change, also run the scope authorization, minimality, and KISS passes in `../../references/scope-authorization.md` over the changed shader regions step 1 already produced. Report the result in the `Scope:` field.
+
 ## External Claim Requests
 
 Emit one single-claim request per `/verify-external-claims` (`../verify-external-claims/SKILL.md`, `## External Claim Requests`); a pending verdict makes the review `NEEDS_ACTION` and keeps the dependent finding unconfirmed.
@@ -71,6 +75,9 @@ Order findings by severity and omit empty sections:
 ### Findings
 - P1 `path:line` — failure, reachable evidence, and smallest correction
 
+### Scope
+- `path:lines` — **unauthorized | overbuilt | kiss:** <cited clause or absent authorization, evidence>
+
 ### External Claim Verification Requests
 <single checkable requests>
 
@@ -81,8 +88,9 @@ Order findings by severity and omit empty sections:
 PASS | NEEDS FIXES
 
 Functions/regions touched: none
+Scope: PASS | NEEDS ACTION | not applicable (Tier 1) | not supplied
 ```
 
-Follow that extension field with the shared handoff lines (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only review never changes a file and never requires a build, and pending verification, a pre-existing issue, or an incomplete review item belongs in `Residuals`.
+Follow those extension fields with the shared handoff lines (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only review never changes a file and never requires a build, and pending verification, a pre-existing issue, or an incomplete review item belongs in `Residuals`.
 
 If no issue is found, return `PASS — no issues found`, list the files reviewed, and include the unchanged footer.

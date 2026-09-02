@@ -413,7 +413,7 @@ Runtime Contracts/Asset and Thread Ownership regions in
 expected, but `/update-vcxproj` applies if the implementation changes
 whole-file target affinity.  `/agent-harness` must own the cold-read,
 coexistence, invalid-input, and lifecycle runtime scenario, and
-`/verify-changes`/`/finalize-changes` own the landing gate.
+`/finalize-changes` owns the landing gate, including its acceptance table.
 
 ## Acceptance criteria
 
@@ -524,7 +524,7 @@ coexistence, invalid-input, and lifecycle runtime scenario, and
   serialization, Collections/SOA, unrelated `PersistentWorker`, or new worker
   pool change.  The complete implementation and lifecycle evidence pass the
   required `/repo-code-review`, `/scope-review`, `/adversarial-review`,
-  style/docs checks, and `/verify-changes` landing review.
+  style/docs checks, and the finalizer's landing acceptance table.
 
 ## Notes
 

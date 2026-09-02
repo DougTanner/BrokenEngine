@@ -12,11 +12,11 @@
 # commit's message unless -CommitMessageFile supplies one, which also forces a
 # replacement commit for a single-commit range so the new message is carried.
 # Callers never reconstruct its Git commands
-# inline. The review window opens later: Show-FinalizeApprovalReview.ps1 owns the
-# SmartGit launch and workflow step 4 calls it last, once the returned tip is bound
-# into a fully staged landing.
+# inline. The review window opens later in the same finalizer dispatch:
+# Show-FinalizeApprovalReview.ps1 owns the SmartGit launch and workflow step 4
+# calls it last, once the returned tip is bound into a fully staged landing.
 #
-# Success contract: exit 0, schema broken-engine-finalize-approval-preparation/v3,
+# Success contract: exit 0, schema broken-engine-finalize-approval-preparation/v4,
 # status pass, code ok, final sanity PASS, and `session.currentTip` and
 # `candidate.commit` naming the exact same validated approval and landing
 # candidate. The tree identity checks preserve
@@ -36,7 +36,7 @@ param(
 	[string] $VerifiedCandidateCommit,
 	[string] $VerifiedCandidateTree,
 	[string] $CommitMessageFile,
-	[ValidateSet('none', 'compare-and-swap', 'postcondition', 'final-dirty', 'bounded-diagnostic', 'history-contract')][string] $FixtureFailure = 'none'
+	[ValidateSet('none', 'compare-and-swap', 'postcondition', 'final-dirty', 'bounded-diagnostic')][string] $FixtureFailure = 'none'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -51,7 +51,7 @@ if (-not (Test-Path -LiteralPath $workflowModule)) {
 Import-Module $workflowModule -Force
 
 $result = [ordered]@{
-	 schemaVersion = 'broken-engine-finalize-approval-preparation/v3'
+	 schemaVersion = 'broken-engine-finalize-approval-preparation/v4'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Approval preparation did not complete.'
@@ -75,7 +75,6 @@ $result = [ordered]@{
 		initial = $null
 		final = $null
 	}
-	historyContract = $null
 }
 
 $script:CurrentIdentity = $null
@@ -108,12 +107,6 @@ function Get-ApprovalGitObjectId([AllowNull()] $Value)
 	return $null
 }
 
-function Get-ApprovalJsonSha256($Value)
-{
-	$json = $Value | ConvertTo-Json -Compress -Depth 64
-	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($json))).ToLowerInvariant()
-}
-
 function New-ApprovalPreparationProjection
 {
 	$message = Get-BoundedApprovalText ([string]$result.message) 512
@@ -128,14 +121,13 @@ function New-ApprovalPreparationProjection
 	$initialState = if ($null -ne $result.sanity.initial -and $result.sanity.initial.Ok) { 'pass' } else { 'not-run' }
 	$finalState = if ($null -ne $result.sanity.final -and $result.sanity.final.Ok) { 'pass' } else { 'not-run' }
 	return [ordered]@{
-		schemaVersion = 'broken-engine-finalize-approval-preparation/v3'; status = $result.status; code = $code.Text
+		schemaVersion = 'broken-engine-finalize-approval-preparation/v4'; status = $result.status; code = $code.Text
 		message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
 		session = [ordered]@{ originalTip = Get-ApprovalGitObjectId $result.tips.originalSession; currentTip = Get-ApprovalGitObjectId $result.tips.approvedSession; primaryTip = Get-ApprovalGitObjectId $result.tips.primary }
 		candidate = [ordered]@{ commit = Get-ApprovalGitObjectId $result.tips.approvedSession; tree = Get-ApprovalGitObjectId $result.squash.approvedTree; parent = Get-ApprovalGitObjectId $result.squash.approvedParent }
 		squash = [ordered]@{ disposition = $result.squash.disposition; commitCount = $result.squash.commitCount; refUpdated = $result.squash.refUpdated; rollback = $result.squash.rollback }
 		sanity = [ordered]@{ initial = $initialState; final = $finalState }
 		verifiedCandidate = [ordered]@{ supplied = $verifiedCandidateCommitBound; matched = [bool]$result.verifiedCandidate.matched }
-		historyContract = $result.historyContract
 		diagnostics = [ordered]@{ totalCount = $diagnostics.Count; items = $diagnostics; truncated = $false; selector = $null; requery = $(if ($diagnostics.Count -gt 0) { 'Invoke-FinalizeApprovalPreparation' } else { $null }) }
 	}
 }
@@ -175,24 +167,6 @@ function Get-GitText([string[]] $Arguments)
 function Get-CommitField([string] $Commit, [string] $Format)
 {
 	return Get-GitText @('show', '--no-show-signature', '-s', "--format=$Format", $Commit)
-}
-
-function Invoke-HistoryContract([string] $CandidateCommit, [string] $PrimaryTip)
-{
-	$historyScript = Join-Path $script:CurrentIdentity '.agents\skills\code-quality-metrics\scripts\Invoke-CodeQualityMetricsHistory.ps1'
-	if (-not (Test-Path -LiteralPath $historyScript -PathType Leaf)) { Throw-Preparation 1 'history.contract-unavailable' "The code-quality history Contract producer is missing: '$historyScript'." }
-	if ($FixtureFailure -ceq 'history-contract') { Throw-Preparation 2 'history.contract-failed' 'Fixture forced history Contract failure.' }
-	$arguments = @('-NoProfile', '-File', $historyScript, '-Mode', 'Contract', '-RepositoryRoot', $script:CurrentIdentity, '-BaseCommit', $PrimaryTip, '-TipCommit', $CandidateCommit)
-	$response = Invoke-FinalizeNativeText "$PSHOME\pwsh.exe" $arguments $script:CurrentIdentity
-	if ($response.ExitCode -ne 0) { Throw-Preparation 2 'history.contract-failed' "History Contract failed: $($response.Stderr.Trim())" }
-	$lines = @($response.Stdout -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-	if ($lines.Count -ne 1) { Throw-Preparation 2 'history.contract-invalid' 'History Contract did not return exactly one JSON receipt.' }
-	try { $receipt = $lines[0] | ConvertFrom-Json -Depth 64 -ErrorAction Stop } catch { Throw-Preparation 2 'history.contract-invalid' "History Contract returned invalid JSON: $($_.Exception.Message)" }
-	try { [void](Assert-FinalizeHistoryContractReceipt $receipt $PrimaryTip $CandidateCommit) }
-	catch { Throw-Preparation 2 'history.contract-invalid' $_.Exception.Message }
-	$runtimeDigest = if ($null -ne $receipt.capture) { [string]$receipt.capture.bootstrapIdentityDigest } else { $null }
-	$patchIdentity = [ordered]@{ changes = $receipt.patch.changes; metricSupportedChanges = $receipt.patch.metricSupportedChanges; cppChanged = $receipt.patch.cppChanged }
-	return [ordered]@{ receipt = $receipt; digest = Get-ApprovalJsonSha256 $receipt; generatorDigest = [string]$receipt.generator.sha256; captureDigest = $(if ($null -ne $receipt.capture) { [string]$receipt.capture.digest } else { $null }); runtimeDigest = $runtimeDigest; mode = [string]$receipt.decision.captureMode; patchDigest = Get-ApprovalJsonSha256 $patchIdentity; patch = $receipt.patch; coverage = $(if ($null -ne $receipt.snapshot) { $receipt.snapshot.coverageRequired } else { $null }) }
 }
 
 function New-ReplacementCommit([string] $Tree, [string] $Parent, [string] $SourceCommit, [string] $OverrideMessage)
@@ -438,7 +412,6 @@ try
 	{
 		Throw-Preparation 2 'git.session-dirty-after-sanity' 'Session worktree or index changed during final approval preparation.'
 	}
-	$result.historyContract = Invoke-HistoryContract $result.tips.approvedSession $ExpectedPrimaryTip
 
 	Complete-Preparation 0 'pass' 'ok' 'Approval candidate is prepared and bound to the final sanity check.'
 }

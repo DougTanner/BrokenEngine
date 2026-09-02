@@ -69,5 +69,5 @@ Do not author Plan files directly. Route proven optimization residuals through
 metadata, and dependencies; no Plan claim is required.
 
 When a landing gate applies (defined in root `AGENTS.md`), complete
-`/verify-changes` and `/finalize-changes`; there is no step that adds a plan row
-after the change lands.
+`/finalize-changes`; there is no step that adds a plan row after the change
+lands.

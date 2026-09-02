@@ -10,8 +10,9 @@
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
 	OpenAI API credits (verify with `codex login status`). The wrapper refuses an inherited
 	OPENAI_API_KEY so the child cannot bill the API instead.
-	Reviews request the fast service tier: ~1.5x speed for ~2.5x subscription credit burn; if the
-	model does not advertise that tier Codex warns and runs standard.
+	Reviews run on the standard service tier. $serviceTier below switches them to Codex's fast tier
+	(~1.5x speed for ~2.5x subscription credit burn); if the model does not advertise that tier
+	Codex warns and runs standard.
 
 	One-call contract: a launch call (-Worktree/-PromptFile/-OutFile) starts Codex detached, then
 	waits up to 540 seconds for it and returns a single-line JSON receipt (schema
@@ -71,6 +72,9 @@ $temporaryDirectory = [System.IO.Path]::GetTempPath()
 # One wait stays 60 seconds under the caller's 600000 ms command cap; a longer review resumes with -Wait.
 $waitBudgetSeconds = 540
 $waitSleepSeconds = 5
+
+# 'default' or 'fast'. Fast is disabled for now; set 'fast' to re-enable it (see .NOTES for the cost).
+$serviceTier = 'default'
 
 function Write-Receipt([hashtable] $Fields)
 {
@@ -145,7 +149,7 @@ function Invoke-CodexAttempt([string] $StagingPath)
 		-C $Worktree `
 		-m gpt-5.6-sol `
 		-c 'model_reasoning_effort="medium"' `
-		-c 'service_tier="fast"' `
+		-c "service_tier=`"$serviceTier`"" `
 		--ephemeral `
 		-o $StagingPath `
 		- | Out-Null

@@ -139,7 +139,7 @@ Its parameters, the `-DependsOn` single-token rule, its result shape, and its ex
 
 | Case | Tracked Plan bytes | Completion route |
 |---|---|---|
-| New Plan | Run `New-PlanFile.ps1` (step 2) to write the final Plan under `Documents/Plans/<area>/`; it mints the marker and never overwrites an existing path. | Take the tree validation from the script's folded result; route through `/verify-changes` and `/finalize-changes` only when a landing gate applies. |
+| New Plan | Run `New-PlanFile.ps1` (step 2) to write the final Plan under `Documents/Plans/<area>/`; it mints the marker and never overwrites an existing path. | Take the tree validation from the script's folded result; route through `/finalize-changes` only when a landing gate applies. |
 | Existing Plan, prose only | Edit the live tracked Plan directly, including reciprocal Coordination prose; preserve its marker byte-for-byte. | Validate and finalize the tracked edit. |
 | Existing Plan, dependency change | Edit only the marker's `dependsOn` array plus required reciprocal Coordination prose; never change `createdUtc`. | Validate and finalize the tracked edit. |
 

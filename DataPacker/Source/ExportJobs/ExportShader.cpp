@@ -178,10 +178,11 @@ std::filesystem::path ExportShader::PreprocessShader()
 }
 
 ExportShader::ExportShader(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
-: ExportJob(rChunkFlags, rFile)
+: ExportJob(rChunkFlags, rFile, kiVersion)
 {
 	mDependencyFile = gpFileManager->mCacheDirectory / mRelativeDirectory / (mInputPath.filename().native() + L".d");
-	mDependencyMetadataFile = gpFileManager->mCacheDirectory / mRelativeDirectory / (mInputPath.filename().native() + L".deps.meta");
+	mDependencyMetadataFile = gpFileManager->mCacheDirectory / mRelativeDirectory / mInputPath.filename();
+	mDependencyMetadataFile += std::format(".v{}.deps.meta", GetVersion());
 
 	if (rFile.extension() == ".comp")
 	{

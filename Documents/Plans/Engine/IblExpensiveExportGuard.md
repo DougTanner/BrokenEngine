@@ -3,7 +3,7 @@
 
 ## Context
 
-Final survivor `S002-C018` is a promoted HIGH DataPacker guard finding. `MainThread` calls both IBL convolution passes unconditionally before ordinary exports, while the `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` guard is consulted by ordinary texture/RDO encoding only (`DataPacker/Source/Main.cpp:707-715`; `DataPacker/Source/ExportJobs/ExportCubemapIbl.cpp:239-323,530-563`). A guarded verification run with dirty cube inputs still performs expensive CMFT convolution and writes outputs.
+Final survivor `S002-C018` is a promoted HIGH DataPacker guard finding. `MainThread` calls both IBL convolution passes unconditionally before ordinary exports, while the `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` guard is consulted by ordinary texture/direct BC encoding only (`DataPacker/Source/Main.cpp:707-715`; `DataPacker/Source/ExportJobs/ExportCubemapIbl.cpp:239-323,530-563`). A guarded verification run with dirty cube inputs still performs expensive CMFT convolution and writes outputs.
 
 The final disposition is in `Temp/CppDirectiveVerificationAudit/012bbf1f-4b21-4e4e-8821-0ab4ff28d520/dispositions/group-002.md` under `S002-C018 — FINAL: PROMOTE_HIGH`; the source report is `Temp/CppDirectiveVerificationAudit/012bbf1f-4b21-4e4e-8821-0ab4ff28d520/shard-002.md:269` and the consolidated selector is `Temp/CppDirectiveVerificationAudit/012bbf1f-4b21-4e4e-8821-0ab4ff28d520/consolidated-index.md:105`. The target remained at baseline `a20acf1e31a24a0f61ae638e8976602b49655788`.
 
@@ -15,7 +15,7 @@ The author's recommendation is to include dirty irradiance and prefiltered IBL c
 
 - `DataPacker/Source/Main.cpp:701-715` — manager construction and IBL invocation.
 - `DataPacker/Source/ExportJobs/ExportCubemapIbl.cpp:239-323,530-563` — dirty convolution passes.
-- `DataPacker/Source/ExportJobs/Texture/Texture.cpp:387-392` — existing expensive-export guard pattern.
+- `DataPacker/Source/ExportJobs/Texture/Texture.cpp:358-363` — existing expensive-export guard pattern.
 - `DataPacker/Source/AGENTS.md` and `DataPacker/Source/ExportJobs/AGENTS.md` — guarded export contract.
 
 ## In scope
@@ -25,7 +25,7 @@ The author's recommendation is to include dirty irradiance and prefiltered IBL c
 
 ## Out of scope
 
-- CMFT algorithms, IBL dimensions, cache fingerprints, output layout, ordinary texture/RDO guard behavior, or Gaea export.
+- CMFT algorithms, IBL dimensions, cache fingerprints, output layout, ordinary texture/direct BC encoding guard behavior, or Gaea export.
 - New guard variables, compatibility modes, or unit tests.
 
 ## Risk tier and invariants

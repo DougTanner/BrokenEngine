@@ -10,14 +10,14 @@ public:
 
 	static std::optional<common::ChunkFlags_t> Handles(const std::filesystem::directory_entry& rDirectoryEntry);
 
+	static constexpr int64_t kiVersion = Version(1);
+
 	ExportRaw(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
-	: ExportJob(rChunkFlags, rFile)
+	: ExportJob(rChunkFlags, rFile, kiVersion)
 	{
 	}
 
 	virtual ~ExportRaw() = default;
-
-	virtual int64_t GetVersion() const override { return Version(1); }
 
 protected:
 

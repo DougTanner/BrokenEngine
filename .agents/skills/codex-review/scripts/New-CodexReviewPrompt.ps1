@@ -49,7 +49,6 @@ $script:PromptBytes = 0
 $script:SectionCount = 0
 $script:DiffRange = @()
 $script:DiffPath = @()
-$script:HeadSha = $null
 $script:Untracked = @()
 $script:ScopeText = $null
 
@@ -66,7 +65,6 @@ $result = [ordered]@{
 	fileCount = 0
 	binaryExcluded = 0
 	sectionsWritten = 0
-	missing = @()
 }
 
 function Write-PromptStderr([string] $Text) {
@@ -101,7 +99,7 @@ function Complete-CodexReviewPrompt([int] $ExitCode, [string] $Status, [string] 
 	exit $ExitCode
 }
 
-function Invoke-PromptGit([string[]] $Arguments, [bool] $AllowFailure = $false, [string] $StandardInput = '') {
+function Invoke-PromptGit([string[]] $Arguments, [bool] $AllowFailure = $false) {
 	$start = [Diagnostics.ProcessStartInfo]::new()
 	$start.FileName = 'git'
 	$start.WorkingDirectory = $script:Root
@@ -111,10 +109,6 @@ function Invoke-PromptGit([string[]] $Arguments, [bool] $AllowFailure = $false, 
 	$start.RedirectStandardError = $true
 	$start.StandardOutputEncoding = $script:Utf8
 	$start.StandardErrorEncoding = $script:Utf8
-	if ($StandardInput.Length -gt 0) {
-		$start.RedirectStandardInput = $true
-		$start.StandardInputEncoding = $script:Utf8
-	}
 	$start.Environment['GIT_OPTIONAL_LOCKS'] = '0'
 	foreach ($argument in @('-C', $script:Root, '--no-pager') + $Arguments) { [void] $start.ArgumentList.Add($argument) }
 	$process = [Diagnostics.Process]::new()
@@ -122,11 +116,6 @@ function Invoke-PromptGit([string[]] $Arguments, [bool] $AllowFailure = $false, 
 	if (-not $process.Start()) { throw "Could not start git for: $($Arguments -join ' ')" }
 	$stdoutTask = $process.StandardOutput.ReadToEndAsync()
 	$stderrTask = $process.StandardError.ReadToEndAsync()
-	# Both reads are already draining, so the payload cannot deadlock behind a full pipe.
-	if ($StandardInput.Length -gt 0) {
-		$process.StandardInput.Write($StandardInput)
-		$process.StandardInput.Close()
-	}
 	$process.WaitForExit()
 	$run = [pscustomobject] @{
 		ExitCode = $process.ExitCode
@@ -344,186 +333,14 @@ function Write-PromptTargets([string] $Text) {
 	$script:TargetsAvailable = $true
 }
 
-function Get-PromptHeadEntry([string] $RelativePath) {
-	# ls-tree takes a pathspec, so a name holding '[', '*', or '?' would be read as a pattern and could
-	# miss its own entry or answer for a different one; :(literal) makes the lookup name the path given.
-	# An absent path is empty stdout with exit 0, so presence is decided from the listing, not the exit.
-	$listed = @((Invoke-PromptGit @('ls-tree', $script:HeadSha, '--', ":(literal)$RelativePath")).Stdout -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-	if ($listed.Count -eq 0) { return $null }
-	# '<mode> <type> <oid>' ahead of the tab that separates the path, which may itself hold spaces.
-	$fields = ($listed[0].TrimEnd("`r") -split "`t")[0] -split ' '
-	if ($fields.Count -lt 3) { return $null }
-	# The permission bit is deliberately not part of the type: a Windows working tree cannot express it,
-	# so 100644 and 100755 have to compare as the same kind of entry.
-	$type = if ($fields[0] -ceq '120000') { 'link' } elseif ($fields[0] -ceq '160000') { 'commit' } elseif ($fields[0] -ceq '040000') { 'tree' } else { 'blob' }
-	return [pscustomobject] @{ Type = $type; Oid = $fields[2] }
-}
-
-function Get-PromptWorkingEntry([string] $RelativePath) {
-	# Windows resolves a path case-insensitively, so the losing side of a case-only rename would find the
-	# winning side's file and report a difference that does not exist. Each component is matched against
-	# the name the file system actually holds.
-	$full = $script:Root
-	foreach ($component in ($RelativePath -split '/')) {
-		if ($component.Length -eq 0 -or -not [IO.Directory]::Exists($full)) { return $null }
-		$matched = $null
-		foreach ($candidate in [IO.Directory]::GetFileSystemEntries($full, $component)) {
-			if ([IO.Path]::GetFileName($candidate) -ceq $component) { $matched = $candidate; break }
-		}
-		if ($null -eq $matched) { return $null }
-		$full = $matched
-	}
-	$item = Get-Item -LiteralPath $full -Force
-	# A named link target, not the reparse-point attribute: a cloud-storage placeholder carries that
-	# attribute while standing in for the plain file it names no target for.
-	if (-not [string]::IsNullOrEmpty($item.LinkTarget)) {
-		# Git stores a symlink as its target text: forward slashes, no trailing newline. Hashing that
-		# text is what keeps a symlink apart from a regular file holding the same characters.
-		return [pscustomobject] @{ Type = 'link'; Oid = (Invoke-PromptGit @('hash-object', '--stdin') $false $item.LinkTarget.Replace('\', '/')).Stdout.Trim() }
-	}
-	if ($item -is [IO.DirectoryInfo]) {
-		# A directory can only answer for a gitlink, whose working side is the submodule's checked-out
-		# commit; a submodule that cannot report one leaves no oid and stays divergent.
-		# rev-parse searches upwards, so a plain directory — a missing or deleted submodule — would
-		# answer with this repository's own HEAD and could match the recorded gitlink. An empty prefix
-		# is what proves the directory is a repository root rather than a path inside one; anything else
-		# is not a gitlink at all, and compares as an absent working side.
-		$prefix = Invoke-PromptGit @('-C', $full, 'rev-parse', '--show-prefix') $true
-		if ($prefix.ExitCode -ne 0 -or $prefix.Stdout.Trim().Length -ne 0) { return $null }
-		$run = Invoke-PromptGit @('-C', $full, 'rev-parse', 'HEAD') $true
-		return [pscustomobject] @{ Type = 'commit'; Oid = $(if ($run.ExitCode -eq 0) { $run.Stdout.Trim() } else { $null }) }
-	}
-	# hash-object runs on the repository-relative path so the same attribute filters `git add` applied
-	# when the candidate tree was written apply here, and the oids compare like-for-like.
-	return [pscustomobject] @{ Type = 'blob'; Oid = (Invoke-PromptGit @('hash-object', '--', $RelativePath)).Stdout.Trim() }
-}
-
-function Test-PromptReviewedTreeClean() {
-	# /verify-changes maps its acceptance evidence onto the -Head commit, so the only thing that would
-	# put the review on a diff nobody approved is a reviewed path whose working-tree bytes differ from
-	# that commit's tree. The index is deliberately not consulted: a landing candidate built into a
-	# temporary index leaves the branch ref and the real index behind, and its tree is still the
-	# reviewed one.
-	if ($script:DiffPath.Count -eq 0) { return }
-	$divergent = [Collections.Generic.List[string]]::new()
-	$seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-	foreach ($path in $script:DiffPath) {
-		if (-not $seen.Add($path)) { continue }
-		# Absence on a side is itself a state, so it compares as a null type and a null oid: a path
-		# present on exactly one side is a divergence, not a match. The entry kind is compared alongside
-		# the oid, because a symlink and a regular file holding the same target text share one oid.
-		$head = Get-PromptHeadEntry $path
-		$working = Get-PromptWorkingEntry $path
-		$headType = $(if ($null -eq $head) { $null } else { $head.Type })
-		$workingType = $(if ($null -eq $working) { $null } else { $working.Type })
-		$headOid = $(if ($null -eq $head) { $null } else { $head.Oid })
-		$workingOid = $(if ($null -eq $working) { $null } else { $working.Oid })
-		if ($headType -cne $workingType -or $headOid -cne $workingOid) { $divergent.Add($path) }
-	}
-	if ($divergent.Count -gt 0) {
-		Complete-CodexReviewPrompt 2 'blocked' 'prompt.head-required' "The working tree still differs from -Head on reviewed path(s): $($divergent -join '; ')"
-	}
-}
-
-function Test-PromptScopeEvidence([object] $ChangeSet) {
-	# Two assigned skills each need evidence produced earlier in the workflow that the reviewer cannot
-	# recover from the diff: the draft execution card, and — for /verify-changes — another reviewer's
-	# /validate-skill and /progressive-disclosure-review results, a build envelope, plus the reviewed
-	# revision's identity values. Without this check a scope
-	# that omits it costs a whole review round. The scope text is only read here: section (b) still
-	# copies the caller's bytes verbatim.
+function Test-PromptScopeEvidence() {
+	# /plan-audit needs evidence produced earlier in the workflow that the reviewer cannot recover from
+	# the diff: the draft execution card. Without this check a scope that omits it costs a whole review
+	# round. The scope text is only read here: section (b) still copies the caller's bytes verbatim.
 	# Case-insensitively, because the producing skills head the card differently — 'Draft execution card'
 	# and 'Execution card:' — and both carry the same marker words.
 	if ($AssignedSkill -eq 'plan-audit' -and -not $script:ScopeText.Contains('execution card', [StringComparison]::OrdinalIgnoreCase)) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.execution-card-required' "/plan-audit needs the draft execution card in -ScopeFile, which carries no 'execution card' marker."
-	}
-	if ($AssignedSkill -ne 'verify-changes') { return }
-	# Exact-case names and prefixes, matching Test-InstructionDocPath in
-	# Get-SessionChangeInventory.ps1: the two skills must gate on the same path set, and a
-	# case-insensitive match here would gate a plain 'agents.md' the inventory never routes.
-	function Test-InstructionDocPath([string] $Path) {
-		$leaf = [IO.Path]::GetFileName($Path)
-		if ($leaf -ceq 'AGENTS.md' -or $leaf -ceq 'CLAUDE.md') { return $true }
-		return ($leaf.EndsWith('.md', [StringComparison]::OrdinalIgnoreCase) -and
-			($Path.StartsWith('.agents/skills/', [StringComparison]::Ordinal) -or $Path.StartsWith('.agents/references/', [StringComparison]::Ordinal)))
-	}
-	$skillTouched = $false
-	$reviewedDocPaths = [Collections.Generic.List[string]]::new()
-	foreach ($entry in @($ChangeSet.entries)) {
-		foreach ($path in @($entry.path, $entry.oldPath)) {
-			if ([string]::IsNullOrEmpty($path)) { continue }
-			if ([IO.Path]::GetFileName($path) -eq 'SKILL.md') { $skillTouched = $true }
-			if ((Test-InstructionDocPath $path) -and -not $reviewedDocPaths.Contains($path)) { $reviewedDocPaths.Add($path) }
-		}
-	}
-	$missing = [Collections.Generic.List[string]]::new()
-	if ($skillTouched -and -not $script:ScopeText.Contains('Validation: PASS')) { $missing.Add('Validation: PASS') }
-	# Both markers, and both as that handoff's summary block emits them: the bare skill name also
-	# appears in an ordinary changed-file list, while 'Files checked:' heads no other gated handoff.
-	# Everything after the marker is read as that handoff's own block, ending at the next handoff's
-	# 'Skill: ' line, so a PASS verdict or a baseline belonging to some other handoff in the same scope
-	# cannot stand in for this one's.
-	if ($reviewedDocPaths.Count -gt 0) {
-		# Both matches are anchored to a line start, because ordinary scope prose quotes the marker text
-		# inline while describing this gate: an unanchored match reads that sentence as the handoff and
-		# hides the real block below it. The terminator is searched from the end of the marker match, so
-		# it can only land on a later line's own start.
-		# The last marker is the one read: a rebase round appends its handoff below the earlier ones, so the
-		# newest block governs and a superseded one can neither block this gate nor satisfy it.
-		$markerMatches = [Regex]::Matches($script:ScopeText, '(?m)^Skill: progressive-disclosure-review')
-		$markerMatch = $(if ($markerMatches.Count -gt 0) { $markerMatches[$markerMatches.Count - 1] } else { $null })
-		$block = ''
-		if ($null -ne $markerMatch) {
-			$blockStart = $markerMatch.Index + $markerMatch.Length
-			$nextSkill = [Regex]::new('(?m)^Skill: ').Match($script:ScopeText, $blockStart)
-			$blockEnd = $(if ($nextSkill.Success) { $nextSkill.Index } else { $script:ScopeText.Length })
-			$block = $script:ScopeText.Substring($blockStart, $blockEnd - $blockStart)
-		}
-		if ($null -eq $markerMatch -or -not $block.Contains('Files checked:')) {
-			$missing.Add("the /progressive-disclosure-review handoff, marked by 'Skill: progressive-disclosure-review' and 'Files checked:'")
-		}
-		else {
-			# A NEEDS_ACTION or BLOCKED handoff says nothing about the prose this landing actually carries,
-			# so it is gated exactly like an absent handoff. Another 'Baseline:' is accepted only when it is
-			# a resolvable commit at which the reviewed instruction docs do not differ from the dispatch
-			# baseline, which is exactly what makes the reviewed diff's doc bytes the bytes that reviewer
-			# read; movement in other docs is root AGENTS.md Step 8's reachability re-review, decided by
-			# the manager rather than by this gate. An unresolvable commit fails the same git call and
-			# stays blocked.
-			if (-not $block.Contains('Status: PASS')) { $missing.Add("'Status: PASS' in the /progressive-disclosure-review handoff") }
-			$baselineMatch = [Regex]::Match($block, '(?m)^Baseline: ([0-9a-f]{40})')
-			$baselineAccepted = $false
-			if ($baselineMatch.Success) {
-				$handoffBaseline = $baselineMatch.Groups[1].Value
-				if ($handoffBaseline -ceq $ChangeSet.baselineSha) {
-					$baselineAccepted = $true
-				}
-				else {
-					$docDiff = Invoke-PromptGit (@('diff', '--quiet', $handoffBaseline, $ChangeSet.baselineSha, '--') + $reviewedDocPaths.ToArray()) $true
-					$baselineAccepted = $docDiff.ExitCode -eq 0
-				}
-			}
-			if (-not $baselineAccepted) {
-				$missing.Add("a /progressive-disclosure-review handoff whose 'Baseline:' is the dispatch baseline or a resolvable commit whose reviewed instruction docs do not differ from it")
-			}
-		}
-	}
-	# A diff carrying C++ or shader bytes was built, and the build envelope is the only authoritative
-	# result: acceptance prose alone cannot stand in for it. The JSON signature is matched rather than
-	# the bare schema name, which that same prose can legitimately mention without carrying the artifact.
-	if (($ChangeSet.triggers.repoCodeReview -or $ChangeSet.triggers.glslReview) -and
-		-not $script:ScopeText.Contains('"schemaVersion":"broken-engine-build-result/v1"')) {
-		$missing.Add("each build's 'broken-engine-build-result/v1' envelope")
-	}
-	# The identity values bind every supplied artifact to the reviewed revision, so a scope that names
-	# neither leaves the reviewer validating evidence against an unknown change set.
-	if (-not $script:ScopeText.Contains($ChangeSet.baselineSha)) { $missing.Add('the baseline SHA') }
-	if (-not [string]::IsNullOrEmpty($ChangeSet.headSha) -and -not $script:ScopeText.Contains($ChangeSet.headSha)) { $missing.Add('the head SHA') }
-	if ($missing.Count -gt 0) {
-		# The capped message can drop tail items, so the array carries the complete list and the message
-		# is only its readable summary.
-		$result.missing = [string[]] $missing.ToArray()
-		Complete-CodexReviewPrompt 2 'blocked' 'prompt.typed-artifacts-required' "/verify-changes needs evidence -ScopeFile does not carry: $($missing -join ', ')."
 	}
 }
 
@@ -591,11 +408,6 @@ try {
 			Complete-CodexReviewPrompt 2 'blocked' 'prompt.assigned-skill-unknown' "-AssignedSkill names no skill file '$skillFile'; pass -AdHocRole for a descriptive reviewer role that has none."
 		}
 	}
-	# Case-insensitive, because the skill-file check above already accepted any casing the file system
-	# resolves; a case-sensitive match here would silently drop the special-skill contract.
-	if ($AssignedSkill -eq 'verify-changes' -and [string]::IsNullOrWhiteSpace($Head)) {
-		Complete-CodexReviewPrompt 2 'blocked' 'prompt.head-required' '/verify-changes reviews the committed landing diff and requires a commit-valued -Head.'
-	}
 	if (-not (Test-Path -LiteralPath $ScopeFile -PathType Leaf)) {
 		Complete-CodexReviewPrompt 1 'error' 'prompt.scope-file-missing' "-ScopeFile must be an existing file holding the manager-authored scope text: '$ScopeFile'."
 	}
@@ -654,10 +466,8 @@ try {
 	}
 	$script:DiffPath = $diffPath.ToArray()
 	$script:Untracked = $untracked.ToArray()
-	$script:HeadSha = $changeSet.headSha
 	$script:DiffRange = if ([string]::IsNullOrEmpty($changeSet.headSha)) { @($changeSet.baselineSha) } else { @($changeSet.baselineSha, $changeSet.headSha) }
-	if ($AssignedSkill -eq 'verify-changes') { Test-PromptReviewedTreeClean }
-	Test-PromptScopeEvidence $changeSet
+	Test-PromptScopeEvidence
 	if ($null -ne $script:TargetsFile) {
 		Write-PromptTargets (Get-PromptTargetsText $listed.ToArray())
 	}

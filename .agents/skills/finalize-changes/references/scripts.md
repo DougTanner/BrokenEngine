@@ -10,7 +10,7 @@ repository-relative `Temp/finalize-primary-movement-result.json` artifact.
 The caller parses that artifact for every result. For the exact result with
 `status` `needs-review` and `code` `primary.disjoint-needs-review`, the finalizer
 handoff returns the artifact path and selector `$`; main reads the complete typed
-`broken-engine-finalize-primary-movement/v1` result, including the
+`broken-engine-finalize-primary-movement/v2` result, including the
 foreign-commit manifest, losslessly from that artifact. Never inline-copy,
 summarize, or reconstruct it; the artifact remains byte-identical and available
 through the SmartGit/summary handoff. Other results surface only short status,
@@ -19,10 +19,7 @@ block. For
 `Invoke-FinalizeApprovalPreparation.ps1`, preserve the complete command stdout
 losslessly in the ignored repository-relative
 `Temp/finalize-approval-preparation-result.json` artifact during the invocation
-below. The finalizer handoff returns that artifact path and the exact selector
-`$.historyContract.receipt`; the manager resolves the selector from the artifact
-before dispatching `/verify-changes`. Never generatively copy, summarize, or
-restate the selected receipt. The `Show-FinalizeApprovalReview.ps1` invocation
+below. The `Show-FinalizeApprovalReview.ps1` invocation
 below likewise redirects its single-line stdout to the ignored repository-relative
 `Temp/finalize-approval-review-result.json` artifact, and that artifact path is
 what the landing invocations pass as `-ApprovalReviewResultFile`; its values are
@@ -35,7 +32,6 @@ never re-typed by hand.
   - [Primary movement check](#primary-movement-check)
   - [Approval review receipt](#approval-review-receipt)
   - [Landing and recovery](#landing-and-recovery)
-- [Fixture suites](#fixture-suites)
 
 ## Invocation
 
@@ -56,15 +52,13 @@ brief.
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route session-landing -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<primary-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<primary-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<candidate-parent>' -ExpectedPrimaryTip '<candidate-parent>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>' -VerifiedCandidateCommit '<candidate-commit>' -VerifiedCandidateTree '<candidate-tree>' -HistoryContractDigest '<contract-digest>' -HistoryContractGeneratorDigest '<generator-digest>' -HistoryContractCaptureDigest '<capture-digest-or-empty>' -HistoryContractRuntimeDigest '<runtime-digest-or-empty>' -HistoryContractPatchDigest '<patch-digest>' -HistoryContractMode '<catch-up|cpp-change|carry-forward>' -WorktreeCliExecutable '<worktreecli-exe>' -SessionLabel '<session-label>' -OwnerToken '<owner-token>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -AdvancePrimary
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<candidate-parent>' -ExpectedPrimaryTip '<candidate-parent>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>' -VerifiedCandidateCommit '<candidate-commit>' -VerifiedCandidateTree '<candidate-tree>' -WorktreeCliExecutable '<worktreecli-exe>' -SessionLabel '<session-label>' -OwnerToken '<owner-token>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -AdvancePrimary
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeApprovalPreparation.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' > 'Temp/finalize-approval-preparation-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizePrimaryMovementCheck.ps1 -CurrentWorktree '<session>' -PrimaryWorktree '<primary>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -CandidateCommit '<candidate-commit>' -CandidateTree '<candidate-tree>' -CandidateParent '<candidate-parent>' -OwnedPaths '<path>,<path>' > 'Temp/finalize-primary-movement-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalPreparationResultFile 'Temp/finalize-approval-preparation-result.json' -HistoryContractRowDate '<historyUpdate.rowDate>' -HistoryJsonSha256 '<historyUpdate.jsonl.sha256>' -HistoryJsonBytes '<historyUpdate.jsonl.bytes>' -HistorySvgSha256 '<historyUpdate.svg.sha256>' -HistorySvgBytes '<historyUpdate.svg.bytes>' -HistorySvgEmbeddedSha256 '<historyUpdate.svg.embeddedSha256>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
-pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract -RepositoryRoot '<current-worktree>' -BaseCommit '<primary-tip>' -TipCommit '<approved-commit>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit > 'Temp/finalize-approval-review-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
@@ -79,11 +73,8 @@ A landing claim's `-Worktree` is the route's own worktree —
 `'<current-worktree>'` on the session route and `'<primary-worktree>'` on the
 separately requested primary-commit route — because landing accepts the lease
 only when its recorded worktree matches the landing identity.
-The second landing form is the recovery invocation only when a surviving
-structured active-overlay result provides all six history values; map them from
-its `historyUpdate` fields exactly as shown. A carry-forward source-only result
-and a hard crash with no result use the first form and omit all six; never pass
-a partial recovery tuple.
+A recovery invocation after a crash repeats that same landing command with its
+original approved arguments.
 
 ## Contracts
 
@@ -92,7 +83,7 @@ a partial recovery tuple.
 `Invoke-FinalizePrimaryMovementCheck.ps1` is read-only: it takes no lease and
 does not change a ref, checkout, index, or worktree. It emits one fixed-shape
 JSON result. The schema version is
-`broken-engine-finalize-primary-movement/v1`. Its top-level fields are
+`broken-engine-finalize-primary-movement/v2`. Its top-level fields are
 `schemaVersion`, `status`, `code`, `message`, `candidate`, `tips`,
 `ownedPaths`, `foreignCommits`, and `changes`:
 
@@ -104,12 +95,10 @@ JSON result. The schema version is
   relative POSIX paths. `foreignCommits.items` contains foreign commit
   identities ordered oldest-to-newest; the aggregate changed-path manifest is
   in `changes`.
-- `changes` is
-  `{totalCount,items,truncated,historyPaths,nonHistoryPaths,overlapPaths}`.
-  Each evidence collection has `{totalCount,items,truncated}`. Each `items`
-  row has exactly the tuple fields `(path,status,oldMode,newMode)`, and the
-  three named path collections contain the history, non-history, and overlap
-  paths respectively.
+- `changes` is `{totalCount,items,truncated,overlapPaths}`. Each evidence
+  collection has `{totalCount,items,truncated}`. Each `items` row has exactly
+  the tuple fields `(path,status,oldMode,newMode)`, and `overlapPaths` contains
+  the overlap paths, computed over every changed path.
 - Path collections are ordinal-sorted and deduplicated. Foreign commit items
   retain oldest-to-newest order, and change rows sort by the tuple
   `(path,status,oldMode,newMode)`. Every bounded collection has a cap of 500;
@@ -121,9 +110,9 @@ The fixed terminal mapping is:
 
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
-| 0 | `pass` | `ok`, `primary.tree-identical`, `primary.history-only` | Continue to SmartGit review and the landing summary. |
+| 0 | `pass` | `ok`, `primary.tree-identical` | Continue to SmartGit review and the landing summary. |
 | 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](../SKILL.md#worker-workflow) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) owns primary-movement policy. No conditional/preconfirmation landing lease is acquired; the normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
-| 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.owned-history-path`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
+| 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 
 Malformed JSON, a schema mismatch, or an exit/status mismatch is itself a
@@ -141,27 +130,18 @@ reconstructs the assessment from Git output.
   invocation passes the same set unchanged. A path found in neither the baseline
   tree nor the expected-tip tree nor the worktree still blocks with
   `input.path-not-single-entry`.
-- On `-Route primary-commit` without `-AdvancePrimary`, the candidate result is
-  bound to the read-only history Contract before verification. On the confirmed
-  `-AdvancePrimary` resume, `-OwnerToken` is mandatory and must name the caller's
-  live 3600-second landing lease; no omitted-token primary mutation is allowed.
-  The result is `broken-engine-finalize-candidate/v3` with `historyContract`,
-  `historyUpdate`, and `final` fields. For active history modes, the final
-  commit is the deterministic sole-parent replacement, while `candidate.commit`
-  remains the reviewed source candidate. On the carry-forward primary-commit
-  route, the verified source candidate advances directly and `final.replacement`
-  is `false`; its history update is skipped.
-- `Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract -RepositoryRoot <root>
-  -BaseCommit <primary-tip> -TipCommit <source-tip>` is read-only and writes no
-  tracked file. Generate uses the same exact `RepositoryRoot,BaseCommit,TipCommit,DateUtc,OutputDirectory`
-  interface. Production reads history bytes from the supplied immutable BaseCommit;
-  it never uses a working-tree JSONL suffix. Its exact typed result is
-  `broken-engine-code-quality-history-contract/v1`; approval preparation returns
-  that receipt plus a compact canonical receipt digest, generator digest, optional
-  capture digest, patch digest, and capture mode. `series.historyBytesSha256` binds
-  the complete BaseCommit history bytes, including the live suffix. Contract mode
-  does not choose a final date, row index, or output hash — those are dynamic under
-  the landing lock.
+- On the confirmed `-AdvancePrimary` resume, `-OwnerToken` is mandatory and must
+  name the caller's live 3600-second landing lease; no omitted-token primary
+  mutation is allowed. The result is `broken-engine-finalize-candidate/v4` with
+  `historyUpdate` and `final` fields. The final commit is the deterministic
+  sole-parent commit carrying the two generated history files, while
+  `candidate.commit` remains the reviewed source candidate.
+- `Invoke-CodeQualityMetricsHistory.ps1 -Mode Generate` uses the exact
+  `RepositoryRoot,BaseCommit,TipCommit,DateUtc,OutputDirectory` interface and
+  writes only `CodeQualityMetricsHistory.jsonl` and
+  `CodeQualityMetricsHistory.svg` into that directory. Production reads history
+  bytes from the supplied immutable BaseCommit; it never uses a working-tree
+  JSONL suffix. The producer alone decides what the new row contains.
 - `Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
   one commit on the current primary tip, and blocks with
   `git.primary-not-ancestor` when the session tip does not already contain that
@@ -187,14 +167,18 @@ reconstructs the assessment from Git output.
   seconds by default. Run every claim invocation, with or without
   `-LandingOwner`, under a host command timeout comfortably above that bound:
   at least 360,000 ms for the default, scaled up correspondingly for a longer
-  `-WaitSeconds`. `-Release` never enters the wait and is exempt. That timeout
-  is a setting on the shell tool or runner, never text appended to the
-  canonical command, which stays byte-identical. A host kill returns no
-  structured result while the surviving child can still claim the lease:
-  without `-LandingOwner` the minted owner token dies with that result,
-  orphaning the lease under a token nobody holds and blocking every later
-  claim until natural expiry, while a claim that supplied `-LandingOwner`
-  still knows its token and releases the orphaned lease with `-Release`.
+  `-WaitSeconds`. A contention result that arrives after that bound still
+  reports `attempts: 1` and `retryAfterMilliseconds` equal to the poll
+  interval; neither field records elapsed time, so judge whether the wait
+  happened by wall-clock, never by those fields. `-Release` never enters the
+  wait and is exempt. That timeout is a setting on the shell tool or runner,
+  never text appended to the canonical command, which stays byte-identical. A
+  host kill returns no structured result while the surviving child can still
+  claim the lease: without `-LandingOwner` the minted owner token dies with
+  that result, orphaning the lease under a token nobody holds and blocking
+  every later claim until natural expiry, while a claim that supplied
+  `-LandingOwner` still knows its token and releases the orphaned lease with
+  `-Release`.
   Invoke it successfully before approval preparation begins
   reconciliation, retain or refresh the lease throughout agent-driven
   reconciliation, and release it with `-Release` before any user wait, in the
@@ -257,7 +241,7 @@ and overwrites the artifact; the stale receipt is never reused, because its
   to 20 minutes; its worst case is about 13 minutes — the omitted-token route's
   300-second lock-claim wait, this 500-second index-lock budget, and the
   landing's own Git work, plus the measured roughly 60-second history Snapshot
-  catch-up/C++ path — so a caller raising that budget must raise its host timeout
+  path — so a caller raising that budget must raise its host timeout
   by the same amount. Pass the post-confirmation claim's owner token as
   `-OwnerToken` so landing continues under that same lease, which it accepts only
   as a same-actor continuation under the `workflow.md` `## Bundled scripts` ownership
@@ -271,41 +255,27 @@ and overwrites the artifact; the stale receipt is never reused, because its
   derived identity. A recovery invocation applies the identity matching rule
   without the duration gate to release a live retained claim because it performs
   no rebase or advance; foreign, mismatched, and unverifiable claims are untouched.
-  Under the held 3600-second lease it re-runs Contract against current primary and
-  source, permits only dynamic corpus/history data plus the documented
-  `catch-up`/`cpp-change`/`carry-forward` mode reclassification, and branches on
-  the re-evaluated mode. A `carry-forward` landing skips Generate and overlay and
-  advances the approved source commit when unchanged; otherwise it advances an
-  internally rebased or recovery-accepted commit proven to carry the approved
-  patch identity and change list with unchanged reserved history blobs. Landing
+  Under the held 3600-second lease, after any internal rebase, it runs Generate
+  with one UTC row date frozen once for the whole landing and reused by every
+  attempt, so an internal rebase cannot shift the recorded date. Landing
   measures the approved source patch from the confirmed candidate's own parent,
   so a candidate whose parent is behind live primary — including one where the
-  intervening commits only rewrote the reserved history outputs — is the ordinary
-  bounded internal rebase case rather than a blocked result, and
+  intervening commits only rewrote the two generated history paths — is the
+  ordinary bounded internal rebase case rather than a blocked result, and
   `-ExpectedPrimaryTip` remains the approved primary ancestor used for recovery
-  matching. Other
-  modes run Generate with one captured UTC date into a unique ignored `Temp`
-  directory. Generate must
-  classify the mode before capture comparison: only an approved `catch-up` that
-  narrows to `carry-forward` may lose its active capture/runtime identity; every
-  other missing or changed active identity blocks. Generate must return
-  `broken-engine-code-quality-history-update/v1` with exactly
-  `CodeQualityMetricsHistory.jsonl` and `CodeQualityMetricsHistory.svg`; hashes,
-  sizes, row date/index, coverage, and SVG embedded series/generator digests are
-  validated before a temporary-index overlay creates one sole-parent replacement
-  commit with frozen approved metadata. The producer receives a new, absent child
+  matching. The producer receives a new, absent child
   directory beneath an existing ignored `Temp` parent; it never reuses an output
-  directory. The public v4 receipt stores only the two repository-relative
-  reserved paths, hashes, sizes, dates, indices, and digests — never an absolute
-  or GUID-bearing Temp path. No branch ref moves while that object is built. The final result is `broken-engine-finalize-landing/v4` and separates
+  directory, and landing makes no capture decision of its own. Both generated
+  files are then committed over the approved source commit through a temporary
+  index as one sole-parent commit with the frozen approved metadata; no branch
+  ref moves while that object is built. The final result is
+  `broken-engine-finalize-landing/v5` and separates
   `approvedSource`, `rebasedSource`, `historyUpdate`, and `final` commit/tree
   fields. The reviewed PNG deletion remains an ordinary source change; only the
-  two reserved generated paths are allowed after confirmation. When primary
-  advanced first it makes at most one internal rebase; active modes require a
-  provably byte-identical non-history patch plus a valid regenerated overlay,
-  while `carry-forward` reports the rebased source commit/tree without an
-  overlay. Report the commit from the result's `landed` block rather than
-  `candidate`. A blocked result reports its
+  two generated paths are allowed after confirmation. When primary
+  advanced first it makes at most one internal rebase, which requires a provably
+  byte-identical patch outside those two paths. Report the commit from the
+  result's `landed` block rather than `candidate`. A blocked result reports its
   `disposition` and a `lock` projection; act on those, never a memorized code
   list. A `retryable-wait` result may be re-invoked with the approval-bound
   arguments after its reported `retryAfterMilliseconds`. When it acquired no lock
@@ -320,7 +290,7 @@ and overwrites the artifact; the stale receipt is never reused, because its
   and always retains the lease; `landing.retry-exhausted` is retryable and leaves
   the confirmed session commit restored. Blocked `history.source-changed` means
   the approved source patch itself — measured from that candidate's own parent —
-  rewrites a reserved history output path, or that patch changed after
+  rewrites one of the two generated history paths, or that patch changed after
   confirmation; it is a genuine block that returns for re-review and a refreshed
   confirmation, never a condition a rebase can cure. A rolled-back
   `candidate.postcondition-failed` landing likewise leaves the session branch and
@@ -328,33 +298,23 @@ and overwrites the artifact; the stale receipt is never reused, because its
   produced — so re-invoking it with the original approved arguments passes strict
   sanity and needs no fresh approval preparation. Re-invoking a crashed landing
   that left primary advanced, with the original approved arguments, is idempotent,
-  including against a tip its own internal rebase produced. Recovery first searches for a carry-forward source-only match:
-  the approved source commit is accepted when unchanged; otherwise a single-
-  parent internally rebased or recovery-accepted commit must be proven to carry
-  the approved patch identity and change list with unchanged reserved history
-  blobs. After the recovery lock, guarded checkout reconciliation re-reads the
-  ref and proves the expected primary and session checkouts before resetting
-  them. Before resetting the session checkout, its branch ref must be exactly
-  the approved source/recovered commit or a proven single-parent
-  patch-equivalent; an arbitrary ancestor is never a valid reset target. For
-  active overlay modes, recovery separately searches only first-parent
-  descendants of the approved primary tip, walking back from current primary to
-  that tip, for exactly one replacement matching frozen metadata, the approved
-  non-history patch digest and change list, one valid committed row date, and
-  exact JSONL/SVG plus embedded SVG digests. It never assigns indices or reruns
+  including against a tip its own internal rebase produced. Recovery walks
+  first-parent from the primary ref back to `-ExpectedPrimaryTip` and accepts a
+  commit only when it has exactly one parent, carries the frozen approved commit
+  metadata, contains both generated history paths, and its patch identity
+  excluding those two paths equals the approved patch identity. No match is
+  ordinary foreign primary movement, not a blocker, when the primary head itself
+  does not carry the frozen metadata; a head that does carry it with no matching
+  commit blocks, as do multiple matches and a primary head that does not descend
+  from `-ExpectedPrimaryTip`. It never assigns indices or reruns
   historical Snapshot, never rewrites a newer primary ref, and reconciles a
   proven-stale primary checkout plus the original session branch/worktree only
   after guarded checks prove each expected state; it never overwrites a mismatched
-  checkout state. Zero, multiple, or non-ancestor active-overlay matches block.
-  Source-only and active-overlay recovery paths each own their complete mode and
-  result handling:
-  a carry-forward path must revalidate carry-forward, while an active
-  reclassification must find the complete overlay match; no legacy rebase
-  fallback may report landed. For an active-overlay structured result that
-  survived, pass its complete row-date/hash/size/embedded-digest tuple for an
-  additional exact match. Carry-forward recovery has `historyUpdate.status`
-  `skipped` with null `receipt`, `rowDate`, `jsonl`, and `svg`, so omit the tuple;
-  after a hard crash, omit the whole tuple because a partial tuple is invalid.
+  checkout state. After the recovery lock, guarded checkout reconciliation
+  re-reads the ref and proves the expected primary and session checkouts before
+  resetting them. Before resetting the session checkout, its branch ref must be
+  exactly the approved source/recovered commit or a proven single-parent
+  patch-equivalent; an arbitrary ancestor is never a valid reset target.
   Pass `-ReleasePlanClaim` when a claimed Plan reached final preparation; the
   script then deletes the claim best-effort. Without the switch it invokes no
   `plan` command at all.
@@ -368,50 +328,3 @@ stays the caller's lease, released the same way once the worktrees are provably
 clear; an omitted-token claim is discoverable by a later invocation only when
 its derived session and canonical worktree match, and every foreign or
 unverifiable claim stays untouched until its normal expiry or external repair.
-
-## Fixture suites
-
-Three bundled suites cover the scripts above against disposable scratch
-repositories. Run one only when its trigger list below changes; each uses the
-same canonical invocation form as the commands above.
-
-```text
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Test-FinalizeWorkflowFixtures.ps1 -WorktreeCliExecutable '<worktreecli-exe>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Test-LandingLockStatusFixtures.ps1 -WorktreeCliExecutable '<worktreecli-exe>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Test-AgentToolsPromotionFixtures.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -AgentHarnessExecutable '<agentharness-exe>'
-```
-
-Substitute the session worktree's provisioned tool binaries that `/compile`
-documents — `Tools/WorktreeCli/Platforms/VisualStudio2026/Output/WorktreeCli.exe`
-for `<worktreecli-exe>` and
-`Tools/AgentHarness/Platforms/VisualStudio2026/Output/AgentHarness.exe` for
-`<agentharness-exe>` — and never pass a placeholder literally.
-
-- `Test-FinalizeWorkflowFixtures.ps1` runs when
-  `Invoke-FinalizeCandidateCommit.ps1`,
-  `Invoke-FinalizeApprovalPreparation.ps1`,
-  `Invoke-FinalizePrimaryMovementCheck.ps1`, `Invoke-FinalizeLockClaim.ps1`,
-  `Invoke-FinalizeLanding.ps1`, `Show-FinalizeApprovalReview.ps1`,
-  `.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1`,
-  `.agents/scripts/AgentScriptCommon.psm1`,
-  `.agents/scripts/AgentWorktreeSession.psm1`,
-  `.agents/scripts/FinalizeWorkflowCommon.psm1`,
-  `.agents/scripts/WorktreeCliSessionExclusion.psm1`, or the suite itself
-  changes.
-  The suite may pass the checker-only `-FixtureFailure unexpected` input only
-  while `BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE=1`; public finalization never
-  passes that input.
-- `Test-LandingLockStatusFixtures.ps1` exercises WorktreeCli's `lock` CLI
-  directly rather than a bundled script, so it runs when WorktreeCli's
-  landing-lock implementation, `.agents/scripts/FinalizeWorkflowCommon.psm1`, or
-  the suite itself changes.
-- `Test-AgentToolsPromotionFixtures.ps1` runs when
-  `Invoke-AgentToolsPromotion.ps1`,
-  `.agents/scripts/Test-AgentToolsCapabilities.ps1`,
-  `.agents/scripts/AgentScriptCommon.psm1`,
-  `.agents/scripts/AgentWorktreeSession.psm1`,
-  `.agents/scripts/FinalizeWorkflowCommon.psm1`,
-  `.agents/scripts/WorktreeCliSessionExclusion.psm1`, the AgentTools promotion
-  contract in `agenttools.md`, or the suite itself changes. Both supplied
-  executables must pass the capability pre-flight the suite runs before it
-  allocates any scratch repository.

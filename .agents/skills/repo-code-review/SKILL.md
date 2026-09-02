@@ -50,11 +50,6 @@ only the targets bytes; `blocked` (exit 2) or `error` (exit 1) leaves stdout
 empty and reports the envelope on stderr, which counts as a missing targets file
 below. Never rebuild the targets file or restate the class decision inline.
 
-`.agents/scripts/Test-SessionChangeInventoryFixtures.ps1` owns
-`Get-SessionChangeInventory.ps1`'s executable fixture coverage and takes no
-parameters: `pwsh -NoProfile -File
-.agents/scripts/Test-SessionChangeInventoryFixtures.ps1`.
-
 Return `BLOCKED` when the session baseline, diff boundary, targets file, intent,
 or invariants are missing or moving. Do not reconstruct them from a mutable merge
 base, derive a broader target selection from checkout changes, or expand a supplied
@@ -261,9 +256,14 @@ inspection proves an existing helper fits. Deliberate client/server and
 collection mirrors remain parallel.
 
 Exclude micro-simplifications, style preferences, naming, header placement
-other than the required `Common/ExternalHeaders.h` rule above, formatting,
-general documentation checks, and scope authorization and unnecessary extra
-work, which `/scope-review` owns.
+other than the required `Common/ExternalHeaders.h` rule above, formatting, and
+general documentation checks.
+
+## Scope Authorization
+
+For a Tier-2+ change, also run the scope authorization, minimality, and KISS
+passes in `../../references/scope-authorization.md` over the changed C++
+regions this review already covers. Report the result in the `Scope:` field.
 
 ## External Claim Requests
 
@@ -284,6 +284,9 @@ finding is `Required`. Omit empty optional sections.
 ### Findings
 - `path:line` — **Critical | Required:** <reachable failure, evidence, smallest correction>
 
+### Scope
+- `path:lines` — **unauthorized | overbuilt | kiss:** <cited clause or absent authorization, evidence>
+
 ### API Verification Requests
 <single checkable requests>
 
@@ -297,6 +300,7 @@ finding is `Required`. Omit empty optional sections.
 PASS | NEEDS ACTION | BLOCKED
 
 Functions/regions touched: none
+Scope: PASS | NEEDS ACTION | not applicable (Tier 1) | not supplied
 Project membership trigger: /update-vcxproj — <paths/reason> | none
 ```
 

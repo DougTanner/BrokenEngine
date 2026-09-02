@@ -4,11 +4,11 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
 
 ## Shared Pipeline
 
-- `ExportJob` owns content-fingerprint dirty checks, cache metadata, chunk I/O, and failure cleanup. `%LOCALAPPDATA%/BrokenEngine/DataPackerCache/<project>` holds versioned chunks and fingerprints; checkout-local packs and manifests can be rebuilt from clean shared chunks without re-exporting sources.
+- `ExportJob` owns content-fingerprint dirty checks, cache metadata, chunk I/O, and failure cleanup. `%LOCALAPPDATA%/BrokenEngine/DataPackerCache/<project>` holds chunks and fingerprints; a job's chunk, fingerprint metadata, and shader dependency sidecar names carry that job's export-format version. Checkout-local packs and manifests can be rebuilt from clean shared chunks without re-exporting sources.
+- Before a clean cached chunk body is republished, its chunk-header identity (magic, the job's path CRC, and the NUL-terminated path text) and body extent are validated; a mismatch logs a warning and falls back to a full re-export.
 - A successful export writes derived metadata before the primary fingerprint. Interrupted or failed work therefore remains dirty, and jobs remove incomplete sidecars in `CleanupOnFailure()`.
-- One legacy cache format is still accepted: when a job has no fingerprint metadata but the old `.txt` last-modified-time sidecar exists and still matches the source, `ExportJob` writes the fingerprint, deletes the `.txt`, and treats the cache as clean. This is a one-way upgrade shim for caches predating fingerprints and can be dropped once no such cache matters.
 - `ExportJob::Version(N)` folds in `sizeof(common::ChunkHeader)`. Jobs that serialize additional payload structs also fold in their sizes (`ExportScene.h` and `ExportModel.h` show the pattern). Same-size reorder or semantic changes need the owning manual version bump; the layout `static_assert`s in `Common/DataFile.h` name which job's version owns each payload struct, so read the failing assertion message instead of guessing which version to bump.
-- A job may version an expensive sub-stage independently of its chunk payload when that stage's outputs are tracked in the checkout, giving the stage its own marker and a fingerprint covering only its own inputs. Keep that version outside `Version(...)` so an unrelated chunk-header change cannot rewrite tracked outputs, and bump whichever version owns the behavior that changed; island texture encoding is the current instance.
+- A job may version an expensive sub-stage independently of its chunk payload when that stage's outputs are tracked in the checkout, giving the stage its own marker and a fingerprint covering only its own inputs. Name and key that marker by the stage's own version alone, keep that version outside `Version(...)`, and bump whichever version owns the behavior that changed. Island texture encoding is the current instance.
 - Each job constructs a `common::ThreadLocal` on its worker and uses that thread's workbuffer. Keep job output and scratch isolated from other parallel exports.
 - `AllocateHeaderAndData` is normally called once per export. Scene animation data is appended afterward; its chunk size excludes that section and a header pointer captured before vector growth is invalid after reallocation.
 - `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea or texture encoding begins. Clean cached outputs remain readable under this guard.
@@ -25,7 +25,9 @@ Texture encoding and chunk routing are described in `Texture/AGENTS.md`. Island/
 
 Scene export is two-phase. A versioned `.PreExport` marker governs generation of model and block-compressed texture intermediates; the main phase writes scene metadata and optional animation data. Pre-export also removes orphaned scene texture intermediates so recursive texture discovery cannot ship stale assets. Generated assets are referenced by relative-path CRC. A scene's dirty check covers the `.gltf` plus every external file it references, so editing a referenced texture or buffer re-runs pre-export; a reference the scene names but disk does not have keeps the scene dirty, leaving that failure to the per-asset export rather than aborting the whole run.
 
-Scene texture pre-export deduplicates workers by source and output format. Each worker writes a private, untagged stage; all workers must finish before any final intermediate is published. Keep cleanup ownership separate for stages from this attempt and final paths published by it, because a failure during encoding or publication must not classify one kind of path as the other.
+Scene texture pre-export deduplicates attempts by source and output format. Each attempt writes a private, untagged stage; all attempts must finish before any final intermediate is published. Keep cleanup ownership separate for stages from this attempt and final paths published by it, because a failure during encoding or publication must not classify one kind of path as the other.
+
+A scene pack supports one node-referenced skin, and a scene whose nodes reference more than one skin is rejected.
 
 When multiple mesh nodes reuse one glTF material, or primitives under one material differ in deformation mode (skinned versus not), preserve distinct material entries while retaining the source material index used for texture lookup, so no draw mixes deformation modes.
 
@@ -44,5 +46,5 @@ Audio export accepts only 16-bit PCM and 32-bit float `.wav` sources; anything e
 ## See Also
 
 - `Island/AGENTS.md` - Gaea route caches, split lifecycle, and island payloads
-- `Texture/AGENTS.md` - texture intermediates, RDO, migration, and chunk formats
+- `Texture/AGENTS.md` - texture intermediates, encoding, migration, and chunk formats
 - `../../../Common/AGENTS.md` - shared chunk and serialization contracts

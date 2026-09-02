@@ -26,12 +26,8 @@ hand. An improvised invocation can send wrong arguments into an operation that
 changes primary. A script that cannot be run as documented is a bug: stop and
 report it.
 
-Approval preparation invokes the read-only history producer in Contract mode,
-and landing reads its receipt's compact generator/capture/patch identities
-directly from the saved approval preparation result file
-(`-ApprovalPreparationResultFile`); no digest is ever hand-copied onto a
-command line. Under its landing lease, finalization follows the [root
-`AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and the exact mode
+Under its landing lease, finalization follows the [root
+`AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and the exact
 mechanics in [`scripts.md`](scripts.md). The separately
 requested primary-commit route follows the same ceremony, as
 `primary-commit.md` states.
@@ -67,24 +63,25 @@ every other lease is foreign.
 2. Create the authorized source landing commit, then squash and rebase it onto the
    current primary tip. Reconciliation never advances primary. Inspect dependency
    overlap and any place the rebase merged cleanly but changed the code's
-   meaning. After the final source candidate is prepared, approval preparation
-   runs the history producer's Contract mode and returns the typed
-   `broken-engine-code-quality-history-contract/v1` receipt before
-   `/verify-changes`. When the landing content changed after the commit was first
+   meaning. When the landing content changed after the commit was first
    created, pass approval preparation the `-CommitMessageFile` override
    `scripts.md` documents so the prepared commit's message describes
    what it now contains.
-3. Main dispatches `/verify-changes` on the resulting diff, only once every
-   hygiene handoff the session-change inventory's `triggers` object reports
-   true already exists — `/code-style-review` for changed C++,
-   `/update-vcxproj`, `/validate-skill`, `/update-claude-docs`,
-   `/progressive-disclosure-review` — and passes
-   every typed receipt verbatim, each `broken-engine-build-result/v1` envelope
-   included, never summarized. A triggered `/progressive-disclosure-review`
+3. Fill the acceptance table on the resulting diff, loading and following
+   [`landing-acceptance-table.md`](landing-acceptance-table.md) first, which
+   owns the typed-artifact rules. Fill it from the hygiene handoffs that already
+   exist — the session-change inventory's `triggers` object reports which ones
+   the session owes: `/code-style-review` for changed C++, `/update-vcxproj`,
+   `/validate-skill`, `/update-claude-docs`, `/progressive-disclosure-review`.
+   Never withhold the table waiting for a missing one: give each triggered
+   handoff that does not exist its own row with the status that reference
+   assigns a missing artifact. A triggered `/progressive-disclosure-review`
    handoff counts as existing only as a PASS whose `Baseline:` satisfies the
-   rule in that skill's `## Output` section. A meaningful change
-   to that diff re-runs review of the changed regions only.
-4. After the step-3 `/verify-changes` PASS on the `session-landing` route, invoke
+   rule in that skill's `## Output` section. Consume every typed receipt
+   verbatim, each `broken-engine-build-result/v1` envelope included, never
+   summarized. A meaningful change to that diff re-runs review of the changed
+   regions only.
+4. After the step-3 acceptance table on the `session-landing` route, invoke
    the read-only primary-movement checker using the canonical command in
    [`scripts.md#invocation`](scripts.md#invocation), and
    consume its fixed result and terminal table in
@@ -111,12 +108,7 @@ every other lease is foreign.
    Redirect its stdout to
    `Temp/finalize-approval-review-result.json` exactly as
    [`scripts.md`](scripts.md) shows: that artifact is a required landing input,
-   not a record of one. On the separately requested direct-primary (`primary-commit`)
-   route, invoke it only after `/verify-changes` has returned PASS on the final
-   diff, without invoking this checker, and immediately before the landing
-   summary — never alongside step-2 preparation — so the user reviews the
-   SmartGit window after verification is complete, right before being asked to
-   confirm, and the review window is open whenever SmartGit is available.
+   not a record of one.
    Exit-0 statuses
    `opened`, `unavailable`, and `failed` are non-blocking: carry the status into
    the summary's `SmartGit review` line, and for `unavailable`/`failed` the
@@ -127,7 +119,9 @@ every other lease is foreign.
    not reinvoke after landing's own clean identical internal rebase (step 6),
    which preserves the existing confirmation; a meaningful change requiring a
    refreshed confirmation launches it again against the newly reviewed landing
-   commit before that refreshed confirmation. Then return a landing summary: `## Context`,
+   commit before that refreshed confirmation. Then return one handoff carrying
+   the complete step-3 acceptance table, then this script's SmartGit result,
+   then a landing summary: `## Context`,
    outcome-focused `## What landed`, and `## Landing` stating the
    checked candidate parent and live primary (and, after harmless primary
    movement, that any internal rebase can land only a byte-identical patch),
@@ -140,7 +134,7 @@ every other lease is foreign.
    primary change still ends with this summary, per `SKILL.md` `## Worker
    workflow`.
    For the separately requested direct-primary (`primary-commit`) route, preserve
-   the exact-tip verification-to-summary flow in `primary-commit.md:23-32`
+   the exact-tip acceptance-to-summary flow in `primary-commit.md`
    and do not invoke this checker.
 5. Only that affirmative response permits the same worker to claim the landing
    lock and invoke landing with that owner token, in the order
@@ -148,11 +142,9 @@ every other lease is foreign.
    `-ApprovalReviewResultFile` naming the step-4 artifact; the receipt gate in
    [`scripts.md`](scripts.md#approval-review-receipt) owns when landing blocks on
    it, and step 6 disposes of such a block like any other blocked
-   landing. Under the landing lease, landing freezes the
-   approved commit message, complete author/committer identities and dates, and
-   the non-history patch identity and rechecks the approved Contract against
-   current history/mode. It follows the [root `AGENTS.md` Step 8 landing
-   invariant](../../../../AGENTS.md) and exact mode mechanics in
+   landing. Under the landing lease, landing follows the
+   [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and the
+   exact mechanics in
    [`scripts.md`](scripts.md). Landing then advances
    primary by compare-and-swap with
    rollback, resets and verifies both checkouts, releases the lock, and deletes
@@ -162,7 +154,7 @@ every other lease is foreign.
 6. If primary advanced before the advance succeeds, landing does its own bounded
    rebase and retry, following the [root `AGENTS.md` Step 8 landing
    invariant](../../../../AGENTS.md) and [`scripts.md`](scripts.md)
-   for the resulting mode and disposition. Never rebase or resolve by hand. Act on the
+   for the resulting disposition. Never rebase or resolve by hand. Act on the
    blocked result's reported `disposition` and `lock` projection exactly as
    `scripts.md` specifies, never a memorized list of codes. A
    `terminal` result stops this caller; one reporting a changed reviewed contract
@@ -183,7 +175,7 @@ every other lease is foreign.
   preconfirmation reconciliation: re-resolve the current session and primary
   tips, and a fresh candidate baseline; perform the ordinary linear rebase and
   hunk resolution under the `Recovery` section, recreate and prepare a new
-  candidate, rerun the affected reviews and `/verify-changes`, reopen SmartGit,
+  candidate, rerun the affected reviews and the acceptance table, reopen SmartGit,
   produce a fresh summary, and obtain fresh user confirmation. If any abort,
   restoration, or release is
   unproven, retain the existing blocker and lease state and stop; do not begin
@@ -200,11 +192,8 @@ every other lease is foreign.
   determine a valid resolution; otherwise resolve rather than abort.
 - Process died after primary advanced: re-invoke
   `../scripts/Invoke-FinalizeLanding.ps1` with the original approved arguments.
-  Choose the second form in [`scripts.md`](scripts.md) only
-  when a surviving structured result provides the complete active-overlay
-  history tuple; choose the first form for a carry-forward source-only result or
-  a hard crash with no result. That reference owns the tuple, source-match, and
-  mode mechanics.
+  [`scripts.md`](scripts.md) owns the rules by which recovery matches the
+  landed commit.
   If the primary ref advanced before its checkout reset, recovery recognizes the
   ref/tree mismatch, acquires or adopts the landing lease, resets and verifies the
   primary checkout, then continues ordinary recovery; initial non-recovery sanity
@@ -214,22 +203,6 @@ every other lease is foreign.
   stated in [`scripts.md`](scripts.md)'s
   `Invoke-FinalizeApprovalPreparation.ps1` entry. This is not the
   rewritten-history case below, whose `--onto` form does not apply.
-- Landing blocked `terminal` with `history.contract-changed` reporting that the
-  aggregate digest changed while the approved candidate parent remained
-  unchanged, after the session branch was rebased by hand once approval
-  preparation had already run — the caller-side rebase step 6 forbids: that
-  run's frozen history Contract still names the pre-rebase base, so landing
-  blocks even when the patch is byte-identical, and the blocked result carries
-  only the approved digests. The approval-review receipt is not stale here: it
-  already names the rebased commit, or landing would have stopped earlier with
-  `approval-review.candidate-mismatch`. This is a stale artifact, not a changed
-  reviewed contract: re-invoke `Invoke-FinalizeApprovalPreparation.ps1` per its
-  [`scripts.md`](scripts.md) entry, refresh the approval-review receipt only
-  when that run produces a commit other than the receipt's `approvedTip` (its
-  `one-commit-no-op` disposition keeps the same commit), and re-invoke landing;
-  the byte-identical patch keeps the existing confirmation. Any other
-  `history.contract-changed` message is the changed-reviewed-contract case
-  step 6 routes to re-review.
 - Primary history rewritten under the session: reattaching through the wrapper
   repairs this, rebasing the session branch onto the new primary tip; the step-4
   re-check detects it mid-session. To repair it in place, recover the old fork

@@ -6,8 +6,9 @@
 # finished confirmation question rather than a working agent. Callers never
 # reconstruct its SmartGit command inline.
 #
-# Main invokes this after the fresh /verify-changes PASS and primary-movement check,
-# so the SmartGit window is the final tool action before the landing summary.
+# The finalizer invokes this after filling the acceptance table and running the
+# primary-movement check, so the SmartGit window is the final tool action before
+# the landing summary.
 #
 # The landing route always passes -LaunchSmartGit, so a session landing always
 # attempts the launch and the window opens whenever SmartGit is available.

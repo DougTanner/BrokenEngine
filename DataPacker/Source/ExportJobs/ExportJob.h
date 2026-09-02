@@ -10,7 +10,7 @@ public:
 	// Folds in the chunk-header size so a header-layout change auto-invalidates every cache.
 	static constexpr int64_t Version(int64_t iRaw) { return iRaw + sizeof(common::ChunkHeader); }
 
-	ExportJob(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile);
+	ExportJob(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile, int64_t iVersion);
 	ExportJob(ExportJob&& rToMove) noexcept = default;
 	ExportJob& operator=(ExportJob&& rToMove) noexcept = default;
 	virtual ~ExportJob() = default;
@@ -22,10 +22,12 @@ public:
 	virtual bool CheckDirty(const std::filesystem::path& rPackFile);
 	std::vector<std::byte>& RunExport();
 
-	// Get export format version for this job type
-	virtual int64_t GetVersion() const = 0;
+	// Get export format version for this job type. Not virtual: the base constructor builds the cache
+	// entry names from it, where a call could not reach a derived override.
+	int64_t GetVersion() const { return miVersion; }
 
 	int64_t miId = 0;
+	int64_t miVersion = 0;
 	bool mbDirty = false;
 	common::ChunkFlags_t mChunkFlags;
 
@@ -34,7 +36,6 @@ public:
 	std::string mRelativeFile;
 	std::filesystem::path mChunkFile;
 	std::filesystem::path mCacheMetadataFile;
-	std::filesystem::path mLastModifiedTimeFile;
 
 	std::future<std::vector<std::byte>&> mFuture;
 

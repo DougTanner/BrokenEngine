@@ -12,18 +12,16 @@ allowed-tools: [Read, Bash, Agent]
 
 Claude Code runs every delegated reviewer or auditor role (Sol on Codex, per the
 root [AGENTS.md](../../../AGENTS.md) role table) — `plan-audit`,
-`plan-simplicity-review`,
-`repo-code-review`, `glsl-review`, `scope-review`,
+`plan-simplicity-review`, `repo-code-review`, `glsl-review`,
 `progressive-disclosure-review`, `adversarial-review`,
-`context-efficiency-review`,
-`session-audit`, and external review lenses — on Codex/Sol through this skill.
+`next-plan-checkpoint-review`, `session-audit`, and external review lenses —
+on Codex/Sol through this skill.
 Parent/manager orchestrators that dispatch their own child reviewer, including
 `/next-plan-review`, are excluded, and so is the child reviewer they dispatch:
 that child routes per the delegated-review routing bullet in the root
 [AGENTS.md](../../../AGENTS.md). A `/codex-review` invocation of an assigned
 skill constitutes the delegated-`reviewer` execution context; it is not an
-"inline run" in the assigned skills' vocabulary, and `/verify-changes`
-records it as the delegated reviewer execution. Codex callers must stop
+"inline run" in the assigned skills' vocabulary. Codex callers must stop
 instead of invoking this skill recursively — their reviewer role already
 resolves to Sol.
 
@@ -67,12 +65,9 @@ resolves to Sol.
    evaluation of that result to the reviewer alone. Include the assigned
    skill's own required evidence in that
    same file before dispatching: `plan-audit`'s draft execution card
-   (`../plan-audit/SKILL.md`) and, for
-   `verify-changes`, the reviewed change set's baseline and head SHAs plus each
-   typed artifact its `## Required inputs` conditions name
-   (`../verify-changes/SKILL.md`). The script blocks the dispatch when a SHA or
-   a diff-triggered typed artifact is absent. For a reviewer role with no
-   skill file — the Tier-2 coherence review, for one — pass a descriptive role
+   (`../plan-audit/SKILL.md`). The script blocks the dispatch when that card is
+   absent. For a reviewer role with no skill file — the Tier-2 coherence
+   review, for one — pass a descriptive role
    name as `-AssignedSkill` together with `-AdHocRole`, and put that role's full
    review contract in `-ScopeFile`. `-RiskTier` adds one
    `Risk tier: <n>` line above that text. `-PromptPath` must not already exist.
@@ -101,15 +96,9 @@ resolves to Sol.
    as one under `Temp/`; `prompt.head-untracked-conflict` — a
    commit-valued head has no untracked side; `prompt.assigned-skill-unknown` —
    `-AssignedSkill` names no skill file, so fix the name or pass `-AdHocRole`;
-   `prompt.head-required` — `verify-changes` needs a commit-valued `-Head` whose
-   reviewed paths' working-tree bytes match that commit's tree;
    `prompt.execution-card-required` — a `plan-audit` scope carries no
-   `execution card` marker; `prompt.typed-artifacts-required` — a
-   `verify-changes` scope is missing the baseline or head SHA, or a typed
-   artifact the reviewed diff triggers, and the `missing` array lists every
-   missing item, with `message` as the readable summary. Exit `1` is a script
-   error: stop and report its `code` and `message` rather than hand-assembling
-   a prompt.
+   `execution card` marker. Exit `1` is a script error: stop and report its
+   `code` and `message` rather than hand-assembling a prompt.
 3. Run the review with one bare blocking script call, issued with a call timeout
    of at least `600000` ms and never wrapped in a loop or chained with another
    command:
@@ -157,14 +146,8 @@ resolves to Sol.
 
 ## Manager evaluation
 
-Sol over-reports edge cases and tends toward over-engineering, so the calling
-manager session decides each finding under the root
-[AGENTS.md](../../../AGENTS.md) decide-once and reject-speculative-findings
-rules. Interruption findings — power loss, process kill, crash or timeout
-mid-operation — are answered by the existing ordered fallback steps (idempotent
-re-run, lease expiry, claim healing, Git state), never by new recovery
-machinery; accept one only when a named interruption point provably defeats
-those steps, and even then present the cost to the user before implementing.
+The calling manager session decides each finding under the root
+[AGENTS.md](../../../AGENTS.md) rule for review findings.
 
 ## Fallback
 

@@ -13,7 +13,6 @@
 #include "ExportJobs/ExportTexture.h"
 #include "ExportJobs/Island/BakeIslandIntermediates.h"
 #include "ExportJobs/Texture/MigrateLegacyIntermediates.h"
-#include "ExportJobs/Texture/RdoSweep.h"
 #include "ExportJobs/Texture/Texture.h"
 
 struct DataTypeEntry
@@ -690,6 +689,7 @@ static void GenerateDataHeader(const std::filesystem::path& rOutPath)
 bool MainThread(int argc, char* argv[])
 {
 	common::ThreadLocal threadLocal(1024, std::nullopt, false);
+	common::Multithreading multithreading(std::max<int64_t>(0, common::HardwareCoreCount() - 3));
 
 	LOG(kDefault, kDebug, "\nData Packer");
 	ScopedLogIndent scopedLogIndent;
@@ -744,31 +744,6 @@ static bool RunCommand(int argc, char* argv[])
 			return false;
 		}
 		return MaterializeData(argv);
-	}
-	if (argc >= 2 && std::string_view(argv[1]).starts_with("--rdo-sweep"))
-	{
-		// CLI trust boundary: each sweep mode takes exactly one image/intermediate path
-		if (argc != 3)
-		{
-			std::printf("%s requires exactly one <image path> argument\n", argv[1]);
-			return false;
-		}
-		common::ThreadLocal threadLocal(1024, std::nullopt, false);
-		Texture::StaticInit();
-		if (std::string_view(argv[1]) == "--rdo-sweep")
-		{
-			return RunRdoSweep(argv[2]) == 0;
-		}
-		if (std::string_view(argv[1]) == "--rdo-sweep-full")
-		{
-			return RunRdoSweepFull(argv[2]) == 0;
-		}
-		if (std::string_view(argv[1]) == "--rdo-sweep-validate")
-		{
-			return RunRdoSweepValidate(argv[2]) == 0;
-		}
-		std::printf("Unknown mode %s\n", argv[1]);
-		return false;
 	}
 	return MainThread(argc, argv);
 }

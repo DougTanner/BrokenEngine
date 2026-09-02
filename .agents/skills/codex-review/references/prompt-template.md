@@ -7,8 +7,7 @@ manager-authored `-ScopeFile` text and the collected evidence are the only other
 prompt content, and neither is authored here.
 
 Change a fragment only through the Change Workflow: a dropped prohibition line
-silently weakens every review this skill dispatches, and the fixtures compare the
-generated prompt against these bytes.
+silently weakens every review this skill dispatches.
 
 ## Fragment: role instruction
 

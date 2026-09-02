@@ -307,6 +307,9 @@ void ExportScene::Export()
 {
 	tinygltf::Model gltfModel = LoadGltfModel();
 
+	// Both the pre-export and main-export paths read skin 0, so canonicalize before either runs
+	CanonicalizeSceneSkin(gltfModel);
+
 	std::optional<int64_t> optionalStoredVersion = ReadPreExportMarkerVersion();
 	bool bNeedsPreExport = mbNeedsPreExport || !optionalStoredVersion.has_value() || optionalStoredVersion.value() != GetVersion();
 
@@ -395,66 +398,17 @@ void ExportScene::ProcessTextures(tinygltf::Model& rGltfModel)
 		}
 	}
 
-	// Launch one async texture processing task per unique source/format pair. The outer stages are
-	// registered before launch so a launch failure still leaves every attempted path available for cleanup.
-	std::vector<std::future<void>> futures;
-	futures.reserve(textureAttempts.size());
-	std::exception_ptr firstException = nullptr;
+	// Process each unique source/format pair on this export-job thread. BC encoding dispatches its
+	// block rows across the shared worker pool, while the outer stages remain available for cleanup.
 	try
 	{
 		for (const TextureAttempt& rAttempt : textureAttempts)
 		{
 			const tinygltf::Image& rImage = rGltfModel.images.at(rAttempt.iSource);
-			futures.push_back(std::async(std::launch::async, [vkFormat = rAttempt.vkFormat, &rImage, path = rAttempt.stagingPath]()
-			{
-				std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
-				Texture texture(reinterpret_cast<const std::byte*>(rImage.image.data()), rImage.width, rImage.height, rImage.component);
-				texture.MakeMipmaps(vkFormat);
-				texture.Save(path, vkFormat, {});
-			}));
-		}
-	}
-	catch (...)
-	{
-		firstException = std::current_exception();
-	}
-
-	// Observe every launched task, retaining the first exception while allowing all workers to finish
-	// before any attempt-stage cleanup or final publication.
-	for (std::future<void>& rFuture : futures)
-	{
-		try
-		{
-			rFuture.get();
-		}
-		catch (...)
-		{
-			if (firstException == nullptr)
-			{
-				firstException = std::current_exception();
-			}
-		}
-	}
-	if (firstException != nullptr)
-	{
-		CleanupTextureAttemptFiles();
-		std::rethrow_exception(firstException);
-	}
-
-	// Publish every completed outer stage only after all unique workers succeeded. Keep final paths out of
-	// mIntermediateFiles until every move succeeds so failure cleanup cannot remove a prior final that this
-	// attempt already published.
-	std::vector<std::filesystem::path> publishedTextureFiles;
-	publishedTextureFiles.reserve(textureAttempts.size());
-	for (const TextureAttempt& rAttempt : textureAttempts)
-	{
-		publishedTextureFiles.push_back(rAttempt.finalPath);
-	}
-	try
-	{
-		for (const TextureAttempt& rAttempt : textureAttempts)
-		{
-			VERIFY_SUCCESS(MoveFileExW(rAttempt.stagingPath.native().c_str(), rAttempt.finalPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
+			std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
+			Texture texture(reinterpret_cast<const std::byte*>(rImage.image.data()), rImage.width, rImage.height, rImage.component);
+			texture.MakeMipmaps(rAttempt.vkFormat);
+			texture.Save(rAttempt.stagingPath, rAttempt.vkFormat, {});
 		}
 	}
 	catch (...)
@@ -462,7 +416,24 @@ void ExportScene::ProcessTextures(tinygltf::Model& rGltfModel)
 		CleanupTextureAttemptFiles();
 		throw;
 	}
-	mPublishedTextureFiles.swap(publishedTextureFiles);
+
+	// Publish every completed outer stage only after all unique workers succeeded. Record each final as soon as it
+	// is published, so a mid-loop failure's CleanupOnFailure removes the replaced prefix instead of leaving a mixed
+	// generation for the texture pass to pack.
+	mPublishedTextureFiles.reserve(textureAttempts.size());
+	try
+	{
+		for (const TextureAttempt& rAttempt : textureAttempts)
+		{
+			VERIFY_SUCCESS(MoveFileExW(rAttempt.stagingPath.native().c_str(), rAttempt.finalPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
+			mPublishedTextureFiles.push_back(rAttempt.finalPath);
+		}
+	}
+	catch (...)
+	{
+		CleanupTextureAttemptFiles();
+		throw;
+	}
 	mTextureAttemptFiles.clear();
 
 	// Log each source slot, including slots sharing one unique worker, and retain the existing

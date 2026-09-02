@@ -42,10 +42,54 @@ void WriteFingerprintMetadata(const std::filesystem::path& rPath, std::string_vi
 	VERIFY_SUCCESS(MoveFileExW(temporaryPath.native().c_str(), rPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
 }
 
+// Trust boundary: a cached chunk body is opaque bytes an earlier run left on disk, and CheckDirty only covers the
+// outer marker and the source fingerprint, so a same-size edit of the body would be republished into a new pack.
+// Checks identity and extent only, and returns nullptr when they hold or the reason to report. Payload bytes are
+// deliberately not covered; the runtime enforces the compressed-payload contract when the pack is loaded.
+const char* ValidateCachedChunkBody(std::span<const std::byte> body, common::crc_t crc, const std::string& rRelativeFile, bool bAllowTail)
+{
+	if (body.size() < static_cast<size_t>(common::kiChunkDataOffset))
+	{
+		return "body smaller than its header";
+	}
+
+	const common::ChunkHeader* pHeader = reinterpret_cast<const common::ChunkHeader*>(body.data());
+	if (pHeader->iMagic != common::ChunkHeader::kiMagic)
+	{
+		return "chunk header magic mismatch";
+	}
+	if (pHeader->crc != crc)
+	{
+		return "chunk header CRC mismatch";
+	}
+	// Comparing one byte past the path compares the terminator too, so this also proves the cached path is
+	// NUL-terminated where every consumer that reads pcPath as a C string expects it to end.
+	if (rRelativeFile.size() >= std::size(pHeader->pcPath) || std::memcmp(pHeader->pcPath, rRelativeFile.c_str(), rRelativeFile.size() + 1) != 0)
+	{
+		return "chunk header path mismatch";
+	}
+
+	// Bound iSize by the body before rounding it up, so a corrupt near-maximum value cannot overflow the round.
+	if (pHeader->iSize < 0 || pHeader->iSize > static_cast<int64_t>(body.size()))
+	{
+		return "chunk header size outside chunk";
+	}
+	// AllocateHeaderAndData gives a fresh body exactly the header plus the alignment-rounded data, so any other
+	// extent was not produced by this job. Scene jobs append animation data past that point (ExportScene::Export).
+	int64_t iExpectedSize = common::kiChunkDataOffset + common::RoundUp<int64_t, common::kiAlignmentBytes>(pHeader->iSize);
+	if (bAllowTail ? static_cast<int64_t>(body.size()) < iExpectedSize : static_cast<int64_t>(body.size()) != iExpectedSize)
+	{
+		return "chunk header size does not match body";
+	}
+
+	return nullptr;
 }
 
-ExportJob::ExportJob(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
+}
+
+ExportJob::ExportJob(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile, int64_t iVersion)
 : miId(siNextJobId++)
+, miVersion(iVersion)
 , mChunkFlags(rChunkFlags)
 , mInputPath(rFile)
 {
@@ -59,21 +103,18 @@ ExportJob::ExportJob(common::ChunkFlags_t rChunkFlags, const std::filesystem::pa
 	}
 	mRelativeDirectory.remove_filename();
 
+	// The cache directory is shared across worktrees, so the exporter version is part of the entry name:
+	// exporters built from different sources then keep separate entries instead of invalidating each other's.
 	mChunkFile = gpFileManager->mCacheDirectory;
 	mChunkFile /= mRelativeDirectory;
 	std::filesystem::create_directories(mChunkFile);
 	mChunkFile /= mInputPath.filename();
-	mChunkFile += ".chunk";
+	mChunkFile += std::format(".v{}.chunk", miVersion);
 
 	mCacheMetadataFile = gpFileManager->mCacheDirectory;
 	mCacheMetadataFile /= mRelativeDirectory;
 	mCacheMetadataFile /= mInputPath.filename();
-	mCacheMetadataFile += ".meta";
-
-	mLastModifiedTimeFile = gpFileManager->mCacheDirectory;
-	mLastModifiedTimeFile /= mRelativeDirectory;
-	mLastModifiedTimeFile /= mInputPath.filename();
-	mLastModifiedTimeFile += ".txt";
+	mCacheMetadataFile += std::format(".v{}.meta", miVersion);
 
 	mRelativeFile = mRelativeDirectory.string() + mInputPath.filename().string();
 	mCrc = common::Crc(mRelativeFile);
@@ -133,21 +174,6 @@ bool ExportJob::CheckDirty(const std::filesystem::path& rPackFile)
 
 	std::string inputFingerprint = GetInputFingerprint();
 	std::optional<std::string> cachedFingerprint = ReadFingerprintMetadata(mCacheMetadataFile);
-	if (!cachedFingerprint.has_value() && std::filesystem::exists(mLastModifiedTimeFile))
-	{
-		int64_t iLegacyLastModifiedTime = 0;
-		std::fstream legacyStream(mLastModifiedTimeFile, std::ios::in | std::ios::binary);
-		legacyStream.read(reinterpret_cast<char*>(&iLegacyLastModifiedTime), sizeof(iLegacyLastModifiedTime));
-		int64_t iCurrentLastModifiedTime = std::filesystem::last_write_time(mInputPath).time_since_epoch().count();
-		if (legacyStream && iLegacyLastModifiedTime == iCurrentLastModifiedTime)
-		{
-			WriteFingerprintMetadata(mCacheMetadataFile, inputFingerprint);
-			std::filesystem::remove(mLastModifiedTimeFile);
-			cachedFingerprint = inputFingerprint;
-			LOG(kDefault, kDebug, "Upgraded legacy cache metadata \"{}\"", mCacheMetadataFile.string());
-		}
-	}
-
 	if (!cachedFingerprint.has_value() || cachedFingerprint.value() != inputFingerprint)
 	{
 		LOG(kDefault, kDebug, "Input fingerprint changed for \"{}\"", mInputPath.string());
@@ -179,12 +205,24 @@ std::vector<std::byte>& ExportJob::RunExport()
 		// CheckDirty only validated the 16-byte header, and resize() zero-inits the buffer, so a short read
 		// (truncated/interrupted chunk) would silently pack a zero tail. Verify the full body was read; if not,
 		// discard the cache and fall through to a full dirty re-export rather than shipping the zeroed bytes.
-		if (fileStream.good() && fileStream.gcount() == static_cast<std::streamsize>(mHeaderAndData.size()))
+		if (!fileStream.good() || fileStream.gcount() != static_cast<std::streamsize>(mHeaderAndData.size()))
+		{
+			LOG(kDefault, kWarning, "Cached chunk file \"{}\" is truncated ({} of {} bytes read); re-exporting", mChunkFile.string(), fileStream.gcount(), mHeaderAndData.size());
+			mbDirty = true;
+		}
+		else if (const char* pReason = ValidateCachedChunkBody(mHeaderAndData, mCrc, mRelativeFile, mChunkFlags & common::ChunkFlags::kScene); pReason != nullptr)
+		{
+			LOG(kDefault, kWarning, "Cached chunk file \"{}\" failed validation ({}); re-exporting", mChunkFile.string(), pReason);
+			mbDirty = true;
+		}
+		else
 		{
 			return mHeaderAndData;
 		}
-		LOG(kDefault, kWarning, "Cached chunk file \"{}\" is truncated ({} of {} bytes read); re-exporting", mChunkFile.string(), fileStream.gcount(), mHeaderAndData.size());
-		mbDirty = true;
+
+		// Export() reaches the buffer through AllocateHeaderAndData's resize, which leaves surviving elements
+		// untouched, so the rejected cache bytes have to go before they can survive into a fresh chunk.
+		mHeaderAndData.clear();
 	}
 
 	std::string inputFingerprint = GetInputFingerprint();
@@ -210,10 +248,9 @@ std::vector<std::byte>& ExportJob::RunExport()
 	ASSERT(relativeFileString.length() < MAX_PATH);
 	std::memcpy(pChunkHeader->pcPath, relativeFileString.c_str(), sizeof(*relativeFileString.c_str()) * relativeFileString.length());
 
-	// The primary fingerprint is the cache completion marker. Remove it (and the legacy fallback) before
-	// mutating the chunk so any write or derived-metadata failure leaves the job unambiguously dirty.
+	// The fingerprint is the cache completion marker. Remove it before mutating the chunk so any write
+	// or derived-metadata failure leaves the job unambiguously dirty.
 	std::filesystem::remove(mCacheMetadataFile);
-	std::filesystem::remove(mLastModifiedTimeFile);
 
 	// Write chunk file with magic and version
 	std::fstream fileStream(mChunkFile, std::ios::out | std::ios::binary);

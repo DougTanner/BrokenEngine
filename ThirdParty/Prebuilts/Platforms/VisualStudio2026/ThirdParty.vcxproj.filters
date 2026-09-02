@@ -45,22 +45,7 @@
     <ClCompile Include="..\..\..\bc7enc_rdo\bc7decomp.cpp">
       <Filter>DataPacker</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\bc7enc_rdo\bc7decomp_ref.cpp">
-      <Filter>DataPacker</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\bc7enc_rdo\rgbcx.cpp">
-      <Filter>DataPacker</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\bc7enc_rdo\utils.cpp">
-      <Filter>DataPacker</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\bc7enc_rdo\lodepng.cpp">
-      <Filter>DataPacker</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\bc7enc_rdo\ert.cpp">
-      <Filter>DataPacker</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\bc7enc_rdo\rdo_bc_encoder.cpp">
       <Filter>DataPacker</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\DataPacker\DirectXTK.cpp">

@@ -89,7 +89,7 @@
       <FloatingPointModel>Strict</FloatingPointModel>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <AdditionalOptions>/Zc:__cplusplus /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
@@ -110,7 +110,7 @@
       <FloatingPointModel>Strict</FloatingPointModel>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <AdditionalOptions>/Zc:__cplusplus /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -133,7 +133,7 @@
       <FloatingPointModel>Strict</FloatingPointModel>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <AdditionalOptions>/Zc:__cplusplus /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -158,12 +158,7 @@
     <ClCompile Include="..\..\Source\Engine\Clipper2.cpp" />
     <ClCompile Include="..\..\..\bc7enc_rdo\bc7enc.cpp" />
     <ClCompile Include="..\..\..\bc7enc_rdo\bc7decomp.cpp" />
-    <ClCompile Include="..\..\..\bc7enc_rdo\bc7decomp_ref.cpp" />
     <ClCompile Include="..\..\..\bc7enc_rdo\rgbcx.cpp" />
-    <ClCompile Include="..\..\..\bc7enc_rdo\utils.cpp" />
-    <ClCompile Include="..\..\..\bc7enc_rdo\lodepng.cpp" />
-    <ClCompile Include="..\..\..\bc7enc_rdo\ert.cpp" />
-    <ClCompile Include="..\..\..\bc7enc_rdo\rdo_bc_encoder.cpp" />
     <ClCompile Include="..\..\Source\DataPacker\cmft.cpp" />
     <ClCompile Include="..\..\Source\DataPacker\DirectXTK.cpp" />
     <ClCompile Include="..\..\Source\DataPacker\SPIRV-Cross.cpp" />

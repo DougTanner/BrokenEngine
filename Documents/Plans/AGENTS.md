@@ -23,6 +23,6 @@ Completion uses `plan complete`; explicit rejection uses `plan reject --user-aut
 
 Plans live in area subdirectories, never directly at `Plans/`. An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
 
-The two scope sections are the control the finished change is measured against: `/scope-review` treats a changed region no `## In scope` clause covers, or one an `## Out of scope` line names, as unauthorized. A boundary written vaguely is a boundary that cannot be enforced.
+The two scope sections are the control the finished change is measured against: the Step-5 correctness review of each changed artifact type treats a changed region no `## In scope` clause covers, or one an `## Out of scope` line names, as unauthorized. A boundary written vaguely is a boundary that cannot be enforced.
 
 A document presenting options rather than a decision-complete implementation does not belong here; it belongs in `../Investigations/` (see `../Investigations/AGENTS.md`) until the decision exists. Work blocked on another change expresses that as a `dependsOn` edge, which the scheduler already honours; work blocked on a decision is not a Plan yet.

@@ -24,11 +24,11 @@ emits one path-free identity object and never starts the analyzer.
 ## History
 
 `Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract` is a read-only decision; `-Mode Generate`
-runs under the caller's landing lock and writes only the `CodeQualityMetricsHistory.jsonl`/`.svg`
-pair into the supplied ignored `Temp` directory.
+writes only the `CodeQualityMetricsHistory.jsonl`/`.svg` pair into the supplied ignored `Temp`
+directory.
 
-Standalone Contract/Generate behavior remains unchanged and is owned here. Landing, including the
-`carry-forward` invariant, is owned by [root `AGENTS.md` Step 8](../../../AGENTS.md) and
+Contract/Generate behavior is owned here. Landing is owned by
+[root `AGENTS.md` Step 8](../../../AGENTS.md) and
 [`/finalize-changes`](../finalize-changes/SKILL.md).
 
 ## Snapshot

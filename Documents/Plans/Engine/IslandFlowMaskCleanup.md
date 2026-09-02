@@ -31,8 +31,9 @@ lists, and `BakeRoute`'s required raw-output list and diagnostics. Existing
 route/archetype files may still emit an unlisted extra Flow output; the
 DataPacker must no longer require, read, fingerprint, or publish it.
 
-Advance `ExportIsland::kiTextureVersion` from `1` to `2` so cached masks are
-re-encoded under the new input contract. Keep `ExportIsland::GetVersion`, the
+Advance `ExportIsland::kiTextureVersion` from its current value to the next
+value (expected `2` to `3`) so cached masks are re-encoded under the new input
+contract. Keep `ExportIsland::GetVersion`, the
 island payload layout, and the shared `IslandHeader` unchanged. Update the
 island, terrain-shader, world-lighting binding, and placeholder comments to
 describe RGB masks plus constant unused alpha. Do not remove the bindless

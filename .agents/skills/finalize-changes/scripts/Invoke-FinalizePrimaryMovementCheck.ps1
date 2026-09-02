@@ -21,8 +21,6 @@ if (-not (Test-Path -LiteralPath $commonModule -PathType Leaf)) {
 }
 Import-Module $commonModule -Force -DisableNameChecking
 
-$script:HistoryJsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'
-$script:HistorySvgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
 $script:EvidenceLimit = 500
 
 function New-Evidence([object[]] $Items) {
@@ -41,7 +39,7 @@ function New-Evidence([object[]] $Items) {
 
 function New-Result {
 	return [ordered]@{
-		schemaVersion = 'broken-engine-finalize-primary-movement/v1'
+		schemaVersion = 'broken-engine-finalize-primary-movement/v2'
 		status = 'error'
 		code = 'assessment.failed'
 		message = 'Primary movement assessment did not complete.'
@@ -53,8 +51,6 @@ function New-Result {
 			totalCount = 0
 			items = @()
 			truncated = $false
-			historyPaths = New-Evidence @()
-			nonHistoryPaths = New-Evidence @()
 			overlapPaths = New-Evidence @()
 		}
 	}
@@ -262,36 +258,24 @@ function Get-RawChanges([string] $Root, [string] $Parent, [string] $LivePrimary)
 function Set-Evidence([object[]] $Foreign, [object[]] $Rows, [string[]] $Owned) {
 	$rowValues = @()
 	if ($null -ne $Rows) { $rowValues = @($Rows) }
-	$history = [Collections.Generic.List[string]]::new()
-	$nonHistory = [Collections.Generic.List[string]]::new()
 	$ownedSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 	foreach ($path in $Owned) { [void] $ownedSet.Add($path) }
 	$overlap = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 	foreach ($row in $rowValues) {
-		if ($row.Path -ceq $script:HistoryJsonPath -or $row.Path -ceq $script:HistorySvgPath) { [void] $history.Add($row.Path) }
-		else {
-			[void] $nonHistory.Add($row.Path)
-			if ($ownedSet.Contains($row.Path)) { [void] $overlap.Add($row.Path) }
-		}
+		if ($ownedSet.Contains($row.Path)) { [void] $overlap.Add($row.Path) }
 	}
-	$historyPaths = @(Get-OrdinalUnique $history.ToArray())
-	$nonHistoryPaths = @(Get-OrdinalUnique $nonHistory.ToArray())
 	$overlapPaths = @(Get-OrdinalUnique @($overlap))
 	$script:Result.foreignCommits = New-Evidence @($Foreign)
 	$script:Result.changes = [ordered]@{
 		totalCount = $rowValues.Count
 		items = (New-Evidence $rowValues).items
 		truncated = ($rowValues.Count -gt $script:EvidenceLimit)
-		historyPaths = New-Evidence $historyPaths
-		nonHistoryPaths = New-Evidence $nonHistoryPaths
 		overlapPaths = New-Evidence $overlapPaths
 	}
 	return [pscustomobject]@{
-		HistoryPaths = $historyPaths
-		NonHistoryPaths = $nonHistoryPaths
 		OverlapPaths = $overlapPaths
 		Truncated = ($script:Result.ownedPaths.truncated -or $script:Result.foreignCommits.truncated -or $script:Result.changes.truncated -or
-			$script:Result.changes.historyPaths.truncated -or $script:Result.changes.nonHistoryPaths.truncated -or $script:Result.changes.overlapPaths.truncated)
+			$script:Result.changes.overlapPaths.truncated)
 	}
 }
 
@@ -315,9 +299,6 @@ try {
 
 	$owned = Get-OwnedPathList $OwnedPaths
 	$script:Result.ownedPaths = New-Evidence $owned
-	if (@($owned | Where-Object { $_ -ceq $script:HistoryJsonPath -or $_ -ceq $script:HistorySvgPath }).Count -gt 0) {
-		Throw-Blocked 'primary.owned-history-path' 'OwnedPaths contains a reserved history JSONL or SVG path.'
-	}
 
 	if ($FixtureFailure -ceq 'unexpected') {
 		if ([Environment]::GetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE') -cne '1') {
@@ -366,15 +347,12 @@ try {
 		Throw-Blocked 'primary.evidence-truncated' 'Primary movement evidence exceeds the 500-item cap.'
 	}
 	if ($partition.OverlapPaths.Count -gt 0) {
-		Throw-Blocked 'primary.path-overlap' 'Foreign primary movement overlaps an owned non-history path.'
+		Throw-Blocked 'primary.path-overlap' 'Foreign primary movement overlaps an owned path.'
 	}
 	if (@($rows).Count -eq 0) {
 		Complete-Result 0 'pass' 'primary.tree-identical' 'Primary moved by a descendant range with no net tree paths.'
 	}
-	if ($partition.NonHistoryPaths.Count -eq 0) {
-		Complete-Result 0 'pass' 'primary.history-only' 'Primary movement changes only reserved history paths.'
-	}
-	Complete-Result 0 'needs-review' 'primary.disjoint-needs-review' 'Primary movement has non-history paths disjoint from the owned paths.'
+	Complete-Result 0 'needs-review' 'primary.disjoint-needs-review' 'Primary movement changes paths disjoint from the owned paths.'
 }
 catch {
 	$exitCode = if ($_.Exception.Data.Contains('exit')) { [int] $_.Exception.Data['exit'] } else { 1 }

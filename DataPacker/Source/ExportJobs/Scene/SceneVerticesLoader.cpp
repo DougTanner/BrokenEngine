@@ -319,6 +319,19 @@ void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& 
 			throw std::runtime_error(std::format("Scene primitive {} is missing indices; non-indexed primitives are unsupported.", i));
 		}
 
+		// tinygltf defaults an absent "mode" to TINYGLTF_MODE_TRIANGLES, so this rejects only genuine strip, fan, line, and point
+		// primitives. The export optimizes and the runtime draws triangle lists, so any other topology would be silently
+		// reinterpreted as unrelated triangles.
+		if (rPrimitive.mode != TINYGLTF_MODE_TRIANGLES)
+		{
+			throw std::runtime_error(std::format("Scene primitive {} uses glTF mode {}; only triangle lists (mode {}) are supported.", i, rPrimitive.mode, TINYGLTF_MODE_TRIANGLES));
+		}
+
+		if (rModel.accessors[rPrimitive.indices].count % 3 != 0)
+		{
+			throw std::runtime_error(std::format("Scene primitive {} has {} indices, which is not a multiple of three.", i, rModel.accessors[rPrimitive.indices].count));
+		}
+
 		ASSERT(rPrimitive.attributes.find("POSITION") != rPrimitive.attributes.end());
 		ASSERT(rPrimitive.attributes.find("COLOR_0") == rPrimitive.attributes.end());
 		if (rPrimitive.attributes.find("TEXCOORD_6") != rPrimitive.attributes.end())
@@ -328,7 +341,9 @@ void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& 
 
 		ASSERT(rPrimitive.material >= 0);
 		int iOriginalMaterial = rPrimitive.material;
-		bool bHasSkinning = rPrimitive.attributes.find("JOINTS_0") != rPrimitive.attributes.end();
+		// Joint indices only mean anything when the owning node actually references a skin; without one there is no
+		// joint/inverse-bind mapping to apply, so the primitive ships as a mesh-matrix draw and the shader ignores its joint attributes
+		bool bHasSkinning = rNode.skin >= 0 && rPrimitive.attributes.find("JOINTS_0") != rPrimitive.attributes.end();
 
 		int iEffectiveMaterial = ResolveEffectiveMaterial(rContext, iOriginalMaterial, iCurrentNodeIndex, bHasSkinning, matMeshWorld);
 		Material& rMaterial = rMaterials.at(iEffectiveMaterial);

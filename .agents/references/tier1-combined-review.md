@@ -9,8 +9,8 @@ the dispatch is shared.
 
 The whole change is Tier 1 and no changed file is C++. A Tier-1 change that
 touches C++, and every Tier-2+ change, keeps the separate Step 5, 6, and 7
-dispatches unchanged. Step 8's landing-gate `/verify-changes` reviewer is never
-folded in — it binds to the final prepared diff, which does not exist yet.
+dispatches unchanged. Step 8's landing acceptance table is never folded in — the
+finalizer binds it to the final prepared diff, which does not exist yet.
 
 ## Components, in order
 
@@ -21,8 +21,8 @@ folded in — it binds to the final prepared diff, which does not exist yet.
    `/validate-skill` for a changed `.agents/skills/*/SKILL.md`, and
    `/progressive-disclosure-review` for a changed `AGENTS.md`, `CLAUDE.md`,
    `.agents/skills/**/*.md`, or `.agents/references/**/*.md` file. Run each triggered
-   skill in full and return its complete handoff unmodified, exactly as
-   `/verify-changes` requires for a skill change. Each passes on its own skill's
+   skill in full and return its complete handoff unmodified, exactly as the
+   landing acceptance table requires. Each passes on its own skill's
    pass condition.
 3. When Step 7 applies — a stage completing without landing — map every approved
    criterion and invariant to evidence that settles the question on its own,

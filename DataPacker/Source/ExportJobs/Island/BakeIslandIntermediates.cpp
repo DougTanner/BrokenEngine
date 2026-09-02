@@ -111,6 +111,43 @@ std::filesystem::path ResolveTerrain(const std::filesystem::path& rIslandFolder,
 	throw std::runtime_error(std::format("Archetype '{}' not found in any input directory's Islands/ folder or as a sibling of \"{}\".", archetype, rIslandFolder.string()));
 }
 
+// Prune stale source sub-folders: any directory whose name isn't a current route label. This
+// drops folders for routes removed from the list, so no orphaned leaf produces a stale chunk.
+// Island.json and the archetype .terrain are files, so this never touches them. An empty route
+// list therefore removes every generated sub-folder of the island folder.
+void RemoveNonRouteSubFolders(const std::filesystem::path& rIslandFolder, const std::vector<const RouteSubdivision*>& rRoutes)
+{
+	// Collect stale sub-folders first, then delete — mutating the directory mid-iteration via
+	// remove_all is unspecified behavior for directory_iterator.
+	std::vector<std::filesystem::path> staleSubFolders;
+	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(rIslandFolder))
+	{
+		if (!rEntry.is_directory())
+		{
+			continue;
+		}
+		std::string name = rEntry.path().filename().string();
+		bool bIsRouteLabel = false;
+		for (const RouteSubdivision* pRoute : rRoutes)
+		{
+			if (name == pRoute->pcLabel)
+			{
+				bIsRouteLabel = true;
+				break;
+			}
+		}
+		if (!bIsRouteLabel)
+		{
+			staleSubFolders.push_back(rEntry.path());
+		}
+	}
+	for (const std::filesystem::path& rStaleSubFolder : staleSubFolders)
+	{
+		std::filesystem::remove_all(rStaleSubFolder);
+		LOG(kDefault, kDebug, "Removed stale island sub-folder: \"{}\"", rStaleSubFolder.string());
+	}
+}
+
 void BakeOne(const std::filesystem::path& rGaeaExecutable, const std::filesystem::path& rIslandFolder)
 {
 	std::filesystem::path islandJsonFile = rIslandFolder / "Island.json";
@@ -195,38 +232,8 @@ void BakeOne(const std::filesystem::path& rGaeaExecutable, const std::filesystem
 	std::filesystem::path archetypeFile = ResolveTerrain(rIslandFolder, islandJson);
 	std::filesystem::path cacheIslandFolder = GetIslandCachePath(rIslandFolder);
 
-	// Prune stale source sub-folders: any directory whose name isn't a current route label. This
-	// drops folders for routes removed from the list, so no orphaned leaf produces a stale chunk.
-	// Island.json and the archetype .terrain are files, so this never touches them.
-	// Collect stale sub-folders first, then delete — mutating the directory mid-iteration via
-	// remove_all is unspecified behavior for directory_iterator.
-	std::vector<std::filesystem::path> staleSubFolders;
-	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(rIslandFolder))
-	{
-		if (!rEntry.is_directory())
-		{
-			continue;
-		}
-		std::string name = rEntry.path().filename().string();
-		bool bIsRouteLabel = false;
-		for (const RouteSubdivision* pRoute : routes)
-		{
-			if (name == pRoute->pcLabel)
-			{
-				bIsRouteLabel = true;
-				break;
-			}
-		}
-		if (!bIsRouteLabel)
-		{
-			staleSubFolders.push_back(rEntry.path());
-		}
-	}
-	for (const std::filesystem::path& rStaleSubFolder : staleSubFolders)
-	{
-		std::filesystem::remove_all(rStaleSubFolder);
-		LOG(kDefault, kDebug, "Removed stale island sub-folder: \"{}\"", rStaleSubFolder.string());
-	}
+	RemoveNonRouteSubFolders(rIslandFolder, routes);
+
 	std::function<void(const std::filesystem::path&)> pruneStaleCacheRoutes = [&routes](const std::filesystem::path& rCacheIslandFolder)
 	{
 		if (!std::filesystem::exists(rCacheIslandFolder))
@@ -322,9 +329,22 @@ void BakeIslandIntermediates()
 
 		for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(islandsRoot))
 		{
-			if (rEntry.is_directory() && std::filesystem::exists(rEntry.path() / "Island.json"))
+			if (!rEntry.is_directory())
+			{
+				continue;
+			}
+
+			if (std::filesystem::exists(rEntry.path() / "Island.json"))
 			{
 				islandFolders.push_back(rEntry.path());
+			}
+			else
+			{
+				// An island folder without Island.json is a deleted island: its generated route
+				// folders must go here, before ExportIsland / ExportTexture discovery claims their
+				// leaves and packs chunks for an island that no longer exists. The island folder
+				// itself stays — an empty directory claims nothing.
+				RemoveNonRouteSubFolders(rEntry.path(), {});
 			}
 		}
 	}

@@ -228,6 +228,16 @@ try {
 	$script:Root = [string]$context.repositoryRoot
 	$primary = [string]$context.primaryCheckout
 
+	if ($Target -ceq 'ThirdParty') {
+		# Only the primary checkout owns a real ThirdParty Output; in a linked worktree it is a link to the
+		# primary's shared library, so a build here would overwrite it. The primary is identified by its .git
+		# being an ordinary directory, as Bootstrap-AgentTools.ps1 and Provision-WorktreeThirdParty.ps1 do.
+		$rootGit = Get-Item -LiteralPath (Join-Path $script:Root '.git') -Force -ErrorAction SilentlyContinue
+		if ($null -eq $rootGit -or -not $rootGit.PSIsContainer -or ($rootGit.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+			Stop-CompileInvoke 'thirdparty.worktree-not-primary' "ThirdParty builds run in the primary checkout only ('$primary'); this checkout's ThirdParty Output is a link to the primary's shared library. Rebuild ThirdParty as explicit primary maintenance (wrapper bootstrap rebuilds it at session start)."
+		}
+	}
+
 	# The effective data mode decides which authorizations hold, so it resolves from the read-only
 	# context alone and its guards block before provisioning or any other side effect can run.
 	if ($isGameTarget) {

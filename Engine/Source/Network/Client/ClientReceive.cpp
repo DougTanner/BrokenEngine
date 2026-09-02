@@ -335,6 +335,17 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 		return;
 	}
 
+	// Trust boundary: an islandCrc with no loaded template escapes Receive's catch and terminates the
+	// client at AcquireTextureSlot's mIslands.at during ApplyReceivedStaticData. Reject the whole payload.
+	for (const IslandPlacement& rPlacement : received.staticData.islands)
+	{
+		if (!gpIslandTerrain->mIslands.contains(rPlacement.islandCrc))
+		{
+			LOG(kNetwork, kWarning, "Client::ServerCoordStaticData unknown island CRC {} Coord: ({},{}) Slot: {}", rPlacement.islandCrc, coord.x, coord.y, uiSlotIndex);
+			return;
+		}
+	}
+
 	// Heap: received static data vector grows on new subscription
 	mReceivedStaticData.push_back(std::move(received));
 }

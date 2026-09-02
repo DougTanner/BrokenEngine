@@ -6,11 +6,11 @@ namespace audiorepair
 // Pack-time output sample rate. Every source .wav is resampled to this so source rate == mastering
 // rate holds at runtime, letting XAudio2 bypass its per-voice SRC. The engine pins its mastering
 // voice to the same value — see kiMasteringSampleRate in Engine/Source/Audio/AudioUtility.h
-// (kept in lockstep). Changing this requires an ExportAudio::GetVersion bump to force re-export.
+// (kept in lockstep). Changing this requires an ExportAudio::kiVersion bump to force re-export.
 inline constexpr int64_t kiAudioExportSampleRate = 48000;
 
 // Policy toggles. Music/ assets are loudness-mastered — flat-topping there is intentional limiting,
-// so declip defaults off for them. Flipping either toggle requires an ExportAudio::GetVersion bump
+// so declip defaults off for them. Flipping either toggle requires an ExportAudio::kiVersion bump
 // to force re-export.
 inline constexpr bool kbDeclipEnabled = true;
 inline constexpr bool kbDeclipMusic = false;

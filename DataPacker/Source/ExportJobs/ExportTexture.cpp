@@ -113,10 +113,28 @@ void ExportTexture::ProcessKtxCubemap()
 void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 {
 	std::vector<std::byte> fileBytes = common::ReadEntireFile(mInputPath);
-	TextureIntermediateHeader header = ReadTextureIntermediateHeader(fileBytes.data(), static_cast<int64_t>(fileBytes.size()));
+	const int64_t iFileSize = static_cast<int64_t>(fileBytes.size());
+	TextureIntermediateHeader header = ReadTextureIntermediateHeader(fileBytes.data(), iFileSize);
 	int64_t iWidth = header.iWidth;
 	int64_t iHeight = header.iHeight;
 	int64_t iMipMaps = header.iMipCount;
+
+	// Trust boundary: the intermediate is an opaque file and the shared parser locates the payload
+	// without judging it, so bound the header and the declared extents here — before the payload
+	// iterators below, ComputeImageByteSize's per-mip loop, and the inflate buffer allocation.
+	if (iFileSize <= header.iPayloadOffset)
+	{
+		throw std::runtime_error(std::format("Texture intermediate \"{}\" is {} bytes; expected more than its {}-byte header.", mInputPath.string(), iFileSize, header.iPayloadOffset));
+	}
+
+	// 16384 / 15 match TextureUploadManager::ValidateTextureDimensions (the VkPhysicalDeviceLimits::
+	// maxImageDimension2D guaranteed floor class, and log2(16384) + 1 mips), so anything published here
+	// still uploads at runtime; they also keep every zlib-path mip chain inside uLongf.
+	if (iWidth <= 0 || iHeight <= 0 || iMipMaps <= 0 || iWidth > 16384 || iHeight > 16384 || iMipMaps > 15)
+	{
+		throw std::runtime_error(std::format("Texture intermediate \"{}\" declares invalid dimensions {}x{} with {} mips.", mInputPath.string(), iWidth, iHeight, iMipMaps));
+	}
+
 	std::vector<std::byte> data(fileBytes.begin() + header.iPayloadOffset, fileBytes.end());
 
 	// Texture .pack chunks are LZ4-compressed (the runtime FileManager LZ4-decompresses them). Neither
@@ -131,6 +149,24 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 	int64_t iUncompressedSize = bRawHalfFloat
 		? static_cast<int64_t>(data.size())
 		: ComputeUncompressedTextureSize(vkFormat, iWidth, iHeight, iMipMaps);
+
+	// Lz4Compress narrows the source size to int, so bound the derived size here: the inflate buffer
+	// and the LZ4 call never see a size outside LZ4's input domain.
+	if (iUncompressedSize > LZ4_MAX_INPUT_SIZE)
+	{
+		throw std::runtime_error(std::format("Texture intermediate \"{}\" derives a {}-byte payload; LZ4 accepts at most {} bytes.", mInputPath.string(), iUncompressedSize, LZ4_MAX_INPUT_SIZE));
+	}
+
+	if (bRawHalfFloat)
+	{
+		// Half-float intermediates are only ExportCubemapIbl's raw six-face output, so the payload must be
+		// exactly the declared six-face mip chain.
+		int64_t iExpectedSize = common::ComputeImageByteSize(vkFormat, iWidth, iHeight, iMipMaps, 6, 1);
+		if (iUncompressedSize != iExpectedSize)
+		{
+			throw std::runtime_error(std::format("Texture intermediate \"{}\" payload is {} bytes; expected {} bytes for {}x{} with {} mips across 6 faces.", mInputPath.string(), iUncompressedSize, iExpectedSize, iWidth, iHeight, iMipMaps));
+		}
+	}
 
 	std::vector<std::byte> inflated;
 	if (!bRawHalfFloat)

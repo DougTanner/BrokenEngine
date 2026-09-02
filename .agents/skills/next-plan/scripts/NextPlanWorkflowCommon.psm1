@@ -47,39 +47,4 @@ function Get-NextPlanContext {
 function Invoke-NextPlanProcess([string] $Executable,[string[]] $Arguments,[string] $WorkingDirectory) { return Invoke-FinalizeNativeText -Executable $Executable -Arguments $Arguments -WorkingDirectory $WorkingDirectory }
 function ConvertFrom-NextPlanProcessJson($Response,[string] $Operation) { if ([string]::IsNullOrWhiteSpace($Response.Stdout)) { throw "$Operation returned empty stdout. $($Response.Stderr.Trim())" }; try { return $Response.Stdout.Trim() | ConvertFrom-Json -Depth 100 -ErrorAction Stop } catch { throw "$Operation did not return one JSON value. $($_.Exception.Message)" } }
 function Assert-NextPlanGitPath([string] $Path) { Assert-FinalizeGitPath $Path }
-# The metrics-history overlay is the only content the landing flow regenerates after the user's landing
-# confirmation (root AGENTS.md Step 8), so it is the only legitimate difference between a stranded commit and
-# its re-landed copy. Every other path stays in the compared bytes. `--unified=3` pins the default context so a
-# repository or user `diff.context` setting cannot change what the comparison sees.
-$script:NextPlanFilteredPatchArguments = @(
-	'--no-color','--no-ext-diff','--no-textconv','--full-index','--binary','--no-renames','--unified=3','--','.',
-	':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl',
-	':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg')
-function Get-NextPlanFilteredPatchHash([string] $Worktree,[string] $Commit) {
-	# Invoke-NextPlanProcess decodes stdout as UTF-8 text, which replaces every invalid byte with U+FFFD and would
-	# make two different binary patches hash equal, so this proof reads git's raw stdout bytes instead.
-	$start = [Diagnostics.ProcessStartInfo]::new()
-	$start.FileName = 'git.exe'
-	$start.WorkingDirectory = $Worktree
-	$start.UseShellExecute = $false
-	$start.CreateNoWindow = $true
-	$start.RedirectStandardOutput = $true
-	$start.RedirectStandardError = $true
-	foreach ($argument in (@('-C',$Worktree,'diff',"$Commit^",$Commit) + $script:NextPlanFilteredPatchArguments)) { [void] $start.ArgumentList.Add($argument) }
-	$process = [Diagnostics.Process]::new()
-	$process.StartInfo = $start
-	if (-not $process.Start()) { throw "Could not start 'git.exe'." }
-	$patch = [IO.MemoryStream]::new()
-	try {
-		$copy = $process.StandardOutput.BaseStream.CopyToAsync($patch)
-		$stderrTask = $process.StandardError.ReadToEndAsync()
-		[void] $copy.GetAwaiter().GetResult()
-		$process.WaitForExit()
-		$exitCode = $process.ExitCode
-		$stderr = $stderrTask.GetAwaiter().GetResult()
-		if ($exitCode -ne 0) { throw "git diff of $Commit against its parent failed. $($stderr.Trim())" }
-		$sha256 = [Security.Cryptography.SHA256]::Create()
-		try { return [Convert]::ToHexString($sha256.ComputeHash($patch.ToArray())) } finally { $sha256.Dispose() }
-	} finally { $patch.Dispose(); $process.Dispose() }
-}
-Export-ModuleMember -Function New-NextPlanStateBlocker,Test-NextPlanStateBlocker,Get-NextPlanContext,Invoke-NextPlanProcess,ConvertFrom-NextPlanProcessJson,Assert-NextPlanGitPath,Get-NextPlanFilteredPatchHash
+Export-ModuleMember -Function New-NextPlanStateBlocker,Test-NextPlanStateBlocker,Get-NextPlanContext,Invoke-NextPlanProcess,ConvertFrom-NextPlanProcessJson,Assert-NextPlanGitPath

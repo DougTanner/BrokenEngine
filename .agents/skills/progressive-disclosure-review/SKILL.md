@@ -39,8 +39,15 @@ affected files receive a focused re-review.
 ## Review
 
 1. Take the changed regions from the read-only inventory rather than
-   re-deriving hunks, using the invocation and result contract in
-   `../scope-review/SKILL.md` step 1, filtered to instruction-doc paths.
+   re-deriving hunks: `pwsh -NoProfile -File
+   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
+   repository toplevel> -Baseline <full 40-character SHA> -Regions` (add `-Head
+   <commit>` for a committed head and `-IncludeUntracked <comma-separated
+   paths>` for untracked files), filtered to instruction-doc paths. Only
+   `status` `pass` (exit 0) is usable; `blocked` (exit 2) or `error` (exit 1)
+   means the diff input is unavailable — report that instead of enumerating
+   hunks inline. Read `truncation.regions` and `counts.unlistedUntracked` from
+   the result.
 2. Duplication: flag changed prose that restates or paraphrases content another
    location already owns — a reference doc, a script's own documented usage, a
    parent `AGENTS.md`, another skill, elsewhere in the same file, or code and
@@ -75,7 +82,9 @@ affected files receive a focused re-review.
 - `AGENTS.md` content correctness, chain sync, and leaf/hub size targets —
   `/update-claude-docs`.
 - C++ comment style and formatting — `/code-style-review`.
-- Scope authorization and unnecessary extra work — `/scope-review`.
+- Scope authorization and unnecessary extra work — the Step-5 correctness
+  review of each changed artifact type
+  (`../../references/scope-authorization.md`).
 
 ## Output
 
@@ -108,14 +117,13 @@ Residuals: <pre-existing excess or none>
 
 `Changed files` and `Build required` are `none` because this findings-only
 review never edits a file; the remaining shared lines follow
-`../../references/subagent-reporting.md`, `## Handoffs`. Before `/codex-review`
-prompt assembly will assemble a `/verify-changes` prompt over changed
-instruction prose, this block must carry four things, none of which may be
-dropped or reworded: the `Skill: progressive-disclosure-review` marker line, the
-`Files checked:` line, a `Status: PASS` verdict, and a `Baseline:` line whose
-SHA is either the `/verify-changes` dispatch baseline or another resolvable
-commit at which the instruction docs that diff changes do not differ from the
-dispatch baseline, which is what makes those docs' reviewed bytes the bytes
+`../../references/subagent-reporting.md`, `## Handoffs`. Whatever gates on this
+handoff for changed instruction prose, the block must carry four things, none of
+which may be dropped or reworded: the `Skill: progressive-disclosure-review`
+marker line, the `Files checked:` line, a `Status: PASS` verdict, and a
+`Baseline:` line whose SHA is either the reviewed diff's baseline or another
+resolvable commit at which the instruction docs that diff changes do not differ
+from that baseline, which is what makes those docs' reviewed bytes the bytes
 this review read. A `NEEDS_ACTION` or `BLOCKED` handoff, and one whose
 `Baseline:` is absent, unresolvable, or a commit at which those docs differ,
 are gated exactly like a missing handoff — so re-run only when those docs

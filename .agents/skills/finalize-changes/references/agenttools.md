@@ -33,6 +33,3 @@ Wrapper bootstrap is the only in-place shared-Output build path. It runs at
 wrapper start under its global mutex, incrementally rebuilds WorktreeCli,
 AgentHarness, and ThirdParty, and best-effort seeds DataPacker. Routine builds
 consume immutable primary outputs and never promote or copy tools.
-
-Run AgentTools promotion fixtures only when this contract or its projection
-changes.

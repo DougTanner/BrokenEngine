@@ -4,7 +4,7 @@ Revisit When: Codex-hosted Sol review turnaround becomes a bottleneck worth the 
 
 ## Context
 
-Reviews dispatched from Claude Code already run on Codex's fast (priority) service tier: `.codex/codex-review.ps1:225` passes `-c 'service_tier="fast"'` to the detached `codex exec` invocation. That change was deliberately scoped to the Claude Code route only.
+Reviews dispatched from Claude Code can run on Codex's fast (priority) service tier: `.codex/codex-review.ps1` passes `-c "service_tier=..."` from its `$serviceTier` switch to the detached `codex exec` invocation. That switch is currently `default` (fast tier disabled) and was deliberately scoped to the Claude Code route only.
 
 Codex-hosted sessions never call that script. Their `reviewer` role resolves to `.codex/agents/sol.toml`, which sets only `model = "gpt-5.6-sol"` and `model_reasoning_effort = "medium"` and carries no service-tier setting, so the tier falls back to the user's `~/.codex/config.toml`. The suggested maintainer profile documented at `README.md:151` sets `service_tier = "default"`. Root cause: Sol reviews started inside Codex therefore run on the standard tier while the identical review started from Claude Code runs fast, purely because of where it was dispatched.
 

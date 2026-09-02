@@ -1,20 +1,18 @@
 # Texture Export Helpers
 
-Texture transforms, intermediate-file I/O, RDO sweeps, and legacy-intermediate migration. The parent ExportJobs hub owns asset matching and final chunk routing.
+Texture transforms, intermediate-file I/O, block encoding, and legacy-intermediate migration. The parent ExportJobs hub owns asset matching and final chunk routing.
 
 ## Intermediate Contract
 
 `Texture::Save` writes a magic marker, dimensions, mip count, then the encoded payload. BCn and R16 intermediates are zlib-compressed on disk; half-float cubemap pre-pass output remains raw. Readers must use the shared parser and its returned payload offset rather than duplicating header math.
 
-Texture writers use a private, untagged staging name and atomically replace the requested destination only after the complete file is flushed and closed, so an in-progress file cannot be picked up by texture routing. Scene pre-export keeps one staged output per unique source/format pair, waits for every worker before publishing any final intermediate, and tracks unpublished attempts separately from outputs published by the current attempt so failure cleanup keeps those ownership boundaries intact.
+Texture writers use a private, untagged staging name and atomically replace the requested destination only after the complete file is flushed and closed, so an in-progress file cannot be picked up by texture routing. Scene pre-export keeps one staged output per unique source/format pair, completes every attempt before publishing any final intermediate, and tracks unpublished attempts separately from outputs published by the current attempt so failure cleanup keeps those ownership boundaries intact.
 
 Final texture chunks use LZ4 and store compressed and uncompressed sizes for `FileManager`. Raw intermediate input is decoded as needed and re-encoded for the chunk; changing the intermediate or chunk contract requires coordinated producer, exporter-version, shared-header, and runtime-reader updates.
 
-## Encoding and RDO
+## Encoding
 
-Mip generation, format conversion, underwater masking, and block compression are offline quality-sensitive work. Preserve deterministic inputs and the configured encoder path; the optional bc7e.ispc route remains disabled. `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` fails before encoding in both the job entry point and shared RDO path.
-
-RDO sweeps decode an existing intermediate through the shared parser and report every candidate encode through `LOG` only: they write no files and change nothing on disk. Keep them that way. `RunRdoSweepValidate` is the mode that measures the current production encoder settings against alternatives.
+Mip generation, format conversion, underwater masking, and direct BC4/5/7 block compression are offline quality-sensitive work. Preserve deterministic inputs and the configured base encoders; the optional bc7e.ispc route remains disabled. The shared worker pool dispatches bounded block-row ranges, and whole encode chains remain serialized by the caller-held `sEncodeMutex`; [Common threading](../../../../Common/Threading/AGENTS.md) owns `Dispatch` participation and reentrancy. `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` fails before encoding in both the job entry point and shared encoding path.
 
 ## Migration
 

@@ -160,8 +160,7 @@ Analysis findings are pre-existing or out-of-scope debt, never permission to fix
 code in this workflow. Route every accepted candidate through
 `create-follow-up-plans`, passing oversized files with their required
 `/reduce-file <path>` instruction intact. Acceptance and landing then follow root
-`AGENTS.md` Change Workflow Steps 7 and 8 through `verify-changes` and
-`finalize-changes`.
+`AGENTS.md` Change Workflow Steps 7 and 8 through `finalize-changes`.
 
 ## Summary
 

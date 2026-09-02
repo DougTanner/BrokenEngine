@@ -438,8 +438,8 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	std::filesystem::create_directories(diagnosticsDirectory);
 
 	// Encode each intermediate as a BC-compressed mip chain in turn (MakeMipmaps walks down to the
-	// BC 4-divisibility floor). sEncodeMutex serializes the BC encoder across textures (it spawns up to
-	// HardwareCoreCount() - 2 threads internally; mutex bounds memory). A JPEG sidecar is written next to each
+	// BC 4-divisibility floor). sEncodeMutex serializes the BC encoder across textures while each encode
+	// uses the shared bounded worker pool; the mutex also bounds source-pixel memory. A JPEG sidecar is written next to each
 	// output for visual diagnosis of the bake input (mip 0 only). MaskByHeightmap runs before
 	// MakeMipmaps on each so the flat-value underwater regions propagate down the mip chain via
 	// the box / linear downsample naturally — the BC encoder then sees long constant runs at every
@@ -539,10 +539,11 @@ std::string ExportIsland::GetInputFingerprint() const
 
 std::filesystem::path ExportIsland::GetTextureMarkerPath() const
 {
-	// mCacheMetadataFile is "<temp>/<relativeDirectory>/<leaf>.meta"; the texture marker is its sibling,
-	// so both stage markers share the job's temp directory and are discarded together by a temp wipe.
-	std::filesystem::path markerPath = mCacheMetadataFile;
-	markerPath.replace_extension(".textures");
+	// Keyed by kiTextureVersion alone, never the chunk version: a chunk-payload bump must keep reusing the
+	// tracked BC textures. The marker sits beside the job's other cache entries so a cache wipe discards them together.
+	std::filesystem::path markerPath = mCacheMetadataFile.parent_path();
+	markerPath /= mInputPath.filename();
+	markerPath += std::format(".t{}.textures", kiTextureVersion);
 	return markerPath;
 }
 

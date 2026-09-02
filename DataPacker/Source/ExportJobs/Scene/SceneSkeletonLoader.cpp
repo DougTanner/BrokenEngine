@@ -13,6 +13,52 @@ std::unordered_map<int, int> BuildNodeParentMap(const tinygltf::Model& rModel)
 	return parentMap;
 }
 
+void CanonicalizeSceneSkin(tinygltf::Model& rModel)
+{
+	std::unordered_set<int> referencedSkins;
+	for (const tinygltf::Node& rNode : rModel.nodes)
+	{
+		if (rNode.skin < 0)
+		{
+			continue;
+		}
+
+		// tinygltf parses "skin" without range checking, and the glTF file is untrusted input
+		if (rNode.skin >= static_cast<int>(rModel.skins.size()))
+		{
+			throw std::runtime_error(std::format("ExportScene node references skin {}, but the model declares only {} skins", rNode.skin, rModel.skins.size()));
+		}
+
+		referencedSkins.insert(rNode.skin);
+	}
+
+	if (referencedSkins.size() > 1)
+	{
+		throw std::runtime_error(std::format("ExportScene references {} distinct glTF skins; the pack format carries one skeleton per scene", referencedSkins.size()));
+	}
+
+	if (referencedSkins.empty())
+	{
+		return;
+	}
+
+	int iReferencedSkin = *referencedSkins.begin();
+	if (iReferencedSkin == 0)
+	{
+		return;
+	}
+
+	std::swap(rModel.skins.at(0), rModel.skins.at(iReferencedSkin));
+	for (tinygltf::Node& rNode : rModel.nodes)
+	{
+		// No other node references a skin, so nothing maps onto the displaced slot
+		if (rNode.skin == iReferencedSkin)
+		{
+			rNode.skin = 0;
+		}
+	}
+}
+
 SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 {
 	LOG(kDefault, kDebug, "LoadSkeletonData: Loading all nodes...");
@@ -23,7 +69,8 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 	skeletonData.skeleton.uiNodeCount = static_cast<uint16_t>(rModel.nodes.size());
 	ASSERT(skeletonData.skeleton.uiNodeCount <= common::Skeleton::kiMaxNodes);
 
-	// Load skin joint data if a skin exists
+	// Load skin joint data if a skin exists. CanonicalizeSceneSkin ran before export, so slot 0 holds the skin the
+	// nodes reference; this and every other skin-0 read in the exporter depend on that.
 	if (!rModel.skins.empty())
 	{
 		const tinygltf::Skin& rSkin = rModel.skins[0];

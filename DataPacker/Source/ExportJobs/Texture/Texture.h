@@ -50,10 +50,10 @@ constexpr const char* TextureIntermediateSuffix(VkFormat vkFormat)
 }
 
 // zlib-DEFLATE a byte buffer at Z_BEST_COMPRESSION; returns a size-trimmed vector. Shared by the
-// texture-intermediate writers (Texture::Save / MigrateLegacyIntermediates) and the RDO sweep so the
-// compression level and Z_OK handling can't drift between them. The on-disk texture intermediates stay
-// zlib; the .pack texture chunks themselves are LZ4 (see Lz4Compress) and transcoded from zlib in
-// ExportTexture's raw-passthrough path.
+// texture-intermediate writers (Texture::Save / MigrateLegacyIntermediates) so the compression level
+// and Z_OK handling can't drift between them. The on-disk texture intermediates stay zlib; the .pack
+// texture chunks themselves are LZ4 (see Lz4Compress) and transcoded from zlib in ExportTexture's
+// raw-passthrough path.
 std::vector<std::byte> ZlibCompress(const std::byte* puiSource, int64_t iSourceSize);
 
 // LZ4HC-compress a byte buffer at LZ4HC_CLEVEL_MAX; returns a size-trimmed vector. Used for texture
@@ -81,11 +81,12 @@ struct TextureIntermediateHeader
 };
 
 // Parse the magic-vs-legacy header from the front of a texture-intermediate byte buffer and locate
-// the payload. PARSE/locate only -- imposes no validation policy, so each reader keeps its own
-// (ExportTexture trusts, RdoSweep asserts, MigrateLegacyIntermediates branches on bHadMagic to skip
-// already-migrated files then plausibility-checks the legacy header). For a magic-prefixed buffer
-// `iDataSize` must cover >= 4 qwords; legacy needs >= 3 (callers that can't guarantee that gate the
-// call with their own size check). Out-of-range qwords read as 0 rather than overrunning the buffer.
+// the payload. PARSE/locate only -- imposes no validation policy, so each reader validates on its own
+// terms and fails its own way (ExportTexture bounds the header and declared extents and throws an export
+// error, while MigrateLegacyIntermediates branches on bHadMagic to skip already-migrated files then
+// plausibility-checks the legacy header and skips a bad one). For a magic-prefixed buffer `iDataSize` must cover
+// >= 4 qwords; legacy needs >= 3 (callers that can't guarantee that gate the call with their own size
+// check). Out-of-range qwords read as 0 rather than overrunning the buffer.
 TextureIntermediateHeader ReadTextureIntermediateHeader(const std::byte* puiData, int64_t iDataSize);
 
 // True when the filename carries the `[C]` cubemap tag — the convention marking a .ktx or
@@ -101,8 +102,8 @@ class Texture
 public:
 
 	// Callers must hold this mutex around any Texture construction + MakeMipmaps + Save/Export
-	// chain that goes through RDO encoding. The encoder spawns up to HardwareCoreCount() - 2 threads
-	// internally; the mutex bounds memory by ensuring only one texture's source pixels exist at a time.
+	// chain that uses BC encoding. Encoding dispatches across the shared bounded worker pool; the mutex
+	// bounds memory and keeps that non-reentrant pool to one active encode at a time.
 	static std::mutex sEncodeMutex;
 
 	static void StaticInit();
@@ -132,7 +133,7 @@ public:
 	// 4×-downsampled engine-meter elevation), so each heightmap sample governs an iHeightmapDivisor²
 	// block of texture pixels. Single-mip only — call before MakeMipmaps so mips inherit the
 	// flattened regions naturally. Used by ExportIsland to zero out invisible underwater pixels
-	// before BC encoding, giving RDO + zlib large constant runs to compress.
+	// before BC encoding, giving the base codecs and zlib large constant runs to compress.
 	void MaskByHeightmap(const std::vector<float>& rHeightmap, int64_t iHeightmapWidth, int64_t iHeightmapHeight, int64_t iHeightmapDivisor, float fThresholdMeters, const float pfFlatValue[4]);
 
 	static uint32_t PixelToUint32(const std::vector<float>& rIn, int64_t iWidth, int64_t iX, int64_t iY);
@@ -142,9 +143,6 @@ public:
 	static void ToR8G8B8A8(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight);
 	static void ToR16(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight);
 	static void ToR32Sfloat(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight);
-
-	// Sweep-mode entry point: callers pass the RDO knobs explicitly. Production callers go through ToBc{4,5,7}.
-	static void EncodeWithRdo(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, float fLambda, uint32_t uiLookbackWindowSize, int iBc7UberLevel, TextureOptions_t options);
 
 	void Export(std::vector<std::byte>& rData, VkFormat vkFormat, TextureOptions_t options);
 
@@ -171,6 +169,8 @@ public:
 	std::vector<std::vector<float>> mData;
 
 private:
+
+	static void EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, TextureOptions_t options);
 
 	// The file-loading constructor dispatches to one loader per FileType; each fills mData and (for the
 	// image / EXR paths that don't receive dimensions) miWidth / miHeight. kFloat32 / kUint16Raw require
