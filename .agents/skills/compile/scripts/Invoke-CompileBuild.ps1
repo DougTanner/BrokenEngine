@@ -17,6 +17,7 @@ param(
 	[ValidateSet('Shared', 'Local')][string] $DataBuildMode,
 	[switch] $RunDataPacker,
 	[switch] $AllowGaeaExport,
+	[switch] $ForbidExpensiveExport,
 	[switch] $AcceptDeletionOnlyException,
 	[switch] $Prefast,
 	[string] $RepositoryRoot,
@@ -47,6 +48,7 @@ $script:GameTargets = @('Client', 'Server')
 $script:ReleaseOnlyTargets = @('DataPacker', 'WorktreeCli', 'AgentHarness')
 $script:AgentToolsTargets = @('WorktreeCli', 'AgentHarness')
 $script:GaeaGuardVariable = 'BT_DATAPACKER_FORBID_GAEA_EXPORT'
+$script:ExpensiveExportGuardVariable = 'BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT'
 $script:TargetFiles = @{
 	ThirdParty = 'ThirdParty\Prebuilts\Platforms\VisualStudio2026\ThirdParty.sln'
 	DataPacker = 'DataPacker\Platforms\VisualStudio2026\DataPacker.sln'
@@ -202,12 +204,16 @@ try {
 			@{ Set = -not [string]::IsNullOrWhiteSpace($DataBuildMode); Name = '-DataBuildMode' },
 			@{ Set = [bool]$RunDataPacker; Name = '-RunDataPacker' },
 			@{ Set = [bool]$AllowGaeaExport; Name = '-AllowGaeaExport' },
+			@{ Set = [bool]$ForbidExpensiveExport; Name = '-ForbidExpensiveExport' },
 			@{ Set = [bool]$AcceptDeletionOnlyException; Name = '-AcceptDeletionOnlyException' })) {
 			if ($pair.Set) { Stop-CompileInvoke 'parameter.game-only' "$($pair.Name) applies to Client or Server builds only." }
 		}
 	}
 	if ($AllowGaeaExport -and -not $RunDataPacker) {
 		Stop-CompileInvoke 'parameter.gaea-invalid' '-AllowGaeaExport applies only to the authorized -RunDataPacker generation build.'
+	}
+	if ($ForbidExpensiveExport -and -not $RunDataPacker) {
+		Stop-CompileInvoke 'parameter.expensive-export-invalid' '-ForbidExpensiveExport applies only to the authorized -RunDataPacker generation build.'
 	}
 	if ($null -ne $Files) {
 		# Elements split on ',' so the single-argument -File form carries a whole list.
@@ -328,7 +334,7 @@ try {
 	}
 
 	# Authorized Local generation: materialize, then run the one RunDataPacker=true build under the
-	# Gaea guard.
+	# Gaea guard and, when requested, the optional expensive-export guard.
 	if (-not (Test-JsonProperty $context 'devEnvDir') -or [string]::IsNullOrWhiteSpace($context.devEnvDir)) {
 		Stop-CompileInvoke 'dev-env-dir.unresolved' 'The generation build requires DevEnvDir, which the compile context did not report.'
 	}
@@ -351,18 +357,30 @@ try {
 	$generationProperties = @($dataProperties) + "/p:DevEnvDir=$($context.devEnvDir)"
 	$hadGaeaGuard = Test-Path "Env:$($script:GaeaGuardVariable)"
 	$previousGaeaGuard = [Environment]::GetEnvironmentVariable($script:GaeaGuardVariable)
+	if ($ForbidExpensiveExport) {
+		$hadExpensiveExportGuard = Test-Path "Env:$($script:ExpensiveExportGuardVariable)"
+		$previousExpensiveExportGuard = [Environment]::GetEnvironmentVariable($script:ExpensiveExportGuardVariable)
+	}
 	try {
 		if (-not $AllowGaeaExport) {
 			[Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, '1')
 			$script:Summary.Add("Gaea guard applied: $($script:GaeaGuardVariable)=1 for the generation build.")
 		}
 		else { $script:Summary.Add('Gaea guard omitted under explicit -AllowGaeaExport authorization.') }
+		if ($ForbidExpensiveExport) {
+			[Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, '1')
+			$script:Summary.Add("Expensive-export guard applied: $($script:ExpensiveExportGuardVariable)=1 for the generation build.")
+		}
 		$buildExitCode = Invoke-WorktreeCliBuild $generationProperties
 	}
 	finally {
 		if (-not $AllowGaeaExport) {
 			if ($hadGaeaGuard) { [Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, $previousGaeaGuard) }
 			else { [Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, $null) }
+		}
+		if ($ForbidExpensiveExport) {
+			if ($hadExpensiveExportGuard) { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $previousExpensiveExportGuard) }
+			else { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $null) }
 		}
 	}
 

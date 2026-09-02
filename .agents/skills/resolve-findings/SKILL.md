@@ -10,12 +10,19 @@ allowed-tools: [Read, Grep, Glob, Edit, "Bash(git diff *)", "Bash(git status *)"
 
 # Resolve Findings
 
-Run inside one delegated `implementer`. Fix only the accepted failures assigned
-by the manager and do not delegate. The manager owns finding decisions and scope
-changes, and dispatches builds, independent verification, and all fresh-context
-review to their assigned roles.
+## Purpose
 
-## Required Assignment
+Fixes only the review findings, compile failures, and runtime failures the
+manager explicitly accepted and assigned, and returns the fix handoff. Runs
+inside one delegated `implementer` that does not delegate.
+
+## When to use
+
+- The manager has accepted a review finding, compile failure, or runtime failure
+  and assigns the fix, supplying its evidence, classification, scope, and
+  session baseline.
+
+## Inputs
 
 Require a self-contained assignment carrying the authoritative task-brief fields
 (`../../references/subagent-reporting.md`) plus these skill-specific fields:
@@ -37,24 +44,6 @@ Structural work also returns to the manager: an in-scope acceptance failure
 blocks the active change; proven pre-existing or out-of-scope work may become a
 follow-up; user-approved expanded scope re-enters `/implement-plan` after the
 manager updates the authoritative plan.
-
-## Fix Workflow
-
-Confirm a checkable root cause before editing; leave an item unchanged when the
-cause is uncertain or out of scope. Apply the smallest change restoring approved
-behavior, check affected sites, and return out-of-scope candidates and build or
-runtime verification to the manager. Before handing off, audit the completed
-edit against the assignment, session baseline, and smallest plausible
-regression, and report the result under `Self-audit resolved`.
-
-Resolve conflicting sources by the authority order in root `AGENTS.md`
-`### Diagnosis Discipline`, naming the contradiction and the controlling source.
-
-Do not establish disputed external API, language, specification, or library
-behavior from memory: emit one single-claim request per
-`/verify-external-claims` (`../verify-external-claims/SKILL.md`,
-`## External Claim Requests`). A pending verdict keeps the item unresolved and
-the handoff `NEEDS_ACTION`.
 
 ## Handoff
 
@@ -84,3 +73,8 @@ dispatches independent verification as a separate role after the fix and
 required checks complete. Use `PASS` when every
 assigned item is fixed with no fix-work residual, `NEEDS_ACTION` when manager
 action remains, and `BLOCKED` when missing required evidence prevents work.
+
+## References
+
+- [`references/worker.md`](references/worker.md) — fix steps and rules for the
+  dispatched worker.

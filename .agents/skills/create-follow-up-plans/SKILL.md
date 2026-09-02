@@ -6,172 +6,44 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 
 # Create Follow-up Plans
 
-Turn eligible residuals into executable debt Plans. This skill owns the decision on each proposed follow-up, grouping, duplicate detection, area and filename placement, collision handling, dependencies, metadata, and Coordination decisions; callers supply evidence, not those decisions.
+## Purpose
 
-## Inputs and boundary
+Turn eligible residuals into concise, evidence-backed executable debt Plans
+under `Documents/Plans/<area>/`, with tracked scheduler metadata.
 
-Require direct finding evidence, originating step and unmet acceptance criterion, affected symbols/files, prior reviewer or user decisions, the active intent/plan, related residuals, and the session changed-file list. Inspect missing facts; never invent evidence or behavior.
+## When to use
 
-Read `Documents/AGENTS.md` and `Documents/Plans/AGENTS.md` completely. Their current Plan shape, metadata, dependency, and Coordination rules override this skill. This skill creates debt Plans only. Report a capability addition for main-agent routing to manual `Documents/Features/`; do not disguise it as debt.
+- A Change Workflow residual is proven pre-existing or outside the approved
+  implementation boundary of the active change.
+- Review findings must be recorded without duplicating an existing Plan.
+- A tooling-friction follow-up is recorded at a `/next-plan` claim exit.
+- Not for routing an in-scope acceptance failure out of the active change.
 
-Reject an in-scope acceptance failure, including required structural work: it remains a blocker in the active change. Also reject stale, disproven, fixed, stylistic-only, and evidence-free proposals, stating why.
+## Inputs
 
-Tooling friction observed during a `/next-plan` run is a separate category, and so is a script or documented tool invocation that returned an oversized result flooding the main context, cited by the context-efficiency envelope (tool, invocation, measured size, checkpoint). For tooling-friction proposals only, the substitutions below replace the corresponding root-cause-based requirements above and in `## Workflow` — the proof steps, the grouping and duplicate rules, and the drafted Plan's verified root cause; every other requirement still applies, and ordinary proposals keep the full root-cause bar unchanged. The observed in-session symptom with its citation — exact command or script path, observed output or malformed result, and the rework or workaround it forced — substitutes for the unmet acceptance criterion or accepted residual, and for the confirmed root cause wherever one is required, including in the drafted Plan. For a context-efficiency proposal, the envelope fields — tool, invocation, measured size — plus the separately supplied checkpoint substitute for the observed-output citation and for the rework or workaround it forced. Proven root cause is deferred to the `/next-plan-review` session named in the Plan's `## Design`. For the pre-existing and out-of-scope proof, verify that the misbehaving skill or script is outside the claimed Plan's `## In scope`; when it is inside, the failure is an in-scope blocker of the active change and is rejected as a friction follow-up. Grouping and duplicate detection key on (skill or script, observed symptom) instead of root cause; re-observing an already-recorded symptom updates nothing and is rejected as a duplicate. Evidence-free proposals — "the skill felt awkward", no citation — stay rejected.
+- `Objective` — the active intent or plan the proposals arose from.
+- `Scope` — affected symbols and files, and the session changed-file list.
+- `Fixed decisions` — prior reviewer or user decisions to preserve.
+- `Evidence` — direct finding evidence, the originating step and unmet
+  acceptance criterion, and related residuals.
 
-Plan files and the metadata line that must be their very first bytes are
-ordinary tracked Git content; write them directly, with or without a live Plan
-claim. `Documents/Features` remains manual and is not an alternate
-executable-Plan store.
+## Handoff
 
-## Workflow
+Return the shared handoff from `.agents/references/subagent-reporting.md`
+`## Handoffs`, including every proposal exactly once, with these rows:
 
-### 1. Prove and consolidate proposals
+- `Findings`: none.
+- `Changed files`: one row per created Plan (path — gap and metadata); one row
+  per updated existing Plan (path — prose-only or dependency update).
+- `Decisive checks`: one row per duplicate mapping (proposal -> existing Plan
+  path); one row per Plan with its Change Workflow tier and trigger and its
+  dependencies and Coordination; one row for the plan validate result; one row
+  for the required verification/finalization route.
+- `Build required`: none.
+- `Residuals` stays last: unrecorded item, conflict, or blocker and reason, or
+  none.
 
-For every proposal:
+## References
 
-1. State the false required condition and its originating criterion, accepted finding, or residual.
-2. Confirm root cause and unresolved state from current source or direct logs. Record durable `path:line`, symbol, and observed behavior evidence.
-3. Prove it is pre-existing or outside the approved implementation boundary.
-4. Preserve user decisions and the authority order among user direction, approved plan, documentation, and current behavior; report contradictions.
-
-Group items only when root cause, implementation boundary, invariant, and verification strategy all match. Split independently landable work, architectural decisions, separate subsystems, or meaningfully different risks.
-
-Run the provisioned `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe plan validate --repo <absolute-git-common-dir> --worktree <checkout>` before duplicate decisions and after tracked Plan edits. If the executable is absent, stop and report that authorized primary maintenance through `/compile` is required. Require exit `0`, the versioned JSON contract, `status: valid`, and `code: ok`; record stale dependency notices and healed claims. Treat `plans` entries as the executable inventory; never inspect machine-local claims.
-
-Search all live plan files by symbols, paths, root-cause terms, outcome, and `## Coordination`. A plan is a duplicate when it owns the same root cause and implementation boundary. Map the proposal to it unless the proven unmet acceptance criterion requires extending that plan.
-
-### 2. Draft and classify
-
-Choose the existing owning area and a concise PascalCase filename; never overwrite a collision. Draft the smallest decision-complete plan with `# Title`, `## Context`, `## Design`, `## Critical files`, `## In scope`, `## Out of scope`, `## Acceptance criteria` when the diff is insufficient, and `## Notes`. Include verified root cause, originating gap, implementation boundary, and applicable determinism/CRC, serialization/`.pack`/`kiVersion`, replay, wire, affinity, threading, allocation, shader, build, or live-verification exposure. Pre-stage architectural choices instead of deciding them. Phrase every choice you do make as the author's recommendation with its rationale rather than in binding language, per the authority-order directive in root `AGENTS.md`. Do not add unit tests or unsupported implementation detail.
-
-Derive the future implementation's Change Workflow Tier 1/2/3 from the highest root `AGENTS.md` risk trigger and record that trigger in the Plan. Put only directional prerequisites in `dependsOn`; put mandatory nondirectional constraints in reciprocal standard `## Coordination` sections in every affected Plan. A follow-up authored during a `/next-plan` run never names the Plan that run is completing; that skill's Claim lifecycle section shows why the edge cannot survive completion. Do not add score, effort ranking, queue tier, queue row, request file, or claim data.
-
-Draft a tooling-friction body from this template. Its `Worktree` line is a profile-relative locator, never an absolute path, and no transcript path or transcript text ever enters the body:
-
-```markdown
-# Fix: <skill or script> — <one-line symptom>
-
-## Context
-<Observed symptom: exact command run, script path(:line if known), observed
-output/behavior, what was repeated or worked around. No transcript text.>
-
-Session provenance (machine-local; not reproducible after cleanup). The Client
-through Worktree fields name the session that observed the friction — the
-session `/next-plan-review` must reach — while the `Landing ref` line names a
-ref whose tree actually contains this Plan:
-- Client: claude | codex
-- Conversation session ID: <lowercase uuid on Claude, read from
-  CLAUDE_CODE_SESSION_ID in main's own session shell — a subagent shell reports
-  that subagent's own ID; none on Codex, whose transcripts /next-plan-review
-  discovers by bounded commit window>
-- Worktree/branch UUID: <lowercase uuid, the same one the Session branch and
-  Worktree lines carry — selection evidence only, never production proof>
-- Session branch: <claude|codex>/<uuid>
-- Worktree: <profile-relative locator, e.g. .claude\worktrees\<repo>\<uuid> —
-  never an absolute path, so no home prefix enters the public repo>
-- Observed in an earlier session: <omit this line entirely when the session
-  recording this Plan is the session that observed the friction. Otherwise
-  state that the fields above are the observing session's, and give that
-  session's landed commit or branch — required on Codex, whose transcript
-  discovery needs the commit window around it.>
-- Landing ref: <a ref whose tree contains this Plan; never assume the session
-  branch above contains it. When the observing session records and lands the
-  Plan itself: the session branch above, whose tip is that session's final
-  commit and which survives exactly as long as the worktree recorded above.
-  When a later session records it: that later session's landing commit hash or
-  session branch, because the branch above was landed before this Plan
-  existed.>
-  Fallback once the recorded ref is gone:
-  `git log --diff-filter=A --format=%H -- <this plan path>`, but a periodic
-  Plan-history squash can make it return an unrelated aggregate commit, so
-  review its result only when the commit is attributable to one session alone
-  (its diff limited to that session's files); never review an aggregate or
-  multi-session squash commit.
-- Run the review before /cleanup-worktrees removes the worktree recorded above:
-  Codex transcript discovery requires the producing worktree to remain
-  registered, and Claude review requires the exact conversation session ID
-  above.
-
-## Design
-In a new session, run `/next-plan-review <review ref>` — the commit or branch on
-the `Observed in an earlier session` line when that line is present, otherwise
-the landing ref — supplying the recorded client and, on Claude, the recorded
-conversation session ID; a Codex review supplies the client and that review ref
-only. Root-cause the friction from the proven transcript, then make the smallest
-fix inside the `## In scope` boundary below. If root-causing shows the fix lies
-outside that boundary, surface it for re-planning instead of expanding scope.
-
-## Critical files
-- <each concrete SKILL.md and/or script file involved — these files are the
-  authorized fix boundary>
-
-## In scope
-- Root-cause investigation via /next-plan-review, run with the recorded client
-  and the review ref named in `## Design` — the `Observed in an earlier session`
-  ref when present, otherwise the landing ref — plus, on Claude, the recorded
-  conversation session ID; a Codex review supplies the client and that review
-  ref only
-- The smallest resulting fix, confined to <the files named above, naming
-  sections/functions when the observed symptom already identifies them>
-
-## Out of scope
-- The landed change the session produced
-- Unrelated skills/scripts; any transcript path or transcript text in the repo
-
-## Risk tier and invariants
-Expected Tier 2 (scoped tool behavior); escalate if the fix reaches
-build/bootstrap coordination. Never embed transcript paths or home paths.
-
-## Acceptance criteria
-- The recorded symptom no longer reproduces under the documented invocation
-- /validate-skill passes for any changed SKILL.md; plan validate exits 0
-```
-
-Create the file with the repository-owned `.agents/scripts/New-PlanFile.ps1`:
-
-```powershell
-pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
-```
-
-Its parameters, the `-DependsOn` single-token rule, its result shape, and its exit handling are in `../../references/new-plan-file.md`.
-
-### 3. Apply exactly one case
-
-| Case | Tracked Plan bytes | Completion route |
-|---|---|---|
-| New Plan | Run `New-PlanFile.ps1` (step 2) to write the final Plan under `Documents/Plans/<area>/`; it mints the marker and never overwrites an existing path. | Take the tree validation from the script's folded result; route through `/finalize-changes` only when a landing gate applies. |
-| Existing Plan, prose only | Edit the live tracked Plan directly, including reciprocal Coordination prose; preserve its marker byte-for-byte. | Validate and finalize the tracked edit. |
-| Existing Plan, dependency change | Edit only the marker's `dependsOn` array plus required reciprocal Coordination prose; never change `createdUtc`. | Validate and finalize the tracked edit. |
-
-Never create a request file, row, score, claim, or a commit that publishes a row.
-
-## Report
-
-Include every proposal exactly once:
-
-```text
-Created:
-- <Plan path> — <gap and metadata>
-
-Updated existing:
-- <Plan path or none> — <prose-only or dependency update>
-
-Duplicate mappings:
-- <residual> -> <existing plan path, or none>
-
-Tier and coordination:
-- <Plan> — Change Workflow Tier/trigger; dependencies/Coordination
-
-Verification/finalization handoff:
-- <plan validate evidence; required route>
-
-Files changed + regions touched:
-- <path> — <heading/region>
-- none
-
-Residuals:
-- <unrecorded item, conflict, or blocker and reason, or none>
-```
-
-Report a written Plan as tracked content; do not describe it as claimed or
-landed until that has actually happened.
+- [`references/worker.md`](references/worker.md) — worker entry: the steps and
+  the rules governing them.

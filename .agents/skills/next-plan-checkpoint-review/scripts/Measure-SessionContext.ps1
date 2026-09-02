@@ -33,9 +33,20 @@ function Complete-Measurement([int] $ExitCode, [string] $Status, [string] $Code,
 # Strict mode makes a missing property an error, and transcript records omit fields freely.
 function Get-Field($Object, [string] $Name) {
 	if ($null -eq $Object) { return $null }
-	# The unary comma keeps an array-valued field from unrolling into the caller's pipeline.
-	if ($Object.PSObject.Properties.Name -ccontains $Name) { return , $Object.$Name }
+	# Reading the collection's Name member throws under strict mode when the object has no properties, and the
+	# Properties[$Name] indexer is case-insensitive, so match by iterating the collection instead, which stays
+	# case-sensitive and works when it is empty.
+	foreach ($property in $Object.PSObject.Properties) {
+		# The unary comma keeps an array-valued field from unrolling into the caller's pipeline.
+		if ($property.Name -ceq $Name) { return , $Object.$Name }
+	}
 	return $null
+}
+
+function Get-ToolUseIdTag([string] $Text) {
+	$match = [regex]::Match($Text, '<tool-use-id>([^<]*)</tool-use-id>')
+	if ($match.Success) { return $match.Groups[1].Value }
+	return ''
 }
 
 function Measure-ResultChars($Content) {
@@ -101,15 +112,28 @@ try {
 		# Sidechain lines are a subagent's own context and never entered the main session.
 		if ((Get-Field $record 'isSidechain') -eq $true) { continue }
 		$recordType = [string](Get-Field $record 'type')
+		# A background subagent's handoff reaches main in one of two shapes, neither of which is a tool_result
+		# even though both entered main's context the same way: a `queued_command` attachment when the handoff
+		# was still queued as the turn ended, and otherwise a system-authored `user` record whose string content
+		# is a task-notification block (branch below). Both name the dispatching tool_use id in a
+		# `<tool-use-id>` tag, so keying each by that id ranks it with a resolved tool name instead of
+		# `unknown`. A queued command without the tag is human-typed, and `queue-operation` records repeat a
+		# handoff already counted here; both stay uncounted.
+		if ($recordType -ceq 'attachment') {
+			$attachment = Get-Field $record 'attachment'
+			$prompt = Get-Field $attachment 'prompt'
+			if ([string](Get-Field $attachment 'type') -ceq 'queued_command' -and $prompt -is [string]) {
+				$queuedToolUseId = Get-ToolUseIdTag $prompt
+				if (-not [string]::IsNullOrEmpty($queuedToolUseId)) {
+					$measured.Add([pscustomobject]@{ ToolUseId = $queuedToolUseId; Chars = $prompt.Length })
+				}
+			}
+			continue
+		}
 		if ($recordType -cne 'assistant' -and $recordType -cne 'user') { continue }
 		$content = Get-Field (Get-Field $record 'message') 'content'
-		# A completed subagent's handoff arrives as a system-authored `user` record whose string content is a
-		# task-notification block, so it never reaches the tool_result branch below even though it entered
-		# main's context the same way. Key it by the dispatching tool_use id the block names, so it ranks with a
-		# resolved tool name instead of `unknown`.
 		if ($content -is [string] -and [string](Get-Field (Get-Field $record 'origin') 'kind') -ceq 'task-notification') {
-			$notificationMatch = [regex]::Match($content, '<tool-use-id>([^<]*)</tool-use-id>')
-			$measured.Add([pscustomobject]@{ ToolUseId = $(if ($notificationMatch.Success) { $notificationMatch.Groups[1].Value } else { '' }); Chars = (Measure-ResultChars $content) })
+			$measured.Add([pscustomobject]@{ ToolUseId = (Get-ToolUseIdTag $content); Chars = (Measure-ResultChars $content) })
 			continue
 		}
 		if ($content -isnot [object[]]) { continue }

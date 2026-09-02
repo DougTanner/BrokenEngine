@@ -10,18 +10,21 @@ allowed-tools: [Read, Grep, Glob, PowerShell]
 
 # Session Audit
 
-Run only on an explicit user request. Main dispatches one fresh `reviewer`. The
-reviewer does not edit, run commands that change state, implement fixes, or
-delegate.
+## Purpose
+
+Trace the named late, reconciled, or previously unseen integration hypotheses in
+a complete logical change and report findings. Root `../../../AGENTS.md` owns
+stage order; this skill owns only that local read-only action.
+
+## When to use
+
+Run only on an explicit user request. Delegation and reviewer conduct follow
+`../../references/subagent-reporting.md`.
 Audit only hypotheses that earlier domain reviews could not have covered; do not
 repeat their artifact-level correctness, style, documentation, shader, or
 validation passes.
 
-Root `../../../AGENTS.md` owns stage order. This skill owns only the local
-read-only action after a complete brief has triggered it: trace the named late,
-reconciled, or previously unseen integration hypotheses and report findings.
-
-## Required Inputs
+## Inputs
 
 Require a self-contained, immutable brief containing:
 
@@ -76,25 +79,7 @@ ambiguous, moving, or incomplete. The assigned implementer's assembly from
 repository state is the only allowed source; the auditor never reconstructs
 these inputs from conversation history.
 
-## Method
-
-1. Confirm the checkout and derive the session diff from the session
-   baseline, then inventory it.
-2. For each triggered mode, apply its `## Required Inputs` procedure over only
-   its named regions and the minimum callers, consumers, mirrors, contracts,
-   and whole-file context needed to prove or refute its hypotheses. Stop when
-   all authorized hypotheses resolve.
-3. Report only changed, reachable failures. Refute proposed findings against guards,
-   preconditions, handoffs, and current contracts. Put proven pre-existing or
-   out-of-scope defects in `Residuals`. Exclude stale citations in a claimed
-   plan that is deleted when it completes.
-4. Emit a single-claim API verification request for any candidate depending on
-   a non-obvious external rule; do not present it as confirmed. The main session
-   reads every finding, deduplicates it, and classifies Intent
-   (`conformance | plan_delta`) and Scope (`non_structural | structural`) before
-   dispatching any fix.
-
-## Output
+## Handoff
 
 Return the shared handoff form in `../../references/subagent-reporting.md`,
 extended with the audit result block and these narrowed lines:
@@ -123,3 +108,14 @@ Use `NEEDS_ACTION` for findings or pending external verification and `BLOCKED`
 only for missing required evidence. Critical means data loss, broken
 functionality, determinism failure, or an equivalent contract breach; every
 other finding is Required.
+
+The main session reads every finding, deduplicates it, and classifies Intent
+(`conformance | plan_delta`) and Scope (`non_structural | structural`) before
+dispatching any fix.
+
+## References
+
+- [`references/worker.md`](references/worker.md) — the audit steps the
+  dispatched reviewer runs.
+- [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+  — task brief and shared handoff form.

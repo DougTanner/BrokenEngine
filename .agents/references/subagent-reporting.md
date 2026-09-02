@@ -5,23 +5,35 @@ Delegation uses a fresh, isolated context by default: Codex uses
 fork is allowed only when exact authoritative conversation text cannot be
 safely summarized, and the prompt states why.
 
+Root `AGENTS.md`'s rule that subagents never spawn subagents is enforced by
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` and by `disallowedTools: Agent` in each
+role definition.
+
 A delegated review or audit runs solely inside one fresh delegated `reviewer`
 that returns findings only, and the tool restrictions a skill body states are
 prose boundaries rather than host enforcement.
 
 ## Task brief
 
-Every delegation supplies one self-contained brief containing:
+Every delegation supplies one self-contained brief on this form:
 
-- assigned role and exact objective;
-- owned scope and explicit exclusions;
-- fixed user decisions and changes the user approved after the plan;
-- governing repository paths;
-- known affected artifacts, symbols, or regions;
-- session baseline or other meaningful identity;
-- acceptance checks and expected observations;
-- task-specific prohibitions; and
-- required return format.
+```text
+Role: <role name from the root AGENTS.md table>
+Skill: <skill to run, or none>
+Objective: <one sentence>
+Required sections: <handoff fields or report sections the caller will read>
+Scope: <files, regions, or artifacts owned>
+Exclusions: <what this worker must not touch>
+Fixed decisions: <user decisions already made, or none>
+Governing paths: <repository paths that bind this work>
+Baseline: <full SHA and worktree/branch from Get-AgentWorktreeSessionContext>
+Acceptance: <checks and expected observations>
+Prohibitions: <task-specific bans, or none>
+Return: <return format, normally the shared handoff>
+```
+
+`Required sections` names which skill-specific report sections the caller will
+read; the worker skips the rest. The shared handoff is always returned in full.
 
 The session baseline is the commit a session's work is diffed against, fixed
 when the session starts. The baseline and every other machine-derivable
@@ -37,6 +49,11 @@ Get-AgentWorktreeSessionContext
 The leading `./` is required — without it PowerShell treats the path as a
 module name and searches `PSModulePath` instead of the worktree.
 
+That output's `SessionId` is the worktree/branch UUID parsed from the session
+branch, never the conversation session ID a follow-up Plan's provenance block
+records; `.agents/skills/next-plan/references/follow-up-provenance.md`,
+`## Conversation session ID`, owns where that value comes from.
+
 Use `none` when a field has no value. Add only fields required by the invoked
 skill. Cite repository paths; do not paste root instructions, skill bodies, the
 complete Plan, manager transcript, unrelated handoffs, or raw XML/logs. When a
@@ -49,16 +66,28 @@ work to another worker.
 
 ## Handoffs
 
+A handoff is the short structured result a subagent returns to its manager.
 Return only decision-relevant evidence:
 
 ```text
 Status: PASS | NEEDS_ACTION | BLOCKED
-Changed files: <paths and regions, or none>
-Decisive checks: <command/read and result>
+Findings: <review roles only; one row each: ID Critical|Required|Recommended path:line — claim — evidence>
+Changed files: <one row each, path and region; or none>
+Decisive checks: <one row each, command or read and its result>
 Build required: <exact targets, or none>
-Executor: <own model id> <own effort>, each `unknown` when unreadable
+Evidence: <existing or Temp/ path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <actionable blocker or none>
 ```
+
+Every row is one line. Do not quote code and do not repeat a row from another
+field. A field over 10 rows, or a whole handoff over 40 lines or 20,000
+characters, moves its full material to an existing file or log, or to a `Temp/`
+file when no existing file holds it, and cites it under `Evidence` as path plus
+selector. A typed envelope a role must return verbatim, such as the
+`broken-engine-build-result/v1` envelope the `builder` returns and the typed
+receipts `/finalize-changes` consumes, is exempt and does not count toward these
+limits.
 
 Both `Executor` values are what the host reports to the worker itself: the model
 identity the host states in the worker's own context, and the effort from the
@@ -72,9 +101,10 @@ pins state intent, not proof — so it writes `unknown`, and headless
 of the two values is written `unknown` independently when its source is
 unreadable.
 
-Skills may extend this form, but retain `Build required` and keep `Residuals`
-last. Name an existing file or log plus a narrow selector when evidence is
-large. Create a file under `Temp/` only when the owning workflow requires it.
+A skill extends this form only by adding rows inside an existing field or by
+declaring extra fields in its own `## Handoff` section, each one line or one row
+per item, never a paragraph. `Build required` stays present and `Residuals`
+stays last.
 Independent review and verification use a context that did not produce the
 work. A focused correction/retest also uses an independent context.
 
@@ -85,6 +115,23 @@ host tool cap. Ending a turn to await one's own background child is that
 prohibited open-ended wait: a completion notification cannot resume a worker
 whose turn has ended, so capture the child's result in-turn before delivering
 the handoff.
+
+Main consumes each dispatched worker's handoff once, from the host's own
+delivery of it; it requests that worker's result again only through the
+no-progress and terminal-failure route below.
+
+What main does with each field:
+
+| Field | What main does with it |
+| --- | --- |
+| `Status` | Routes the work: PASS advances; NEEDS_ACTION decides each finding, sending accepted fixes to changed artifacts to `/resolve-findings` and accepted plan findings back into the plan; BLOCKED resolves or asks the user. |
+| `Findings` | Decided one at a time. |
+| `Changed files` | Bounds what is re-reviewed. |
+| `Decisive checks` | Feed the acceptance table. |
+| `Build required` | Goes to a `builder`. |
+| `Evidence` | Read only when a decision needs it. |
+| `Executor` | Proves routing. |
+| `Residuals` | Go to the message footer or to `/create-follow-up-plans`. |
 
 ## Whether a worker is still running, and interruption
 

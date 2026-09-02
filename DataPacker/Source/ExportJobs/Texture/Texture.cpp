@@ -151,12 +151,22 @@ void Texture::LoadUint16Raw(const std::filesystem::path& rPath)
 	}
 }
 
+// OpenEXR reports every failure through a result code, so a discarded result publishes an
+// incompletely decoded image that looks valid downstream.
+static void CheckExrResult(exr_result_t exrResult, const std::filesystem::path& rPath, const char* pcCall)
+{
+	if (exrResult != EXR_ERR_SUCCESS)
+	{
+		throw std::runtime_error(std::format("{} failed for EXR \"{}\": {}", pcCall, rPath.string(), exr_get_default_error_message(exrResult)));
+	}
+}
+
 void Texture::LoadExr(const std::filesystem::path& rPath)
 {
 	exr_context_initializer_t exrContextInitializer = EXR_DEFAULT_CONTEXT_INITIALIZER;
 	exr_context_t exrContext {};
 	exr_result_t exrResult = exr_start_read(&exrContext, reinterpret_cast<const char*>(rPath.u8string().c_str()), &exrContextInitializer);
-	ASSERT(exrResult == EXR_ERR_SUCCESS);
+	CheckExrResult(exrResult, rPath, "exr_start_read");
 	common::ScopedLambda releaseExrContext([=]()
 	{
 		exr_context_t exrContextCopy = exrContext;
@@ -164,9 +174,9 @@ void Texture::LoadExr(const std::filesystem::path& rPath)
 	});
 
 	exr_attr_box2i_t dataWindow {};
-	exr_get_data_window(exrContext, 0, &dataWindow);
+	CheckExrResult(exr_get_data_window(exrContext, 0, &dataWindow), rPath, "exr_get_data_window");
 	int32_t iScansPerChunk = 0;
-	exr_get_scanlines_per_chunk(exrContext, 0, &iScansPerChunk);
+	CheckExrResult(exr_get_scanlines_per_chunk(exrContext, 0, &iScansPerChunk), rPath, "exr_get_scanlines_per_chunk");
 	ASSERT(iScansPerChunk == 1);
 
 	miWidth = dataWindow.max.x + 1;
@@ -178,10 +188,16 @@ void Texture::LoadExr(const std::filesystem::path& rPath)
 	for (int y = dataWindow.min.y; y <= dataWindow.max.y; y += iScansPerChunk)
 	{
 		exr_chunk_info_t exrChunkInfo {};
-		exr_read_scanline_chunk_info(exrContext, 0, y, &exrChunkInfo);
+		CheckExrResult(exr_read_scanline_chunk_info(exrContext, 0, y, &exrChunkInfo), rPath, "exr_read_scanline_chunk_info");
 
 		exr_decode_pipeline_t decoder {};
-		exr_decoding_initialize(exrContext, 0, &exrChunkInfo, &decoder);
+		CheckExrResult(exr_decoding_initialize(exrContext, 0, &exrChunkInfo, &decoder), rPath, "exr_decoding_initialize");
+
+		if (decoder.channel_count != 3)
+		{
+			exr_decoding_destroy(exrContext, &decoder);
+			throw std::runtime_error(std::format("EXR \"{}\" expected 3 channels, found {}.", rPath.string(), decoder.channel_count));
+		}
 
 		decoder.channels[0].user_data_type = EXR_PIXEL_FLOAT;
 		decoder.channels[0].decode_to_ptr = reinterpret_cast<uint8_t*>(pixelsB.data() + y * miWidth);
@@ -201,9 +217,16 @@ void Texture::LoadExr(const std::filesystem::path& rPath)
 		decoder.channels[2].user_line_stride = static_cast<int32_t>(4 * miWidth);
 		decoder.channels[2].user_bytes_per_element = 4;
 
-		exr_decoding_choose_default_routines(exrContext, 0, &decoder);
-		exr_decoding_run(exrContext, 0, &decoder);
+		// The initialized decoder holds intermediate buffers, so it must be destroyed before either failure throws.
+		const char* pcLastCall = "exr_decoding_choose_default_routines";
+		exrResult = exr_decoding_choose_default_routines(exrContext, 0, &decoder);
+		if (exrResult == EXR_ERR_SUCCESS)
+		{
+			pcLastCall = "exr_decoding_run";
+			exrResult = exr_decoding_run(exrContext, 0, &decoder);
+		}
 		exr_decoding_destroy(exrContext, &decoder);
+		CheckExrResult(exrResult, rPath, pcLastCall);
 	}
 
 	float* pfSrcR = pixelsR.data();

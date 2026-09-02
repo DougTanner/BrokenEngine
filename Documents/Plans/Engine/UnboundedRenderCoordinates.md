@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-30T16:41:17.810Z","dependsOn":["Documents/Plans/Engine/FrameAreaValidation.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-30T16:41:17.810Z","dependsOn":[]} -->
 # Make simulation and presentation geometry cell-local on the unbounded grid
 
 ## Context

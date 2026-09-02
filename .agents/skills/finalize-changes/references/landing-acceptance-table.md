@@ -18,8 +18,10 @@ diff, before main asks the confirmation.
 2. Reconcile the diff paths against the declared owned paths. Each changed
    region must name its authorizing Plan clause or user instruction. Extra,
    missing without a recorded no-change decision, or unauthorized bytes block.
-3. Confirm every handoff still applies to this diff and no later change
-   invalidated it.
+3. Confirm every handoff still applies to this diff. A later change invalidates
+   a handoff only where it changed bytes that handoff's result depends on — for
+   the two typed prose handoffs below, the session's own bytes in the regions
+   they read.
 4. Inventory ignored/non-worktree state from the same run's `landing.porcelain`
    and `landing.submodules` rows, recording exact path, owner/persistence
    contract, evidence, and `unchanged`, `intentionally persisted`, `restored`,
@@ -67,16 +69,24 @@ require data mode, generation authority, Gaea outcome, and normalized paths;
 their data evidence is that same envelope reporting success with wrapper exit
 `0`. Do not accept schema/result/exit mismatches.
 
-Skill changes require a complete `/validate-skill` PASS handoff with mechanical
-self-check, target validator exit/output, semantic review, and no Critical
-finding.
+Skill changes require a complete `/validate-skill` handoff with mechanical
+self-check, target validator exit/output, semantic review, and no unresolved
+Critical finding.
 
-Instruction-doc changes require a complete `/progressive-disclosure-review` PASS
+Instruction-doc changes require a complete `/progressive-disclosure-review`
 handoff with the baseline, the files checked, the findings, and no unresolved
 finding.
 
 A missing typed artifact — `/validate-skill`, `/progressive-disclosure-review`,
 or a build envelope — is a `BLOCKED` row, never a `PASS`.
+
+A `NEEDS_ACTION` typed handoff still scores its row when every finding it raised
+is resolved — fixed in the reviewed diff or recorded refuted per the review
+reconciliation above — and a scoped spot-check re-review of exactly those
+regions returned `PASS`. Never dispatch a repeated whole-artifact review for
+that row. For `/validate-skill` the mechanical evidence is then that skill's
+documented validator runs on the reviewed tree, script runs rather than a
+review.
 
 ## Executable Plan check
 

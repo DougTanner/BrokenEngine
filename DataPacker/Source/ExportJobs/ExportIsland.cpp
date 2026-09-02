@@ -373,6 +373,12 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	{
 		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid crop dimensions: crop ({},{} + {}x{}) in full texture {}.", rInputPath.string(), baked.iCropX, baked.iCropY, baked.iCropWidth, baked.iCropHeight, baked.iFullTexturePixels));
 	}
+	if (!std::isfinite(baked.fWidthMeters) || baked.fWidthMeters <= 0.0f
+		|| !std::isfinite(baked.fHeightMeters) || baked.fHeightMeters <= 0.0f
+		|| !std::isfinite(baked.fElevationMeters) || baked.fElevationMeters <= 0.0f)
+	{
+		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid world dimensions: {}x{} m footprint, {} m elevation.", rInputPath.string(), baked.fWidthMeters, baked.fHeightMeters, baked.fElevationMeters));
+	}
 
 	size_t uiCropPixelCount = CheckedProduct(static_cast<size_t>(baked.iCropWidth), static_cast<size_t>(baked.iCropHeight), "island crop pixel");
 	if (uiCropPixelCount > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max()) / 4)

@@ -13,7 +13,7 @@
 # replacement commit for a single-commit range so the new message is carried.
 # Callers never reconstruct its Git commands
 # inline. The review window opens later in the same finalizer dispatch:
-# Show-FinalizeApprovalReview.ps1 owns the SmartGit launch and workflow step 4
+# Show-FinalizeApprovalReview.ps1 owns the SmartGit launch and workflow step 7
 # calls it last, once the returned tip is bound into a fully staged landing.
 #
 # Success contract: exit 0, schema broken-engine-finalize-approval-preparation/v4,
@@ -35,8 +35,7 @@ param(
 	[Parameter(Mandatory)][string] $ExpectedPrimaryTip,
 	[string] $VerifiedCandidateCommit,
 	[string] $VerifiedCandidateTree,
-	[string] $CommitMessageFile,
-	[ValidateSet('none', 'compare-and-swap', 'postcondition', 'final-dirty', 'bounded-diagnostic')][string] $FixtureFailure = 'none'
+	[string] $CommitMessageFile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -283,11 +282,6 @@ try
 		$script:OverrideMessage = [IO.File]::ReadAllText($CommitMessageFile)
 		Assert-Input (-not [string]::IsNullOrWhiteSpace($script:OverrideMessage)) 'CommitMessageFile must not be empty.'
 	}
-	if ($FixtureFailure -cne 'none')
-	{
-		Assert-Input ($env:BROKEN_ENGINE_FINALIZE_APPROVAL_PREPARATION_FIXTURE -ceq '1') 'Fixture-only inputs require the finalization preparation fixture environment.'
-	}
-	if ($FixtureFailure -ceq 'bounded-diagnostic') { Throw-Preparation 1 (('c' * 140)) (('m' * 600)) }
 
 	$script:CurrentIdentity = Get-FinalizeExistingWindowsIdentity $CurrentWorktree 'Current worktree'
 	$script:PrimaryIdentity = Get-FinalizeExistingWindowsIdentity $PrimaryWorktree 'Primary worktree'
@@ -372,8 +366,7 @@ try
 		$replacementTip = New-ReplacementCommit $originalTree $ExpectedPrimaryTip $range[0] $script:OverrideMessage
 		$script:ReplacementTip = $replacementTip
 		$result.squash.replacementCommit = $replacementTip
-		$expectedOld = if ($FixtureFailure -ceq 'compare-and-swap') { '0000000000000000000000000000000000000000' } else { $actualTip }
-		$update = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity, 'update-ref', $script:SessionRef, $replacementTip, $expectedOld) $script:CurrentIdentity
+		$update = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity, 'update-ref', $script:SessionRef, $replacementTip, $actualTip) $script:CurrentIdentity
 		if ($update.ExitCode -ne 0)
 		{
 			Throw-Preparation 2 'git.compare-and-swap-failed' 'Session branch changed before its atomic replacement; the original tip remains selected.'
@@ -382,10 +375,6 @@ try
 		$result.squash.refUpdated = $true
 		$result.squash.disposition = if ($range.Count -eq 1) { 'message-replaced' } else { 'squashed' }
 		$result.tips.approvedSession = $replacementTip
-		if ($FixtureFailure -ceq 'postcondition')
-		{
-			Throw-Preparation 2 'git.fixture-postcondition-failed' 'Fixture forced a post-replacement validation failure.'
-		}
 
 		$resolvedTip = Get-GitText @('rev-parse', $script:SessionRef)
 		$approvedTree = Get-GitText @('rev-parse', "$replacementTip^{tree}")
@@ -403,10 +392,6 @@ try
 	if ($result.sanity.final.SessionTip -cne $result.tips.approvedSession -or $result.sanity.final.PrimaryTip -cne $ExpectedPrimaryTip)
 	{
 		Throw-Preparation 2 'sanity.final-identity-mismatch' 'The final sanity check did not bind the approved session tip and primary tip.'
-	}
-	if ($FixtureFailure -ceq 'final-dirty')
-	{
-		[IO.File]::WriteAllText((Join-Path $script:CurrentIdentity 'fixture-final-dirty.tmp'), 'fixture', [Text.UTF8Encoding]::new($false))
 	}
 	if (-not (Test-CleanSession))
 	{

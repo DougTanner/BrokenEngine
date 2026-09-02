@@ -24,8 +24,7 @@ param(
 	[string] $OwnerToken,
 	[switch] $ReleasePlanClaim,
 	# Total seconds this landing may spend waiting out foreign primary index.lock contention.
-	[ValidateRange(1, 3600)][int] $IndexLockWaitSeconds = 500,
-	[ValidateSet('none', 'compare-and-swap', 'post-reset', 'post-update-ref', 'bounded-diagnostic', 'retry-patch-mismatch', 'history-generate', 'recovery-primary-race', 'history-recovery-active-primary-edit', 'history-recovery-session-race', 'history-recovery-session-staged-race')][string] $FixtureFailure = 'none'
+	[ValidateRange(1, 3600)][int] $IndexLockWaitSeconds = 500
 )
 
 $ErrorActionPreference = 'Stop'
@@ -204,7 +203,6 @@ function Invoke-HistoryGenerate([string] $SourceCommit, [string] $PrimaryTip) {
 	if (Test-Path -LiteralPath $script:HistoryTempRoot) { Throw-Landing 2 'history.temp-collision' 'History Generate selected an existing output directory.' }
 	$historyScript = Join-Path $script:CurrentIdentity.Worktree '.agents\skills\code-quality-metrics\scripts\Invoke-CodeQualityMetricsHistory.ps1'
 	if (-not (Test-Path -LiteralPath $historyScript -PathType Leaf)) { Throw-Landing 1 'history.generate-unavailable' "The code-quality history Generate producer is missing: '$historyScript'." }
-	if ($FixtureFailure -ceq 'history-generate') { Throw-Landing 2 'history.generate-failed' 'Fixture forced history Generate failure.' }
 	$arguments = @('-NoProfile', '-File', $historyScript, '-Mode', 'Generate', '-RepositoryRoot', $script:CurrentIdentity.Worktree, '-BaseCommit', $PrimaryTip, '-TipCommit', $SourceCommit, '-DateUtc', $script:LandingHistoryDate, '-OutputDirectory', $script:HistoryTempRoot)
 	$response = Invoke-FinalizeNativeText "$PSHOME\pwsh.exe" $arguments $script:CurrentIdentity.Worktree
 	if ($response.ExitCode -ne 0) { Throw-Landing 2 'history.generate-failed' "History Generate failed: $($response.Stderr.Trim())" }
@@ -494,10 +492,8 @@ function Advance-PrimaryExactCandidate {
 	$expectedStatus = Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('status', '--porcelain=v1', '-z', '--untracked-files=all')
 	$prepared = New-LandingHistoryCommit
 	$finalCommit = $prepared.Commit; $finalTree = $prepared.Tree
-	$expectedForCas = if ($FixtureFailure -ceq 'compare-and-swap') { '0000000000000000000000000000000000000000' } else { $script:LandingPrimaryTip }
-	$advance = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $finalCommit, $expectedForCas) $script:PrimaryIdentity.Worktree
+	$advance = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $finalCommit, $script:LandingPrimaryTip) $script:PrimaryIdentity.Worktree
 	if ($advance.ExitCode -ne 0) { return $false }
-	if ($FixtureFailure -ceq 'post-update-ref') { $result.primaryAdvanced = $true; Throw-Landing 1 'fixture.crash-after-update-ref' 'Fixture stopped after the primary ref update and before its checkout reset.' }
 	$result.primaryAdvanced = $true
 	$script:FinalCommit = $finalCommit; $script:FinalTree = $finalTree
 	$result.tips.current = $finalCommit
@@ -505,7 +501,6 @@ function Advance-PrimaryExactCandidate {
 	try {
 		$reset = Invoke-LandingPrimaryCheckout $finalCommit
 		if ($reset.ExitCode -ne 0) { throw "Primary checkout did not update to the exact final commit: $($reset.Stderr.Trim())" }
-		if ($FixtureFailure -ceq 'post-reset') { throw 'Fixture forced post-reset failure.' }
 		$actual = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim()
 		$actualTree = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "$actual^{tree}")).Trim()
 		if ($actual -cne $finalCommit -or $actualTree -cne $finalTree) { throw 'Primary ref does not equal the exact verified final commit and tree.' }
@@ -667,7 +662,7 @@ function Invoke-LandingRebaseOntoPrimary {
 	}
 	$rebasedCommit = (Invoke-FinalizeGit $worktree @('rev-parse', "refs/heads/$CurrentBranch")).Trim()
 	$rebasedIdentity = Get-LandingPatchIdentity $newPrimaryTip $rebasedCommit
-	if ($FixtureFailure -ceq 'retry-patch-mismatch' -or $rebasedIdentity.PatchId -cne $approvedIdentity.PatchId -or $rebasedIdentity.Changes -cne $approvedIdentity.Changes) {
+	if ($rebasedIdentity.PatchId -cne $approvedIdentity.PatchId -or $rebasedIdentity.Changes -cne $approvedIdentity.Changes) {
 		Restore-LandingSessionBranch 'rebase.patch-not-identical' 'Rebasing onto the current primary tip did not reproduce the confirmed patch.'
 	}
 	$script:LandingPrimaryTip = $newPrimaryTip
@@ -757,24 +752,6 @@ function Complete-RecoveredLanding($InitialMatch, [string] $InitialPrimaryRef) {
 	$sessionHead = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "refs/heads/$CurrentBranch")).Trim()
 	if (-not (Test-RecoveredSessionHead $sessionHead $match)) { Throw-Landing 2 'history.recovery-session-changed' 'The original session branch no longer points at the confirmed source or a proven equivalent rebase.' }
 	Assert-RecoveryCheckoutMatches $script:CurrentIdentity.Worktree $sessionHead
-	if ($FixtureFailure -ceq 'history-recovery-session-race') {
-		[IO.File]::WriteAllText((Join-Path $script:CurrentIdentity.Worktree 'base.txt'), 'fixture recovery session race', [Text.UTF8Encoding]::new($false))
-	}
-	elseif ($FixtureFailure -ceq 'history-recovery-session-staged-race') {
-		[IO.File]::WriteAllText((Join-Path $script:CurrentIdentity.Worktree 'base.txt'), 'fixture recovery session staged race', [Text.UTF8Encoding]::new($false))
-		$stage = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity.Worktree, 'add', '--', 'base.txt') $script:CurrentIdentity.Worktree
-		if ($stage.ExitCode -ne 0) { Throw-Landing 1 'fixture.recovery-session-race-failed' "Fixture could not stage its deterministic late edit: $($stage.Stderr.Trim())" }
-	}
-	elseif ($FixtureFailure -ceq 'history-recovery-active-primary-edit') {
-		[IO.File]::WriteAllText((Join-Path $script:PrimaryIdentity.Worktree 'base.txt'), 'fixture recovery active primary edit', [Text.UTF8Encoding]::new($false))
-	}
-	if ($primaryNeedsReset -and $FixtureFailure -ceq 'recovery-primary-race') {
-		$race = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, '-c', 'user.name=fixture recovery', '-c', 'user.email=fixture-recovery@example.invalid', 'commit-tree', "$claimedPrimaryRef^{tree}", '-p', $claimedPrimaryRef, '-m', 'fixture recovery active primary descendant') $script:PrimaryIdentity.Worktree
-		$raceCommit = $race.Stdout.Trim()
-		if ($race.ExitCode -ne 0 -or $raceCommit -cnotmatch '^[0-9a-f]{40}$') { Throw-Landing 1 'fixture.recovery-active-primary-race-failed' 'Fixture could not create its deterministic active recovery primary descendant.' }
-		$raceUpdate = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity.Worktree, 'update-ref', "refs/heads/$PrimaryBranch", $raceCommit, $claimedPrimaryRef) $script:PrimaryIdentity.Worktree
-		if ($raceUpdate.ExitCode -ne 0) { Throw-Landing 1 'fixture.recovery-active-primary-race-failed' 'Fixture could not advance the primary ref for the active recovery race.' }
-	}
 	if ($script:PrimaryIdentity.Head -cne $claimedPrimaryRef -or $primaryStatus.Length -ne 0) {
 		# The landed commit's parent is the exact stale checkout proven above. Guard the symbolic branch
 		# ref, then update only its index/worktree so a foreign ref movement cannot be rewritten by
@@ -889,8 +866,6 @@ function Complete-LandedState {
 }
 
 try {
-	if ($FixtureFailure -cne 'none' -and $env:BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE -cne '1') { Throw-Landing 1 'input.fixture-forbidden' 'Fixture-only inputs require the finalization workflow fixture environment.' }
-	if ($FixtureFailure -ceq 'bounded-diagnostic') { Throw-Landing 1 (('c' * 140)) (('m' * 600)) }
 	# \z rather than $: .NET's $ also matches before a trailing newline, so a hex value carrying one would pass.
 	if ($ApprovedSessionCommit -cnotmatch '^[0-9a-f]{8,40}\z' -or $ExpectedCurrentTip -cnotmatch '^[0-9a-f]{8,40}\z' -or $ExpectedPrimaryTip -cnotmatch '^[0-9a-f]{8,40}\z') {
 		Throw-Landing 1 'input.commit-invalid' 'Approved and expected commits must be 8 to 40 lowercase hexadecimal object ID characters.'
@@ -933,7 +908,7 @@ try {
 	# like every other pre-landing check: the caller-owned lease is still live and the caller releases
 	# it. SmartGit outcomes stay non-blocking; malformed, mismatched, or non-attempted receipts block.
 	if ([string]::IsNullOrWhiteSpace($ApprovalReviewResultFile)) {
-		if ($env:BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE -cne '1') { Throw-Landing 2 'approval-review.missing' 'A broken-engine-finalize-approval-review/v1 receipt from -ApprovalReviewResultFile is required for postconfirmation landing.' }
+		Throw-Landing 2 'approval-review.missing' 'A broken-engine-finalize-approval-review/v1 receipt from -ApprovalReviewResultFile is required for postconfirmation landing.'
 	}
 	else {
 		$reviewItem = Get-Item -LiteralPath $ApprovalReviewResultFile -Force -ErrorAction SilentlyContinue

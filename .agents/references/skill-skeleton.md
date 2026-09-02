@@ -1,0 +1,55 @@
+# Skill Skeleton
+
+The body shape every `.agents/skills/` skill follows, and the checklist a
+reviewer applies to it. Frontmatter and package mechanics belong to
+`/validate-skill`; layering and size thresholds belong to
+`/progressive-disclosure-review`.
+
+## Section order
+
+1. `Purpose` (`SKILL.md`) — what the skill produces, in at most 3 lines.
+2. `When to use` (`SKILL.md`) — triggers only.
+3. `Inputs` (`SKILL.md`) — which task-brief fields from
+   [`subagent-reporting.md`](subagent-reporting.md) the skill consumes.
+4. `Steps` (`references/worker.md`) — numbered, one imperative each, each ending
+   on a checkable done-condition, no paragraph over 4 lines.
+5. `Handoff` (`SKILL.md`) — the shared form from `subagent-reporting.md`,
+   `## Handoffs`, plus any declared extension fields.
+6. `Rules` (`references/worker.md`) — judgment no step owns, as bullets.
+7. `References` (`SKILL.md`) — each linked file owning one topic.
+
+Omit a section the skill has no content for; never reorder.
+
+## Public and private files
+
+`SKILL.md` is the public file, read by main and by the worker;
+`references/worker.md` is the private file, read by the dispatched worker, or by
+main when it runs the skill itself.
+`## Section order` above marks each section's file. Text main must present or
+ask verbatim is a subsection of `Handoff`.
+
+`SKILL.md` links `references/worker.md` from `References` as its worker-entry
+line. `SKILL.md` on its own must suffice for main to dispatch the worker and to
+present or ask anything verbatim; a `SKILL.md` missing text main must deliver
+verbatim is the failure this rule prevents. Text main reads to decide whether or
+how to dispatch — triggers, inputs, verbatim presentations and questions — is
+public even when it would otherwise fall under `Steps` or `Rules`.
+
+Each other reference is linked from `references/worker.md` when only the worker
+reads it, or from `SKILL.md` when main reads it.
+
+## Shared vocabulary
+
+Status and severity words are the ones the shared handoff form in
+`subagent-reporting.md` lists. `Critical` and `Required` are defined in
+`.agents/skills/repo-code-review/SKILL.md`, and `Recommended` in
+`.agents/skills/validate-skill/SKILL.md`. Introduce no other status or severity
+term.
+
+## Reviewer checklist
+
+- Every action the previous body required is present exactly once across the two
+  files.
+- Each section lives in the file `## Section order` names; `SKILL.md` carries
+  only what main reads.
+- Size and layering pass `/progressive-disclosure-review`.

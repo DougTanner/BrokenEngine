@@ -8,40 +8,23 @@ disable-model-invocation: true
 
 # Save Plan
 
-Persist exactly one complete client-supplied proposal. For Codex use the latest complete `<proposed_plan>` body; for Claude use the explicitly supplied absolute plan-file path. Do not discover or infer a source from a client-local plan store.
+## Purpose
 
-Read `Documents/AGENTS.md` and the selected tree's guidance. The saved plan is a file one model writes for another model to pick up: a different implementing model with no access to the planning conversation executes it verbatim, so the body must be the final actionable plan — self-contained, with no unresolved options, TBDs, or decisions deferred to the implementer beyond trivial naming and local detail. Require a decision-complete body: context, smallest design, critical files, out-of-scope boundary, applicable risk trigger/invariants, and observable acceptance criteria where the change needs them. The body still picks exactly one design, but phrase an agent-made choice in the supplied body as the author's recommendation with its rationale, and use binding language only where the authority-order directive in root `AGENTS.md` permits it.
+Persist exactly one complete client-supplied proposal.
 
-The body must carry an explicit scope contract: in-scope entries under a required `## In scope` heading, the boundary under a required `## Out of scope` heading, and the listed scope is both target and ceiling: the implementer makes the smallest complete change and adds no abstractions, configuration, refactors, or fixes to adjacent code it encounters. Scope is limited inside files, not only across them — in-scope entries name the specific functions, members, or regions to change, and naming a file grants no permission to touch anything in it beyond the named regions plus the mechanical necessities (includes, declarations) the named change requires. Every file a `## Coordination` clause obliges the implementer to edit must itself appear in the in-scope list with its named regions; a coordination obligation is not a substitute for scope.
+## Inputs
 
-Ask the user for a meaningfully missing decision — including ambiguity, a missing scope ceiling, or file-granularity-only scope — rather than invent or patch it.
+For Codex use the latest complete `<proposed_plan>` body; for Claude use the explicitly supplied absolute plan-file path. Do not discover or infer a source from a client-local plan store.
 
-Once the body is final, and before classifying and writing it, dispatch one fresh `reviewer` for `/plan-simplicity-review` on that final body snapshot whenever the body adds new code or modifies non-documentation behavior per the trigger Change Workflow Step 2 owns in root `AGENTS.md`. In Claude Code that dispatch goes through `/codex-review`; a Codex caller is already the Sol mapping and dispatches the `reviewer` directly, per that skill's own rule. Route the findings by disposition, not by finding class: accepted `simplify` findings revise the body, and every `user-judgment` finding goes to the user, whatever class it carries.
+## Handoff
 
-Because this skill persists exactly the client-supplied proposal and invoking it pre-approves landing the saved file, present the complete revised body for explicit user approval before saving whenever accepted findings change its meaning; a clean review, or accepted findings that change only sub-semantic wording, keeps that pre-approval in force. This save-time review does not waive the prep-time `/plan-simplicity-review` that `/next-plan` runs when the plan is later prepared for implementation.
+Report source, selected path, duplicate outcome, tier trigger, dependency decision, validation command/result where applicable, and changed files. A saved Plan is tracked Git content, not a queue change and not a claim.
 
-Classify into `Documents/Plans/` for executable engine debt or `Documents/Features/` for manual capability planning. Select an existing area and a concise PascalCase filename matching `^[A-Z][A-Za-z0-9]*\.md$`. Search live Plans for duplicate root cause and implementation boundary before writing.
-
-## Executable Plans
-
-Write the plan body to a file, then create the Plan with the repository-owned `.agents/scripts/New-PlanFile.ps1`.
-
-```powershell
-pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
-```
-
-Its parameters, the `-DependsOn` single-token rule, its result shape, and its exit handling are in `../../references/new-plan-file.md`; only the created outcome there permits reporting the plan as saved.
-
-Record the folded result's invalid-plan diagnostics and stale-edge notices: existing dependency paths must remain executable to block a child, and missing paths are intentionally stale satisfied edges. Do not read local claims or use validation to choose, claim, or reorder work.
-
-## Manual Features
-
-Features are ordinary Markdown. Do not prepend scheduler metadata unless the user explicitly makes it an executable Plan, and never create claim records, request files, score fields, queue rows, or publication inputs for Features.
-
-## Landing pre-approval
+### Landing pre-approval
 
 Invoking this skill is the user's explicit approval to commit or land the saved file (Plan or Feature) to the primary branch: its content was already approved during planning, and only that file lands. Per the authoritative landing-confirmation contract (`../finalize-changes/SKILL.md`, "Landing confirmation"), when the diff that changes primary consists solely of the saved file, this invocation is a yes given in advance that stays in effect, so `/finalize-changes` proceeds without asking the confirmation question; any additional changed file in the diff voids the exception and the entire change uses the landing gate.
 
-## Report
+## References
 
-Report source, selected path, duplicate outcome, tier trigger, dependency decision, validation command/result where applicable, and changed files. A saved Plan is tracked Git content, not a queue change and not a claim.
+- [`references/worker.md`](references/worker.md) — worker entry: the body,
+  review, classification, and write steps, and the rules.

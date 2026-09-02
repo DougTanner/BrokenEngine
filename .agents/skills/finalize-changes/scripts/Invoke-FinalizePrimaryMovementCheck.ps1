@@ -8,8 +8,7 @@ param(
 	[string] $CandidateCommit,
 	[string] $CandidateTree,
 	[string] $CandidateParent,
-	[string[]] $OwnedPaths,
-	[string] $FixtureFailure = 'none'
+	[string[]] $OwnedPaths
 )
 
 $ErrorActionPreference = 'Stop'
@@ -284,7 +283,6 @@ try {
 	Assert-TextInput $PrimaryWorktree 'PrimaryWorktree'
 	Assert-TextInput $CurrentBranch 'CurrentBranch'
 	Assert-TextInput $PrimaryBranch 'PrimaryBranch'
-	if ($FixtureFailure -notin @('none', 'unexpected')) { Throw-Input 'FixtureFailure must be none or unexpected.' }
 
 	$session = $null
 	$primary = $null
@@ -299,13 +297,6 @@ try {
 
 	$owned = Get-OwnedPathList $OwnedPaths
 	$script:Result.ownedPaths = New-Evidence $owned
-
-	if ($FixtureFailure -ceq 'unexpected') {
-		if ([Environment]::GetEnvironmentVariable('BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE') -cne '1') {
-			Throw-Input 'FixtureFailure requires BROKEN_ENGINE_FINALIZE_WORKFLOW_FIXTURE=1.'
-		}
-		Throw-Assessment 'Fixture forced an unexpected primary movement assessment failure.'
-	}
 
 	Assert-ExactHashInput $CandidateCommit 'CandidateCommit'
 	Assert-ExactHashInput $CandidateTree 'CandidateTree'

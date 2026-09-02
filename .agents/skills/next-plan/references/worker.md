@@ -1,0 +1,114 @@
+# Next Plan Worker
+
+## Steps
+
+1. Resolve session context in a clean wrapper-created session worktree, as one
+   shell call from its root:
+`Import-Module ./.agents/skills/next-plan/scripts/NextPlanWorkflowCommon.psm1; Get-NextPlanContext`
+   Done when it reports the authoritative primary, owner, and provisioned
+   WorktreeCli; missing tooling first needs explicitly authorized primary
+   maintenance through `/compile`.
+2. Only when a decision needs the queue — a tier-constrained request, or the
+   user asks to see the queue — see it before selecting:
+`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Get-NextPlanList.ps1`
+   It is read-only and reports a bounded point-in-time projection — widen with
+   `-Top <n>` only when a decision needs more. A bare or plain named-Plan
+   invocation skips this step, because step 3 selects and reports every stop
+   itself. Done when `## Inputs` in [`../SKILL.md`](../SKILL.md) resolves exactly
+   one Plan or blocks.
+3. Claim that selection as its own shell call, in the root AGENTS.md canonical
+   invocation form — bare:
+`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1`
+   or with the requested normalized path or partial pattern quoted after
+   `-Plan`, for example:
+`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md'`
+   Done when `ok` or `reused` reports this session holds the named claim.
+4. Dispatch one preparation `implementer` to verify every Plan statement against
+   current code, on the single task brief in
+   [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md);
+   the Plan is immutable, current code wins, and every delegation states that
+   Plan and card statements are hypotheses, so every contradiction returns to
+   main as a card correction rather than an edit.
+
+   Main writes that brief from the claimed Plan's own citations — path plus
+   line range — and leaves reading the target source to the dispatched
+   `implementer`, reading source itself only for a decision it must make that
+   the Plan and the returned handoff cannot settle.
+
+   Done when the execution card carries `### What does this plan do?` and
+   `### Why this is good for the codebase`, each 2-4 plain sentences, then goal,
+   out of scope, tier trigger, interfaces/invariants, acceptance checks with
+   expected observations, and required/conditional roles. When the
+   `/plan-audit` input is a scratch snapshot instead of the claimed Plan path,
+   that snapshot carries the plan's `## In scope` and `## Out of scope`
+   sections exactly as `/plan-audit`'s `## Inputs` requires, so `/plan-audit`
+   has a diff boundary to test.
+5. Invoke step 3's claim script idempotently immediately before the final
+   preparation handoff. Done when it reports the held claim, or is skipped on
+   step 6's straight-through path, where the tree already carries the
+   implementation edit and a claim run refuses a dirty tree.
+6. Present for approval per `### Implementation approval` in
+   [`../SKILL.md`](../SKILL.md). Done when the user's decision arrives, or when
+   that section's straight-through path applies and main has recorded its facts.
+7. Implement the approved change. Done when its own acceptance checks pass.
+8. Run the checkpoint exactly once, however the run ends: after step 7's
+   acceptance checks, before step 9, and before `/finalize-changes` prepares the
+   landing commit, so a Plan it produces is an ordinary new worktree file riding
+   the same squash with no landing-commit join. Every terminal path of the run
+   reaches this step before the run ends: a `none-available` or other claim
+   stop, a deferral, a blocker, or a refused approval comes straight here from
+   wherever it stopped, while an implemented run keeps the position above.
+
+   Main never performs either review itself; it dispatches them per
+   [run-checkpoint.md](run-checkpoint.md). Done when both follow-up lines are
+   recorded per run-checkpoint.md.
+9. Exit the claim before landing-commit creation: an `implementer` runs
+`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Complete-NextPlan.ps1`
+   with no arguments for completion, appending `-Reject` only after explicit
+   user-authorized rejection.
+
+   Success removes only direct-child dependency edges, deletes the selected Plan
+   in the worktree, reports the changed paths the landing commit must contain,
+   and returns `nextAction: finalize-changes`. Done when that result is in hand;
+   the claim stays held until landing succeeds, and `/finalize-changes` deletes
+   it after primary advances.
+
+## Rules
+
+- The preparation worker must never run the mutation-capable claim script.
+- On `claim.session-diverged` the script never moves or resets a session branch:
+  report the named commits to the user, who decides how to resolve it. For a
+  bare selection `none-available` is a normal whole-skill stop with nothing to
+  claim, and selection is not re-run to look again; for a `-Plan`-targeted
+  invocation it is the same whole-skill stop, reported to the user, and the
+  manager never selects or claims a different candidate in that run. Any other
+  status stops the skill without repair, reordering, or retry.
+- The context baseline is provisional until a claim reports a `sync` object.
+  Never create/adopt a worktree or inspect machine-local claims directly.
+- Which reviewer runs at which tier is Step 2 of root
+  [AGENTS.md](../../../../AGENTS.md); Tier 3 additionally follows
+  [tier3-workflow.md](tier3-workflow.md). Missing a mandatory reviewer blocks.
+- An affirmative response approves only the latest unchanged presentation. A
+  meaningful Plan, card, scope, invariant, acceptance, or decision change
+  requires a new complete presentation.
+- Deferral uses
+`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Defer-NextPlan.ps1`
+  and only an ordinary live claim. After final preparation has run, deferral
+  requires an explicit user instruction given in the current session, recorded
+  in the handoff; nothing else unlocks it. Deferral never touches the worktree,
+  so uncommitted implementation work stays exactly as it is.
+- Resuming retained work needs an explicit user resume instruction given in the
+  current session, recorded in the handoff, and then the targeted claim with
+  `-ResumeRetained` appended:
+`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md' -ResumeRetained`
+  That switch is valid only with `-Plan` and changes no file. A retained-work
+  resume is the one exception to step 1's clean wrapper-created worktree.
+- The checkpoint review covers friction observable in the transcript up to its
+  own dispatch; `/next-plan-review` covers the rest after landing.
+- [claim-results.md](claim-results.md) owns how each claim, listing, and
+  claim-exit result is read, including the `sync`,
+  `claim.session-diverged`, and `claim.worktree-dirty` fields, the listing's
+  snapshot limits and tier-constrained reading procedure, and the completion and
+  retained-path result shapes. Do not reconstruct any script's transitions.
+- [follow-up-provenance.md](follow-up-provenance.md) owns where the provenance
+  block's values come from.

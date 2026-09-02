@@ -114,6 +114,8 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			engine::CoordFrames& rSub = itFrames->second;
 			rSub.staticData.Read(fileStream, /*bIncludeNavData=*/false);
 			rSub.staticData.coord = coord;
+			// The serialized area is derived data, not trusted: the coord that was just read defines it.
+			rSub.staticData.vecArea = engine::ComputeCanonicalFrameArea(coord);
 			auto pFrame = std::make_unique<game::Frame>();
 			fileStream >> *pFrame;
 			rSub.pCurrent = std::move(pFrame);

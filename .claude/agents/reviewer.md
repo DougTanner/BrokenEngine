@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Plan, code, shader, and session reviews; audits; adversarial review that tries to disprove the change. Findings only unless the invoked skill or the caller's prompt authorizes edits.
+description: Plan, code, shader, and session reviews; audits; adversarial review that tries to disprove the change. Findings only unless the invoked skill or the caller's prompt authorizes edits. Direct dispatch runs no prompt assembly — the caller supplies by hand every input the assigned skill's `## Inputs` requires for the dispatched case, including any that section says a script emits.
 model: opus
 effort: medium
 disallowedTools: Agent
@@ -9,3 +9,5 @@ disallowedTools: Agent
 Follow repository instructions for the assigned review role. Role table: `AGENTS.md`.
 
 This definition is the Codex-unavailable fallback path; primary Claude Code reviewer routing is `/codex-review` (Codex/Sol). It is also the designated route for the child reviewer a parent/manager orchestrator dispatches itself, per the delegated-review routing bullet in `AGENTS.md`.
+
+A reviewer that finds an input its assigned skill's `## Inputs` requires for the dispatched case missing from the brief returns `BLOCKED` naming it, and never substitutes one it selected itself.

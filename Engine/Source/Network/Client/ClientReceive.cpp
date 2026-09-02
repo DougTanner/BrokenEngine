@@ -335,6 +335,9 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 		return;
 	}
 
+	// The serialized area is derived data, not trusted: the coord this payload was matched to defines it.
+	received.staticData.vecArea = ComputeCanonicalFrameArea(coord);
+
 	// Trust boundary: an islandCrc with no loaded template escapes Receive's catch and terminates the
 	// client at AcquireTextureSlot's mIslands.at during ApplyReceivedStaticData. Reject the whole payload.
 	for (const IslandPlacement& rPlacement : received.staticData.islands)
@@ -652,6 +655,14 @@ void Client::ServerTimespeedUpdate(std::span<const uint8_t> packetData)
 
 	if (!NetworkMessages::Read(packetData, message))
 	{
+		return;
+	}
+
+	// Defensive (trust boundary: network input): TimeStep divides by both fields, so a zero is an
+	// integer divide-by-zero and a negative runs the client clock backward
+	if (message.iMultiply < 1 || message.iDivide < 1)
+	{
+		LOG(kNetwork, kWarning, "Client::ServerTimespeedUpdate Rejected non-positive ratio Multiply: {} Divide: {}", message.iMultiply, message.iDivide);
 		return;
 	}
 

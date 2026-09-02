@@ -1,7 +1,8 @@
 # Sole SmartGit review-tool boundary for a session landing.
 #
-# Invoked last in workflow step 4 — after approval preparation returned the
-# approved tip — as the final tool invocation before the landing summary renders.
+# Invoked last in workflow step 7 — after the earlier approval-preparation step
+# returned the approved tip — as the final tool invocation before the landing
+# summary renders.
 # Opening the log window here means the user returns from their review to a
 # finished confirmation question rather than a working agent. Callers never
 # reconstruct its SmartGit command inline.
@@ -26,8 +27,8 @@
 # opened is the launch success path; unavailable/failed are non-blocking,
 # and the caller copies message and the exact manualCommand into the approval response while keeping the landing gate in
 # force. Only invalid input exits 1, with status error and a code naming the cause
-# (input.invalid for a malformed tip, a tip that resolves to no commit, or a
-# fixture gate; internal.error for a primary worktree that will not resolve).
+# (input.invalid for a malformed tip or a tip that resolves to no commit;
+# internal.error for a primary worktree that will not resolve).
 # A clean identical post-confirmation rebase that
 # preserves the existing confirmation must not reopen the review tool the user
 # already saw: that path does not invoke this script at all. A material change
@@ -37,9 +38,7 @@
 param(
 	[Parameter(Mandatory)][string] $PrimaryWorktree,
 	[Parameter(Mandatory)][string] $ApprovedTip,
-	[switch] $LaunchSmartGit,
-	[AllowEmptyString()][string] $FixtureSmartGitExecutable,
-	[ValidateSet('none', 'smartgit-launch')][string] $FixtureFailure = 'none'
+	[switch] $LaunchSmartGit
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,7 +62,6 @@ $result = [ordered]@{
 }
 
 $script:PrimaryIdentity = $null
-$script:HasFixtureSmartGitExecutable = $PSBoundParameters.ContainsKey('FixtureSmartGitExecutable')
 
 function Complete-Review([int] $ExitCode, [string] $Status, [string] $Code, [string] $Message)
 {
@@ -115,11 +113,7 @@ function Invoke-SmartGit
 		Complete-Review 0 'preview' 'review.preview' 'SmartGit was not launched; run manualCommand to open the candidate.'
 	}
 	$resolvedExecutable = $null
-	if ($script:HasFixtureSmartGitExecutable)
-	{
-		$resolvedExecutable = $FixtureSmartGitExecutable
-	}
-	elseif (Test-Path -LiteralPath $standardExecutable -PathType Leaf)
+	if (Test-Path -LiteralPath $standardExecutable -PathType Leaf)
 	{
 		$resolvedExecutable = $standardExecutable
 	}
@@ -139,10 +133,6 @@ function Invoke-SmartGit
 	$result.executable = [IO.Path]::GetFullPath($resolvedExecutable)
 	try
 	{
-		if ($FixtureFailure -ceq 'smartgit-launch')
-		{
-			throw 'Fixture forced a SmartGit launch failure.'
-		}
 		$processArguments = @($arguments | ForEach-Object { ConvertTo-ProcessArgument $_ })
 		$process = Start-Process -FilePath $result.executable -ArgumentList $processArguments -PassThru
 		$result.processId = $process.Id
@@ -159,10 +149,6 @@ try
 {
 	# \z rather than $: .NET's $ also matches before a trailing newline, so a hex value carrying one would pass.
 	Assert-Input ($ApprovedTip -cmatch '^[0-9a-f]{8,40}\z') 'ApprovedTip must be 8 to 40 lowercase hexadecimal characters.'
-	if ($FixtureFailure -cne 'none' -or $script:HasFixtureSmartGitExecutable)
-	{
-		Assert-Input ($env:BROKEN_ENGINE_FINALIZE_APPROVAL_PREPARATION_FIXTURE -ceq '1') 'Fixture-only inputs require the finalization preparation fixture environment.'
-	}
 	$script:PrimaryIdentity = Get-FinalizeExistingWindowsIdentity $PrimaryWorktree 'Primary worktree'
 	# Only an abbreviated tip is expanded, here, so the SmartGit anchor always carries the full ID; a full
 	# 40-character tip keeps the unchanged path that never resolved it.

@@ -11,9 +11,17 @@ allowed-tools: [Read, Grep, Glob, PowerShell]
 
 # Adversarial Review
 
-Run in one fresh delegated `reviewer`. Do not edit files, run state-changing commands,
-implement fixes, or delegate further. Review logic and correctness; leave style
-to the artifact's domain review.
+## Purpose
+
+Attempt to disprove a change across every changed artifact type and report the
+reachable failures that survive refutation. Runs as one delegated `reviewer` per
+[`subagent-reporting.md`](../../references/subagent-reporting.md).
+
+## When to use
+
+- A Tier-3 change (see root AGENTS.md, Risk tiers).
+- Correctness review leaves one concrete unresolved reachable hypothesis.
+- The user requests an adversarial second opinion on a supplied diff.
 
 ## Inputs
 
@@ -42,38 +50,7 @@ declared invariants, and behavioral or contract statements expressed by the diff
 the authorized hypotheses. If no briefing exists, reconstruct these inputs from
 conversation history. Do not turn either case into an open-ended repository audit.
 
-## Method
-
-Read the callers, consumers, schemas, instructions, generated outputs, or
-sibling paths each hypothesis needs; diff-only reading is insufficient.
-
-Test the contract appropriate to the artifact. For code and shaders, trace
-logic, integration, lifetime, threading, determinism, edge states, and build
-reachability. For scripts, project metadata, schemas, and data, trace inputs,
-state changes, failure handling, compatibility, and consumers. For skills, plans,
-workflow, and documentation, trace discovery and invocation policy,
-executable instructions, authority boundaries, acceptance semantics, links,
-and contradictions with governing instructions.
-
-## Evidence Rules
-
-Every finding cites a `file:line` read in this review, names a reachable in-scope
-failure the change introduced or newly exposed (input or state leads to a wrong
-outcome, a violated governing contract, or a failed approved acceptance
-criterion), and survives an attempt to refute it against guards, established
-preconditions, and governing invariants. Report proven pre-existing or
-out-of-scope defects in `Residuals` instead of fixing or expanding into them,
-while in-scope structural acceptance failures stay findings. Exclude style issues
-and diagnostics a prescribed compiler, validator, or static check directly
-catches.
-
-For any finding that depends on a non-obvious external API, language,
-specification, or library claim, emit one single-claim request per
-`/verify-external-claims` (`../verify-external-claims/SKILL.md`,
-`## External Claim Requests`); a pending verdict makes the review
-`NEEDS_ACTION`, and the claim is not confirmed until that verdict returns.
-
-## Output
+## Handoff
 
 ```markdown
 ## Adversarial Review Results
@@ -98,3 +75,8 @@ Use `NEEDS_ACTION` for findings or pending external verification and `BLOCKED`
 only when required evidence could not be obtained. Critical means data loss,
 broken functionality, determinism failure, or equivalent contract breach;
 everything else reported is required, never optional.
+
+## References
+
+- [`references/worker.md`](references/worker.md) — the steps and rules the
+  dispatched reviewer follows.

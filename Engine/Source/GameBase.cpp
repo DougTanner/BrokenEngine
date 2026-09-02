@@ -936,8 +936,7 @@ void GameBase::CreateFrameAtCoord(GridCoord coord)
 
 	// Populate static data for this coord
 	FrameStaticData& rStaticData = rFrames.staticData;
-	XMVECTOR vecBaseArea = XMVectorSet(kfBaseAreaMinX, kfBaseAreaMaxY, kfBaseAreaMaxX, kfBaseAreaMinY);
-	rStaticData.vecArea = ComputeFrameArea(vecBaseArea, coord);
+	rStaticData.vecArea = ComputeCanonicalFrameArea(coord);
 	rStaticData.coord = coord;
 	GenerateIslandChain(coord, rStaticData.islands);
 	// navData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.

@@ -3,8 +3,7 @@
 	Run a Broken Engine review skill on Codex (Sol) headless and capture its findings.
 
 	Primary Claude Code reviewer route: it runs a delegated reviewer/auditor role on Codex/Sol.
-	Driven by the /codex-review skill, which on failure falls back to the Opus reviewer subagent,
-	then general-purpose on Opus. Codex never invokes this — its reviewer role is already Sol.
+	Driven by the /codex-review skill. Codex never invokes this — its reviewer role is already Sol.
 
 .NOTES
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
@@ -34,9 +33,11 @@
 
 	Exit codes: 0 for every wait whatever its status;
 	126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, any other
-	non-zero only for a script error. The caller reports non-zero, and a failed or malformed wait
-	status, as CODEX-UNAVAILABLE and stops there; nothing is substituted automatically, and only
-	explicit user authorization routes the assignment to the Opus reviewer. None of these retry.
+	non-zero only for a script error. None of these retry. When the codex CLI itself exits non-zero,
+	the failed receipt's reason carries its last non-empty stderr line capped at 200 characters, with
+	the full stderr retained as <runId>.stderr.txt beside the run records; when the CLI printed
+	nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed or
+	malformed status is `.agents/skills/codex-review/references/worker.md`, `### Fallback`.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Launch')]
 param(
@@ -139,7 +140,8 @@ function Publish-OutputFile([string] $StagingPath, [string] $DestinationPath, [s
 
 # Both attempts are this same call on the same unchanged prompt file; only the staging path differs.
 # Codex's own console chatter is discarded, because anything this function writes to the pipeline
-# would be captured by the caller's assignment alongside the exit code it actually returns.
+# would be captured by the caller's assignment alongside the exit code it actually returns; its
+# stderr instead goes to the run's retained stderr file so a failure reason can quote it.
 function Invoke-CodexAttempt([string] $StagingPath)
 {
 	Get-Content -LiteralPath $PromptFile -Raw | & $codex.Source `
@@ -152,7 +154,7 @@ function Invoke-CodexAttempt([string] $StagingPath)
 		-c "service_tier=`"$serviceTier`"" `
 		--ephemeral `
 		-o $StagingPath `
-		- | Out-Null
+		- 2> $stderrOutput | Out-Null
 	return [int] $LASTEXITCODE
 }
 
@@ -264,7 +266,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 
 	New-Item -ItemType Directory -Path $recordDirectory -Force | Out-Null
 	# Records are kept for repeat waits, so a launch is what bounds the directory.
-	Get-ChildItem -LiteralPath $recordDirectory -Filter '*.json' -File -ErrorAction SilentlyContinue |
+	Get-ChildItem -LiteralPath $recordDirectory -File -ErrorAction SilentlyContinue |
 		Where-Object { $_.LastWriteTimeUtc -lt (Get-Date).ToUniversalTime().AddDays(-7) } |
 		Remove-Item -Force -ErrorAction SilentlyContinue
 
@@ -297,6 +299,9 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 $stagingOutput = Join-Path $temporaryDirectory "broken-engine-codex-review-$InternalRunId.output.md"
 $retryStagingOutput = Join-Path $temporaryDirectory "broken-engine-codex-review-$InternalRunId.output-retry.md"
 $pendingOutput = Join-Path ([System.IO.Path]::GetDirectoryName($OutFile)) "$InternalRunId.partial.md"
+# Retained beside the run records: both attempts truncate and rewrite it, so it always holds the
+# stderr of the attempt whose exit code is reported.
+$stderrOutput = Join-Path $recordDirectory "$InternalRunId.stderr.txt"
 $exitCode = 1
 $reason = $null
 $retried = $false
@@ -362,7 +367,20 @@ try
 	}
 	else
 	{
+		# The CLI's own error text is the only diagnosis a caller gets, but the receipt is read into
+		# a parent session's context, so only the last non-empty line survives, capped in length.
 		$reason = "codex exited $exitCode"
+		$tail = @(Get-Content -LiteralPath $stderrOutput -ErrorAction SilentlyContinue) -match '\S' | Select-Object -Last 1
+		if ($null -ne $tail)
+		{
+			$tail = $tail.Trim()
+			if ($tail.Length -gt 200)
+			{
+				$tail = $tail.Substring(0, 200)
+			}
+
+			$reason = "codex exited ${exitCode}: $tail"
+		}
 	}
 }
 catch

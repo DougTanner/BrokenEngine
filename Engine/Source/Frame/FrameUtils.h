@@ -127,6 +127,12 @@ inline XMVECTOR XM_CALLCONV ComputeFrameArea(FXMVECTOR vecBaseArea, GridCoord co
 	return XMVectorAdd(vecBaseArea, vecOffset);
 }
 
+// The one canonical frame area for a coord: every producer and every read site must agree on this value
+inline XMVECTOR XM_CALLCONV ComputeCanonicalFrameArea(GridCoord coord)
+{
+	return ComputeFrameArea(XMVectorSet(kfBaseAreaMinX, kfBaseAreaMaxY, kfBaseAreaMaxX, kfBaseAreaMinY), coord);
+}
+
 inline constexpr size_t kuiInitialTransferCapacity = 32;
 
 inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecPosition)

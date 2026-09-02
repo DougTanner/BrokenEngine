@@ -111,7 +111,7 @@ The fixed terminal mapping is:
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
 | 0 | `pass` | `ok`, `primary.tree-identical` | Continue to SmartGit review and the landing summary. |
-| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](../SKILL.md#worker-workflow) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) owns primary-movement policy. No conditional/preconfirmation landing lease is acquired; the normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
+| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) owns primary-movement policy. No conditional/preconfirmation landing lease is acquired; the normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
 | 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 
@@ -182,7 +182,7 @@ reconstructs the assessment from Git output.
   Invoke it successfully before approval preparation begins
   reconciliation, retain or refresh the lease throughout agent-driven
   reconciliation, and release it with `-Release` before any user wait, in the
-  order `workflow.md` `## Bundled scripts` states; a release of an already-absent
+  order `worker.md` `## Bundled scripts` states; a release of an already-absent
   lease passes. The post-confirmation landing claim uses the landing lease
   duration — `-LeaseSeconds 3600`, its default, so omitting the parameter is
   correct; a refresh keeps a lease's original duration, so landing refuses to
@@ -244,7 +244,7 @@ and overwrites the artifact; the stale receipt is never reused, because its
   path — so a caller raising that budget must raise its host timeout
   by the same amount. Pass the post-confirmation claim's owner token as
   `-OwnerToken` so landing continues under that same lease, which it accepts only
-  as a same-actor continuation under the `workflow.md` `## Bundled scripts` ownership
+  as a same-actor continuation under the `worker.md` `## Bundled scripts` ownership
   rule, preserving the raw `$SessionLabel`. Without `-OwnerToken`, it derives
   `$SessionLabel/landing`, first inspects the lock, and adopts a live owner only
   when that exact derived session and the same canonical worktree match and the

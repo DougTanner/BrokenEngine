@@ -510,6 +510,39 @@ void NavData::Read(std::istream& rStream)
 		common::Read(rStream, visEdgeB.at(i));
 	}
 
+	// The 3-vertex minimum is the producer's guarantee: NavBuild's bake skips shorter paths, and
+	// BuildCellNavData only rebases the offsets it copies.
+	if (iPolygonCount > 0 && polygonOffsets.at(0) != 0)
+	{
+		throw common::CorruptStreamException("NavData::Read topology");
+	}
+
+	// Range-check every offset before any span arithmetic, so no later subtraction runs on a hostile value.
+	for (int32_t i = 0; i < iPolygonCount; ++i)
+	{
+		if (polygonOffsets.at(i) < 0 || polygonOffsets.at(i) > iVertexCount - 3)
+		{
+			throw common::CorruptStreamException("NavData::Read topology");
+		}
+	}
+
+	for (int32_t i = 0; i < iPolygonCount; ++i)
+	{
+		auto [iStart, iEnd] = PolygonRange(polygonOffsets, i, iVertexCount);
+		if (iEnd - iStart < 3)
+		{
+			throw common::CorruptStreamException("NavData::Read topology");
+		}
+	}
+
+	for (int32_t i = 0; i < iEdgeCount; ++i)
+	{
+		if (visEdgeA.at(i) < 0 || visEdgeA.at(i) >= iVertexCount || visEdgeB.at(i) < 0 || visEdgeB.at(i) >= iVertexCount)
+		{
+			throw common::CorruptStreamException("NavData::Read topology");
+		}
+	}
+
 	// Derived broad-phase data is not serialized; rebuild it from the vertices just read so the client
 	// matches the server's BuildCellNavData result.
 	BuildNavAcceleration(*this);

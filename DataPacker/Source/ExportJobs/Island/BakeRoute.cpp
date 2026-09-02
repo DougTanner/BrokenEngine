@@ -326,11 +326,12 @@ void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rR
 }
 
 // Read raw elevation and convert to engine-meters: pixel_m = (pixel_normalized -
-// fSeaLevelNormalized) × elevationMeters. Beach = 0, ocean negative (to -fBeachOffsetMeters),
-// land positive. NaN/Inf scrubbed to the sea floor (R32_SFLOAT is unbounded; a stray non-finite
-// pixel would poison the elevation G-buffer and vertex displacement). The full-res buffer feeds
-// every chunk's ProcessBakedRegion crop; the raw Elevation.r32 stays on disk as the bake source.
-std::vector<float> LoadElevationMeters(const std::filesystem::path& rIntermediatesDir, int64_t iTexturePixels, float fSeaLevelNormalized, float fElevationMeters, float fBeachOffsetMeters)
+// fSeaLevelNormalized) × elevationMeters. Beach = 0, ocean negative (to the sea floor), land
+// positive. A non-finite or outside-[0, 1] raw sample is rejected (R32_SFLOAT is unbounded, so
+// such a pixel is a broken bake, not data to salvage; it would poison the elevation G-buffer and
+// vertex displacement). The full-res buffer feeds every chunk's ProcessBakedRegion crop; the raw
+// Elevation.r32 stays on disk as the bake source.
+std::vector<float> LoadElevationMeters(const std::filesystem::path& rIntermediatesDir, int64_t iTexturePixels, float fSeaLevelNormalized, float fElevationMeters)
 {
 	std::filesystem::path elevationFile = rIntermediatesDir / "Elevation.r32";
 	size_t uiPixelCount = CheckedTexturePixelCount(elevationFile, iTexturePixels);
@@ -358,9 +359,14 @@ std::vector<float> LoadElevationMeters(const std::filesystem::path& rIntermediat
 	{
 		throw std::runtime_error(std::format("Failed to read complete Gaea elevation output \"{}\".", elevationFile.string()));
 	}
-	for (float& rfPixel : fullElevationMeters)
+	for (size_t uiPixel = 0; uiPixel < uiPixelCount; ++uiPixel)
 	{
-		rfPixel = std::isfinite(rfPixel) ? (rfPixel - fSeaLevelNormalized) * fElevationMeters : -fBeachOffsetMeters;
+		float fRaw = fullElevationMeters[uiPixel];
+		if (!std::isfinite(fRaw) || fRaw < 0.0f || fRaw > 1.0f)
+		{
+			throw std::runtime_error(std::format("Gaea produced \"{}\" with elevation pixel {} at {}, outside the normalized [0, 1] range. Verify the archetype's Elevation Export node uses FloatRaw32 format and that the graph feeding it is clamped to [0, 1].", elevationFile.string(), uiPixel, fRaw));
+		}
+		fullElevationMeters[uiPixel] = (fRaw - fSeaLevelNormalized) * fElevationMeters;
 	}
 	return fullElevationMeters;
 }
@@ -432,6 +438,10 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 	{
 		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" primitive missing POSITION attribute or indices accessor.", meshGltfFile.string()));
 	}
+	if (rPrimitive.mode != TINYGLTF_MODE_TRIANGLES)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" primitive mode is {}, not triangles ({}). Set the Mesher node's topology to triangles.", meshGltfFile.string(), rPrimitive.mode, TINYGLTF_MODE_TRIANGLES));
+	}
 
 	const tinygltf::Accessor& rPosAccessor = gltfModel.accessors.at(static_cast<size_t>(positionIt->second));
 	const tinygltf::BufferView& rPosView = gltfModel.bufferViews.at(static_cast<size_t>(rPosAccessor.bufferView));
@@ -441,17 +451,47 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor is not float3.", meshGltfFile.string()));
 	}
 
+	// Every span check below is written as a subtraction/division against the container size rather
+	// than an addition compared to it, so no size_t sum can wrap past the limit it is tested against.
+	static constexpr size_t kuiPositionBytes = sizeof(float) * 3;
+	if (rPosView.byteOffset > rPosBuffer.data.size() || rPosView.byteLength > rPosBuffer.data.size() - rPosView.byteOffset)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION buffer view (byteOffset {}, byteLength {}) does not fit its {}-byte buffer.", meshGltfFile.string(), rPosView.byteOffset, rPosView.byteLength, rPosBuffer.data.size()));
+	}
+	if (rPosAccessor.count < 1)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor has no vertices (count {}).", meshGltfFile.string(), rPosAccessor.count));
+	}
+	if (rPosAccessor.byteOffset > rPosView.byteLength || kuiPositionBytes > rPosView.byteLength - rPosAccessor.byteOffset)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor byteOffset {} leaves no room for a float3 in its {}-byte buffer view.", meshGltfFile.string(), rPosAccessor.byteOffset, rPosView.byteLength));
+	}
+	// ByteStride() is never -1 here: the float3 check above passed and tinygltf rejects a byteStride
+	// that is not a multiple of 4 while parsing.
+	size_t uiStride = static_cast<size_t>(rPosAccessor.ByteStride(rPosView));
+	if (rPosAccessor.count - 1 > (rPosView.byteLength - rPosAccessor.byteOffset - kuiPositionBytes) / uiStride)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor count {} at stride {} runs past its buffer view (byteOffset {}, byteLength {}).", meshGltfFile.string(), rPosAccessor.count, uiStride, rPosAccessor.byteOffset, rPosView.byteLength));
+	}
+	if ((rPosView.byteOffset + rPosAccessor.byteOffset) % alignof(float) != 0)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION data starts at byte {}, which is not float-aligned.", meshGltfFile.string(), rPosView.byteOffset + rPosAccessor.byteOffset));
+	}
+
 	int64_t iVertexCount = static_cast<int64_t>(rPosAccessor.count);
 	rMeshPositions.resize(static_cast<size_t>(iVertexCount) * 3);
 	{
 		const std::byte* pSrc = reinterpret_cast<const std::byte*>(rPosBuffer.data.data()) + rPosView.byteOffset + rPosAccessor.byteOffset;
-		size_t uiStride = rPosAccessor.ByteStride(rPosView);
 		for (int64_t iVertex = 0; iVertex < iVertexCount; ++iVertex)
 		{
 			const float* pfXyz = reinterpret_cast<const float*>(pSrc + static_cast<size_t>(iVertex) * uiStride);
+			if (!std::isfinite(pfXyz[0]) || !std::isfinite(pfXyz[1]) || !std::isfinite(pfXyz[2]))
+			{
+				throw std::runtime_error(std::format("Gaea Mesher output \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshGltfFile.string(), iVertex, pfXyz[0], pfXyz[1], pfXyz[2]));
+			}
 			float fX = pfXyz[0];
 			float fY = -pfXyz[2];
-			float fZ = std::isfinite(pfXyz[1]) ? pfXyz[1] - fBeachOffsetMeters : -fBeachOffsetMeters;
+			float fZ = pfXyz[1] - fBeachOffsetMeters;
 			rMeshPositions[static_cast<size_t>(iVertex) * 3 + 0] = fX;
 			rMeshPositions[static_cast<size_t>(iVertex) * 3 + 1] = fY;
 			rMeshPositions[static_cast<size_t>(iVertex) * 3 + 2] = fZ;
@@ -461,6 +501,40 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 	const tinygltf::Accessor& rIdxAccessor = gltfModel.accessors.at(static_cast<size_t>(rPrimitive.indices));
 	const tinygltf::BufferView& rIdxView = gltfModel.bufferViews.at(static_cast<size_t>(rIdxAccessor.bufferView));
 	const tinygltf::Buffer& rIdxBuffer = gltfModel.buffers.at(static_cast<size_t>(rIdxView.buffer));
+	size_t uiIndexComponentBytes = 0;
+	if (rIdxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+	{
+		uiIndexComponentBytes = sizeof(uint32_t);
+	}
+	else if (rIdxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+	{
+		uiIndexComponentBytes = sizeof(uint16_t);
+	}
+	else if (rIdxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+	{
+		uiIndexComponentBytes = sizeof(uint8_t);
+	}
+	else
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor has unsupported componentType {}.", meshGltfFile.string(), rIdxAccessor.componentType));
+	}
+	if (rIdxView.byteOffset > rIdxBuffer.data.size() || rIdxView.byteLength > rIdxBuffer.data.size() - rIdxView.byteOffset)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices buffer view (byteOffset {}, byteLength {}) does not fit its {}-byte buffer.", meshGltfFile.string(), rIdxView.byteOffset, rIdxView.byteLength, rIdxBuffer.data.size()));
+	}
+	if (rIdxAccessor.byteOffset > rIdxView.byteLength || rIdxAccessor.count > (rIdxView.byteLength - rIdxAccessor.byteOffset) / uiIndexComponentBytes)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor (byteOffset {}, count {}, {} byte(s) per index) runs past its buffer view (byteLength {}).", meshGltfFile.string(), rIdxAccessor.byteOffset, rIdxAccessor.count, uiIndexComponentBytes, rIdxView.byteLength));
+	}
+	if (rIdxAccessor.count % 3 != 0)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor count {} is not a multiple of three.", meshGltfFile.string(), rIdxAccessor.count));
+	}
+	if ((rIdxView.byteOffset + rIdxAccessor.byteOffset) % uiIndexComponentBytes != 0)
+	{
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices start at byte {}, which is not aligned to the {}-byte index component.", meshGltfFile.string(), rIdxView.byteOffset + rIdxAccessor.byteOffset, uiIndexComponentBytes));
+	}
+
 	int64_t iIndexCount = static_cast<int64_t>(rIdxAccessor.count);
 	rMeshIndices.resize(static_cast<size_t>(iIndexCount));
 	{
@@ -488,8 +562,14 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 				}
 				break;
 			}
-			default:
-				throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor has unsupported componentType {}.", meshGltfFile.string(), rIdxAccessor.componentType));
+		}
+	}
+
+	for (size_t uiIndex = 0; uiIndex < rMeshIndices.size(); ++uiIndex)
+	{
+		if (rMeshIndices[uiIndex] >= static_cast<uint32_t>(iVertexCount))
+		{
+			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), uiIndex, rMeshIndices[uiIndex], iVertexCount));
 		}
 	}
 
@@ -593,7 +673,7 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 	// STAGE 2 — split (fast). Raw outputs are present here (just baked, or reused fresh).
 	// PatchArchetype doesn't touch the Sea node, so the patched copy keeps the authored Level (or
 	// kfGaeaSeaLevelDefault); the per-island beach offset drives the elevation transform, auto-crop
-	// cut line, and mesh-Z scrub.
+	// cut line, and mesh-Z offset.
 	float fSeaLevelNormalized = ReadArchetypeSeaLevel(patchedArchetypeFile);
 	float fBeachOffsetMeters = fSeaLevelNormalized * rContext.rDimensions.fElevationMeters;
 	LOG(kDefault, kDebug, "Archetype Sea Level (read, not patched): {} → beach offset {} m for elevationMeters {} m", common::Wb(fSeaLevelNormalized, 4), common::Wb(fBeachOffsetMeters, 2), common::Wb(rContext.rDimensions.fElevationMeters, 2));
@@ -611,7 +691,7 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 	// (Engine/Source/Graphics/Managers/RenderTargetTextures.cpp) blends seamlessly with edge texels.
 	ASSERT(std::abs(-fBeachOffsetMeters - common::kfSeaBottomMeters) < 0.01f);
 
-	std::vector<float> fullElevationMeters = LoadElevationMeters(intermediatesDirectory, rContext.iTexturePixels, fSeaLevelNormalized, rContext.rDimensions.fElevationMeters, fBeachOffsetMeters);
+	std::vector<float> fullElevationMeters = LoadElevationMeters(intermediatesDirectory, rContext.iTexturePixels, fSeaLevelNormalized, rContext.rDimensions.fElevationMeters);
 
 	std::vector<uint16_t> fullAmbientOcclusion = LoadAmbientOcclusion(intermediatesDirectory, rContext.iTexturePixels);
 

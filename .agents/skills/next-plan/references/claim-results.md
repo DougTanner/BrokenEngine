@@ -27,20 +27,27 @@ up by the next invocation.
 
 ## Reading the queue listing
 
-`Get-NextPlanList.ps1` reports a bounded projection: per-state counts, the first
-Plans in selection order (default 10), and every claimed row. It never emits the
-whole tree, so a large Plan queue cannot flood the session. It deliberately
-reads the session worktree's own tree and never moves it, so a Plan landed on
-primary after this session started shows up only after the claim script
-fast-forwards the session. Its eligible and claimed states are likewise an
-unguarded point-in-time snapshot of the machine-local claim store, so a bare
-claim run moments later can skip Plans the listing showed as eligible because
-concurrent sessions claimed them in between. That is normal scheduler behavior
-rather than a selection defect, and the claim result does not name the
-passed-over Plans.
+`Get-NextPlanList.ps1` runs only when [worker.md](worker.md) step 2 calls for
+it. It reports a bounded projection: per-state counts, then the first Plans in
+selection order (default 5) as `path`/`state` rows, with `blockedBy` on a
+blocked row and `diagnostic` on an excluded one. It never emits the whole tree,
+so a large Plan queue cannot flood the session. It deliberately reads the
+session worktree's own tree and never moves it, so a Plan landed on primary
+after this session started shows up only after the claim script fast-forwards
+the session. Its eligible and claimed states are likewise an unguarded
+point-in-time snapshot of the machine-local claim store, so a bare claim run
+moments later can skip Plans the listing showed as eligible because concurrent
+sessions claimed them in between. That is normal scheduler behavior rather than
+a selection defect, and the claim result does not name the passed-over Plans.
 
 For a tier-constrained request, read the `Risk tier` prose of the top eligible
 candidates in that order until one matches, then claim that path.
+
+A plain named run skips the listing, so the claim result names every stop: a
+partial pattern matching nothing blocks with `plan-name-not-found`, several
+matches block with `plan-name-ambiguous` and list `candidates`, and an exact
+path that is absent, blocked, excluded, or claimed by another session reports
+`none-available`; [worker.md](worker.md) rules own how each stop is handled.
 
 ## Diverged sessions
 
