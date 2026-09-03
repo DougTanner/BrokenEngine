@@ -104,7 +104,8 @@ unreadable.
 A skill extends this form only by adding rows inside an existing field or by
 declaring extra fields in its own `## Handoff` section, each one line or one row
 per item, never a paragraph. `Build required` stays present and `Residuals`
-stays last.
+stays last. A target that `/compile` builds in Release only carries
+`Release|x64` and no other configuration/platform under `Build required`.
 Independent review and verification use a context that did not produce the
 work. A focused correction/retest also uses an independent context.
 
