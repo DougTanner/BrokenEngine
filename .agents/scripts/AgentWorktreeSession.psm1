@@ -59,8 +59,8 @@ function Get-AgentWorktreePrimaryIdentity([string] $RepositoryRoot) {
 
 # Session identity is entirely Git-derived: the branch names the session, the Git common directory
 # names the primary checkout, and the baseline is the attribution point the session diverged from.
-# A checkout on any other branch shape (a primary-commit route) resolves with SessionId $null rather
-# than failing, because primary mutation there needs no session identity.
+# A checkout not on a claude/ or codex/ session branch has no session sidecar, so it resolves with
+# SessionId $null instead of failing.
 # A session worktree's primary branch is the one its wrapper recorded in the session sidecar, not the
 # branch the primary checkout currently has checked out.
 function Get-AgentWorktreeSessionContext {
@@ -115,7 +115,10 @@ function Get-AgentWorktreeSessionContext {
 	# only the open stage in the diff. Substituting the merge base directly instead of falling
 	# back to --fork-point keeps the answer deterministic and reflog-independent.
 	$baseline = $null
-	$configured = [Environment]::GetEnvironmentVariable('BROKEN_ENGINE_BASELINE', 'Process')
+	# The wrapper records the baseline in this gitignored file; a missing or empty file is simply no
+	# hint. A child process can rewrite the file, which is why it replaces the former environment hint.
+	$baselineHintPath = Join-Path $top 'Temp\session-baseline'
+	$configured = if (Test-Path -LiteralPath $baselineHintPath -PathType Leaf) { [IO.File]::ReadAllText($baselineHintPath).Trim() } else { $null }
 	if (-not [string]::IsNullOrWhiteSpace($configured)) {
 		$resolved = @(& git -C $top rev-parse --quiet --verify "$configured^{commit}" 2>$null)
 		if ($LASTEXITCODE -eq 0 -and $resolved.Count -eq 1) {
@@ -145,4 +148,30 @@ function Get-AgentWorktreeSessionContext {
 	}
 }
 
-Export-ModuleMember -Function Get-AgentWorktreePrimaryIdentity, Get-AgentWorktreeRecords, Test-AgentWorktreeNoGitOperation, Test-AgentWorktreeAncestor, Get-AgentWorktreeSessionContext
+# One copy of a rare, risky Git sequence, shared by the wrapper's reattach path and the mid-session
+# repair script. It is outcome-neutral: 'ancestor' means the resolved fork point is still on the
+# primary tip's history, which the wrapper treats as success and the repair script as a blocker.
+# --fork-point can succeed with no output, so the plain merge-base fallback runs before the guard and
+# --is-ancestor never receives an unset value. A refusal beats a partial repair, so a dirty tree is
+# rejected outright and a failed replay is aborted back to what was found.
+function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBranch, [string] $PrimaryTip, [string] $Branch) {
+	$forkPoint = @(& git -C $Worktree merge-base --fork-point "refs/heads/$PrimaryBranch" HEAD 2>$null)
+	$baseline = if ($LASTEXITCODE -eq 0 -and $forkPoint.Count -eq 1 -and -not [string]::IsNullOrWhiteSpace($forkPoint[0])) { $forkPoint[0].Trim() }
+		else { @(Invoke-AgentGit @('-C', $Worktree, 'merge-base', 'HEAD', $PrimaryTip))[0].Trim() }
+	& git -C $Worktree merge-base --is-ancestor $baseline $PrimaryTip
+	if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Outcome = 'ancestor'; ForkPoint = $baseline; Baseline = $baseline } }
+	$repair = "git -C '$Worktree' rebase --onto $PrimaryTip $baseline $Branch"
+	$refusal = "Primary branch '$PrimaryBranch' was rewritten: fork point $baseline is no longer on its history, which is now at $PrimaryTip. Replay this session onto the new tip manually: $repair"
+	if (@(Invoke-AgentGit @('-C', $Worktree, 'status', '--porcelain', '-z', '--untracked-files=all')).Count -ne 0) {
+		throw "Worktree '$Worktree' has staged, unstaged, or untracked changes, so it was left untouched. $refusal"
+	}
+	& git -C $Worktree rebase --onto $PrimaryTip $baseline $Branch
+	if ($LASTEXITCODE -ne 0) {
+		& git -C $Worktree rebase --abort
+		if ($LASTEXITCODE -ne 0) { throw "Replaying this session onto the rewritten primary branch failed, and rolling that replay back failed too, so the worktree is left mid-rebase. Roll it back manually: git -C '$Worktree' rebase --abort. $refusal" }
+		throw "Replaying this session onto the rewritten primary branch failed and was aborted, so the worktree was left untouched. $refusal"
+	}
+	return [pscustomobject]@{ Outcome = 'rebased'; ForkPoint = $baseline; Baseline = $PrimaryTip }
+}
+
+Export-ModuleMember -Function Get-AgentWorktreePrimaryIdentity, Get-AgentWorktreeRecords, Test-AgentWorktreeNoGitOperation, Test-AgentWorktreeAncestor, Get-AgentWorktreeSessionContext, Repair-AgentWorktreeForkPoint

@@ -22,7 +22,7 @@
    or with the requested normalized path or partial pattern quoted after
    `-Plan`, for example:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md'`
-   Done when `ok` or `reused` reports this session holds the named claim.
+   Done when the result reports `nextAction: prepare`.
 4. Dispatch one preparation `implementer` to verify every Plan statement against
    current code, on the single task brief in
    [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md);
@@ -35,21 +35,16 @@
    `implementer`, reading source itself only for a decision it must make that
    the Plan and the returned handoff cannot settle.
 
-   Done when the execution card carries `### What does this plan do?` and
-   `### Why this is good for the codebase`, each 2-4 plain sentences, then goal,
-   out of scope, tier trigger, interfaces/invariants, acceptance checks with
-   expected observations, and required/conditional roles. When the
-   `/plan-audit` input is a scratch snapshot instead of the claimed Plan path,
-   that snapshot carries the plan's `## In scope` and `## Out of scope`
-   sections exactly as `/plan-audit`'s `## Inputs` requires, so `/plan-audit`
-   has a diff boundary to test.
+   Done when the execution card carries every field of the card template in
+   [`../SKILL.md`](../SKILL.md) `## Handoff`. When the `/plan-audit` input is a
+   scratch snapshot instead of the claimed Plan path, that snapshot carries the
+   plan's `## In scope` and `## Out of scope` sections exactly as
+   `/plan-audit`'s `## Inputs` requires, so `/plan-audit` has a diff boundary to
+   test.
 5. Invoke step 3's claim script idempotently immediately before the final
-   preparation handoff. Done when it reports the held claim, or is skipped on
-   step 6's straight-through path, where the tree already carries the
-   implementation edit and a claim run refuses a dirty tree.
+   preparation handoff. Done when it reports the held claim.
 6. Present for approval per `### Implementation approval` in
-   [`../SKILL.md`](../SKILL.md). Done when the user's decision arrives, or when
-   that section's straight-through path applies and main has recorded its facts.
+   [`../SKILL.md`](../SKILL.md). Done when the user's decision arrives.
 7. Implement the approved change. Done when its own acceptance checks pass.
 8. Run the checkpoint exactly once, however the run ends: after step 7's
    acceptance checks, before step 9, and before `/finalize-changes` prepares the
@@ -76,13 +71,9 @@
 ## Rules
 
 - The preparation worker must never run the mutation-capable claim script.
-- On `claim.session-diverged` the script never moves or resets a session branch:
-  report the named commits to the user, who decides how to resolve it. For a
-  bare selection `none-available` is a normal whole-skill stop with nothing to
-  claim, and selection is not re-run to look again; for a `-Plan`-targeted
-  invocation it is the same whole-skill stop, reported to the user, and the
-  manager never selects or claims a different candidate in that run. Any other
-  status stops the skill without repair, reordering, or retry.
+- Every result is acted on per its `nextAction`, and for a `-Plan`-targeted
+  invocation the manager never selects or claims a different candidate in that
+  run.
 - The context baseline is provisional until a claim reports a `sync` object.
   Never create/adopt a worktree or inspect machine-local claims directly.
 - Which reviewer runs at which tier is Step 2 of root
@@ -106,9 +97,9 @@
 - The checkpoint review covers friction observable in the transcript up to its
   own dispatch; `/next-plan-review` covers the rest after landing.
 - [claim-results.md](claim-results.md) owns how each claim, listing, and
-  claim-exit result is read, including the `sync`,
-  `claim.session-diverged`, and `claim.worktree-dirty` fields, the listing's
-  snapshot limits and tier-constrained reading procedure, and the completion and
-  retained-path result shapes. Do not reconstruct any script's transitions.
+  claim-exit result is read, including the `sync` and `nextAction` fields, the
+  listing's snapshot limits and tier-constrained reading procedure, and the
+  completion and retained-path result shapes. Do not reconstruct any script's
+  transitions.
 - [follow-up-provenance.md](follow-up-provenance.md) owns where the provenance
   block's values come from.

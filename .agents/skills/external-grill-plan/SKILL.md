@@ -31,8 +31,8 @@ Require all of the following before starting:
   `implementer`'s brief;
 - user intent, applicable repository instructions, session baseline when one
   exists, and any changes the user approved after the plan;
-- the draft execution card: Tier-3 triggers, roles, and each
-  acceptance criterion with its decisive check and expected result.
+- the draft execution card, carrying every field of the card template in
+  [`../next-plan/SKILL.md`](../next-plan/SKILL.md) `## Handoff`.
 - Roles: execution splits by role — the preparation `implementer` performs every
   repository read and search this skill requires and returns immutable decision
   briefs; the main session interviews the user, decides, and dispatches the

@@ -72,10 +72,9 @@ For each accepted finding that Step 7's own fix-it-here rule in root
 or isolation proposal, supplying the observed symptom with its citation plus the
 provenance block sourced per [follow-up-provenance.md](follow-up-provenance.md).
 An `active-change-blocker` finding never becomes a follow-up Plan: it returns
-to the current change as a blocker. Step 7 in root
-[AGENTS.md](../../../../AGENTS.md) names this Plan the instance of a leftover
-routed after the Step 5 review dispatch and owns how it is authored and
-verified.
+to the current change as a blocker. This Plan is a leftover routed after the
+Step 5 review dispatch; Step 7 in root [AGENTS.md](../../../../AGENTS.md) owns
+how it is authored and verified.
 
 Friction first observed after this checkpoint — including friction in running
 the claim-exit script and in `/finalize-changes` itself — is recorded through

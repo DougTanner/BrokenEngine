@@ -1,6 +1,6 @@
 ---
 name: code-style-review
-description: Reviews and auto-fixes provably meaning-preserving C++ style violations in session-changed ranges or an explicit cleanup scope, per `Documents/C++StyleGuide.txt`. Use after C++ changes or for a requested style, naming, or formatting cleanup; routes semantic candidates for classification instead of changing behavior.
+description: Reviews and auto-fixes provably meaning-preserving C++ style violations in session-changed ranges or an explicit cleanup scope, over a fixed subset of the `Documents/C++StyleGuide.txt` rules. Use after C++ changes or for a requested style, naming, or formatting cleanup; routes semantic candidates for classification instead of changing behavior.
 allowed-tools: [Read, Write, Edit, Grep, PowerShell]
 ---
 
@@ -8,9 +8,9 @@ allowed-tools: [Read, Write, Edit, Grep, PowerShell]
 
 ## Purpose
 
-Fixed C++ style violations in the selected ranges, per
-`Documents/C++StyleGuide.txt`, plus the session's debug and comment residue
-removed and every semantic candidate routed for caller classification.
+Fixed violations of the `Documents/C++StyleGuide.txt` rule subset
+[`references/worker.md`](references/worker.md) names, in the selected ranges,
+plus the session's residue removed and semantic candidates routed to the caller.
 
 ## When to use
 

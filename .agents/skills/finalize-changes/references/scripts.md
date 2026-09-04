@@ -32,6 +32,7 @@ never re-typed by hand.
   - [Primary movement check](#primary-movement-check)
   - [Approval review receipt](#approval-review-receipt)
   - [Landing and recovery](#landing-and-recovery)
+  - [Session fork-point repair](#session-fork-point-repair)
 
 ## Invocation
 
@@ -41,18 +42,16 @@ Angle-bracket values are placeholders; quote every one. `<owner-token>` is a
 canonical lowercase GUID in `8-4-4-4-12` form. For the lock claim, either omit
 `-LandingOwner` so `Invoke-FinalizeLockClaim.ps1` creates and returns one, or
 create one explicitly with `WorktreeCli lock token`; later commands that supply
-the already-held token, including `-AdvancePrimary`, carry it and do not create
-one. `<baseline>` is the `Baseline` that `Get-AgentWorktreeSessionContext`
-reports when run from the command's `<current-worktree>` after that branch's
-most recent rebase; a rebase invalidates an earlier-resolved value, so
-re-resolve it from a fresh run, never from earlier command text or the dispatch
-brief.
+the already-held token carry it and do not create one. `<baseline>` is the
+`Baseline` that `Get-AgentWorktreeSessionContext` reports when run from the
+command's `<current-worktree>` after that branch's most recent rebase; a rebase
+invalidates an earlier-resolved value, so re-resolve it from a fresh run, never
+from earlier command text or the dispatch brief. `<session-label>` is the
+`SessionId` that `Get-AgentWorktreeSessionContext` reports; pass that
+identical value to every command below that takes `-SessionLabel`.
 
 ```text
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route session-landing -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<primary-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<primary-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -Route primary-commit -CurrentWorktree '<primary-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<primary-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<candidate-parent>' -ExpectedPrimaryTip '<candidate-parent>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>' -VerifiedCandidateCommit '<candidate-commit>' -VerifiedCandidateTree '<candidate-tree>' -WorktreeCliExecutable '<worktreecli-exe>' -SessionLabel '<session-label>' -OwnerToken '<owner-token>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -AdvancePrimary
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeApprovalPreparation.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' > 'Temp/finalize-approval-preparation-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizePrimaryMovementCheck.ps1 -CurrentWorktree '<session>' -PrimaryWorktree '<primary>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -CandidateCommit '<candidate-commit>' -CandidateTree '<candidate-tree>' -CandidateParent '<candidate-parent>' -OwnedPaths '<path>,<path>' > 'Temp/finalize-primary-movement-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>'
@@ -62,17 +61,19 @@ pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLan
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit > 'Temp/finalize-approval-review-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
+pwsh -NoProfile -File .agents/scripts/Repair-SessionForkPoint.ps1
 ```
 
 Add `-ReleasePlanClaim` to the landing command when a claimed Plan reached final
 preparation, `-CommitMessageFile '<message-file>'` to the approval-preparation
-command when the rules below call for the message override, and `-LeaseSeconds`,
-`-CooperatingSessionOwner`, or `-WaitSeconds`
-only where the rules below call for a non-default value.
-A landing claim's `-Worktree` is the route's own worktree —
-`'<current-worktree>'` on the session route and `'<primary-worktree>'` on the
-separately requested primary-commit route — because landing accepts the lease
-only when its recorded worktree matches the landing identity.
+command when the rules below call for the message override,
+`-VerifiedCandidateCommit '<reviewed-commit>' -VerifiedCandidateTree
+'<reviewed-tree>'` to that same approval-preparation command to prove the
+reconciled session tree still equals a tree that was already reviewed, and
+`-LeaseSeconds`, `-CooperatingSessionOwner`, or `-WaitSeconds` only where the
+rules below call for a non-default value.
+A landing claim's `-Worktree` is `'<current-worktree>'`, because landing accepts
+the lease only when its recorded worktree matches the landing identity.
 A recovery invocation after a crash repeats that same landing command with its
 original approved arguments.
 
@@ -110,7 +111,7 @@ The fixed terminal mapping is:
 
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
-| 0 | `pass` | `ok`, `primary.tree-identical` | Continue to SmartGit review and the landing summary. |
+| 0 | `pass` | `ok`, `primary.tree-identical` | Continue to the SmartGit launch line and the landing summary. |
 | 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) owns primary-movement policy. No conditional/preconfirmation landing lease is acquired; the normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
 | 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
@@ -130,12 +131,8 @@ reconstructs the assessment from Git output.
   invocation passes the same set unchanged. A path found in neither the baseline
   tree nor the expected-tip tree nor the worktree still blocks with
   `input.path-not-single-entry`.
-- On the confirmed `-AdvancePrimary` resume, `-OwnerToken` is mandatory and must
-  name the caller's live 3600-second landing lease; no omitted-token primary
-  mutation is allowed. The result is `broken-engine-finalize-candidate/v4` with
-  `historyUpdate` and `final` fields. The final commit is the deterministic
-  sole-parent commit carrying the two generated history files, while
-  `candidate.commit` remains the reviewed source candidate.
+- `Invoke-FinalizeCandidateCommit.ps1` never advances primary. Its result is
+  `broken-engine-finalize-candidate/v5`, carrying only the candidate.
 - `Invoke-CodeQualityMetricsHistory.ps1 -Mode Generate` uses the exact
   `RepositoryRoot,BaseCommit,TipCommit,DateUtc,OutputDirectory` interface and
   writes only `CodeQualityMetricsHistory.jsonl` and
@@ -157,7 +154,17 @@ reconstructs the assessment from Git output.
   `-CommitMessageFile` supplies an existing non-empty file whose text replaces
   it; the override also rebuilds the commit when the session range holds a
   single commit, so a candidate that gained content after creation can be
-  re-messaged to describe it.
+  re-messaged to describe it. The optional `-VerifiedCandidateCommit` and
+  `-VerifiedCandidateTree` pair is supplied together or not at all; each must be
+  a lowercase 40-character object ID naming an existing commit and that same
+  commit's own tree; supplying one alone, a malformed ID, a missing commit, or a
+  tree that is not that commit's tree fails with exit 1, `input.invalid`. When
+  supplied, the script compares the reconciled session tip's tree against
+  `-VerifiedCandidateTree` before squashing and blocks with exit 2,
+  `candidate.tree-changed`, when they differ. The result's `verifiedCandidate`
+  block reports `supplied`, true when the pair was passed, and `matched`, true
+  once the comparison passed; a run omitting the pair reports both as false and
+  performs no comparison.
 - `Invoke-FinalizeLockClaim.ps1` makes one blocking lease claim —
   WorktreeCli owns the bounded wait and the guarded expiry recovery — and
   separately performs standalone release through `-Release` with the held
@@ -199,8 +206,8 @@ reconstructs the assessment from Git output.
 `status`, `code`, `message`, `approvedTip`, `executable`, `arguments`,
 `manualCommand`, and `processId`. `approvedTip` is the full 40-character
 reviewed commit, expanded from an abbreviated `-ApprovedTip`. The redirected
-artifact is that receipt: both advance routes read `approvedTip` and `status`
-from the file named by `-ApprovalReviewResultFile`.
+artifact is that receipt: landing reads `approvedTip` and `status` from the
+file named by `-ApprovalReviewResultFile`.
 
 The review outcome stays non-blocking — `opened`, `unavailable`, and `failed` all
 satisfy the gate, because only an attempted launch is required, not a successful
@@ -210,10 +217,9 @@ result carrying `status` and `approvedTip` blocks with `approval-review.missing`
 one whose `approvedTip` is not the commit being landed blocks with
 `approval-review.candidate-mismatch`, and one recording no attempted launch
 blocks with `approval-review.not-launched`. All three are exit 2, `blocked`,
-`terminal`, and happen before the landing changes anything on primary. On the
-session route the caller-owned lease claimed in the invocation order above is
-already live, and the worker releases it with `-Release` exactly as for any
-other blocked landing.
+`terminal`, and happen before the landing changes anything on primary. The
+caller-owned lease claimed in the invocation order above is already live, and
+the worker releases it with `-Release` exactly as for any other blocked landing.
 
 A refreshed confirmation reruns the review against the newly reviewed candidate
 and overwrites the artifact; the stale receipt is never reused, because its
@@ -292,7 +298,12 @@ and overwrites the artifact; the stale receipt is never reused, because its
   the approved source patch itself — measured from that candidate's own parent —
   rewrites one of the two generated history paths, or that patch changed after
   confirmation; it is a genuine block that returns for re-review and a refreshed
-  confirmation, never a condition a rebase can cure. A rolled-back
+  confirmation, never a condition a rebase can cure. Blocked
+  `history.overlay-invalid` means the temporary overlay tree changed something
+  other than the exact reserved JSONL/SVG pair; its message names the unexpected
+  paths, and any reserved path the overlay failed to add. That guard runs before
+  the compare-and-swap advance, so the run changed nothing on primary and the
+  message is the whole evidence. A rolled-back
   `candidate.postcondition-failed` landing likewise leaves the session branch and
   worktree at the approved tip — not at the commit its own internal rebase
   produced — so re-invoking it with the original approved arguments passes strict
@@ -328,3 +339,23 @@ stays the caller's lease, released the same way once the worktrees are provably
 clear; an omitted-token claim is discoverable by a later invocation only when
 its derived session and canonical worktree match, and every foreign or
 unverifiable claim stays untouched until its normal expiry or external repair.
+
+### Session fork-point repair
+
+`.agents/scripts/Repair-SessionForkPoint.ps1` repairs one session branch whose
+fork point left the primary branch's history because primary was rewritten under
+it. `finalize-changes` is its sole documented caller; the `Recovery` entry in
+[`worker.md`](worker.md#recovery) owns when to run it. It takes no parameters,
+resolves the session from the worktree root it is run in, touches no lock, lease,
+or primary ref, and never rebases primary.
+
+It emits one compressed JSON line whose schema version is
+`broken-engine-fork-point-repair/v1`, carrying exactly `schemaVersion`, `status`,
+`code`, `message`, `exitCode`, `forkPoint`, `primaryTip`, `branch`, `baseline`,
+and `rebased`:
+
+| Exit | Status | Codes | Caller action |
+| ---: | --- | --- | --- |
+| 0 | `pass` | `ok` | The session branch was replayed onto `primaryTip` and `baseline` was recorded as the session's new baseline. Continue. |
+| 2 | `blocked` | `fork-point.not-recoverable`, `fork-point.repair-refused` | The session branch was not replayed: `fork-point.not-recoverable` means the resolved fork point is still on primary's history, so there is nothing to replay, which after a detected rewrite means the true fork point has expired from the primary branch's reflog; `fork-point.repair-refused` means the shared repair threw — a dirty tree, a failed replay, or a Git failure. The message states any cleanup the worktree still needs. Return the message as a blocker. |
+| 1 | `error` | `session.unresolved` | The session worktree could not be resolved. Return the message as a blocker. |

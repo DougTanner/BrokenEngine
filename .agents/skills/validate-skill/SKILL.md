@@ -19,8 +19,8 @@ package.
 - When frontmatter, `agents/openai.yaml`, invocation policy, trigger quality, or
   bundled links need review.
 - Dispatch per `.agents/references/subagent-reporting.md`; the fresh delegated
-  `reviewer` running it may be the Tier-1 combined pass of
-  `.agents/references/tier1-combined-review.md`.
+  `reviewer` running it may be the Step 5 combined pass of `/coherence-review`
+  (`.agents/skills/coherence-review/SKILL.md`).
 
 ## Inputs
 
@@ -45,7 +45,7 @@ Accurate checks:
 - confirmed check
 ```
 
-Use `PASS` only when both mechanical runs succeed and no Critical finding remains. Use `NEEDS_ACTION` for target content or semantic Critical findings. Use `BLOCKED` for setup, invocation, read, or internal-validator failures. A Critical finding blocks a passing result; a Recommended finding is advisory and does not.
+Use `PASS` only when both mechanical runs succeed and no Critical finding remains. Use `NEEDS_ACTION` for target content or semantic Critical findings. Use `BLOCKED` for setup, invocation, read, or internal-validator failures. A Critical finding blocks a passing result; a Recommended finding is advisory and does not. Per-package detail of a multi-package run stays inline unless it would exceed the size limits in `.agents/references/subagent-reporting.md` `## Handoffs`, in which case it moves to one `Temp/` file cited under `Evidence` as path plus one selector per package, leaving only the summary rows inline.
 
 ## References
 

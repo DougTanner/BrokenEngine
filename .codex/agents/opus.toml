@@ -1,5 +1,5 @@
 name = "opus"
 description = "New code, complex fixes, documentation, affected-site propagation, and research requiring judgment."
-developer_instructions = "Follow repository instructions for Opus-assigned work. Never dispatch another agent; return delegated work to the caller."
+developer_instructions = "Follow repository instructions for Opus-assigned work. Never dispatch another agent; return delegated work to the caller. Keep the returned handoff within the size cap, and follow the overflow route when it exceeds that cap; both are defined in `.agents/references/subagent-reporting.md` `## Handoffs`."
 model = "gpt-5.6-luna"
 model_reasoning_effort = "max"

@@ -1,7 +1,10 @@
 # C++ Correctness Checks
 
 Full text of the checks [`worker.md`](worker.md) indexes. Apply a check only
-when a concrete changed path makes its failure reachable.
+when a concrete changed path makes its failure reachable. The conventions the
+changed code is judged against are in the conventions reference,
+[`../../../references/cpp-conventions.md`](../../../references/cpp-conventions.md);
+the checks below say what to compare and what to flag.
 
 - [General logic and ownership](#general-logic-and-ownership)
 - [Type and domain modeling](#type-and-domain-modeling)
@@ -21,9 +24,8 @@ when a concrete changed path makes its failure reachable.
 
 Trace initialization, lifetime, aliasing, ranges, conversions, arithmetic,
 branch and early-return behavior, RAII cleanup, GPU-resource ownership, and
-error-path progress. Internal callers may rely on established preconditions;
-do not demand defensive checks between trusted code units. Validate opaque
-file, network, OS, user, and third-party data at its owning trust boundary.
+error-path progress. Judge demanded defensive checks and unvalidated file,
+network, OS, user, and third-party data against the trust-boundary convention.
 
 ### Type and domain modeling
 
@@ -73,24 +75,23 @@ the owning subsystem's established failure channel; there is no universal
 ### Allocation-tracked paths and logging
 
 Flag reachable heap allocation while Engine/Game tracking is active unless the
-existing design requires it and `ScopedSuppressAllocationTracking` carries the
-required `// Heap:` rationale. Startup, teardown, offline tools, and other
+existing design requires it and the suppression carries the rationale the
+conventions reference requires. Startup, teardown, offline tools, and other
 untracked paths do not become findings merely because they allocate.
 
-Use `gpThreadLocal->mWorkbuffer` for tracked temporary data. Follow
-`GameBase::BuildAndDispatchFrameTicks` (`/Engine/Source/GameBase.cpp`) for a
-persistent member rebuilt under `ScopedSuppressAllocationTracking` for
-synchronous dispatch. For
-loop-built dynamic log text, follow the current
+Follow `GameBase::BuildAndDispatchFrameTicks` (`/Engine/Source/GameBase.cpp`)
+for a persistent member rebuilt under `ScopedSuppressAllocationTracking` for
+synchronous dispatch. For loop-built dynamic log text, follow the current
 `CrcValidateLoop` (`/Engine/Source/Network/Client/ReconcileReplayCrc.cpp`)
 `ScopedWorkbufferArena` construction. Verify changed tracked logs use the
-repository's allocation-free wrappers and formatters rather than temporary
-strings or allocating formatting paths.
+allocation-free wrappers and formatters the conventions reference requires,
+rather than temporary strings or allocating formatting paths.
 
 ### ASSERT behavior
 
 `ASSERT` throws in every configuration. For each added or changed assertion,
-compare behavior with the assertion removed:
+compare behavior with the assertion removed and apply the useless-ASSERT
+convention, whose preferred fixes are these, in order from best to last resort:
 
 - If the next operation fails immediately at the same location, the assertion
   is useless; require removal or make the invariant impossible at its source.
@@ -174,11 +175,11 @@ ordering. Do not apply this check to semantic codecs or serialization adapters.
 ### Repository patterns
 
 - Flag a struct or function that grew to two or more `bool` members or
-  parameters in this change to use `common::Flags<EnumType>` instead (root
-  `AGENTS.md` Key Pattern). This is a hard flag, not a suggestion.
+  parameters in this change to use `common::Flags<EnumType>` instead (the
+  conventions reference). This is a hard flag, not a suggestion.
 - Flag a new standard-library or third-party `#include` added to a PCH-backed
   `.h`/`.cpp`; it belongs in `Common/ExternalHeaders.h`, not the individual
-  source file (root `AGENTS.md` Key Pattern).
+  source file (the conventions reference).
 
 ### Completeness and duplication
 

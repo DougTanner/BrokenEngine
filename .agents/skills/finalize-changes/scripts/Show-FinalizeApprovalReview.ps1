@@ -1,15 +1,12 @@
 # Sole SmartGit review-tool boundary for a session landing.
 #
-# Invoked last in workflow step 7 — after the earlier approval-preparation step
-# returned the approved tip — as the final tool invocation before the landing
-# summary renders.
-# Opening the log window here means the user returns from their review to a
+# The finalizer fills in this script's launch line in workflow step 7 — after the
+# earlier approval-preparation step returned the approved tip, the acceptance
+# table, and the primary-movement check — and returns it; main runs that line,
+# redirecting the receipt, as its last tool call before the landing summary.
+# Opening the log window there means the user returns from their review to a
 # finished confirmation question rather than a working agent. Callers never
 # reconstruct its SmartGit command inline.
-#
-# The finalizer invokes this after filling the acceptance table and running the
-# primary-movement check, so the SmartGit window is the final tool action before
-# the landing summary.
 #
 # The landing route always passes -LaunchSmartGit, so a session landing always
 # attempts the launch and the window opens whenever SmartGit is available.
@@ -19,9 +16,9 @@
 #
 # Contract: schema broken-engine-finalize-approval-review/v1. Unlike the mutating
 # scripts, every preview/launch outcome exits 0 and none report status pass — the
-# review outcome is non-blocking, but the attempt is not: the caller redirects this
-# single-line stdout to Temp/finalize-approval-review-result.json and passes that
-# receipt to the landing scripts, which read approvedTip and status from it and
+# review outcome is non-blocking, but the attempt is not: main redirects this
+# single-line stdout to Temp/finalize-approval-review-result.json and the finalizer
+# passes that receipt to the landing scripts, which read approvedTip and status from it and
 # refuse to change primary when it does not record an attempted launch for the
 # exact commit being landed. preview is the default;
 # opened is the launch success path; unavailable/failed are non-blocking,
@@ -31,9 +28,9 @@
 # internal.error for a primary worktree that will not resolve).
 # A clean identical post-confirmation rebase that
 # preserves the existing confirmation must not reopen the review tool the user
-# already saw: that path does not invoke this script at all. A material change
-# requiring a refreshed confirmation does invoke it again, against the newly
-# reviewed candidate, before that refreshed confirmation.
+# already saw: that path gets no fresh launch line. A material change
+# requiring a refreshed confirmation gets one, against the newly
+# reviewed candidate, which main runs before that refreshed confirmation.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $PrimaryWorktree,

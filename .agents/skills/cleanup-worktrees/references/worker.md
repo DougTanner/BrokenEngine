@@ -24,7 +24,8 @@ returns live in [`../SKILL.md`](../SKILL.md).
 
 ## Rules
 
-- Manual invocation authorizes removal of every wrapper-root worktree past 48
+- Manual invocation authorizes removal of every registered worktree of the
+  repository except the primary checkout, wherever its folder lives, past 48
   hours old by folder creation time — including dirty or unlanded ones — with no
   second confirmation.
 - The same run deletes files under the repository-root `Temp/` directory whose
@@ -34,7 +35,8 @@ returns live in [`../SKILL.md`](../SKILL.md).
 - The script blocks if the checkout's Git directory differs from its common Git
   directory; do not work around it.
 - Do not recreate failed commands with broader Git or filesystem operations.
-- The script deliberately refuses cleanup outside the two wrapper roots,
-  saved-ref deletion, and global pruning. Within those roots it deliberately
-  force-removes worktrees and force-deletes their `claude/`/`codex/` branches
-  with `git branch -D`.
+- The script deliberately refuses saved-ref deletion and global pruning, and
+  never touches a folder Git has not registered as a worktree. It deliberately
+  force-removes eligible worktrees and force-deletes their `claude/`/`codex/`
+  branches with `git branch -D`; a worktree on any other branch is removed but
+  its branch is left.

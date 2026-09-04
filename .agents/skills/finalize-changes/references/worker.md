@@ -24,14 +24,13 @@ Use the root AGENTS.md canonical invocation form.
 Invoke them directly, exactly as documented; never write a wrapper,
 orchestrator, or replacement around them, and never reconstruct their steps by
 hand. An improvised invocation can send wrong arguments into an operation that
-changes primary. A script that cannot be run as documented is a bug: stop and
-report it.
+changes primary. `Show-FinalizeApprovalReview.ps1` is the one script this worker
+fills in and returns for main to run verbatim instead of invoking it itself.
+A script that cannot be run as documented is a bug: stop and report it.
 
 Under its landing lease, finalization follows the [root
 `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and the exact
-mechanics in [`scripts.md`](scripts.md). The separately
-requested primary-commit route follows the same ceremony, as
-`primary-commit.md` states.
+mechanics in [`scripts.md`](scripts.md).
 
 The caller releases its reconciliation lease through
 `../scripts/Invoke-FinalizeLockClaim.ps1 -Release` before the confirmation pause, so
@@ -91,34 +90,23 @@ every other lease is foreign.
    - A meaningful change to that diff re-runs review of the changed regions
      only.
    - Done when every row of that table carries a status.
-4. Route the change.
-   - For the separately requested direct-primary (`primary-commit`) route, load
-     `primary-commit.md` — this is that exceptional reference's sole trigger —
-     preserve the exact-tip acceptance-to-summary flow it states, and do not
-     invoke the primary-movement checker.
-   - The `session-landing` route continues to step 5.
-   - Done when the route is named and the `primary-commit` route has loaded that
-     reference.
-5. Run the primary-movement check.
-   - After the step-3 acceptance table on the `session-landing` route, invoke the
-     read-only primary-movement checker using the canonical command in
+4. Run the primary-movement check.
+   - After the step-3 acceptance table, invoke the read-only primary-movement
+     checker using the canonical command in
      [`scripts.md#invocation`](scripts.md#invocation).
    - Done when its fixed result and terminal table in
      [`scripts.md#primary-movement-check`](scripts.md#primary-movement-check)
      have been consumed.
-6. Branch on that terminal result.
-   - A `pass` result continues to `Show-FinalizeApprovalReview.ps1` in step 7 and
-     the existing landing summary.
-   - A `blocked` or `error` result, or a malformed result or schema/exit
-     mismatch, opens no review window and returns no landing summary; return a
-     blocker that names the candidate parent and live primary whenever either is
-     available.
-   - A `needs-review` result with code `primary.disjoint-needs-review` follows
-     the documented lossless checker-result handoff in
-     [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts) and is consumed
-     as a usable non-conflict terminal.
-   - It proceeds directly to `Show-FinalizeApprovalReview.ps1` in step 7 and the
-     existing landing summary.
+5. Branch on that terminal result.
+   - Act on the terminal mapping in
+     [`scripts.md#primary-movement-check`](scripts.md#primary-movement-check),
+     which owns every status and code.
+   - A blocker returns no launch line and no landing summary, and names the
+     candidate parent and live primary whenever either is available.
+   - A `needs-review` result follows the documented lossless checker-result
+     handoff in [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts), is
+     consumed as a usable non-conflict terminal, and proceeds directly to the
+     `SmartGit launch:` line in step 6 and the existing landing summary.
    - Apply the
      [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and
      [`scripts.md#landing-and-recovery`](scripts.md#landing-and-recovery) for the
@@ -127,31 +115,23 @@ every other lease is foreign.
      review. Any later primary movement is handled by landing's existing bounded
      internal rebase and terminal result.
    - Done when the result is a usable terminal or a blocker was returned.
-7. Launch the SmartGit approval review.
-   - On the `session-landing` route, invoke
-     `../scripts/Show-FinalizeApprovalReview.ps1 -LaunchSmartGit` only after this
-     checker has returned a usable terminal result.
-   - Its gate codes are in
-     [`scripts.md#approval-review-receipt`](scripts.md#approval-review-receipt).
-   - Redirect its stdout to `Temp/finalize-approval-review-result.json` exactly
-     as [`scripts.md`](scripts.md) shows: that artifact is a required landing
-     input, not a record of one.
-   - Any exit `1`, `error` status, malformed result, or schema mismatch blocks.
-   - Do not reinvoke after landing's own clean identical internal rebase
-     (step 15), which preserves the existing confirmation; a meaningful change
-     requiring a refreshed confirmation launches it again against the newly
-     reviewed landing commit before that refreshed confirmation.
-   - Done when that artifact holds this script's result or a blocker was
-     returned.
-8. Carry the SmartGit status into the summary.
-   - Exit-0 statuses `opened`, `unavailable`, and `failed` are non-blocking:
-     carry the status into the summary's `SmartGit review` line.
-   - For `unavailable`/`failed` carry the authoritative `manualCommand` and the
-     message as well, in the exact line form `SKILL.md`
-     `### Landing confirmation` states, which main copies into the confirmation.
-   - Done when that line is written.
-9. Assemble and return one handoff carrying the complete step-3 acceptance
-   table, then this script's SmartGit result, then a landing summary.
+6. Fill in the SmartGit launch line.
+   - Only after this checker has returned a usable terminal result, take the
+     `Show-FinalizeApprovalReview.ps1` command from
+     [`scripts.md#invocation`](scripts.md#invocation), redirect included, and
+     fill `<primary-worktree>` and, as `<landing-commit>`, the prepared landing
+     commit.
+   - Do not run it: main runs it after this handoff, per `SKILL.md`
+     `### Landing confirmation`.
+   - Done when that line is filled in for the commit the summary describes, or
+     a blocker was returned.
+7. Refresh that line only for a meaningful change.
+   - Whenever `SKILL.md` `### Landing confirmation` requires a refreshed
+     confirmation, refill the line for the newly reviewed landing commit and
+     return it with the refreshed summary.
+   - Done when the line names the commit the current summary describes.
+8. Assemble and return one handoff carrying the complete step-3 acceptance
+   table, the `SmartGit launch:` row holding that line, and a landing summary.
    - The summary carries `## Context`, outcome-focused `## What landed`, and
      `## Landing`.
    - `## Landing` states the checked candidate parent and live primary (and,
@@ -161,47 +141,49 @@ every other lease is foreign.
      and the exact remaining operation.
    - Retain all existing summary fields and do not state
      `Primary has not advanced.` when the live tip is newer.
-   - Main presents it immediately before the authoritative confirmation
-     question. That summary is a terminal return: the worker ends its turn with
-     it as its final answer.
-   - Steps 1-9 change nothing on primary, so a brief that says to stop before any
+   - Main runs the launch line, then presents the summary immediately before the
+     authoritative confirmation question. That summary is a terminal return: the
+     worker ends its turn with it as its final answer.
+   - Steps 1-8 change nothing on primary, so a brief that says to stop before any
      primary change still ends with this summary, per `SKILL.md` `## Inputs`.
    - Done when that single handoff has been returned.
-10. Claim the landing lock.
-    - Only that affirmative response permits the same worker to claim the landing
-      lock and invoke landing with that owner token, in the order
-      `## Bundled scripts` states.
-    - Done when that claim has returned the owner token landing carries.
-11. Invoke landing with that owner token.
-    - That invocation passes `-ApprovalReviewResultFile` naming the step-7
-      artifact; the receipt gate in
+9. Claim the landing lock.
+   - Only that affirmative response permits the same worker to claim the landing
+     lock and invoke landing with that owner token, in the order
+     `## Bundled scripts` states.
+   - Done when that claim has returned the owner token landing carries.
+10. Invoke landing with that owner token.
+    - That invocation passes `-ApprovalReviewResultFile` naming the receipt that
+      main's run of the step-6 line wrote; the receipt gate in
       [`scripts.md`](scripts.md#approval-review-receipt) owns when landing blocks
-      on it, and step 15 disposes of such a block like any other blocked landing.
+      on it, and step 14 disposes of such a block like any other blocked landing.
     - For a claimed Plan pass `-ReleasePlanClaim` so the machine-local claim is
       deleted best-effort.
     - Under the landing lease, landing follows the
       [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and the
       exact mechanics in [`scripts.md`](scripts.md).
     - Done when landing has returned its result.
-12. Read the advance and cleanup landing performed.
+11. Read the advance and cleanup landing performed.
     - Landing advances primary by compare-and-swap with rollback, resets and
       verifies both checkouts, and releases the lock.
     - Done when that result reports the advance or the rollback that replaced it,
       both checkouts verified, and the lock released.
-13. Check what landing added to the landed commit.
-    - Under that lock, after any rebase, landing adds exactly the two generated
+12. Read what landing proved it added to the landed commit.
+    - An exit-0 landing already proves the landed commit is the reviewed source
+      commit, or its clean patch-identical rebase, plus exactly the two generated
       metrics-history files
       ([`scripts.md`](scripts.md#primary-movement-check) owns the generator and
-      the output names) to the single landing commit and nothing else.
-    - The landed commit is the reviewed source commit, or its clean
-      patch-identical rebase, plus those two files.
-    - Any other generated byte or path returns to review and reconfirmation.
-    - Done when the landed commit adds exactly those two files, or the other
-      byte or path has been returned to review.
-14. Record the machine-local claim deletion.
+      the output names) and nothing else;
+      [`scripts.md`](scripts.md#landing-and-recovery) owns the guard behind that
+      proof.
+    - Return the message of a run blocked with `history.overlay-invalid`;
+      [`scripts.md`](scripts.md#landing-and-recovery) owns what that code proves.
+    - Done when the exit-0 result is recorded as that proof, or the blocked
+      message has been returned.
+13. Record the machine-local claim deletion.
     - A failed claim delete is a reported residual, never a landing blocker.
     - Done when the deletion is recorded as performed or as that residual.
-15. Dispose of a landing blocked by primary advancing.
+14. Dispose of a landing blocked by primary advancing.
     - If primary advanced before the advance succeeds, landing does its own
       bounded rebase and retry, following the
       [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and
@@ -214,7 +196,7 @@ every other lease is foreign.
       `### Landing confirmation` for focused re-review and a refreshed
       confirmation.
     - Done when the reported disposition has been acted on.
-16. Retain the session branch and worktree; only `/cleanup-worktrees` or explicit
+15. Retain the session branch and worktree; only `/cleanup-worktrees` or explicit
     user direction removes them. Done when this worker has removed neither.
 
 `/session-audit` runs only on explicit user request.
@@ -246,8 +228,9 @@ every other lease is foreign.
   preconfirmation reconciliation: re-resolve the current session and primary
   tips, and a fresh candidate baseline; perform the ordinary linear rebase and
   hunk resolution under the `Recovery` section, recreate and prepare a new
-  candidate, rerun the affected reviews and the acceptance table, reopen SmartGit,
-  produce a fresh summary, and obtain fresh user confirmation. If any abort,
+  candidate, rerun the affected reviews and the acceptance table, produce a fresh
+  summary and launch line — main reopens SmartGit from that line — and obtain
+  fresh user confirmation. If any abort,
   restoration, or release is
   unproven, retain the existing blocker and lease state and stop; do not begin
   recovery or expose a user wait. No primary change is attempted until the
@@ -273,19 +256,16 @@ every other lease is foreign.
   under the session): use the single rebase invocation and re-invocation rule
   stated in [`scripts.md`](scripts.md)'s
   `Invoke-FinalizeApprovalPreparation.ps1` entry. This is not the
-  rewritten-history case below, whose `--onto` form does not apply.
+  rewritten-history case below, which the fork-point repair script handles
+  ([`scripts.md#session-fork-point-repair`](scripts.md#session-fork-point-repair)).
 - Primary history rewritten under the session: reattaching through the wrapper
-  repairs this, rebasing the session branch onto the new primary tip; the step-5
-  re-check detects it mid-session. To repair it in place, recover the old fork
-  point with `git merge-base --fork-point refs/heads/<primary-branch> HEAD`,
-  then require `git merge-base --is-ancestor <old-fork-point> <new-primary-tip>`
-  to exit non-zero before using it: once the pre-rewrite tip has expired from
-  that branch's reflog, `--fork-point` succeeds with an older surviving
-  ancestor, and rebasing from it replays commits primary already carries. When
-  it is an ancestor the old fork point is not recoverable — stop and report a
-  blocker rather than guess one. Otherwise rebase the session branch with
-  `git rebase --onto <new-primary-tip> <old-fork-point>` and re-export
-  `BROKEN_ENGINE_BASELINE` to the new tip so attribution stays correct.
+  repairs this, rebasing the session branch onto the new primary tip; the step-4
+  re-check detects it mid-session. To repair it in place, run the canonical
+  invocation of `.agents/scripts/Repair-SessionForkPoint.ps1` in
+  [`scripts.md#invocation`](scripts.md#invocation) and act on its result per
+  [`scripts.md#session-fork-point-repair`](scripts.md#session-fork-point-repair),
+  returning a `blocked` result as a blocker with the script's message. Never
+  perform the rebase by hand.
 
 ## Exceptional references
 

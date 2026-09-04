@@ -4,9 +4,11 @@
 
 1. Read every owned changed region in full context and the producers,
    consumers, callers, sibling implementations, shared headers, and governing
-   instructions needed to understand each handed-off contract. Done when every
-   handed-off contract has been read at its definition and at the sites that
-   depend on it.
+   instructions needed to understand each handed-off contract. The C++
+   conventions the propagated edits must keep are in
+   [`../../../references/cpp-conventions.md`](../../../references/cpp-conventions.md).
+   Done when every handed-off contract has been read at its definition and at
+   the sites that depend on it.
 2. Search both the old and new side of every contract. Account for all old-name
    hits after a rename and all users of the new symbol or representation. Use
    repository-tracked searches that work on the current host (prefer `git grep`

@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param([string] $Plan,[switch] $ResumeRetained)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
-$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v5';status='error';code='internal.error';message='Claim did not run.';claim=$null}
-function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message){$result.status=$Status;$result.code=$Code;$result.message=$Message;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
+$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v5';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
+function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
 # NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
 # a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
 # are worktree paths a fast-forward could touch.
@@ -11,7 +11,7 @@ function Format-DirtyPath([string[]]$Paths){$text=@($Paths|Select-Object -First 
 try {
  Import-Module (Join-Path $PSScriptRoot 'NextPlanWorkflowCommon.psm1') -Force -DisableNameChecking
  $targeted=-not [string]::IsNullOrWhiteSpace($Plan)
- if($ResumeRetained -and -not $targeted){Complete-Claim 2 'blocked' 'claim.usage-error' '-ResumeRetained is valid only with -Plan, because only a named Plan can carry work retained by an earlier deferral; no Plan was claimed and the worktree was not touched.'}
+ if($ResumeRetained -and -not $targeted){Complete-Claim 2 'blocked' 'claim.usage-error' '-ResumeRetained is valid only with -Plan, because only a named Plan can carry work retained by an earlier deferral; no Plan was claimed and the worktree was not touched.' 'stop-report-to-user'}
  $pattern=$null
  if ($Plan) {
   $Plan=$Plan.Replace('\','/')
@@ -28,10 +28,10 @@ try {
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)
  if($dirty.Count -ne 0){
-  if(-not $ResumeRetained){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route"}
+  if(-not $ResumeRetained){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
   # Selection and validation read Documents/Plans from this tree, so uncommitted scheduler input is never safe to claim against.
   $schedulerPaths=@($dirty|Where-Object{$_.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)})
-  if($schedulerPaths.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "-ResumeRetained cannot claim while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched."}
+  if($schedulerPaths.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "-ResumeRetained cannot claim while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched." 'stop-report-to-user'}
   if($context.SessionHead -cne $context.PrimaryTip){
    # The claim below fast-forwards the session, which would overwrite a retained path the primary movement also changed.
    # NUL-delimited output keeps both sides of the comparison in the same raw path form.
@@ -39,7 +39,7 @@ try {
    if($incoming.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git diff --name-only could not compare the session head with the primary tip. $($incoming.Stderr.Trim())")}
    $incomingPaths=@(($incoming.Stdout -split "`0")|Where-Object{-not [string]::IsNullOrEmpty($_)})
    $overlap=@($dirty|Where-Object{$incomingPaths -ccontains $_})
-   if($overlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "-ResumeRetained cannot claim because fast-forwarding the session from $($context.SessionHead) to the primary tip $($context.PrimaryTip) would touch $($overlap.Count) retained path(s): $(Format-DirtyPath $overlap). No Plan was claimed and the worktree was not touched; commit or land that work first."}
+   if($overlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "-ResumeRetained cannot claim because fast-forwarding the session from $($context.SessionHead) to the primary tip $($context.PrimaryTip) would touch $($overlap.Count) retained path(s): $(Format-DirtyPath $overlap). No Plan was claimed and the worktree was not touched; commit or land that work first." 'stop-report-to-user'}
   }
   $result.retained=[ordered]@{count=$dirty.Count;truncated=($dirty.Count -gt 10);paths=@($dirty|Select-Object -First 10)}
  }
@@ -54,17 +54,17 @@ try {
    $revList=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'rev-list',"$($context.PrimaryTip)..$($context.SessionHead)") $context.Worktree
    if($revList.ExitCode -ne 0){throw "git rev-list $($context.PrimaryTip)..$($context.SessionHead) failed. $($revList.Stderr.Trim())"}
    $held=@(($revList.Stdout -split "`n")|ForEach-Object{$_.Trim()}|Where-Object{$_.Length -gt 0})
-   Complete-Claim 2 'blocked' 'claim.session-diverged' "Session HEAD $($context.SessionHead) holds $($held.Count) commit(s) the primary tip $($context.PrimaryTip) does not ($($held -join ', ')), so the session cannot be fast-forwarded; no Plan was claimed and the session branch was not moved. Report this to the user, who decides how to resolve it."
+   Complete-Claim 2 'blocked' 'claim.session-diverged' "Session HEAD $($context.SessionHead) holds $($held.Count) commit(s) the primary tip $($context.PrimaryTip) does not ($($held -join ', ')), so the session cannot be fast-forwarded; no Plan was claimed and the session branch was not moved. Report this to the user, who decides how to resolve it." 'stop-report-to-user'
   }
   $merge=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'merge','--ff-only',$context.PrimaryTip) $context.Worktree
-  if($merge.ExitCode -ne 0){$mergeDetail=(($merge.Stdout,$merge.Stderr) -join "`n").Trim();Complete-Claim 1 'error' 'claim.session-sync-failed' "Fast-forwarding the session branch from $($context.SessionHead) to the primary tip $($context.PrimaryTip) failed; no Plan was claimed, and the worktree may be partially updated, so inspect it before retrying. git reported: $mergeDetail"}
+  if($merge.ExitCode -ne 0){$mergeDetail=(($merge.Stdout,$merge.Stderr) -join "`n").Trim();Complete-Claim 1 'error' 'claim.session-sync-failed' "Fast-forwarding the session branch from $($context.SessionHead) to the primary tip $($context.PrimaryTip) failed; no Plan was claimed, and the worktree may be partially updated, so inspect it before retrying. git reported: $mergeDetail" 'stop-report-to-user'}
   $result.sync=[ordered]@{fastForwarded=$true;from=$context.SessionHead;to=$context.PrimaryTip}
  }
  $validate=Invoke-NextPlanProcess $context.WorktreeCli @('plan','validate','--repo',$context.CommonDirectory,'--worktree',$context.Worktree) $context.Worktree
  $validation=ConvertFrom-NextPlanProcessJson $validate 'plan validate'; $projection=[ordered]@{}; foreach($name in @('status','code','message','diagnostics','notices','healedClaims')){if($validation.PSObject.Properties.Name -ccontains $name){$projection[$name]=$validation.$name}}; $result.validation=$projection
- if($validate.ExitCode -eq 2 -and [string]$projection['code'] -ceq 'busy'){Complete-Claim 2 'blocked' 'scheduler.busy' 'Another session held the plan scheduler for the full wait; no Plan was claimed. Tell the user and retry later.'}
- if($validate.ExitCode -eq 1 -and [string]$projection['code'] -ceq 'guard-unavailable'){Complete-Claim 1 'error' 'scheduler.guard-unavailable' 'The plan scheduler lock storage is unusable; no Plan was claimed. Tell the user - this is not a Plan metadata problem.'}
- if($validate.ExitCode -ne 0){$exit=if($validate.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'plan.validation-failed' 'Plan validation failed.'}
+ if($validate.ExitCode -eq 2 -and [string]$projection['code'] -ceq 'busy'){Complete-Claim 2 'blocked' 'scheduler.busy' 'Another session held the plan scheduler for the full wait; no Plan was claimed. Tell the user and retry later.' 'retry-later'}
+ if($validate.ExitCode -eq 1 -and [string]$projection['code'] -ceq 'guard-unavailable'){Complete-Claim 1 'error' 'scheduler.guard-unavailable' 'The plan scheduler lock storage is unusable; no Plan was claimed. Tell the user - this is not a Plan metadata problem.' 'stop-report-to-user'}
+ if($validate.ExitCode -ne 0){$exit=if($validate.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'plan.validation-failed' 'Plan validation failed.' 'stop-report-to-user'}
  if($null -ne $pattern){
   $candidates=[Collections.Generic.List[string]]::new()
   foreach($executablePlan in @($validation.plans)){
@@ -76,17 +76,17 @@ try {
    }
   }
   $candidates.Sort([StringComparer]::Ordinal)
-  if($candidates.Count -eq 0){Complete-Claim 2 'blocked' 'plan-name-not-found' "Pattern '$pattern' matched no validated executable Plan."}
-  if($candidates.Count -gt 1){$result.candidates=@($candidates);Complete-Claim 2 'blocked' 'plan-name-ambiguous' "Pattern '$pattern' matched multiple validated executable Plans; use a canonical Documents/Plans path."}
+  if($candidates.Count -eq 0){Complete-Claim 2 'blocked' 'plan-name-not-found' "Pattern '$pattern' matched no validated executable Plan." 'stop-report-to-user'}
+  if($candidates.Count -gt 1){$result.candidates=@($candidates);Complete-Claim 2 'blocked' 'plan-name-ambiguous' "Pattern '$pattern' matched multiple validated executable Plans; use a canonical Documents/Plans path." 'stop-report-to-user'}
   $Plan=$candidates[0]
  }
  $claimArguments=@('plan','claim-next','--repo',$context.CommonDirectory,'--primary-worktree',$context.Primary,'--worktree',$context.Worktree,'--branch',$context.SessionBranch,'--owner',$context.Owner,'--session',$context.Session);if($Plan){$claimArguments+=@('--plan',$Plan)}
  $response=Invoke-NextPlanProcess $context.WorktreeCli $claimArguments $context.Worktree;$claim=ConvertFrom-NextPlanProcessJson $response 'plan claim-next'
- if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.'}
+ if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.' 'stop-report-to-user'}
  $code=[string]$claim.code
- if($code -ceq 'none'){Complete-Claim 0 'pass' 'none-available' 'No eligible Plans plan is available.'}
+ if($code -ceq 'none'){Complete-Claim 0 'pass' 'none-available' 'No eligible Plans plan is available.' 'stop-report-to-user'}
  if($code -cne 'claimed' -and $code -cne 'existing'){throw "plan claim-next returned an unknown result code '$code'."}
  $result.claim=[ordered]@{claimed=$true;plan=[string]$claim.plan;state=$code}
- if($code -ceq 'existing'){Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.'}
- Complete-Claim 0 'pass' 'ok' 'Plan claimed for this session.'
-} catch {if(Get-Command Test-NextPlanStateBlocker -ErrorAction SilentlyContinue){if(Test-NextPlanStateBlocker $_){Complete-Claim 2 'blocked' 'claim.context-conflict' $_.Exception.Message}};Complete-Claim 1 'error' 'claim.failed' $_.Exception.Message}
+ if($code -ceq 'existing'){Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
+ Complete-Claim 0 'pass' 'ok' 'Plan claimed for this session.' 'prepare'
+} catch {if(Get-Command Test-NextPlanStateBlocker -ErrorAction SilentlyContinue){if(Test-NextPlanStateBlocker $_){Complete-Claim 2 'blocked' 'claim.context-conflict' $_.Exception.Message 'stop-report-to-user'}};Complete-Claim 1 'error' 'claim.failed' $_.Exception.Message 'stop-report-to-user'}

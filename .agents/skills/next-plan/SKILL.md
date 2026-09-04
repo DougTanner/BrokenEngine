@@ -1,6 +1,6 @@
 ---
 name: next-plan
-description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the resolved Plan and execution card for implementation approval; preparation-proven Tier-1 work continues without that pause. Use only when the latest user request explicitly invokes `/next-plan` or `$next-plan`.
+description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the resolved Plan and execution card for implementation approval. Use only when the latest user request explicitly invokes `/next-plan` or `$next-plan`.
 disable-model-invocation: true
 argument-hint: "[Documents/Plans/... | partial pattern]"
 allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestion]
@@ -42,7 +42,6 @@ unaffected results.
 ```text
 Claim: <Plan path or none; resolved state when claimed>
 Classification: Tier 1 | Tier 2 | Tier 3 and trigger
-Approval pause: skipped (proven Tier-1) | required
 Build required: <exact targets, or none>
 Residuals: <blocker or none>
 
@@ -74,10 +73,6 @@ replacement presentation.
 
 When preparation shows the problem the Plan describes is gone, ask the user
 whether to retain the Plan or to explicitly authorize obsolete final cleanup.
-
-The claimed-executable-Plan paragraph after the Change Workflow steps in root
-[AGENTS.md](../../../AGENTS.md) owns the straight-through path, which skips this
-pause; main records the facts it proves in the handoff.
 
 ## References
 

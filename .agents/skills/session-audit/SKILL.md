@@ -62,10 +62,9 @@ worktree> -Baseline <full 40-character SHA> -Regions`. It writes no file and
 prints one
 `broken-engine-session-change-inventory/v1` object with `entries` and their
 `class` values, `counts`, `triggers`, and the per-hunk `regions` table. Only
-`status` `pass` (exit 0) is usable; `blocked` (exit 2) or `error` (exit 1) means
-the inventory is missing for the rule below. Entries are capped at 500 rows and
-regions at 400, so the implementer reports `truncation` and `truncated` with the
-brief so a shortfall is never presented as a complete inventory. An untracked
+`status` `pass` is usable; any other status means the inventory is missing for
+the rule below. The implementer reports `truncated` with the brief so a
+shortfall is never presented as a complete inventory. An untracked
 file appears only when the caller supplies it with `-IncludeUntracked
 <comma-separated paths>`, and `counts.unlistedUntracked` reports how many
 untracked files the run did not list.

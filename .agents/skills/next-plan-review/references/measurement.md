@@ -1,7 +1,62 @@
-# Control-Work Measurement and Execution-Model Routing
+# Main-Context, Control-Work, and Routing Measurement
 
-Read this reference when assessing control-work share and execution-model
-routing for [`/next-plan-review`](../SKILL.md).
+Read this reference when assessing main-session token efficiency, control-work
+share, and execution-model routing for [`/next-plan-review`](../SKILL.md).
+
+## Contents
+
+- [Measure main-session token efficiency](#measure-main-session-token-efficiency)
+- [Measure control-work share](#measure-control-work-share)
+- [Verify execution-model routing](#verify-execution-model-routing)
+
+## Measure main-session token efficiency
+
+The main session runs the most expensive model, so concern 4 asks what entered
+its context and what each entry bought; a subagent's own context is out of
+scope. Measure before judging. For a Claude parent transcript, run once
+`pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath <parent transcript path>`,
+whose header comment states the row shapes: its rows select which records to
+open, and the `len` column only orders that selection. Measure a finding's
+chars from the opened record's own content, and a brief's from its dispatch
+record. For any other transcript, measure from the record sizes it exposes, and
+report `unverified` when it exposes none.
+
+Then judge each check below. A finding names the emitting artifact — the
+skill, reference, script, or role — the measured chars, and the concrete
+replacement; without all three it is not a finding.
+
+1. Script-able instruction: instruction prose main loaded that tells it to
+   perform a deterministic procedure — a fixed sequence of lookups, checks,
+   formatting, or file mechanics needing no judgment — that a bundled script
+   could run and return as a bounded result. Name the instruction span and the
+   script that would replace it, existing or new.
+2. Public skill surface: a `SKILL.md` main loaded that carried more than a
+   parent needs to decide on and dispatch the skill — steps, rules, or script
+   mechanics that belong in `references/worker.md` — or that lacked a decision
+   input main then read a reference to get. Name the lines to move or the
+   missing input.
+3. Brief assembly: for each delegation event, the reads, script runs, and turns
+   main spent solely to fill the brief, and the brief's length against the
+   skill's `## Inputs`. Flag an input the worker could derive from a path or
+   script it is given, content pasted where a path plus selector would do, and
+   an `## Inputs` list that makes main gather what the worker could gather.
+4. Handoff volume: for each handoff main received, its chars against the shared
+   limits in `../../../references/subagent-reporting.md`, and any material main
+   did not act on — evidence pasted inline, a restated brief, narrated
+   reasoning, or bulk data meant for a later worker. Name the path plus
+   selector form, and for bulk data the file, that should have carried it.
+5. Direct main work: a tool result main read itself that a worker's brief could
+   have named instead, and any single result over the 20,000-character
+   per-result budget — raw logs, images, screenshots, captures, and other
+   binary or base64 payloads included. Name the role that should have consumed
+   it, or the bounded form.
+6. Repeats: the same instruction body, reference, or handoff entering main more
+   than once, and a re-read of content main already held.
+
+Not findings: content the user pasted or asked to display; a Plan body,
+execution card, or user-facing text main itself must approve or present; a
+handoff within the shared limits whose every row main acted on; and a narrow
+change having no unnecessary subagents.
 
 ## Measure control-work share
 

@@ -433,7 +433,7 @@ function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $U
 		})
 	}
 	# Wrap so a zero- or one-element table stays a collection instead of unrolling (see
-	# Find-SessionDebugResidue.ps1 Get-NewSideLine for the same pattern).
+	# Find-SessionCandidates.ps1 Get-NewSideLine for the same pattern).
 	return , $regions
 }
 

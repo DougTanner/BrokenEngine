@@ -13,7 +13,8 @@ Skip this phase in audit-only mode.
 1. Confirm the execution card, scope, decisions, and acceptance checks remain
    current, and read the assigned plan items, applicable `AGENTS.md` files,
    current implementation, dependencies, helpers, and mirrored patterns before
-   editing.
+   editing. For C++ changes, the conventions to apply are in
+   [`../../../references/cpp-conventions.md`](../../../references/cpp-conventions.md).
    - Done when every listed source has been read and each remains current.
 2. Before introducing a new function, type, helper, or substantial logic block,
    search with `rg` for the proposed identifier, the responsibility terms
@@ -71,9 +72,10 @@ Skip this phase in audit-only mode.
 12. Hand off anything requiring compilation, runtime behavior, hardware, user
     knowledge, or an independent role. Done when each of those items appears in
     the handoff.
-13. Re-run the applicable static checks and update the affected-site and build
-    handoffs for the audit fixes. Done when those checks pass and the handoff
-    rows reflect every audit fix.
+13. Re-run the applicable static checks as
+    [`../../../references/static-checks.md`](../../../references/static-checks.md)
+    documents them. Done when those checks pass and the affected-site and build
+    handoff rows reflect every audit fix.
 
 ## Rules
 

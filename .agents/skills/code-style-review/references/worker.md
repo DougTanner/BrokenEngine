@@ -17,71 +17,77 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    repository toplevel> -Baseline <full 40-character SHA> -Regions`.
    - It writes no file and prints one
      `broken-engine-session-change-inventory/v1` object.
+   - When the caller supplied untracked paths, add
+     `-IncludeUntracked <comma-separated paths>` to that command.
    - Done when that object is in hand.
 3. Select the session-changed C++ ranges: the object's `regions` rows whose
    path carries the `class` `cpp` or `dual-language-header` in `entries`. Never
    enumerate these ranges inline. Done when the range list exists without an
    inline enumeration.
-4. Confirm the inventory run is usable. Only `status` `pass` (exit 0) is
-   usable; `blocked` (exit 2) or `error` (exit 1) means the ranges are
-   unavailable — report that instead of proceeding. Done when the status is
-   `pass` or the unavailability is reported.
+4. Confirm the inventory run is usable. Only `status` `pass` is usable; any
+   other status means the ranges are unavailable — report that instead of
+   proceeding. Done when the status is `pass` or the unavailability is
+   reported.
 5. Confirm the ranges are complete.
-   - They are usable only when `truncation.entries` and `truncation.regions`
-     each report an emitted count equal to the full count; if either falls
-     short report the ranges unavailable instead of proceeding.
-   - Done when both counts match or the unavailability is reported.
-6. Read `Documents/C++StyleGuide.txt` first; it is authoritative. Inspect every
-   applicable rule, not only the grep-friendly examples in step 7. Done when
-   the applicable rules are in hand.
-7. Search the selected ranges for violations.
-   - High-value checks include:
-     - Hungarian notation and complete names (Rules 3, 14, 56, 57);
-     - `auto`, template, float, null, and override rules (15, 19, 27-29);
-     - container access and types (16, 21, 32);
-     - namespace and member access rules (41, 49);
-     - pointer conditions, argument layout, initializers, preprocessor form,
-       braces, and early-return guards (50-52, 58, 61, 62);
-     - comments describing the present code rather than change history (64).
-   - Done when every selected range has been searched.
-8. Auto-fix only when the resulting C++ meaning is demonstrably unchanged.
-   Examples include whitespace, argument layout, an exact deduced type replacing
-   disallowed `auto`, and `NULL` replaced where it is a null pointer constant.
-   Done when every applied fix is meaning-preserving.
-9. Do not auto-fix a proposed finding that requires changing container type or
-   access semantics, public API, class/struct access or layout, control flow,
-   overload resolution, or numeric behavior.
-   - Report it for caller classification and the applicable domain review.
-   - Done when each such finding is listed under `Routed Findings`.
-10. Rename an identifier only when it is a meaning-preserving style correction
+   - They are usable only when `truncated` is false; when it is true the run
+     emitted a short list, so report the ranges unavailable instead of
+     proceeding.
+   - Done when `truncated` is false or the unavailability is reported.
+6. Read `Documents/C++StyleGuide.txt`; it is the authority every step-9
+   adjudication is decided against. Hand-read the selected ranges for the rules
+   the scanner does not cover: 3, 14, 16 (including its vector `.at()` clause),
+   21, 49, 51, 56, 61, 62, and the "always write `std::`" half of 41. Those
+   hand-read rules, the rules the scanner's `style-rule-<n>` kinds cover, and
+   rule 64 in step 18 are this review's whole style mandate; every other guide
+   rule is outside it. Done when the guide is in hand and those rules have been
+   read across every selected range.
+7. Run the session-added candidate scanner once: `pwsh -NoProfile -File
+   .agents/scripts/Find-SessionCandidates.ps1 -RepositoryRoot <absolute
+   repository toplevel> -Baseline <full 40-character SHA>`,
+   - with optional `-Head <commit>` and the `-IncludeUntracked` switch, which
+     makes the scanner enumerate every untracked file itself and include those
+     files in the scan; pass the switch when the caller supplied any untracked
+     path.
+   - Done when one `broken-engine-session-candidates/v1` object with `hits`
+     rows of `path`, `line`, `kind`, and `text`, plus `counts` and `truncated`,
+     is in hand.
+8. Confirm the scan is usable.
+   - Only `status` `pass` (exit 0) is usable; `blocked` (exit 2) or `error`
+     (exit 1) means both the style candidates and the added-versus-pre-existing
+     distinction are unavailable — report that rather than reconstructing
+     either scan inline, and treat `truncated` `true` as hits the run did not
+     list.
+   - Done when the status is `pass` or the unavailability is reported.
+9. Adjudicate every `style-rule-<n>` row against rule n of the guide, reading
+   the surrounding code; the rows are a starting list, not the finding set.
+   Rule 29 needs the base class, which is off the line, so look it up.
+   - The rows carry their own rule number, so this step covers whatever kinds
+     the run emits; the mandate's remaining rules are hand-read in step 6, plus
+     rule 64 in step 18.
+   - Done when every style row is accepted as a finding or rejected.
+10. Auto-fix only when the resulting C++ meaning is demonstrably unchanged.
+    Examples include whitespace, argument layout, an exact deduced type
+    replacing disallowed `auto`, and `NULL` replaced where it is a null pointer
+    constant. Done when every applied fix is meaning-preserving.
+11. Do not auto-fix a proposed finding that requires changing container type or
+    access semantics, public API, class/struct access or layout, control flow,
+    overload resolution, or numeric behavior.
+    - Report it for caller classification and the applicable domain review.
+    - Done when each such finding is listed under `Routed Findings`.
+12. Rename an identifier only when it is a meaning-preserving style correction
     and all code references can be propagated, searching the old identifier
     across the repository before editing. Done when that search covers every
     reference.
-11. Propagate every reference the rename breaks in C++ and shader sources,
+13. Propagate every reference the rename breaks in C++ and shader sources,
     including references outside the selected ranges. Applying the shader-side
     reference updates is part of the rename. Done when no broken reference to
     the old identifier remains.
-12. Route stale `AGENTS.md` references to `/update-claude-docs`, and list
+14. Route stale `AGENTS.md` references to `/update-claude-docs`, and list
     ordinary documentation and plan references as caller residuals. Done when
     each stale reference is routed or listed.
-13. Return the exact affected build targets for every rename; a rename is not
+15. Return the exact affected build targets for every rename; a rename is not
     verified without those builds. Done when `Build required` names those
     targets.
-14. Run the session-added residue scanner: `pwsh -NoProfile -File
-    .agents/scripts/Find-SessionDebugResidue.ps1 -RepositoryRoot <absolute
-    repository toplevel> -Baseline <full 40-character SHA>`,
-    - with optional `-Head <commit>` and the `-IncludeUntracked` switch, which
-      makes the scanner enumerate every untracked file itself and include those
-      files in the scan.
-    - Done when one `broken-engine-session-debug-residue/v1` object with `hits`
-      rows of `path`, `line`, `kind`, and `text`, plus `counts` and
-      `truncated`, is in hand.
-15. Confirm the scan is usable.
-    - Only `status` `pass` (exit 0) is usable; `blocked` (exit 2) or `error`
-      (exit 1) means the session-added distinction is unavailable — report it
-      rather than reconstructing these scans inline, and treat `truncated`
-      `true` as hits the run did not list.
-    - Done when the status is `pass` or the unavailability is reported.
 16. Remove confirmed temporary debug instrumentation added during the session,
     including temporary `LOG`, `printf`, `DEBUG_BREAK()`, `assert(false)`,
     `// FIXME`, and `// HACK` lines, taking the added-versus-pre-existing
@@ -103,21 +109,20 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 - Run inside one delegated `mechanic`; never delegate. Review C++ only. Style
   review is not a landing gate (defined in root `AGENTS.md`).
 - Shader style is out of scope; do not review or route it. The only shader
-  edits are the reference updates that propagate a C++ rename (steps 10-13).
+  edits are the reference updates that propagate a C++ rename (steps 12-15).
 - Rule 15 permits `auto` for XMVECTOR/XMMATRIX results, a type obvious from a
   template parameter on the right, iterators, structured bindings, and a
   lambda expression assigned directly to the variable. It remains forbidden
   in plain range-based loops.
 - Rule 49 forwarding findings are routed, not auto-fixed — see
   `/repo-code-review` (`../../repo-code-review/SKILL.md`).
-- The inventory's entries list is capped at 500 rows and the regions table at
-  400, and the ranges are derived from both, which is why step 5 reads
-  `truncated`. An untracked file appears only when the caller supplies it with
-  `-IncludeUntracked <comma-separated paths>`, and `counts.unlistedUntracked`
-  reports how many untracked files the run did not list.
-- The residue scanner scans added lines only and reports candidates only: it
-  never edits a file, never decides whether a hit is temporary or intentional,
-  and never writes to disk, so every judgment and removal in steps 16-18 stays
-  here.
+- The untracked rule differs per script: the step-2 inventory covers an
+  untracked file only when `-IncludeUntracked <comma-separated paths>` lists it,
+  and its `counts.unlistedUntracked` reports how many it did not list; the
+  step-7 scanner takes `-IncludeUntracked` as a switch and enumerates the
+  untracked files itself.
+- Every judgment in steps 9 and 16-18 stays here, because the scanner's
+  contract (`.agents/scripts/Find-SessionCandidates.ps1`) is read-only and
+  candidates-only.
 - Never add a debug tag merely to defer cleanup, and do not alter pre-existing
   intentional debug logs. Never touch strings or non-comment code.

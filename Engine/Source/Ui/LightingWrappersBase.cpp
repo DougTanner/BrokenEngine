@@ -5,7 +5,7 @@ namespace engine
 
 // Write - Pre-Blur
 Wrapper gLightingBlurSigma(2.0f, 0.01f, 4.0f);
-Wrapper gLightingBlurSampleCount(200.0f, 16.0f, 400.0f);
+Wrapper gLightingBlurSampleCount(200.0f, 16.0f, 400.0f, 1.0f);
 Wrapper gLightingBlurEdgeFalloff(0.4f, 0.01f, 0.6f);
 
 // Write - Deposit
@@ -14,16 +14,16 @@ Wrapper gLightingDepositThreshold(0.0f, 0.0f, 4.0f);
 Wrapper gLightingDepositCompress(4.0f, 0.0f, 16.0f);
 
 // Write - Spread
-Wrapper gSpreadPassCount(40.0f, 1.0f, static_cast<float>(shaders::kiMaxSpreadPasses)); // min >= 1.0f load-bearing: keeps std::pow(fPassCount, -fCombineExposurePassScale) base positive and the 1/fPassCount pass scaling finite (LightingUniforms.cpp).
+Wrapper gSpreadPassCount(40.0f, 1.0f, static_cast<float>(shaders::kiMaxSpreadPasses), 1.0f); // min >= 1.0f load-bearing: keeps std::pow(fPassCount, -fCombineExposurePassScale) base positive and the 1/fPassCount pass scaling finite (LightingUniforms.cpp). Step 1.0f load-bearing: RenderTargetTexturesLighting.cpp / CommandBufferRecordMain.cpp and uint() in LightCombine.comp truncate this value while LightingUniforms.cpp normalization and LightingSpread.frag interpolation use it raw, so only an integral value makes every phase describe the same pass count.
 Wrapper gSpreadDecay(1.0f, 0.0f, 1.0f);
 Wrapper gSpreadAccumulationDecay(0.35f, 0.0f, 1.0f);
 
 // Write - Spread Start
 Wrapper gSpreadTextureMultiplierStart(0.05f, 0.01f, 0.1f);
 Wrapper gSpreadDirectionality(0.1f, 0.0f, 1.0f);
-Wrapper gSpreadDirectionCount(4.0f, 4.0f, 32.0f);
+Wrapper gSpreadDirectionCount(4.0f, 4.0f, 32.0f, 1.0f);
 Wrapper gSpreadDistance(0.0f, 0.0f, 10.0f);
-Wrapper gSpreadRingCount(4.0f, 2.0f, 24.0f); // min >= 2.0f load-bearing: keeps fTotalSamples > 0 so the fNorm divide in LightingSpread.frag:146 can't hit 0/0 (single ring at fDistanceFalloff=1.0 zeroes the only ring).
+Wrapper gSpreadRingCount(4.0f, 2.0f, 24.0f, 1.0f); // min >= 2.0f load-bearing: keeps fTotalSamples > 0 so the fNorm divide in LightingSpread.frag:146 can't hit 0/0 (single ring at fDistanceFalloff=1.0 zeroes the only ring).
 Wrapper gSpreadJitter(0.0f, 0.0f, 1.0f);
 Wrapper gSpreadSampleJitterRangeStart(4.0f, 0.0f, 20.0f);
 Wrapper gSpreadSampleJitterClusteringStart(4.0f, 0.25f, 16.0f);
@@ -37,7 +37,7 @@ Wrapper gSpreadOutputCompress(3.5f, 0.0f, 5.0f);
 // Write - Spread End
 Wrapper gSpreadTextureMultiplierEnd(0.01f, 0.005f, 0.02f);
 Wrapper gSpreadDirectionalityEnd(0.8f, 0.0f, 1.0f);
-Wrapper gSpreadDirectionCountEnd(4.0f, 4.0f, 16.0f);
+Wrapper gSpreadDirectionCountEnd(4.0f, 4.0f, 16.0f, 1.0f);
 HeightLerpWrapperQuartet gSpreadDistanceEnd
 {
 	Wrapper(150.0f, 0.0f, 1000.0f),  // StartHeight
@@ -45,7 +45,7 @@ HeightLerpWrapperQuartet gSpreadDistanceEnd
 	Wrapper(10.0f, 1.0f, 40.0f),     // Low
 	Wrapper(26.0f, 1.0f, 40.0f),     // High
 };
-Wrapper gSpreadRingCountEnd(3.0f, 2.0f, 16.0f); // min >= 2.0f load-bearing: see gSpreadRingCount — interpolated ring count must also stay >= 2.
+Wrapper gSpreadRingCountEnd(3.0f, 2.0f, 16.0f, 1.0f); // min >= 2.0f load-bearing: see gSpreadRingCount — interpolated ring count must also stay >= 2.
 Wrapper gSpreadJitterEnd(0.874f, 0.0f, 1.0f);
 Wrapper gSpreadSampleJitterRangeEnd(0.0f, 0.0f, 10.0f);
 Wrapper gSpreadSampleJitterClusteringEnd(4.0f, 0.25f, 16.0f);

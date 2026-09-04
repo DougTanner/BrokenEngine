@@ -21,16 +21,6 @@ function Invoke-Git {
 	}
 }
 
-function Test-PathUnderRoot {
-	param(
-		[Parameter(Mandatory = $true)][string] $Path,
-		[Parameter(Mandatory = $true)][string] $Root
-	)
-
-	$prefix = $Root + [IO.Path]::DirectorySeparatorChar
-	return $Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
-}
-
 function Get-WorktreeRecords {
 	param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
 
@@ -138,7 +128,6 @@ try {
 	$rootResult = Invoke-Git -Arguments @('rev-parse', '--show-toplevel')
 	if ($rootResult.ExitCode -ne 0 -or $rootResult.Output.Count -ne 1) { throw 'cleanup-worktrees must run inside a Git repository' }
 	$repositoryRoot = Get-CanonicalPath -Path $rootResult.Output[0].Trim()
-	$repositoryName = Split-Path -Leaf $repositoryRoot
 
 	$gitDirResult = Invoke-Git -Arguments @('-C', $repositoryRoot, 'rev-parse', '--path-format=absolute', '--git-dir')
 	$commonDirResult = Invoke-Git -Arguments @('-C', $repositoryRoot, 'rev-parse', '--path-format=absolute', '--git-common-dir')
@@ -161,48 +150,44 @@ try {
 		}
 	}
 
-	$claudeRoot = Get-CanonicalPath -Path (Join-Path $HOME ".claude/worktrees/$repositoryName")
-	$codexRoot = Get-CanonicalPath -Path (Join-Path $HOME ".codex/worktrees/$repositoryName")
 	$cutoff = [DateTime]::Now.AddHours(-48)
 	$eligible = @()
 	foreach ($record in @(Get-WorktreeRecords -RepositoryRoot $repositoryRoot)) {
 		$path = Get-CanonicalPath -Path $record.Path
-		$expectedPrefix = ''
-		if (Test-PathUnderRoot -Path $path -Root $claudeRoot) { $expectedPrefix = 'claude/' }
-		elseif (Test-PathUnderRoot -Path $path -Root $codexRoot) { $expectedPrefix = 'codex/' }
-		else { continue }
+		if ($path.Equals($repositoryRoot, [StringComparison]::OrdinalIgnoreCase)) { continue }
 
 		if ($record.IsPrunable) { Add-Retained -List $retained -Path $path -Reason "prunable: $($record.PrunableReason)"; continue }
 		if (-not (Test-Path -LiteralPath $path)) { Add-Retained -List $retained -Path $path -Reason 'path is missing'; continue }
 		$created = (Get-Item -LiteralPath $path -Force).CreationTime
 		if ($created -gt $cutoff) { Add-Retained -List $retained -Path $path -Reason 'younger than 48 hours' -Expected $true; continue }
 		if ($Preview) { Add-Retained -List $retained -Path $path -Reason 'eligible (preview)' -Expected $true }
-		else { $eligible += [pscustomobject] @{ Path = $path; Prefix = $expectedPrefix } }
+		else { $eligible += $path }
 	}
 
 	foreach ($candidate in $eligible) {
 		$currentRecords = @(Get-WorktreeRecords -RepositoryRoot $repositoryRoot | Where-Object {
-			(Get-CanonicalPath -Path $_.Path).Equals($candidate.Path, [StringComparison]::OrdinalIgnoreCase)
+			(Get-CanonicalPath -Path $_.Path).Equals($candidate, [StringComparison]::OrdinalIgnoreCase)
 		})
-		if ($currentRecords.Count -ne 1) { Add-Retained -List $retained -Path $candidate.Path -Reason 'registration changed before removal'; continue }
+		if ($currentRecords.Count -ne 1) { Add-Retained -List $retained -Path $candidate -Reason 'registration changed before removal'; continue }
 		$current = $currentRecords[0]
-		if (-not (Test-Path -LiteralPath $candidate.Path)) { Add-Retained -List $retained -Path $candidate.Path -Reason 'path is missing before removal'; continue }
-		if ((Get-Item -LiteralPath $candidate.Path -Force).CreationTime -gt $cutoff) { Add-Retained -List $retained -Path $candidate.Path -Reason 'younger than 48 hours before removal'; continue }
+		if (-not (Test-Path -LiteralPath $candidate)) { Add-Retained -List $retained -Path $candidate -Reason 'path is missing before removal'; continue }
+		if ((Get-Item -LiteralPath $candidate -Force).CreationTime -gt $cutoff) { Add-Retained -List $retained -Path $candidate -Reason 'younger than 48 hours before removal'; continue }
 
-		$removeResult = Invoke-Git -Arguments @('-c', 'core.longpaths=true', '-C', $repositoryRoot, 'worktree', 'remove', '--force', $candidate.Path)
+		$removeResult = Invoke-Git -Arguments @('-c', 'core.longpaths=true', '-C', $repositoryRoot, 'worktree', 'remove', '--force', $candidate)
 		if ($removeResult.ExitCode -ne 0) {
-			Add-Retained -List $retained -Path $candidate.Path -Reason "git worktree remove failed: $($removeResult.Output -join '; ')"
+			Add-Retained -List $retained -Path $candidate -Reason "git worktree remove failed: $($removeResult.Output -join '; ')"
 			continue
 		}
 		if ([string]::IsNullOrWhiteSpace($current.Branch)) {
-			$removed.Add([pscustomobject] @{ Path = $candidate.Path; Branch = '<none>'; BranchStatus = 'no branch to delete' })
+			$removed.Add([pscustomobject] @{ Path = $candidate; Branch = '<none>'; BranchStatus = 'no branch to delete' })
 			continue
 		}
-		if (-not $current.Branch.StartsWith($candidate.Prefix, [StringComparison]::Ordinal)) {
-			$removed.Add([pscustomobject] @{ Path = $candidate.Path; Branch = $current.Branch; BranchStatus = 'left (unexpected prefix)' })
+		# Only wrapper-created session branches are disposable; any other branch is the user's.
+		if (-not ($current.Branch.StartsWith('claude/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('codex/', [StringComparison]::Ordinal))) {
+			$removed.Add([pscustomobject] @{ Path = $candidate; Branch = $current.Branch; BranchStatus = 'left (not a session branch)' })
 			continue
 		}
-		$removedItem = [pscustomobject] @{ Path = $candidate.Path; Branch = $current.Branch; BranchStatus = 'retained' }
+		$removedItem = [pscustomobject] @{ Path = $candidate; Branch = $current.Branch; BranchStatus = 'retained' }
 		$removed.Add($removedItem)
 		$branchResult = Invoke-Git -Arguments @('-C', $repositoryRoot, 'branch', '-D', '--', $current.Branch)
 		if ($branchResult.ExitCode -ne 0) {

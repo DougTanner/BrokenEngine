@@ -28,7 +28,7 @@ the handoff form live in [`../SKILL.md`](../SKILL.md).
    report holds either its single whole-plan finding or the per-step set, never
    both.
 6. Emit the report in the form `../SKILL.md`, `## Handoff` defines. Done when
-   the extension fields and the shared handoff lines are both present.
+   the extension field and the shared handoff lines are both present.
 
 ## Applicability
 
@@ -108,7 +108,8 @@ steps change product, user interface, tooling, or public interface behavior.
   recommending that the whole plan be rejected is an in-remit outcome when no
   amount of simplification makes it worth implementing.
 - The plan's internal design decisions and its rejected alternatives are equally
-  non-authoritative, per the authority-order directive in root `AGENTS.md`.
+  non-authoritative, per
+  [`../../../references/authority-order.md`](../../../references/authority-order.md).
 - Correctness, traceability, and citation verification belong to `/plan-audit`,
   running in parallel on the same snapshot where that review runs — leave them
   there; post-implementation diff minimality belongs to the Step-5 correctness

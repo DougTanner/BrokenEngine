@@ -24,8 +24,9 @@ applies. The source input, the landing pre-approval, and the report form live in
 
    - Phrase an agent-made choice in the supplied body as the author's
      recommendation with its rationale.
-   - Use binding language only where the authority-order directive in root
-     `AGENTS.md` permits it.
+   - Use binding language only where
+     [`../../../references/authority-order.md`](../../../references/authority-order.md)
+     permits it.
 
    Done when the body names one design and every agent-made choice is phrased
    that way.
@@ -54,8 +55,9 @@ applies. The source input, the landing pre-approval, and the report form live in
    fresh `reviewer` for `/plan-simplicity-review` on that final body snapshot:
 
    - Dispatch whenever the body adds new code or modifies non-documentation
-     behavior per the trigger Change Workflow Step 2 owns in root `AGENTS.md`,
-     with skill-edit behavior as `/plan-simplicity-review` defines it.
+     behavior per the trigger in
+     [`../../plan-simplicity-review/SKILL.md`](../../plan-simplicity-review/SKILL.md)
+     `## When to use`.
    - In Claude Code that dispatch goes through `/codex-review`; a Codex caller
      is already the Sol mapping and dispatches the `reviewer` directly, per that
      skill's own rule.

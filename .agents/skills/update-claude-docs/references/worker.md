@@ -87,10 +87,3 @@ the modes, the inputs, and the handoff.
 - Do not trim, rewrite, or normalize unrelated sections discovered during
   inspection.
 - Choose the simplest resolution for minor wording and organization choices.
-
-## References
-
-- [`content-rules.md`](content-rules.md) — what AGENTS.md prose may say, and
-  what it must not.
-- [`audit-mode.md`](audit-mode.md) — audit discovery boundary, rubric, report
-  format, and content examples.

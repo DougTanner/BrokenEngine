@@ -49,9 +49,21 @@ Nested lists or mappings are invalid. `argument-hint` remains a text scalar even
 
 Folded text uses `>-`; consecutive nonblank lines fold with spaces and blank lines preserve paragraph breaks. Length checks apply to the parsed text, not indentation.
 
+## Package members
+
+Every file under the skill directory must be a top-level `SKILL.md`, `LICENSE`, or `LICENSE.txt`, the file `agents/openai.yaml`, or a file beneath `references/`, `scripts/`, or `assets/`; any other file is reported as invalid.
+
 ## Bundled links
 
 Markdown links whose relative destination begins with `references/`, `scripts/`, or `assets/` must resolve beneath the skill directory. URL fragments and query strings do not participate in the filesystem check. Absolute paths, URI destinations, and links outside those bundled directories are not bundled links under this rule.
+
+## Section order and placement
+
+`SECTION001` checks section placement and order against `.agents/references/skill-skeleton.md`, which owns the section list, their relative order, and the file each belongs to. A `## ` heading outside a fenced code block that appears in a file the skeleton assigns to the other file, or after a heading the skeleton orders later, is reported at its own line. Headings the skeleton does not name are ignored, and an omitted section is valid.
+
+## Handoff vocabulary
+
+`VOCAB001` checks handoff vocabulary. Inside any fenced code block in `SKILL.md`, a line at column zero beginning exactly `Status:` or `Findings:` followed by a space or the end of the line carries closed vocabulary. After removing `<...>` placeholders, each `|`-separated value of a `Status:` line must be one of the status words, and each value of a `Findings:` line one of the severity words, that the shared handoff form in `.agents/references/subagent-reporting.md` `## Handoffs` lists. Prose outside a fenced block, and a line starting with anything else such as `Routed Findings:` or a list marker, is not checked.
 
 ## Codex companion file
 

@@ -1,6 +1,6 @@
 ---
 name: next-plan-review
-description: Review a landed change from its Git commit and proven parent/child session transcripts. Use when prioritized process improvements are wanted for plan/objective conformance, solution minimality/overengineering, review/testing coverage, token efficiency, workflow friction, or landing speed, including when a tooling-friction Plan directs this session to run `/next-plan-review <landing ref>`.
+description: Review a landed change from its Git commit and proven parent/child session transcripts. Use when prioritized process improvements are wanted for plan/objective conformance, solution minimality/overengineering, review/testing coverage, main-session token efficiency, workflow friction, or landing speed, including when a tooling-friction Plan directs this session to run `/next-plan-review <landing ref>`.
 user-invocable: true
 argument-hint: "[commit-ish]"
 allowed-tools: [Read, Grep, Glob, Agent, PowerShell]

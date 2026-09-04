@@ -13,6 +13,12 @@ A delegated review or audit runs solely inside one fresh delegated `reviewer`
 that returns findings only, and the tool restrictions a skill body states are
 prose boundaries rather than host enforcement.
 
+## Contents
+
+- [Task brief](#task-brief)
+- [Handoffs](#handoffs)
+- [Whether a worker is still running, and interruption](#whether-a-worker-is-still-running-and-interruption)
+
 ## Task brief
 
 Every delegation supplies one self-contained brief on this form:
@@ -53,6 +59,12 @@ That output's `SessionId` is the worktree/branch UUID parsed from the session
 branch, never the conversation session ID a follow-up Plan's provenance block
 records; `.agents/skills/next-plan/references/follow-up-provenance.md`,
 `## Conversation session ID`, owns where that value comes from.
+
+On a direct `reviewer` dispatch the targets file where the assigned skill
+requires one, and the changed-file inventory where the assigned skill documents
+a run, come the same way from `.agents/scripts/Get-SessionChangeInventory.ps1` —
+`.agents/skills/repo-code-review/SKILL.md` `## Inputs` for the `-EmitTargets`
+form — rather than being retyped into the brief.
 
 Use `none` when a field has no value. Add only fields required by the invoked
 skill. Cite repository paths; do not paste root instructions, skill bodies, the

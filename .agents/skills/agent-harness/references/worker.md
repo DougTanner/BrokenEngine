@@ -100,10 +100,6 @@ and the handoff this run returns.
    Done when this run uses only that provisioned output under the session owner
    the claim settled.
 
-   - Wrapper sessions use their existing WorktreeCli session owner; a
-     non-worktree checkout may let the provisioner create a transient
-     provisioning session.
-
 7. Read the claim result and act on its exit code. Done when the claim is held
    with its values retained, or the reported block or failure is reported and
    the attempt ends.

@@ -65,7 +65,9 @@ schema live in [`../SKILL.md`](../SKILL.md).
 11. List such evidence under `Architecture handoff` for
     `/external-architecture-review` without designing the fix. Done when every
     such piece of evidence sits in that handoff.
-12. Apply repository rules only where their authorities cover the file:
+12. Apply repository rules only where their authorities cover the file; the
+    repository-wide C++ conventions are in
+    [`../../../references/cpp-conventions.md`](../../../references/cpp-conventions.md):
 
     - `Common/AGENTS.md` and `Engine/Source/Memory/AGENTS.md` govern workbuffer
       use, tracked-loop allocation, suppression, and the required `// Heap:`

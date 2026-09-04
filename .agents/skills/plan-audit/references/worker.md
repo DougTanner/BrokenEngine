@@ -73,18 +73,19 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
     claimed outcome. Done when each is reported.
 17. For a `/next-plan` invocation, compare the complete current plan to the
     execution card and session baseline. Done when that comparison is made.
-18. Verify that its goal, out-of-scope boundary, Tier-3 trigger, interfaces and
-    invariants, acceptance checks with expected observations, role assignments,
-    and unresolved decisions agree with current repository evidence. Done when
-    each of those is checked against that evidence.
+18. Verify that every field of the card template in
+    [`../../next-plan/SKILL.md`](../../next-plan/SKILL.md) `## Handoff`, plus
+    the plan's unresolved decisions, agrees with current repository evidence.
+    Done when each of those is checked against that evidence.
 19. Report any mismatch as a finding for the manager; do not manufacture
     authority artifacts or another approval gate. Done when every mismatch is
     reported.
 20. Audit the proposed execution card against the risk-tier definitions in root
     `AGENTS.md`, classifying at the highest applicable tier. Done when that
     comparison is made and any mismatch reported.
-21. Verify that every concrete trigger is named, required and conditional roles
-    fit the actual file types and risks, and each acceptance criterion has an
+21. Judge these card fields: every trigger named concretely, the
+    out-of-scope boundary enforceable, required and conditional roles fitting
+    the actual file types and risks, and each acceptance criterion carrying an
     initially decisive check and expected result, with a named independent
     signal for any duplicate check. Done when each of those is verified.
 22. If evidence proves a criterion unverifiable in the available environment,
@@ -104,8 +105,9 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   repository. Report only a concrete problem or improvement the manager
   actually has to resolve.
 - A plan's own decision declarations are hypotheses to verify like any other
-  statement it makes, except as the authority-order directive in root
-  `AGENTS.md` provides.
+  statement it makes, except as
+  [`../../../references/authority-order.md`](../../../references/authority-order.md)
+  provides.
 - Load the file or claimed-plan bytes once and retain that immutable snapshot
   for the whole audit. Do not follow later edits. If an input the `## Inputs`
   section of [`../SKILL.md`](../SKILL.md) lists is missing, return `BLOCKED`

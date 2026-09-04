@@ -12,9 +12,10 @@
 # commit's message unless -CommitMessageFile supplies one, which also forces a
 # replacement commit for a single-commit range so the new message is carried.
 # Callers never reconstruct its Git commands
-# inline. The review window opens later in the same finalizer dispatch:
-# Show-FinalizeApprovalReview.ps1 owns the SmartGit launch and workflow step 7
-# calls it last, once the returned tip is bound into a fully staged landing.
+# inline. The review window opens after this finalizer dispatch returns:
+# Show-FinalizeApprovalReview.ps1 owns the SmartGit launch, workflow step 7 fills
+# its line in once the returned tip is bound into a fully staged landing, and main
+# runs that line last, before the landing summary.
 #
 # Success contract: exit 0, schema broken-engine-finalize-approval-preparation/v4,
 # status pass, code ok, final sanity PASS, and `session.currentTip` and

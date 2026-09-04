@@ -1,6 +1,6 @@
 ---
 name: cleanup-worktrees
-description: Remove Broken Engine session worktrees created by the Claude Code and Codex CLI wrapper scripts once they are 48+ hours old by folder creation time, regardless of dirty or unlanded state, and delete repository-root `Temp/` files 48+ hours old by last-write time. Use this skill manually each morning before creating new sessions; it leaves younger worktrees untouched and reports saved Codex refs without deleting them.
+description: Remove every worktree registered to the current Broken Engine repository, wherever it lives, once it is 48+ hours old by folder creation time, regardless of dirty or unlanded state, and delete repository-root `Temp/` files 48+ hours old by last-write time. Use this skill manually each morning before creating new sessions, once per primary checkout; it leaves younger worktrees untouched and reports saved Codex refs without deleting them.
 argument-hint: [preview]
 allowed-tools: [Read, Bash, PowerShell]
 disable-model-invocation: true
@@ -10,14 +10,17 @@ disable-model-invocation: true
 
 ## Purpose
 
-Clean retained Claude Code and Codex CLI worktrees whose folders are 48+ hours
-old.
+Clean every worktree registered to the repository, except the primary checkout,
+whose folder is 48+ hours old.
 
 ## When to use
 
-Run this skill manually each morning before creating new sessions. A wrapper
-session still running after 48 hours will have its worktree removed —
-close or land long-lived sessions before running cleanup.
+Run this skill manually each morning before creating new sessions. Any
+registered worktree older than 48 hours is removed with its uncommitted work,
+whether a wrapper session is still running in it or you created it by hand —
+close or land long-lived sessions before running cleanup. Each primary checkout
+(for example `BrokenEngine` and `BrokenEnginePublic`) only sees its own
+worktrees, so run it once from each.
 
 ## Handoff
 

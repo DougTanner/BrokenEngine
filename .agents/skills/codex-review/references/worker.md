@@ -17,8 +17,9 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    it, and never decides which files are in scope.
 
    Relay a plan's agent-made decisions there as reviewable claims, never as
-   settled constraints; the authority-order directive in the root
-   [AGENTS.md](../../../../AGENTS.md) owns which decisions bind.
+   settled constraints;
+   [`../../../references/authority-order.md`](../../../references/authority-order.md)
+   owns which decisions bind.
 
    Done when `-ScopeFile` states the scope, the authorized files and regions,
    the focus notes, and the current residuals.
@@ -34,9 +35,9 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    The script blocks the dispatch when that card is absent.
 
    Done when that evidence is in `-ScopeFile`.
-4. For a reviewer role with no skill file — the Tier-2 coherence review, for one
-   — pass a descriptive role name as `-AssignedSkill` together with
-   `-AdHocRole`, and put that role's full review contract in `-ScopeFile`.
+4. For a reviewer role with no skill file, pass a descriptive role name as
+   `-AssignedSkill` together with `-AdHocRole`, and put that role's full review
+   contract in `-ScopeFile`.
 
    Done when that role name and its full review contract are in place, or the
    assigned skill has a skill file.

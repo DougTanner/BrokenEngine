@@ -742,6 +742,102 @@ function Read-OpenAiSidecar
 	}
 }
 
+# .agents/references/skill-skeleton.md owns the section order and the file each section
+# belongs to; .agents/references/subagent-reporting.md owns the closed status and severity
+# vocabularies. These tables only mirror those sources.
+$skeletonSectionOrder = @('Purpose', 'When to use', 'Inputs', 'Steps', 'Handoff', 'Rules', 'References')
+$skeletonSkillSections = @('Purpose', 'When to use', 'Inputs', 'Handoff', 'References')
+$skeletonWorkerSections = @('Steps', 'Rules')
+$handoffStatusWords = @('PASS', 'NEEDS_ACTION', 'BLOCKED')
+$handoffSeverityWords = @('Critical', 'Required', 'Recommended')
+
+function Split-VocabularyTokens
+{
+	param([string] $Value)
+
+	$tokens = [System.Collections.Generic.List[string]]::new()
+	foreach ($token in ([regex]::Replace([string] $Value, '<[^>]*>', '') -split '\|'))
+	{
+		$trimmed = $token.Trim()
+		if ($trimmed.Length -gt 0)
+		{
+			$tokens.Add($trimmed)
+		}
+	}
+	return $tokens
+}
+
+function Get-InstructionFindings
+{
+	param([string[]] $Lines, [string[]] $OwnedSections, [bool] $ScanVocabulary)
+
+	$findings = [System.Collections.Generic.List[object]]::new()
+	$insideFence = $false
+	$highestRank = -1
+	for ($i = 0; $i -lt $Lines.Count; $i++)
+	{
+		$lineText = $Lines[$i]
+		$lineNumber = $i + 1
+		if ($lineText -cmatch '^\s*```')
+		{
+			$insideFence = -not $insideFence
+			continue
+		}
+		if (-not $insideFence)
+		{
+			if ($lineText -cmatch '^##[ \t]+(.+?)[ \t]*$')
+			{
+				$heading = $Matches[1]
+				$rank = [Array]::IndexOf($script:skeletonSectionOrder, $heading)
+				if ($rank -lt 0)
+				{
+					continue
+				}
+				if ($OwnedSections -cnotcontains $heading)
+				{
+					$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'SECTION001'; Message = "section ## $heading belongs to the other package file in .agents/references/skill-skeleton.md" })
+					continue
+				}
+				if ($rank -lt $highestRank)
+				{
+					$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'SECTION001'; Message = "section ## $heading is out of the order .agents/references/skill-skeleton.md sets" })
+					continue
+				}
+				$highestRank = $rank
+			}
+			continue
+		}
+		if (-not $ScanVocabulary)
+		{
+			continue
+		}
+		if ($lineText -cmatch '^Status:(?:[ ](.*))?$')
+		{
+			foreach ($token in (Split-VocabularyTokens $Matches[1]))
+			{
+				if ($script:handoffStatusWords -ccontains $token)
+				{
+					continue
+				}
+				$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'VOCAB001'; Message = "status word $token is outside the closed set in .agents/references/subagent-reporting.md" })
+			}
+			continue
+		}
+		if ($lineText -cmatch '^Findings:(?:[ ](.*))?$')
+		{
+			foreach ($token in (Split-VocabularyTokens $Matches[1]))
+			{
+				if ($script:handoffSeverityWords -ccontains $token)
+				{
+					continue
+				}
+				$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'VOCAB001'; Message = "severity word $token is outside the closed set in .agents/references/subagent-reporting.md" })
+			}
+		}
+	}
+	return $findings.ToArray()
+}
+
 try
 {
 	$invocation = Read-Invocation
@@ -1086,6 +1182,37 @@ try
 		}
 	}
 
+	foreach ($finding in (Get-InstructionFindings $lines $skeletonSkillSections $true))
+	{
+		Add-Diagnostic $finding.Line $finding.Code $finding.Message
+	}
+
+	$workerFile = Join-Path $skillDirectory 'references/worker.md'
+	if ([System.IO.File]::Exists($workerFile))
+	{
+		$workerRelativeDisplay = [System.IO.Path]::GetRelativePath($repositoryRoot, $workerFile)
+		$workerDisplayPath = if (Test-LexicalParentEscape $workerRelativeDisplay) { $workerFile.Replace('\', '/') } else { $workerRelativeDisplay.Replace('\', '/') }
+		try
+		{
+			$workerText = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($workerFile))
+		}
+		catch
+		{
+			$workerText = $null
+		}
+		if ($null -ne $workerText)
+		{
+			if ($workerText.Length -gt 0 -and $workerText[0] -eq [char] 0xFEFF)
+			{
+				$workerText = $workerText.Substring(1)
+			}
+			foreach ($finding in (Get-InstructionFindings $workerText.Replace("`r`n", "`n").Split("`n") $skeletonWorkerSections $false))
+			{
+				Add-Diagnostic $finding.Line $finding.Code $finding.Message $workerDisplayPath 3
+			}
+		}
+	}
+
 	$openAiSidecar = Join-Path $skillDirectory 'agents/openai.yaml'
 	if ([System.IO.File]::Exists($openAiSidecar))
 	{
@@ -1099,6 +1226,27 @@ try
 		{
 			Read-OpenAiSidecar $openAiSidecar $openAiDisplayPath ([string] $fields['name']) $skillDirectory
 		}
+	}
+
+	$packagePaths = [System.Collections.Generic.List[string]]::new()
+	foreach ($packageFile in [System.IO.Directory]::EnumerateFiles($skillDirectory, '*', [System.IO.SearchOption]::AllDirectories))
+	{
+		$packagePaths.Add([System.IO.Path]::GetRelativePath($skillDirectory, $packageFile).Replace('\', '/'))
+	}
+	$orderedPackagePaths = $packagePaths.ToArray()
+	[Array]::Sort($orderedPackagePaths, [StringComparer]::Ordinal)
+	foreach ($packagePath in $orderedPackagePaths)
+	{
+		if ($packagePath -ceq 'SKILL.md' -or $packagePath -ceq 'LICENSE' -or $packagePath -ceq 'LICENSE.txt' -or
+			$packagePath -ceq 'agents/openai.yaml' -or $packagePath -cmatch '^(references|scripts|assets)/')
+		{
+			continue
+		}
+
+		$packageFullPath = Join-Path $skillDirectory $packagePath
+		$packageRelativeDisplay = [System.IO.Path]::GetRelativePath($repositoryRoot, $packageFullPath)
+		$packageDisplayPath = if (Test-LexicalParentEscape $packageRelativeDisplay) { $packageFullPath.Replace('\', '/') } else { $packageRelativeDisplay.Replace('\', '/') }
+		Add-Diagnostic 1 'PACKAGE001' 'unexpected file in skill package' $packageDisplayPath 2
 	}
 
 	if ($diagnostics.Count -gt 0)

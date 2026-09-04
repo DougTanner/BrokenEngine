@@ -37,10 +37,9 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
   `## Out of scope` sections — headings verbatim, with their content intact —
   because the citation check reads heading presence from the supplied file
   alone. Never inline text: the citation check takes only a path.
-- Draft execution card for every Tier-2 and Tier-3 plan: proposed
-  tier and triggers, roles, and each acceptance criterion with its decisive
-  check, expected result, and independent signal when a check is duplicated.
-  Head it with the words `execution card`, in any casing, which
+- Draft execution card for every Tier-2 and Tier-3 plan, carrying every field of
+  the card template in [`../next-plan/SKILL.md`](../next-plan/SKILL.md)
+  `## Handoff`. Head it with the words `execution card`, in any casing, which
   `/codex-review`'s prompt assembly requires in the scope file before it will
   dispatch this audit.
 - Approved execution card, superseding the draft above, and session baseline
@@ -53,12 +52,13 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
 
 For each finding:
 
-> `PA-F-###` — `plan-path:line` — category — concrete problem — evidence: `repository-path:line` — proposed improvement
+> `PA-F-###` Critical|Required|Recommended `plan-path:line` — category — concrete problem — evidence: `repository-path:line` — proposed improvement
+
+Those entries are the rows of the shared handoff's `Findings` field.
 
 If clean, state `PASS — no meaningful plan flaws found.` Return:
 
 ```text
-Findings: <entries or none>
 API Verification Requests: <single checkable requests or none>
 Traceability checked: <requirements/invariants <-> implementation sites/checks>
 Required next step: Tier 3 -> manager decision, then /external-grill-plan | Tier 2 -> manager decision

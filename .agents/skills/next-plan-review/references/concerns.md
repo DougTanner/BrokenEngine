@@ -18,10 +18,10 @@ elapsed time. Builds, harness work, debugging, and review are active work.
 Required implementation and landing approvals are not waste; flag only extra
 loops or unexplained waits.
 
-Before assessing concerns 5 and 6 below, read
-[`measurement.md`](measurement.md) for the control-work
-classification and measurement calculus and the execution-model routing rules
-those two concerns apply.
+Before assessing concerns 4, 5, and 6 below, read
+[`measurement.md`](measurement.md) for the main-session token-efficiency
+measurement, the control-work classification and measurement calculus, and the
+execution-model routing rules those three concerns apply.
 
 This audit does not code-review the implementation, infer defects or failure
 modes, claim correctness, or request extra testing to establish correctness.
@@ -52,12 +52,12 @@ Assess in this order:
 3. Workflow coverage: report each required review or testing step only as
    `occurred`, `missing`, or `unverified`. This is process compliance evidence,
    not an assessment of adequacy or implementation correctness.
-4. Token efficiency: use of deterministic tools, purposeful delegation,
-   manager-context discipline, raw-log volume, images, screenshots, captures,
-   and other binary or base64 payloads entering context, and review/test
-   loops caused by concrete new evidence. A payload finding must carry a
-   measured size and the signal it bought. Do not penalize a narrow change
-   for having no unnecessary subagents.
+4. Token efficiency: what entered the main session's context and what each
+   entry bought, measured and judged by the six checks in `measurement.md`
+   `## Measure main-session token efficiency` — script-able instructions, public
+   skill surface, brief assembly, handoff volume, direct main work, and
+   repeats. Every finding carries the emitter, measured chars, and replacement
+   that section requires.
 5. Execution-model routing: inventory and verify every direct child/headless
    attempt using the concern-first classification, allowed evidence chains,
    and verdict rules in `measurement.md`.

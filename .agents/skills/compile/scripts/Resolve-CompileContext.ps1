@@ -58,6 +58,7 @@ $script:Result = [ordered]@{
 	dataBuildModeDerivation = 'path-rules-only'
 	gameDataDirectory = $null
 	generatedDataIncludeRoot = $null
+	recommendedTargets = @()
 }
 if ($IncludeDevEnvDir) { $script:Result.devEnvDir = $null }
 
@@ -74,6 +75,7 @@ function Complete-CompileContext([int] $ExitCode, [string] $Status, [string] $Co
 		$script:Result.triggerMatchesTruncated = $true
 		$script:Result.deletionOnlyCandidates = @()
 		$script:Result.deletionOnlyCandidatesTruncated = $true
+		$script:Result.recommendedTargets = @()
 		$script:Result.status = 'blocked'
 		$script:Result.code = 'output.capacity-exceeded'
 		$script:Result.message = "Compile context exceeds the $($script:MaximumOutputBytes)-byte output cap; the changed-path evidence cannot be reported completely."
@@ -146,6 +148,23 @@ function Get-ContextTrigger([string] $Path) {
 	return $null
 }
 
+function Get-ContextRecommendedTargets([string[]] $Paths) {
+	# A changed path under one of the shared roots recommends both executables; any other path
+	# contributes nothing, so this stays advisory and the worker still fixes the final list.
+	$sharedPrefixes = @('Common/', 'Engine/', 'Projects/BrokenEngineSandbox/Source/')
+	foreach ($path in $Paths) {
+		foreach ($prefix in $sharedPrefixes) {
+			if ($path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+				return @(
+					[pscustomobject][ordered]@{ project = 'BrokenEngineSandbox'; configuration = 'Debug'; reason = 'shared-code' }
+					[pscustomobject][ordered]@{ project = 'BrokenEngineSandboxServer'; configuration = 'Debug'; reason = 'shared-code' }
+				)
+			}
+		}
+	}
+	return @([pscustomobject][ordered]@{ project = 'BrokenEngineSandbox'; configuration = 'Debug'; reason = 'default' })
+}
+
 function Get-ContextDevEnvDirectory {
 	$candidate = Join-Path 'C:\Program Files\Microsoft Visual Studio\18\Community' 'Common7\IDE'
 	if (-not (Test-ContextIdeDirectory $candidate)) {
@@ -189,14 +208,12 @@ try {
 	}
 	$script:Result.primaryCheckout = $primary
 
-	# An explicitly supplied baseline is authoritative and is never advanced. The wrapper environment
-	# hint is only an identity hint, so it resolves through the session context, which may advance it to
-	# the session's real divergence point after a mid-session rebase. Baseline resolution never fails
-	# closed: any module, session, or resolution failure keeps the environment value.
-	$baselineSupplied = -not [string]::IsNullOrWhiteSpace($Baseline)
-	$baselineInput = Select-ContextInput $Baseline 'BROKEN_ENGINE_BASELINE'
-	if ($null -eq $baselineInput) { $baselineInput = 'HEAD' }
-	elseif (-not $baselineSupplied) {
+	# An explicitly supplied baseline is authoritative and is never advanced. Without one, the session
+	# context owns the answer, and may advance it to the session's real divergence point after a
+	# mid-session rebase. Baseline resolution never fails closed: any module, session, or resolution
+	# failure falls back to the HEAD default.
+	$baselineInput = if ([string]::IsNullOrWhiteSpace($Baseline)) { $null } else { $Baseline.Trim() }
+	if ($null -eq $baselineInput) {
 		try {
 			Import-Module (Join-Path $sharedScripts 'AgentWorktreeSession.psm1') -Force -DisableNameChecking
 			$sessionContext = Get-AgentWorktreeSessionContext -Worktree $root
@@ -207,8 +224,9 @@ try {
 			}
 		}
 		catch {
-			[Console]::Error.WriteLine("compile-context: session baseline resolution failed; keeping the BROKEN_ENGINE_BASELINE value '$baselineInput': $($_.Exception.Message)")
+			[Console]::Error.WriteLine("compile-context: session baseline resolution failed; falling back to HEAD: $($_.Exception.Message)")
 		}
+		if ($null -eq $baselineInput) { $baselineInput = 'HEAD' }
 	}
 	$baselineResponse = Invoke-ContextGit @('-C', $root, 'rev-parse', '--verify', '--quiet', '--end-of-options', "$baselineInput^{commit}")
 	$resolvedBaseline = $baselineResponse.Stdout.Trim()
@@ -264,6 +282,8 @@ try {
 	if ($script:Result.changedPathsTruncated -or $script:Result.triggerMatchesTruncated -or $script:Result.deletionOnlyCandidatesTruncated) {
 		Complete-CompileContext 2 'blocked' 'changed-paths.capacity-exceeded' "The changed-path evidence exceeds the $($script:MaximumReportedPaths)-entry report cap and cannot be reported completely."
 	}
+
+	$script:Result.recommendedTargets = @(Get-ContextRecommendedTargets @($changed))
 	Complete-CompileContext 0 'pass' 'ok' "Compile context resolved; data mode $($script:Result.dataBuildMode) from path rules."
 }
 catch {

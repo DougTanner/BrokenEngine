@@ -2,8 +2,8 @@
 name: plan-simplicity-review
 description: >-
   Review an implementation plan that adds new code or modifies
-  non-documentation behavior (root AGENTS.md Step 2 owns when to dispatch; the
-  Trigger section here owns when a skill edit counts as behavior) for
+  non-documentation behavior (root AGENTS.md Step 2 owns when to dispatch; this
+  skill's `## When to use` owns what counts as new code and behavior) for
   YAGNI/KISS violations before implementation: ultra-rare edge-case handling,
   speculative hardening, problems a plainly simpler mechanism or a deferred
   ASSERT would solve, and bandaid fixes that suppress a symptom instead of
@@ -25,15 +25,23 @@ options the user must choose between.
 ## When to use
 
 Use this skill at every tier, for every implementation plan with a step that
-adds new code per Step 2's trigger in root `AGENTS.md` — including an addition
-inside an existing file — or that modifies non-documentation behavior, tracked
-executable Plans and session-prepared plans alike; a plan for which the trigger
-does not fire skips it.
+adds new code or that modifies non-documentation behavior, tracked executable
+Plans and session-prepared plans alike; a plan for which the trigger does not
+fire skips it.
+
+New code means a new tracked file, function, class, system, script, guard or
+recovery path, or configuration surface absent at the session baseline —
+including an addition inside an existing file. Non-documentation behavior means
+C++, shaders, scripts, or the skill behavior the Trigger section below defines.
 
 Dispatch it once per `../../references/subagent-reporting.md`, in parallel with
 `/plan-audit` on the same plan snapshot where `/plan-audit` runs (Tier 2+) and
 standalone where it does not (Tier 1, and the save-time dispatch from
 `/save-plan`).
+
+If later planning adds substantial implementation complexity, main runs this
+skill once more on the final plan before implementation; it does not loop, and
+any further expansion is a separately approved planning stage.
 
 ### Trigger: when a skill edit is behavior
 
@@ -63,8 +71,8 @@ retitles, or clarifies behavior that stays exactly as it was.
 
 For each finding:
 
-> `PSR-F-###` — `plan-path:line` (for an inline plan, the line in the
-> supplied plan text) — class:
+> `PSR-F-###` Critical|Required|Recommended `plan-path:line` (for an inline
+> plan, the line in the supplied plan text) — class:
 > rare-edge-case | speculative-hardening | overbuilt-mechanism |
 > assert-and-defer | bandaid-fix | plan-not-worth-executing — concrete problem
 > — evidence: `<stable locator: repository-path:line, plan-path:line,
@@ -81,19 +89,20 @@ For each finding:
 A `plan-not-worth-executing` finding cites the plan's goal or title line and is
 always the only finding in the report.
 
+Those entries are the rows of the shared handoff's `Findings` field.
+
 If clean, state `PASS — plan changes are minimally scoped.` Return:
 
 ```text
 Steps reviewed: <added-code and modified-artifact steps>
-Findings: <entries or none>
 ```
 
-A clean result returns that `PASS` statement, exactly those two extension
-fields, and the shared handoff lines; per-question judgment notes stay in the
-reviewer's own context, cited as a gitignored `Temp/` file under `Evidence`
-only when they must travel.
+A clean result returns that `PASS` statement, that one extension field, and the
+shared handoff lines; per-question judgment notes stay in the reviewer's own
+context, cited as a gitignored `Temp/` file under `Evidence` only when they must
+travel.
 
-Follow those extension fields with the shared handoff lines
+Follow that extension field with the shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
 review never changes a file and never requires a build.
 

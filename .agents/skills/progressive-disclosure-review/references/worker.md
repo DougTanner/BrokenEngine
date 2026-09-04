@@ -12,11 +12,11 @@ Steps and rules for the dispatched reviewer. The public
    <commit>` for a committed head and `-IncludeUntracked <comma-separated
    paths>` for untracked files), filtered to instruction-doc paths.
 
-   Only `status` `pass` (exit 0) is usable; `blocked` (exit 2) or `error`
-   (exit 1) means the diff input is unavailable — report that instead of
-   enumerating hunks inline. Read `truncation.regions` and
-   `counts.unlistedUntracked` from the result. Done when the filtered
-   instruction-doc regions are in hand or the unavailable input is reported.
+   Only `status` `pass` is usable; any other status means the diff input is
+   unavailable — report that instead of enumerating hunks inline. Read
+   `truncated` and `counts.unlistedUntracked` from the result. Done when the
+   filtered instruction-doc regions are in hand or the unavailable input is
+   reported.
 
 2. Flag changed prose that restates or paraphrases content another location
    already owns — a reference doc, a script's own documented usage, a parent

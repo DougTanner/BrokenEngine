@@ -34,7 +34,6 @@ $environmentNames = @(
 	'BROKEN_ENGINE_SESSION_BRANCH',
 	'BROKEN_ENGINE_PRIMARY_CHECKOUT',
 	'BROKEN_ENGINE_TARGET_BRANCH',
-	'BROKEN_ENGINE_BASELINE',
 	'BROKEN_ENGINE_AGENT_CLIENT'
 )
 $previousEnvironment = @{}
@@ -50,7 +49,6 @@ function Set-AgentWorktreeEnvironment([object] $Identity, [string] $Owner) {
 	$env:BROKEN_ENGINE_SESSION_BRANCH = $Identity.Branch
 	$env:BROKEN_ENGINE_PRIMARY_CHECKOUT = $Identity.Primary.Root
 	$env:BROKEN_ENGINE_TARGET_BRANCH = $Identity.TargetBranch
-	$env:BROKEN_ENGINE_BASELINE = $Identity.Baseline
 	$env:BROKEN_ENGINE_AGENT_CLIENT = $Client
 }
 
@@ -99,30 +97,10 @@ try {
 			# rebasing onto another branch's tip would relocate this session's work.
 			$primaryTip = @(Invoke-AgentGit @('-C', $reattachTarget, 'rev-parse', "refs/heads/$($primary.Branch)"))[0].Trim()
 			# Rewriting the primary branch (a daily history squash) orphans the commits this branch was
-			# created from, and plain merge-base then resolves to before the rewritten commits, so the session
-			# diff would silently include work already on primary. The primary branch reflog still records the
-			# pre-rewrite tip, so --fork-point recovers where this branch actually diverged.
-			$forkPoint = @(& git -C $reattachTarget merge-base --fork-point "refs/heads/$($primary.Branch)" HEAD 2>$null)
-			$baseline = if ($LASTEXITCODE -eq 0 -and $forkPoint.Count -eq 1 -and -not [string]::IsNullOrWhiteSpace($forkPoint[0])) { $forkPoint[0].Trim() }
-				else { @(Invoke-AgentGit @('-C', $reattachTarget, 'merge-base', 'HEAD', $primaryTip))[0].Trim() }
-			& git -C $reattachTarget merge-base --is-ancestor $baseline $primaryTip
-			if ($LASTEXITCODE -ne 0) {
-				# The fork point left primary's history, so this branch still carries the rewritten commits:
-				# replay only the session's own commits onto the new tip. A refusal beats a partial repair, so
-				# a dirty tree is rejected outright and a failed replay is aborted back to what was found.
-				$repair = "git -C '$reattachTarget' rebase --onto $primaryTip $baseline $branch"
-				$refusal = "Primary branch '$($primary.Branch)' was rewritten: fork point $baseline is no longer on its history, which is now at $primaryTip. Replay this session onto the new tip manually: $repair"
-				if (@(Invoke-AgentGit @('-C', $reattachTarget, 'status', '--porcelain', '-z', '--untracked-files=all')).Count -ne 0) {
-					throw "Worktree '$reattachTarget' has staged, unstaged, or untracked changes, so it was left untouched. $refusal"
-				}
-				& git -C $reattachTarget rebase --onto $primaryTip $baseline $branch
-				if ($LASTEXITCODE -ne 0) {
-					& git -C $reattachTarget rebase --abort
-					if ($LASTEXITCODE -ne 0) { throw "Replaying this session onto the rewritten primary branch failed, and rolling that replay back failed too, so the worktree is left mid-rebase. Roll it back manually: git -C '$reattachTarget' rebase --abort. $refusal" }
-					throw "Replaying this session onto the rewritten primary branch failed and was aborted, so the worktree was left untouched. $refusal"
-				}
-				$baseline = $primaryTip
-			}
+			# created from, so the shared repair recovers the real fork point and, when that fork point left
+			# primary's history, replays only this session's own commits onto the new tip. Here an ancestor
+			# fork point simply means no repair is needed.
+			$baseline = (Repair-AgentWorktreeForkPoint $reattachTarget $primary.Branch $primaryTip $branch).Baseline
 		}
 		$identity = [pscustomobject]@{ Primary = $primary; Worktree = $reattachTarget; Branch = $branch; TargetBranch = $primary.Branch; Baseline = $baseline }
 	}
@@ -153,6 +131,9 @@ try {
 	New-Item -ItemType Directory -Path $sidecarDirectory -Force | Out-Null
 	$sidecar = [ordered]@{ schemaVersion = 'broken-engine-session-sidecar/v1'; targetBranch = $identity.TargetBranch } | ConvertTo-Json
 	[IO.File]::WriteAllText((Join-Path $sidecarDirectory 'session-sidecar.json'), $sidecar, [Text.UTF8Encoding]::new($false))
+	# The baseline hint Get-AgentWorktreeSessionContext reads. A file, not an environment variable, so a
+	# child process repairing the fork point can rewrite it. Rewritten on every create and reattach.
+	[IO.File]::WriteAllText((Join-Path $sidecarDirectory 'session-baseline'), $identity.Baseline + "`n", [Text.UTF8Encoding]::new($false))
 	if ($worktreeCreated) {
 		# Seed the shared harness app-data root with the two caches whose cold rebuild dominates a first
 		# launch. The runtime validates both on load and regenerates them on any mismatch, so a stale or

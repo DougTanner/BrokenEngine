@@ -30,15 +30,13 @@ diff, before main asks the confirmation.
    uncommitted candidate and classifies as `intentionally persisted`.
 
 The run writes no file. `-Landing` requires a commit-valued `-Head` and excludes
-the other modes. Only `status` `pass` (exit 0) is usable; `blocked` (exit 2) or
-`error` (exit 1) means the reviewed diff is unavailable, which is a `BLOCKED`
-table, never a diff rebuilt inline. Each `landing` array is capped at 500 rows:
-check `truncation.landing` and `truncated`, and treat an emitted count below the
-full count as unreviewed state rather than a clean inventory. A `-Landing` run
-still reports the complete top-level `triggers` object like any other run, and
-`planTouched` is the only trigger the `landing` object itself adds; no part of
-the run ever runs or replaces the WorktreeCli `plan validate` run required by
-`## Executable Plan check` below.
+the other modes. Only `status` `pass` is usable; any other status means the
+reviewed diff is unavailable, which is a `BLOCKED` table, never a diff rebuilt
+inline. Treat `truncated` true as unreviewed state rather than a clean
+inventory. A `-Landing` run still reports the complete top-level `triggers`
+object like any other run, and `planTouched` is the only trigger the `landing`
+object itself adds; no part of the run ever runs or replaces the WorktreeCli
+`plan validate` run required by `## Executable Plan check` below.
 
 ## Acceptance table
 
@@ -49,10 +47,11 @@ behavior, required check/review, and residual:
 
 Every `PASS` cites evidence read or run here, or a mandated handoff whose fields
 prove the row. Narrative alone is `UNVERIFIED`. Duplicate checks name their
-independent signal. Tier sets the exploration ceiling: Tier 1 uses
-static/schema/link/validator/affected-target compile evidence; Tier 2 adds the
-approved observable scenario; Tier 3 adds exposed invariant/integration
-evidence. Only an approved user delta may revise/defer a criterion, and a
+independent signal. The change's tier sets the exploration ceiling, per
+[`../../verify-acceptance/references/worker.md`](../../verify-acceptance/references/worker.md)
+`## Tier evidence ceiling`; at the landing gate Tier-1 compile evidence covers
+every affected target and the Tier-2 scenario is the approved one. Only an
+approved user delta may revise/defer a criterion, and a
 deferral names its tracked Plan.
 
 Reconcile each review as:

@@ -69,21 +69,22 @@ Example:
 PowerShell | selector: worktreecli plan list | chars: 41208 | class: fixable-defect | emitter: .agents/skills/next-plan/scripts/Get-NextPlanList.ps1 | bounding: state counts plus the first 10 rows
 ```
 
+Those friction and context lines are the rows of the shared handoff's `Findings`
+field, except a `necessary-evidence` context line, which is a `Decisive checks`
+row instead.
+
 Then the summary block:
 
 ```text
 Run checkpoint: <claimed Plan path or no claim>
 Rows at or over threshold: <count | skipped (<supplied state>)>
-Findings: <count or none>
-Status: PASS | NEEDS_ACTION
 ```
 
-Use `PASS` when no lens yields a finding under its precision guard. Report every
-`necessary-evidence` row as a checked row rather than a finding: it uses the
-context line form above but counts in neither the `Findings:` count nor the
-`NEEDS_ACTION` decision. When the context-efficiency lens is skipped, use that
-line's `skipped` form. The handoff extends the block in
-`../../references/subagent-reporting.md`, keeping `Build required` and
+Use the shared handoff's `Status: PASS` when no lens yields a finding under its
+precision guard. A `necessary-evidence` row does not count toward the
+`NEEDS_ACTION` decision. When the context-efficiency lens is skipped, use the
+`Rows at or over threshold:` line's `skipped` form. The handoff extends the
+block in `../../references/subagent-reporting.md`, keeping `Build required` and
 `Residuals` last.
 
 ## References

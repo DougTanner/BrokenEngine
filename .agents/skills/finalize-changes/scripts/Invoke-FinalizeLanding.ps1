@@ -427,7 +427,16 @@ function New-HistoryOverlayTree($Artifacts, [string] $SourceCommit) {
 		$changes = Get-TreeChangeGuard (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$SourceCommit^{tree}")).Trim() $tree
 		$expected = @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg')
 		$actual = @($changes -split "`n" | Where-Object { $_ } | ForEach-Object { $_.Substring($_.IndexOf("`t") + 1) } | Sort-Object)
-		if (($actual -join '|') -cne (($expected | Sort-Object) -join '|')) { Throw-Landing 2 'history.overlay-invalid' 'The temporary history overlay changed a path outside the exact reserved JSONL/SVG pair.' }
+		$unexpected = @($actual | Where-Object { $_ -cnotin $expected })
+		$missing = @($expected | Where-Object { $_ -cnotin $actual })
+		if ($unexpected.Count -ne 0 -or $missing.Count -ne 0) {
+			# This guard runs before the advance, so its message is the only evidence of what the overlay
+			# actually changed; a check after primary has moved cannot recover it.
+			$detail = @()
+			if ($unexpected.Count -ne 0) { $detail += "unexpected paths: $($unexpected -join ', ')" }
+			if ($missing.Count -ne 0) { $detail += "missing reserved paths: $($missing -join ', ')" }
+			Throw-Landing 2 'history.overlay-invalid' "The paths the temporary history overlay changed are not exactly the reserved JSONL/SVG pair ($($detail -join '; '))."
+		}
 		return $tree
 	}
 	finally {

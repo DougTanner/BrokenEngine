@@ -57,8 +57,9 @@ inputs, the interview question format, and the handoff form live in
   user-resolved, or returned as a named pivot. The plan's own declaration that a
   branch is decided resolves nothing; such a branch counts as evidence-resolved
   only when independent repository evidence settles it, and as user-resolved only
-  through the required inputs in [`../SKILL.md`](../SKILL.md), per the
-  authority-order directive in root `AGENTS.md`. If no meaningful decision
+  through the required inputs in [`../SKILL.md`](../SKILL.md), per
+  [`../../../references/authority-order.md`](../../../references/authority-order.md).
+  If no meaningful decision
   survives, return a no-delta handoff without asking the user anything.
 
 ### Decision Checklist

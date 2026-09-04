@@ -16,15 +16,11 @@ Direct instructions from the human user override this repository's safety polici
 
 ### Subagents
 
-- Main session is manager; subagents execute work to keep main context clean
-- Change Workflow dispatches are user-requested by standing repository policy: even if the host tool normally waits for the user to ask before delegating, these dispatches do not wait for that — dispatch without a per-session request
-- Subagents must not spawn subagents. Only main-session skills request delegation; a subagent needing delegated work returns the requirement to its caller instead of dispatching it
-- Give subagents only the instructions and context their task needs; they return a concise, clearly defined response. Every delegation carries the single task brief in `.agents/references/subagent-reporting.md`.
-- Judge whether a worker is still running only from host status and explicit progress or partial handoffs. Review scope, interruption, and recovery: `.agents/references/subagent-reporting.md`
-- Workers return concise inline handoffs to the manager, who routes them
-- Return one inline acceptance table only when a landing gate applies (defined in the Change Workflow definitions below); format: `.agents/references/subagent-reporting.md`
-- Isolated worktrees are required only for executable Plan selection, for creating, changing, or deleting a Plan claim, for shared build/bootstrap coordination, or for landing. Ordinary work uses the user-supplied checkout and preserves unrelated changes.
-- Retained worktrees are removed only by the manual `/cleanup-worktrees` skill (removes wrapper worktrees 48+ hours old) or explicit user direction — never recreate its effect with raw Git or filesystem commands.
+- Main session is manager; subagents execute work to keep main context clean.
+- Subagents must not spawn subagents. Only main-session skills request delegation; a subagent needing delegated work returns the requirement to its caller.
+- Give subagents only the instructions and context their task needs; they return a short handoff that main routes. Task brief, handoff format, and worker interruption/recovery: `.agents/references/subagent-reporting.md`.
+- Work in this session's own worktree (wrapper session, defined below).
+- Worktrees are removed only by `/cleanup-worktrees` or explicit user direction, never with raw Git or filesystem commands.
 
 ### Delegation roles
 
@@ -51,12 +47,12 @@ ChatGPT Codex: Fable -> gpt-5.6-sol max; Sol -> gpt-5.6-sol medium; Opus and Son
 
 This workflow governs every tracked artifact — C++, shaders, PowerShell and other scripts, skills, plans, and documentation. An artifact type a step does not name is a case this workflow does not assign to anyone: resolve it with the user, never by treating the step as inapplicable.
 
-The user's request is implementation authority for Tier 1 and Tier 2 changes; agents classify the work, make the smallest complete change, run checks matching the size of the change, and report changed files, decisive checks, and residuals. Do not require a user approval round-trip, wrapper session, or report file unless a landing gate applies.
+For Tier 1 and Tier 2, the user's request is the approval. Classify the work, make the smallest complete change, run the checks that fit its size, and report changed files, the checks that settled it, and residuals. No approval round-trip or report file unless a landing gate applies.
 
 Definitions:
 
-- Execution card — pre-implementation record of goal, out-of-scope boundary, tier trigger, affected interfaces/invariants, acceptance checks, and roles.
-- Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, a separately requested primary commit, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
+- Execution card — the pre-implementation record the Step 1 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits.
+- Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
 - Wrapper session — session started through `.claude/claude-worktree.sh` or `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude, `-ReattachWorktree <path>` for Codex; never adopt an arbitrary worktree.
 - Primary — the shared main checkout and its main branch that finished session work lands into.
@@ -76,16 +72,81 @@ A reviewer may escalate the tier when the changed bytes expose a higher-risk sur
 
 ### Steps
 
-1. Approve and classify. From user intent — plus an `implementer`'s repository preparation whenever the work is Tier 2+ or needs repository evidence to classify — main locks in the objective, approved stage decisions, tier and triggers, roles, acceptance checks, and execution card. Tier 1 and Tier 2 authorize implementation; Tier 3, Plan claim, and landing also require an execution card.
-2. Plan review. Tier 2+ starts from an `implementer`-prepared plan; Tier 1 skips `/plan-audit`. Main dispatches a `reviewer` for `/plan-audit` and reports a blocker if that role is unavailable. When the plan adds new code — a new tracked file, function, class, system, script, guard or recovery path, or configuration surface absent at the session baseline — or modifies non-documentation behavior — C++, shaders, scripts, or skill behavior as `/plan-simplicity-review` defines it — main also dispatches one fresh `reviewer` for `/plan-simplicity-review` on the same plan snapshot, at every tier: in parallel with `/plan-audit` where that runs, and standalone at Tier 1, which still skips `/plan-audit`; when unsure whether a plan triggers it, dispatch it. If later planning adds substantial implementation complexity, main runs `/plan-simplicity-review` once more on the final plan before implementation; it does not loop, and any further expansion is a separately approved planning stage. For Tier 3, an `implementer` owns `/external-grill-plan` repository evidence and short written decision summaries, updated round by round; a `locator` resolves external-claim requests; main only decides and interviews from those handoffs, then presents the resolved plan for approval. Brief and iteration contract: `.agents/skills/next-plan/references/tier3-workflow.md`. Plans may include optional `/agent-harness` verification.
-3. Implement and propagate. Main splits the work into disjoint slices where possible and dispatches one `implementer` each in parallel, each making the smallest complete assigned change and returning notes on which other code sites the change may affect; then an `implementer` runs `/update-affected-code` after any C++ or GLSL change. Review-fix exceptions belong to `/resolve-findings`.
-4. Run targeted pre-review checks. `Implementer`s run applicable static checks. Main routes every `Build required` handoff to a `builder` before covered work advances; full builds and runtime or harness scenarios remain acceptance-table work.
-5. Review and resolve correctness. Main dispatches exactly one fresh `reviewer` per changed artifact type, scoped to changed bytes and the documented rules the change actually touches: C++ → `/repo-code-review`; shaders → `/glsl-review`; Tier-1 non-C++ → direct coherence; other Tier-2+ artifacts → a coherence review by a reviewer with no prior involvement in the change, who also fixes and self-verifies sub-semantic issues (meaning-preserving wording, formatting) in that pass when the way that reviewer was dispatched permits edits; whatever it cannot fix routes with the semantic findings. At Tier 1 with no changed C++, that single dispatch is the combined pass carrying Steps 6 and 7; contract: `.agents/references/tier1-combined-review.md`. For Tier 2+, each of those reviews also runs the scope, minimality, and simplicity checks in `.agents/references/scope-authorization.md`, including the ad-hoc coherence contract main writes for non-C++ Tier-2+ artifacts; there is no separate scope dispatch. Main decides once and routes accepted fixes to a separate `implementer`; only affected regions are re-reviewed and retested, and a second round requires a reproducible blocker. Tier 3 adds `/adversarial-review`; any tier may use it for one concrete unresolved reachable hypothesis.
-6. Apply the cleanup steps this change triggers: a `mechanic` runs `/code-style-review` for changed C++ and `/update-vcxproj` for changes to file membership or to which executable a whole file belongs to; a fresh `reviewer` runs `/validate-skill` for changed `.agents/skills/*/SKILL.md`, which at Tier 1 with no changed C++ runs inside the Step 5 combined pass instead of its own dispatch; an `implementer` runs `/update-claude-docs` after C++ or GLSL changes; then a fresh `reviewer` runs `/progressive-disclosure-review` when the session changed any `AGENTS.md`, `CLAUDE.md`, `.agents/skills/**/*.md`, or `.agents/references/**/*.md` file, ordered after `/update-claude-docs` so the prose that step generates is in scope, and at Tier 1 with no changed C++ it runs inside the Step 5 combined pass like `/validate-skill`. Documentation inspects affected AGENTS.md scope but may need no edit.
-7. Verify the acceptance table. Main dispatches a fresh read-only `reviewer` to map every approved criterion and invariant to evidence that settles the question on its own, including each duplicate check's independent signal; a stage landing in the same session satisfies this through the finalizer's Step 8 landing acceptance table, so this step's reviewer applies only to a stage completing without landing, and at Tier 1 with no changed C++ the Step 5 combined pass is that reviewer. Tier 1 uses static, schema, link, validator, and changed-C++ compilation checks; Tier 2 adds the smallest observable scenario; Tier 3 adds exposed invariant or integration checks. Passing completes only the current stage. A proven leftover whose own fix is small — Tier 1 or Tier 2, bounded, and decision-complete from evidence the session already has — arising in a session whose own change is also small is fixed inside the current change rather than scheduled: it becomes approved scope recorded on the execution card, and the whole enlarged change is reclassified at the highest applicable tier and passes every workflow step that tier triggers for the regions it touches, plan review before implementation included; main reports the expansion in the message it was already sending rather than asking for a separate acceptance. Every other proven out-of-scope leftover — one that is not small, one that is not decision-complete from in-session evidence, or one the user explicitly directs to defer — an `implementer` routes through `/create-follow-up-plans`. A routed leftover already proven before the Step 5 review dispatch is authored before that dispatch under the execution card's preauthorized category for it, with the concrete Plan path recorded on the card when the Plan is authored, so that round's scope and coherence reviews cover it, while a leftover first proven later routes here unchanged — the `/next-plan` run-checkpoint friction and context-efficiency follow-up Plan is the named instance of that later case.
-8. Verify and land. At a landing gate, `/finalize-changes` prepares final Plan state when a claimed Plan completes, squashes the session work into one commit, and rebases it onto the current primary tip; the finalizer then fills the acceptance table on that final prepared diff, mapping every approved criterion, invariant, and required check to evidence that settles the question on its own in that reviewed diff, and returns it with the landing summary, which main presents. Exactly one explicit user confirmation authorizes changing primary. After confirmation the finalizer advances primary under the landing lock; mechanics: `/finalize-changes`. A meaningful diff change after review or confirmation — a conflict resolution, changed session bytes, or changed semantics — re-runs review of the affected regions and re-asks the confirmation; a clean identical rebase does not. Clean or disjoint foreign primary movement whose session patch remains byte-identical requires no focused dependency re-review or rebuild and does not re-ask an already-given confirmation; an actual rebase conflict requiring manual resolution, any changed session bytes, or any meaningful semantic change follows the preceding rule. Movement with no such reachability obligates nothing. `/session-audit` runs only on explicit user request. The confirmation contract and the acceptance table both live in `/finalize-changes`. Landing completes only a repository stage; the session ends only when every stage is complete or explicitly deferred, with a tracked follow-up Plan where required.
+`/next-plan` owns executable Plan selection and claim lifecycle.
 
-For a claimed executable Plan, preparation that proves the work Tier 1, decision-complete, and current may continue straight into implementation without an approval pause; everything else presents for approval first. The landing confirmation always applies. `/next-plan` owns selection and claim lifecycle.
+#### Step 1 — Approve and classify
+
+- `implementer` runs `/prepare-change` — Tier 2+, or any tier where classifying the work needs repository evidence.
+
+From user intent and any such preparation, main locks in the objective, the approved stage decisions, the tier and its triggers, the roles, and the acceptance checks. Tier 1 and Tier 2 authorize implementation; Tier 2, Tier 3, and a Plan claim also require an execution card, which `/plan-audit` needs.
+
+#### Step 2 — Plan review
+
+Order: `/prepare-change` first, because both plan reviews read the prepared plan; then `/plan-audit` and `/plan-simplicity-review` in parallel; then, at Tier 3, `/external-grill-plan` rounds until the plan is decision-complete, with `/verify-external-claims` between rounds.
+
+- `implementer` runs `/prepare-change` to prepare the plan — Tier 2+.
+- `reviewer` runs `/plan-audit` — Tier 2+; Tier 1 skips it.
+- fresh `reviewer` runs `/plan-simplicity-review` on the same plan snapshot — every tier, when the plan adds new code or changes non-documentation behavior (both defined in that skill's `## When to use`); when unsure whether a plan triggers it, dispatch it.
+- `implementer` owns `/external-grill-plan` repository evidence and short written decision summaries, updated round by round — Tier 3 only.
+- `locator` runs `/verify-external-claims` — Tier 3 only, for the external claims a grill round raises.
+
+Main reports a blocker if the `reviewer` role is unavailable for `/plan-audit`. At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
+
+#### Step 3 — Implement and propagate
+
+Order: the slices run in parallel; `/update-affected-code` runs after them.
+
+- `implementer` runs `/implement-plan` for each disjoint slice — every tier.
+- `implementer` runs `/update-affected-code` — after any C++ or GLSL change.
+
+Main splits the work into disjoint slices where possible. Review-fix exceptions belong to `/resolve-findings`.
+
+#### Step 4 — Run targeted pre-review checks
+
+Order: both run in parallel; each `Build required` handoff compiles as it arrives.
+
+- `implementer`s run the applicable static checks in `.agents/references/static-checks.md` — every tier.
+- `builder` runs `/compile` — every `Build required` handoff, before the covered work advances.
+
+Full builds and runtime or harness scenarios remain acceptance-table work.
+
+#### Step 5 — Review and resolve correctness
+
+Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker.
+
+- fresh `reviewer` runs `/repo-code-review` — when the change touches C++.
+- fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
+- fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier 1 with no changed C++ or GLSL this dispatch is the Step 5 combined pass and also carries Steps 6 and 7.
+- fresh `reviewer` runs `/coherence-review` — other Tier-2+ artifacts; the reviewer must be new to the change.
+- `reviewer` runs `/adversarial-review` — Tier 3 always; optional at any tier for one concrete unresolved hypothesis.
+- separate `implementer` runs `/resolve-findings` — whenever main accepts a finding.
+
+Main dispatches one fresh `reviewer` per changed artifact type, scoped to the changed bytes and the rules they touch. Scope, minimality, and simplicity checks run inside each Tier 2+ review; there is no separate scope dispatch. Main decides each finding once.
+
+#### Step 6 — Apply the triggered cleanup
+
+Order: all run in parallel, except `/progressive-disclosure-review` runs after `/update-claude-docs` so the prose that step generates is in scope.
+
+- `mechanic` runs `/code-style-review` — for changed C++.
+- `mechanic` runs `/update-vcxproj` — for changes to file membership or to which executable a whole file belongs to.
+- fresh `reviewer` runs `/validate-skill` — when any `.agents/skills/*/SKILL.md` changed; where the Step 5 combined pass applies it runs inside that pass instead of its own dispatch.
+- `implementer` runs `/update-claude-docs` — after C++ or GLSL changes.
+- fresh `reviewer` runs `/progressive-disclosure-review` — when the session changed any `AGENTS.md`, `CLAUDE.md`, `.agents/skills/**/*.md`, or `.agents/references/**/*.md` file; where the Step 5 combined pass applies it runs inside that pass like `/validate-skill`.
+
+#### Step 7 — Verify the acceptance table
+
+Order: `/verify-acceptance` runs after Step 6; `/create-follow-up-plans` runs when a leftover is proven, per the Leftovers paragraph below.
+
+- fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing without landing; a stage landing in the same session gets this from Step 8's landing table instead, and where the Step 5 combined pass applies that pass is this reviewer.
+- `implementer` runs `/create-follow-up-plans` — for every proven out-of-scope leftover not fixed inside the current change.
+
+Leftovers: a proven leftover that is itself small (Tier 1 or 2, bounded, decidable from evidence already in hand), found in a session whose own change is also small, is fixed inside the current change: record it as approved scope (on the execution card when one exists), reclassify the whole change at the highest applicable tier, run every step that tier triggers for the touched regions (plan review included), and report the expansion in the message already being sent. Every other proven out-of-scope leftover, including one the user directs to defer, goes through `/create-follow-up-plans`. One proven before the Step 5 dispatch is authored first, with the Plan path recorded as approved scope, so that round's reviews cover it; one proven later routes here unchanged.
+
+#### Step 8 — Verify and land
+
+- `implementer` runs `/finalize-changes` — at a landing gate.
+
+Exactly one explicit user confirmation authorizes changing primary; after it the finalizer advances primary under the landing lock. The confirmation contract, the acceptance table, and what a later diff change re-triggers live in `/finalize-changes`. Landing completes one stage; the session ends only when every stage is complete or explicitly deferred, with a tracked follow-up Plan where required.
 
 ### Convergence
 
@@ -96,20 +157,20 @@ Once a stage's required checks pass, stop changing it: advance to the next stage
 - Minimum sufficient change: request and approved plan are target and ceiling — smallest complete change satisfying acceptance criteria and invariants; no speculative features, abstractions, configuration, extension points, or cleanup. Update related sites only when omission would make them incorrect; ignore polish.
 - KISS, YAGNI, DRY: reuse existing mechanisms. Extract helpers only for current duplication, never for hypothetical use. Mirrored patterns stay parallel.
 - Add backward compatibility only after explicit user consent. Without it, keep one current format, path, or behavior and remove obsolete compatibility code.
-- Error handling at trust boundaries only: assume function parameters from within the codebase are valid — no defensive validation between our own functions. Do validate anything opaque to the current code unit: network input, file reads, OS/third-party API results.
-- No useless ASSERTs: an ASSERT that throws one line before the code would crash anyway adds false safety — remove it; prefer making the condition impossible in calling code, or recovering gracefully. `/repo-code-review` lists the preferred fixes in order, from best to last resort.
 - Progressive disclosure: each fact — including a genuinely new term's definition — lives once at its owning layer and is referenced elsewhere: AGENTS.md carries the constraints, invariants, and routing every session needs; a skill carries its when-to-use and how-to-invoke workflow; scripts and skill `references/` carry mechanics, schemas, and long detail; code comments carry local non-obvious rationale. Comment what the code cannot say — an invariant, a required ordering, a consequence — never a language feature or house pattern the declaration already shows. Review: `/progressive-disclosure-review` for the layering, `/code-style-review` for comments.
 - Public/private skills: every `.agents/skills/*/SKILL.md` is the public file and carries only what a parent session needs to decide on and dispatch the skill — purpose, triggers, inputs, handoff — while `references/worker.md` is the private file with the steps and rules, read by the dispatched worker or by a main session choosing to run the skill itself. Shape and checklist: `.agents/references/skill-skeleton.md`.
 - One term per concept: use the established repository term; prefer plain words over formal ones.
 - Do not add unit tests
-- Bundled scripts as documented: run a repository script exactly as its skill documents it — never wrap, reimplement, or work around one. The canonical invocation form for running a bundled `.ps1` script, defined here once for the whole repository and referenced rather than restated by every skill, is `pwsh -NoProfile -File <repo-relative script path> [arguments]`. Run it from the session worktree root and keep the script path repo-relative, for example `.agents/skills/next-plan/scripts/Get-NextPlanList.ps1` — never `$RepositoryRoot`, `Join-Path`, `cygpath -w`, or an absolute path. Never change the shared working directory — no Bash `cd`, no `Set-Location`: the working directory can persist across calls in both tools, so a later repo-relative path stops resolving; address scratch files by path from the session worktree root instead. One script invocation per shell call: never sequence it with another command using `;`, `&&`, `||`, or a newline, and never append an exit-code echo; consuming that single invocation's own result is part of it and stays allowed, such as assigning it to a variable or piping it into `ConvertFrom-Json`. Never pass `-ExecutionPolicy Bypass`. Importing a `.psm1` module is not a script run and is exempt from both rules: run `Import-Module ./<repo-relative .psm1 path>` followed by the function call in the same shell call, because the imported functions must land in the caller's own session; the leading `./` is required, or PowerShell treats the path as a module name and searches `PSModulePath` instead of the worktree, and the `-File` script form never applies to a module function. The bare invocation text is identical in both the Bash tool and the PowerShell tool; a result-consuming form — a variable assignment, a pipe into `ConvertFrom-Json`, a redirect or `Set-Content` pipe to a file, or any other use of that one invocation's own output — is PowerShell-tool only and is never permitted from the Bash tool. Array-argument exception: when a parameter binds an array and does not split its own input, `-File` passes a comma list as one literal value, so use `pwsh -NoProfile -Command "& '<repo-relative path>' -Param 'a','b'"`. A script that cannot be run as documented is a bug: stop and report it to the parent session or user.
+- Bundled scripts: run a repository script exactly as its skill documents it — never wrap, reimplement, or work around one; a script that cannot be run as documented is a bug to report. Canonical invocation form: `pwsh -NoProfile -File <repo-relative script path> [arguments]`, run from the session worktree root; never an absolute path or `-ExecutionPolicy Bypass`. Never change the working directory (no `cd`, no `Set-Location`); address scratch files by path from the worktree root. One script per shell call with nothing chained before or after it; using that call's own output (assigning it, piping to `ConvertFrom-Json`) is allowed from the PowerShell tool only. Import a `.psm1` with `Import-Module ./<repo-relative path>` (leading `./` required) and call its functions in the same shell call. When a parameter takes an array, use `pwsh -NoProfile -Command "& '<repo-relative path>' -Param 'a','b'"` instead of `-File`.
 
 ### User Interaction
 
 - IMPORTANT: Every question or decision request aimed at the user must be answerable from the current message without hidden reasoning or remembered scrollback. Provide the FULL context needed to understand as rendered message text the user is guaranteed to see — text emitted before a question-tool call may never be displayed, so present first and ask only after the context is visible — and explain what the answer changes or blocks. When relevant, give options, trade-offs, and a recommendation. The user has NOT read the source code or plan file.
 - AVOID jargon, the user is NOT a domain expert, use plain language (dumb it down).
 - Explain fully when asked; use headings and bullet points so a longer explanation stays skimmable.
-- Reporting work: separate built from verified, and name each required check still open — reserve "done" for after those checks close. State a defect with its evidence and effect; a verdict or count alone is not a finding. Compare options on the same criteria, evidence, detail, and tone — recommend one, but never describe the favorite by its benefit and the alternative by its risk. The main session's final user-facing message of a turn that ran Change Workflow work ends with the lines `Follow-up Plans created:` followed by one repo-relative path per Plan that turn created, each tagged `landed in <commit>` or `unlanded in worktree`, or the single word `none` — always the very last lines.
+- Reporting work: state what was built and what was verified separately, and name every required check still open; "done" means those checks have closed. A defect is stated with its evidence and effect, never as a verdict or count alone.
+- Comparing options: use the same criteria, evidence, detail, and tone for each; recommend one, but never sell the favorite by its benefit and the alternative by its risk.
+- Footer: the main session's final message of any turn that ran Change Workflow work ends with `Follow-up Plans created:` followed by one repo-relative path per Plan created that turn, tagged `landed in <commit>` or `unlanded in worktree`, or the single word `none`.
 
 ### Resolving Ambiguity
 
@@ -120,7 +181,7 @@ Once a stage's required checks pass, stop changing it: advance to the next stage
 ### Diagnosis Discipline
 
 - Verify root cause before editing: confirm it from close code inspection or evidence, never from "I know what the bug is". `/external-diagnose-bug` owns the method.
-- Authority order when sources disagree about intended behavior: explicit user statement > final approved plan plus changes the user approved after the plan > AGENTS.md/docs/comments > current code behavior. Plans are usually agent-authored, so at review and plan-authoring time a plan-internal decision binds only when user direction supplied outside the plan itself corroborates it — an execution card, a dispatch brief, or the user's own words, never the plan's own text claiming it — and hard binding language such as "decided" or "not an option" is reserved for such corroborated user-directed choices. Never silently make one side match another — surface the contradiction as a residual (footer line) naming both sides and which was trusted.
+- Authority order when sources disagree about intended behavior: explicit user statement > final approved plan plus changes the user approved after the plan > AGENTS.md/docs/comments > current code behavior. When a plan's own decision declarations bind, and how to phrase a choice a plan makes, is in `.agents/references/authority-order.md`. Never silently make one side match another — surface the contradiction as a residual (footer line) naming both sides and which was trusted.
 
 ## Directory Structure
 
@@ -146,16 +207,4 @@ Same source, two executables: client (graphics, audio, input) defines `BT_CLIENT
 ## Key Patterns
 
 - Live verification: invoke `/agent-harness` for all harness operations — launching and driving the client/server, sim setup, UI input, state queries, screenshots, logs, replay determinism checks.
-- Log levels: `kVerbose` — per-frame / high-frequency. `kDebug` — one-time (startup, connect). `kInfo` — state transitions, important one-shots (default threshold). `kWarning` — investigate (timeouts, desync); may spam. `kError` — failures; always logged. Runtime-threshold and compile-floor mechanics: `Common/Log/AGENTS.md`.
-- Managers: Singletons via `gp*` globals (`gpGraphics`, `gpAudioManager`)
-- DirectX Math: Prefer aligned versions (`Float4A` not `Float4`)
-	- XMVECTOR W invariant: Positions W=1.0; directions / velocities / normals / offsets W=0.0; color alpha defaults 1.0 (opaque)
-	- Function form, not operators: `XMVectorAdd`/`Subtract`/`Multiply`/`Divide`/`Scale`/`Negate` — never `vec + vec`, `f * vec`, `-vec`.
-	- Rotating a vector uses `XMVector3RotateSafe`/`XMVector3InverseRotateSafe`: the SDK versions leave a rounding residue in W that breaks the invariant above, so `Common/ExternalHeaders.h` re-zeroes W and makes the raw names fail to compile.
-- Base classes: Include/use game versions, not Base versions — `game::gpGame` not `GameBase` directly
-- Workbuffer: Use `gpThreadLocal->mWorkbuffer` for temp allocations instead of local `std::vector`/`std::string`.
-- Allocation tracking: Heap allocations in the main loop trigger `DEBUG_BREAK()`. When unavoidable, wrap with `ScopedSuppressAllocationTracking` + `// Heap:` comment. See `Engine/Source/Memory/AGENTS.md`
-- LOG formatting: logging in allocation-tracked Game/Engine code must remain allocation-free; /repo-code-review owns accepted formatting and wrapper details
-- Standard library / external headers: PCH-backed `#include`s go in `Common/ExternalHeaders.h`; PCH-less AgentTools use `Tools/ToolCommon/ToolCliCommon.h`. Rules and exceptions: `Common/AGENTS.md` and `Tools/ToolCommon/AGENTS.md`
-- Flags over booleans: Use `common::Flags<EnumType>` instead of multiple `bool` variables.
-- Multithreading: Use `common::gpMultithreading->Dispatch()` or `common::PersistentWorker` for data-parallel work.
+- C++ conventions: `.agents/references/cpp-conventions.md`.

@@ -1,9 +1,9 @@
-# Added-lines-only debug residue scanner for the session cleanup step of /code-style-review: it reports
-# candidate temporary instrumentation and navigation comments on lines this session added, so a cleanup
-# never has to separate them from pre-existing intentional debug logs by hand. The scan reports
-# candidates only — it never decides whether a hit is temporary or intentional, never edits a file, and
-# writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is safe under
-# a read-only sandbox. Stdout carries only the result document.
+# Added-lines-only candidate scanner for /code-style-review: it reports candidate temporary
+# instrumentation, navigation comments, and style-rule candidates on lines this session added, so a
+# review never has to separate them from pre-existing code by hand. The scan reports candidates only —
+# it never decides whether a hit is temporary or a row is a violation, never edits a file, and writes
+# nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is safe under a
+# read-only sandbox. Stdout carries only the result document.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -28,9 +28,12 @@ $script:MaximumOutputBytes = 131072
 
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
 $script:CppClasses = @('cpp', 'dual-language-header')
-# One entry per candidate kind listed in .agents/skills/code-style-review/SKILL.md "Session Cleanup",
-# in the order a line is attributed: a line reports the first kind that matches it.
-$script:ResiduePatterns = @(
+# One entry per candidate kind: the residue kinds .agents/skills/code-style-review/references/worker.md
+# steps 16-17 remove, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 9
+# adjudicates. The order is the order a line is attributed: a line reports the first kind that matches
+# it. An entry's Except clears a match that is one of the rule's permitted forms. That worker's step 6
+# hand-read list is the complement of the style-rule-<n> kinds here, so update it with this table.
+$script:CandidatePatterns = @(
 	@{ Kind = 'log'; Pattern = '\bLOG\s*\(' }
 	@{ Kind = 'printf'; Pattern = '\bprintf\s*\(' }
 	@{ Kind = 'debug-break'; Pattern = '\bDEBUG_BREAK\s*\(\s*\)' }
@@ -39,6 +42,17 @@ $script:ResiduePatterns = @(
 	@{ Kind = 'fixme'; Pattern = '(?://|/\*|^\s*\*).*\bFIXME\b' }
 	@{ Kind = 'hack'; Pattern = '(?://|/\*|^\s*\*).*\bHACK\b' }
 	@{ Kind = 'navigation-comment'; Pattern = '(?://|/\*|^\s*\*).*\b(?:AGENTS|CLAUDE)\.md\b' }
+	@{ Kind = 'style-rule-15'; Pattern = '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
+	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|\btypename(?:\.\.\.)?\s+[A-Z]*[a-z])' }
+	@{ Kind = 'style-rule-27'; Pattern = '\b\d+\.(?:\d+(?:[eE][-+]?\d+)?)?(?:[^\w.]|$)|\b\d+\.f\b|(?:^|[^\w.])\.\d+(?:f|\b)' }
+	@{ Kind = 'style-rule-28'; Pattern = '\bNULL\b' }
+	@{ Kind = 'style-rule-29'; Pattern = '\bvirtual\b.*\)\s*(?:const\s*)?(?:noexcept\s*)?;'; Except = '\boverride\b|\bfinal\b' }
+	@{ Kind = 'style-rule-32'; Pattern = '\bstd::map\s*<' }
+	@{ Kind = 'style-rule-41'; Pattern = '\busing\s+namespace\s+[\w:]+\s*;'; Except = 'using\s+namespace\s+DirectX\s*;' }
+	@{ Kind = 'style-rule-50'; Pattern = '\b(?:if|while)\s*\((?:.*(?:&&|\|\||\())?\s*!?\s*(?:[\w.>-]*(?:->|\.))?[gms]?p[A-Z]\w*\s*(?:\)|&&|\|\|)' }
+	@{ Kind = 'style-rule-52'; Pattern = '\w\{\}' }
+	@{ Kind = 'style-rule-57'; Pattern = '\b\w+(?:Impl|Internal)\s*\(' }
+	@{ Kind = 'style-rule-58'; Pattern = '^\s*#\s*ifn?def\b' }
 )
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
@@ -46,16 +60,16 @@ $script:HeadSha = ''
 $script:NewSideLines = @{}
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-session-debug-residue/v1'
+	schemaVersion = 'broken-engine-session-candidates/v1'
 	status = 'error'
 	code = 'internal.error'
-	message = 'Session debug residue scan did not run.'
+	message = 'Session candidate scan did not run.'
 	hits = @()
 	counts = $null
 	truncated = $false
 }
 
-function Complete-SessionDebugResidue([int] $ExitCode, [string] $Status, [string] $Code, [string] $Message) {
+function Complete-SessionCandidates([int] $ExitCode, [string] $Status, [string] $Code, [string] $Message) {
 	$result.status = $Status
 	$result.code = $Code
 	$result.message = if ($Message.Length -gt $script:MaximumMessageLength) { $Message.Substring(0, $script:MaximumMessageLength) } else { $Message }
@@ -66,7 +80,7 @@ function Complete-SessionDebugResidue([int] $ExitCode, [string] $Status, [string
 	exit $ExitCode
 }
 
-function Invoke-ResidueProcess([string] $FileName, [string[]] $Arguments, [string] $WorkingDirectory) {
+function Invoke-CandidateProcess([string] $FileName, [string[]] $Arguments, [string] $WorkingDirectory) {
 	$start = [Diagnostics.ProcessStartInfo]::new()
 	$start.FileName = $FileName
 	$start.WorkingDirectory = $WorkingDirectory
@@ -93,8 +107,8 @@ function Invoke-ResidueProcess([string] $FileName, [string[]] $Arguments, [strin
 	return $run
 }
 
-function Invoke-ResidueGit([string[]] $Arguments) {
-	$run = Invoke-ResidueProcess 'git' (@('-C', $script:Root, '--no-pager') + $Arguments) $script:Root
+function Invoke-CandidateGit([string[]] $Arguments) {
+	$run = Invoke-CandidateProcess 'git' (@('-C', $script:Root, '--no-pager') + $Arguments) $script:Root
 	if ($run.ExitCode -ne 0) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
 	return $run.Stdout
 }
@@ -109,7 +123,7 @@ function Get-NewSideLine([string] $Path) {
 		[IO.File]::ReadAllText((Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)), $script:Utf8)
 	}
 	else {
-		Invoke-ResidueGit @('show', "$($script:HeadSha):$Path")
+		Invoke-CandidateGit @('show', "$($script:HeadSha):$Path")
 	}
 	$script:NewSideLines[$Path] = @($text -split "`r`n|`n|`r")
 	return , $script:NewSideLines[$Path]
@@ -121,17 +135,17 @@ function Get-InventoryDocument() {
 	if ($IncludeUntracked) {
 		# The inventory reports an untracked path only when the caller lists it, so the pass-through
 		# switch supplies the whole untracked set in the comma-separated form that script splits.
-		$untracked = @((Invoke-ResidueGit @('ls-files', '--others', '--exclude-standard', '-z')) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
+		$untracked = @((Invoke-CandidateGit @('ls-files', '--others', '--exclude-standard', '-z')) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
 		if ($untracked.Count -gt 0) { $arguments += @('-IncludeUntracked', ($untracked -join ',')) }
 	}
 	$shell = [Environment]::ProcessPath
 	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
-	$run = Invoke-ResidueProcess $shell $arguments $script:Root
+	$run = Invoke-CandidateProcess $shell $arguments $script:Root
 	$document = $null
 	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) { $document = $run.Stdout | ConvertFrom-Json }
 	if ($run.ExitCode -ne 0 -or $null -eq $document -or $document.status -cne 'pass') {
 		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { $run.Stderr.Trim() }
-		Complete-SessionDebugResidue 2 'blocked' 'residue.inventory-unavailable' "The session change inventory did not produce a scannable result: $reason"
+		Complete-SessionCandidates 2 'blocked' 'candidates.inventory-unavailable' "The session change inventory did not produce a scannable result: $reason"
 	}
 	return $document
 }
@@ -156,9 +170,11 @@ function Get-AddedLine([object] $Inventory) {
 	return $added
 }
 
-function Test-DebugResiduePattern([string] $Text) {
-	foreach ($pattern in $script:ResiduePatterns) {
-		if ($Text -cmatch $pattern.Pattern) { return $pattern.Kind }
+function Test-CandidatePattern([string] $Text) {
+	foreach ($pattern in $script:CandidatePatterns) {
+		if ($Text -cnotmatch $pattern.Pattern) { continue }
+		if ($pattern.ContainsKey('Except') -and $Text -cmatch $pattern.Except) { continue }
+		return $pattern.Kind
 	}
 	return $null
 }
@@ -166,10 +182,10 @@ function Test-DebugResiduePattern([string] $Text) {
 try {
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
-		Complete-SessionDebugResidue 2 'blocked' 'residue.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
+		Complete-SessionCandidates 2 'blocked' 'candidates.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
 	if (-not (Test-Path -LiteralPath $script:InventoryScript -PathType Leaf)) {
-		Complete-SessionDebugResidue 2 'blocked' 'residue.inventory-missing' "The session change inventory script is missing: '$($script:InventoryScript)'."
+		Complete-SessionCandidates 2 'blocked' 'candidates.inventory-missing' "The session change inventory script is missing: '$($script:InventoryScript)'."
 	}
 	$inventory = Get-InventoryDocument
 	$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
@@ -179,7 +195,7 @@ try {
 
 	$hits = [Collections.Generic.List[object]]::new()
 	foreach ($line in (Get-AddedLine $inventory)) {
-		$kind = Test-DebugResiduePattern $line.Text
+		$kind = Test-CandidatePattern $line.Text
 		if ($null -eq $kind) { continue }
 		$text = $line.Text.Trim()
 		if ($text.Length -gt $script:MaximumTextLength) { $text = $text.Substring(0, $script:MaximumTextLength) }
@@ -195,7 +211,7 @@ try {
 
 	# Counts always describe the complete scan, never the truncated emission.
 	$counts = [ordered]@{ total = $sorted.Count }
-	foreach ($pattern in $script:ResiduePatterns) { $counts[$pattern.Kind] = @($sorted | Where-Object { $_.kind -ceq $pattern.Kind }).Count }
+	foreach ($pattern in $script:CandidatePatterns) { $counts[$pattern.Kind] = @($sorted | Where-Object { $_.kind -ceq $pattern.Kind }).Count }
 	$result.counts = $counts
 	$emitted = [Collections.Generic.List[object]]::new()
 	foreach ($hit in ($sorted | Select-Object -First $script:MaximumHits)) { $emitted.Add($hit) }
@@ -207,8 +223,8 @@ try {
 		$drop = [Math]::Max(1, [int] [Math]::Ceiling($emitted.Count * 0.1))
 		$emitted.RemoveRange($emitted.Count - $drop, $drop)
 	}
-	Complete-SessionDebugResidue 0 'pass' 'ok' "Scanned the session-added C++ lines and found $($sorted.Count) residue candidate(s)."
+	Complete-SessionCandidates 0 'pass' 'ok' "Scanned the session-added C++ lines and found $($sorted.Count) candidate(s)."
 }
 catch {
-	Complete-SessionDebugResidue 1 'error' 'internal.error' $_.Exception.Message
+	Complete-SessionCandidates 1 'error' 'internal.error' $_.Exception.Message
 }

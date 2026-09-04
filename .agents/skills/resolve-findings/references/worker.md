@@ -26,6 +26,8 @@ and the handoff form.
 - The manager owns finding decisions and scope changes, and dispatches builds,
   independent verification, and all fresh-context review to their assigned
   roles.
+- For C++ fixes, the conventions to apply are in
+  [`../../../references/cpp-conventions.md`](../../../references/cpp-conventions.md).
 - Resolve conflicting sources by the authority order in root `AGENTS.md`
   `### Diagnosis Discipline`, naming the contradiction and the controlling
   source.

@@ -23,7 +23,10 @@ the primary tip lacks cannot be fast-forwarded, so it stops with
 therefore reads a tree at the primary tip as of that invocation,
 `none-available` means the Plan is genuinely ineligible rather than merely
 absent from a stale worktree; a Plan that lands on primary afterwards is picked
-up by the next invocation.
+up by the next invocation. A `claim.session-diverged` result carries no
+`divergence` object: its `message` lists every commit the session holds and
+primary lacks, and under `-ResumeRetained` it may also carry the `retained`
+projection.
 
 ## Reading the queue listing
 
@@ -43,20 +46,10 @@ a selection defect, and the claim result does not name the passed-over Plans.
 For a tier-constrained request, read the `Risk tier` prose of the top eligible
 candidates in that order until one matches, then claim that path.
 
-A plain named run skips the listing, so the claim result names every stop: a
-partial pattern matching nothing blocks with `plan-name-not-found`, several
-matches block with `plan-name-ambiguous` and list `candidates`, and an exact
-path that is absent, blocked, excluded, or claimed by another session reports
-`none-available`; [worker.md](worker.md) rules own how each stop is handled.
-
-## Diverged sessions
-
-A `claim.session-diverged` result carries no `divergence` object: its `message`
-lists every commit the session holds and primary lacks. Under `-ResumeRetained`
-the blocked result may also carry the `retained` projection, because the script
-builds it before the divergence check
-(`Invoke-NextPlanClaim.ps1:44,53-57`). Report both the unlanded commits and any
-retained work to the user, who decides how to resolve it.
+An exact `Documents/Plans/...` path that is absent, blocked, excluded, or
+claimed by another session yields `none-available`. A partial pattern matching
+several validated executable Plans yields `plan-name-ambiguous`, whose `message`
+names no match; the matching Plan paths are in the result's `candidates` array.
 
 ## Claim-exit result fields
 
@@ -66,16 +59,19 @@ contain as `changes.items[].path`, counted by `changes.totalCount`, with
 `nextAction: finalize-changes`.
 
 `Defer-NextPlan.ps1` reports the uncommitted work it leaves in place as
-`retained`: a bounded `paths` list with the full `count`.
-
-## Retained work and `-ResumeRetained`
-
-Any dirty session worktree other than deferral-retained work blocks a claim with
-`claim.worktree-dirty`, naming the dirty paths and leaving the tree and the
-scheduler untouched.
-
-The `-ResumeRetained` switch never stages, stashes, or reverts anything, leaves
+`retained`: a bounded `paths` list with the full `count`. The claim script's
+`-ResumeRetained` switch never stages, stashes, or reverts anything, leaves
 every retained file byte-identical, and reports those paths as `retained` on the
-pass result. It still blocks with `claim.worktree-dirty` when a dirty path is
-under `Documents/Plans/`, because selection reads that scheduler input from this
-tree, or when the fast-forward to the primary tip would touch a retained path.
+pass result.
+
+## `nextAction`
+
+Every claim and deferral result carries a `nextAction` naming the one thing to
+do next, drawn from these four values:
+
+- `prepare` — this session holds the claim; continue the preparation workflow.
+- `stop-report-to-user` — the run stops here; report the result and let the user
+  decide what happens next, after the [worker.md](worker.md) step 8 checkpoint.
+- `resume-with-flag` — a `-Plan` run found an unclean worktree; the rerun with
+  `-ResumeRetained` is gated by the [worker.md](worker.md) resume rule.
+- `retry-later` — tell the user, and the same command can be run again later.

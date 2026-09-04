@@ -73,6 +73,10 @@ dispatches independent verification as a separate role after the fix and
 required checks complete. Use `PASS` when every
 assigned item is fixed with no fix-work residual, `NEEDS_ACTION` when manager
 action remains, and `BLOCKED` when missing required evidence prevents work.
+Per-finding application detail stays inline unless it would exceed the size
+limits in `../../references/subagent-reporting.md` `## Handoffs`, in which case
+it moves to one `Temp/` file cited under `Evidence` as path plus one selector
+per finding, leaving only the item table rows inline.
 
 ## References
 

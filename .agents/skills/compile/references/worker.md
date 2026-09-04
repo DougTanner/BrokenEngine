@@ -37,10 +37,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      and `message`.
    - `repositoryRoot`, `primaryCheckout`, and `baseline` (the resolved commit) —
      an explicitly supplied baseline is authoritative and is used exactly as
-     given; a `BROKEN_ENGINE_BASELINE` hint in a session worktree resolves
-     through the session context, which may advance it to the session's real
-     divergence point, and falls back to the hint itself whenever that
-     resolution fails.
+     given; without one, a session worktree resolves its baseline through the
+     session context, which may advance it to the session's real divergence
+     point, and falls back to `HEAD` whenever that resolution fails.
    - `changedPaths`/`changedPathCount` — the complete changed-path set: the
      single baseline diff (committed, staged, and unstaged tracked changes) plus
      untracked files, separator-normalized. `changedPathsTruncated`,
@@ -55,13 +54,16 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      never its decision.
    - `dataBuildMode` with `dataBuildModeDerivation` `path-rules-only`, plus
      `gameDataDirectory` and `generatedDataIncludeRoot`.
+   - `recommendedTargets` — advisory `{project, configuration, reason}` rows
+     derived from the changed paths.
 
 3. Fix the target and configuration list from that evidence. Done when every
    target this request will build is named.
 
-   - Default: BrokenEngineSandbox client Debug.
-   - If any changed file is shared (`Common/`, `Engine/`, or non-exclusive game
-     code), build both client and server.
+   - Start from `recommendedTargets`, which is advisory: a `BrokenEngineSandbox`
+     row is `-Target Client` and a `BrokenEngineSandboxServer` row is
+     `-Target Server`, but you still fix the final list, because the rules below
+     depend on session state and request inputs the script cannot see.
    - If the session's approved plan or acceptance table includes an
      agent-harness scenario, build both client and server in the same request
      regardless of changed-file affinity — the harness launches both executables
@@ -228,11 +230,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   so step 1's run informs your decision and never feeds values into a later
   command. Each of its inputs takes an explicitly supplied parameter first, then
   the wrapper environment hint (`BROKEN_ENGINE_WORKTREE_PATH`,
-  `BROKEN_ENGINE_PRIMARY_CHECKOUT`, `BROKEN_ENGINE_BASELINE`), then the derived
-  default. Environment values are wrapper-provided identity hints, so the
-  `BROKEN_ENGINE_BASELINE` hint resolves through the session context and may
-  advance to the session's real divergence point, while an explicitly supplied
-  baseline never moves.
+  `BROKEN_ENGINE_PRIMARY_CHECKOUT`), then the derived default. The baseline takes
+  no environment hint; step 2's `baseline` field states how it resolves.
 - Never reconstruct these operations inline: no hand-typed changed-path
   `git diff`/`git ls-files` commands, no hand-resolved repository root, primary
   checkout, or baseline, and no inline `vswhere`/`DevEnvDir` discovery. A
@@ -268,13 +267,10 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   stops on failure. Validated stable primary submodule trees plus shared
   immutable ThirdParty, WorktreeCli, and AgentHarness Output directories are the
   only exceptions to worktree-local build artifacts.
-- For routine work, build the checkout supplied by the caller. An isolated
-  session worktree remains appropriate for queue operations, concurrent work, or
-  a landing gate, but is not a prerequisite for a targeted build. Keep existing
-  build serialization and the gated AgentTools promotion path; do not share
-  mutable build output between checkouts (the session-start DataPacker seed is a
-  one-time verified copy the worktree then owns and may rebuild over, not shared
-  output).
+- Keep existing build serialization and the gated AgentTools promotion path; do
+  not share mutable build output between checkouts (the session-start DataPacker
+  seed is a one-time verified copy the worktree then owns and may rebuild over,
+  not shared output).
 - The AgentTools targets build into a session-local `OutDir` because the default
   Output is the shared immutable primary Output held by the running WorktreeCli
   driver; a default-output WorktreeCli build therefore fails with a structural

@@ -35,12 +35,9 @@ Whenever a session baseline exists, the complete changed-artifact list is the
 <absolute repository toplevel> -Baseline <full 40-character SHA>` (add `-Head
 <commit>` for a committed head). It writes no file and prints one
 `broken-engine-session-change-inventory/v1` object with `entries`, `counts`, and
-`triggers`. Only `status` `pass` (exit 0) is usable; `blocked` (exit 2) or
-`error` (exit 1) means the changed-artifact list is unavailable, so return
-`BLOCKED`. The list is capped at 500 rows, so read `truncation.entries` and
-`truncated`: an emitted count below the full count also means the complete
-changed-artifact list is unavailable, so return `BLOCKED` for it exactly as for
-a non-pass status. An untracked file appears only when the caller supplies it
+`triggers`. The run is usable only when `status` is `pass` and `truncated` is
+false; otherwise the complete changed-artifact list is unavailable, so return
+`BLOCKED`. An untracked file appears only when the caller supplies it
 with `-IncludeUntracked <comma-separated paths>`, and `counts.unlistedUntracked`
 reports how many untracked files the run did not list. Never enumerate the
 changed artifacts inline.

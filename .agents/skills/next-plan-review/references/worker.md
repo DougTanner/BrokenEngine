@@ -67,13 +67,20 @@ The numbered spine the invoking parent executes, and the judgment no step owns.
    - Done when the commit facts and those contracts are in hand.
 4. For Claude, require the exact parent transcript/session ID from client context
    or the user. Never guess from timestamps, prescribe a private local path, or
-   sweep Claude data. Done when that exact ID is in hand or the review is
-   `BLOCKED` for want of it.
+   sweep Claude data. Once that ID has resolved a transcript path, read that
+   transcript through the projection invocation documented in
+   [`measurement.md`](measurement.md) `## Measure main-session token efficiency`,
+   opening only the records that projection selects; never hand-compose a
+   projection or read a transcript whole. Done when that exact ID is in hand or
+   the review is `BLOCKED` for want of it.
 5. Prove production of the commit, then build the routing inventory.
    - Prove the parent started before and covered the commit, used the eligible
      retained registered worktree selected by the finder, and recorded
      finalization producing the full hash. An exact ID or filename is selection
      evidence, not production proof.
+   - For Claude, query the recorded worktree with one bounded command —
+     `git worktree list --porcelain` filtered to the one recorded worktree path —
+     never an unfiltered listing.
    - A default `HEAD` is eligible only when transcript and finalization evidence
      prove production of that exact commit; otherwise report
      `Transcript provenance: BLOCKED`.
@@ -144,6 +151,9 @@ The numbered spine the invoking parent executes, and the judgment no step owns.
      minimality, 3 workflow coverage, 4 token efficiency, 5 execution-model
      routing, 6 control-work share, 7 process overhead, 8 isolation and landing,
      9 speed.
+   - Measure the main session's context entries per
+     [`measurement.md`](measurement.md) `## Measure main-session token
+     efficiency` before assessing concern 4.
    - Done when the brief carries every requirement above.
 8. Require in that same brief the shared handoff form and the extension block in
    [`../SKILL.md`](../SKILL.md) `## Handoff`, plus the single task brief from
