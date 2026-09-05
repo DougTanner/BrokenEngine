@@ -238,11 +238,15 @@ every other lease is foreign.
   movement touched a session-owned path): stop and report the result to the
   manager. When the manager authorizes recovery, this same finalizer performs
   the single ordinary linear rebase and the re-invocation of approval
-  preparation with re-resolved tips stated in [`scripts.md`](scripts.md)'s
-  `Invoke-FinalizeApprovalPreparation.ps1` entry, inspecting any place that
-  rebase merged cleanly but changed the code's meaning, re-runs step 3 for the
-  changed regions, and re-runs the movement check. This is
-  not the rewritten-history case below, which the fork-point repair script handles
+  preparation with the re-resolved tips and any verified-candidate pair stated
+  in [`scripts.md`](scripts.md)'s `Invoke-FinalizeApprovalPreparation.ps1`
+  entry, inspecting any place that rebase merged cleanly but changed the code's
+  meaning, re-runs step 3 for the changed regions, and re-runs the movement
+  check. That inspection and the step-3 re-run, including the review of the
+  changed regions that re-run triggers, cover the rebased tip a re-resolved pair
+  now names, so a supplied gate stays supplied instead of being dropped. This is
+  not the rewritten-history case below, which the fork-point repair script
+  handles
   ([`scripts.md#session-fork-point-repair`](scripts.md#session-fork-point-repair)).
 - Primary history rewritten under the session: reattaching through the wrapper
   repairs this, rebasing the session branch onto the new primary tip; the step-4

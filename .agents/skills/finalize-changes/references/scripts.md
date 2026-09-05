@@ -136,9 +136,14 @@ reconstructs the assessment from Git output.
   `primary.path-overlap` block from the primary-movement check runs the ordinary
   linear `git rebase refs/heads/<primary-branch>` from the session worktree root
   — never the `--onto` form and never another ref — and then re-invokes this
-  script with `-ExpectedCurrentTip` re-resolved to the rebased session tip and
-  `-ExpectedPrimaryTip` re-resolved to the live primary tip, its other arguments
-  unchanged; that rebase also invalidates any `<baseline>` already resolved for
+  script with `-ExpectedCurrentTip` re-resolved to the rebased session tip,
+  `-ExpectedPrimaryTip` re-resolved to the live primary tip, and any
+  `-VerifiedCandidateCommit`/`-VerifiedCandidateTree` pair re-resolved to that
+  same rebased session tip and its own tree, its other arguments unchanged.
+  Carrying the pre-rebase pair forward instead blocks such a recovery with
+  `candidate.tree-changed`, because the rebased tree also holds the foreign
+  commits' content; the pre-rebase tree is no longer what anyone is landing.
+  That rebase also invalidates any `<baseline>` already resolved for
   `Invoke-FinalizeCandidateCommit.ps1`, which `## Invocation` requires
   re-resolving. It returns the only landing commit sent to verification. That
   commit inherits the oldest session commit's message unless the optional
