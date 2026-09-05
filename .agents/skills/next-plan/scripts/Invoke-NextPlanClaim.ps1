@@ -49,14 +49,21 @@ try {
   }
  }
  $context=Get-NextPlanContext
+ # A claim this session already holds needs no tree work and no scheduler mutation, so report it before the gates below;
+ # every other claim-status outcome, unreadable output included, falls through to the flow below, which reports a
+ # scheduler stop from plan validate instead. Reusing a held claim therefore never fast-forwards the session.
+ $heldClaim=$null
+ try{$claimStatus=Get-NextPlanClaimStatus $context;if($claimStatus.ExitCode -eq 0 -and [string]$claimStatus.Status.code -ceq 'claimed'){$heldClaim=$claimStatus.Status}}catch{$heldClaim=$null}
+ if($null -ne $heldClaim){$result.claim=[ordered]@{claimed=$true;plan=[string]$heldClaim.plan;state='existing'};Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
  $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)
  if($dirty.Count -ne 0){
-  if(-not $ResumeRetained){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
-  # Selection and validation read Documents/Plans from this tree, so uncommitted scheduler input is never safe to claim against.
+  # Validation and Plan completion read Documents/Plans from this tree, so uncommitted scheduler input is never safe to
+  # claim against; no rerun flag can lift this, so the message names a route that works instead of a flag that does not.
   $schedulerPaths=@($dirty|Where-Object{$_.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)})
-  if($schedulerPaths.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "-ResumeRetained cannot claim while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched." 'stop-report-to-user'}
+  if($schedulerPaths.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Set those paths aside with: git stash push -u -m '<tag>' -- <those paths>, then rerun this command and restore them with: git stash apply --index <that stash entry>, which keeps a staged version; or land that work first." 'stop-report-to-user'}
+  if(-not $ResumeRetained){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
   if($context.SessionHead -cne $context.PrimaryTip){
    # The claim below fast-forwards the session, which would overwrite a retained path the primary movement also changed.
    # NUL-delimited output keeps both sides of the comparison in the same raw path form.

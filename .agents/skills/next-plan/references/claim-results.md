@@ -15,10 +15,22 @@ baseline, and a result without one leaves the recorded baseline unchanged, so
 the `Get-NextPlanContext` baseline holds only until the first claim reports a
 `sync` object.
 
-Before it validates and claims, the claim script brings the session branch up to
-the primary tip by fast-forward only when the session is behind, reporting a
-`sync` object that names the old and new commits; a session holding any commit
-the primary tip lacks cannot be fast-forwarded, so it stops with
+A session that already holds a Plan claim is reported as `reused` with
+`nextAction: prepare` before the tree is examined. That holds in any tree state
+and whether or not `-Plan` was passed, and a `-Plan` value is not resolved at
+all for a held claim, so no path or pattern result can surface. The `reused`
+result therefore carries neither a `sync` nor a `retained` object and the
+recorded baseline is unchanged.
+
+Any other claim run, bare or targeted, is refused with `stop-report-to-user`,
+never `resume-with-flag`, when the session worktree holds an uncommitted
+`Documents/Plans` path; that result's `message` names those paths and the route
+that works.
+
+Otherwise, before it validates and claims, the claim script brings the session
+branch up to the primary tip by fast-forward only when the session is behind,
+reporting a `sync` object that names the old and new commits; a session holding
+any commit the primary tip lacks cannot be fast-forwarded, so it stops with
 `claim.session-diverged` and leaves the branch untouched. Because selection
 therefore reads a tree at the primary tip as of that invocation,
 `none-available` means the Plan is genuinely ineligible rather than merely
@@ -80,8 +92,9 @@ one thing to do next, drawn from these five values:
 - `prepare` — this session holds the claim; continue the preparation workflow.
 - `stop-report-to-user` — the run stops here; report the result and let the user
   decide what happens next, after the [worker.md](worker.md) step 8 checkpoint.
-- `resume-with-flag` — a `-Plan` run found an unclean worktree; the rerun with
-  `-ResumeRetained` is gated by the [worker.md](worker.md) resume rule.
+- `resume-with-flag` — a `-Plan` run found an unclean worktree whose dirty paths
+  are all outside `Documents/Plans`; the rerun with `-ResumeRetained` is gated
+  by the [worker.md](worker.md) resume rule.
 - `retry-later` — tell the user, and the same command can be run again later.
 - `finalize-changes` — the Plan terminal state is prepared; land the change
   through `/finalize-changes`.

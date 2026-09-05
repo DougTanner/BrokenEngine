@@ -45,6 +45,14 @@ function Get-NextPlanContext {
 	} catch { if (Test-NextPlanStateBlocker $_) { throw $_.Exception }; throw (New-NextPlanStateBlocker $_.Exception.Message) }
 }
 function Invoke-NextPlanProcess([string] $Executable,[string[]] $Arguments,[string] $WorkingDirectory) { return Invoke-FinalizeNativeText -Executable $Executable -Arguments $Arguments -WorkingDirectory $WorkingDirectory }
+function Get-NextPlanClaimStatus($Context) {
+	# The returned argument array is also the argument array a mutating claim command takes, and the JSON is parsed
+	# before the caller weighs the exit code, so unreadable output reaches the caller's catch path instead of a code test.
+	$claimArguments = @('--repo',$Context.CommonDirectory,'--worktree',$Context.Worktree,'--owner',$Context.Owner,'--session',$Context.Session)
+	$response = Invoke-NextPlanProcess $Context.WorktreeCli (@('plan','claim-status') + $claimArguments) $Context.Worktree
+	$status = ConvertFrom-NextPlanProcessJson $response 'plan claim-status'
+	return [pscustomobject]@{ Arguments=$claimArguments; ExitCode=$response.ExitCode; Status=$status }
+}
 function ConvertFrom-NextPlanProcessJson($Response,[string] $Operation) { if ([string]::IsNullOrWhiteSpace($Response.Stdout)) { throw "$Operation returned empty stdout. $($Response.Stderr.Trim())" }; try { return $Response.Stdout.Trim() | ConvertFrom-Json -Depth 100 -ErrorAction Stop } catch { throw "$Operation did not return one JSON value. $($_.Exception.Message)" } }
 function Assert-NextPlanGitPath([string] $Path) { Assert-FinalizeGitPath $Path }
-Export-ModuleMember -Function New-NextPlanStateBlocker,Test-NextPlanStateBlocker,Get-NextPlanContext,Invoke-NextPlanProcess,ConvertFrom-NextPlanProcessJson,Assert-NextPlanGitPath
+Export-ModuleMember -Function New-NextPlanStateBlocker,Test-NextPlanStateBlocker,Get-NextPlanContext,Invoke-NextPlanProcess,Get-NextPlanClaimStatus,ConvertFrom-NextPlanProcessJson,Assert-NextPlanGitPath
