@@ -25,7 +25,7 @@ rebase` and re-invokes approval preparation."
 `references/scripts.md:142-152` owns those mechanics: ordinary linear `git
 rebase refs/heads/<primary-branch>`, never `--onto`, then re-invocation with
 re-resolved tips. `SKILL.md:44-45` routes it: "A stale-base result loops back to
-main before any launch line is returned."
+main before any SmartGit review is run."
 
 In this session the advancing primary commit `ed11ba01` touched none of the
 session's nine paths, the rebase replayed cleanly, and `git patch-id --stable`
@@ -54,22 +54,14 @@ cite. In this session four rows (the combined `/coherence-review` pass,
 handoffs lived in main's context. Main pasted all four into a resume message and
 the finalizer rescored them unchanged — a second full round trip.
 
-**3. Pre-confirmation lock cycles.** `scripts.md:189-193` requires the lease to
-be claimed before approval preparation and released before any user wait, and
-`worker.md:35-40` repeats that ordering. Because the stale-base block restarts
-the sequence, this session claimed and released the landing lock twice before
-the confirmation. The lock itself guards only the primary advance
-(`scripts.md:230`; root `AGENTS.md:157`), and the movement check is read-only
-and takes no lease (`scripts.md:84-85`).
-
 Impact: every landing that races an advancing primary pays two manager round
-trips and a duplicated lock cycle that decide nothing, delaying the one thing
-the user is waiting on — the SmartGit review.
+trips that decide nothing, delaying the one thing the user is waiting on — the
+SmartGit review.
 
 ## Design
 
-Author's recommendation, in three parts. Each is small and independently
-verifiable; the third is expected to fall out of the first.
+Author's recommendation, in two parts. Each is small and independently
+verifiable.
 
 **A. Rebase inside approval preparation.** Give
 `Invoke-FinalizeApprovalPreparation.ps1` the clean-rebase case itself. At the
@@ -119,12 +111,6 @@ never in main's context). `landing-acceptance-table.md` needs no rule change:
 the scoring bar stays exactly as written; the fix only guarantees the evidence
 is present.
 
-**C. Pre-confirmation lock cycles.** Investigate whether the duplicate
-claim/release pair survives fix A. It should not: with the rebase inside
-preparation there is one pre-confirmation reconciliation pass and therefore one
-claim/release cycle. If it does survive, report it; do not weaken or reorder the
-lease rules in `scripts.md:189-193` as part of this Plan.
-
 ## Critical files
 
 - `.agents/skills/finalize-changes/scripts/Invoke-FinalizeApprovalPreparation.ps1`
@@ -153,8 +139,6 @@ lease rules in `scripts.md:189-193` as part of this Plan.
   routing sentence in `SKILL.md`.
 - The `SKILL.md` `## Inputs` requirement that the dispatch brief carry the typed
   review and hygiene handoffs (verbatim or as `Temp/` path plus selector).
-- A reported finding, with evidence, on whether a duplicate pre-confirmation
-  lock claim/release cycle remains after the above.
 
 ## Out of scope
 
@@ -162,8 +146,7 @@ lease rules in `scripts.md:189-193` as part of this Plan.
   changes, and everything in `SKILL.md` `### Landing confirmation`, stay as
   written.
 - Conflicting rebases: they keep returning a blocker to the manager.
-- `Invoke-FinalizeLanding.ps1`, the landing lock scripts, and the lease ordering
-  rules in `scripts.md:189-193`.
+- `Invoke-FinalizeLanding.ps1` and the landing lock scripts.
 - The scoring rules in `landing-acceptance-table.md`.
 - Reviewer-side handoff persistence in other skills, unless part B proves main
   cannot supply the handoffs.

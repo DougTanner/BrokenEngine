@@ -1000,7 +1000,6 @@ try {
 	if ($ExpectedCurrentTip -cne $script:LandingCommit) { Throw-Landing 2 'approval.session-tip-changed' 'Session tip is not the explicit user-approved commit.' }
 
 	if ([string]::IsNullOrWhiteSpace($OwnerToken)) {
-		# Landing claims use a derived identity so the caller's raw reconciliation lease remains distinct.
 		# Refresh preserves a lease's recorded duration, so a matching short lease cannot be adopted for
 		# the full landing transaction.
 		$lockState = Get-FinalizeLandingLockState $script:WorktreeCliPath $result.identities.gitCommonDirectory $script:CurrentIdentity.Worktree

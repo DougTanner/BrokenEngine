@@ -1,5 +1,5 @@
-# Landing-lock claim script for the pre-confirmation reconciliation
-# lease. Post-confirmation landing imports the same common helper directly.
+# Claim and release script for the post-confirmation landing
+# lock. The landing script imports the same common helper directly.
 # The script intentionally does not turn live contention into an override
 # request: callers can reinvoke a retryable result after its short delay.
 [CmdletBinding()]

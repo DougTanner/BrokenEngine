@@ -38,11 +38,10 @@ locked primary change, claim deletion, and recovery.
 One dispatch covers everything before the confirmation: the worker runs approval
 preparation, fills the acceptance table on the prepared diff, runs the
 primary-movement check and, only once that check reaches a usable terminal
-result, returns the completed table, the SmartGit launch line, and the landing
-summary in a single handoff. Main runs that launch line, reads its receipt,
-presents that summary, and asks the confirmation below, with no other tool call
-in between — `### Landing confirmation` states those two calls. A stale-base
-result loops back to main before any launch line is returned.
+result, runs the SmartGit approval review and returns the completed table, that
+review's status, and the landing summary in a single handoff. Main presents that
+summary and asks the confirmation below, with no tool call in between.
+A stale-base result loops back to main before any SmartGit review is run.
 
 "Stop before any primary change" names the confirmation pause below, never an
 earlier stop.
@@ -61,9 +60,9 @@ Use the shared form in
 with `Build required` present and `Residuals` last, extended by one row each for
 finalization state, objective state, checkout/branches/resulting commit,
 lock/reconcile/sign-off/landing status, files changed during reconciliation, and
-`SmartGit launch:` — the `Show-FinalizeApprovalReview.ps1` command line from
-`references/scripts.md` `## Invocation`, every placeholder filled in for the
-prepared landing commit, present whenever the handoff carries a landing summary.
+a `SmartGit review:` row carrying the review line `### Landing confirmation`
+defines, filled from the receipt the worker read, present whenever the handoff
+carries a landing summary.
 Emit one final line beginning `SESSION COMPLETE` stating
 that landing succeeded, the claim was released, the worktree is clean, and every
 objective stage is complete or explicitly deferred to a named unclaimed Plan —
@@ -72,23 +71,15 @@ retained-claim, or still-active work.
 
 ### Landing confirmation
 
-Main first runs the handoff's `SmartGit launch:` line verbatim under the root
-AGENTS.md bundled-script rule, then reads `status`, `code`, `message`, and
-`manualCommand` from the receipt that line redirects to. Those are the only
-tool calls between the handoff and the question. A receipt with any status the
-line forms below do not name, or one that is unreadable, is a blocker to
-report, not a summary to present.
-
-Main then presents the self-contained summary immediately before the question:
+Main presents the self-contained summary immediately before the question:
 a one-sentence change that names a superseded decision whenever the session
 record holds one, changed-file count and kind, session branch and the
 primary branch resolved as `<primary-branch>` below,
 the acceptance table's non-PASS rows if it has any, and the required
 line `**SmartGit review:** <status>` for `opened` and
 `**SmartGit review:** <status> — <manualCommand> — <message>` for `unavailable`
-and `failed`, filled from the fields just read — so the summary cannot be written
-before that receipt exists. Write it in plain words the user can act on, with no
-repository jargon. Then ask exactly:
+and `failed`, copied from the handoff's `SmartGit review` row. Write it in plain
+words the user can act on, with no repository jargon. Then ask exactly:
 
 - `Confirm landing this change from <session-branch> onto primary branch <primary-branch>?`
 
@@ -113,9 +104,9 @@ rebase onto an advanced primary lands without re-asking, and needs no re-review
 or rebuild. An actual rebase conflict
 requiring manual resolution, a change to the session bytes, or a meaningful
 semantic change re-runs review of the affected regions and requires a refreshed
-summary, a fresh `SmartGit launch:` line for the new commit that main runs the
-same way, and a fresh confirmation; `references/worker.md` defines the recovery
-transition after `rebase.conflicted`.
+summary, a fresh SmartGit review the worker runs for the new commit, and a fresh
+confirmation; `references/worker.md` defines the recovery transition after
+`rebase.conflicted`.
 
 ## References
 

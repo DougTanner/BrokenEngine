@@ -11,13 +11,12 @@ a changed CLI contract, a changed lock or claim format, or a behavior other
 sessions depend on mid-run — pause and warn the user before landing. When it
 cannot affect another live worktree, continue without a pause.
 
-Before the landing summary, release reconcile leases and run
-`../scripts/Wait-AgentToolsQuiescence.ps1` with the durable session owner, using
-the canonical invocation in [`scripts.md` Invocation](scripts.md#invocation) for
-the root argument. `shared-quiescence` is a typed retry with no user
-authority: wait only for its retry interval, then reconcile because primary may
-have advanced. Invalid exclusion-ledger state requires authority and is never
-bypassed.
+Before the landing summary, run `../scripts/Wait-AgentToolsQuiescence.ps1`
+with the durable session owner, using the canonical invocation in
+[`scripts.md` Invocation](scripts.md#invocation) for the root argument.
+`shared-quiescence` is a typed retry with no user authority: wait only
+for its retry interval, then reconcile because primary may have advanced.
+Invalid exclusion-ledger state requires authority and is never bypassed.
 
 The summary states that landing replaces the authoritative AgentTools binaries
 consumed by every linked worktree and names changed CLI contracts. After

@@ -102,8 +102,8 @@ The fixed terminal mapping is:
 
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
-| 0 | `pass` | `ok`, `primary.tree-identical` | Continue to the SmartGit launch line and the landing summary. |
-| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Verify and land step's landing invariant](../../../../AGENTS.md) owns primary-movement policy. No conditional/preconfirmation landing lease is acquired; the normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
+| 0 | `pass` | `ok`, `primary.tree-identical` | Continue to the SmartGit review and the landing summary. |
+| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Verify and land step's landing invariant](../../../../AGENTS.md) owns primary-movement policy. The normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
 | 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 
@@ -177,18 +177,13 @@ reconstructs the assessment from Git output.
   every later claim until natural expiry, while a claim that supplied
   `-LandingOwner` still knows its token and releases the orphaned lease with
   `-Release`.
-  Invoke it successfully before approval preparation begins
-  reconciliation, retain or refresh the lease throughout agent-driven
-  reconciliation, and release it with `-Release` before any user wait, in the
-  order `worker.md` `## Bundled scripts` states; a release of an already-absent
-  lease passes. The post-confirmation landing claim uses the landing lease
+  The post-confirmation landing claim uses the landing lease
   duration — `-LeaseSeconds 3600`, its default, so omitting the parameter is
   correct; a refresh keeps a lease's original duration, so landing refuses to
-  continue a shorter one. Live contention is
-  retryable; only validated expiry recovers through WorktreeCli's
-  compare-and-swap against the recorded owner, run only when no registered
-  worktree has a Git operation in progress; unverifiable state requires user
-  authority and is never overridden.
+  continue a shorter one. Live contention is retryable; only validated expiry
+  recovers through WorktreeCli's compare-and-swap against the recorded owner,
+  run only when no registered worktree has a Git operation in progress;
+  unverifiable state requires user authority and is never overridden.
 
 ### Approval review receipt
 
@@ -209,7 +204,7 @@ one whose `approvedTip` is not the commit being landed blocks with
 `approval-review.candidate-mismatch`, and one recording no attempted launch
 blocks with `approval-review.not-launched`. All three are exit 2, `blocked`,
 `terminal`, and happen before the landing changes anything on primary. The
-caller-owned lease claimed in the invocation order above is already live, and
+landing lease claimed after confirmation is already live, and
 the worker releases it with `-Release` exactly as for any other blocked landing.
 
 A refreshed confirmation reruns the review against the newly reviewed candidate
