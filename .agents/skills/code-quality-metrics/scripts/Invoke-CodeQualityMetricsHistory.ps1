@@ -5,6 +5,7 @@ param(
     [string]$Mode,
     [Parameter(Mandatory = $true)]
     [string]$RepositoryRoot,
+    [Parameter(Mandatory = $true)]
     [string]$BaseCommit,
     [string]$TipCommit,
     [string]$DateUtc,
@@ -140,16 +141,10 @@ function Assert-PropertySet([object]$Value, [string[]]$Required, [string[]]$Opti
     foreach ($name in $Required) { if ($names -notcontains $name) { throw "History row is missing '$name'." } }
     foreach ($name in $names) { if ($Required -notcontains $name -and $Optional -notcontains $name) { throw "History row contains unexpected field '$name'." } }
 }
-function Read-History([string]$Repository, [AllowNull()][string]$Base) {
+function Read-History([string]$Repository, [string]$Base) {
     $path = Join-Path $Repository ($script:HistoryRelativePath -replace '/', '\')
-    if ([string]::IsNullOrWhiteSpace($Base)) {
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "History JSONL is missing: $script:HistoryRelativePath." }
-        $bytes = [IO.File]::ReadAllBytes($path)
-    }
-    else {
-        Assert-CommitObject $Base 'BaseCommit'
-        $bytes = Invoke-GitBytes $Repository @('cat-file', 'blob', ($Base + ':' + $script:HistoryRelativePath))
-    }
+    Assert-CommitObject $Base 'BaseCommit'
+    $bytes = Invoke-GitBytes $Repository @('cat-file', 'blob', ($Base + ':' + $script:HistoryRelativePath))
     if ($bytes.Length -lt $script:PrefixBytes) { throw 'History JSONL is shorter than the immutable prefix.' }
     $prefix = [byte[]]$bytes[0..($script:PrefixBytes - 1)]
     if ($prefix.Length -ne $script:PrefixBytes -or (Get-BytesSha256 $prefix) -ne $script:PrefixSha256) { throw 'History JSONL immutable prefix does not match the approved byte contract.' }
@@ -518,13 +513,11 @@ try {
     if ($Mode -eq 'Generate' -and -not $OutputDirectory) { throw 'Generate requires a unique Temp OutputDirectory.' }
     if ($Mode -eq 'Generate') { $date = Get-ExplicitUtcDate $DateUtc } elseif ($DateUtc) { $date = Get-ExplicitUtcDate $DateUtc } else { $date = $null }
     $head = Get-GitSha $repository 'HEAD'
-    $base = if ($BaseCommit) { $BaseCommit.ToLowerInvariant() } else { $head }
+    $base = $BaseCommit.ToLowerInvariant()
     $tip = if ($TipCommit) { $TipCommit.ToLowerInvariant() } else { $head }
     Assert-CommitObject $base 'BaseCommit'; Assert-CommitObject $tip 'TipCommit'
     [void](Get-GitSha $repository $base); [void](Get-GitSha $repository $tip)
-    # Production always supplies BaseCommit so the source table comes from that immutable Git
-    # object. The working-tree fallback is retained only for standalone fixture mode.
-    $history = Read-History $repository $(if ($BaseCommit) { $base } else { $null })
+    $history = Read-History $repository $base
     if ($date) { Assert-DateAfterHistory $history $date }
     $plan = Get-Plan $repository $history $base $tip
     if ($Mode -eq 'Contract') {

@@ -20,14 +20,13 @@ pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQua
   -OutputDirectory <new directory beneath RepositoryRoot/Temp>
 ```
 
-`-BaseCommit` and `-TipCommit` are full lowercase commit identities in every production call. When
-`-BaseCommit` is supplied, the source JSONL is read as the exact raw blob at
+`-BaseCommit` and `-TipCommit` are full lowercase commit identities in every production call.
+`-BaseCommit` is required: the source JSONL is always read as the exact raw blob at
 `<BaseCommit>:.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl`;
-the working-tree file is not consulted. A no-base invocation is retained only for standalone
-fixture mode and compares the current working tree (including staged changes) with `HEAD`. With
-both commits, the patch classifier uses the Git diff between those commits. Generate requires `-DateUtc` exactly in UTC
-`YYYY-MM-DD` form and rejects an earlier table date. Contract may receive the date to perform the same date check,
-but does not approve an output date or output hash.
+the working-tree file is not consulted. The patch classifier uses the Git diff between the base and
+tip commits. Generate requires `-DateUtc` exactly in UTC `YYYY-MM-DD` form and rejects an earlier
+table date. Contract may receive the date to perform the same date check, but does not approve an
+output date or output hash.
 
 ## Source table and decision
 
