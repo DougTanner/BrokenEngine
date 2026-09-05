@@ -31,12 +31,10 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
 
 ## Inputs
 
-- Immutable complete plan as a file path readable from the worktree root — the
-  exact claimed-Plan path or a scratch snapshot the manager wrote (a gitignored
-  `Temp/` path is fine), whose body carries the plan's `## In scope` and
-  `## Out of scope` sections — headings verbatim, with their content intact —
-  because the citation check reads heading presence from the supplied file
-  alone. Never inline text: the citation check takes only a path.
+- Immutable complete plan as a file path readable from the worktree root — the exact claimed-Plan path or
+  a complete resolved Plan snapshot the preparation `implementer` wrote and cited under `Evidence` (a gitignored `Temp/` path is fine),
+  whose body carries the plan's `## In scope` and `## Out of scope` sections — headings verbatim, with their content intact — because
+  the citation check reads heading presence from the supplied file alone. Never inline text: the citation check takes only a path.
 - Draft execution card for every Tier-2 and Tier-3 plan, carrying every field of
   the card template in [`../next-plan/SKILL.md`](../next-plan/SKILL.md)
   `## Handoff`. Head it with the words `execution card`, in any casing, which

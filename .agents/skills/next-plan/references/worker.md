@@ -48,10 +48,10 @@
    Done when the execution card carries every field of the card template in
    [`../SKILL.md`](../SKILL.md) `## Handoff`.
 
-   When the `/plan-audit` input is a scratch snapshot instead of the claimed
-   Plan path, that snapshot carries the plan's `## In scope` and
-   `## Out of scope` sections exactly as `/plan-audit`'s `## Inputs` requires,
-   so `/plan-audit` has a diff boundary to test.
+   When `/plan-audit` will read a scratch snapshot instead of the claimed Plan path,
+   the preparation `implementer` writes the complete resolved Plan—mechanism, corrections,
+   exact `## In scope` and `## Out of scope` sections with content intact, and complete
+   execution card—and cites its path plus `## Execution card` selector under `Evidence` for `/plan-audit`.
 5. Invoke step 3's claim script idempotently immediately before the final
    preparation handoff. Done when it reports the held claim.
 6. Present for approval per `### Implementation approval` in
