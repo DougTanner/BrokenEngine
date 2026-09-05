@@ -5,19 +5,12 @@
 namespace common
 {
 
-// Returns the minimum absolute value while preserving the sign of the first parameter
-// Used for clamping velocity changes while maintaining direction
-// Parameters: fA - Value whose sign is preserved, fB - Maximum absolute value
-// Returns: Value with sign of fA and minimum absolute value of fA and fB
+// Clamps fA to fB's magnitude while preserving fA's sign; callers provide a nonnegative fB.
 constexpr float MinAbs(float fA, float fB)
 {
 	return fA >= 0.0f ? std::min(fA, fB) : -std::min(-fA, fB);
 }
 
-// Compile-time ceiling function that rounds up to the nearest integer
-// Used for constant calculations requiring compile-time evaluation
-// Parameters: f - Float value to round up
-// Returns: Smallest integer greater than or equal to f
 #pragma warning(suppress: 26497) // consteval is stricter than constexpr
 consteval int64_t Ceil(float f)
 {
@@ -48,20 +41,13 @@ inline void XM_CALLCONV ValidateVector(FXMVECTOR vec)
 	else                       { ASSERT(XMVectorGetW(vec) == 0.0f); }
 }
 
-// Converts packed RGBA uint32_t to XMVECTOR with normalized [0.0, 1.0] components
-// Parameters: uiColor - Packed RGBA color (0xRRGGBBAA)
-// Returns: XMVECTOR with RGBA components in [0.0, 1.0] range
+// Converts 0xRRGGBBAA to normalized RGBA components.
 XMVECTOR XM_CALLCONV ColorToVector(uint32_t uiColor);
 
-// Converts XMVECTOR color to packed RGBA uint32_t (inverse of ColorToVector)
-// Components are clamped to [0.0, 1.0] range before packing
-// Parameters: vecColor - XMVECTOR color with normalized components
-// Returns: Packed RGBA color (0xRRGGBBAA)
+// Clamps normalized components to [0, 1] and packs them as 0xRRGGBBAA.
 uint32_t XM_CALLCONV ColorToUint(FXMVECTOR vecColor);
 
-// Linear interpolation between two packed RGBA colors by a given percentage
-// Parameters: uiA - Start color, uiB - End color, fPercent - Interpolation factor [0.0, 1.0]
-// Returns: Interpolated color
+// Interpolates packed RGBA colors with fPercent in [0, 1].
 uint32_t ColorLerp(uint32_t uiA, uint32_t uiB, float fPercent);
 
 XMVECTOR XM_CALLCONV ToBaseHeight(FXMVECTOR vecPosition, FXMVECTOR vecEyePosition, float fBaseHeight);

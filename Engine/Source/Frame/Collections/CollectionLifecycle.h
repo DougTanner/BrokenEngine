@@ -7,11 +7,8 @@ namespace engine
 
 struct FramePostRenderBase;
 
-// ============================================================================
-// INDEXABLE COLLECTION HELPERS
-// ============================================================================
-// Add / remove lifecycle for paired Interpolate/PostRender collections. Relies on
-// GrowCapacityWithCopy / SwapElement from CollectionMemory.h (included above).
+// Paired Interpolate/PostRender lifecycle helpers grow with GrowCapacityWithCopy and remove with
+// SwapElement from CollectionMemory.h.
 
 // Increments counts for paired Interpolate/PostRender collections and returns spawn index.
 template <typename TInterpolate, typename TPostRender>

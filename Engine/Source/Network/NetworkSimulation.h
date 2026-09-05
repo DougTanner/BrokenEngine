@@ -82,7 +82,7 @@ struct DelayedPacket
 // Owned per-peer (one Client or Server per process) so simulated latency/loss is reproducible across runs.
 struct NetworkSimulationState
 {
-	static constexpr uint32_t kuiSeed = 0x9E3779B9u; // Constant seed (was wall-clock) so sim runs reproduce.
+	static constexpr uint32_t kuiSeed = 0x9E3779B9u; // Constant seed keeps simulated latency and loss reproducible across runs.
 	uint32_t uiRandomState = kuiSeed;
 	int64_t iConsecutiveDrops[NetworkManager::kuiChannelCount] {};
 	std::chrono::steady_clock::time_point channelReleaseTimes[NetworkManager::kuiChannelCount] {};

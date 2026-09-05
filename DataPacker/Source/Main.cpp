@@ -417,15 +417,10 @@ static void SortAndCheckDuplicateExportJobs(std::vector<std::unique_ptr<T>>& rEx
 		return common::ToLower(rpLeft->mRelativeFile) < common::ToLower(rpRight->mRelativeFile);
 	});
 
-	// The two input roots (engine Data + project Data) can hold the same relative path; ExportJob
-	// derives mRelativeFile/mCrc (mCrc = Crc(mRelativeFile)) from whichever root matched, so the
-	// duplicates would silently produce two manifest entries with one CRC (ambiguous runtime lookup)
-	// plus two identically named generated constants. Case-folded duplicates sort adjacent under the
-	// comparator above, so the adjacent-pair walk catches every such collision; guaranteeing unique
-	// lowered keys also makes the sort fully deterministic (no tied keys for std::sort to order
-	// arbitrarily). A CRC equality check is intentionally omitted: identical paths already trip the
-	// case-folded compare, and a hash collision between two DISTINCT paths is astronomically unlikely
-	// and would not sort adjacent anyway — not the bug class this guards.
+	// Case-folded relative paths across engine and project Data must be unique: ExportJob derives the
+	// manifest CRC and generated constant from the relative path, so duplicates make runtime lookup
+	// ambiguous. Lowered-path sorting puts duplicates adjacent for this check and removes tied keys for
+	// deterministic order. This validates path uniqueness, not CRC collisions between distinct paths.
 	for (size_t uiJob = 1; uiJob < rExportJobs.size(); ++uiJob)
 	{
 		const T& rPrevious = *rExportJobs.at(uiJob - 1);
@@ -624,8 +619,7 @@ bool RunExportJobs()
 template <typename... Ts>
 static bool RunAllMainExports()
 {
-	// Comma fold (not `&& ...`) so every export runs even if an earlier one fails;
-	// matches the original explicit `bSuccess &= RunExportJobs<...>()` sequence.
+	// Comma fold so every export runs even if an earlier one fails.
 	bool bSuccess = true;
 	((bSuccess &= RunExportJobs<Ts>()), ...);
 	return bSuccess;

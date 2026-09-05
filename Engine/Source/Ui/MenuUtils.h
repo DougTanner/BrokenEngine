@@ -56,13 +56,10 @@ bool WrapperToggle(std::string_view label, engine::Wrapper* pWrapper);
 bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::string_view format = "%.2f");
 bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float fStep);
 
-// Float-backed RadioButton row: optional header text, then one RadioButton per option on a single line. The
-// checked button is the option whose value equals the wrapper's current value; clicking one writes that value.
-// One place for the enum<->index mapping of present mode, sample count, quality level, and theme — every Wrapper
-// flavor is float-backed, so equality/Set on the raw float is exact for the discrete values used here. Rows are
-// scoped by the wrapper address, so repeated option labels across rows keep distinct ImGui IDs. Returns true on
-// the frame a radio was clicked.
-// RadioButton and header labels are the harness automation API — do not rename.
+// RadioRow draws an optional header and one button per option on one line. Present mode, sample count, quality, and
+// theme share this enum/index mapping; exact discrete float equality selects the checked option, and a click writes
+// its value. Wrapper-address ID scopes keep repeated labels distinct. Header/button labels are the harness API and
+// must stay stable; return true on the click frame.
 bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> aOptions);
 
 #if defined(BT_CLIENT)

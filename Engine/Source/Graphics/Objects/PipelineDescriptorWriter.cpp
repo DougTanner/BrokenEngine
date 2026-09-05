@@ -317,11 +317,8 @@ void RegisterCombinedSamplerBindings(Pipeline& rPipeline, const DescriptorInfo& 
 		}
 		else
 		{
-			// Register per-CRC entries for lazy texture loading and sampler updates.
-			// NOTE: ppTextures is snapshotted into TextureBinding.textures here — any future
-			// array consumer that mutates its backing storage in place after pipeline-create
-			// MUST use kBindlessArrayConsumer instead; otherwise sampler recreation rewrites
-			// the descriptor from the stale snapshot.
+			// Register per-CRC entries for lazy texture loading and sampler updates. ppTextures is copied into TextureBinding.textures; arrays mutated
+			// after pipeline creation require kBindlessArrayConsumer so sampler recreation reads live pointers rather than stale snapshots.
 			for (int64_t k = 0; k < rDescriptorInfo.iCount; ++k)
 			{
 				common::crc_t arrayCrc = rDescriptorInfo.ppTextures[k]->mInfo.crc;

@@ -75,8 +75,7 @@ float XM_CALLCONV Distance(FXMVECTOR vecOne, FXMVECTOR vecTwo)
 
 XMVECTOR XM_CALLCONV DirectionTo(FXMVECTOR vecFrom, FXMVECTOR vecTo)
 {
-	// 3D coincidence test: the prior single-lane XMVectorGetX(XMVectorNearEqual(...)) only compared lane X,
-	// so points equal in X but far apart in Y/Z were wrongly treated as coincident
+	// Compare all three spatial lanes so points equal only in X are not treated as coincident.
 	static constexpr float kfCoincidentEpsilon = 1.0e-6f;
 	if (XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecTo, vecFrom))) < kfCoincidentEpsilon * kfCoincidentEpsilon) [[unlikely]]
 	{
@@ -94,10 +93,8 @@ XMVECTOR XM_CALLCONV ComputeLeadPosition(FXMVECTOR vecShooterPosition, FXMVECTOR
 	float fC = XMVectorGetX(XMVector3Dot(vecOffset, vecOffset));
 
 	float fT = -1.0f;
-	// Relative epsilon scaled by the largest coefficient magnitude: the prior absolute 1e-6f was effectively
-	// "exactly zero" at kilometer-scale coordinates, mis-selecting the linear/quadratic branch. fRef > 0 whenever
-	// shooter != target or the target moves; the all-zero degenerate produces a NaN root that falls through to the
-	// vecTargetPosition return below.
+	// Scale the degeneracy threshold by the largest coefficient for kilometer-scale coordinates. All-zero
+	// coefficients produce NaN roots, leaving fT negative and returning vecTargetPosition.
 	float fRef = std::max(std::abs(fA), std::max(std::abs(fB), std::abs(fC)));
 	static constexpr float kfRelativeEpsilon = 1.0e-6f;
 	if (std::abs(fA) < kfRelativeEpsilon * fRef)

@@ -17,9 +17,8 @@ namespace engine
 namespace
 {
 
-// The on-disk header version describes this one file, not the shared identifier type, so it lives on a
-// wrapper rather than on Guid128. v2 migrated off the legacy hand-rolled v1/size-0 header to the shared
-// version+size convention; v1 files reset once.
+// The on-disk header version belongs to this file wrapper rather than Guid128. Version 2 uses the shared version+size
+// convention, and version 1 files reset once.
 struct ClientGuidFile
 {
 	static constexpr int64_t kiVersion = 2;

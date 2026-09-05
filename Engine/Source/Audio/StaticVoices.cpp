@@ -540,15 +540,10 @@ void StaticVoices::AdvanceFadeIn(float fDeltaTime)
 
 void StaticVoices::UpdateListenerPosition()
 {
-	// Two listener points, decoupled by purpose:
-	//   * mVecListenerPosition (camera eye, full XYZ) — drives the manual fade distance so
-	//     altitude inflates the listener-to-emitter distance.
-	//   * mX3dAudioListener.Position (camera look-at on the world plane at gBaseHeight) —
-	//     drives X3DAudio pan/Doppler. Pinning the X3DAudio listener to the world plane
-	//     keeps the listener-to-ground-emitter vector XY-only, so the pan azimuth reflects
-	//     'left-of-screen → left-ear' instead of being collapsed near-center by altitude.
-	// Velocity is zero — the RTS camera moves slowly enough that listener-motion Doppler is
-	// negligible, and zeroing it avoids artifacts during snap-to-unit / jump-easing.
+	// mVecListenerPosition is the camera eye in full XYZ, so altitude contributes to manual fade distance.
+	// mX3dAudioListener.Position is the camera look-at on the gBaseHeight plane for pan/Doppler; its XY-only vector to
+	// ground emitters keeps screen-left audible on the left rather than collapsed toward center by altitude. Listener
+	// velocity is zero because RTS camera-motion Doppler is negligible and snap/jump easing must not add artifacts.
 	mVecListenerPosition = engine::gpCamera->mVecEyePosition;
 	XMVECTOR vecPanListener = XMVectorSetZ(engine::gpCamera->mVecPosition, gBaseHeight.Get());
 	XMFLOAT3A f3PanPosition {};

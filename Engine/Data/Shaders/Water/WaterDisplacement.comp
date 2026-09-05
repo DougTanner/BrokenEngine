@@ -19,16 +19,11 @@ layout (set = 1, binding = 2) uniform sampler2D elevationTextureSampler;
 layout (set = 1, binding = 3, rgba16f) uniform writeonly image2D displacementImage; // keWaterDisplacementFormat
 layout (set = 1, binding = 4, rgba16f) uniform writeonly image2D normalImage; // keWaterDisplacementFormat
 
-// Pre-computes the Gerstner wave displacement (Δx, Δy, Δz from camera-relative un-displaced position)
-// and Jacobian-derived flat-blended normal, so Water.vert can texelFetch a single sample per vertex
-// instead of summing iWaterLowCount + iWaterMediumCount waves itself. Math matches Water.vert's
-// per-vertex Gerstner wave sum byte-for-byte. Breaking crossfades the low and medium band sums; the
-// Z-taper-near-shore and over-land early-out stay in Water.vert.
-//
-// Texel grid is in 1:1 alignment with the active water-mesh LOD vertex grid: only the top-left
-// (iWaterActiveQuadX + 1) by (iWaterActiveQuadY + 1) rectangle is written per frame. Texels beyond
-// that rectangle hold whatever the previous LOD wrote and are never sampled (Water.vert clamps via
-// f2InTexcoord scaled by the same iWaterActiveQuad*).
+// Compute camera-relative Gerstner displacement (dx,dy,dz from the undisplaced position) and the Jacobian-derived
+// flat-blended normal for Water.vert to fetch per vertex. Breaking crossfades low/medium bands; Water.vert applies
+// shore Z taper and its over-land early-out. The output grid matches the active mesh LOD 1:1: only the top-left
+// (iWaterActiveQuadX+1) by (iWaterActiveQuadY+1) rectangle is written. Water.vert clamps sampling with those same
+// dimensions, so prior-LOD texels outside it remain unused.
 void main()
 {
 	int iActiveX = globalLayout.iWaterActiveQuadX;

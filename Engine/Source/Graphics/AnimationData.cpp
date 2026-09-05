@@ -49,19 +49,14 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 		throw common::CorruptStreamException("AnimationData::Load");
 	}
 
-	// Copy header (now small - just counts + Skeleton counts)
+	// Copy animation and skeleton counts from eager pack memory.
 	std::memcpy(&mHeader, pAnimationData, sizeof(mHeader));
 	pAnimationData += sizeof(mHeader);
 
-	// Trust boundary (counts): these counts come from on-disk pack bytes and drive reinterpret_cast pointer advances
-	// over the chunk plus the runtime sizing of the pre-computed member containers (mpBindPoseLocalMatrices etc.).
-	// A corrupt/tampered count would request an absurd allocation or walk the alias pointers off the eager pack
-	// buffer, so reject implausible counts against the structural maxima before any of them is used. Channels/keyframes
-	// have no container of their own (they only advance alias pointers); bound them by a generous absolute ceiling
-	// — the glTF-driven producer has no clean structural max, and the ceiling caps the pointer arithmetic to a sane
-	// range. (A <=-max-but-oversized count vs the chunk's actual bytes is caught by the iAnimationBytes byte-extent
-	// bound applied to each advance below — the region's true extent is sourced from the chunk table, not from the
-	// scene chunk's ChunkHeader::iSize, which excludes the appended animation section.)
+	// Pack counts size containers and advance aliases; invalid values can over-allocate or leave the eager buffer. Validate container counts
+	// against structural maxima before use. Channels/keyframes only advance aliases and have no producer structural maximum, so the
+	// deserialization ceiling bounds their arithmetic. Bound each section by iAnimationBytes from the chunk table; scene ChunkHeader::iSize
+	// excludes appended animation data.
 	if (mHeader.skeleton.uiNodeCount > common::Skeleton::kiMaxNodes
 		|| mHeader.skeleton.uiSkinJointCount > common::Skeleton::kiMaxSkinJoints
 		|| mHeader.uiAnimationCount > common::AnimationHeader::kiMaxAnimations
@@ -275,9 +270,7 @@ XMVECTOR AnimationData::InterpolateKeyframes(const common::AnimationChannel& rCh
 		float fT2 = fT * fT;
 		float fT3 = fT2 * fT;
 
-		// Hermite basis functions
-		// NOTE: This implementation follows the glTF 2.0 specification correctly.
-		// Per glTF spec: m0 = OUT tangent of keyframe k, m1 = IN tangent of keyframe k+1
+		// glTF 2.0 maps m0 to keyframe k's OUT tangent and m1 to keyframe k+1's IN tangent.
 		float fH00 = 2.0f * fT3 - 3.0f * fT2 + 1.0f;  // p0 coefficient
 		float fH10 = fT3 - 2.0f * fT2 + fT;           // m0 coefficient
 		float fH01 = -2.0f * fT3 + 3.0f * fT2;        // p1 coefficient

@@ -37,15 +37,13 @@ struct IslandTemplate
 {
 	common::crc_t mIslandCrc = 0;
 
-	// Heightmap pixel values are engine-meters relative to beach: 0 == sea level, negative ==
-	// below water, positive == above water. DataPacker reads the archetype Sea node's normalized
-	// Level (fallback 0.1) and shifts Gaea's [0,1] normalized output by `Level × elevationMeters`
-	// at bake time, so no runtime conversion is required (sea floor sits at the per-island depth
-	// -(Level × elevationMeters)). Heightmap is anisotropic: DataPacker auto-crops each island
-	// to its land bbox > 1 m, expanded to a multiple of 4 × kiElevationDivisor so BC encoding
-	// and elevation downsample alignment hold on both axes.
-	// Packed IEEE half-float (R16); aliases the kIsland chunk payload at offset 0. DataPacker quantizes at
-	// export (ExportIsland); dequantize via DirectX::PackedVector::XMConvertHalfToFloat at each read site.
+	// Heightmap samples use engine meters relative to beach: zero is sea level, negative is submerged,
+	// positive is above. At export DataPacker shifts Gaea's normalized output by Sea.Level *
+	// elevationMeters (Level fallback 0.1), giving sea-floor depth -(Level * elevationMeters) without
+	// runtime conversion. The anisotropic land bounds above 1 m expand to multiples of 4 *
+	// kiElevationDivisor on both axes for BC/downsample alignment. mpHeightmapHalf aliases quantized IEEE
+	// R16 half-floats at kIsland payload offset zero; readers use
+	// DirectX::PackedVector::XMConvertHalfToFloat.
 	const uint16_t* mpHeightmapHalf = nullptr;
 	int32_t miHeightmapWidth = 0;
 	int32_t miHeightmapHeight = 0;
@@ -111,12 +109,10 @@ struct IslandTemplate
 	// True once the [positions][indices] CPU slice has been decommitted from the lazy pool.
 	bool mbMeshCpuDecommitted = false;
 
-	// Elevation R16_SFLOAT image uploaded at first-mint from mpHeightmapHalf (raw byte-copy — the resident
-	// heightmap is already R16). Participates in LRU
-	// eviction alongside color/normals/AO/masks (freed in EvictionSweep, re-Created on the next
-	// AcquireTextureSlot first-mint). Lives on the template (not in TextureManager::mTextureMap)
-	// because no standalone elevation chunk ships in the pack — DataPacker moved the data path to the
-	// kIsland chunk's heightmap payload.
+	// Elevation R16_SFLOAT is raw-copied from mpHeightmapHalf at first mint, freed by EvictionSweep with
+	// color/normals/AO/masks, and recreated on the next AcquireTextureSlot first mint. The template owns it
+	// outside TextureManager::mTextureMap because elevation lives in the kIsland heightmap payload,
+	// without a standalone chunk.
 	Texture mElevationTexture;
 #endif
 };
@@ -233,9 +229,8 @@ public:
 
 #if defined(BT_CLIENT)
 private:
-	// First-mint half of AcquireTextureSlot (extracted for readability): pick or reuse a slot,
-	// create the elevation texture from the in-memory heightmap, wire the 5 bindless array pointers,
-	// and register each per-pipeline binding. Returns the assigned slot.
+	// AcquireTextureSlot's first-mint path picks or reuses a slot, creates elevation from the in-memory
+	// heightmap, wires five bindless array pointers, registers per-pipeline bindings, and returns the slot.
 	int64_t FirstMintTextureSlot(common::crc_t islandCrc, IslandTemplate& rTemplate, const common::crc_t (&textureCrcs)[4], std::string_view name);
 
 	enum class MeshEvictionReason : uint8_t

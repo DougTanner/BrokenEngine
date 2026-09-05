@@ -265,12 +265,10 @@ void AgentCommandServer::Drain()
 	// the poll yields a result, so no new request can arrive meanwhile (single connection, one request at a time).
 	if (mDeferredPoll)
 	{
-		// Belt-and-suspenders shutdown guard: discard a deferred response whose connection generation no longer
-		// matches the live connection. In practice the listener thread stays blocked in the mResponseReady cv wait
-		// while its request is deferred, so connection teardown only runs after this deferral publishes or times out
-		// — a mid-capture disconnect can't be observed here today. This branch would only fire on shutdown (or if
-		// active disconnect detection is added later); publishing a stale response would land in the next
-		// connection's stream (id desync), so drop it silently since no peer is waiting.
+		// Discard a deferred response whose generation differs from the live connection so it cannot enter the next
+		// connection's stream and desynchronize IDs. The listener waits on mResponseReady during deferral, so teardown
+		// follows publication or timeout; mid-capture disconnects are not observed here. Shutdown invalidates the
+		// generation, and no peer remains to receive that response.
 		bool bStaleConnection = false;
 		{
 			std::unique_lock lock(mMutex);

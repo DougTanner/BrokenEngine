@@ -205,11 +205,8 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	}
 	fileStream.close();
 
-	// Two valid legacy shapes for the payload:
-	//   1. Pre-zlib raw bytes (size == iExpectedRawSize)
-	//   2. Zlib-wrapped without magic (size != raw, but decompresses to iExpectedRawSize)
-	// The second case happens for files migrated by an earlier session before this magic
-	// scheme was added. Both flow through the same decode + re-encode below.
+	// Accept raw legacy payloads of iExpectedRawSize, or zlib-wrapped payloads without magic whose size
+	// differs from raw and which inflate to iExpectedRawSize. Both use the same decode/re-encode path.
 	std::vector<std::byte> rawBytes;
 	if (iPayloadSize == iExpectedRawSize)
 	{

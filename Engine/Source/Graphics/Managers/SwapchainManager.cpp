@@ -29,8 +29,7 @@ void SwapchainManager::CreateRenderPass()
 	// highlights are not clamped by the UNORM swapchain. The fullscreen HDR-resolve pass (kPipelineHdrResolve)
 	// then tone-maps + color-grades the whole frame into the swapchain via the simplified mVkRenderPass below.
 
-	// --- HDR scene render pass: today's structure (color + depth + optional MSAA) in F16, color ends up
-	//     SHADER_READ_ONLY so the resolve pass can sample it in the same command buffer. ---
+	// HDR scene render pass: color, depth, and optional MSAA in F16; color ends in SHADER_READ_ONLY for the same-command-buffer resolve pass.
 	VkFormat hdrVkFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 	VkAttachmentDescription pHdrVkAttachmentDescriptions[]
 	{
@@ -153,9 +152,8 @@ void SwapchainManager::CreateRenderPass()
 	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &hdrVkRenderPassCreateInfo, nullptr, &mHdrVkRenderPass));
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mHdrVkRenderPass, "SwapchainManagerHdr");
 
-	// --- Present render pass: single color attachment, single sample. The resolve quad is its only client
-	//     (all scene pipelines now target the HDR pass), so no depth/MSAA. DONT_CARE load (fully overwritten),
-	//     PRESENT_SRC_KHR final. Keep the acquire-semaphore incoming dependency (color-only). ---
+	// Present render pass: one single-sample color attachment for the resolve quad; scene pipelines target the HDR pass, so no depth/MSAA. Full
+	// overwrite permits DONT_CARE load; final layout is PRESENT_SRC_KHR, with a color-only acquire-semaphore dependency.
 	VkAttachmentDescription presentVkAttachmentDescription
 	{
 		.flags = 0,
@@ -215,10 +213,6 @@ void SwapchainManager::CreateRenderPass()
 
 void SwapchainManager::CreateSwapchain(VkSwapchainKHR oldSwapchain)
 {
-	// The swapchain is essentially a queue of images that are waiting to be presented to the screen
-	// Our application will acquire such an image to draw to it, and then return it to the queue
-	// How exactly the queue works and the conditions for presenting an image from the queue depend on how the swapchain is set up
-	// The general purpose of the swapchain is to synchronize the presentation of images with the refresh rate of the screen.
 	VkSurfaceCapabilitiesKHR vkSurfaceCapabilitiesKHR {};
 	CHECK_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpInstanceManager->mVkPhysicalDevice, gpInstanceManager->mVkSurfaceKHR, &vkSurfaceCapabilitiesKHR));
 	ASSERT((vkSurfaceCapabilitiesKHR.supportedCompositeAlpha & (VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR | VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)) != 0);
@@ -286,7 +280,7 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR oldSwapchain)
 
 	mfAspectRatio = static_cast<float>(gpGraphics->mFramebufferExtent2D.width) / static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
 
-	// Using double buffering and vsync locks rendering to an integer fraction of the vsync rate. In turn, reducing the performance of the application if rendering is slower than vsync. Consider setting minImageCount to 3 to use triple buffering to maximize performance in such cases.
+	// Prefer at least three swapchain images within surface limits so rendering below the vsync rate can use triple buffering.
 	uint32_t uiMinImageCount = std::max(3u, vkSurfaceCapabilitiesKHR.minImageCount);
 	if (vkSurfaceCapabilitiesKHR.maxImageCount > 0)
 	{
@@ -427,7 +421,6 @@ void SwapchainManager::CreateFramebuffers()
 	{
 		rFrameBuffer.presentVkImage = swapchainImages.at(i++);
 
-		// An image view is 'view' into an image, it describes how to access the image and which part of the image to access
 		VkImageViewCreateInfo vkImageViewCreateInfo
 		{
 			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -456,11 +449,8 @@ void SwapchainManager::CreateFramebuffers()
 		VkName(VK_OBJECT_TYPE_IMAGE, rFrameBuffer.presentVkImage, std::format("Present {}", i - 1).c_str());
 		VkName(VK_OBJECT_TYPE_IMAGE_VIEW, rFrameBuffer.presentVkImageView, std::format("Present {}", i - 1).c_str());
 
-		// The attachments specified during render pass creation are bound by wrapping them into a VkFramebuffer object
-		// A framebuffer object references all of the VkImageView objects that represent the attachments
-		// However, the image that we have to use as attachment depends on which image the swap chain returns when we retrieve one for presentation
-		// That means that we have to create a framebuffer for all of the images in the swap chain and use the one that corresponds to the retrieved image at drawing time.
-		// Single color attachment: the present pass only runs the HDR-resolve quad (depth/MSAA live on mHdrVkFramebuffer).
+		// The present pass uses one framebuffer per swapchain image because the acquired image is its color attachment; HDR color, depth, and MSAA
+		// remain on mHdrVkFramebuffer.
 		VkImageView pVkImageViews[] {rFrameBuffer.presentVkImageView};
 		VkFramebufferCreateInfo vkFramebufferCreateInfo
 		{

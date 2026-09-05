@@ -226,7 +226,7 @@ void main()
 	// Compute vectors
 	vec3 n = GetNormal(material);
 	vec3 v = normalize(mainLayout.f4EyePosition.xyz - f3InWorldPosition);
-	// f4SunMoonNormal is CPU-normalized (GlobalUniforms.cpp PopulateSunMoonDirection); normalization-skip rule in Engine/Data/Shaders/AGENTS.md.
+	// GlobalUniforms.cpp normalizes f4SunMoonNormal before this shader uses it, so l is unit.
 	vec3 l = globalLayout.f4SunMoonNormal.xyz;
 	vec3 h = normalize(l + v);
 	vec3 reflection = -reflect(v, n);

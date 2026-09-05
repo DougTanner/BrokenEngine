@@ -415,6 +415,15 @@ whole-file target affinity.  `/agent-harness` must own the cold-read,
 coexistence, invalid-input, and lifecycle runtime scenario, and
 `/finalize-changes` owns the landing gate, including its acceptance table.
 
+Coordinate with `Documents/Plans/Engine/PackChunkLoaderResetExclusion.md`,
+which closes PackChunks request admission and drains accepted whole/range disk
+jobs before full Graphics reset.  Either Plan may land first, with no metadata
+dependency.  Whichever lands second must reconcile the actual producer set,
+admission/drain ordering, claimed-audio cancellation acknowledgement, and the
+File/Audio synchronization comments.  Music being disk-only is a fact about
+the current starting state, not an invariant after this Plan adds background
+audio range jobs.
+
 ## Acceptance criteria
 
 - After startup, send the existing client-only `audio_resume`, then send

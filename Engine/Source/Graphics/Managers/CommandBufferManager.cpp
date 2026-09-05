@@ -19,7 +19,7 @@ CommandBufferManager::CommandBufferManager()
 
 	ScopedBootTimer scopedBootTimer(kBootTimerCommandBufferManager);
 
-	// Because one of the drawing commands involves binding the right VkFramebuffer, we'll actually have to record a command buffer for every image in the swap chain
+	// Each drawing command binds a specific VkFramebuffer, so record one command buffer per swapchain image.
 	mPerFramebufferCommandBuffers.reserve(gpSwapchainManager->mFramebuffers.size());
 	for (int64_t i = 0; i < static_cast<int64_t>(gpSwapchainManager->mFramebuffers.size()); ++i)
 	{

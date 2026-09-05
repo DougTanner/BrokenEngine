@@ -69,7 +69,7 @@ constexpr float kfBlastersSpeed = 50.0f;
 constexpr float kfBlastersSpawnCooldown = 1.0f;
 
 constexpr float kfEnemyBlasterSize = kfSpaceshipRadius * 0.15f;
-// Enemy blaster lighting now in LightingWrappers (gEnemyBlaster*)
+// Enemy blaster lighting tuning is supplied by LightingWrappers (gEnemyBlaster*).
 
 #if defined(BT_CLIENT)
 // Hit flash effect timing
@@ -577,8 +577,8 @@ void SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInf
 	SpaceshipsInterpolate::ClientInit(rFrame, iIndex);
 #endif
 
-	// Create the registry id missiles home on. This consumes one frame uuid at exactly the position the removed
-	// Targets add consumed it, keeping the per-spawn order (pusher id first, registry id second) replay-identical.
+	// Generate the missile-homing registry ID with one frame UUID after the pusher ID, preserving per-spawn UUID
+	// order for replay.
 	rCurrentInterpolate.puiRegistryIds[iIndex] = engine::registry_id_t::Generate(rFrame.postRender);
 
 	// Initialize post-render state
@@ -630,7 +630,6 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 		float fNextBlasterSpawnTime = rPrevious.pfNextBlasterSpawnTimes[i] - fDeltaTime;
 		float fArrivalGracePeriod = std::max(0.0f, rPrevious.pfArrivalGracePeriods[i] - fDeltaTime);
 
-		// Load from Interpolate (these are now in Interpolate)
 		float fDeltaRotation = rPreviousInterpolate.pfDeltaRotations[i];
 
 		// Find nearest alive player (shared input for RegenerateHealth + ComputeSteering)
@@ -662,7 +661,6 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 		rCurrent.pfNextBlasterSpawnTimes[i] = fNextBlasterSpawnTime;
 		rCurrent.pfArrivalGracePeriods[i] = fArrivalGracePeriod;
 
-		// Save to Interpolate (these are now in Interpolate)
 		rCurrentInterpolate.pfDeltaRotations[i] = fDeltaRotation;
 	}
 

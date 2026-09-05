@@ -856,27 +856,12 @@ void PackChunks::ResetTextureChunkStates()
 
 void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs)
 {
-	// Restore pool pointers for all lazy chunks (ProcessPendingTextures clears pData/iDataSize for adopted textures)
-	// Must iterate ALL chunks (not just textures) because pool offsets are cumulative.
-	// When targetCrcs is non-empty, only texture chunks in the span get state/handle reset; pool-pointer
-	// restoration is idempotent for chunks already pointing at the correct offset, so it is safe to apply
-	// to everything. This per-chunk path is used by Phase 5 LRU eviction.
-	//
-	// Thread-safety precondition (relied upon, NOT enforced here): no other thread may concurrently access a
-	// chunk this rewrites. Two classes of concurrent access exist, excluded by ordering, not an in-code guard:
-	//   * The transfer thread (TextureUploadManager::UploadThread) writing rLazyChunk.vkImage during a
-	//     kUploading chunk's vmaCreateImage — must not be uploading any chunk this nulls.
-	//   * The audio fill worker (kThreadStreamingVoiceFill, via StreamingVoice::FillSlot -> ReadChunkData)
-	//     reading pData/iDataSize lock-free. The pool-pointer restoration below rewrites those for EVERY
-	//     lazy chunk (cumulative offsets), but to identical values for any chunk not being evicted, so a
-	//     racing audio read of a non-evicted chunk is benign.
-	// Both callers guarantee the transfer-thread exclusion:
-	//   * Whole-pool variant (device-loss): runs at Graphics::Destroy after DestroyTransferResources()
-	//     has set mbShutdown and joined the transfer thread.
-	//   * Scoped per-island variant (LRU eviction): runs inside RenderGlobal's drained descriptor-patch
-	//     window, on already-resident (not uploading) chunks.
-	// No cheap idle check is reachable from here (mbShutdown is private to TextureUploadManager), so the
-	// guarantee is documented rather than asserted. Keep the two callers' transition logic in sync.
+	// Rebuild every lazy chunk's pool pointer and size in map order because offsets are cumulative;
+	// only selected textures have state and GPU handles reset. Callers own synchronization: device-loss
+	// runs after the upload thread joins, while LRU eviction runs in RenderGlobal's drained descriptor
+	// window and targets resident, non-uploading textures. Streaming music remains nonresident, so its
+	// ReadChunkData calls use disk fallback and do not access these fields. Lazy-loading workers remain
+	// live during both reset callers and must be excluded before these plain fields can be rewritten safely.
 	bool bResetAll = targetCrcs.empty();
 	int64_t iPoolOffset = 0;
 	for (auto& [crc, rLazyChunk] : mLazyChunkMap)
@@ -1036,8 +1021,8 @@ bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffse
 	// this — for a loaded chunk it copies from the (now-decommitted) resident pool and would fault — so read directly.
 	// Uncompressed chunks only (on-disk payload == pool layout); islands satisfy this (iUncompressedSize == 0).
 	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
-	// A compressed chunk's pool holds decompressed bytes, so the raw disk re-read below would silently reload garbage
-	// (not crash). Islands never compress; assert the contract so a future compressed-island route fails loud here.
+	// Compressed chunks store decompressed bytes in the pool, so a raw disk reload corrupts that representation without
+	// necessarily crashing. This path requires uncompressed chunks; island chunks satisfy that contract.
 	ASSERT(!common::IsCompressed(rLazyChunk.header.flags));
 	if (!RecommitChunkRange(crc, rLazyChunk, uiOffset, uiLength))
 	{

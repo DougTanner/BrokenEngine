@@ -121,9 +121,8 @@ struct VkDispatchIndirectCommand
 CONSTEXPR float kfPi = 3.141592654f;
 CONSTEXPR float kfEpsilon = 1e-6f;
 
-// Global Set-0 descriptor binding numbers. Single-sourced here (dual-language) so the C++ descriptor
-// layout/writes (TextureDescriptors) and every shader's layout(set = 0, binding = N) qualifier stay in
-// lockstep — a binding-number change in one place no longer silently mismatches the other.
+// Global Set-0 descriptor binding numbers are shared by C++ descriptor writes and shader layout qualifiers; keep
+// both sides in lockstep.
 CONSTEXPR int kiGlobalBindingGlobalUniform = 0;
 CONSTEXPR int kiGlobalBindingMainUniform = 1;
 CONSTEXPR int kiGlobalBindingSamplerRepeatModelData = 13;

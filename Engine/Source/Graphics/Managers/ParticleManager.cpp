@@ -29,8 +29,8 @@ int32_t ParticleManager::GetOrAssignTextureIndex(common::crc_t textureCrc)
 
 void ParticleManager::Spawn(shaders::ParticlesSpawnLayout& rParticlesSpawnLayout, shaders::ParticleLayout layout, common::crc_t textureCrc)
 {
-	// Cull before taking the lock: both checks read only the by-value layout copy and the immutable camera rect,
-	// so culled spawns no longer serialize workers on mSpawnMutex during parallel tick dispatch.
+	// Cull before locking: both checks use the by-value layout and immutable camera rect, so culled spawns do not take mSpawnMutex during
+	// parallel dispatch.
 	if (layout.f4Position.x < engine::gpCamera->f4RenderVisibleArea.x || layout.f4Position.x > engine::gpCamera->f4RenderVisibleArea.z || layout.f4Position.y > engine::gpCamera->f4RenderVisibleArea.y || layout.f4Position.y < engine::gpCamera->f4RenderVisibleArea.w)
 	{
 		return;
@@ -65,7 +65,7 @@ void ParticleManager::RenderGlobal(int64_t iCommandBuffer)
 	const float fStretchVelocityEnd = 10.0f;
 	rGlobalLayout.fParticlesStretchVelocityStart = fStretchVelocityStart;
 	rGlobalLayout.fParticlesStretchVelocityMultiplier = 2.0f;
-	// Stretch-range reciprocal folded CPU-side (was LongParticlesRender.vert's per-vertex max()+divide); invocation-invariant.
+	// Compute the stretch-range reciprocal once on the CPU; it is invariant across shader invocations.
 	rGlobalLayout.fParticlesStretchRangeInv = 1.0f / std::max(fStretchVelocityEnd - fStretchVelocityStart, shaders::kfEpsilon);
 
 	// Spawn

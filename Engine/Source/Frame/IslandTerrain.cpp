@@ -11,7 +11,7 @@ namespace engine
 // Footprint-AREA thresholds (engine m^2) for the IslandChainPlacement size buckets. The multi-island
 // export tiles a ~400 m master into 1x1 (400x400 Huge), 2x1/3x1 strips (Large), mid tiles (Medium), and
 // 4x4 (100x100 Small). Area separates them where the larger dimension cannot — a 2x1 strip (200x400) and
-// the 1x1 master (400x400) share the same long edge. Starting-point values; tune as the export settles.
+// the 1x1 master (400x400) share the same long edge.
 inline constexpr float kfHugeIslandAreaMeters = 120000.0f;   // 1x1     = 400x400 = 160k
 inline constexpr float kfLargeIslandAreaMeters = 48000.0f;   // 2x1/3x1 strips    = 53k-80k
 inline constexpr float kfMediumIslandAreaMeters = 16000.0f;  // mid tiles; 4x4 (10k) falls below -> Small
@@ -104,14 +104,10 @@ IslandTerrain::IslandTerrain()
 	}
 
 #if defined(BT_CLIENT)
-	// Unique-channel-CRC invariant (relied upon by IslandTerrain's eviction qualification with NO refcount): every template's
-	// 4 channel chunk CRCs (color/normals/AO/masks) are unique across all templates. They are
-	// path-derived in DataPacker (common::Crc of "<island>/<Channel>", ExportIsland.cpp) and each
-	// island lives in its own directory, so no two templates can share one. TextureDescriptors evicts
-	// all five slot channels, unregisters their binding records, then IslandTerrain frees each channel
-	// by CRC. Shared channels would free a Texture another template still samples while its record was
-	// removed from TextureDescriptors' generation verifier. Assert it fast at boot rather than refcounting
-	// (DataPacker enforces it structurally; the assert just turns a future regression into a fail-fast).
+	// Color/normals/AO/masks chunk CRCs must be unique across templates; DataPacker derives them from each
+	// island's separate path, and boot asserts uniqueness. Eviction uses no refcounts: TextureDescriptors
+	// unregisters all five slot channels before IslandTerrain frees channel textures. Sharing a channel
+	// leaves another template sampling freed storage after its generation-verifier record is removed.
 	{
 		std::vector<common::crc_t> channelCrcs;
 		channelCrcs.reserve(mIslandCrcsSorted.size() * 4);
@@ -331,20 +327,13 @@ XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ElevationCa
 	return XMVector3Normalize(XMVector3Cross(XMVectorSubtract(vecTopRight, vecBottomLeft), XMVectorSubtract(vecTopLeft, vecBottomRight)));
 }
 
-// MAX terrain elevation at f4Position over one already-resolved cell's island list — the shared body of
-// GlobalElevation (a single point) and GlobalNormal (4 finite-difference taps). Split out so GlobalNormal
-// can resolve the cell (hash lookup + island/query list) once and reuse it across taps that share a cell;
-// results are identical to the previous per-point form.
-//
-// MAX over every island whose footprint rectangle contains the point. Rectangles may overlap now (the
-// chain packs by hull, not rectangle), so first-match would pick an arbitrary island; the highest terrain
-// must win, matching the GPU elevation prepass. Commutative max → order-independent and deterministic.
-// Each placement's query (inverse-rotation cos/sin + footprint + heightmap pointer/dims) is precomputed
-// once per cell (FrameStaticData::BuildRenderPlacementCache, index-parallel to islands) so this render
-// path does zero hash lookups and zero libm trig per island. During the one-frame window after a
-// placement edit clears the caches (network resend, menu cycle) the query cache can lag its rebuild by a
-// tick — and the server never builds it at all — so fall back to inline trig + one mIslands.at lookup per
-// island until RunFrameTick refills. The fallback reproduces a query from the placement + template.
+// CellElevation shares MAX elevation over a resolved cell between GlobalElevation and GlobalNormal; the
+// latter reuses cell resolution across four taps. Hull-based placement permits overlapping footprint
+// rectangles, so the highest terrain wins, matching the GPU prepass and remaining order-independent and
+// deterministic. BuildRenderPlacementCache stores inverse rotation, footprint, and heightmap data in
+// island-parallel queries, avoiding per-island hashes and trig. Placement edits clear the cache, which
+// can lag RunFrameTick's rebuild by one tick; the server never builds it. Until available, reconstruct
+// each query from placement/template with inline trig and one mIslands.at lookup.
 float CellElevation(const IslandTerrain& rTerrain, const FrameStaticData& rStaticData, const XMFLOAT4A& f4Position)
 {
 	const std::vector<IslandPlacement>& rIslands = rStaticData.islands;
@@ -524,7 +513,7 @@ FrameElevationSampler XM_CALLCONV IslandTerrain::MakeFrameElevationSampler(const
 	sampler.fSeaFloor = mfSeaFloorElevation;
 	if (rStaticData.elevationGrid.empty())
 	{
-		// pGrid stays null → Sample returns fSeaFloor, matching the old empty-grid early-out.
+		// Leave pGrid null so Sample returns fSeaFloor for an empty elevation grid.
 		return sampler;
 	}
 

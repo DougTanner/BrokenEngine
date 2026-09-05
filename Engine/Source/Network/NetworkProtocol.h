@@ -67,11 +67,10 @@ inline constexpr int64_t kiMaxResendFrames = 8;
 inline constexpr int64_t kiFloorStallLogThreshold = 15;
 inline constexpr int64_t kiMaxBufferedFrames = 256;
 inline constexpr int64_t kiClockSnapThreshold = 28; // |clockError| >= this (ticks) hard-snaps miTickCounter to the servo target; see Network.md
-// Fixed jitter safety buffer added on top of 3x measured jitter when computing miCurrentTargetBehind.
-// 109.375ms = 3.5 ticks at 32Hz: deliberately off the tick boundary so the zero-jitter floor rounds up to
-// a true 4 ticks instead of 5. Measured jitter counts 3x because mSmoothedJitterUs is the mean
-// |interarrival deviation|, which understates the one-way arrival tail the buffer must cover (tail
-// half-width is roughly 1.5x that mean). Preserved in wall-clock terms if the tick rate ever changes.
+// Add 109.375 ms to 3x measured jitter for miCurrentTargetBehind. At 32 Hz this is 3.5 ticks, deliberately
+// off-boundary so zero jitter rounds to four ticks rather than five. mSmoothedJitterUs measures mean absolute
+// interarrival deviation; the one-way tail half-width is roughly 1.5x that mean, motivating the 3x factor. The safety
+// term is specified in wall-clock microseconds.
 inline constexpr int64_t kiJitterSafetyUs = 109'375;
 // Slack between the clock-servo target (latestServerTick - miCurrentTargetBehind) and the hard sim
 // ceiling in GameBase::ClientUpdate. The servo steers toward the bare target so the sim never rests
@@ -128,10 +127,9 @@ static_assert(std::is_standard_layout_v<ClientGuid>, "ClientGuid must stay stand
 namespace engine
 {
 
-// --- Client -> Server message contract --------------------------------------------------------------
-// Declarative per-packet limits checked once at the server dispatch choke point (Server::Receive).
-// Covers only engine packet types below kGamePacketStart; game-range types are contract-checked at
-// parse via GetGamePacketContract. See Documents/Architecture/Network.md "Client -> Server Contract".
+// Client-to-server packet limits are declarative and checked once at Server::Receive for engine types below
+// kGamePacketStart; game-range types are checked during parsing by GetGamePacketContract. See
+// Documents/Architecture/Network.md "Client -> Server Contract".
 
 // The 64 mirrors NetworkManager::kiMaxEnetCoordSlots; a static_assert tying it to the transport
 // ceiling lives in Server.cpp because NetworkProtocol.h cannot include NetworkManager.h.

@@ -692,11 +692,8 @@ void TextureDescriptors::ClearTextureBindings()
 
 int64_t TextureDescriptors::CrcToIndex(common::crc_t crc)
 {
-	// Lock-free by phase exclusion, not by mutex. Two writer phases touch mImageInfosMap / miNextTextureIndex
-	//   and never overlap: worker threads reach this only through ParticleManager::Spawn (serialized by
-	//   mSpawnMutex) during RunFrameTick's gpMultithreading->Dispatch() fan-out, which fully joins before the
-	//   main thread runs the render-path callers (UpdateDescriptorsForTexture / BlurLightingTexture). Those
-	//   callers ASSERT(!mbInFrameTick) so the invariant fails loud if a future caller moves into frame-tick code.
+	// Phase exclusion protects mImageInfosMap and miNextTextureIndex: ParticleManager::Spawn serializes worker writes with mSpawnMutex during
+	// RunFrameTick dispatch, which fully joins before render writes. UpdateDescriptorsForTexture and BlurLightingTexture assert !mbInFrameTick.
 	auto it = mImageInfosMap.find(crc);
 	if (it != mImageInfosMap.end())
 	{

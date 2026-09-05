@@ -119,7 +119,7 @@ void MainMenuScreen::Render(GameBase& rGame)
 		}
 	}
 
-	// Remote Server button (placeholder for future Internet servers)
+	// The Remote Server button is displayed disabled because no connection action is available.
 	if (model.features & StandardMenuFeature::kRemoteServer)
 	{
 		ImGui::BeginDisabled();

@@ -9,7 +9,6 @@ inline std::pair<bool, std::string> GetFileOrStringContent(const T& rSource)
 {
 	if constexpr (std::is_same_v<std::decay_t<T>, std::string>)
 	{
-		// Source is already a string
 		return {true, rSource};
 	}
 	else if constexpr (std::is_same_v<std::decay_t<T>, std::filesystem::path>)
@@ -19,12 +18,10 @@ inline std::pair<bool, std::string> GetFileOrStringContent(const T& rSource)
 			return {false, {}};
 		}
 
-		// Pre-allocate string based on file size
 		size_t uiFileSize = std::filesystem::file_size(rSource);
 		std::string fileContents;
 		fileContents.resize(uiFileSize);
 
-		// Read file into string
 		std::fstream fileStream(rSource, std::ios::in | std::ios::binary);
 		fileStream.read(fileContents.data(), uiFileSize);
 		const bool bReadOk = static_cast<bool>(fileStream) && static_cast<size_t>(fileStream.gcount()) == uiFileSize;
@@ -50,13 +47,11 @@ inline bool ContentsEqual(const T1& rOne, const T2& rTwo)
 	auto [oneValid, oneContent] = GetFileOrStringContent(rOne);
 	auto [twoValid, twoContent] = GetFileOrStringContent(rTwo);
 
-	// Return false if either source does not exist or could not be read
 	if (!oneValid || !twoValid)
 	{
 		return false;
 	}
 
-	// Return true if equal
 	return oneContent == twoContent;
 }
 

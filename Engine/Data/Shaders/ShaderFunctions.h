@@ -74,10 +74,9 @@ vec3 SampleNormal(GlobalLayout globalLayout, sampler2D normalSampler, vec2 f2Pos
 // regions.
 vec3 SunLighting(vec3 f3MaterialColor, GlobalLayout globalLayout, vec4 f4Position, vec3 f3Normal, float fShadowSun, float fShadowMoon, float fAmbientOcclusion)
 {
-	// Terrain-specific helper: only Terrain.frag calls SunLighting. Per-target-scaled colors, their Rec.601
-	// magnitudes, and the ambient split are folded CPU-side (GlobalUniforms.cpp), so only the shadow-dependent
-	// terms remain per-pixel. f3Normal must be unit: the sole caller passes an already-normalized f3SunNormal,
-	// so the redundant normalize is skipped (shader AGENTS.md normalization-skip rule).
+	// Terrain.frag is SunLighting's sole caller. GlobalUniforms.cpp folds per-target colors, Rec.601 magnitudes, and
+	// ambient split on the CPU, leaving shadow terms per pixel. f3Normal must be unit; the caller supplies normalized
+	// f3SunNormal, so no extra normalize is needed.
 	vec3 f3Sun  = globalLayout.f4SunColorTerrain.xyz;
 	vec3 f3Moon = globalLayout.f4MoonColorTerrain.xyz;
 	float fNdotL = max(0.0f, dot(f3Normal, globalLayout.f4SunMoonNormal.xyz));

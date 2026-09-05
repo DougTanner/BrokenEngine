@@ -178,8 +178,8 @@ void GameBase::ProcessInput(bool bLostFocus)
 
 	if constexpr (kbScreenshots)
 	{
-		// F9 toggles continuous dev capture: while on, queue a default one-shot request each frame (preserves the
-		// prior continuous-capture behavior atop the new request mailbox). Empty request path -> default %TEMP% path.
+		// F9 toggles continuous dev capture, queuing a default one-shot request each frame when the request slot is
+		// empty; an empty path uses the default %TEMP% location.
 		static bool sbContinuousScreenshots = false;
 		if (menuInput.flags & MenuInputFlags::kToggleScreenshots)
 		{
@@ -270,10 +270,9 @@ void GameBase::ClientUpdate()
 		}
 	}
 
-	// Set after the ceiling clamp so mfLastDeltaTime reflects the sim seconds actually applied this
-	// iteration (kept in lockstep with miTickCounter / mfCurrentTime below). No client-side consumer
-	// reads mfLastDeltaTime from inside PrepareActiveSet today; if one is added, move this earlier
-	// and accept that it represents pre-clamp intent rather than executed work.
+	// Set mfLastDeltaTime after the ceiling clamp so it records executed sim seconds (iFullTicks * kfDeltaTime), in
+	// lockstep with miTickCounter and mfCurrentTime. PrepareActiveSet runs earlier and has no client-side reader of
+	// this delta.
 	mfLastDeltaTime = static_cast<float>(iFullTicks) * kfDeltaTime;
 
 	miTickCounter += iFullTicks;
@@ -589,10 +588,8 @@ float GameBase::AdvanceRenderClock(double dT, bool bPaused, bool bHaveInterpolat
 			mfRenderTime = dT + 0.5 * kfDeltaTime;
 		}
 
-		// Rebase only on multi-tick T regression (reconcile snap, full-state seed). Tolerance
-		// widens to [T - kfDt, T + 2*kfDt] so a single-tick commit — which leaves mfRenderTime
-		// anywhere from slightly below new T to slightly below new T+kfDt — never triggers a
-		// rebase. Rebasing on every commit was the 32 Hz vibration signature.
+		// Rebase only when mfRenderTime leaves [T - kfDeltaTime, T + 2*kfDeltaTime], so single-tick commits keep the
+		// render phase continuous.
 		if (mfRenderTime < dT - kfDeltaTime || mfRenderTime > dT + 2.0 * kfDeltaTime)
 		{
 			// A rebase is a discontinuous visual time jump — should be rare outside loss bursts
@@ -804,16 +801,12 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 
 bool GameBase::HandleDeferredSwapchain()
 {
-	// A swapchain recreate is deferred (window minimized / off-screen; mbSwapchainRecreateDeferred), OR the previous
-	// frame's tail acquire/present failed OUT_OF_DATE and only escalated meDestroyType (>= kSwapchain) without deferring:
-	// in both cases the swapchain is retired (or already torn down by a post-Destroy defer), miFramebufferIndex is stale,
-	// and the rotated acquire semaphore is unsignaled, so rendering/submitting/presenting that stale index against it
-	// wedges on the next fence-wait timeout. At frame head meDestroyType >= kSwapchain is only ever true after such a
-	// failed tail (settings escalations are consumed by the same tail's Create()), so it precisely flags the poisoned
-	// frame. Skip the whole render/present block, but keep retrying the recreate each frame (mirrors
-	// RenderMainPresentAcquire's frame tail) so rendering resumes cleanly on restore. No mPresent.Wait() here: the last
-	// rendered frame's RenderMainPresentAcquire tail already waited its present before the first deferred Create(), and
-	// skipped frames enqueue no new present.
+	// Skip rendering/submission/present when recreation is deferred or meDestroyType >= kSwapchain: the retired or
+	// torn-down swapchain has a stale framebuffer index and unsignaled acquire semaphore, risking a fence-wait timeout.
+	// At frame head the destroy tier comes from a failed OUT_OF_DATE acquire/present tail; that tail already consumes
+	// settings escalations. Retry Create each frame and acquire only once deferral clears, mirroring
+	// RenderMainPresentAcquire. The last rendered tail already waited for present, and skipped frames enqueue none, so
+	// no mPresent.Wait is needed here.
 	if (gpGraphics->mbSwapchainRecreateDeferred || gpGraphics->meDestroyType >= DestroyType::kSwapchain) [[unlikely]]
 	{
 		gpGraphics->Create();

@@ -272,11 +272,9 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			// kRespawnPlayer carries no payload, so it keeps SpawnPlayerData's own default offsets.
 			float fSpawnOffsetX = SpawnPlayerData{}.fSpawnOffsetX;
 			float fSpawnOffsetY = SpawnPlayerData{}.fSpawnOffsetY;
-			// kRespawnPlayer is reserved (no issuer repo-wide) — kept compilable, not wired up.
-			// TRAP: only kSpawnPlayer extracts SpawnPlayerData, so a respawn leaves globalPlayerId at 0.
-			// A wired-up respawn spawning with id 0 would be invisible to both global-id re-resolution scans
-			// (ServerBroadcaster + FleetNavigationController) — never receiving fleet updates or weapon
-			// toggles. Any future respawn must carry a real global id (or reuse kSpawnPlayer).
+			// kRespawnPlayer is reserved and unissued; only kSpawnPlayer extracts SpawnPlayerData, so this branch
+			// leaves globalPlayerId zero. Zero IDs are invisible to ServerBroadcaster and FleetNavigationController
+			// re-resolution, excluding fleet updates and weapon toggles; usable player spawns require a real global ID.
 			if (rStatusChange.eType == StatusChangeType::kSpawnPlayer)
 			{
 				const SpawnPlayerData& rSpawnData = std::get<SpawnPlayerData>(rStatusChange.data);
@@ -491,9 +489,7 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const S
 #endif // BT_CLIENT
 }
 
-// =============================================================================
-// PlayersInterpolate::Update — synchronization-only per-player update
-// =============================================================================
+// PlayersInterpolate::Update synchronizes per-player state.
 
 void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
 {
@@ -649,9 +645,7 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 	}
 }
 
-// =============================================================================
-// PlayersPostRender::PreCollision — collision-system glue
-// =============================================================================
+// PlayersPostRender::PreCollision builds player collision layers.
 
 thread_local int64_t PlayersPostRender::siCollisionLayerIndex = 0;
 
@@ -729,9 +723,7 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 	});
 }
 
-// =============================================================================
-// PlayersPostRender::Update — orchestrator (per-iter helpers in PlayersNavigation.cpp + PlayersCombat.cpp)
-// =============================================================================
+// PlayersPostRender::Update orchestrates per-iteration helpers in PlayersNavigation.cpp and PlayersCombat.cpp.
 
 void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
 {

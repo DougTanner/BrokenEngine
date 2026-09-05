@@ -20,11 +20,7 @@ struct AlignedDeleter
 template<typename T>
 using AlignedUniquePtr = std::unique_ptr<T[], AlignedDeleter>;
 
-// Factory function for creating 64-byte SIMD-aligned array storage
-// Allocates iCount elements aligned to 64 bytes via _aligned_malloc
-// Returns an empty (null) AlignedUniquePtr if _aligned_malloc fails (no throw)
-// Parameters: iCount - Number of elements to allocate
-// Returns: AlignedUniquePtr managing the allocated memory
+// Allocates iCount elements with 64-byte alignment; an allocation failure returns an empty pointer without throwing.
 template<typename T>
 AlignedUniquePtr<T> MakeAligned(int64_t iCount)
 {

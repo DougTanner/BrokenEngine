@@ -334,13 +334,10 @@ void Texture::CreateRenderTarget()
 			.initialLayout = mInfo.renderPassInitialVkImageLayout,
 			.finalLayout = mInfo.renderPassFinalVkImageLayout,
 		},
-		// Depth
-		// This optional kDepth branch reuses a per-texture depth image every frame (UNDEFINED initial layout + CLEAR
-		// loadOp), but the render pass built here has only an OUTGOING (0 -> EXTERNAL) dependency; there is currently
-		// NO live TextureFlags::kDepth caller, so the incoming EXTERNAL -> 0 dependency is left implicit. A future
-		// kDepth user MUST add an explicit incoming dependency with depth src stage + access scopes
-		// (VK_PIPELINE_STAGE_EARLY/LATE_FRAGMENT_TESTS_BIT + VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, mirroring
-		// the HDR pass's incoming depth dependency in SwapchainManager::CreateRenderPass) to avoid the same latent depth write-after-write.
+		// The optional, unused kDepth path reuses a per-texture depth image with UNDEFINED initial layout and CLEAR load. This pass has only an
+		// outgoing dependency; incoming depth synchronization is implicit. Reusing depth requires an explicit EXTERNAL-to-0 dependency with
+		// EARLY/LATE_FRAGMENT_TESTS and DEPTH_STENCIL_ATTACHMENT_WRITE scopes, as in SwapchainManager::CreateRenderPass, to prevent depth
+		// write-after-write.
 		VkAttachmentDescription
 		{
 			.flags = 0,

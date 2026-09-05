@@ -232,11 +232,10 @@ private:
 		return fStep > 0.0f ? std::round(fValue / fStep) * fStep : fValue;
 	}
 
-	// Every flavor (bool, discrete-enum, int64 index) round-trips through these floats. Exactness ceiling:
-	// integer-backed values must stay below 2^24 or Get<T>() loses precision. Live caution: gPresentMode's allowed
-	// set holds VK_PRESENT_MODE_FIFO_LATEST_READY_KHR (1000361000 -> 1000361024.0f) — safe only because
-	// SwapchainManager.cpp:160-175 normalizes to FIFO/Mailbox/Immediate and Resets before any Get<VkPresentModeKHR>()
-	// consumption (:245), and no UI nor the GraphicsSettings.cpp:122 load path selects it today.
+	// All wrapper flavors store floats; integer-backed values need exact float representation (every integer through
+	// 2^24 is exact). gPresentMode includes FIFO_LATEST_READY_KHR (1000361000 rounds to 1000361024.0f). Settings can
+	// load that value; SwapchainManager compares supported Mailbox/Immediate choices, defaults to FIFO, and resets the
+	// wrapper before submitting the Vulkan swapchain request. The UI exposes only these three modes.
 	float mfStep = 0.0f;
 	float mfDefault = 0.0f;
 	float mfMin = 0.0f;

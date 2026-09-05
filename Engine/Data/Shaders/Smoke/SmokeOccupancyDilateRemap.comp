@@ -30,15 +30,10 @@ layout (scalar, set = 1, binding = 3) readonly buffer ownOccupancyBuffer
 	uint ownOccupancy[];
 };
 
-// Second-pass dilate (used before SmokeSpreadComputeA).
-//
-// SmokeSpreadComputeA does a scale-aware sample: at output current-frame tile (X, Y),
-// it samples TextureTwo at WorldToSmokeTexcoord(prev, VisibleAreaToWorld(output_uv, curr)).
-// That sample lands at floor(prev_uv * tileCount) — possibly several tiles away from (X, Y)
-// when the world area zooms between frames. We need to check occupancy (= where ComputeB
-// just wrote) at that remapped index, not at (X, Y), or zoom drops smoke at edges where
-// the remap displacement exceeds the 5x5 box (Chebyshev-2) dilation radius. TextureOne's own
-// occupancy is unioned at the output tile index so stale storage is always rewritten.
+// Before SmokeSpreadComputeA, map the current output tile center through world space into the previous TextureTwo
+// grid, then test the 5x5 (Chebyshev-2) neighborhood at floor(prev_uv * tileCount). Zoom can move that index beyond
+// a direct dilation radius and otherwise drop edge smoke. Union TextureOne's own occupancy at the output index to
+// rewrite stale storage.
 void main()
 {
 	uint uiTilesX = globalLayout.uiSmokeTilesX;

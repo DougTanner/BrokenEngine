@@ -14,8 +14,8 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	gpRawInputManager->Update(bLostFocus);
 	const RawInput& rRawInput = gpRawInputManager->mRawInput;
 
-	// Seed only the wheel baseline: the rest of the previous snapshot stays zeroed on the first poll so a key
-	// already held at startup still reads as a fresh press, exactly as before.
+	// Seed only the wheel baseline; the other previous-snapshot fields remain zero so keys already held at startup
+	// report fresh presses.
 	if (!(mStateFlags & InputStateFlags::kScrollWheelInitialized))
 	{
 		mPreviousRawInput.iScrollWheelValue = rRawInput.iScrollWheelValue;
@@ -98,16 +98,12 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	}
 	gpCamera->mCameraInput.f2Move = f2Move;
 
-	// The UI owns the wheel when ImGui's MouseWheelY owner test fails, when the cursor is over a window that can
-	// actually scroll, or while WheelingWindow holds an earlier target. A non-scrolling panel, modal, or empty
-	// background leaves the notch with the camera, menus open or not. This mirrors the routing ImGui::UpdateMouseWheel
-	// performs, so a notch is never both scrolled and zoomed: for a root window its scroll target is the hovered window
-	// (its bubble loop only walks child windows, and this UI creates none), and WheelingWindow covers the lock during
-	// which ImGui keeps feeding an earlier target regardless of current hover. ImPlot's owner remains visible for the
-	// first two input polls after leaving a plot; those owner-visible polls conservatively suppress background notches,
-	// while the following poll first sees no owner and is camera-eligible.
-	// Hover is one frame old — ImGui resolves it in NewFrame, after this poll — so a notch arriving on the frame the
-	// cursor crosses a panel edge is judged against the previous hover.
+	// ImGui owns the wheel when MouseWheelY has an owner, WheelingWindow holds a target, or the hovered window can
+	// scroll and accepts wheel input. Non-scrolling panels, modals, and background leave it with the camera regardless
+	// of open menus. This mirrors UpdateMouseWheel for this root-window-only UI; child-window bubbling is absent.
+	// WheelingWindow retains its earlier target, and ImPlot's owner suppresses notches for two polls after exit; the
+	// next owner-free poll can zoom. Hover resolves in NewFrame after this poll, so panel-edge crossings use the prior
+	// hover.
 	const ImGuiContext* pImGuiContext = ImGui::GetCurrentContext();
 	const ImGuiWindow* pHoveredWindow = pImGuiContext != nullptr ? pImGuiContext->HoveredWindow : nullptr;
 	bool bUserInterfaceOwnsScroll = (pImGuiContext != nullptr && pImGuiContext->WheelingWindow != nullptr) ||

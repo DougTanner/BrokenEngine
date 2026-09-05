@@ -381,10 +381,6 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 	}
 
 	// Based on https://github.com/Overv/VulkanTutorial
-	// Since Vulkan is a platform agnostic API, it can not interface directly with the window system on its own
-	// To establish the connection between Vulkan and the window system to present results to the screen, we need to use platform-specific extensions
-	// It exposes a VkSurfaceKHR object that represents an abstract type of surface to present rendered images to
-	// The surface in our program will be backed by the window that we've already opened with GLFW or Android
 	VkWin32SurfaceCreateInfoKHR vkWin32SurfaceCreateInfoKHR
 	{
 		.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,

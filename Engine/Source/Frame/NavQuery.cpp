@@ -7,16 +7,11 @@
 namespace engine
 {
 
-// Test if a segment intersects any obstacle edge, using the NavData edge grid as a broad phase. The
-// result is an order-independent boolean OR, so grid-traversal order never changes it -> deterministic.
-// Precondition: rNavData carries the gridMin/gridMax and edge CSR that BuildNavAcceleration derives from
-// a non-empty vertex set (the CSR is empty otherwise). Each caller establishes that for itself — the
-// query path through NavQueryDirection's empty-vertices early-out, the build path in NavCellData.cpp by
-// running the visibility pass after BuildNavAcceleration and only on a non-empty cell.
-// Soundness: edges are bucketed into every cell their AABB overlaps (conservative), and the DDA walks
-// every cell the clipped segment passes through, so a real crossing is always found.
-// Promoted from the anonymous namespace to external linkage (engine::, declared in NavBuildInternal.h)
-// so the cell visibility build and the runtime query can never disagree about what is blocked.
+// Conservative edge-CSR AABB buckets and DDA traversal of every clipped-segment cell test all real
+// crossings; the boolean OR is order-independent. Callers require gridMin/gridMax and edge CSR from
+// BuildNavAcceleration on nonempty vertices. NavQueryDirection checks empty vertices; NavCellData runs
+// visibility only for a nonempty cell after building acceleration. Both share this definition through
+// NavBuildInternal.h to agree on blocked paths.
 bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVertices, const NavData& rNavData)
 {
 	float fMinX = rNavData.gridMin.x;
@@ -156,9 +151,8 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	return false;
 }
 
-// Is the point inside any obstacle polygon? AABB broad phase per polygon, then the shared winding-
-// number PointInPolygon core (single-sourced with the builder via NavBuildInternal.h). Promoted to
-// external linkage alongside SegmentBlockedByObstacle above, for the same reason.
+// PointInAnyPolygon uses a per-polygon AABB broad phase and shares PointInPolygon's winding core with
+// the builder through NavBuildInternal.h.
 bool PointInAnyPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, const NavData& rNavData)
 {
 	for (size_t iPoly = 0; iPoly < rNavData.polygonOffsets.size(); ++iPoly)

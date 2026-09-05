@@ -22,15 +22,10 @@ char* ToHex(std::span<char, N> pcBuffer, T uiValue)
 	return pcBuffer.data();
 }
 
-// Converts wide string (UTF-16) to UTF-8 narrow string using Win32 WideCharToMultiByte
-// Parameters: wideChars - Wide string to convert
-// Returns: UTF-8 encoded string
+// Converts UTF-16 text to UTF-8 with Win32 WideCharToMultiByte.
 std::string ToString(std::wstring_view wideChars);
 
-// Splits a string into a vector of substrings based on a delimiter
-// Generic template works with any string type (std::string, std::wstring, etc.)
-// Parameters: rString - String to split, rDelimiter - Delimiter to split on
-// Returns: Vector of substrings
+// Splits rString at each rDelimiter and appends the remaining suffix.
 template<typename T>
 std::vector<T> Split(const T& rString, const T& rDelimiter)
 {
@@ -50,15 +45,11 @@ std::vector<T> Split(const T& rString, const T& rDelimiter)
 	return splits;
 }
 
-// Converts ASCII 'A'-'Z' to lowercase (locale-independent; all other bytes unchanged)
-// Parameters: rIn - String to convert
-// Returns: Lowercase version of the input string
+// Locale-independent: converts ASCII uppercase letters to lowercase and leaves other bytes unchanged.
 std::string ToLower(std::string_view chars);
 
-// Sanitizes file paths to be valid C++ variable names by keeping ASCII letters, digits and underscore
-// Removes: every other byte (locale-independent); the mapping is many-to-one, so the caller must check uniqueness
-// Parameters: rIn - Path string to sanitize
-// Returns: Sanitized string, a valid C++ identifier once the caller prefixes it (for example with 'k')
+// Keeps ASCII letters, digits, and underscores independently of locale. The mapping is many-to-one;
+// callers must check uniqueness and prefix the result to form a C++ identifier.
 std::string PathToCppVariable(std::string_view path);
 
 } // namespace common

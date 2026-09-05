@@ -3,15 +3,11 @@
 #include "ShaderLayouts.h"
 #include "ShaderFunctions.h"
 
-// Specular-AA variant select — compile-time, toggled by editing this define and re-running DataPacker
-// (same in-source mechanism as DT_LIGHTING_ONLY in ShaderLayoutsBase.h). Filters the sub-pixel high-power
-// skybox specular lobes analytically so no MSAA sample-shading (or pre-pass) is needed.
-// Runtime sliders: fWaterSpecAAVariance tunes modes 1-3; fWaterSpecAAThreshold modes 2-3.
-// 0 = off — pointwise lobes (flickers; baseline reference)
-// 1 = scalar-domain analytic box filter — closed-form integral of s^p over the pixel footprint
-// 2 = NDF variance widening — Kaplanyan/Tokuyoshi geometric specular AA via the Vlachos production form
-// 3 = octave-agreement Toksvig — variance from the multi-sample normal weighted-sum length
-// 4 = 2x2 analytic supersample — lobe chain re-evaluated at derivative-extrapolated normals (ALU only)
+// WATER_SPEC_AA_MODE selects compile-time filtering of sub-pixel high-power skybox lobes; re-run DataPacker after
+// define edits, as for DT_LIGHTING_ONLY. 0: pointwise reference; 1: closed-form box integral of s^p over the pixel
+// footprint; 2: Kaplanyan/Tokuyoshi NDF variance widening via Vlachos; 3: Toksvig variance from weighted normal-sum
+// agreement; 4: 2x2 ALU supersampling at derivative-extrapolated normals. fWaterSpecAAVariance controls modes 1-3
+// and fWaterSpecAAThreshold modes 2-3. Analytic filtering needs neither MSAA sample shading nor a prepass.
 #define WATER_SPEC_AA_MODE 3
 
 // Zoom/minification handoff for modes 2-3: adds DataPacker-baked per-mip Toksvig variance — the
@@ -115,11 +111,9 @@ void main()
 	float fDirectionalLighting = max(1.0f - globalLayout.fWaterDirectional, dot(f3InNormal, globalLayout.f4SunMoonNormal.xyz));
 	vec3 f3DirectionalLighting = f3PreLightingColor * fDirectionalLighting;
 	vec3 f3LightingColor = mix(f3PreLightingColor, f3DirectionalLighting, 0.75f);
-	// Per-target water sun/moon: the max-combined color, its /3 sun scalar, and the /3 ambient scalar are
-	// folded CPU-side (GlobalUniforms.cpp PopulateDayCycleColors) — all operands are uniform. The prior
-	// moon-brightness gating is preserved in the CPU fold (at noon f4MoonColor is ~0). f3SunOrMoon still
-	// multiplies the per-pixel skybox color at f3SkyboxColorSun below. Carrying sun and ambient as separate
-	// scalars lets fShadowAffectAmbient relax the ambient half only, deferred to the shadow-apply site.
+	// GlobalUniforms.cpp folds max-combined water sun/moon color plus /3 sun and ambient scalars from uniform inputs;
+	// at noon f4MoonColor is near zero. Separate scalars keep fShadowAffectAmbient on ambient while f3SunOrMoon
+	// modulates skybox color.
 	vec3 f3SunOrMoon = globalLayout.f4WaterSunOrMoon.xyz;
 	float fSunScalar     = globalLayout.fWaterSunScalar;
 	float fAmbientScalar = globalLayout.fWaterAmbientScalar;

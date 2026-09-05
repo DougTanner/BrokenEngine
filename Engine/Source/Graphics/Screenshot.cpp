@@ -80,11 +80,8 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 {
 	LOG(kGraphics, kDebug, "SaveScreenshot()");
 
-	// Wait on the fence for the specific framebuffer's Image command buffer.
-	// Precondition: the fence must already have a pending or completed signal for the content being captured —
-	// never a fresh reset whose signal depends on this caller returning (that was the screenshot deadlock). The
-	// caller (Graphics::RenderMainPresentAcquire) guarantees this by running after SubmitUiCommandBuffer has
-	// enqueued the UI submit that signals mVkFence (ImGuiManager::Submit) and before Present.
+	// Wait for the acquired framebuffer's Image command buffer after SubmitUiCommandBuffer queues mVkFence and before Present; the fence must
+	// carry a pending or completed signal for the captured content.
 	CommandBuffers& rCommandBuffers = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 	CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 

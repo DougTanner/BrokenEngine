@@ -74,9 +74,8 @@ void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4>
 		return;
 	}
 
-	// Per-cell island center: pick the nearest placement to this spaceship for return-to-island steering.
-	// Candidates are precomputed once per coord in Update (tick-invariant across ships); values are bit-identical
-	// to the former per-ship XMVectorSet(x, y, gBaseHeight.Get(), 1.0f) — same floats, computed once.
+	// Return-to-island steering selects the nearest center from candidates precomputed once per coord in Update.
+	// The tick-invariant candidates use the placement's x/y, gBaseHeight, and w=1 for every ship.
 	XMVECTOR vecIslandCenter = XMLoadFloat4(&islandCandidates[0]);
 	float fNearestDistanceSq = std::numeric_limits<float>::max();
 	for (const XMFLOAT4& rCandidate : islandCandidates)

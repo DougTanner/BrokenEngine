@@ -3,16 +3,10 @@
 namespace engine
 {
 
-// ============================================================================
-// MEMBER-POINTER VISITOR
-// ============================================================================
-// Resolves the "member is a C-array-of-pointers T* pp[N] vs a single pointer T*" branch exactly once.
-// Array members visit each element-pointer reference member[i] in order 0 .. N-1; single-pointer members
-// invoke fn once on the member-pointer reference. Visitation order is CRC- and layout-load-bearing.
-// fn receives a reference to the element pointer so assign/reset/swap callers can mutate it, carrying the
-// member's const-ness. Where fn needs the element size, derive it as
-// std::remove_pointer_t<std::remove_reference_t<decltype(elementPtrRef)>> — strip the reference *before*
-// the pointer; remove_pointer_t on the reference type is a no-op and yields sizeof(pointer) (8).
+// ForEachMemberPointer visits array pointer elements in index order and scalar pointers once; order
+// determines CRC and layout. Callbacks receive pointer references for assign/reset/swap, preserving
+// constness. Derive ElementType with remove_pointer_t<remove_reference_t<decltype(elementPtrRef)>>:
+// reversing the removals leaves a pointer type and gives pointer-sized storage.
 
 template <typename TMember, typename TFn>
 constexpr void ForEachMemberPointer(TMember& member, TFn&& fn)
@@ -31,10 +25,7 @@ constexpr void ForEachMemberPointer(TMember& member, TFn&& fn)
 	}
 }
 
-// ============================================================================
-// SIZE CALCULATION HELPER
-// ============================================================================
-// Calculate buffer size needed for a member (array or single pointer).
+// Computes 64-byte-rounded storage for array or scalar member pointers at iCapacity.
 
 template <typename T>
 constexpr int64_t CalculateBufferSize(int64_t iCapacity, const T& member)
@@ -64,10 +55,7 @@ int64_t MemberTupleBufferSize(int64_t iCapacity, const TTuple& members)
 	return iBufferSize;
 }
 
-// ============================================================================
-// LOW-LEVEL MEMORY ALIGNMENT HELPERS
-// ============================================================================
-// Internal building blocks for 64-byte pointer alignment used by higher-level allocation helpers.
+// Member-pointer helpers maintain 64-byte alignment for contiguous collection storage.
 
 // Aligns pointer to 64-byte boundary and advances current position. Used during initial allocation.
 template <typename T>
@@ -103,10 +91,7 @@ void AssignAndCopyAligned(T& member, int64_t iCapacity, int64_t iCount, std::byt
 	});
 }
 
-// ============================================================================
-// HIGH-LEVEL ALLOCATION & REALLOCATION HELPERS
-// ============================================================================
-// Orchestrate memory management for Structure-of-Arrays collections.
+// Allocation helpers manage contiguous Structure-of-Arrays storage.
 
 // Resets collection to null state by releasing buffer and zeroing member pointers.
 template <typename TStruct, typename TTuple>
@@ -367,10 +352,6 @@ void GrowCapacityWithCopy(TStruct& rStruct, int64_t iNewCapacity, int64_t iCurre
 	rStruct.iCapacity = iNewCapacity;
 	rStruct.iPhysicalLayoutCapacity = iNewCapacity;
 }
-
-// ============================================================================
-// ELEMENT MANIPULATION
-// ============================================================================
 
 // Swaps element at index i with last element for O(1) unordered removal.
 // Does NOT decrement count or bounds-check - caller must handle count decrement and index re-checking.

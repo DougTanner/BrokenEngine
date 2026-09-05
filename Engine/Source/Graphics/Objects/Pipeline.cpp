@@ -109,9 +109,8 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 		}
 	}
 
-	// The former fixed [kiMaxDescriptorSetLayoutBindings] array was the sole bound on the entry count, and
-	// PipelineDescriptorWriter's stack scratch arrays are still sized to that cap. Bounds entries only — a
-	// kModel entry expands into several descriptor writes, which the per-push cursor ASSERTs guard.
+	// Bound descriptor entries by ShaderHeader::kiMaxDescriptorSetLayoutBindings; PipelineDescriptorWriter's scratch arrays use the same cap. A
+	// kModel entry expands into several writes, guarded by per-push cursor assertions.
 	ASSERT(static_cast<int64_t>(mInfo.pDescriptorInfos.size()) <= common::ShaderHeader::kiMaxDescriptorSetLayoutBindings);
 
 	if (mInfo.flags & kCompute)
@@ -192,12 +191,9 @@ void Pipeline::Destroy() noexcept
 		mIndirectVmaAllocation = VK_NULL_HANDLE;
 	}
 
-	// mModelMaterialsStorageBuffer is deliberately NOT torn down here — its member Buffer dtor owns the free.
-	// The mDeviceLocalVkBuffer == VK_NULL_HANDLE guard in WriteModelDescriptor (PipelineDescriptorWriter.cpp)
-	// exists to build the buffer once across Write()'s per-framebuffer loop, not to support in-place
-	// re-Create() reuse: model pipelines are rebuild-only (fresh objects every time),
-	// so a Destroy() on a pipeline holding this buffer is only ever followed by destruction. If an in-place
-	// re-Create with a different scene ever appears, destroy the buffer here or the guard keeps stale materials.
+	// WriteModelDescriptor's null-handle guard creates mModelMaterialsStorageBuffer once across the per-framebuffer loop; the member Buffer
+	// destructor releases it. Model pipelines require fresh objects: Destroy on a pipeline holding this buffer is followed by object
+	// destruction, and in-place recreation retains stale materials.
 }
 
 void Pipeline::RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iInstanceCount, int64_t iFirstInstance, const XMFLOAT4& f4PushConstants)

@@ -284,8 +284,7 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 	mpPipelines[kPipelineTerrain].Create(
 	{
 		.name = "Terrain",
-		// kIndirect* flag dropped: terrain records one vkCmdDrawIndexedIndirect per island template in
-		// CommandBufferRecordMain, from Islands' own indirect buffers (instead of a single visible-area indirect draw).
+		// Terrain records one vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain from Islands' per-template indirect buffers.
 		.flags = {kDepthTest, kDepthWrite, kCullBack, kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersTerrainTerrainvertCrc), &mrShaders.at(data::kShadersTerrainTerrainfragCrc)},
 		// pVertexBuffer is null: vertex buffer is per-island and bound at draw time. Vertex input
@@ -319,10 +318,8 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			// mesh vertices into world space (set=1 binding=19). Mirrors kPipelineShadowElevation's
 			// SSBO usage; gl_InstanceIndex is supplied per-island via firstInstance at draw time.
 			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
-			// Bindless per-island material masks (set=1 binding=20). Packed RGBA = Rock/Sand/Snow/Flow
-			// replacing the procedural fRockPercent / fBeachPercent / fSnowPercent heuristics in
-			// Terrain.frag. Appended after the SSBO so existing frag bindings 9..18 and the
-			// Terrain.vert SSBO at 19 stay put.
+			// Bindless per-island material masks use set=1 binding=20; packed RGBA stores Rock/Sand/Snow/Flow. The masks follow the SSBO so fragment
+			// bindings 9..18 and the Terrain.vert SSBO at 19 stay fixed.
 			{.flags = {kCombinedSamplers, kSamplerClamp, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mMasksTextures.data()}, // set=1 binding 20 (masks)
 			// Per-island heightmap array (R16_SFLOAT), set=1 binding 21 (appended after masks at 20 so bindings
 			// 0..20 stay put). Terrain.vert samples it at the island-local UV to sink THIS island's submerged

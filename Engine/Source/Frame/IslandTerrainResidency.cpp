@@ -157,12 +157,9 @@ int64_t IslandTerrain::AcquireTextureSlot(common::crc_t islandCrc)
 		return FirstMintTextureSlot(islandCrc, rTemplate, textureCrcs, rLazyChunk.header.pcPath);
 	}
 
-	// Slot assigned but not yet resident. Reached only while a freshly-minted template's chunks are
-	// still loading — the slot stays in slot-0 fallback until RestorationSweep patches it back. Two
-	// paths that might seem to land here do not: LRU eviction fully tears the slot down (miTextureSlot
-	// = -1 — see EvictionSweep) so an evicted-then-revisited template re-mints above; and device-loss
-	// recovery runs ResetTextureSlots (TextureManager ctor) which forces miTextureSlot < 0 for every
-	// template, so they all re-mint above too — re-Creating mElevationTexture via the first-mint path.
+	// A freshly minted slot stays in slot-0 fallback while chunks load, until RestorationSweep patches it.
+	// Eviction and device-loss ResetTextureSlots set miTextureSlot negative, so the next use re-enters
+	// first mint and recreates mElevationTexture.
 	gpFileManager->RequestChunkLoad(textureCrcs, LoadPriority::kRealtime);
 	LOG(kLoading, kVerbose, "Re-acquire islandCrc={} slot={}, requesting chunk loads", islandCrc, rTemplate.miTextureSlot);
 	return rTemplate.miTextureSlot;

@@ -222,11 +222,8 @@ TextureManager::TextureManager()
 	mRenderTargetTextures.mAmbientOcclusionTextures.resize(shaders::kiMaxIslands);
 	mRenderTargetTextures.mMasksTextures.resize(shaders::kiMaxIslands);
 
-	// Device-lost recovery: clear per-template slot residency state so the next AcquireTextureSlot
-	// runs the first-mint path, re-registering all five channel bindings while elevation remains at
-	// its placeholder until the four chunk-backed channels are ready. Without this, every island
-	// would silently stay on the placeholder set up by the fan-out loop below — see
-	// Graphics/DynamicIslandLoadingFollowups.md Follow-up 1.
+	// Device-loss recovery resets per-template slot residency so AcquireTextureSlot re-registers all five channels; elevation stays on its
+	// placeholder until the four chunk-backed channels are ready. Without the reset, the initialization fan-out leaves islands on placeholders.
 	gpIslandTerrain->ResetTextureSlots();
 
 	// Island textures load dynamically per ClientSession::ApplyReceivedStaticData. TextureDescriptors
@@ -465,8 +462,7 @@ void TextureManager::CreateSamplers()
 
 VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 {
-	// Maps each sampler flag to its slot. Order matches the prior first-match if/else chain (Elevation
-	// first); flags are mutually exclusive, so order only matters if a caller violates that (asserted below).
+	// Map sampler flags to slots; flags are mutually exclusive, so order matters only when a caller violates the asserted contract.
 	static constexpr struct { DescriptorFlags flag; SamplerSlot slot; } kFlagToSlot[]
 	{
 		{DescriptorFlags::kSamplerElevation, kSamplerSlotElevation},
@@ -652,7 +648,7 @@ bool TextureManager::AnyAdoptionPending() const
 	// ProcessPendingTextures writes descriptor elements (UpdateDescriptorsForTexture per-slot, the
 	// UpdateTextureArrayDescriptors flush, and the lighting-blur array write), so RenderGlobal's all-framebuffer-fence
 	// drain must fire first. The TextureUploadManager pending-adoption counter tracks exactly those two states
-	// (kUploading, between them, is excluded), replacing a full per-frame mTextureMap scan with an O(1) read.
+	// (kUploading, between them, is excluded), providing an O(1) read.
 	return gpTextureUploadManager->HasPendingAdoptions();
 }
 

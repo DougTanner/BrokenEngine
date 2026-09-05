@@ -14,10 +14,8 @@ bool Client::SendAck()
 		return false;
 	}
 
-	// Tick-rate-locked cadence: skip if less than one sim-tick interval has elapsed since the last ack,
-	// so ack packet rate is decoupled from render framerate. Interval derived from kiTickRate (never a
-	// hardcoded Hz literal) so a future tick-rate change carries the ack cadence with it. Not gated on
-	// sim advancement -- a paused/stalled sim must still ack so server resends/RTT stay alive.
+	// ACKs are sent at most once per simulation-tick interval (1/kiTickRate seconds), independently of render rate.
+	// They continue while simulation is paused or stalled so server resends and RTT remain active.
 	constexpr std::chrono::nanoseconds kAckInterval {1'000'000'000 / kiTickRate};
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	if (now - mLastAckSendTime < kAckInterval)

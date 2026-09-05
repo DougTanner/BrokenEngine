@@ -150,8 +150,8 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	XMVECTOR vecMoon = XMVectorScale(vecMoonFloor, fMoonAmount);
 	XMStoreFloat4(&rGlobalLayout.f4MoonColor, vecMoon);
 
-	// Per-target sun/moon intensities. Terrain/Water/Objects are captured as locals and pre-folded into the
-	// precomputed products below (their layout fields were retired); Smoke stays as a raw multiplier.
+	// Per-target sun/moon intensities. Terrain, Water, and Objects capture these values as locals and fold them into precomputed products;
+	// Smoke remains a raw multiplier.
 	float fSunIntensityTerrain = gSunMoonSunIntensityTerrain.Get();
 	float fMoonIntensityTerrain = gSunMoonMoonIntensityTerrain.Get();
 	float fSunIntensityWater = gSunMoonSunIntensityWater.Get();
@@ -199,13 +199,9 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	rGlobalLayout.fWaterMoonWeight = fWaterMoonWeight;
 	rGlobalLayout.fWaterShadowWeightSumInv = 1.0f / std::max(0.001f, fWaterSunWeight + fWaterMoonWeight);
 
-	// Objects (Model.frag) sun/moon products. fPbrSun / fPbrDayBrightness are Main-phase PBR tunables, folded
-	// here because the day-cycle sun/moon colors are only CPU-local in this global phase (reading them back from
-	// the mapped f4SunColor/f4MoonColor would stall on write-combined memory). The direct BRDF term folds the
-	// per-target Objects intensity and fPbrSun; the IBL specular term additionally folds the Rec.709 luminance of
-	// the UNSCALED color over fPbrDayBrightness — kept as a separate field so the IBL path stays linear in fPbrSun
-	// (folding fPbrSun into the luminance would compound to fPbrSun^3). Unguarded reciprocal reproduces Model.frag's
-	// original divide by fPbrDayBrightness.
+	// Fold Main-phase PBR tunables here while day-cycle colors are CPU-local; reading mapped write-combined uniforms back stalls. Direct BRDF
+	// products include Object intensity and fPbrSun. IBL uses separate unscaled Rec.709 luminance / fPbrDayBrightness so it stays linear in
+	// fPbrSun; scaling that luminance compounds to fPbrSun^3. The brightness reciprocal is intentionally unguarded.
 	const XMVECTOR vecRec709 = XMVectorSet(0.2126f, 0.7152f, 0.0722f, 0.0f);
 	float fPbrSun = gPbrSun.Get();
 	float fPbrDayBrightnessInv = 1.0f / gPbrDayBrightness.Get();
@@ -309,17 +305,11 @@ static void XM_CALLCONV PopulateShadowStretch(shaders::GlobalLayout& rGlobalLayo
 
 static void PopulateShadowArea(shaders::GlobalLayout& rGlobalLayout, float fShadowTextureSizeWidth, float fShadowTextureSizeHeight, float& rfWorldTexelX, float& rfFullWidth)
 {
-	// Shadow area: world-sized texels from a coverage-safe camera-height reference. The reference expands immediately
-	// with outward zoom and contracts at its existing rate on inward zoom, so it is never below the live eye height.
-	// The texel world size is sized so a constant on-screen pixel count
-	// (textureWidth / kfShadowHeadroomMultiplier) spans the live straight-down frustum width at the camera's
-	// mfShadowTexelEyeHeight, so it is fixed at a settled height (the grid snaps cleanly under XY pan -> no shimmer)
-	// and only rescales immediately outward or gradually inward. The headroom keeps the live render area inside the
-	// full footprint throughout either transition. Reading the actual (clamped)
-	// extent keeps the world coverage device-clamp-invariant.
-	// f4ShadowArea is the full footprint, camera-centered and snapped to the current texel grid (integer-texel pan).
-	// The base texel derives from the analytic straight-down frustum width (gFov/aspect), never the snapped
-	// render-area width, so it stays bit-stable at a settled height.
+	// Shadow texels use a coverage-safe eye-height reference: outward zoom expands it immediately, inward zoom contracts it at the existing
+	// rate, and it never falls below live height. Derive texel size from the analytic straight-down gFov/aspect frustum, not the snapped render
+	// area, so the grid is bit-stable at settled height and integer-texel XY pan does not shimmer. textureWidth / kfShadowHeadroomMultiplier
+	// pixels span that frustum; the headroom covers the live area throughout zoom transitions. Use the actual clamped extent for
+	// device-independent coverage and center f4ShadowArea on the camera, snapped to the texel grid.
 	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::Camera::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelEyeHeight, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, gFov.Get(), engine::gpCamera->mVecPosition);
 	rGlobalLayout.f4ShadowArea = area.f4Area;
 
@@ -387,7 +377,7 @@ static void XM_CALLCONV PopulateShadowParameters(shaders::GlobalLayout& rGlobalL
 	float fOffsetNoon = std::pow(fNoonPercent, 2.0f);
 
 	rGlobalLayout.fShadowFeather = 1.0f / (fShadowNoon * gShadowFeatherNoon.Get() + fShadowEvening * gShadowFeatherSunset.Get());
-	// Kept as a local (field removed): folded into fShadowAngleOffsetSum after the sun extension resolves the shadow sun angle.
+	// fShadowNoonOffset contributes to fShadowAngleOffsetSum after the sun extension resolves the shadow sun angle.
 	float fShadowNoonOffset = fOffsetNoon * gShadowFeatherNoonOffset.Get();
 
 	float fShadowDistanceFalloff = gShadowDistanceFalloff.Get();
@@ -412,7 +402,7 @@ static void XM_CALLCONV PopulateShadowParameters(shaders::GlobalLayout& rGlobalL
 	rGlobalLayout.fObjectShadowsGrow = gObjectShadowsGrow.Get();
 	rGlobalLayout.fObjectShadowsIntensity = fDayPercent * gObjectShadowsNoon.Get() + (1.0f - fDayPercent) * gObjectShadowsSunset.Get();
 	rGlobalLayout.fObjectShadowsIntensity *= std::pow(fDayPercent, 0.1f);
-	// Kept as a local (field removed): folded into fShadowAngleOffsetSum below.
+	// fShadowSunsetOffset contributes to fShadowAngleOffsetSum after the sun extension resolves the shadow sun angle.
 	float fShadowSunsetOffset = fShadowEvening * gShadowFeatherSunsetOffset.Get();
 
 	PopulateShadowStretch(rGlobalLayout, fSunAngle, vecSunMoonNormal);
@@ -431,9 +421,8 @@ static void XM_CALLCONV PopulateShadowParameters(shaders::GlobalLayout& rGlobalL
 	float fShadowHeightFadeTop = gShadowHeightFadeTop.Get();
 	float fShadowHeightFadeBottom = gShadowHeightFadeBottom.Get();
 	rGlobalLayout.fShadowHeightFadeBottom = fShadowHeightFadeBottom;
-	// No divide-by-zero guard: reproduces Shadow.comp's original unguarded divide exactly. Fade top is in
-	// [0,20] and bottom in [-30,0], so the range is >= 0; the only degenerate case top==bottom==0 yields +inf,
-	// which the shader's final clamp already absorbed as the prior 1/0 did.
+	// Fade top is [0,20] and bottom is [-30,0], so the range is nonnegative; top == bottom == 0 yields +inf, which Shadow.comp's final clamp
+	// absorbs.
 	rGlobalLayout.fShadowHeightFadeRangeInv = 1.0f / (fShadowHeightFadeTop - fShadowHeightFadeBottom);
 
 	float fWorldTexelX = 0.0f;
@@ -458,7 +447,7 @@ static void PopulateTerrainParameters(shaders::GlobalLayout& rGlobalLayout, floa
 	// height/depth multiplier.
 	rGlobalLayout.fIslandAmbientOcclusion = fNoonPercent * gIslandAmbientOcclusion.Get();
 
-	// fTerrainSnowBlend folds into f4TerrainSnowSunNormal (PopulateSunMoonDirection); no standalone field remains.
+	// PopulateSunMoonDirection folds fTerrainSnowBlend into f4TerrainSnowSunNormal.
 	rGlobalLayout.fTerrainSnowAmbientOcclusionExclusion = gTerrainSnowAmbientOcclusionExclusion.Get();
 	const float fTerrainDetailNormalsMultiplier = gTerrainDetailNormalsMultiplier.Resolve(engine::gpCamera->mfCameraEyeHeight);
 

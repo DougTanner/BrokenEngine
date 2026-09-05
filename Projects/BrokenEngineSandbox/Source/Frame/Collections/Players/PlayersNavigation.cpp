@@ -168,18 +168,13 @@ bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRender& rCu
 		|| (iNavDirection != iEntryNavDirection)
 		|| (((rFrame.interpolate.iTick + rCurrent.pGlobalPlayerIds[i].iValue) % kiNavRecomputeInterval) == 0);
 
-	// Throttle-overshoot fix: the throttle holds rVecAiDirection (a world-space bearing) for up to
-	// kiNavRecomputeInterval ticks, so a ship rounding an obstacle corner overshoots the turn on the stale
-	// bearing and drives into the island. Force an immediate recompute when the nav polygon contains the
-	// point kfNavLookahead ahead along the carried bearing OR the current position. Both are needed:
-	// containment ahead does not imply containment at the position, and a ship that has already been driven
-	// inside sits there as its steady state. This replaces an elevation probe that tested the *inner*
-	// contour — NavThresholdElevation supplies gBaseHeight - kfPlayerRadius - kfPushMargin as the nav threshold and
-	// ApplyTerrainPush below uses that same expression, while the nav polygon is that contour inflated
-	// outward — so a ship stranded in the no-nav band measured zero terrain push and never tripped the
-	// probe. Deterministic: rVecAiDirection (carried, shared), vecPosition, and navData (server-built and
-	// wire-shipped) are identical on client and server, and this draws no RNG (RNG parity preserved).
-	// Roam (mode -1) already re-steers every tick via ComputeAiSteering, so it is exempt.
+	// The throttle carries the shared world-space bearing for up to kiNavRecomputeInterval ticks. Recompute when
+	// either the kfNavLookahead point or current position is inside a nav polygon: lookahead alone misses ships
+	// already stranded inside. NavThresholdElevation and ApplyTerrainPush use
+	// gBaseHeight - kfPlayerRadius - kfPushMargin; the nav polygon inflates that contour, leaving a no-nav band
+	// with zero terrain push. rVecAiDirection, vecPosition, and server-built, wire-shipped navData match on
+	// client/server, and this check draws no RNG. Roam mode -1 is exempt because ComputeAiSteering re-steers
+	// every tick.
 	if (!bRecompute && iNavDirection >= 0 && XMVectorGetX(XMVector3LengthSq(vecAiDirection)) > 0.001f)
 	{
 		XMVECTOR vecLookahead = XMVectorMultiplyAdd(XMVectorReplicate(kfNavLookahead), vecAiDirection, vecPosition);
@@ -315,20 +310,14 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 
 	if (riNavDirection == 5)
 	{
-		// Following flagship via NavQuery pathfinding.
-		// No arrival check and no no-flagship fallback here, deliberately. When the flagship row is gone the
-		// proximity scan above is a no-op, but on the nominal path a follower stalls for one tick only:
-		// ServerFleetManager::OnPlayerDeath -> FleetNavigationController::ShiftFlagshipAfterDeath moves the
-		// fleet's flagship index after the removal tick, ProcessFlagshipUpdates drains that into a kUpdateFleet
-		// whose Update-phase handler writes kIsFlagship, and the next Update finds the new flagship or takes the
-		// fleet-override path above. A promoted flagship recovers on D+2, once its reassigned kIsFlagship and
-		// same-cell wanted coord are navigation-visible: the predicate above enters mode 4 and clears the stale
-		// flagship destination without advancing the fleet's rally timer. Agent-injected players belong to no
-		// Fleet, so they never receive that kUpdateFleet at all (harness-only).
-		// Mirror mode 4's three entry draws (island pick + footprint X + footprint Y) so flipping
-		// between modes 4 and 5 does not desync the shared random stream. Only the draw COUNT matters:
-		// every common::Random advances the engine exactly once regardless of the max argument, so the
-		// bounds here need not match the island mode 4 actually selects. See mode 4 below.
+		// Follow the flagship via NavQuery without arrival or missing-flagship fallback. A missing flagship makes
+		// the proximity scan a no-op. OnPlayerDeath -> ShiftFlagshipAfterDeath updates the fleet index after
+		// removal; ProcessFlagshipUpdates publishes kUpdateFleet, whose Update handler writes kIsFlagship. A
+		// follower normally stalls one tick before finding the replacement or taking the fleet override. A promoted
+		// flagship recovers on D+2 when its flag and same-cell wanted coord become navigation-visible; mode 4 clears
+		// the stale destination without advancing the rally timer. Agent-injected players have no Fleet and receive
+		// no kUpdateFleet. Consume mode 4's three draws (island pick, footprint X, footprint Y) on each mode-5 tick:
+		// every common::Random advances once regardless of its bound, preserving stream alignment across modes 4/5.
 		common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
 		const engine::IslandPlacement& rRngPlacement = rStaticData.islands.at(static_cast<size_t>(i) % rStaticData.islands.size());
 		const engine::IslandTemplate& rRngTemplate = engine::gpIslandTerrain->mIslands.at(rRngPlacement.islandCrc);

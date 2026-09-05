@@ -287,10 +287,9 @@ void GenerateIrradianceCubemaps()
 			});
 			std::memcpy(srcImage.m_data, cubemapData.floatData.data(), uiTotalPixels * 4 * sizeof(float));
 
-			// Generate 128x128 irradiance cubemap using spherical harmonics.
-			// Cross-machine note: unlike the radiance filter, this SH path is serial CPU (no OpenCL, no
-			// thread-count input), so it carries only generic FP-environment exposure (FMA contraction in
-			// the double-precision SH reduction; DataPacker is not /fp:strict) - low cross-host variance risk.
+			// Generate 128x128 irradiance through serial CPU double-precision spherical harmonics, without
+			// OpenCL or a thread-count input. DataPacker is not /fp:strict, so FMA contraction and the FP
+			// environment can affect output across hosts.
 			static constexpr uint32_t kuiIrradianceFaceSize = 128;
 			cmft::imageIrradianceFilterSh(dstImage, kuiIrradianceFaceSize, srcImage);
 
@@ -531,12 +530,9 @@ void GeneratePreFilteredCubemaps()
 {
 	static const uint8_t kuiCpuThreads = static_cast<uint8_t>(std::max(1u, std::thread::hardware_concurrency()));
 
-	// Cross-machine note: radiance convolution runs on whatever OpenCL GPU is present (below), so the
-	// pre-filtered half-float output is GPU/driver-dependent; the CPU fallback (kuiCpuThreads above) is
-	// thread-count-dependent. Either way the .R16G16B16A16_SFLOAT radiance intermediates are reproducible
-	// only per bake host. Acceptable under the single-canonical-bake-machine assumption;
-	// force a pinned-thread CPU path if CI / multi-machine
-	// bakes are introduced.
+	// OpenCL radiance convolution produces GPU/driver-dependent half-float output; the CPU fallback
+	// depends on kuiCpuThreads. R16G16B16A16_SFLOAT intermediates rely on a single canonical bake host
+	// for reproducibility.
 	ExpectedIblOutputs expectedOutputs;
 	cmft::ClContext* pClContext = nullptr;
 	const bool bClLoaded = cmft::clLoad() != 0;

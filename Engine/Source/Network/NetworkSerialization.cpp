@@ -442,8 +442,8 @@ int64_t DecompressStatusChangeBatch(const void* pSource, int64_t iSourceSize, ga
 		return 0;
 	}
 
-	// Decompress into a workbuffer reservation (LZ4 writes iResult bytes and only those are deserialized, so no
-	// zero-fill; item (b)'s bounded reads never run past iResult, so the prior chunk-rounded slack is unneeded)
+	// LZ4 writes iResult bytes and only those bytes are deserialized; bounded reads stop at iResult, so no zero-fill or
+	// extra slack is needed.
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferAllocation<uint8_t*> decompressedAllocation = rWorkbuffer.PushBuffer<uint8_t*>(iUncompressedSize);
 	uint8_t* pDecompressed = decompressedAllocation;

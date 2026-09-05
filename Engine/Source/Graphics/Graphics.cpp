@@ -195,23 +195,12 @@ void Graphics::RenderGlobal(float fCurrentTime)
 
 	miRenderFrameDeltaNs = mRenderFrameTimer.GetDeltaNs(true).count();
 
-	// Phase 5 LRU eviction sweeps bracket ProcessPendingTextures inside the descriptor-patch
-	// safety window (post-fence-wait, pre-cmd-buffer-recording). EvictionSweep frees GPU
-	// resources for templates whose grace period elapsed; RestorationSweep patches per-channel
-	// from slot-0 fallback back to real Texture* as each chunk reaches kReady.
-	//
-	// The single current-framebuffer fence wait above is insufficient for these sweeps: with triple
-	// buffering, OTHER in-flight frames may still reference the slots whose images/descriptors the
-	// sweeps free or rewrite. Drain all framebuffer fences first — but only on frames where a sweep
-	// will actually mutate (island-set churn), so steady-state frames pay no stall.
-	//
-	// ProcessPendingTextures (below) also writes descriptor elements on any frame it adopts a chunk —
-	// per-slot island writes, the array flush, and the lighting-blur array write — which race in-flight
-	// samplers the same way (UPDATE_AFTER_BIND makes the write spec-legal, not race-free). AnyAdoptionPending
-	// folds those adoption frames into the same drain; restoration's template-owned elevation array write
-	// has no mTextureMap chunk, so AnyRestorationPending stays a distinct, non-redundant predicate.
-	// ProcessPendingTextures clears then republishes this only when the gate opens. Clear the previous frame's
-	// one-time acquire command buffer before the predicate so an idle frame cannot submit it again.
+	// EvictionSweep frees expired template GPU resources, then ProcessPendingTextures adopts chunks, and RestorationSweep restores channels
+	// from slot-0 fallback as chunks reach kReady. These descriptor changes run after fence waits and before command recording. Drain every
+	// framebuffer fence only when churn, adoption, or restoration is pending; UPDATE_AFTER_BIND permits writes but does not prevent races with
+	// in-flight samplers. AnyAdoptionPending covers per-slot, array-flush, and lighting-blur writes; AnyRestorationPending also covers
+	// template-owned elevation without a texture-map chunk. Clear the prior acquire publication before testing the predicate so an idle frame
+	// cannot resubmit it; ProcessPendingTextures republishes only inside the write epoch.
 	gpTextureManager->mbHasPendingAcquireBarriers = false;
 	bool bDescriptorChurnPending = gpIslandTerrain->AnyEvictionPending() || gpIslandTerrain->AnyRestorationPending() || gpTextureManager->AnyAdoptionPending();
 	if (bDescriptorChurnPending)
@@ -260,11 +249,9 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 
 	gpCommandBufferManager->SubmitUiCommandBuffer(iCommandBuffer);
 
-	// Capture between the UI submit and Present: SubmitUiCommandBuffer has enqueued the UI submit
-	// (ImGuiManager::Submit) that signals the per-framebuffer fence, so SaveScreenshot's wait blocks on an
-	// already-pending signal rather than a fresh reset whose signal depends on this thread returning (that was the
-	// deadlock), and the present image is still application-owned. Costs a full GPU sync on screenshot frames;
-	// dev-only toggle.
+	// Capture after SubmitUiCommandBuffer and before Present: the UI submit has queued mVkFence, so SaveScreenshot waits on a pending or
+	// completed signal while the present image remains application-owned.
+	// Screenshot capture incurs a full GPU synchronization and is dev-only.
 	if constexpr (kbScreenshots)
 	{
 		if (mScreenshotRequest)
@@ -340,16 +327,10 @@ void Graphics::Create()
 
 	Refresh();
 
-	// Skip-and-defer: a swapchain-tier recreate is pending, but Destroy() below has already torn down the old
-	// swapchain by the time CreateSwapchain reads the (now degenerate) surface caps. Pre-query the caps here: if
-	// the window reports a zero-area defined extent (minimized / dragged mostly off-screen), leave meDestroyType
-	// pending so a later frame retries once the window is valid again — mirrors Refresh()'s wanted-extent zero guard.
-	// kSurface is excluded: surface caps on a lost surface are meaningless (zeroed), and surface-loss recovery must
-	// always proceed to full teardown+recreate — deferring it here would wedge recovery.
-	// Accepted residual: a zero-area extent concurrent with surface-loss (kSurface) or device-loss recovery (which
-	// reconstructs Graphics fresh, so the gate sees kNone) still reaches CreateSwapchain, where the min/maxImageExtent
-	// clamp is a no-op when minImageExtent is also zero. That compound failure (minimize racing a surface/device loss)
-	// is rare, and guarding it here would need new recovery-retry semantics — left unhandled by design.
+	// Defer swapchain-tier recreation before Destroy when a defined surface extent is zero, leaving meDestroyType pending for retry as
+	// Refresh's zero-extent guard does. Lost-surface capabilities are invalid, so surface-loss recovery must proceed with teardown and
+	// recreation. Zero-area extents during surface loss or fresh device recovery bypass this gate and reach CreateSwapchain; the extent clamp
+	// cannot help when minImageExtent is also zero. That case has no recovery-retry handling.
 	if (gpInstanceManager != nullptr && meDestroyType >= DestroyType::kSwapchain && meDestroyType < DestroyType::kSurface)
 	{
 		VkSurfaceCapabilitiesKHR vkSurfaceCapabilitiesKHR {};

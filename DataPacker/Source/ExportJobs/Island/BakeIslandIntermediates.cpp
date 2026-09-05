@@ -32,24 +32,13 @@ std::filesystem::path IslandRelativePath(const std::filesystem::path& rSourcePat
 	throw std::runtime_error(std::format("Island path \"{}\" is outside DataPacker input roots", rSourcePath.string()));
 }
 
-// Route → subdivision table (single source of truth). `pcLabel` is BOTH the Island.json "routes"
-// value AND the per-route sub-folder name. `iGaeaChoice` is patched into the archetype's single
-// Gaea Route node ("Choice") = the 0-based input-port index: 0 = In (1x1, single landmass),
-// 1 = Input2 (2x1 dual band), 2 = Input3 (2x2 quad grid), 3 = Input4 (3x1) ... 9 = Input10 (4x4).
-// `iColumns`/`iRows` split the full square bake into that many chunks along X (east-west) /
-// Y (north-south); each chunk becomes an independent kIsland in the pack.
-//
-// NOTE: the split axes must match how the Route lays out its landmasses. The "2x1" dual band stacks
-// two landmasses along Y (Route Input2 feeds two copies of the cone-edge offset by ±OffsetY), so it
-// splits along Y only (iRows = 2). The "2x2" quad grid offsets four copies by ±OffsetX AND ±OffsetY
-// into the four quadrant centers, so it splits along both axes (iColumns = iRows = 2) to cut BETWEEN
-// the landmasses rather than through them. The label "RxC" reads ROWS-by-COLUMNS (R landmasses along
-// Y, C along X); the label names the route, not the pixel axis. Splits need NOT divide texturePixels
-// evenly: ProcessBakedRegion searches each natural (possibly uneven) region for its landmass, then
-// the per-axis crop borrows neighbour pixels at a non-64-aligned region edge to reach the crop
-// alignment, so a 3-way split of a power-of-two bake works. Editing iColumns/iRows is a post-Gaea
-// split change: bump kiSplitVersion (NOT kiBakeVersion) so existing Gaea bakes are reused and only
-// the split re-runs.
+// pcLabel is both the Island.json route and cache subfolder; iGaeaChoice is the zero-based Gaea Route
+// input (0=In, 1=Input2, through 9=Input10). iColumns/iRows split X/Y into independent kIsland chunks.
+// Labels are rows-by-columns: the 2x1 dual band separates Y-offset landmasses, and 2x2 separates both
+// axes at quadrant boundaries. Split axes must cut between the Route's landmasses. Uneven regions are
+// valid: ProcessBakedRegion borrows neighboring pixels to meet crop alignment, including three-way
+// splits of power-of-two bakes. Column/row changes bump kiSplitVersion, reuse raw Gaea output, and rerun
+// only the split.
 constexpr RouteSubdivision kRouteSubdivisions[] =
 {
 	{"1x1", 0, 1, 1},

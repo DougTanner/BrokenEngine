@@ -5,9 +5,7 @@
 namespace game
 {
 
-// ============================================================================
-// Lighting (scene light contribution)
-// ============================================================================
+// Lighting wrappers control scene-light contributions.
 
 // Explosions - Primary light
 engine::Wrapper gExplosionPrimaryLightingAreaOne(16.0f, 1.0f, 32.0f);
@@ -62,9 +60,7 @@ engine::Wrapper gHitFlashLightingAreaTwo(0.0f, 0.0f, 4.0f);
 engine::Wrapper gHitFlashLightingIntensityOne(0.0f, 0.0f, 2.0f);
 engine::Wrapper gHitFlashLightingIntensityTwo(0.0f, 0.0f, 2.0f);
 
-// ============================================================================
-// Visible (visual area / intensity)
-// ============================================================================
+// Visible wrappers control visual area and intensity.
 
 // Explosions - Primary light
 engine::Wrapper gExplosionPrimaryVisibleAreaOne(4.0f, 0.1f, 5.0f);

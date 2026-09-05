@@ -24,10 +24,7 @@ struct FixedString
 	constexpr operator const char*() const { return data; }
 };
 
-// Compile-time integer-to-string conversion
-// Used for generating compile-time CRC arrays with numbered suffixes
-// Parameters: i - Integer to convert (must be positive)
-// Returns: String representation of the integer
+// Generates decimal suffixes for compile-time CRC arrays; input must be nonnegative.
 constexpr std::string IntToString(int64_t i)
 {
 	std::string string;
@@ -52,11 +49,7 @@ inline constexpr crc_t kCrcMultiplier = 0x123456789abcdef1;
 // save/replay version gate game::Frame::kiVersion in the same change. That gate is the only signal
 // separating "data desynced" from "checksum algorithm changed" (skip it and straddling replays false-desync).
 
-// Compile-time CRC hash function for string hashing
-// Used extensively for asset identification and lookup throughout the codebase
-// Note: Custom hash algorithm, not standard CRC32/64
-// Parameters: pData - String to hash
-// Returns: 64-bit hash value
+// Custom 64-bit hash used for asset identification and lookup; it is not standard CRC32/64.
 constexpr crc_t Crc(std::string_view pData)
 {
 	crc_t crc = kCrcSeed;
@@ -86,10 +79,6 @@ constexpr crc_t Crc(std::string_view pData)
 	return crc;
 }
 
-// Compile-time only CRC hash function - forces compile-time evaluation
-// Causes compiler error if used with runtime values
-// Parameters: pData - String to hash (must be a compile-time constant)
-// Returns: 64-bit hash value
 #pragma warning(suppress: 26497) // consteval is stricter than constexpr
 consteval crc_t CrcConsteval(std::string_view pData)
 {
@@ -99,12 +88,8 @@ consteval crc_t CrcConsteval(std::string_view pData)
 }
 static_assert(Crc("test") == CrcConsteval("test"), "CRC functions must produce identical results");
 
-// Template overload for hashing arrays (pointer + count)
-// Determinism contract: hashes the raw object representation verbatim, including any padding and
-// float bit patterns. Equal values produce equal hashes only when the type is padding-free (or the
-// objects were value-initialized before fill); pass deterministically-zeroed, layout-stable data.
-// Parameters: pValues - Pointer to array to hash, iCount - Number of elements
-// Returns: 64-bit hash value
+// Hashes native object representations, including padding and float bit patterns; use layout-stable,
+// padding-free or deterministically-zeroed data.
 template<typename T>
 inline crc_t Crc(const T* pValues, int64_t iCount)
 {
@@ -117,14 +102,9 @@ inline crc_t Crc(const T* pValues, int64_t iCount)
 template<typename T>
 concept NotStringLike = !std::is_convertible_v<T, std::string_view>;
 
-// Generic hash function for trivially copyable types by reinterpreting bytes
-// Excludes string-like types to avoid ambiguous overload with Crc(std::string_view), and XMVECTOR so
-// the dedicated Crc(FXMVECTOR) overload below always wins — removing that overload becomes a compile
-// error here rather than a silent raw-__m128 byte hash.
-// Determinism contract: hashes the raw object representation verbatim, including padding and float
-// bit patterns; pass a value-initialized, padding-free (or deterministically-zeroed) object.
-// Parameters: rIn - Trivially copyable object to hash
-// Returns: 64-bit hash value
+// String-like types use the string_view overload, and XMVECTOR requires its dedicated overload with no
+// generic fallback. Hashing includes native padding and float bit patterns; pass value-initialized,
+// padding-free or deterministically-zeroed objects.
 template <typename T> requires NotStringLike<T>
 	&& (!std::is_pointer_v<std::remove_cvref_t<T>>)
 	&& (!std::is_same_v<std::remove_cvref_t<T>, XMVECTOR>)

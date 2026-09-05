@@ -13,7 +13,7 @@ namespace game
 namespace
 {
 
-// ---- collection_layout_capacity_fixture (Fix 2: physical-layout-capacity retention acceptance) ----
+// collection_layout_capacity_fixture verifies physical-layout capacity retention.
 
 // Deterministic per-row shared-member values. The identical formulas drive the source-stream writer and the
 // post-read verification, and they cover every MissilesPostRender::SharedMembers() column, so any column or row
@@ -217,7 +217,7 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 	}
 }
 
-// ---- registry_fixture (engine::FrameRegistry public-API acceptance) ----
+// registry_fixture exercises the engine::FrameRegistry public API.
 
 // An id type the registry cannot name, so an ownership layer over it must go through the type-erased
 // RegistryIdBytes bind instead of a cross-type pointer view.

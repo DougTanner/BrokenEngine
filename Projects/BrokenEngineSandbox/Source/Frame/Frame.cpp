@@ -151,10 +151,8 @@ void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame
 	GameFlags_t gameFlags = rPrevious.gameFlags;
 	float fSpawnTimer = rPrevious.fSpawnTimer;
 
-	// Update spawn timer. Held at its 0.0f init while the main menu is up: menu frames never drain the timer
-	// (Spawn early-returns before the drain loop when kMainMenu is set), so accumulating here would build an
-	// unbounded backlog that bursts into simultaneous spawn groups if a menu->game transition is ever added.
-	// Freezing yields a clean full interval before the first spawn after any such transition.
+	// Main-menu frames hold the spawn timer at its zero initialization: Spawn returns before draining it, so the
+	// timer must not accumulate an undrained backlog.
 	if (!(gameFlags & GameFlags::kMainMenu))
 	{
 		fSpawnTimer += fDeltaTime;
@@ -494,8 +492,7 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 	int64_t iSpaceshipCount = rSpaceships.iCount;
 	int64_t iSubscriberCount = rSubscribers.iCount;
 
-	// A spaceship is targetable once its arrival grace has run out — the timing the removed Targets kDestination
-	// flag used to carry — and while it still publishes a registry id.
+	// A spaceship is targetable after its arrival grace expires while it publishes a registry id.
 	auto IsEligible = [&](int64_t i) { return rSpaceships.puiRegistryIds[i].IsValid() && pfArrivalGracePeriods[i] <= 0.0f; };
 
 	int64_t iEligibleCount = 0;
@@ -523,8 +520,8 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 		pAscendingRows[i] = i;
 	}
 
-	// The registry block starts with the eligible rows the caller fills and binds; the derived subscriber counts
-	// follow them. Ascending row order is what makes the fixed ranking's exact ties resolve as they did before.
+	// The registry block stores caller-filled eligible rows before derived subscriber counts; ascending row order
+	// resolves exact ranking ties deterministically.
 	int64_t* pEligibleRows = reinterpret_cast<int64_t*>(pScratch);
 	int64_t iEligibleRow = 0;
 	for (int64_t i = 0; i < iSpaceshipCount; ++i)

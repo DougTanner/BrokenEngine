@@ -140,7 +140,7 @@ constexpr float kfAccentStripThickness = 3.0f;
 constexpr float kfButtonAccentBarWidth = 6.0f;
 constexpr float kfHoverAnimRate = 12.0f;
 
-// Custom menu chrome per engine::UiTheme; hues track the engine ThemePalettes (ImGuiManager.cpp) — designer-pass placeholders
+// Custom menu chrome follows engine::UiTheme and ImGuiManager.cpp's ThemePalettes.
 struct MenuChrome
 {
 	ImVec4 f4PanelBorder;

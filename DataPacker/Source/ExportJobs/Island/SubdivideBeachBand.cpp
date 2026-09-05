@@ -3,11 +3,8 @@
 namespace
 {
 
-// All lambdas in the original inline block captured the same shared mutable state by reference
-// (the two mesh buffers, the worklist, the per-triangle alive/depth vectors, and the two edge
-// adjacency maps). Lifting them into a struct makes the dependency graph explicit: refs that
-// outlive Run() are constructor inputs, internal state is direct members. Run() drives the
-// worklist; everything else is a helper. TU-local in an anonymous namespace.
+// BeachSubdivider keeps caller-owned mesh/config references that outlive Run; worklist, per-triangle
+// state, and edge maps are internal. Run drives the worklist.
 struct BeachSubdivider
 {
 	BeachSubdivider(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits)

@@ -88,7 +88,7 @@ Wrapper gWaterLowAngleAdjust(0.2f, 0.0f, 0.5f);
 Wrapper gWaterLowWavelengthAdjust(-0.75f, -2.0f, 0.0f);
 Wrapper gWaterLowAmplitudeAdjust(1.0f, 0.0f, 4.0f);
 Wrapper gWaterLowSpeedAdjust(0.288f, 0.0f, 4.0f);
-// Camera-height fade for low-frequency wave amplitudes. At camera eye height ≤ Start, multiplier = 1.0 (full waves). At ≥ End, multiplier = 0.0 (no low waves). Linear in between. Defaults preserve the previous hardcoded 1× → 2× default-eye-height ramp.
+// Camera-height fade for low-frequency wave amplitudes: 1.0 at or below Start, 0.0 at or above End, and linear between.
 Wrapper gWaterLowAmplitudeFadeStart(300.0f, 0.0f, 1000.0f);
 Wrapper gWaterLowAmplitudeFadeEnd(600.0f, 0.0f, 1000.0f);
 

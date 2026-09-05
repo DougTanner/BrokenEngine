@@ -77,15 +77,9 @@ void AgentInput::Finish(AgentScriptStatus eStatus)
 	meStatus = eStatus;
 	mbScriptActive = false;
 
-	// Release held synthetic keys/buttons so nothing sticks after the script ends (the overlay stops running once
-	// inactive anyway, but keep members clean for the next script). Scroll accumulator persists by design.
-	// Down/up sink asymmetry: this clears the overlay (game-side) synthetic mouse buttons, and the game overlay auto-
-	// releases a bare `down` ~2 frames later, but the ImGui side stays logically held until a matching `up` event.
-	// `click` is the composing primitive that pairs down+up on both sinks; a bare `down` without a later `up` leaves
-	// ImGui's button state held.
-	// Pos-sink asymmetry: the overlay (game-world) synthetic mouse pos clears here, but the ImGui-pos pin does NOT — it
-	// deliberately persists until the next script (see BeginScript). Between scripts the game-world mouse reverts to the
-	// physical cursor while the UI mouse stays pinned; the accepted asymmetry.
+	// Finish clears synthetic keys/buttons and the game-world mouse position, which then follows the physical cursor;
+	// the scroll accumulator persists, and the ImGui position stays pinned until BeginScript. Click emits down/up on
+	// both sinks; a bare down auto-releases on the game overlay after about two frames but leaves ImGui held until up.
 	std::fill(std::begin(mpbSyntheticKeys), std::end(mpbSyntheticKeys), false);
 	muiSyntheticMouseButtons = 0;
 	mbSyntheticMousePosValid = false;

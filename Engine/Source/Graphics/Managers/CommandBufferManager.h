@@ -24,8 +24,8 @@ public:
 	common::PersistentWorker mSubmitGlobal;
 	common::PersistentWorker mSubmitMain;
 
-	// Accepted: Semaphore waits at submission granularity. VkEvent would allow non-particle compute to proceed,
-	// but the GPU occupancy gain is minimal given the current workload mix.
+	// Semaphore waits operate at submission granularity. VkEvent allows non-particle compute to proceed, but finer synchronization offers
+	// minimal occupancy gains for this workload.
 	VkSemaphore mParticleSyncVkSemaphore = VK_NULL_HANDLE;
 	bool mbParticleSemaphoreSignaled = false;
 

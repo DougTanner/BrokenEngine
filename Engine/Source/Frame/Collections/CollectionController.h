@@ -7,10 +7,7 @@ namespace engine
 class Wrapper;
 #endif
 
-// ============================================================================
-// CONTROLLER TYPES FOR KEYFRAME ANIMATION
-// ============================================================================
-// Reusable keyframe animation system for collections that need time-based property interpolation.
+// Collection controller types provide time-based keyframe interpolation.
 
 inline constexpr int64_t kMaxControllerKeyframes = 4;
 inline constexpr uint8_t kuiInvalidTypeIndex = 0xFF;

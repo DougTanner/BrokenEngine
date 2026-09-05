@@ -43,16 +43,11 @@ WaterNormalSamplingResult SampleWaterNormals()
 	result.fWeightTwo = mainLayout.fWaterNormalWeightTwo;
 	result.fWeightThree = mainLayout.fWaterNormalWeightThree;
 
-	// Per-sample rotation (in each group below): m2UvRotX = R(-θ) rotates worldUV → texUV (texture pattern appears
-	// CCW-rotated by θ in world). m2NormalRotX = R(+θ) is its inverse, applied to the sampled tangent-space
-	// normal.xy to bring it back into world frame.
-	// Note: reducedOrigin is already rotated on the CPU (WaterUniforms.cpp uses the same per-sample
-	// rotation angle to rotate cameraXY before fmod). Rotating it again here would double-rotate
-	// AND break precision: the wrap shift sizeMult*10 must be integer for fract() to absorb it,
-	// but R*(sizeMult*10, 0) is non-integer for arbitrary θ. So m2UvRot is applied to the
-	// camera-relative position and derivatives only — the reducedOrigin stays as-is. reducedTime
-	// carries the same invariant: it is the per-frame scroll delta already rotated CPU-side before
-	// accumulation/fmod, so it must not be rotated here either.
+	// m2UvRot=R(-theta) maps world UV to texture UV, making the pattern appear rotated CCW by theta; inverse
+	// m2NormalRot=R(+theta) returns sampled tangent normal XY to world space. WaterUniforms.cpp rotates reducedOrigin
+	// before fmod and reducedTime before accumulation/fmod. Applying rotation again breaks orientation and the integral
+	// fract-wrap shift for arbitrary angles; apply m2UvRot only to camera-relative positions and derivatives, leaving
+	// both reduced values unchanged.
 	#define SAMPLE_NORMAL_PRECISE(sampler, size, reducedOrigin, reducedTime, m2UvRot, sizeMult, speedMult, offset) \
 	{ \
 		float fCallSize = sizeMult * size; \

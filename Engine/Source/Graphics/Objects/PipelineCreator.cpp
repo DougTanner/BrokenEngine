@@ -90,14 +90,9 @@ static void CreateSingleSetPipelineLayout(VkDescriptorSetLayoutCreateInfo& rLayo
 	VkName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, rPipeline.mVkPipelineLayout, rPipeline.mInfo.name.data());
 }
 
-// Creates a host-visible/coherent indirect buffer of iSlotCount * iElementSize bytes, asserts VMA honored the
-// host-visible + coherent request, and zeroes the persistent mapping so no slot runs until the CPU writes real
-// data. Shared by the graphics draw-indirect and compute dispatch-indirect host-visible paths — they differ
-// only in element/command type (VkDrawIndexedIndirectCommand vs VkDispatchIndirectCommand) and which typed
-// mapped-pointer member the caller stores the result in; every command struct is fully zero-cleared, so a byte
-// memset over the whole range is equivalent to the old per-field init. Returns the mapped pointer. NOTE: never
-// route the device-local paths through here (graphics N-slot / compute single-slot device-local are GPU-written,
-// not host-mapped).
+// Allocate iSlotCount * iElementSize host-visible/coherent bytes and assert those properties. Zero every indirect-command byte so no slot
+// executes before CPU data is written; return the persistent mapping. Graphics draw-indirect and compute dispatch-indirect share this path
+// with their respective command types. Device-local draw/dispatch paths remain GPU-written and unmapped.
 static void* CreateHostVisibleIndirectBuffer(Pipeline& rPipeline, int64_t iSlotCount, int64_t iElementSize)
 {
 	VmaAllocationInfo vmaAllocationInfo {};
@@ -717,12 +712,9 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		pVkDescriptorSetLayoutBindings[iDescriptorCount++] = rBinding;
 	}
 
-	// Partition bindings by shader-reflected set index. Bindings on set 1 become the per-pipeline
-	// descriptor set; bindings on set 0 are assumed to live on the global Set 0 (compatible types).
-	// A compute shader that hasn't been migrated yet declares all bindings without an explicit set,
-	// which SPIR-V reports as set 0 — but those bindings won't be type-compatible with the global
-	// Set 0 layout (UBO/sampler/sampled-image at fixed slots). For those shaders we keep the legacy
-	// single-set layout and detach the global set so binder + writer treat the pipeline as standalone.
+	// Partition reflected bindings by set: set 1 is per-pipeline; compatible set-0 bindings use global Set 0. Compute bindings without an
+	// explicit set reflect as set 0; incompatible types require a standalone single-set layout with the global set detached for both binder and
+	// writer.
 	VkDescriptorSetLayoutBinding pVkSet1Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 	int64_t iSet1Count = 0;
 	for (int64_t i = 0; i < iDescriptorCount; ++i)
@@ -764,9 +756,8 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 	}
 	else
 	{
-		// Unmigrated compute (or no global Set 0 available): single-set layout in which the shader's
-		// set-0 bindings ARE the per-pipeline set. Null the external-layout pointer so binder/writer
-		// treat this pipeline as standalone.
+		// Standalone compute, including when global Set 0 is unavailable: shader set-0 bindings form the per-pipeline set. Clear the
+		// external-layout pointer so binder and writer treat it as standalone.
 		rPipeline.mVkExternalDescriptorSetLayout = VK_NULL_HANDLE;
 		CreateSingleSetPipelineLayout(uniformTextureVkDescriptorSetLayoutCreateInfo, pVkDescriptorSetLayoutBindings, iDescriptorCount, rPipeline, vkPipelineLayoutCreateInfo, VK_SHADER_STAGE_COMPUTE_BIT);
 	}

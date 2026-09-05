@@ -172,9 +172,9 @@ const XMFLOAT2* LocalHull(const IslandTemplate& rTemplate, XMFLOAT2 (&rRectStora
 // matching view and the IslandPlacement, and return the new placed index.
 int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT2 f2World, float fRotation, const common::ConvexHull2D& rCandidate)
 {
-	// placedHullStorage MUST NOT reallocate — placedHullViews hold raw pointers into it (below). It is
-	// reserved to kiMaxIslandsPerCell; a future constant change that lets placement exceed the reserve
-	// would dangle every view and corrupt the SAT overlap test → non-deterministic packing → CRC desync.
+	// placedHullViews hold raw vertex pointers into placedHullStorage, reserved to kiMaxIslandsPerCell.
+	// Placement must not exceed that reserve; the stable-view contract protects SAT overlap tests,
+	// deterministic packing, and CRC agreement.
 	ASSERT(rContext.placedHullStorage.size() < rContext.placedHullStorage.capacity());
 	rContext.placedHullStorage.emplace_back(rContext.scratch.begin(), rContext.scratch.end());
 	common::ConvexHull2D view = rCandidate;
@@ -316,9 +316,9 @@ void GenerateIslandChain(GridCoord coord, std::vector<IslandPlacement>& rOut)
 	float fAnchorRotation = SignedJitter(kfAnchorRotationJitter, context.anchorRandom);
 	XMFLOAT2 f2AnchorLocal {};
 	bool bAnchorPlaced = PlaceAnchor(context, anchorCrc, fAnchorTargetX, fAnchorTargetY, fAnchorRotation, f2AnchorLocal);
-	// Output index 0 must be the anchor (SpaceshipsNavigation / PlayersNavigation index islands.at(0)).
-	// PlaceAnchor only fails if the island can't fit the cell at all — impossible for current assets at the
-	// current cell size, but assert so a future oversized island fails fast instead of silently shifting index 0.
+	// The anchor must occupy output index 0 for SpaceshipsNavigation and PlayersNavigation. PlaceAnchor
+	// fails when the island cannot fit the cell; assert success so consumers cannot silently index a
+	// different island.
 	ASSERT(bAnchorPlaced);
 
 	// 2. BIG-ISLAND CHAIN — 2 Large then 3 Medium, contact-linked along a hard-turning curve from the Huge

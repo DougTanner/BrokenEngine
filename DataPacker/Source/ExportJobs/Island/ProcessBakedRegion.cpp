@@ -1,24 +1,17 @@
 #include "BakeIslandIntermediatesInternal.h"
 
-// Crops one chunk region [xStart,xEnd) x [yStart,yEnd) out of the full Gaea bake and writes the
-// chunk's per-region geometry (Elevation.r32, AmbientOcclusion.r16, MeshProcessed.bin,
-// BakedDimensions.json) into the leaf's Gaea cache folder. The source leaf remains the home of the
-// tracked BC outputs and provides ExportIsland's stable chunk path. Shared full-res
-// Color/Normals/mask PNGs remain in the route cache, and the crop rect recorded in BakedDimensions
-// lets ExportIsland crop them in-memory. A 1x1 route passes the
-// whole texture as the region; a 2x1 route calls this once per Y-half, a 2x2 route once per quadrant
-// (both axes split at the midpoints), so the existing auto-crop runs (and, in ExportIsland, the
-// underwater re-coloring) once per chunk.
-// meshPositions / meshIndices are taken by value so each region mutates its own copy of the shared
-// post-subdivision mesh.
-// Returns true if the leaf was written, false if rejected (too low — see kfMinIslandMaxHeightMeters).
+// Crop the half-open route region into per-leaf Elevation.r32, AmbientOcclusion.r16, MeshProcessed.bin,
+// and BakedDimensions.json in the Gaea cache. The source leaf owns tracked BC outputs and ExportIsland's
+// stable chunk path; the recorded crop rect lets ExportIsland crop shared full-resolution
+// color/normal/mask images in memory. A 1x1 route supplies the whole texture, 2x1 each Y half, and 2x2
+// each quadrant, with auto-crop and underwater recoloring once per chunk. Each call mutates its own
+// post-subdivision mesh copy. Return true when written, false below kfMinIslandMaxHeightMeters.
 
 namespace
 {
 
-// Widest edge-taper band, in meters. Matches the band the removed full-bake taper used (8192 / 16
-// pixels at ~0.049 m/px). The quarter-dimension clamp in TaperLeafElevationEdgesToSeaFloor keeps a
-// small leaf (down to ~50 m) from having its entire shoal deepened by a fixed-width band.
+// The quarter-dimension clamp keeps small leaves from deepening their entire shoal with the fixed-width
+// edge-taper band.
 constexpr float kfEdgeTaperMaxMeters = 25.0f;
 
 // Aligned crop rect into the full bake, in full-bake pixel coords. Shared output of the auto-crop
@@ -135,15 +128,11 @@ std::vector<float> CropAndDownsampleElevation(const std::vector<float>& rFullEle
 	return downsampledPixels;
 }
 
-// Force the leaf's border elevation smoothly down to the per-island sea floor. Every leaf ships as
-// an independent island sitting in the engine's constant open-ocean elevation clear, so the taper
-// runs per leaf — including edges produced by interior split cut lines, which the full bake's own
-// border never covers. Water at or below halfway depth must reach exactly -fBeachOffsetMeters
-// (= common::kfSeaBottomMeters) at the edge for it to blend with that clear, but shallows above
-// halfway depth are preserved almost unchanged so the taper cannot amputate a leaf's visible sand
-// apron where the coast nears a cut edge. Only underwater pixels are touched and none is ever
-// raised, so terrain at or above sea level keeps its shape and terrain already deeper than the
-// ceiling keeps its detail.
+// Independent island leaves need border tapering, including interior split edges, toward their
+// per-island sea floor -fBeachOffsetMeters. At the edge, underwater pixels at or below halfway depth
+// receive the full lowering weight; shallower water changes little to preserve the visible sand apron.
+// Only underwater pixels change and none is raised, preserving land and detail already below the taper
+// ceiling.
 void TaperLeafElevationEdgesToSeaFloor(std::vector<float>& rDownsampledPixels, int64_t iWidth, int64_t iHeight, float fMetersPerPixel, float fBeachOffsetMeters)
 {
 	float fBandMeters = std::min(kfEdgeTaperMaxMeters, 0.25f * fMetersPerPixel * static_cast<float>(std::min(iWidth, iHeight)));
@@ -250,10 +239,7 @@ void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<uint32_t>
 	}
 	rMeshIndices = std::move(survivingIndices);
 
-	// Defense-in-depth twin of the pixel-cut-line throw above: the pixel bbox guard catches the
-	// common case (no land in region), but a future Mesher with gaps could pass the pixel check
-	// and still emit no triangles inside the crop bbox. Catch the empty-mesh chunk here rather
-	// than silently shipping an invisible island.
+	// Reject an empty cropped mesh after the pixel-bbox check so no invisible island chunk is written.
 	if (rMeshIndices.empty())
 	{
 		throw std::runtime_error(std::format("Island chunk \"{}\" region [{}..{}, {}..{}] has zero surviving triangles after mesh crop ({} discarded): the Route subdivision produced no mesh inside this chunk's bbox. Check the archetype's Mesher resolution or Route shape.", rLeafDir.string(), rRegion.iStartX, rRegion.iEndX - 1, rRegion.iStartY, rRegion.iEndY - 1, iDiscardedTriangles));

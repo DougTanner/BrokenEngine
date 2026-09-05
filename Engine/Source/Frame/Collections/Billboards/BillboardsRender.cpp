@@ -85,9 +85,7 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			f4Position.y = std::clamp(f4Position.y, -1.0f + fSize, 1.0f - fSize);
 		}
 
-		// Calculate rotation for offscreen rotate flag
-		// RotationFromPosition now returns the signed atan2 heading, so the prior manual hemisphere flip is folded
-		// into a single negation (3*pi/2 - theta), preserving the original orientation (mod 2*pi)
+		// Offscreen rotation maps RotationFromPosition's signed heading with 3*pi/2 minus theta.
 		if (flags & kOffscreenRotate)
 		{
 			fRotation = XM_PI + XM_PIDIV2 - common::RotationFromPosition(XMVector3Normalize(XMLoadFloat4A(&f4Position)));

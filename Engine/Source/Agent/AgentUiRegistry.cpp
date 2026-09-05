@@ -271,12 +271,10 @@ int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow)
 
 } // namespace engine
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Dear ImGui test-engine hook externs (imgui_internal.h:3951-3954). The vendored imgui is compiled with IMGUI_ENABLE_TEST_ENGINE
-// (ThirdParty/Prebuilts/Source/Engine/ImGui.cpp), so these are invoked from ItemAdd()/ItemInfo() when
-// g.TestEngineHookItems is set (ImGuiManager ctor, agent layer active). They forward into the client-only registry.
-// Global scope, matching the extern declarations. The server links imgui too (BT_ENGINE include) — its no-op
-// implementations live in AgentUiRegistryServerStubs.cpp.
+// Global Dear ImGui test-engine hooks match imgui_internal.h and run from ItemAdd()/ItemInfo() with
+// IMGUI_ENABLE_TEST_ENGINE and g.TestEngineHookItems active. The vendored ImGui wrapper enables the hooks; ImGuiManager
+// enables item hooks for the agent layer. Client hooks forward to AgentUiRegistry, while the server links the same
+// ImGui code and supplies no-op hooks in AgentUiRegistryServerStubs.cpp.
 
 void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb, [[maybe_unused]] const ImGuiLastItemData* item_data)
 {

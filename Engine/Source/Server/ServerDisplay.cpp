@@ -34,9 +34,8 @@ static std::string sProfileText;
 static uint64_t suLastContentHash = 0;
 static bool sbHasLastContentHash = false;
 
-// Entity totals the left panel draws, summed once per tick from the game cell-stat seam. File-static like the
-// rest of the display state (one window per process). Aggregation is skipped when profiling is compiled out,
-// so these stay zero and the entity rows read empty exactly as they did before.
+// Entity totals for the left panel are summed once per tick from the game cell-stat seam and stay file-static for the
+// process's one window. Profiling-disabled builds skip aggregation, so these remain zero and the entity rows are empty.
 static int64_t siTotalPlayers = 0;
 static int64_t siTotalSpaceships = 0;
 static int64_t siTotalBlasters = 0;

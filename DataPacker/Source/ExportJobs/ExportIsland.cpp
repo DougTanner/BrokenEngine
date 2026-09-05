@@ -12,10 +12,6 @@ static_assert(std::string_view(kpcIslandColor).ends_with(TextureIntermediateSuff
 static_assert(std::string_view(kpcIslandMasks).ends_with(TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK)));
 static_assert(std::string_view(kpcIslandNormals).ends_with(TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK)));
 
-// ---------------------------------------------------------------------------
-// Single-resolution island ingest
-// ---------------------------------------------------------------------------
-
 namespace
 {
 
@@ -185,9 +181,9 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 	}
 }
 
-// Runtime SAT (common::ConvexHullsOverlap) requires both inputs to be convex and CCW; verify the
-// producer here so a future change to BuildValidAreaHull (or a degenerate input) fails the bake
-// instead of silently letting islands intersect at the waterline.
+// Runtime SAT (common::ConvexHullsOverlap) requires convex CCW hulls; verify hulls with at least three
+// vertices before serialization so invalid winding/convexity cannot let islands overlap at the
+// waterline.
 static void VerifyHullCcwConvex(const ExportedIsland& rOut)
 {
 	if (rOut.iValidAreaVertexCount >= 3)
@@ -422,10 +418,9 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	rOut.iHeightmapWidth = static_cast<int32_t>(iElevationWidth);
 	rOut.iHeightmapHeight = static_cast<int32_t>(iElevationHeight);
 
-	// Peak over the downsampled shipped heightmap, in engine-meters above beach (finite, non-empty).
-	// Computed from the full-precision floats before the payload is quantized to R16, so it can sit up
-	// to the ~0.25 m peak half-float rounding above what the runtime actually samples — harmless: this
-	// field currently has no runtime reader.
+	// fMaxHeightMeters is the peak of finite, nonempty downsampled engine-meter heights above beach,
+	// before R16 quantization, so it can differ from sampled height by half-float rounding. Runtime copies
+	// this metadata into the island template but does not query it.
 	rOut.fMaxHeightMeters = *std::ranges::max_element(rOut.cpuHeightmapData);
 
 	// Convex hull of the valid (above-threshold) region — same heightmap + threshold as the texture
@@ -491,10 +486,6 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	// here — Export() packs it into the chunk payload below.
 
 }
-
-// ---------------------------------------------------------------------------
-// ExportJob entry points
-// ---------------------------------------------------------------------------
 
 std::optional<common::ChunkFlags_t> ExportIsland::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {

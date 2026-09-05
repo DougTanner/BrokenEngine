@@ -409,9 +409,8 @@ void RenderTargetTextures::CreateLightingTextures()
 
 void RenderTargetTextures::RegisterDebugTextures(int64_t iPassCount)
 {
-	// Debug textures: terrain G-buffer (elevation only — color/normal/AO composite RTTs were deleted
-	// when Terrain.frag switched to direct bindless per-island sampling), then deposit RGB (visible
-	// area), deposit combined direction, spread pass 0..N combined direction, combine red.
+	// Debug textures: terrain elevation, deposit RGB (visible area), deposit combined direction, spread pass 0..N combined direction, and
+	// combine red. Terrain.frag samples color/normal/AO directly from bindless per-island textures.
 	static constexpr int64_t kiTerrainDebugSlotCount = 1;
 	mppDebugTextures[0] = &mTerrainElevationTexture;
 	mpDebugTextureFormats[0] = shaders::kiDebugTextureFormatTerrainElevation;

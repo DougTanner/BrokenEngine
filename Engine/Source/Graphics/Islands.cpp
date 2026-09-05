@@ -234,9 +234,8 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 		return engine::gpCamera->InVisibleArea(f4MeshVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius);
 	};
 
-	// Count every active placement with the same frame and visibility predicates used by both emission passes.
-	// Residency bookkeeping and texture-slot acquisition remain once per placement, matching the previous
-	// visible-first pass while leaving the actual writes until after all per-template bases are known.
+	// Count each active placement with the frame and visibility predicates used by both emission passes.
+	// Acquire residency and texture slots once per placement; write placements after all per-template bases are known.
 	for (const GridCoord& rCoord : rActiveCoords)
 	{
 		auto it = rFrames.find(rCoord);

@@ -2,11 +2,9 @@
 
 #include "BakeIslandIntermediates.h" // WorldDimensions
 
-// Gaea-2-specific archetype patching + executable resolution, split out of BakeIslandIntermediates.cpp
-// so all Gaea.Swarm-version-specific logic lives in one translation unit for eventual Gaea 3 migration.
-// This header is intentionally json-free (no tinygltf/nlohmann pull-in): the entry points parse their
-// .terrain JSON internally. Island.json -> archetype resolution (ResolveTerrain) stays in
-// BakeIslandIntermediates.cpp because its signature takes a parsed nlohmann::json.
+// GaeaArchetype owns Gaea-2-specific patching and executable resolution. This header is JSON-free:
+// implementations parse .terrain internally without exposing tinygltf/nlohmann types. ResolveTerrain
+// stays in BakeIslandIntermediates.cpp because Island.json resolution accepts parsed nlohmann::json.
 
 // Resolves Gaea.Swarm.exe: GAEA2_PATH env var first, then the default install location. Throws if
 // neither exists.

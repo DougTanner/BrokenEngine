@@ -1011,7 +1011,7 @@ namespace toolcli
 				return Failure("scan-failed");
 			}
 			// Every check that can reject the operation runs before the first path changes, so a later invalid child or
-			// untracked target can no longer leave an earlier child marker already rewritten.
+			// untracked target cannot leave an earlier child marker already rewritten.
 			struct ChildRewrite
 			{
 				std::wstring path;

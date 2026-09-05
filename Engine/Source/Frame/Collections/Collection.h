@@ -21,10 +21,7 @@ namespace engine
 struct FramePostRenderBase;
 struct GridCoord;
 
-// ============================================================================
-// MULTI-ARRAY SERIALIZATION HELPERS
-// ============================================================================
-// Synchronized operations on parallel arrays using fold expressions.
+// Multi-array helpers process member pointers in tuple order.
 
 // Computes ordered-fold CRC of multiple member arrays for deterministic replay validation.
 template <typename TTuple>
@@ -101,10 +98,6 @@ void AllocateAndRead(TStruct& rStruct, std::istream& rStream, TTuple&& members)
 	MultiRead(rStream, rStruct.iCount, std::forward<TTuple>(members));
 	NormalizeAfterRead(rStream, rStruct);
 }
-
-// ============================================================================
-// COLLECTION BASE CLASS
-// ============================================================================
 
 // Collection configuration flags
 enum class CollectionFlags : uint32_t
@@ -372,11 +365,6 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 	int64_t iPhysicalLayoutCapacity = 0;
 	common::AlignedUniquePtr<std::byte> pData;
 };
-
-// ============================================================================
-// COLLECTION-LEVEL PATTERN HELPERS
-// ============================================================================
-// High-level API functions for complete collection operations.
 
 // Computes complete CRC of collection (metadata + all member arrays) for deterministic replay validation.
 template <typename TStruct, typename TTuple>

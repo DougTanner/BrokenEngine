@@ -25,8 +25,7 @@ void TextureUploadManager::InitTransferResources()
 	RethrowException();
 
 	mbShutdown = false;
-	// Re-arm the drain handshake state alongside mbShutdown so a recreate starts the upload thread clean
-	//   (WaitIdle always returns with these false today, but keep the re-init symmetric and future-proof).
+	// Reset the drain handshake with mbShutdown so a recreated upload thread starts clean.
 	mbDrainRequested = false;
 	mbDrained = false;
 	mbThreadExited.store(false, std::memory_order_release); // A recreated thread starts un-exited
@@ -95,7 +94,7 @@ void TextureUploadManager::DestroyTransferResources()
 
 	if (mTransferVkFence != VK_NULL_HANDLE)
 	{
-		// Intentionally unchecked (teardown drain): the file's only unchecked Vulkan result — do not "fix" with CHECK_VK, which could throw mid-destroy.
+		// Teardown drain intentionally ignores this Vulkan result because CHECK_VK could throw before destruction completes.
 		vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mTransferVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count());
 	}
 
@@ -160,10 +159,8 @@ void TextureUploadManager::RequestUpload(common::crc_t crc, LoadPriority ePriori
 
 void TextureUploadManager::WaitIdle()
 {
-	// Nothing in flight to drain once the thread has been told to exit or was never started (first-boot
-	//   Create() calls Destroy() before TextureManager creation runs StartThread(), and mbShutdown starts
-	//   false); returning matches the original empty-lock no-op and avoids waiting on an ack that will
-	//   never come. joinable() is main-thread-only state here: this thread is the sole starter/joiner.
+	// No upload thread can acknowledge a drain after shutdown/exit or before startup. First-boot Create calls Destroy before TextureManager
+	// starts the thread, while mbShutdown is false. This thread is the sole starter/joiner, so joinable() is main-thread-only state.
 	if (mbShutdown || mbThreadExited || !mUploadThread.joinable())
 	{
 		return;

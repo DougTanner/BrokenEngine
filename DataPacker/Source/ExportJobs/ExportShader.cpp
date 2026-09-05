@@ -142,9 +142,8 @@ std::filesystem::path ExportShader::RunVulkanTool(const std::filesystem::path& r
 
 std::filesystem::path ExportShader::PreprocessShader()
 {
-	// glslc.exe is glslangValidator.exe but with support for #include
-	// We're only going to use it to pre-process the shader to bake in include files
-	// We'll use glslangValidator.exe to actually compile it because glslc.exe often fails silently on compile errors
+	// glslc preprocesses shaders with #include support; glslangValidator compiles them because glslc can
+	// return success with compile errors.
 	std::filesystem::path glslcExecutable(GetVulkanSdkBinariesDirectory());
 	glslcExecutable.append("glslc.exe");
 
@@ -220,7 +219,6 @@ std::filesystem::path ExportShader::CompileShader(const std::filesystem::path& r
 	}
 	commandLineParameters += L" -V";      // Generate binary
 	commandLineParameters += L" --target-env vulkan1.2"; // Also update VK_API_VERSION_1_2 in engine
-	// commandLineParameters += L" -t";   // Multi-threaded
 	commandLineParameters += L" -o \"" + spirvFile.native() + L"\"";
 	commandLineParameters += L" \"" + rPreProcessedFile.native() + L"\"";
 

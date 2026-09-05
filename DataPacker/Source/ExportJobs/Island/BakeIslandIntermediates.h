@@ -5,9 +5,8 @@
 // from `Island.json` + a resolved `.terrain` archetype, writing .r32 (elevation) / .r16 (AO) /
 // .png (sRGB color) / .exr (normals) files to the shared Gaea cache that ExportIsland consumes.
 // Throws on any failure (caught by main()'s try/catch).
-// Gaea-2-version-specific logic (executable resolution, archetype patching, Sea-level read) is
-// isolated in GaeaArchetype.{h,cpp} for eventual Gaea 3 migration; this TU keeps the version-agnostic
-// bake/split orchestration.
+// Gaea 2 executable resolution, archetype patching, and Sea-level reads live in GaeaArchetype.{h,cpp};
+// this translation unit owns version-agnostic bake/split orchestration.
 void BakeIslandIntermediates();
 
 struct WorldDimensions

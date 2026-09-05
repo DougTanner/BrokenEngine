@@ -62,17 +62,12 @@ static bool sbLightingRefreshFrame = true; // Cached before global lighting publ
 
 static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, bool bScheduledRefresh, bool bLightingEnabled)
 {
-	// Lighting area: world-sized texels from a raw-frustum-safe camera-height reference (mirror of the shadow-area path in
-	// PopulateShadowParameters). The deposit/spread/combine textures are pre-sized (RenderTargetTextures, via
-	// LightingDetailTextureSize) by kfLightingHeadroomMultiplier; the texel world size is sized so a constant
-	// on-screen pixel count (textureWidth / kfLightingHeadroomMultiplier) spans the live frustum width at the camera's
-	// mfLightingTexelEyeHeight. That reference expands immediately outward and contracts at its existing rate inward,
-	// so it never falls below live height; the grid stays fixed at a settled height and snapped cleanly under XY pan.
-	// Reading the actual (clamped) extent keeps raw-frustum coverage
-	// device-clamp-invariant and snaps deposit quads onto integer texels.
-	// f4LightingArea is the full camera-centered footprint snapped to the deposit texel grid. Snapping to
-	// the deposit grid (not combine) is load-bearing: deposit is where lights rasterize, so its grid must move in
-	// integer-texel steps under pan. Spread/combine/temporal resample the same world rectangle at their own resolutions.
+	// Lighting mirrors the shadow area's raw-frustum-safe eye-height reference. RenderTargetTextures sizes deposit/spread/combine through
+	// LightingDetailTextureSize with kfLightingHeadroomMultiplier; textureWidth / that multiplier pixels span the frustum at
+	// mfLightingTexelEyeHeight. The reference expands immediately outward, contracts at the existing rate inward, and never falls below live
+	// height. Actual clamped extents preserve device-independent coverage. At settled height the grid stays fixed; snap the camera-centered
+	// f4LightingArea to integer deposit texels because deposit rasterizes lights. Spread/combine/temporal resample that world rectangle at
+	// their own resolutions.
 	float fLightingTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent.width);
 	float fLightingTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent.height);
 	float fCombineTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.extent.width);
@@ -156,9 +151,8 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fCombineBlackTightness = gCombineBlackTightness.Get();
 	rGlobalLayout.fCombineHuePreserve = gCombineHuePreserve.Get();
 
-	// Uchimura tone-curve segment constants precomputed on the CPU (all six inputs are invocation-invariant uniforms).
-	// S0/S1/CP feed LightCombine.comp Uchimura and DebugTexture.frag; the epsilon guard on P - S1 removes the prior
-	// shader divergence (DebugTexture guarded, LightCombine did not).
+	// Precompute Uchimura segment constants S0/S1/CP from six invocation-invariant uniforms for LightCombine.comp and DebugTexture.frag; both
+	// use the same P-S1 epsilon guard.
 	float fCombineL0 = ((fCombineMaxBrightness - fCombineLinearStart) * fCombineLinearLength) / fCombineContrast;
 	float fCombineS1 = fCombineLinearStart + fCombineContrast * fCombineL0;
 	float fCombineC2 = (fCombineContrast * fCombineMaxBrightness) / std::max(fCombineMaxBrightness - fCombineS1, shaders::kfEpsilon);
@@ -272,8 +266,8 @@ void RenderLightingMain(int64_t iCommandBuffer)
 		rMainLayout.fWaterNormalWRelSqThree = 0.0f;
 	}
 	rMainLayout.fWaterNormalWeightSumInv = 1.0f / std::max(3.0f * fWaterNormalWeightTotal, shaders::kfEpsilon);
-	// Water.frag height darken: keep bottom, upload only the range reciprocal (top folds away). Unguarded to
-	// reproduce the shader's original divide (degenerate top==bottom -> +inf, absorbed by the surrounding clamp).
+	// Water.frag height darkening keeps the bottom and uploads only the range reciprocal; leave it unguarded because top == bottom yields +inf
+	// absorbed by the surrounding clamp.
 	float fWaterHeightDarkenTop = gWaterHeightDarkenTop.Get();
 	float fWaterHeightDarkenBottom = gWaterHeightDarkenBottom.Get();
 	rMainLayout.fWaterHeightDarkenBottom = fWaterHeightDarkenBottom;
@@ -282,7 +276,7 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fWaterHeightDarkenSource = gWaterHeightDarkenSource.Get();
 	rMainLayout.fWaterHeightDarkenLighting = gWaterHeightDarkenLighting.Get();
 
-	// fLightingWaterSkyboxSunBias no longer uploaded: it folds into globalLayout.f4WaterBiasedSunNormal (GlobalUniforms.cpp).
+	// GlobalUniforms folds fLightingWaterSkyboxSunBias into globalLayout.f4WaterBiasedSunNormal.
 	rMainLayout.fLightingWaterSkyboxNormalBlendWave = gLightingWaterSkyboxNormalBlendWave.Get();
 	rMainLayout.fLightingWaterSkyboxIntensity = gLightingWaterSkyboxIntensity.Get();
 	rMainLayout.fLightingWaterSkyboxAdd = gLightingWaterSkyboxAdd.Get();

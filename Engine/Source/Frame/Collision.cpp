@@ -307,7 +307,7 @@ void Collision::SetupZones(FXMVECTOR vecArea)
 		}
 	}
 
-	// Same-layer collision could be supported but needs implementation (avoid self-collision, different loop structure)
+	// Same-layer collision is unsupported; each layer's collision mask must exclude its own category.
 	for (int64_t iLayer = 0; iLayer < siLayerCount; ++iLayer)
 	{
 		ASSERT((sLayers.at(static_cast<size_t>(iLayer)).uiCollidesWith & sLayers.at(static_cast<size_t>(iLayer)).uiCategory) == 0 && "Same-layer collision not implemented");

@@ -568,7 +568,7 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 
 } // namespace
 
-// ---- Shared helper (trust boundary — params are external input) ----
+// Shared agent helpers validate external parameters at the trust boundary.
 
 // Parse a [x,y] JSON array into a GridCoord; .get<int32_t>() throws on a non-number.
 engine::GridCoord CoordFromParam(const nlohmann::json& rParams, const char* pcKey)
@@ -584,7 +584,7 @@ engine::GridCoord CoordFromParam(const nlohmann::json& rParams, const char* pcKe
 namespace
 {
 
-// ---- StatusChange injection helpers ----
+// StatusChange injection helpers.
 
 bool IsCoordActive(engine::GridCoord coord)
 {

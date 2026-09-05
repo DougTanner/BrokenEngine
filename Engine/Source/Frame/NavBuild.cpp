@@ -12,11 +12,8 @@ struct ContourEdge
 {
 	XMFLOAT2 f2A {};
 	XMFLOAT2 f2B {};
-	// Cell-edge identifiers for each endpoint. Each marching-squares midpoint lives on exactly one
-	// cell-edge (horizontal or vertical); two cells that share a cell-edge produce the same midpoint
-	// position and therefore the same identifier. Used as the chain-graph key in
-	// ChainEdgesIntoPolygons, replacing the older `XMFLOAT2 → quantized uint64` keying that suffered
-	// from single-precision float drift across the two sides of a shared edge.
+	// Cell-edge identifiers key each marching-squares endpoint; shared edges use one key on both sides,
+	// so ChainEdgesIntoPolygons keeps a midpoint together without float drift.
 	uint64_t uiKeyA = 0;
 	uint64_t uiKeyB = 0;
 };
@@ -81,7 +78,7 @@ void ExtractContourEdges(std::vector<ContourEdge>& rEdges, const float* pfHeight
 
 			// Edge midpoints via linear interpolation. Result is the unbounded crossing fraction in
 			// [0, 1]; downstream chain keying uses the integer cell-edge identifier so float drift
-			// or corner-snap quantization can no longer split a shared midpoint across two keys.
+			// or corner-snap quantization cannot split a shared midpoint across two keys.
 			auto Lerp = [](float fA, float fB, float fThresholdValue) -> float
 			{
 				float fDenom = fA - fB;
@@ -209,10 +206,9 @@ void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const
 		vertexToEdge.insert({rEdges.at(i).uiKeyA, {i, false}});
 		vertexToEdge.insert({rEdges.at(i).uiKeyB, {i, true}});
 
-		// Determinism guard: each cell-edge key is shared by at most two cells (one entry per side), so
-		// the chain walk's unused-candidate pick is unique regardless of bucket order. A future
-		// ExtractContourEdges change emitting a duplicate key would make NavData hash-bucket-order-
-		// dependent (divergent across builds). At-most-two, not exactly-two: boundary cell-edges have one.
+		// Each cell-edge key has at most two entries, one per side; boundary edges have one. This makes
+		// the unused chain candidate unique regardless of bucket order. Duplicate ExtractContourEdges
+		// entries make NavData depend on hash-bucket order and diverge across builds.
 		ASSERT(vertexToEdge.count(rEdges.at(i).uiKeyA) <= 2);
 		ASSERT(vertexToEdge.count(rEdges.at(i).uiKeyB) <= 2);
 	}
@@ -274,9 +270,8 @@ void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const
 
 } // anonymous namespace
 
-// Segment-segment intersection test. Promoted from the anonymous namespace to external linkage
-// (engine::, declared in NavBuildInternal.h) so NavCellData.cpp's kbDebugNavCrossingCheck diagnostic
-// can call it across the TU boundary. Proper interior crossing only (not endpoint touching).
+// Shared segment intersection test for NavCellData's crossing diagnostic and NavQuery's edge test; it
+// accepts proper interior crossings only, not endpoint touching.
 bool SegmentsIntersect(XMFLOAT2 f2A1, XMFLOAT2 f2A2, XMFLOAT2 f2B1, XMFLOAT2 f2B2)
 {
 	float fD1x = f2A2.x - f2A1.x;
@@ -300,10 +295,8 @@ bool SegmentsIntersect(XMFLOAT2 f2A1, XMFLOAT2 f2A2, XMFLOAT2 f2B1, XMFLOAT2 f2B
 	return fT > kfSegmentEpsilon && fT < (1.0f - kfSegmentEpsilon) && fU > kfSegmentEpsilon && fU < (1.0f - kfSegmentEpsilon);
 }
 
-// Winding-number point-in-polygon test. Promoted from the anonymous namespace to external linkage
-// (engine::, declared in NavBuildInternal.h) so NavQuery.cpp's PointInAnyPolygon shares one winding
-// core with the builder — a tuned boundary rule can't drift between build and query. Pointer + count
-// so callers can pass a sub-range of a larger vertex buffer (PointInAnyPolygon).
+// The builder and NavQuery's PointInAnyPolygon share this winding-number core so boundary rules cannot
+// drift. Pointer plus count accepts subranges of a larger vertex buffer.
 bool PointInPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, int32_t iVertexCount)
 {
 	int32_t iWinding = 0;
@@ -361,11 +354,9 @@ void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t
 
 	LOG(kNavData, kDebug, "NavBuild: chained into {} polygons", polygons.size());
 
-	// Step 3: Hand raw chained polygons to Clipper2 — Union in UV, then transform to centered local
-	// metric coordinates for isotropic inflation and simplification before mapping back to UV.
-	// Clipper2 is Vatti-based with integer-coordinate robustness; miter offsets fall back to
-	// bevel at concave corners that would otherwise self-intersect (the bowtie failure mode
-	// the previous custom miter offset suffered from).
+	// Union raw chained polygons in UV, then transform to centered local meters for isotropic inflation
+	// and simplification before mapping back to UV. Clipper2 uses integer-coordinate robustness and
+	// squares miter joins that exceed the limit; its finishing union removes offset self-intersections.
 	static constexpr double kfMiterLimit = 2.0;
 	static constexpr double kfSimplifyEpsilonMeters = 1.00;
 	// Clipper2 PathsD quantizes doubles to int64 at 10^precision per unit. Keep precision 6 for both
@@ -400,9 +391,9 @@ void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t
 		}
 	}
 
-	// The nav polygon is deliberately the terrain-push contour plus ship clearance. All new or changed
-	// distances and tolerances here are meters; UV is representation only.
-	// Outward miter offset; Clipper2 auto-bevels when miter would exceed limit.
+	// Navigation uses the terrain-push contour plus ship clearance. All distances and tolerances are
+	// meters; UV is representation only. Clipper2 applies an outward miter offset and squares joins
+	// beyond the miter limit.
 	Clipper2Lib::PathsD inflated = Clipper2Lib::InflatePaths(unioned, static_cast<double>(fClearanceMeters), Clipper2Lib::JoinType::Miter, Clipper2Lib::EndType::Polygon, kfMiterLimit, kiClipperPrecision);
 	// Topology-preserving simplification (does not introduce crossings).
 	Clipper2Lib::PathsD simplified = Clipper2Lib::SimplifyPaths(inflated, kfSimplifyEpsilonMeters);

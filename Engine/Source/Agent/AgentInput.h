@@ -85,11 +85,9 @@ public:
 	// Consulted by input-suppression so the no-mouse sentinel is issued only when no synthetic pin already owns io.MousePos.
 	bool ImGuiMousePosPinned() const { return mbImGuiMousePosPinned; }
 
-	// Client drain point (main thread, before ImGui NewFrame): advance the active script one step and queue this
-	// frame's ImGui IO events.
-	// Called unconditionally at the drain point above GameBase::Render (Main.cpp), so the script still advances even
-	// when the window is minimized and Render takes its swapchain-deferred skip (which also skips ImGuiManager::Prepare)
-	// — no minimized fast-fail is needed. Verified 2026-07-11.
+	// At the client main-thread drain point before GameBase::Render and ImGui::NewFrame, advance the active script and
+	// queue this frame's ImGui IO. The call is unconditional, so minimized frames still advance while Render takes the
+	// swapchain-deferred skip and bypasses ImGuiManager::Prepare.
 	void AdvanceFrame();
 
 	// End of RawInputManager::Update: OR the synthetic key / mouse-button / mouse-pos state onto the just-published

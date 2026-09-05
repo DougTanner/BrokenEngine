@@ -451,15 +451,10 @@ Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType 
 
 void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, VkDeviceSize newSize, int64_t iFramebuffer)
 {
-	// Single-slot stash, safe even though a second same-frame resize would destroy this old buffer
-	//   immediately, via a three-point chain: (1) every dynamic buffer is a per-framebuffer instance
-	//   (CreateDynamicBuffer), so only framebuffer i's command buffer ever referenced the (crc, i) buffer;
-	//   (2) all resize callers run after Graphics::RenderGlobal's top-of-frame fence wait for framebuffer i,
-	//   so the prior submission completed; (3) callers immediately rewrite the per-framebuffer descriptor set
-	//   (e.g. BillboardsRender / PlayersRender) and record-once command buffers reference buffers only through
-	//   descriptor sets. (GrowMeshDataBuffer / GrowJointMatrixBuffer apply this same three-point chain to their
-	//   per-framebuffer mPreviousMeshDataBuffer / mPreviousJointMatrixBuffer stash arrays, where a second same-frame
-	//   grow -- not a resize -- is the overwrite case.)
+	// Each dynamic buffer is referenced only by its framebuffer's command buffer. Resize follows that framebuffer's RenderGlobal fence wait,
+	// and callers immediately repoint its descriptors before submission; recorded commands reference buffers only through those descriptors. A
+	// second same-frame resize frees the prior stash immediately. GrowMeshDataBuffer and GrowJointMatrixBuffer use the same ordering for their
+	// per-framebuffer stash arrays, where a second grow overwrites the slot.
 	mPreviousBuffer.reset();
 
 	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mDynamicStorageBuffers[eType];
@@ -528,15 +523,10 @@ void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCou
 
 	void* pOldData = mMeshDataStorageBuffers.at(iCommandBuffer).mpMappedMemory;
 
-	// Per-framebuffer single-slot stash, safe even when a SECOND same-frame grow on this iCommandBuffer
-	//   overwrites the slot and frees the buffer the previous same-frame grow stashed, via the same three-point
-	//   chain as ResizeDynamicBuffer: (1) mMeshDataStorageBuffers is a per-framebuffer instance, so only framebuffer
-	//   iCommandBuffer's command buffer ever referenced this buffer; (2) all grow callers run from RenderFrameMain,
-	//   after Graphics::RenderGlobal's top-of-frame fence wait for framebuffer iCommandBuffer drained the prior
-	//   submission; (3) the repoint below points framebuffer iCommandBuffer's model descriptors at the NEW buffer,
-	//   and record-once command buffers reference buffers only through descriptor sets, so this frame's
-	//   not-yet-submitted CB reads the latest buffer, never the freed one. ResetSkinningAllocations releases only
-	//   the final grow's buffer, once per frame.
+	// Only this framebuffer's command buffer references mMeshDataStorageBuffers[iCommandBuffer]. RenderFrameMain grows it after RenderGlobal
+	// drains that framebuffer's prior submission; the descriptor repoint below makes the not-yet-submitted recorded commands read the new
+	// buffer. A second same-frame grow frees the earlier stash immediately. ResetSkinningAllocations releases the final grow's stash once per
+	// frame.
 	mPreviousMeshDataBuffer[iCommandBuffer] = std::move(mMeshDataStorageBuffers.at(iCommandBuffer));
 
 	mMeshDataStorageBuffers.at(iCommandBuffer).Create(

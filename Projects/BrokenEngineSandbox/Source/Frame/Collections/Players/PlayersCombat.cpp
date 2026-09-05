@@ -96,9 +96,7 @@ static int64_t XM_CALLCONV FindTargetSpaceshipIndex(const SpaceshipsInterpolate&
 	return iClosestSpaceship;
 }
 
-// =============================================================================
-// Per-player Update helpers
-// =============================================================================
+// Per-player update helpers.
 
 void XM_CALLCONV PlayersPostRender::AcquireTarget(const Frame& __restrict rPreviousFrame, FXMVECTOR vecPosition, PlayerFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
 {
@@ -175,9 +173,7 @@ void PlayersPostRender::RegenerateShield(float fDeltaTime, float fShieldCooldown
 	}
 }
 
-// =============================================================================
-// Collision phases
-// =============================================================================
+// Player collision phases apply entity damage.
 
 static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[maybe_unused]] PlayersInterpolate& rPlayerInterpolate, PlayersPostRender& rPlayer, int64_t i, float fDamage, [[maybe_unused]] FXMVECTOR vecDamagePosition, [[maybe_unused]] float fHexShieldIntensity = 1.0f)
 {
@@ -296,9 +292,7 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 	}
 }
 
-// =============================================================================
-// Weapon and death-explosion spawn helpers (called from PlayersPostRender::Spawn)
-// =============================================================================
+// PlayersPostRender::Spawn creates weapons and death effects.
 
 void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame)
 {

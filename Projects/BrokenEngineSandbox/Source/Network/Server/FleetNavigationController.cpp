@@ -47,17 +47,11 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				continue;
 			}
 
-			// Post-arrival countdown: the timer drains only while the flagship sits at the previously
-			// picked wantedCoord. That makes fNavigationDelay an actual idle-at-destination delay
-			// (cycle = transit + fNavigationDelay) rather than a wall-clock timer that overlaps with
-			// transit and would let the next fire happen the instant the flagship arrives. Cardinal
-			// mode is intentionally NOT gated here: if the flagship arrives mid-cardinal (heading
-			// toward an edge), draining keeps going so that as soon as nav mode flips out of cardinal
-			// the (likely already-negative) timer fires immediately — that's the un-freeze property.
-			// Using mfLastDeltaTime (= iFullTicks * kfDeltaTime, set by GameBase::ServerUpdate after
-			// the pause / time-scale resolution) keeps the timer in lockstep with frame-tick
-			// progression. BuildFrameInputs calls this only for an advancing update, with the delta
-			// scaled by mTimeStep under fast-forward / slow-mo.
+			// Drain fFrameChangeTimer only while the flagship is at wantedCoord, so the cycle is transit plus
+			// fNavigationDelay of idle time. Drain there even in cardinal mode; an expired timer fires when that mode
+			// ends instead of freezing. GameBase::ServerUpdate supplies mfLastDeltaTime = iFullTicks * kfDeltaTime
+			// after pause/time-scale resolution. BuildFrameInputs runs this only for advancing updates, including
+			// mTimeStep fast-forward/slow-motion scaling, keeping it in tick lockstep.
 			if (rFlagship.coord == rFleet.wantedCoord)
 			{
 				rFleet.fFrameChangeTimer -= gpGame->mfLastDeltaTime;

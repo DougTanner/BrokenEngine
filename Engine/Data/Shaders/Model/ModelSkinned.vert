@@ -30,7 +30,7 @@ void main()
 		vec4 row1 = f4Weight0.x * jm0.rows[1] + f4Weight0.y * jm1.rows[1] + f4Weight0.z * jm2.rows[1] + f4Weight0.w * jm3.rows[1];
 		vec4 row2 = f4Weight0.x * jm0.rows[2] + f4Weight0.y * jm1.rows[2] + f4Weight0.z * jm2.rows[2] + f4Weight0.w * jm3.rows[2];
 
-		// Unpack: rotation in .xyz (w was 0, now holds translation), translation from .w components
+		// Unpack each blended row with rotation in .xyz and translation in .w.
 		mat4 skinMatrix = mat4(vec4(row0.xyz, 0.0), vec4(row1.xyz, 0.0), vec4(row2.xyz, 0.0), vec4(row0.w, row1.w, row2.w, 1.0));
 		vec4 skinnedPos = skinMatrix * vec4(f3InPosition, 1.0f);
 		f3LocalPosition = (data.matrix * skinnedPos).xyz;

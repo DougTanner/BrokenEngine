@@ -100,7 +100,7 @@ struct SceneHeader
 	uint8_t uiPad[3] {};
 	uint8_t uiPad2[4] {};  // Explicit: fills the compiler gap that 8-byte-aligns modelCrc to offset 16
 	crc_t modelCrc = 0;  // CRC of the .MODEL vertex/index chunk
-	// Texture CRCs and index starts now in chunk data payload
+	// Texture CRCs and index starts are stored in the chunk data payload.
 
 	// Chunk payload layout: [textureCrcs ALIGN16] [indexStarts ALIGN16] [MaterialShaderData ALIGN16] [AnimationData].
 	// Single source for the writer (ExportScene.cpp) and readers (ModelPipeline.cpp,
@@ -191,7 +191,7 @@ struct Skeleton
 
 	uint16_t uiNodeCount = 0;
 	uint16_t uiSkinJointCount = 0;
-	// nodes, skinJointToNode, inverseBindMatrices now in data stream
+	// Nodes, skinJointToNode, and inverseBindMatrices are stored in the data stream.
 };
 static_assert(sizeof(Skeleton) == 4, "Skeleton layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
 
@@ -219,8 +219,8 @@ struct MeshData
 };
 static_assert(MeshData::kiMaxMeshes >= 2 * SceneHeader::kiMaxMaterials, "MeshData::kiMaxMeshes must cover 2x SceneHeader::kiMaxMaterials");
 
-// Joint matrix: 3 vec4s (48 bytes) instead of full mat4 (64 bytes)
-// rows[i].xyz = rotation row i, rows[i].w = translation component (Tx, Ty, Tz)
+// A joint matrix stores three vec4s (48 bytes); rows[i].xyz is rotation row i and rows[i].w is its
+// translation component.
 struct JointMatrix
 {
 	XMFLOAT4 rows[3] {};
@@ -240,7 +240,7 @@ struct AnimationHeader
 	uint32_t uiCubicKeyframeCount = 0;
 	uint32_t uiMaterialCount = 0;          // Per-material skinning info count
 	Skeleton skeleton {};
-	// animations, materialInfos, and trailing data now in data stream
+	// Animations, materialInfos, and trailing data are stored in the data stream.
 };
 static_assert(sizeof(AnimationHeader) == 24, "AnimationHeader layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
 static_assert(BT_OFFSETOF(AnimationHeader, skeleton) == 20, "AnimationHeader padding changed — embedded Skeleton no longer at offset 20");
@@ -339,7 +339,7 @@ struct ShaderHeader
 	int64_t iDescriptorSetLayoutBindings = 0;
 	int64_t iVertexInputAttributeDescriptions = 0;
 	int64_t iVertexInputStride = 0;
-	// Descriptor bindings and vertex attributes now in chunk data payload
+	// Descriptor bindings and vertex attributes are stored in the chunk data payload.
 
 	// Chunk payload layout: [bindings ALIGN16] [setIndices ALIGN16] [attrs ALIGN16] [SPIR-V].
 	// Single source for the writer (ExportShader.cpp) and reader (PipelineManager.cpp) offset math.
@@ -425,15 +425,11 @@ struct DataHeader
 	static constexpr int64_t kiMagic = 0xDA7AF11E;
 	int64_t iMagic = kiMagic;
 
-	// Auto-bumps when sizeof(ChunkHeader) changes (largest-union-member or outer-field edits). Layout
-	// edits that DON'T change sizeof — reordering/shrinking a non-largest union member, or changing a
-	// non-union payload struct — are instead caught by the per-struct sizeof/offsetof static_asserts
-	// beside each header; bump the manual 50 below when one of those fires. A kiVersion bump forces a
-	// full re-export: the DataPacker manifest check (Main.cpp RunExportJobs) re-runs everything on a
-	// version mismatch, and the engine ASSERTs on a stale-version manifest. Per-job chunk caches are
-	// separate — payload-struct SIZE changes auto-dirty them via the sizeof folds in each job's
-	// kiVersion (ExportScene/ExportModel); same-size reorders still need that raw version
-	// bumped by hand (the static_assert message beside each struct names the owning job).
+	// Changes to sizeof(ChunkHeader) automatically bump this version. Other header or payload layout
+	// edits require a manual bump to this version's constant; per-header sizeof/offsetof assertions
+	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
+	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
+	// sizeof folds, while same-size reorders also require the owning job's raw-version bump.
 	static constexpr int64_t kiVersion = 51 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 

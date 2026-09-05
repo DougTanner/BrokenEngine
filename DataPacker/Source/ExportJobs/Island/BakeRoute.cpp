@@ -7,20 +7,13 @@
 namespace
 {
 
-// One shared cache folder per route under FileManager::mGaeaCacheDirectory.
-// One Gaea bake per route produces all files below at texturePixels resolution; the raw
-// Elevation.r32 stays as the bake source (it is NOT rewritten in place) — ProcessBakedRegion reads
-// it and writes the per-chunk downsampled (texturePixels / kiElevationDivisor) elevation into each
-// cache leaf. Elevation.r32 is headerless IEEE-754 float (Gaea's FloatRaw32 format),
-// normalized [0,1] at bake time — DataPacker reads the Sea node Level from the archetype (fallback
-// kfGaeaSeaLevelDefault when absent), then scales to meters by elevationMeters and subtracts
-// `Level × elevationMeters` so beach = 0 in engine space and the sea floor sits at
-// -(Level × elevationMeters) per island. AmbientOcclusion.r16 stays UshortRaw16 (precision-matched
-// to BC4_UNORM). Color is 8-bit PNG (sRGB-encoded display data; downstream BC7 is 8-bit anyway, so
-// EXR's float precision was wasted and its color-space convention conflicts with Gaea writing
-// sRGB-encoded values into the EXR container). Normals stay multi-channel EXR. Files written by
-// Gaea directly. Used for both the post-Gaea existence verification and the IsGaeaRawDirty
-// existence check. These raw outputs live in each route's shared Gaea cache folder.
+// One route cache under FileManager::mGaeaCacheDirectory holds Gaea's raw texturePixels-resolution
+// outputs, checked after baking and by IsGaeaRawDirty. Elevation.r32 is headerless IEEE FloatRaw32
+// normalized to [0,1]; ProcessBakedRegion reads it without rewriting it and writes leaf elevation
+// downsampled by kiElevationDivisor. Scale by elevationMeters and subtract Sea.Level * elevationMeters
+// (fallback kfGaeaSeaLevelDefault), giving beach Z=0 and floor -Level*elevationMeters. AO uses
+// UshortRaw16 matched to BC4_UNORM. Color/masks use 8-bit sRGB PNGs matched to BC7; Gaea's sRGB-in-EXR
+// convention conflicts with color decoding. Normals remain multi-channel EXR, alongside Mesher outputs.
 constexpr const char* kpcIntermediateFiles[] =
 {
 	"AmbientOcclusion.r16",
@@ -40,30 +33,19 @@ constexpr const char* kpcIntermediateFiles[] =
 // AreLeavesDirty verifies it (and Elevation.r32 / AmbientOcclusion.r16 / BakedDimensions.json)
 // exists in each chunk folder.
 
-// Two-stage fingerprint metadata files, both route-level in the Gaea cache. The bake separates the
-// SLOW Gaea raw export from the FAST post-Gaea split so a split-only change (a kRouteSubdivisions
-// columns/rows edit, or ProcessBakedRegion crop logic) re-splits from the existing Gaea output
-// WITHOUT re-running Gaea.Swarm.
-//
-// kiBakeVersion (BakeVersion.meta): the Gaea RAW output. Bump only when something that changes the
-// raw bake changes — the archetype patch (dims / seed / Route Choice / Mesher resolution) or the
-// Gaea invocation. IsGaeaRawDirty re-runs Gaea on mismatch.
-//
-// kiSplitVersion (SplitVersion.meta): the post-Gaea split. Bump when ProcessBakedRegion (including
-// its per-leaf edge taper) or the chunk split (incl. kRouteSubdivisions columns/rows) changes.
-// AreLeavesDirty re-splits from the existing raw on mismatch — no Gaea re-export.
+// Route-level BakeVersion.meta tracks slow raw Gaea output; bump kiBakeVersion for archetype
+// dimensions, seed, Route Choice, Mesher resolution, or invocation changes, and IsGaeaRawDirty reruns
+// Gaea. SplitVersion.meta tracks fast post-Gaea splitting; bump kiSplitVersion for ProcessBakedRegion
+// crop/edge-taper or route column/row changes. AreLeavesDirty reruns only the split from existing raw
+// output.
 constexpr int32_t kiBakeVersion = 28;
 constexpr int32_t kiSplitVersion = 8;
 
-// Beach-band adaptive subdivision constants. After the Gaea Mesher mesh is parsed, every triangle
-// whose Z-range overlaps the beach band gets recursively split (1->4 midpoint) until its longest XY
-// edge falls below the target. Out-of-band neighbors that inherit a midpoint via a shared edge get
-// the minimal absorption split (1->2 for 1 midpoint, 1->3 for 2, true 1->4 for 3) -- introducing no
-// new midpoints, so the cascade dies at one ring around the band.
-// Band straddles beach (engine-Z = 0): triangles whose Z-range overlaps
-// [kfBeachSubdivisionMinMeters, kfBeachSubdivisionMaxMeters] in absolute engine-meters densify,
-// so both shallow water and just-above-beach terrain are covered. Independent of elevationMeters;
-// set the two bounds asymmetrically to widen the underwater or above-water side independently.
+// After Mesher load, triangles overlapping the absolute engine-Z beach band recursively split 1-to-4
+// until the longest XY edge meets kfBeachSubdivisionMaxEdgeMeters. Out-of-band neighbors absorb
+// one/two/three shared midpoints with 1-to-2/3/4 splits and no new midpoints, limiting the cascade to
+// one ring. The band straddles beach Z=0 independently of elevationMeters; its lower/upper bounds
+// separately control underwater and above-water coverage.
 constexpr float kfBeachSubdivisionMinMeters = -0.25f;
 constexpr float kfBeachSubdivisionMaxMeters = 0.5f;
 constexpr float kfBeachSubdivisionMaxEdgeMeters = 1.0f;
@@ -191,15 +173,11 @@ bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::fil
 	return false;
 }
 
-// Delete numeric leaf folders left over from a previous, larger split. The split loop and AreLeavesDirty
-// only ever visit indices 0 .. iLeafCount-1, so when a route's kRouteSubdivisions columns/rows shrink the
-// higher-index folders are never revisited: they persist carrying cached BakedDimensions.json and
-// ExportIsland::Handles ingests them as stale kIsland chunks (a kiSplitVersion bump does not help — the
-// re-split only rewrites the lower-count leaves). Mirror BakeOne's whole-route prune one level up: collect
-// first, then remove_all (mutating the directory mid-iteration is unspecified for directory_iterator). Runs
-// unconditionally before the dirty early-return, so the leaf-set invariant holds regardless of whether the
-// developer bumped kiSplitVersion. Non-numeric route metadata is untouched; kept leaves
-// (index < iLeafCount) are never removed.
+// Remove numeric leaves with index >= iLeafCount before the dirty early return: neither the split loop
+// nor AreLeavesDirty revisits them, so stale BakedDimensions.json becomes extra kIsland chunks through
+// ExportIsland::Handles. A split-version bump only rewrites retained leaves. As in BakeOne's whole-route
+// prune, collect paths before remove_all to avoid directory-iterator invalidation; preserve nonnumeric
+// metadata and indices below iLeafCount.
 void RemoveOrphanedLeafFolders(const std::filesystem::path& rRouteDir, int64_t iLeafCount)
 {
 	if (!std::filesystem::exists(rRouteDir))
@@ -406,15 +384,11 @@ std::vector<uint16_t> LoadAmbientOcclusion(const std::filesystem::path& rInterme
 	return fullAmbientOcclusion;
 }
 
-// Parse Mesh.gltf (Mesher's glTF separate-format manifest; references Mesh.bin) into a flat
-// float3-positions / uint32-indices mesh in island-local meters, then run the adaptive
-// beach-band subdivision ONCE on the full mesh (the per-chunk region crops reuse the densified
-// result). glTF 2.0 mandates right-handed Y-up: Mesher emits (X_east, Y_height, Z_south); the
-// mapping (X,Y,Z)=(gltf.x, -gltf.z, gltf.y) has determinant +1 so handedness / CCW winding are
-// preserved, engine Y increases northward, engine Z is up. Height gets the per-island beach
-// offset subtracted so sea level = 0. UVs (TEXCOORD_0) are discarded — runtime derives
-// visible-area UV from world XY. Indices are upcast to uint32. The actual chunk crop / re-center
-// / write happens later in ProcessBakedRegion.
+// Parse Mesher's separate Mesh.gltf/Mesh.bin into island-local meter float3 positions and uint32
+// indices. Map glTF (east,height,south) to engine (X,-Z,Y): determinant +1 preserves handedness/CCW,
+// engine Y points north and Z up. Subtract the beach offset for sea level zero; discard TEXCOORD_0
+// because runtime derives visible-area UVs from world XY. Subdivide the full mesh once;
+// ProcessBakedRegion reuses it for each crop, recenter, and write.
 void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeachOffsetMeters, const std::filesystem::path& rRouteDir, std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices)
 {
 	std::filesystem::path meshGltfFile = rIntermediatesDir / "Mesh.gltf";
@@ -576,15 +550,11 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 	int64_t iInitialVertexCount = iVertexCount;
 	int64_t iInitialTriangleCount = iIndexCount / 3;
 
-	// Adaptive beach-band subdivision. Densifies triangles whose Z-range overlaps the band so
-	// the shore silhouette and shore-material blend get enough vertex resolution. In-band tris
-	// do 1->4 midpoint splits until longest XY edge <= kfBeachSubdivisionMaxEdgeMeters. Out-of-band
-	// neighbors that inherit a midpoint via a shared edge do the MINIMAL absorption split
-	// (1->2 for one midpoint, 1->3 for two, 1->4 for all three) -- introducing no new midpoints,
-	// so the cascade dies at one ring. Linear-interp Z for new midpoints is fine because
-	// Terrain.vert overrides Z from the heightmap at rasterization; mesh Z exists only for the
-	// in-band test, and an in-band split's children inherit Z values that are subsets of the
-	// parent's range. Runs once on the full mesh; chunk crops below reuse the densified mesh.
+	// Beach-band subdivision gives shore silhouettes and material blends enough vertices. In-band
+	// triangles split 1-to-4 to the XY edge limit; out-of-band neighbors absorb existing midpoints with
+	// minimal 1-to-2/3/4 splits, adding no midpoints beyond one ring. Interpolated midpoint Z stays within
+	// the parent's range and serves only the band test; Terrain.vert derives rendered Z from the
+	// heightmap. Subdivide once over the full mesh and reuse it for chunk crops.
 	SubdivisionConfig subdivisionConfig
 	{
 		.fBandMinMeters = kfBeachSubdivisionMinMeters,

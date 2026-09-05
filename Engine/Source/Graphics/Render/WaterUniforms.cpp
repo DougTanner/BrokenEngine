@@ -74,16 +74,10 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	float fSpeedDirectionOne = gWaterNormalSpeedDirectionOne.Get();
 	float fSpeedDirectionTwo = gWaterNormalSpeedDirectionTwo.Get();
 	float fSpeedDirectionThree = gWaterNormalSpeedDirectionThree.Get();
-	// Per-sample reduced-time accumulators: integrate (size * speed * dt) per frame and fmod 10.0
-	// rather than recomputing fmod(size * speed * t, 10.0). Per-frame integration keeps the UV
-	// phase continuous when size or speed slide smoothly (e.g. zoom-driven speed lerp); the old
-	// formulation produced a per-frame jump proportional to (deltaSpeed * t) that grew with playtime.
-	// vec2 form: the scalar delta (size * speed * dt) scrolls along an independent per-sample world
-	// direction R(φ)·(1,1) (φ = gWaterNormalSpeedDirection; the default 0 scrolls along world (1,1)), decoupled from the
-	// pattern rotation θ. The CPU applies the UV-space direction R(γ) with γ = φ − θ so the shader's
-	// R(θ) cancels back to world R(φ); magnitude stays √2 for all φ (direction never alters scroll speed).
-	// Each component wraps at 10.0 independently and speedMult * 10 stays integer so fract() absorbs the
-	// wrap for any φ (precision contract intact).
+	// Integrate each sample's size * speed * dt in double precision to keep UV phase continuous as size or speed changes. Scroll along world
+	// R(phi)(1,1), with default phi=0 giving (1,1), independently of pattern rotation theta; CPU R(phi-theta) cancels the shader's R(theta),
+	// preserving magnitude sqrt(2). Wrap each time component at 10.0; speedMult * 10 is integral so shader fract() absorbs the wrap for any
+	// direction.
 	static double sdReducedTimeOneX = 0.0;
 	static double sdReducedTimeOneY = 0.0;
 	static double sdReducedTimeTwoX = 0.0;
@@ -125,15 +119,9 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	double dCameraX = static_cast<double>(f4CameraPos.x);
 	double dCameraY = static_cast<double>(f4CameraPos.y);
 
-	// Per-sample reduced origin: rotate cameraXY on the CPU by the same R(-θ) the shader uses,
-	// THEN fmod. This keeps the precision invariant under rotation: the reducedOrigin already
-	// encodes the rotation, so the shader-side wrap shift is sizeMult*10 = integer (cleanly
-	// absorbed by fract). If we instead let the shader rotate reducedOrigin, the wrap shift
-	// becomes R*(sizeMult*10, 0) — non-integer for any θ that isn't a multiple of π/2 — and
-	// produces a visible normal-pattern jump every time size*cameraXY crosses a multiple of 10.
-	// Takes the precomputed rotation cos/sin (dCos*/dSin*, computed once above) rather than
-	// recomputing the same trig per sample. Note the reduced-time accumulation uses its own
-	// dScrollCos*/dScrollSin* (of γ = φ − θ), not these rotation-only values.
+	// Rotate cameraXY by R(-theta) before fmod on the CPU: rotation is already encoded when shader fract() absorbs the integral sizeMult*10
+	// wrap. Rotating an already-reduced origin gives nonintegral wrap shifts except at multiples of pi/2, causing normal-pattern jumps at each
+	// wrap. Reuse dCos*/dSin* for pattern rotation; reduced-time accumulation separately uses dScrollCos*/dScrollSin* for gamma=phi-theta.
 	auto RotatedCamera = [&](double dCos, double dSin, double& rdOutX, double& rdOutY)
 	{
 		rdOutX = dCos * dCameraX + dSin * dCameraY;
@@ -162,12 +150,9 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	rGlobalLayout.fWaterReducedNormalTimeThreeX = static_cast<float>(sdReducedTimeThreeX);
 	rGlobalLayout.fWaterReducedNormalTimeThreeY = static_cast<float>(sdReducedTimeThreeY);
 
-	// Modulus 10.0 (not 1.0) so the shader's per-sample multipliers fWaterColorNoiseMultiplierOne/Two
-	// produce integer UV wraps for the calibrated defaults (0.2 * 10 = 2, 1.0 * 10 = 10) — fract()
-	// then absorbs the wrap. Modulus 1.0 produced a sudden seam at the wrap radius because mult * 1.0
-	// is non-integer for those defaults. Tuning gotcha: the sliders allow non-integer-tenths values
-	// (e.g. 0.15) which break the integer-product property and the seam returns. Same constraint that
-	// governs fWaterReducedNormalOrigin* above (where the per-octave multipliers are pinned).
+	// Modulus 10.0 makes fWaterColorNoiseMultiplierOne/Two produce integral UV wraps for calibrated defaults (0.2*10=2, 1.0*10=10), absorbed by
+	// fract(). Non-tenths slider values break this property and expose a seam. fWaterReducedNormalOrigin uses the same constraint with fixed
+	// per-octave multipliers.
 	double dNoiseFreq = static_cast<double>(gWaterColorNoiseFrequency.Get());
 	rGlobalLayout.fWaterReducedNoiseOriginX = static_cast<float>(std::fmod(dNoiseFreq * dCameraX, 10.0));
 	rGlobalLayout.fWaterReducedNoiseOriginY = static_cast<float>(std::fmod(dNoiseFreq * dCameraY, 10.0));

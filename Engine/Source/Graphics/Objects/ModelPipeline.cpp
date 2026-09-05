@@ -120,9 +120,7 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 		{
 			pipelineInfo.flags = originalFlags;
 			pipelineInfo.flags.Set(PipelineFlags::kAlphaBlend);
-			// Some materials only have some transparent bits, and the rest still opaque
-			// We will probably need to revisit this in the future once we have proper models
-			// pipelineInfo.flags.Clear({PipelineFlags::kDepthWrite, PipelineFlags::kCullBack});
+			// Partly transparent materials also contain opaque regions, so blending retains the base depth/cull flags.
 		}
 		else
 		{

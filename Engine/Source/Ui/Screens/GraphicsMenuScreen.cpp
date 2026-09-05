@@ -23,11 +23,9 @@ constexpr float kfGraphicsFontScaleAtMaximum = 1.2f;
 constexpr float kfGraphicsHeadingScale = 1.15f;
 constexpr float kfGraphicsColumnGutterPixels = 80.0f;
 
-// WrapperSlider with its label drawn to the left of the bar instead of trailing it, the bar filling the rest of the
-// table column (-FLT_MIN item width). ImGui only ever draws a widget's own label after the frame, so the visible text
-// is emitted separately and the slider carries a hidden-label id ("##" prefix, display portion empty). That id is what
-// the agent UI snapshot records, so describe_ui reports "##Minimum Ambient" and a harness query for the human-readable
-// name resolves through AgentUiRegistry::ResolveLabel's case-insensitive substring tier.
+// Draw pcLabel separately on the left so WrapperSlider fills the remaining column (-FLT_MIN). Its hidden ## ID is
+// recorded by the agent snapshot; AgentUiRegistry::ResolveLabel maps a human-readable query through case-insensitive
+// substring matching.
 void ColumnSlider(const char* pcLabel, Wrapper* pWrapper, std::string_view format = "%.2f")
 {
 	ImGui::AlignTextToFramePadding();

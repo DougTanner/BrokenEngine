@@ -9,13 +9,10 @@ struct SubdivisionConfig
 	int32_t iMaxDepth;        // Safety cap on recursive subdivision depth
 };
 
-// Adaptive beach-band mesh subdivision pass invoked by BakeIslandIntermediates after the Gaea
-// Mesher glTF is loaded. Triangles whose Z-range overlaps [fBandMinMeters, fBandMaxMeters]
-// (straddling beach Z=0) are recursively midpoint-subdivided until their longest XY edge is
-// <= fMaxEdgeMeters; out-of-band one-ring neighbors absorb the resulting midpoints via minimal
-// 1->2 / 1->3 / 1->4 splits that introduce no new midpoints (cascade firewall). Triangles that
-// would exceed iMaxDepth are skipped and riDepthCapHits is incremented (caller logs a warning).
-// Output appends new vertices/indices to the same vectors; the dead-triangle compaction at the
-// end ensures the index buffer contains no UINT32_MAX sentinels on return. iVertexCount and
-// iIndexCount must be recomputed by the caller from vector sizes after this returns.
+// After Gaea Mesher load, recursively midpoint-split triangles overlapping the beach-Z band until the
+// longest XY edge is <= fMaxEdgeMeters. Out-of-band neighbors absorb shared midpoints with minimal
+// 1-to-2/3/4 splits and create none, limiting the cascade to one ring. Exceeding iMaxDepth skips the
+// split and increments riDepthCapHits for the caller's warning. Append to the same vectors, compact dead
+// triangles so no UINT32_MAX sentinel remains, and let the caller recompute vertex/index counts from
+// final sizes.
 void SubdivideBeachBand(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits);

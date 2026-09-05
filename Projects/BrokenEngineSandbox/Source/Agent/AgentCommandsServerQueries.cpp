@@ -14,7 +14,7 @@ namespace game
 namespace
 {
 
-// ---- Frame query helpers (trust boundary — params are external input) ----
+// Frame query helpers validate external parameters at the trust boundary.
 
 int64_t OptionalCount(const nlohmann::json& rParams, const char* pcKey, int64_t iDefault)
 {

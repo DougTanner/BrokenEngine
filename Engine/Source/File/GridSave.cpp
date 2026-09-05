@@ -140,9 +140,8 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			}
 		}
 
-		// Trust boundary (save file): the client grid coord is file-derived and every load entry
-		// (ServerLoad/Autoload/Quickload) adopts it as the followed cell — it must name a frame we just read,
-		// else the grid is torn. Reject uniformly here (replaces the former Quickload ASSERT on file data).
+		// Save-file clientGridCoord is adopted by ServerLoad, Autoload, and Quickload as the followed cell, so it
+		// must match a frame just read; a mismatch is a torn grid.
 		if (!rStagedGrid.coordFrames.contains(rStagedGrid.clientGridCoord))
 		{
 			throw common::CorruptStreamException("client grid coord absent from frames");

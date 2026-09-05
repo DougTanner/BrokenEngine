@@ -18,14 +18,10 @@ struct GridCoord;
 inline constexpr int64_t kiMaxActivePlacements = (game::NetworkSessionContract::kiCoordSlots + 1) * kiMaxIslandsPerCell;
 inline constexpr VkDeviceSize kiIslandMeshArenaBytes = 64ull * 1024ull * 1024ull;
 
-// The SSBO and indirect buffers are triple-buffered (one instance per framebuffer index, sized by
-// kiMaxFramebuffers from Managers/BufferManager.h): UpdateActiveIslands (immediately before RenderGlobal) writes
-// only the instance for the framebuffer index just re-acquired. Re-acquiring that image index implies the prior
-// frame that used it has presented — so its GPU read of that instance is complete — while this frame's
-// render is not yet submitted, so the host write never overlaps an in-flight GPU read. (The earlier single
-// shared buffer raced because every in-flight frame read the same backing memory the host was rewriting.)
-// All instances are allocated once at boot and indexed by gpSwapchainManager->miFramebufferIndex, so they
-// survive swapchain recreation unchanged.
+// SSBO and indirect buffers have one instance per framebuffer index, sized by kiMaxFramebuffers. UpdateActiveIslands runs before
+// RenderGlobal and writes only the re-acquired instance: its prior frame has presented and completed its GPU read, while this frame has not
+// submitted. All instances are allocated at boot and indexed by gpSwapchainManager->miFramebufferIndex, so they survive swapchain
+// recreation.
 
 class Islands
 {

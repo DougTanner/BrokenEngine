@@ -241,9 +241,8 @@ static GerstnerWaveBandStaging sMediumWaveStaging {};
 static LowWaveTunables sLowWaveTunables {};
 static MediumWaveTunables sMediumWaveTunables {};
 
-// Rebuild the frame-invariant low-band terms (directions, omega, phi, clamped base amplitude) into
-// the staging cache. Same per-wave float expression order and RandomEngine consumption sequence as
-// the original inline code, so cached values are bit-identical to a per-frame recompute.
+// Rebuild frame-invariant low-band directions, omega, phi, and clamped base amplitude in the staging cache with fixed per-wave float
+// expression order and RandomEngine consumption; cache rebuilds remain bit-identical to per-frame recomputation.
 static void RebuildLowWaveInvariants(int64_t iCount)
 {
 	// Wave 0: fixed primary direction, no RNG draw, no amplitude clamp.
@@ -455,23 +454,7 @@ static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
 {
-	// Never-empty invariant: client mActiveCoords always contains mClientGridCoord (Game::ComputeActiveSet
-	// gameplay and main-menu branches, Game::Reset re-seed) and the boot prerender passes {kOriginCoord}, so
-	// this return is unreachable. It exists only to keep rRenderInterpolates.at(cameraCoord) below from throwing
-	// if the invariant ever breaks. If it does, this skips every per-frame indirect-count write while the
-	// record-once Main CB still submits unconditionally (Graphics::RenderMainPresentAcquire), re-submitting each
-	// command buffer's last-written counts (framebuffer-count frames stale) for as long as the skip persists.
-	// Only the per-entity/effect + debug instance counts ghost-draw when stale (a leftover nonzero count draws
-	// phantom entities) — those are what an empty path added here must flush before returning. The water LOD
-	// WriteIndirectBuffer / WaterDisplacement WriteIndirectComputeBuffer params are deliberately left at their
-	// last-written per-framebuffer values: water is an always-draw fixed reference mesh (instanceCount = 1,
-	// never reallocated), so its stale-but-self-consistent params keep the frozen-camera ocean rendering and
-	// need no flush. The lighting spread chain's per-pass WriteIndirectBuffer (RenderLightingSpreadIndirect) is
-	// left stale for the same reason: its slots hold instanceCount 0 or 1 against a deposit that is equally
-	// stale, so the pair stays self-consistent and can only re-spread the last frame's light, never ghost-draw.
-	// See the reachable cameraCoord-not-found flush immediately below (all-rings-empty frame, e.g. a failed
-	// reconnect), which zeroes exactly the entity/effect + debug counts via FrameInterpolate::BeginRender/
-	// EndRender + DebugRender::BeginRender/EndRender.
+	// mActiveCoords always contains mClientGridCoord after Game::ComputeActiveSet and Game::Reset; boot prerender seeds {kOriginCoord}.
 	if (rActiveCoords.empty())
 	{
 		return;

@@ -1,12 +1,9 @@
 #pragma once
 
-// Private (non-public) header shared by the nav translation units — NavBuild.cpp (contour-build
-// domain), NavCellData.cpp (cell-merge / acceleration / serialization domain), and NavQuery.cpp
-// (runtime LOS / A* query domain). Holds the geometry predicates the build path and the query path
-// must share so a tuned epsilon or boundary rule can never drift between them — drift would let the
-// build-time visibility graph and the runtime query disagree, threading paths through walls. Each
-// predicate is promoted from file-local to external linkage; its definition stays in the TU that owns
-// its domain, named per declaration below. NOT part of the public API (NavBuild.h).
+// Private geometry predicates shared by NavBuild (contour building), NavCellData (cell merge,
+// acceleration, serialization), and NavQuery (runtime LOS/A*). Definitions stay in their owning
+// translation units; NavBuild.h is the public API. Shared epsilon and boundary rules prevent
+// build/query disagreement that routes paths through walls.
 
 namespace engine
 {
