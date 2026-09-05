@@ -1,11 +1,11 @@
 # Sole SmartGit review-tool boundary for a session landing.
 #
-# The finalizer runs this script in workflow step 6 — after the earlier
-# approval-preparation step returned the approved tip, the acceptance table, and
-# the primary-movement check — with the documented redirect, before its handoff.
-# The window is therefore already open while main writes the landing summary, so
-# the user returns from their review to a finished confirmation question rather
-# than a working agent. Callers never reconstruct its SmartGit command inline.
+# Main runs this script from the finalizer's handoff, after the finalizer's
+# workflow step 6 filled its command line in — the earlier approval-preparation
+# step having returned the approved tip, the acceptance table, and the
+# primary-movement check — with the documented redirect. Main opens the window
+# and asks the landing confirmation in the same exchange, so the user can
+# confirm as soon as their review is done. Callers never reconstruct its SmartGit command inline.
 #
 # The landing route always passes -LaunchSmartGit, so a session landing always
 # attempts the launch and the window opens whenever SmartGit is available.
@@ -15,9 +15,9 @@
 #
 # Contract: schema broken-engine-finalize-approval-review/v1. Unlike the mutating
 # scripts, every preview/launch outcome exits 0 and none report status pass — the
-# review outcome is non-blocking, but the attempt is not: the finalizer redirects this
-# single-line stdout to Temp/finalize-approval-review-result.json and
-# passes that receipt to the landing scripts, which read approvedTip and status from it and
+# review outcome is non-blocking, but the attempt is not: main redirects this single-line
+# stdout to Temp/finalize-approval-review-result.json, and the resumed finalizer passes
+# that receipt path to the landing scripts, which read approvedTip and status from it and
 # refuse to change primary when it does not record an attempted launch for the
 # exact commit being landed. preview is the default;
 # opened is the launch success path; unavailable/failed are non-blocking,
@@ -29,7 +29,7 @@
 # preserves the existing confirmation must not reopen the review tool the user
 # already saw: that path gets no fresh review run. A material change
 # requiring a refreshed confirmation gets one, against the newly
-# reviewed candidate, which the finalizer runs before that refreshed confirmation.
+# reviewed candidate, from a refreshed launch line main runs before that refreshed confirmation.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $PrimaryWorktree,

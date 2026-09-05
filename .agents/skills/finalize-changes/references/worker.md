@@ -12,8 +12,9 @@ Use the root AGENTS.md canonical invocation form.
 Invoke them directly, exactly as documented; never write a wrapper,
 orchestrator, or replacement around them, and never reconstruct their steps by
 hand. An improvised invocation can send wrong arguments into an operation that
-changes primary. A script that cannot be run as documented is a bug: stop and
-report it.
+changes primary. `Show-FinalizeApprovalReview.ps1` is the one script this worker
+fills in and returns for main to run verbatim; this worker never invokes it.
+A script that cannot be run as documented is a bug: stop and report it.
 
 Under its landing lease, finalization follows the [root `AGENTS.md` Verify and
 land step's landing invariant](../../../../AGENTS.md) and the exact mechanics in
@@ -88,12 +89,12 @@ every other lease is foreign.
    - Act on the terminal mapping in
      [`scripts.md#primary-movement-check`](scripts.md#primary-movement-check),
      which owns every status and code.
-   - A blocker returns no SmartGit review and no landing summary, and names the
+   - A blocker returns no launch line and no landing summary, and names the
      candidate parent and live primary whenever either is available.
    - A `needs-review` result follows the documented lossless checker-result
      handoff in [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts), is
      consumed as a usable non-conflict terminal, and proceeds directly to the
-     step-6 SmartGit review and the existing landing summary.
+     `SmartGit launch:` line in step 6 and the existing landing summary.
    - Apply the [root `AGENTS.md` Verify and land step's landing
      invariant](../../../../AGENTS.md) and
      [`scripts.md#landing-and-recovery`](scripts.md#landing-and-recovery) for the
@@ -102,27 +103,23 @@ every other lease is foreign.
      review. Any later primary movement is handled by landing's existing bounded
      internal rebase and terminal result.
    - Done when the result is a usable terminal or a blocker was returned.
-6. Run the SmartGit approval review.
-   - Only after this checker has returned a usable terminal result, run the
+6. Fill in the SmartGit launch line.
+   - Only after this checker has returned a usable terminal result, take the
      `Show-FinalizeApprovalReview.ps1` command from
-     [`scripts.md#invocation`](scripts.md#invocation), redirect included, with
-     `<primary-worktree>` filled in and, as `<landing-commit>`, the prepared
-     landing commit.
-   - Read `status`, `message`, and `manualCommand` from the receipt artifact
-     that redirect writes. A receipt that is unreadable, or whose status is
-     outside the set
-     [`scripts.md#approval-review-receipt`](scripts.md#approval-review-receipt)
-     accepts, is a blocker to return.
-   - Done when those fields are in hand for the commit the summary describes, or
+     [`scripts.md#invocation`](scripts.md#invocation), redirect included, and
+     fill `<primary-worktree>` and, as `<landing-commit>`, the prepared landing
+     commit.
+   - Do not run it: main runs it after this handoff, per `SKILL.md`
+     `### Landing confirmation`.
+   - Done when that line is filled in for the commit the summary describes, or
      a blocker was returned.
-7. Re-run that review only for a meaningful change.
+7. Refresh that line only for a meaningful change.
    - Whenever `SKILL.md` `### Landing confirmation` requires a refreshed
-     confirmation, re-run step 6 for the newly reviewed landing commit and
-     return its status with the refreshed summary.
-   - Done when the review has run against the commit the current summary
-     describes.
+     confirmation, refill the line for the newly reviewed landing commit and
+     return it with the refreshed summary.
+   - Done when the line names the commit the current summary describes.
 8. Assemble and return one handoff carrying the complete step-3 acceptance
-   table, the `SmartGit review` row, and a landing summary.
+   table, the `SmartGit launch:` row holding that line, and a landing summary.
    - The summary carries `## Context`, outcome-focused `## What landed`, and
      `## Landing`.
    - `## Landing` states the checked candidate parent and live primary (and,
@@ -132,8 +129,8 @@ every other lease is foreign.
      and the exact remaining operation.
    - Retain all existing summary fields and do not state
      `Primary has not advanced.` when the live tip is newer.
-   - Main presents the summary immediately before the authoritative
-     confirmation question. That summary is a terminal return: the
+   - Main runs the launch line, then presents the summary immediately before the
+     authoritative confirmation question. That summary is a terminal return: the
      worker ends its turn with it as its final answer.
    - This worker's steps 1-8 change nothing on primary, so a brief that says to
      stop before any primary change still ends with this summary, per
@@ -145,8 +142,8 @@ every other lease is foreign.
      `## Bundled scripts` states.
    - Done when that claim has returned the owner token landing carries.
 10. Invoke landing with that owner token.
-    - That invocation passes `-ApprovalReviewResultFile` naming the receipt the
-      step-6 run wrote; the receipt gate in
+    - That invocation passes `-ApprovalReviewResultFile` naming the receipt that
+      main's run of the step-6 line wrote; the receipt gate in
       [`scripts.md`](scripts.md#approval-review-receipt) owns when landing blocks
       on it, and step 14 disposes of such a block like any other blocked landing.
     - For a claimed Plan pass `-ReleasePlanClaim` so the machine-local claim is
@@ -213,8 +210,8 @@ every other lease is foreign.
   tips, and a fresh candidate baseline; perform the ordinary linear rebase and
   hunk resolution under the `Recovery` section, recreate and prepare a new
   candidate, rerun the affected reviews and the acceptance table, produce a fresh
-  summary and re-run the SmartGit review for that candidate, and obtain fresh
-  user confirmation. If any abort, restoration, or release is unproven, retain
+  summary and launch line — main reopens SmartGit from that line — and obtain
+  fresh user confirmation. If any abort, restoration, or release is unproven, retain
   the existing blocker and lease state and stop; do not begin recovery or
   expose a user wait. No primary change is attempted until the fresh review and
   confirmation complete. Never reuse the original approved landing arguments.
