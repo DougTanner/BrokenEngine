@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-	Run a Broken Engine review skill on Codex (Sol) headless and capture its findings.
+	Run a Broken Engine review or researcher assignment on Codex headless and capture its result.
 
-	Primary Claude Code reviewer route: it runs a delegated reviewer/auditor role on Codex/Sol.
-	Driven by the /codex-review skill. Codex never invokes this — its reviewer role is already Sol.
+	Explicit /codex-review calls default to the Sol role. Claude Code /plan-alternatives dispatches
+	may select the Opus role for blind researcher assignments. Codex uses its normal role dispatch.
 
 .NOTES
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
 	OpenAI API credits (verify with `codex login status`). The wrapper refuses an inherited
 	OPENAI_API_KEY so the child cannot bill the API instead.
-	Reviews run on the standard service tier. $serviceTier below switches them to Codex's fast tier
+	Runs use the standard service tier. $serviceTier below switches them to Codex's fast tier
 	(~1.5x speed for ~2.5x subscription credit burn); if the model does not advertise that tier
 	Codex warns and runs standard.
 
@@ -57,6 +57,11 @@ param(
 	[Parameter(ParameterSetName = 'InternalRun')]
 	[switch] $NoRetry,                                    # spend no in-process retry: exactly one Codex attempt
 
+	[Parameter(ParameterSetName = 'Launch')]
+	[Parameter(ParameterSetName = 'InternalRun')]
+	[ValidateSet('sol', 'opus')]
+	[string] $Agent = 'sol',                              # repository role configuration used for model and effort
+
 	[Parameter(Mandatory, ParameterSetName = 'Wait')]
 	[string] $Wait,                                       # run identifier from a running receipt
 
@@ -76,6 +81,39 @@ $waitSleepSeconds = 5
 
 # 'default' or 'fast'. Fast is disabled for now; set 'fast' to re-enable it (see .NOTES for the cost).
 $serviceTier = 'default'
+
+function Get-AgentConfiguration([string] $RepositoryRoot, [string] $AgentName)
+{
+	$rolePath = Join-Path ([System.IO.Path]::GetFullPath($RepositoryRoot)) ".codex/agents/$AgentName.toml"
+	$lines = @(Get-Content -LiteralPath $rolePath -ErrorAction Stop)
+
+	$values = @{}
+	foreach ($key in @('model', 'model_reasoning_effort'))
+	{
+		$assignments = @($lines | Where-Object { $_ -match "^\s*$key\s*=" })
+		if (($assignments.Count -ne 1) -or ($assignments[0] -notmatch "^\s*$key\s*=\s*`"([^`"]+)`"\s*(?:#.*)?$"))
+		{
+			throw "agent configuration '$rolePath' must contain exactly one quoted $key assignment"
+		}
+
+		$values[$key] = $Matches[1]
+	}
+
+	if ($values.model -notmatch '^\S+$')
+	{
+		throw "agent configuration '$rolePath' contains an unusable model value"
+	}
+
+	if ($values.model_reasoning_effort -notmatch '^[a-z][a-z0-9_-]*$')
+	{
+		throw "agent configuration '$rolePath' contains an unusable model_reasoning_effort value"
+	}
+
+	return [pscustomobject]@{
+		Model = $values.model
+		ReasoningEffort = $values.model_reasoning_effort
+	}
+}
 
 function Write-Receipt([hashtable] $Fields)
 {
@@ -149,8 +187,8 @@ function Invoke-CodexAttempt([string] $StagingPath)
 		exec `
 		--sandbox read-only `
 		-C $Worktree `
-		-m gpt-5.6-sol `
-		-c 'model_reasoning_effort="medium"' `
+		-m $agentConfiguration.Model `
+		-c "model_reasoning_effort=`"$($agentConfiguration.ReasoningEffort)`"" `
 		-c "service_tier=`"$serviceTier`"" `
 		--ephemeral `
 		-o $StagingPath `
@@ -255,6 +293,8 @@ if (-not $codex)
 	exit 127
 }
 
+$agentConfiguration = Get-AgentConfiguration $Worktree $Agent
+
 if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 {
 	# Every host shell call starts in a fresh working directory, so the detached run only ever sees absolute paths.
@@ -280,7 +320,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$powershell = (Get-Process -Id $PID).Path
 	# One pre-quoted command line: an argument array would be re-escaped and would split these paths.
 	$noRetryArgument = if ($NoRetry) { ' -NoRetry' } else { '' }
-	$arguments = "-NoProfile -NonInteractive -File `"$PSCommandPath`" -InternalRunId `"$runId`" -Worktree `"$absoluteWorktree`" -PromptFile `"$detachedPrompt`" -OutFile `"$absoluteOutput`"$noRetryArgument"
+	$arguments = "-NoProfile -NonInteractive -File `"$PSCommandPath`" -InternalRunId `"$runId`" -Worktree `"$absoluteWorktree`" -PromptFile `"$detachedPrompt`" -OutFile `"$absoluteOutput`" -Agent `"$Agent`"$noRetryArgument"
 	$detached = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru
 
 	[ordered]@{

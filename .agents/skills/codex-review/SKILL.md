@@ -1,11 +1,11 @@
 ---
 name: codex-review
 description: >-
-  Retained but inactive route that runs one delegated reviewer or auditor role
-  on Codex headless (gpt-5.6-sol). Not part of the Change Workflow: the root
-  AGENTS.md role table runs every review on the Opus `reviewer` subagent. Use
-  only when the user explicitly asks to run a named review on Codex. Codex
-  callers never invoke it.
+  Retained but inactive route that runs one delegated reviewer, auditor, or
+  researcher role on Codex headless using the selected Sol or Opus role
+  configuration. Not part of the Change Workflow. Use only when the user
+  explicitly asks to run a named review, audit, or /plan-alternatives
+  researcher on Codex. Codex callers never invoke it.
 disable-model-invocation: true
 allowed-tools: [Read, Bash, Agent]
 ---
@@ -14,43 +14,55 @@ allowed-tools: [Read, Bash, Agent]
 
 ## Purpose
 
-Runs one delegated reviewer or auditor role on Codex headless (gpt-5.6-sol)
-and returns its findings, without the reviewed evidence entering this session.
+Runs one delegated reviewer, auditor, or `/plan-alternatives` researcher on
+Codex headless with the selected Sol or Opus role configuration and returns its
+handoff without the task evidence entering this session.
 
 ## When to use
 
 Only when the user explicitly asks, in the current session, to run a named
-review or audit skill on Codex. The Change Workflow never routes here: the root
-[AGENTS.md](../../../AGENTS.md) role table runs every delegated review on the
-Opus `reviewer` subagent, and this package is retained so the route can be
-re-enabled later. A `/codex-review` invocation of an assigned skill constitutes
-the delegated-`reviewer` execution context; it is not an "inline run" in the
-assigned skills' vocabulary. Codex callers never invoke it.
+review or audit skill or a `/plan-alternatives` researcher on Codex. The Change
+Workflow never routes here: the root [AGENTS.md](../../../AGENTS.md) role table
+runs its normal delegated subagents, and this package is retained so the route
+can be re-enabled later.
+
+A `/codex-review` invocation of an assigned review skill constitutes the
+delegated-`reviewer` execution context; it is not an "inline run" in the
+assigned skills' vocabulary. Codex callers never invoke this skill.
 
 ## Inputs
 
-- Assigned skill — the reviewer or auditor role to run, such as `plan-audit`, `repo-code-review`,
-  or `session-audit`
+- Assigned skill — `plan-alternatives`, or the reviewer or auditor role to run,
+  such as `plan-audit`, `repo-code-review`, or `session-audit`
 - Its normal inputs: plan/intent, changed files and regions, and current
   residuals or reviewer focus
+- For `/plan-alternatives`, the assigned axis's complete shared task brief
+  instead of review scope
 - Repository root — the absolute toplevel of the session worktree, defaulting to
   the current one; a relative path is accepted and resolves against the current
   directory — and session baseline (a full 40-character commit SHA)
+- `-Agent` — optional `sol` or `opus`, default `sol`; use `opus` for an
+  explicitly requested `/plan-alternatives` researcher. The selection reads
+  the model and effort pins from the matching repository role configuration.
+
+[`references/worker.md`](references/worker.md) owns prompt preparation and
+dispatch mechanics for both routes.
 
 ## Handoff
 
-Return the handoff plus the `<out>` path — the retained full critique on disk —
-and do not paste extra narration beyond the concise handoff into the session.
+Return the assigned skill's handoff plus the `<out>` path — the retained full
+result on disk — and do not paste extra narration beyond the concise handoff
+into the session.
 
 On genuine failure the handoff is `CODEX-UNAVAILABLE: <short reason>` with the
-unchanged target. Only explicit user authorization given in the current session
-unblocks it, by routing the same unchanged assignment to the Opus `reviewer`
-subagent. With that authorization the brief names the assigned skill and states
-that the user authorized the fallback in this session;
-`.claude/agents/reviewer.md` owns what else it carries, and
-[`references/worker.md`](references/worker.md) `### Fallback` owns the
-failure-time mechanics: what counts as genuine failure, the single `-NoRetry`
-re-dispatch, and the `general-purpose` last resort.
+unchanged target. A researcher failure has no substitute. Only explicit user
+authorization given in the current session unblocks a review or audit failure,
+by routing the same unchanged assignment to the Opus `reviewer` subagent. With
+that authorization the brief names the assigned skill and states that the user
+authorized the fallback in this session; `.claude/agents/reviewer.md` owns what
+else it carries. [`references/worker.md`](references/worker.md) `### Fallback`
+owns the failure-time mechanics: what counts as genuine failure, the single
+`-NoRetry` re-dispatch, and the `general-purpose` last resort.
 
 ## References
 

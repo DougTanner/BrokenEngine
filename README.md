@@ -136,7 +136,7 @@ The wrapper already supplies the dangerous permission bypass; no additional sett
 	.\.codex\codex-worktree.ps1
 	```
 - The wrapper creates branch `codex/<uuid>`, stores the worktree under `~/.codex/worktrees/<repository>/<uuid>`, validates the same links and report directory, and launches Codex with `--dangerously-bypass-approvals-and-sandbox`. Both wrappers rebuild the shared primary binaries under a bootstrap mutex before launch, track the client with kill-on-host-close lifetime, propagate its exit code, and preserve partial artifacts on provisioning failure.
-- The Codex headless review route (`.codex/codex-review.ps1`, driven by the `/codex-review` skill) is retained but not in use: Claude Code runs every delegated reviewer/auditor role on the Opus `reviewer` subagent. When run on explicit request, Codex bills the ChatGPT subscription, not metered API credits.
+- The Codex headless route (`.codex/codex-review.ps1`, driven by the `/codex-review` skill) is retained but dormant. An explicit request can select its Sol or Opus role configuration for a review, audit, or researcher assignment; normal workflow delegation does not use it. Headless Codex runs bill the ChatGPT subscription, not metered API credits.
 
 #### Optional Current Maintainer Configuration
 

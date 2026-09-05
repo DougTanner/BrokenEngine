@@ -5,6 +5,15 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 
 ## Steps
 
+Steps 1-8 assemble reviewer and auditor prompts only. For an explicitly
+requested `/plan-alternatives` researcher dispatch, write the complete per-axis
+shared task brief required by `../../plan-alternatives/SKILL.md` directly to a
+new repo-relative file under `Temp/`; do not run the review prompt builder or
+add its reviewer guardrails. The brief must instruct the researcher to return
+the normal axis handoff and then append a standalone final `PASS` line for the
+dispatch wrapper. Use that file as `<promptPath>`, then continue at step 9 with
+`-Agent opus` and the same result-validation and wait contract.
+
 1. Write the judgment content yourself into `-ScopeFile`: the exact scope, the
    files and regions authorized for review, focus notes, and current residuals.
    The script copies that text verbatim and never authors, summarizes, or edits
@@ -86,13 +95,19 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 
    Done when the receipt's exit status is classified and, on exit `0`, its
    `promptPath` is in hand.
-9. Run the review with one bare blocking script call, issued with a call timeout
-   of at least `600000` ms and never wrapped in a loop or chained with another
-   command:
+9. Run the assigned task with one bare blocking script call, issued with a call
+   timeout of at least `600000` ms and never wrapped in a loop or chained with
+   another command:
 
    ```powershell
-   pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <the receipt's promptPath> -OutFile <out>
+   pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <promptPath> -OutFile <out> -Agent <sol|opus>
    ```
+
+   Select the Agent once for the assignment and pass it explicitly on every
+   dispatch: `sol` for a review, which preserves the script's default, and
+   `opus` for an explicitly requested `/plan-alternatives` researcher. The option
+   selects only the repository role configuration's model and effort pins; the
+   prompt and repository instructions define the task's conduct.
 
    Pass a repo-relative `<out>` such as `Temp/<name>-out.md`; the launch
    tolerates an existing out-file, so `<out>` must be a fresh path that does not
@@ -101,15 +116,18 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    [receipts.md](receipts.md) owns for both scripts.
 
    A `completed` receipt is followed by the separator line `--- findings ---`
-   and then the findings themselves, all on that same call's stdout, so the
+   and then the result itself, all on that same call's stdout, so the
    success path never reads `<out>`; that file remains the retained full
-   critique on disk.
+   result on disk.
 
    To verify a change to `.codex/codex-review.ps1` on a machine without the
    Codex CLI, issue that same call from the Bash tool with a stand-in `codex`
    placed first on `PATH` — `PATH=<stub dir>:$PATH pwsh -NoProfile -File
    .codex/codex-review.ps1 ...` — which stays one invocation; PowerShell has
    no inline prefix form, so this verification form is Bash-tool only.
+
+   For a review or audit, `<promptPath>` is the receipt's `promptPath`. For a
+   researcher, it is the raw brief path prepared before step 9.
 
    Done when that single call has returned its receipt.
 10. A result counts as well-formed only when its last non-empty line is the final
@@ -168,7 +186,7 @@ anyway — leaked drafting notes, or an answer to no assigned scope — re-dispa
 the identical prompt exactly once, with a fresh `<out>` path and `-NoRetry`:
 
 ```powershell
-pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <the same promptPath> -OutFile <fresh out> -NoRetry
+pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <the same promptPath> -OutFile <fresh out> -Agent <the same sol|opus selection> -NoRetry
 ```
 
 `-NoRetry` spends no automatic retry, so this dispatch is the assignment's last
@@ -178,13 +196,13 @@ one: its result is final, and a second malformed result is reported as
 On a genuine failure, stop and return the `CODEX-UNAVAILABLE` handoff that
 [`../SKILL.md`](../SKILL.md) `## Handoff` defines. When the wait status is
 `failed`, take its short reason from the receipt's own `reason` field, without a
-further diagnostic call. This is a blocking failure: never dispatch a substitute
-reviewer automatically.
+further diagnostic call. A researcher assignment stops there with no substitute.
 
-The user authorization that unblocks it, and its target, are in
-[`../SKILL.md`](../SKILL.md) `## Handoff`. If the `reviewer` subagent type is
-also unavailable, route at most once to `subagent_type: "general-purpose"` with
-`model: "opus"` and the reviewer or auditor role stated at the top of the
+For a review or audit, this is a blocking failure: never dispatch a substitute
+reviewer automatically. The user authorization that unblocks it, and its target,
+are in [`../SKILL.md`](../SKILL.md) `## Handoff`. If the `reviewer` subagent type
+is also unavailable, route at most once to `subagent_type: "general-purpose"`
+with `model: "opus"` and the reviewer or auditor role stated at the top of the
 prompt.
 
 Do not retry Codex beyond the single re-dispatch above or add another reviewer
