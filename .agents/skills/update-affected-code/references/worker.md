@@ -56,11 +56,18 @@
    runtime checks, domain review, and documentation sync to the manager. Done
    when the re-run searches leave no unhandled hit and those returns are in the
    handoff.
-8. Emit an `/update-vcxproj` handoff for every added or removed C++/GLSL file
-   and every existing C++ file that gained or lost a whole-file
-   `BT_CLIENT`/`BT_SERVER` guard. Do not inspect or modify project XML. Done
-   when every qualifying file is named in that handoff and no project XML was
-   opened.
+8. Read `triggers.vcxprojCandidates` from the session-change inventory receipt;
+   when the assignment supplies none, produce it with `pwsh -NoProfile -File
+   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
+   repository toplevel> -Baseline <full 40-character SHA>` (add
+   `-Head <commit>` for a committed head, and
+   `-IncludeUntracked <comma-separated paths>` listing the untracked paths in
+   the owned change set, because the run covers an untracked file only when
+   that parameter names it). Emit an `/update-vcxproj` handoff carrying its
+   rows whose paths fall in the owned change set, each with its path and
+   reason. `/update-vcxproj` owns membership, filters, and exceptions; do not
+   inspect or modify project XML. Done when every such row is named in that
+   handoff and no project XML was opened.
 
 ## Rules
 

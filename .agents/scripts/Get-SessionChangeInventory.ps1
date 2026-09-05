@@ -18,6 +18,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SourceAffinity.psm1') -Force
 
 $script:MaximumEntries = 500
 $script:MaximumRegions = 400
@@ -30,6 +31,17 @@ $script:ShaderExtensions = @('.vert', '.frag', '.comp', '.geom', '.tesc', '.tese
 # C++ reachability follows PCH -> project ShaderLayouts.h -> engine ShaderLayoutsBase.h -> nested layout headers; ShaderLayoutsBase.h's branch-specific bridge setup precedes those includes, which are outside its BT_ENGINE branch.
 $script:DualLanguageHeaders = @('shaderlayouts.h', 'shaderlayoutsbase.h', 'shadergloballayout.h', 'shadermainlayout.h')
 $script:CppClasses = @('cpp', 'dual-language-header')
+# The classes whose addition, deletion, rename, or type change can move a project item.
+$script:SourceMembershipClasses = @('cpp', 'dual-language-header', 'glsl')
+# One BLOCKED acceptance row per triggered check in this set; this order is the emitted row order.
+$script:AcceptanceSkeletonChecks = [ordered]@{
+	codeStyleReview = '/code-style-review'
+	commentReview = '/comment-review'
+	updateVcxproj = '/update-vcxproj'
+	validateSkill = '/validate-skill'
+	updateClaudeDocs = '/update-claude-docs'
+	progressiveDisclosureReview = '/progressive-disclosure-review'
+}
 $script:ClassNames = @('dual-language-header', 'glsl', 'cpp', 'skill', 'plan', 'script', 'vcxproj', 'doc', 'binary', 'other')
 $script:ManifestModes = @('100644', '100755')
 $script:ManifestRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
@@ -40,6 +52,7 @@ $script:ManifestExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
 $script:ZeroOid = '0000000000000000000000000000000000000000'
 
 $script:Root = $null
+$script:BaselineSha = ''
 $script:HeadSha = ''
 $script:HeadPaths = $null
 $script:BlobHashes = @{}
@@ -274,6 +287,28 @@ function Get-SkillPackageManifestPath([string] $Path) {
 	return $null
 }
 
+function Get-InventorySideText([string] $Revision, [string] $Path) {
+	# A commit-valued side is read from the object database; the working-tree side is the file itself.
+	# An unreadable side returns $null, which suppresses the guard candidate rather than guessing.
+	if ([string]::IsNullOrEmpty($Revision)) {
+		$full = Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)
+		if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return $null }
+		return [IO.File]::ReadAllText($full)
+	}
+	$run = Invoke-InventoryGit @('show', "$($Revision):$Path") $true
+	if ($run.ExitCode -ne 0) { return $null }
+	return $run.Stdout
+}
+
+function Get-InventoryGuardSide([string] $Text) {
+	# Only a proven whole-file client or server guard is one-sided; every other outcome collapses to
+	# one value, so a candidate is emitted only where /update-vcxproj's own resolver also sees a move.
+	if ($null -eq $Text) { return $null }
+	$affinity = (Resolve-FileAffinity $Text).affinity
+	if ($affinity -ceq 'client' -or $affinity -ceq 'server') { return $affinity }
+	return 'not-one-sided'
+}
+
 function Get-RoutingTrigger([object[]] $Entries) {
 	$classes = [Collections.Generic.HashSet[string]]::new([string[]] @())
 	$membershipClasses = [Collections.Generic.HashSet[string]]::new([string[]] @())
@@ -283,12 +318,30 @@ function Get-RoutingTrigger([object[]] $Entries) {
 	# which the `skill` class (SKILL.md alone) does not cover, so this trigger is decided from the paths
 	# too — both sides, because a rename out of a package can break the package it left.
 	$validateSkill = $false
+	# The paths /update-vcxproj must re-resolve, with why: a membership move the class set already
+	# counts, or a modification that flipped the file's whole-file client/server guard.
+	$candidates = [Collections.Generic.List[object]]::new()
+	$candidatePaths = [Collections.Generic.HashSet[string]]::new([string[]] @(), [StringComparer]::Ordinal)
+	$guardCandidate = $false
 	foreach ($entry in $Entries) {
 		[void] $classes.Add($entry.Class)
 		if ($null -ne $entry.OldClass) { [void] $classes.Add($entry.OldClass) }
 		if ($entry.Status -cin @('A', 'D', 'R', 'T')) {
 			[void] $membershipClasses.Add($entry.Class)
 			if ($null -ne $entry.OldClass) { [void] $membershipClasses.Add($entry.OldClass) }
+			if ($script:SourceMembershipClasses -ccontains $entry.Class -or ($null -ne $entry.OldClass -and $script:SourceMembershipClasses -ccontains $entry.OldClass)) {
+				foreach ($side in @($entry.Path, $entry.OldPath)) {
+					if ($null -ne $side -and $candidatePaths.Add($side)) { $candidates.Add([ordered]@{ path = $side; reason = 'membership' }) }
+				}
+			}
+		}
+		elseif ($entry.Status -ceq 'M' -and $script:CppClasses -ccontains $entry.Class) {
+			$baselineSide = Get-InventoryGuardSide (Get-InventorySideText $script:BaselineSha $entry.Path)
+			$currentSide = Get-InventoryGuardSide (Get-InventorySideText $script:HeadSha $entry.Path)
+			if ($null -ne $baselineSide -and $null -ne $currentSide -and $baselineSide -cne $currentSide) {
+				$guardCandidate = $true
+				if ($candidatePaths.Add($entry.Path)) { $candidates.Add([ordered]@{ path = $entry.Path; reason = 'guard' }) }
+			}
 		}
 		if (Test-InstructionDocPath $entry.Path) { $instructionDoc = $true }
 		if ($null -ne $entry.OldPath -and (Test-InstructionDocPath $entry.OldPath)) { $instructionDoc = $true }
@@ -301,18 +354,19 @@ function Get-RoutingTrigger([object[]] $Entries) {
 	}
 	$cpp = $classes.Contains('cpp') -or $classes.Contains('dual-language-header')
 	$glsl = $classes.Contains('glsl') -or $classes.Contains('dual-language-header')
-	$sourceMembership = $membershipClasses.Contains('cpp') -or $membershipClasses.Contains('dual-language-header') -or $membershipClasses.Contains('glsl')
+	$sourceMembership = @($script:SourceMembershipClasses | Where-Object { $membershipClasses.Contains($_) }).Count -gt 0
 	return [ordered]@{
 		repoCodeReview = $cpp
 		glslReview = $glsl
 		codeStyleReview = $cpp
 		commentReview = $cpp -or $glsl
 		updateAffectedCode = $cpp -or $glsl
-		updateVcxproj = $sourceMembership
+		updateVcxproj = $sourceMembership -or $guardCandidate
 		updateClaudeDocs = $cpp -or $glsl
 		validateSkill = $validateSkill
 		progressiveDisclosureReview = $instructionDoc
 		planTouched = $classes.Contains('plan')
+		vcxprojCandidates = [object[]] $candidates.ToArray()
 	}
 }
 
@@ -470,7 +524,7 @@ function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $U
 	return , $regions
 }
 
-function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation) {
+function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation, [object] $Triggers) {
 	$reviewed = [Collections.Generic.List[object]]::new()
 	$arguments = @('diff', '--raw', '--abbrev=40', '-M', '-z', '--no-color', '--no-ext-diff', "$BaselineSha...$HeadSha", '--')
 	$tokens = (Invoke-InventoryGit $arguments).Stdout -split "`0"
@@ -502,6 +556,19 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 		if ((Get-PathClass $row.path $row.currentMode $false) -ceq 'plan') { $planTouched = $true; break }
 		if ($null -ne $row.oldPath -and (Get-PathClass $row.oldPath $row.baselineMode $false) -ceq 'plan') { $planTouched = $true; break }
 	}
+	# The rows this landing owes, each left BLOCKED for the finalizer to fill with evidence. The
+	# Executable Plan row is decided from the reviewed paths rather than from planTouched, whose
+	# `plan` class deliberately excludes the Plans tree's own AGENTS.md and CLAUDE.md.
+	$skeleton = [Collections.Generic.List[object]]::new()
+	foreach ($name in $script:AcceptanceSkeletonChecks.Keys) {
+		if ($Triggers[$name]) { $skeleton.Add([ordered]@{ check = $script:AcceptanceSkeletonChecks[$name]; status = 'BLOCKED' }) }
+	}
+	foreach ($row in $reviewed) {
+		if ($row.path.StartsWith('Documents/Plans/') -or ($null -ne $row.oldPath -and $row.oldPath.StartsWith('Documents/Plans/'))) {
+			$skeleton.Add([ordered]@{ check = 'Executable Plan check'; status = 'BLOCKED' })
+			break
+		}
+	}
 	$landingTruncation = [ordered]@{
 		reviewed = [ordered]@{ full = $reviewed.Count; emitted = [Math]::Min($reviewed.Count, $script:MaximumEntries) }
 		porcelain = [ordered]@{ full = $porcelain.Count; emitted = [Math]::Min($porcelain.Count, $script:MaximumEntries) }
@@ -513,6 +580,7 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 		porcelain = [string[]] @($porcelain | Select-Object -First $script:MaximumEntries)
 		submodules = [string[]] @($submodules | Select-Object -First $script:MaximumEntries)
 		planTouched = $planTouched
+		acceptanceSkeleton = [object[]] $skeleton.ToArray()
 	}
 }
 
@@ -637,6 +705,7 @@ try {
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.baseline-unresolved' "The baseline does not resolve to a commit in this repository: '$Baseline'."
 	}
 	$baselineSha = $baselineRun.Stdout.Trim()
+	$script:BaselineSha = $baselineSha
 	$result.baselineSha = $baselineSha
 	$headSha = ''
 	if (-not [string]::IsNullOrWhiteSpace($Head)) {
@@ -716,7 +785,7 @@ try {
 	$landingTruncation = $null
 	if ($Landing) {
 		$landingReference = $null
-		$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference)
+		$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference) $result.triggers
 		$landingTruncation = $landingReference
 	}
 

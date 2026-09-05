@@ -61,12 +61,12 @@ every other lease is foreign.
    - Load and follow
      [`landing-acceptance-table.md`](landing-acceptance-table.md) first, which
      owns the typed-artifact rules.
-   - Fill it from the hygiene handoffs that already exist — the session-change
-     inventory's `triggers` object reports which ones the session owes:
-     `/code-style-review` for changed C++, `/update-vcxproj`, `/validate-skill`,
-     `/update-claude-docs`, `/progressive-disclosure-review` — and from the
-     Review and resolve correctness step's `/comment-review` handoff for
-     changed C++ or GLSL.
+   - Fill the landing receipt's `acceptanceSkeleton` rows with evidence from the
+     handoffs they name, and the `Executable Plan check` row from the
+     `plan validate` run [`landing-acceptance-table.md`](landing-acceptance-table.md)
+     `## Executable Plan check` requires, then add the remaining rows per
+     [`landing-acceptance-table.md`](landing-acceptance-table.md)
+     `## Acceptance table`.
    - Never withhold the table waiting for a missing one: give each triggered
      handoff that does not exist its own row with the status that reference
      assigns a missing artifact.

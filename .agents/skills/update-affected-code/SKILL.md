@@ -37,6 +37,10 @@ Require:
   checking client/server guards, and updating mirrored code state the invariant
   and counterpart scope.
 
+The session-change inventory receipt, whose `triggers.vcxprojCandidates` rows
+name the project-membership candidates, is optional: the worker produces it
+from its documented run when the assignment supplies none.
+
 Return `BLOCKED` without editing when the ownership boundary, controlling
 intent, or a required old/new contract is missing. When the implementation
 reports no triggers, inspect the owned diff and changed regions, construct the

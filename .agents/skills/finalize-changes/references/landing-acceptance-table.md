@@ -36,7 +36,10 @@ inline. Treat `truncated` true as unreviewed state rather than a clean
 inventory. A `-Landing` run still reports the complete top-level `triggers`
 object like any other run, and `planTouched` is the only trigger the `landing`
 object itself adds; no part of the run ever runs or replaces the WorktreeCli
-`plan validate` run required by `## Executable Plan check` below.
+`plan validate` run required by `## Executable Plan check` below. The `landing`
+object also carries `acceptanceSkeleton`: the rows this landing owes, each
+emitted `BLOCKED` and named by skill, plus the `Executable Plan check` row when
+the reviewed diff touches `Documents/Plans/`.
 
 ## Acceptance table
 
@@ -89,13 +92,13 @@ review.
 
 ## Executable Plan check
 
-When the reviewed diff touches `Documents/Plans/**`, run
-`Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe plan
-validate --lint-only --repo <absolute Git common directory> --worktree
-<adopted checkout>` and require a valid result for the session worktree. Record
-notices. Otherwise record `not triggered — no executable-Plan change`.
-`--lint-only` takes no scheduler guard, creates no storage, and heals nothing,
-so it reports `healedClaims` as an empty array and changes no scheduler state.
+For the `Executable Plan check` row the landing receipt's `acceptanceSkeleton`
+emits, run `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe
+plan validate --lint-only --repo <absolute Git common directory> --worktree
+<adopted checkout>` and require a valid result for the session worktree,
+recording its notices. `--lint-only` takes no scheduler guard, creates no
+storage, and heals nothing, so it reports `healedClaims` as an empty array and
+changes no scheduler state.
 A run that fails to execute the tool at all is a blocker: record the row
 `BLOCKED` with the exact failure, and never substitute other evidence for the
 missing run.
