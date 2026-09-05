@@ -112,9 +112,10 @@ blocker. `code` and `message` are retained verbatim for the caller; no caller
 reconstructs the assessment from Git output.
 
 - `Invoke-FinalizeCandidateCommit.ps1` stages only the authorized caller
-  paths, preserves disjoint state, and blocks mixed owned paths with a message
-  naming the remedy — stage the named path with `git add -- <path>`, or restore
-  it, so its index and worktree agree, then re-invoke. `pwsh -File`
+  paths, preserves disjoint state, and accepts an owned path whose index and
+  worktree copies merely differ, landing its on-disk bytes and re-staging them;
+  an owned path left unmerged (a conflict stage in the index) still blocks with
+  `git.owned-path-mixed-state` and a message naming the remedy. `pwsh -File`
   hands every argument over as one literal string, so several owned paths can
   only travel as one comma-separated `-OwnedPaths` token. `-OwnedPaths` carries
   the session's full caller-owned landing set, never a hand-trimmed subset: an
