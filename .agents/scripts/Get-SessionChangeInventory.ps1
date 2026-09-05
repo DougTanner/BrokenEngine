@@ -524,27 +524,32 @@ function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $U
 	return , $regions
 }
 
-function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation, [object] $Triggers) {
+function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation) {
+	# The reviewed diff is the session's own three-dot range, resolved to its merge base once so the
+	# script's own entry pipeline answers it: `git diff A...B` is defined as the diff from
+	# merge-base(A, B) to B, so the two-dot pair below compares the same two trees.
+	$mergeBase = (Invoke-InventoryGit @('merge-base', $BaselineSha, $HeadSha)).Stdout.Trim()
+	$reviewedBinaryPaths = Get-InventoryBinaryPath $mergeBase $HeadSha
 	$reviewed = [Collections.Generic.List[object]]::new()
-	$arguments = @('diff', '--raw', '--abbrev=40', '-M', '-z', '--no-color', '--no-ext-diff', "$BaselineSha...$HeadSha", '--')
-	$tokens = (Invoke-InventoryGit $arguments).Stdout -split "`0"
-	$index = 0
-	while ($index -lt $tokens.Count) {
-		$token = $tokens[$index]
-		if ([string]::IsNullOrEmpty($token)) { $index++; continue }
-		$fields = $token.TrimStart(':') -split ' '
-		$status = $fields[4].Substring(0, 1)
-		$old = $null
-		if ($status -ceq 'R' -or $status -ceq 'C') { $old = $tokens[$index + 1]; $path = $tokens[$index + 2]; $index += 3 }
-		else { $path = $tokens[$index + 1]; $index += 2 }
+	$reviewedEntries = [Collections.Generic.List[object]]::new()
+	foreach ($row in (Get-InventoryRawRow $mergeBase $HeadSha)) {
+		# -Landing requires a commit-valued head, so the head side is never the working tree.
+		$reviewedEntries.Add((Get-InventoryEntry $row $reviewedBinaryPaths $false))
 		$reviewed.Add([ordered]@{
-			status = $status
-			path = $path
-			oldPath = $old
-			baselineMode = $fields[0]
-			currentMode = $fields[1]
+			status = $row.Status
+			path = $row.Path
+			oldPath = $row.OldPath
+			baselineMode = $row.SourceMode
+			currentMode = $row.DestinationMode
 		})
 	}
+	# Routing reads a modified file's baseline side from $script:BaselineSha, whose reviewed-diff value
+	# is the merge base. That name is the same script-scope variable the caller's own $baselineSha
+	# binds, and the completion message still reads it, so the top-level value is put back afterwards.
+	$topLevelBaselineSha = $script:BaselineSha
+	$script:BaselineSha = $mergeBase
+	$reviewedTriggers = Get-RoutingTrigger ([object[]] $reviewedEntries.ToArray())
+	$script:BaselineSha = $topLevelBaselineSha
 	$porcelain = @((Invoke-InventoryGit @('status', '--porcelain=v2', '--untracked-files=all', '--ignored=matching')).Stdout -split "`n" | ForEach-Object { $_.TrimEnd("`r") } | Where-Object { -not [string]::IsNullOrEmpty($_) })
 	# Uninitialized submodules are normal provisioning state, reported verbatim and never drift;
 	# a repository whose gitlinks have no .gitmodules entry simply reports none.
@@ -561,7 +566,7 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 	# `plan` class deliberately excludes the Plans tree's own AGENTS.md and CLAUDE.md.
 	$skeleton = [Collections.Generic.List[object]]::new()
 	foreach ($name in $script:AcceptanceSkeletonChecks.Keys) {
-		if ($Triggers[$name]) { $skeleton.Add([ordered]@{ check = $script:AcceptanceSkeletonChecks[$name]; status = 'BLOCKED' }) }
+		if ($reviewedTriggers[$name]) { $skeleton.Add([ordered]@{ check = $script:AcceptanceSkeletonChecks[$name]; status = 'BLOCKED' }) }
 	}
 	foreach ($row in $reviewed) {
 		if ($row.path.StartsWith('Documents/Plans/') -or ($null -ne $row.oldPath -and $row.oldPath.StartsWith('Documents/Plans/'))) {
@@ -785,7 +790,7 @@ try {
 	$landingTruncation = $null
 	if ($Landing) {
 		$landingReference = $null
-		$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference) $result.triggers
+		$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference)
 		$landingTruncation = $landingReference
 	}
 
