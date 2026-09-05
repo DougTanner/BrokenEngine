@@ -52,6 +52,7 @@ Return the shared handoff from
 [`subagent-reporting.md`](../../references/subagent-reporting.md) `## Handoffs`,
 with these declared extension fields:
 
+- `Scope: PASS | NEEDS_ACTION | not applicable (Tier 1) | not supplied`
 - `Coherence` — one line per semantic finding, naming its shared `Findings` row
   by ID and adding only what that one-line row cannot carry, or an explicit
   no-finding statement. Outside the verbatim cleanup handoffs below, files read

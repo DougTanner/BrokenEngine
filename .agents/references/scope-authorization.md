@@ -24,3 +24,8 @@ than guessing.
 
 Every finding cites the specific clause violated or states the specific
 authorization that is absent. No clause named, no finding.
+
+When all three passes above find nothing, report one line in the review's
+declared `Scope:` field — a single `PASS` covering the authorization,
+minimality, and KISS passes together. Passing passes get no `Decisive checks`
+row and nothing else in the handoff.
