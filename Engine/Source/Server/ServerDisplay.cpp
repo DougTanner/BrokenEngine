@@ -35,7 +35,7 @@ static uint64_t suLastContentHash = 0;
 static bool sbHasLastContentHash = false;
 
 // Entity totals for the left panel are summed once per tick from the game cell-stat seam and stay file-static for the
-// process's one window. Profiling-disabled builds skip aggregation, so these remain zero and the entity rows are empty.
+// process's one window. Profiling-disabled builds skip aggregation, so these remain zero and the entity rows read zero.
 static int64_t siTotalPlayers = 0;
 static int64_t siTotalSpaceships = 0;
 static int64_t siTotalBlasters = 0;

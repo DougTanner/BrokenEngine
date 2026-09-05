@@ -10,8 +10,8 @@
 namespace
 {
 
-// The quarter-dimension clamp keeps small leaves from deepening their entire shoal with the fixed-width
-// edge-taper band.
+// Widest edge-taper band: about one sixteenth of a 400 m island footprint (Island.json widthMeters). The
+// quarter-dimension clamp keeps small leaves from deepening their entire shoal with this fixed-width band.
 constexpr float kfEdgeTaperMaxMeters = 25.0f;
 
 // Aligned crop rect into the full bake, in full-bake pixel coords. Shared output of the auto-crop
