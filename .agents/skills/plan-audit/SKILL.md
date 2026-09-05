@@ -64,7 +64,7 @@ If clean, state `PASS — no meaningful plan flaws found.` Return:
 
 ```text
 API Verification Requests: <single checkable requests or none>
-Traceability checked: <requirements/invariants <-> implementation sites/checks>
+Traceability checked: <one requirement or invariant> <-> <implementation site or check>; return one single-line row per mapping, put supporting detail under `Evidence`, and follow the shared handoff overflow rule
 Required next step: Tier 3 -> manager decision, then /external-grill-plan | Tier 2 -> manager decision
 ```
 
