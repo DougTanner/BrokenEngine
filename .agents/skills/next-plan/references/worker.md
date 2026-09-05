@@ -53,7 +53,10 @@
    exact `## In scope` and `## Out of scope` sections with content intact, and complete
    execution card—and cites its path plus `## Execution card` selector under `Evidence` for `/plan-audit`.
 5. Invoke step 3's claim script idempotently immediately before the final
-   preparation handoff. Done when it reports the held claim.
+   preparation handoff. When that result carries a `sync` object, the tree
+   moved under the preparation evidence: diff `sync.from..sync.to` against the
+   paths the preparation handoff cited and re-dispatch step 4 when they
+   intersect. Done when it reports the held claim.
 6. Present for approval per `### Implementation approval` in
    [`../SKILL.md`](../SKILL.md). Done when the user's decision arrives.
 7. Implement the approved change. Done when its own acceptance checks pass.

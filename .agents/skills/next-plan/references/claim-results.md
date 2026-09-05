@@ -15,12 +15,14 @@ baseline, and a result without one leaves the recorded baseline unchanged, so
 the `Get-NextPlanContext` baseline holds only until the first claim reports a
 `sync` object.
 
-A session that already holds a Plan claim is reported as `reused` with
-`nextAction: prepare` before the tree is examined. That holds in any tree state
-and whether or not `-Plan` was passed, and a `-Plan` value is not resolved at
-all for a held claim, so no path or pattern result can surface. The `reused`
-result therefore carries neither a `sync` nor a `retained` object and the
-recorded baseline is unchanged.
+A session that already holds a Plan claim is normally reported as `reused` with
+`nextAction: prepare` before the tree is examined. That early report holds in
+any tree state and whether or not `-Plan` was passed, and a `-Plan` value is
+not resolved at all for a held claim, so no path or pattern result can surface;
+it carries neither a `sync` nor a `retained` object and the recorded baseline
+is unchanged. When the held-claim lookup is instead busy or unreadable, the run
+falls through into the ordinary flow below, so that `reused` result can carry a
+`sync` object and the baseline rule above then applies to it.
 
 Any other claim run, bare or targeted, is refused with `stop-report-to-user`,
 never `resume-with-flag`, when the session worktree holds an uncommitted

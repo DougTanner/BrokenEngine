@@ -50,8 +50,8 @@ try {
  }
  $context=Get-NextPlanContext
  # A claim this session already holds needs no tree work and no scheduler mutation, so report it before the gates below;
- # every other claim-status outcome, unreadable output included, falls through to the flow below, which reports a
- # scheduler stop from plan validate instead. Reusing a held claim therefore never fast-forwards the session.
+ # any other claim-status outcome, unreadable output included, falls through to the flow below, which can fast-forward
+ # the session before plan claim-next re-reports that same held claim as 'existing'.
  $heldClaim=$null
  try{$claimStatus=Get-NextPlanClaimStatus $context;if($claimStatus.ExitCode -eq 0 -and [string]$claimStatus.Status.code -ceq 'claimed'){$heldClaim=$claimStatus.Status}}catch{$heldClaim=$null}
  if($null -ne $heldClaim){$result.claim=[ordered]@{claimed=$true;plan=[string]$heldClaim.plan;state='existing'};Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
