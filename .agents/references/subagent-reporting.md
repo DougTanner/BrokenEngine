@@ -101,10 +101,12 @@ Every row is one line. Do not quote code and do not repeat a row from another
 field. A field over 10 rows, or a whole handoff over 40 lines or 20,000
 characters, moves its full material to an existing file or log, or to a `Temp/`
 file when no existing file holds it, and cites it under `Evidence` as path plus
-selector. A typed envelope a role must return verbatim, such as the
-`broken-engine-build-result/v1` envelope the `builder` returns and the typed
-receipts `/finalize-changes` consumes, is exempt and does not count toward these
-limits.
+selector. A selector into a Markdown file is a `##` heading in it. The handoff
+itself still carries everything main needs; the file is for the workers main
+dispatches next, cited to them as path plus selector. A typed envelope a role
+must return verbatim, such as the `broken-engine-build-result/v1` envelope the
+`builder` returns and the typed receipts `/finalize-changes` consumes, is exempt
+and does not count toward these limits.
 
 Both `Executor` values are what the host reports to the worker itself: the model
 identity the host states in the worker's own context, and the effort from the
@@ -147,7 +149,7 @@ What main does with each field:
 | `Changed files` | Bounds what is re-reviewed. |
 | `Decisive checks` | Feed the acceptance table. |
 | `Build required` | Goes to a `builder`. |
-| `Evidence` | Read only when a decision needs it. |
+| `Evidence` | Passed on to later workers as path plus selector; main reads it only when a decision needs it, and then only at the cited selector, not the file whole. |
 | `Executor` | Proves routing. |
 | `Residuals` | Go to the message footer or to `/create-follow-up-plans`. |
 
