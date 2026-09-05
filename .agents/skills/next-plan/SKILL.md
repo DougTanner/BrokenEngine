@@ -23,7 +23,7 @@ Only for a current explicit `/next-plan` or `$next-plan` invocation.
 
 The `argument-hint` value selects the Plan:
 
-- Bare invocation selects the oldest eligible Plan by immutable `createdUtc`,
+- Bare invocation selects the newest eligible Plan by immutable `createdUtc`,
   then normalized UTF-8 path.
 - A normalized `Documents/Plans/...` argument selects that Plan.
 - Any other argument is a case-sensitive partial match against executable Plan

@@ -589,7 +589,7 @@ namespace toolcli
 					outputPlans.push_back(&plan);
 				}
 			}
-			std::sort(outputPlans.begin(), outputPlans.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc < pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
+			std::sort(outputPlans.begin(), outputPlans.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc > pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
 			for (const Plan* pPlan : outputPlans)
 			{
 				nlohmann::json dependencies = nlohmann::json::array();
@@ -642,7 +642,7 @@ namespace toolcli
 					rows.push_back(&plan);
 				}
 			}
-			std::sort(rows.begin(), rows.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc < pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
+			std::sort(rows.begin(), rows.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc > pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
 			const std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repo);
 			if (!schedulerRoot)
 			{
@@ -811,7 +811,7 @@ namespace toolcli
 				}
 				candidates.push_back(&plan);
 			}
-			std::sort(candidates.begin(), candidates.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc < pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
+			std::sort(candidates.begin(), candidates.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc > pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
 			for (const Plan* pPlan : candidates)
 			{
 				const std::optional<std::filesystem::path> claimPath = ClaimPath(root, pPlan->path);
