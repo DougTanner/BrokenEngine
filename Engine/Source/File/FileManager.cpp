@@ -405,6 +405,11 @@ LazyChunk& FileManager::GetLazyChunk(common::crc_t crc)
 	return mpPackChunks->GetLazyChunk(crc);
 }
 
+void FileManager::WaitForLoadersIdle()
+{
+	mpPackChunks->WaitForLoadersIdle();
+}
+
 void FileManager::ResetTextureChunkStates()
 {
 	mpPackChunks->ResetTextureChunkStates();

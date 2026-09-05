@@ -555,6 +555,10 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			{
 				std::memcpy(pData, &rLazyChunk.pData[iPosition], iSize);
 			});
+
+			// The copy above is synchronous and no upload thread owns this chunk on the early-out path, so the
+			// pool pages are reclaimable here exactly as on the kGpuUploadComplete path in AdoptUploadedChunk.
+			gpFileManager->DecommitChunkRange(rCrc, 0, rLazyChunk.iDataSize);
 			mTextureDescriptors.UpdateDescriptorsForTexture(rCrc);
 			bAdoptedTextures = true;
 
@@ -605,13 +609,12 @@ void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bo
 		rTexture.RecordAcquireBarrier(vkAcquireCommandBuffer);
 	}
 
-	// Race-free null of worker-thread-shared CPU-pool state: reaching kGpuUploadComplete means
-	// the transfer thread (UploadThread) finished this chunk and released ownership, so nulling
-	// pData here (on the main thread) cannot race the transfer thread — the same ordering
-	// invariant FileManager::ResetTextureChunkStates documents.
+	// Race-free decommit of worker-thread-shared CPU-pool state: reaching kGpuUploadComplete means the
+	// transfer thread (UploadThread) finished this chunk and released ownership, so returning its pages
+	// here (on the main thread) cannot race that thread. pData and iDataSize keep their construction
+	// values and describe the reserved pool range, not resident bytes — a whole reload recommits that
+	// range before writing it, and eState stays the residency authority.
 	gpFileManager->DecommitChunkRange(crc, 0, rLazyChunk.iDataSize);
-	rLazyChunk.pData = nullptr;
-	rLazyChunk.iDataSize = 0;
 	mTextureDescriptors.UpdateDescriptorsForTexture(crc);
 
 	rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);

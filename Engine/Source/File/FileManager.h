@@ -197,6 +197,18 @@ public:
 	void NotifyChunkCompletion();
 	LazyChunk& GetLazyChunk(common::crc_t crc);
 
+	// Blocks until no whole or range load is queued or running, with every accepted job's terminal state published.
+	// Full graphics recovery calls this before texture-upload teardown so no loader can publish into the reset that
+	// follows. Callers must not enqueue new work afterwards until recovery completes. No separate admission state
+	// enforces that, because the exclusion is temporal: the one off-main producer (one-shot audio requesting its chunk
+	// from tick workers) has joined by the end of ClientUpdate, which precedes Render and the Graphics::Destroy that
+	// calls this.
+	void WaitForLoadersIdle();
+
+	// Reset texture eState and GPU handles: all texture chunks, or only targetCrcs. Chunk pool pointers and sizes are
+	// fixed at construction and are not touched. The caller owns exclusion for the chunks it resets — full recovery
+	// through WaitForLoadersIdle plus the upload-thread wait, island eviction through RenderGlobal's drained
+	// descriptor window, which excludes Vulkan descriptor/image use and is not a loader drain.
 	void ResetTextureChunkStates();
 	void ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs);
 

@@ -655,6 +655,24 @@ void PackChunks::WaitForChunks(std::span<const common::crc_t> crcs)
 	});
 }
 
+void PackChunks::WaitForLoadersIdle()
+{
+	// Full-recovery boundary: returns once every accepted whole and range job has left the loading threads with its
+	// terminal state published, and nothing is left queued. The exclusion that lets it run without admission state is
+	// temporal, not ownership: one producer is off-main (PlayOneShot3d -> StaticVoice::LoadXAudio2SourceVoice requests
+	// its audio chunk from tick workers), but ClientUpdate joins every dispatch worker before Render, and every
+	// Graphics::Destroy call site runs on the main thread at or after Render, so nothing can enqueue while this waits;
+	// Documents/Plans/Engine/AudioStreamingBackgroundRangeReads.md owns reconciling this once audio adds a producer
+	// outside that window.
+	// Without the drain, a loader that popped a whole-texture request before the all-texture reset can store
+	// kUploading after that reset already ran. RequestChunkLoad skips any chunk at >= kDiskLoaded, so such a chunk
+	// is never requested again and its texture never recovers.
+	std::unique_lock lock(mQueueMutex);
+	LOG(kLoading, kInfo, "PackChunks loader drain begin queued={} active={}", mRequestQueue.size(), miActiveLoadJobs);
+	mCompletionCondition.wait(lock, [this] { return mRequestQueue.empty() && miActiveLoadJobs == 0; });
+	LOG(kLoading, kInfo, "PackChunks loader drain end queued={} active={}", mRequestQueue.size(), miActiveLoadJobs);
+}
+
 void PackChunks::LoadingThread(int64_t iThreadIndex)
 {
 	// All loading threads share the semantically-correct kThreadLazyLoad id: nothing keys shared state off the
@@ -687,6 +705,9 @@ void PackChunks::LoadingThread(int64_t iThreadIndex)
 
 			loadRequest = mRequestQueue.top();
 			mRequestQueue.pop();
+			// Counted in the same locked scope as the pop, so a request is never invisible to WaitForLoadersIdle:
+			// it is either still queued or already active.
+			++miActiveLoadJobs;
 		}
 
 		if (loadRequest.eKind == LoadRequestKind::kRangeReload)
@@ -698,6 +719,15 @@ void PackChunks::LoadingThread(int64_t iThreadIndex)
 		else
 		{
 			LoadChunk(loadRequest, iThreadIndex);
+		}
+
+		// Decremented here rather than inside LoadChunk, which already takes mQueueMutex through
+		// NotifyChunkCompletion, and only after the job published its terminal state above — so a drain that
+		// returns has seen every accepted job's result.
+		{
+			std::unique_lock lock(mQueueMutex);
+			--miActiveLoadJobs;
+			mCompletionCondition.notify_all();
 		}
 	}
 }
@@ -850,28 +880,21 @@ LazyChunk& PackChunks::GetLazyChunk(common::crc_t crc)
 
 void PackChunks::ResetTextureChunkStates()
 {
-	// Wholesale reset for device-loss recovery: restores pool pointers + resets state for every texture chunk.
+	// Wholesale reset for device-loss recovery: resets state and GPU handles for every texture chunk.
+	LOG(kLoading, kInfo, "All-texture chunk state reset");
 	ResetTextureChunkStates({});
 }
 
 void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs)
 {
-	// Rebuild every lazy chunk's pool pointer and size in map order because offsets are cumulative;
-	// only selected textures have state and GPU handles reset. Callers own synchronization: device-loss
-	// runs after the upload thread joins, while LRU eviction runs in RenderGlobal's drained descriptor
-	// window and targets resident, non-uploading textures. Streaming music remains nonresident, so its
-	// ReadChunkData calls use disk fallback and do not access these fields. Lazy-loading workers remain
-	// live during both reset callers and must be excluded before these plain fields can be rewritten safely.
+	// pData/iDataSize are fixed at construction and never rewritten, so this reset touches only the selected
+	// textures' eState and GPU handles. Callers own exclusion against the loading threads: full recovery drains
+	// them through WaitForLoadersIdle and then waits the upload thread, while LRU eviction runs in RenderGlobal's
+	// drained descriptor window (a Vulkan descriptor/image drain, not a loader drain) and targets resident,
+	// non-uploading textures, for which no whole-chunk loader can be in flight.
 	bool bResetAll = targetCrcs.empty();
-	int64_t iPoolOffset = 0;
 	for (auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
-		bool bCompressed = common::IsCompressed(rLazyChunk.header.flags);
-		int64_t iOnDiskSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
-		rLazyChunk.iDataSize = bCompressed ? rLazyChunk.header.iUncompressedSize : iOnDiskSize;
-		rLazyChunk.pData = mpLazyPool + iPoolOffset;
-		iPoolOffset += common::RoundUp<int64_t, common::kiAlignmentBytes>(rLazyChunk.iDataSize);
-
 		if (!(rLazyChunk.header.flags & common::ChunkFlags::kTexture))
 		{
 			continue;
@@ -889,7 +912,7 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 
 		if (eState == ChunkState::kReady)
 		{
-			// CPU data was cleared, need full reload from disk
+			// Adoption decommitted the pool pages, so the CPU bytes are gone: need a full reload from disk
 			rLazyChunk.eState.store(ChunkState::kNotLoaded, std::memory_order_release);
 		}
 		else if (eState == ChunkState::kGpuUploadComplete || eState == ChunkState::kUploading)
@@ -899,7 +922,9 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 #if defined(BT_CLIENT)
 			// Maintain the pending-adoption counter: kUploading (uncounted) -> kDiskLoaded (counted) arms it;
 			// kGpuUploadComplete -> kDiskLoaded stays adoptable (already counted), so leave it unchanged. Both reset
-			// callers run with the upload thread idle (whole-pool: after the join; per-island: in the drained window),
+			// callers run with the upload thread idle (whole-pool: Graphics::Destroy drains the loaders, waits the
+			// upload worker through WaitIdle, then destroys the transfer resources before this reset; per-island:
+			// in the drained descriptor window),
 			// and gpTextureUploadManager outlives the device-loss Graphics recreate, so it is always valid here.
 			if (eState == ChunkState::kUploading)
 			{
@@ -943,10 +968,13 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 
 		// If chunk is loaded, read from memory. No lock: pData visibility comes from the eState release
 		// (LoadChunk) / acquire (here) pair, not mQueueMutex — the lockless writers never take it.
-		// pData/iDataSize are stable once kDiskLoaded except under ResetTextureChunkStates, whose
-		// drained-window precondition excludes concurrent readers.
+		// pData/iDataSize are fixed at construction, so no reset can move them out from under this read.
 		if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 		{
+			// An adopted texture keeps its pData/iDataSize while its pool pages are decommitted, so a texture CRC
+			// reaching this path would copy from decommitted memory. eState is the authority for non-texture reads.
+			ASSERT(!(rLazyChunk.header.flags & common::ChunkFlags::kTexture));
+
 			// Validate read bounds
 			if (uiOffset + buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize))
 			{
@@ -1090,12 +1118,19 @@ MemoryStats PackChunks::GetEagerStats() const
 MemoryStats PackChunks::GetLazyStats() const
 {
 	MemoryStats stats;
-	// No lock: mLazyChunkMap structure is frozen after boot, eState is atomic (acquire), and iDataSize is
-	// stable except under ResetTextureChunkStates' drained-window precondition. mQueueMutex never guarded
-	// these value reads — the lockless writers never take it.
+	// No lock: mLazyChunkMap structure is frozen after boot, eState is atomic (acquire), and iDataSize is fixed
+	// at construction. mQueueMutex never guarded these value reads — the lockless writers never take it.
+	// An adopted texture (kReady) has had its pool pages decommitted, so its retained pData/iDataSize describe
+	// the reserved allocation rather than resident bytes; skip it or the readout overstates what is held.
 	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
-		if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
+		ChunkState eState = rLazyChunk.eState.load(std::memory_order_acquire);
+		if (eState >= ChunkState::kReady && (rLazyChunk.header.flags & common::ChunkFlags::kTexture))
+		{
+			continue;
+		}
+
+		if (eState >= ChunkState::kDiskLoaded)
 		{
 			stats.iBytes += rLazyChunk.iDataSize;
 			++stats.iCount;
@@ -1117,10 +1152,16 @@ MemoryStats PackChunks::GetMemoryStats(data::DataTypes eDataType) const
 	}
 	else
 	{
-		// No lock: see GetLazyStats — mQueueMutex never guarded these value reads.
+		// No lock, and adopted textures skipped: see GetLazyStats.
 		for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 		{
-			if (DataTypeFromFlags(rLazyChunk.header.flags) == eDataType && rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
+			ChunkState eState = rLazyChunk.eState.load(std::memory_order_acquire);
+			if (eState >= ChunkState::kReady && (rLazyChunk.header.flags & common::ChunkFlags::kTexture))
+			{
+				continue;
+			}
+
+			if (DataTypeFromFlags(rLazyChunk.header.flags) == eDataType && eState >= ChunkState::kDiskLoaded)
 			{
 				stats.iBytes += rLazyChunk.iDataSize;
 				++stats.iCount;

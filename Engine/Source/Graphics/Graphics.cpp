@@ -200,7 +200,8 @@ void Graphics::RenderGlobal(float fCurrentTime)
 	// framebuffer fence only when churn, adoption, or restoration is pending; UPDATE_AFTER_BIND permits writes but does not prevent races with
 	// in-flight samplers. AnyAdoptionPending covers per-slot, array-flush, and lighting-blur writes; AnyRestorationPending also covers
 	// template-owned elevation without a texture-map chunk. Clear the prior acquire publication before testing the predicate so an idle frame
-	// cannot resubmit it; ProcessPendingTextures republishes only inside the write epoch.
+	// cannot resubmit it; ProcessPendingTextures republishes only inside the write epoch. This drain covers Vulkan descriptor and image use
+	// only — it is not the PackChunks loader drain (Graphics::Destroy owns that), so unrelated disk loads keep running through this window.
 	gpTextureManager->mbHasPendingAcquireBarriers = false;
 	bool bDescriptorChurnPending = gpIslandTerrain->AnyEvictionPending() || gpIslandTerrain->AnyRestorationPending() || gpTextureManager->AnyAdoptionPending();
 	if (bDescriptorChurnPending)
@@ -671,8 +672,20 @@ bool Graphics::Destroy()
 		gpCommandBufferManager->mSubmitMain.Wait();
 		gpCommandBufferManager->mSubmitGlobal.Wait();
 	}
+	if (meDestroyType >= DestroyType::kSurface)
+	{
+		// Full recovery ends with ResetTextureChunkStates() below, which must find no PackChunks loader running:
+		// a loader that popped a whole-texture request before the reset would otherwise publish kUploading after
+		// it, leaving a chunk in a state RequestChunkLoad skips forever. Lighter destroy levels keep no such
+		// reset, so they keep their current cost.
+		gpFileManager->WaitForLoadersIdle();
+	}
 	if (gpTextureUploadManager != nullptr)
 	{
+		// Must follow the loader drain: a whole-texture job finishing inside the drain stores kUploading and posts
+		// an upload, and the reset maps kUploading back to kDiskLoaded and re-arms the pending-adoption counter —
+		// so without this wait the reset could rewrite a chunk whose upload thread is still writing vkImage and
+		// vmaAllocation.
 		gpTextureUploadManager->WaitIdle();
 	}
 

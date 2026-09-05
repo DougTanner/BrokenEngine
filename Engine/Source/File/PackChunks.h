@@ -35,6 +35,8 @@ public:
 	void NotifyChunkCompletion();
 	LazyChunk& GetLazyChunk(common::crc_t crc);
 
+	void WaitForLoadersIdle();
+
 	void ResetTextureChunkStates();
 	void ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs);
 
@@ -86,6 +88,10 @@ private:
 	mutable std::mutex mQueueMutex;
 	std::priority_queue<LoadRequest> mRequestQueue;
 	std::atomic<bool> mShutdown {false};
+
+	// Jobs popped from mRequestQueue but not yet finished, guarded by mQueueMutex. Queue-empty alone cannot say the
+	// loaders are idle, because a popped job runs outside the lock; WaitForLoadersIdle needs both.
+	int64_t miActiveLoadJobs = 0;
 
 	// Eager-load completion, assigned in LoadPackFiles. mutable: the first GetEagerChunkMap() drains it
 	// (a lazy completion behind the const accessor).
