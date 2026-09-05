@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-03T23:00:04.851Z","dependsOn":["Documents/Plans/Engine/ExecutionCardFile.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-03T23:00:04.851Z","dependsOn":[]} -->
 # Fix: Test-PlanCitations.ps1 — reports `status: pass` while `truncated: true` hid two citations
 
 ## Context
