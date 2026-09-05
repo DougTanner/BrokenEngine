@@ -25,8 +25,9 @@
    Done when the result reports `nextAction: prepare`.
 4. Dispatch one preparation `implementer` to verify every Plan statement against
    current code, on the single task brief in
-   [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md);
-   the Plan is immutable, current code wins, and every delegation states that
+   [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md).
+
+   The Plan is immutable, current code wins, and every delegation states that
    Plan and card statements are hypotheses, so every contradiction returns to
    main as a card correction rather than an edit.
 
@@ -45,11 +46,12 @@
    fires.
 
    Done when the execution card carries every field of the card template in
-   [`../SKILL.md`](../SKILL.md) `## Handoff`. When the `/plan-audit` input is a
-   scratch snapshot instead of the claimed Plan path, that snapshot carries the
-   plan's `## In scope` and `## Out of scope` sections exactly as
-   `/plan-audit`'s `## Inputs` requires, so `/plan-audit` has a diff boundary to
-   test.
+   [`../SKILL.md`](../SKILL.md) `## Handoff`.
+
+   When the `/plan-audit` input is a scratch snapshot instead of the claimed
+   Plan path, that snapshot carries the plan's `## In scope` and
+   `## Out of scope` sections exactly as `/plan-audit`'s `## Inputs` requires,
+   so `/plan-audit` has a diff boundary to test.
 5. Invoke step 3's claim script idempotently immediately before the final
    preparation handoff. Done when it reports the held claim.
 6. Present for approval per `### Implementation approval` in
