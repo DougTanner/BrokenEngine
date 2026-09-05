@@ -8,6 +8,31 @@ function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Me
 # are worktree paths a fast-forward could touch.
 function Get-DirtyPath([string]$Porcelain){$paths=[Collections.Generic.List[string]]::new();$fields=@($Porcelain -split "`0");$index=0;while($index -lt $fields.Count){$record=$fields[$index];$index++;if($record.Length -lt 4){continue};$paths.Add($record.Substring(3));$state=$record.Substring(0,2);if($state.Contains('R') -or $state.Contains('C')){if($index -lt $fields.Count){$paths.Add($fields[$index]);$index++}}};return $paths}
 function Format-DirtyPath([string[]]$Paths){$text=@($Paths|Select-Object -First 10) -join ', ';if($Paths.Count -gt 10){$text+=" (+$($Paths.Count-10) more)"};return $text}
+function Get-TargetedNoneMessage($Context,[string]$RequestedPlan){
+	$fallback="The requested Plan '$RequestedPlan' could not be classified after the claim attempt; retry the targeted claim."
+	try {
+		$response=Invoke-NextPlanProcess $Context.WorktreeCli @('plan','list','--repo',$Context.CommonDirectory,'--worktree',$Context.Worktree) $Context.Worktree
+		$listing=ConvertFrom-NextPlanProcessJson $response 'plan list'
+		if($response.ExitCode -ne 0){return $fallback}
+		if($listing.PSObject.Properties.Name -cnotcontains 'plans' -or $null -eq $listing.plans -or $listing.PSObject.Properties.Name -cnotcontains 'diagnostics' -or $null -eq $listing.diagnostics){return $fallback}
+		$rows=@($listing.plans)
+		$matches=@($rows|Where-Object{[string]$_.path -ceq $RequestedPlan})
+		if($matches.Count -eq 1){
+			$row=$matches[0];$state=[string]$row.state
+			if($state -ceq 'blocked' -and $row.PSObject.Properties.Name -ccontains 'blockedBy'){$blockers=[Collections.Generic.List[string]]::new();foreach($path in @($row.blockedBy)){$blockers.Add([string]$path)};if($blockers.Count -eq 0){return $fallback};$blockers.Sort([StringComparer]::Ordinal);return "The requested Plan '$RequestedPlan' is blocked by prerequisite Plans: $(Format-DirtyPath $blockers.ToArray())."}
+			if($state -ceq 'excluded' -and $row.PSObject.Properties.Name -ccontains 'diagnostic' -and -not [string]::IsNullOrWhiteSpace([string]$row.diagnostic)){return "The requested Plan '$RequestedPlan' is excluded from selection: $([string]$row.diagnostic)."}
+			if($state -ceq 'claimed'){return "The requested Plan '$RequestedPlan' is claimed by another session."}
+			if($state -ceq 'eligible'){return "A later scheduler listing currently reports the requested Plan '$RequestedPlan' as eligible; retry the targeted claim."}
+			return $fallback
+		}
+		if($matches.Count -gt 1){return $fallback}
+		$diagnostics=@($listing.diagnostics)
+		$matchingDiagnostics=@($diagnostics|Where-Object{$_.PSObject.Properties.Name -ccontains 'plan' -and [string]$_.plan -ceq $RequestedPlan})
+		if($matchingDiagnostics.Count -eq 1 -and $matchingDiagnostics[0].PSObject.Properties.Name -ccontains 'message' -and -not [string]::IsNullOrWhiteSpace([string]$matchingDiagnostics[0].message)){return "The requested Plan '$RequestedPlan' is excluded from selection: $([string]$matchingDiagnostics[0].message)."}
+		if($matchingDiagnostics.Count -gt 0){return $fallback}
+		return "The requested Plan '$RequestedPlan' is absent from the session tree."
+	} catch {return $fallback}
+}
 try {
  Import-Module (Join-Path $PSScriptRoot 'NextPlanWorkflowCommon.psm1') -Force -DisableNameChecking
  $targeted=-not [string]::IsNullOrWhiteSpace($Plan)
@@ -84,7 +109,7 @@ try {
  $response=Invoke-NextPlanProcess $context.WorktreeCli $claimArguments $context.Worktree;$claim=ConvertFrom-NextPlanProcessJson $response 'plan claim-next'
  if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.' 'stop-report-to-user'}
  $code=[string]$claim.code
- if($code -ceq 'none'){Complete-Claim 0 'pass' 'none-available' 'No eligible Plans plan is available.' 'stop-report-to-user'}
+ if($code -ceq 'none'){$message=if($targeted){Get-TargetedNoneMessage $context $Plan}else{'No eligible Plan is available.'};Complete-Claim 0 'pass' 'none-available' $message 'stop-report-to-user'}
  if($code -cne 'claimed' -and $code -cne 'existing'){throw "plan claim-next returned an unknown result code '$code'."}
  $result.claim=[ordered]@{claimed=$true;plan=[string]$claim.plan;state=$code}
  if($code -ceq 'existing'){Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}

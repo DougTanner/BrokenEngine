@@ -47,9 +47,16 @@ For a tier-constrained request, read the `Risk tier` prose of the top eligible
 candidates in that order until one matches, then claim that path.
 
 An exact `Documents/Plans/...` path that is absent, blocked, excluded, or
-claimed by another session yields `none-available`. A partial pattern matching
-several validated executable Plans yields `plan-name-ambiguous`, whose `message`
-names no match; the matching Plan paths are in the result's `candidates` array.
+claimed by another session yields `none-available`. Its message names that
+current cause: blocked results list at most 10 sorted prerequisite paths and an
+omitted count, excluded results carry the matching row or Plan diagnostic,
+claimed results expose no claim identity, and absent results say the path is
+absent from the session tree. Because the listing is an unguarded later
+snapshot, an eligible or otherwise unclassifiable result instead directs a
+retry. A bare `none-available` result skips this diagnosis. A partial pattern
+matching several validated executable Plans yields `plan-name-ambiguous`, whose
+`message` names no match; the matching Plan paths are in the result's
+`candidates` array.
 
 ## Claim-exit result fields
 
