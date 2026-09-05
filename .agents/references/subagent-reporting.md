@@ -9,10 +9,12 @@ Root `AGENTS.md`'s rule that subagents never spawn subagents is enforced by
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` and by `disallowedTools: Agent` in each
 role definition.
 
-A delegated review or audit runs solely inside one fresh delegated `reviewer`
-that returns findings only — except `/comment-review`, the checklist review the
-root `AGENTS.md` role table assigns to `mechanic` — and the tool restrictions a
-skill body states are prose boundaries rather than host enforcement.
+The [root role table](../../AGENTS.md#delegation-roles) authoritatively assigns
+delegated work and owns every role exception. This reference owns only
+reporting-local conduct: independent findings-only work uses a fresh context,
+any root-authorized narrow edit path includes its required self-check, and tool
+restrictions a skill body states are prose boundaries rather than host
+enforcement.
 
 ## Task brief
 
@@ -36,11 +38,18 @@ Return: <return format, normally the shared handoff>
 `Required sections` names which skill-specific report sections the caller will
 read; the worker skips the rest. The shared handoff is always returned in full.
 
-The session baseline is the commit a session's work is diffed against, fixed
-when the session starts. The baseline and every other machine-derivable
-identity value in a brief are copied from `Get-AgentWorktreeSessionContext`
-output, never retyped from memory or scrollback. From the session worktree
-root:
+The session baseline is the attribution and delegation fork point for the
+session's work. It begins as the commit reported by
+`Get-AgentWorktreeSessionContext`, and changes only when an authorized branch
+synchronization reports its authoritative new baseline. Use the recorded
+baseline for every later delegation brief and changed-file inventory. Keep it
+in the running workflow context; do not create a second sidecar or baseline
+store. For `/next-plan`,
+[`claim-results.md`](../skills/next-plan/references/claim-results.md#session-baseline-and-the-sync-object)
+owns how a claim receipt updates the recorded baseline. Every other
+machine-derivable identity value in a brief remains copied from
+`Get-AgentWorktreeSessionContext` output, never retyped from memory or
+scrollback. From the session worktree root:
 
 ```powershell
 Import-Module ./.agents/scripts/AgentWorktreeSession.psm1
@@ -90,7 +99,7 @@ Return only decision-relevant evidence:
 
 ```text
 Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <review roles only; one row each: ID Critical|Required|Recommended path:line — claim — evidence>
+Findings: <review roles and skill-declared verification failures only; one row each: ID Critical|Required|Recommended path:line — claim — evidence>
 Changed files: <one row each, path and region; or none>
 Decisive checks: <one row each, command or read and its result>
 Build required: <exact targets, or none>

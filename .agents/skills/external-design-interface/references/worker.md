@@ -40,8 +40,8 @@ assume. Triggers, inputs, and the comparison the manager presents live in
    identify: similar live systems, dominant caller patterns, naming and
    parameter conventions, manager access, workbuffer usage, and relevant
    collection shapes. Done when the brief is sent.
-8. Wait for its evidence before continuing. Done when concise evidence with
-   paths and symbols has returned.
+8. Wait for its evidence before continuing. Done when the researcher extension
+   and its complete shared handoff have returned with concise paths and symbols.
 
 ### Generate Three Designs
 
@@ -56,10 +56,11 @@ assume. Triggers, inputs, and the comparison the manager presents live in
       caller pattern found by research.
 
     Done when all three designs have returned.
-10. Require from each worker C++ interface declarations, representative usage,
-    hidden complexity, client/server guard impact, allocation behavior,
-    threading and frame-phase behavior, deterministic-state impact, and
-    trade-offs. Done when every returned design carries those items.
+10. Require from each worker the planner extension and its complete shared
+    handoff: C++ interface declarations, representative usage, hidden
+    complexity, client/server guard impact, allocation behavior, threading and
+    frame-phase behavior, deterministic-state impact, and trade-offs. Done when
+    every returned design carries those items and the shared fields.
 11. Require each design to identify explicitly any proposed Collection or
     member. Done when every returned design names them and implements no bodies.
 

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([string] $Plan,[switch] $ResumeRetained)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
-$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v5';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
+$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v6';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
 function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
 # NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
 # a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
@@ -49,11 +49,12 @@ try {
   }
  }
  $context=Get-NextPlanContext
- # A claim this session already holds needs no tree work and no scheduler mutation, so report it before the gates below;
- # any other claim-status outcome, unreadable output included, falls through to the flow below, which can fast-forward
- # the session before plan claim-next re-reports that same held claim as 'existing'.
+ # A bare or exact claim this session already holds needs no tree work or scheduler mutation: reuse the same Plan or
+ # report an authoritative different-Plan mismatch before the gates below. A partial pattern needs tree-backed
+ # resolution below. Remaining claim-status outcomes, unreadable output included, fall through to the ordinary flow,
+ # which can synchronize before plan claim-next re-reports the held claim or returns the scheduler's stop.
  $heldClaim=$null
- try{$claimStatus=Get-NextPlanClaimStatus $context;if($claimStatus.ExitCode -eq 0 -and [string]$claimStatus.Status.code -ceq 'claimed'){$heldClaim=$claimStatus.Status}}catch{$heldClaim=$null}
+ if($null -eq $pattern){try{$claimStatus=Get-NextPlanClaimStatus $context $Plan;if($claimStatus.ExitCode -eq 2 -and [string]$claimStatus.Status.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claimStatus.Status.requestedPlan;heldPlan=[string]$claimStatus.Status.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'};if($claimStatus.ExitCode -eq 0 -and [string]$claimStatus.Status.code -ceq 'claimed'){$heldClaim=$claimStatus.Status}}catch{$heldClaim=$null}}
  if($null -ne $heldClaim){$result.claim=[ordered]@{claimed=$true;plan=[string]$heldClaim.plan;state='existing'};Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
  $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
@@ -114,6 +115,7 @@ try {
  }
  $claimArguments=@('plan','claim-next','--repo',$context.CommonDirectory,'--primary-worktree',$context.Primary,'--worktree',$context.Worktree,'--branch',$context.SessionBranch,'--owner',$context.Owner,'--session',$context.Session);if($Plan){$claimArguments+=@('--plan',$Plan)}
  $response=Invoke-NextPlanProcess $context.WorktreeCli $claimArguments $context.Worktree;$claim=ConvertFrom-NextPlanProcessJson $response 'plan claim-next'
+ if($response.ExitCode -eq 2 -and [string]$claim.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claim.requestedPlan;heldPlan=[string]$claim.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'}
  if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.' 'stop-report-to-user'}
  $code=[string]$claim.code
  if($code -ceq 'none'){$message=if($targeted){Get-TargetedNoneMessage $context $Plan}else{'No eligible Plan is available.'};Complete-Claim 0 'pass' 'none-available' $message 'stop-report-to-user'}

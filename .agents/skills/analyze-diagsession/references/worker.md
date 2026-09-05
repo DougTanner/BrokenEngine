@@ -37,10 +37,12 @@ its numbering at 5.
 
    Done when every hotspot's frame phase and PostRender/CRC exposure are
    confirmed from source.
-8. For each top non-OS/driver cluster, gather full function bodies, call sites
-   with enclosing loop and frame-phase context, and container/comparator types
-   behind template hits. Include memory helpers when their clustered share is
-   meaningful. Done when each such cluster has that source context.
+8. From main, dispatch one `locator` per independent top non-OS/driver cluster
+   to gather full function bodies, call sites with enclosing loop and
+   frame-phase context, and container/comparator types behind template hits.
+   Include memory helpers when their clustered share is meaningful. Done when
+   every locator's source-context extension and complete shared handoff have
+   returned and main has interpreted them.
 9. Route proven optimization residuals through `/create-follow-up-plans`, which
    owns duplicate checks, Plan shape, tracked metadata, and dependencies; no
    Plan claim is required. Do not author Plan files directly. Done when every
@@ -48,14 +50,16 @@ its numbering at 5.
 10. When a landing gate applies (defined in root `AGENTS.md`), complete
     `/finalize-changes`; there is no step that adds a plan row after the change
     lands. Done when that gate is either completed or shown not to apply.
-11. Return this run's handoff in the [`../SKILL.md`](../SKILL.md) Handoff shape,
-    whose report bullets lead it. Done when that handoff is returned.
+11. Return this run's final shared handoff in the
+    [`../SKILL.md`](../SKILL.md) Handoff shape, with its profiling report
+    extension first. Done when that complete handoff is returned.
 
 ## Rules
 
 - Use deterministic tools for extraction, xperf, share computation, PDB checks,
   and profile-text searches.
-- Use `locator` agents for source context: verbatim quotes and file:line only,
-  one agent per independent hotspot cluster.
-- Use `builder` through `/compile` only when build verification is required.
+- Main uses `locator` agents for source context: verbatim quotes and file:line
+  only, one agent per independent hotspot cluster.
+- Main dispatches `builder` through `/compile` only when build verification is
+  required.
 - Main interprets measurements, confirms source attribution, and reports.

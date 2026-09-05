@@ -30,17 +30,17 @@ This table is the authoritative spawned-agent routing policy; role definitions a
 | `subagent_type` | Model | Effort | Work |
 | --- | --- | --- | --- |
 | `planner` | Fable | medium | Plans, design |
-| `reviewer` | Opus | medium | Every review and audit except `/comment-review`; adversarial review that tries to disprove the change |
+| `reviewer` | Opus | medium | Every independent findings-only review and audit except `/comment-review`; adversarial review that tries to disprove the change |
 | `implementer` | Opus | medium | Preparation, implementation, propagation, docs, plans, harness, finalization |
 | `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
 | `locator` | Sonnet | xhigh | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
 | `builder` | Sonnet | xhigh | `/compile`, which owns the return contract |
 | `mechanic` | Sonnet | xhigh | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
-- Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. A documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
+- Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On Claude only, a documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
 - Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never substitute for a role, including inside plan mode — route the work through the table above. The documented host-unavailability fallback is the only exception
 - Host plan mode never substitutes for Change Workflow steps: a plan produced there still gets Step 3's `/plan-audit` (and the Tier-3 additions) before implementation
-- Every delegated review or audit the table above assigns to `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including the child reviewer a parent/manager orchestrator such as `/next-plan-review` dispatches itself from the invoking parent. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
+- Every independent findings-only review or audit the table above assigns to `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including the child reviewer a parent/manager orchestrator such as `/next-plan-review` dispatches itself from the invoking parent. `/comment-review` remains the `mechanic` exception; same-context `/implement-plan` and `/update-claude-docs` audits remain with their implementer; and `/coherence-review` may make only the narrow caller-authorized meaning-preserving wording and formatting fixes its worker contract allows, followed by that contract's self-check. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
 
 ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-5.6-sol medium); Sonnet -> Luna (gpt-5.6-luna max).
 
@@ -95,7 +95,7 @@ Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then, at Tier 3,
 - `reviewer` runs `/plan-audit` — Tier 2+; Tier 1 skips it.
 - fresh `reviewer` runs `/plan-simplicity-review` on the same plan snapshot — every tier, when the plan adds new code or changes non-documentation behavior (both defined in that skill's `## When to use`); when unsure whether a plan triggers it, dispatch it.
 - `implementer` owns `/external-grill-plan` repository evidence and short written decision summaries, updated round by round — Tier 3 only.
-- `locator` runs `/verify-external-claims` — Tier 3 only, for the external claims a grill round raises.
+- main runs `/verify-external-claims`, dispatching one `locator` as its evidence worker — Tier 3 only, for the external claims a grill round raises.
 
 Main reports a blocker if the `reviewer` role is unavailable for `/plan-audit`. At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
 
@@ -110,9 +110,9 @@ Main splits the work into disjoint slices where possible. Review-fix exceptions 
 
 #### Step 5 — Run targeted pre-review checks
 
-Order: both run in parallel; each `Build required` handoff compiles as it arrives.
+Order: the full applicable static pass runs after propagation; each `Build required` handoff compiles as it arrives and may run in parallel with that pass. Focused implementation self-checks remain inside the implementation slices.
 
-- `implementer`s run the applicable static checks in `.agents/references/static-checks.md` — every tier.
+- an `implementer` runs the full applicable static pass in `.agents/references/static-checks.md` after propagation — every tier.
 - `builder` runs `/compile` — every `Build required` handoff, before the covered work advances.
 
 Full builds and runtime or harness scenarios remain acceptance-table work.

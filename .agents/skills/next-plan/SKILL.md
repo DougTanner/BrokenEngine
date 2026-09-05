@@ -1,6 +1,6 @@
 ---
 name: next-plan
-description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the resolved Plan and execution card for implementation approval. Use only when the latest user request explicitly invokes `/next-plan` or `$next-plan`.
+description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the resolved Plan and execution card for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
 disable-model-invocation: true
 argument-hint: "[Documents/Plans/... | partial pattern]"
 allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestion]
@@ -11,13 +11,15 @@ allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestio
 ## Purpose
 
 WorktreeCli alone validates metadata, selects, claims, prepares final state, and releases
-claims; `Documents/Features` is never scheduler input. The Verify and land step of root
+claims; `Documents/Features` is never scheduler input. The whole Change Workflow in root
 [AGENTS.md](../../../AGENTS.md) owns the cross-skill stage order, and
 `/finalize-changes` the landing confirmation.
 
 ## When to use
 
-Only for a current explicit `/next-plan` or `$next-plan` invocation.
+Only when the latest user request explicitly asks to execute `/next-plan` or
+`$next-plan` and claim a Plan. An audit, inspection, explanation, or quoted
+mention of either name does not invoke this skill.
 
 ## Inputs
 
@@ -43,9 +45,24 @@ unaffected results.
 ```text
 Claim: <Plan path or none; resolved state when claimed>
 Classification: Tier 1 | Tier 2 | Tier 3 and trigger
+Execution card: <file path plus ## selector>
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <review roles only; one row each: ID Critical|Required|Recommended path:line — claim — evidence, or none>
+Changed files: <one row each, path and region; or none>
+Decisive checks: <one row each, command or read and its result>
 Build required: <exact targets, or none>
+Evidence: <existing or Temp/ path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <blocker or none>
+```
 
+### Execution card presentation/template
+
+`Execution card` names the file and `##` selector containing the following
+required content. Main reads that content and presents it with the resolved
+Plan; the card itself is not repeated inline in the handoff.
+
+```text
 Execution card:
 ### What does this plan do?
 <2-4 plain sentences>

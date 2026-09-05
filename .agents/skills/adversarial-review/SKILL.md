@@ -49,29 +49,24 @@ conversation history. Do not turn either case into an open-ended repository audi
 
 ## Handoff
 
-```markdown
-## Adversarial Review Results
-
-### Findings
-- `path:line` — **Critical:** or **Required:** — <input/state -> wrong outcome that matters, and why>
-- none
-
-### API Verification Requests
-- <symbol/rule> — <exact proposition> — <dependent proposed finding> — <applicability> — <official source>
-- none
-
-### Traced Clean
-<Only when there are no findings: hypotheses traced, decisive refutation, and
-`PASS — disproof attempt complete; stop.`>
+```text
+API verification requests: <symbol/rule — exact proposition — dependent finding ID — applicability — official source; or none>
+Traced clean: <hypotheses traced and decisive refutation, or not applicable>
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <ADV### Critical|Required path:line — claim — reachable evidence and smallest correction; or none>
+Changed files: none
+Decisive checks: <one row per disproof trace/check and result>
+Build required: none
+Evidence: <existing or Temp/ path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <pre-existing/out-of-scope defect, missing evidence, or none>
 ```
-
-Close with the shared handoff lines (`../../references/subagent-reporting.md`,
-`## Handoffs`).
 
 Use `NEEDS_ACTION` for findings or pending external verification and `BLOCKED`
 only when required evidence could not be obtained. Critical means data loss,
 broken functionality, determinism failure, or equivalent contract breach;
-everything else reported is required, never optional.
+everything else reported is required, never optional. Use `PASS` only when the
+disproof attempt is complete and clean.
 
 ## References
 

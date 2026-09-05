@@ -35,10 +35,11 @@ Skip this phase in audit-only mode.
 5. Apply compatible specialist instructions in this same context. Done when
    each applicable specialist instruction is applied, or its requirement for
    another role is recorded for return to the manager.
-6. Run only the focused reads, searches, traces, and static checks needed for
-   internal coherence. Done when those checks pass and every compilation,
-   runtime check, harness item, and independent review is recorded as a manager
-   handoff.
+6. Run only the focused reads, searches, traces, and self-checks needed for
+   internal coherence. The Run targeted pre-review checks stage owns the full
+   applicable static pass after propagation. Done when the focused checks pass
+   and every full static pass, compilation, runtime check, harness item, and
+   independent review is recorded as a manager handoff.
 7. Record each changed file and exact function/type/section, and for code emit
    an affected-site note naming the symbol/pattern and search scope for each
    signature, identity, semantics, layout, client/server guard, missed-caller,
@@ -72,10 +73,12 @@ Skip this phase in audit-only mode.
 12. Hand off anything requiring compilation, runtime behavior, hardware, user
     knowledge, or an independent role. Done when each of those items appears in
     the handoff.
-13. Re-run the applicable static checks as
+13. Re-run any focused check whose inputs the audit changed. Evidence whose
+    inputs are unchanged may be reused. Done when those checks pass, the
+    handoff reflects every audit fix, and the full applicable static pass
+    remains assigned after propagation as
     [`../../../references/static-checks.md`](../../../references/static-checks.md)
-    documents them. Done when those checks pass and the affected-site and build
-    handoff rows reflect every audit fix.
+    assigns them.
 
 ## Rules
 

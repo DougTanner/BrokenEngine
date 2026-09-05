@@ -786,6 +786,11 @@ namespace toolcli
 			}
 			if (bFound)
 			{
+				if (!requestedPlan.empty() && requestedPlan != existingPlanPath)
+				{
+					PrintResult({ { "status", "error" }, { "code", "claim-plan-mismatch" }, { "requestedPlan", WideToUtf8(requestedPlan) }, { "heldPlan", WideToUtf8(existingPlanPath) } }, 2);
+					return kiExitStateConflict;
+				}
 				PrintClaim("existing", existingPlanPath, existing.json);
 				return kiExitOk;
 			}
@@ -863,6 +868,11 @@ namespace toolcli
 				// Only contention is a state conflict; anything else means the lock file itself is unusable.
 				return bContentionObserved ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
 			}
+			std::wstring requestedPlan;
+			if (!rArguments.plan.empty() && !NormalizePlanPath(rArguments.plan, requestedPlan))
+			{
+				return Failure("invalid-plan");
+			}
 			std::wstring plan; Claim claim; bool bFound = false;
 			if (!FindSessionClaim(root, repo, rArguments, plan, claim, bFound))
 			{
@@ -872,6 +882,11 @@ namespace toolcli
 			{
 				PrintResult({ { "status", "ok" }, { "code", "none" } }, 2);
 				return kiExitOk;
+			}
+			if (!requestedPlan.empty() && requestedPlan != plan)
+			{
+				PrintResult({ { "status", "error" }, { "code", "claim-plan-mismatch" }, { "requestedPlan", WideToUtf8(requestedPlan) }, { "heldPlan", WideToUtf8(plan) } }, 2);
+				return kiExitStateConflict;
 			}
 			PrintClaim("claimed", plan, claim.json);
 			return kiExitOk;

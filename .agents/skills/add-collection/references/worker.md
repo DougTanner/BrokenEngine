@@ -134,11 +134,15 @@ runner applies. The purpose and the triggers live in
     the blocking rule:
     [`../../../references/collection-layout-auditor.md`](../../../references/collection-layout-auditor.md).
     Done when the run reports no violation.
-18. Compile every affected client/server target through the repository `compile`
-    workflow after the C++ and project-membership stages are complete. Done when
-    every affected target compiles.
-19. Run the acceptance scenario required by the task; use the agent harness only
-    for runtime-observable criteria. Done when that scenario has run.
+18. Return an exact `Build required` request for every affected client/server
+    target, naming configuration/platform and each selected project-member
+    `.cpp`; for changed headers, name every consuming target. Main schedules
+    `/compile` after the C++ and project-membership stages are complete. Done
+    when every affected target is present in that request.
+19. Return each runtime-observable acceptance criterion as an exact runtime
+    request naming the setup, action, observation, and required evidence. Main
+    schedules `/agent-harness` at the owning verification stage. Done when all
+    required runtime acceptance is present in the handoff, or none is required.
 
 ## Rules
 

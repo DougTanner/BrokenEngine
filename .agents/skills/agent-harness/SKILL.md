@@ -31,22 +31,48 @@ Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, a
 
 Report each criterion `PASS`, `FAIL`, or `BLOCKED` with exact command/query/scene/UI/screenshot/log evidence. Treat setup limitations as blocked checks.
 
-A process-check finding — from launch, a poll, a transport-failure check, or release entry — is evidence like any other: `FAIL` the criterion that was live when it was observed, citing the finding's role, report path, exception headline, exit code, and retained evidence path. A finding observed outside any criterion, such as at release entry, fails the run and is reported as a residual with the same values. A criterion whose endpoint crashed before it could be exercised is `BLOCKED` on that crash, not silently retried. Do not diagnose or edit a failure in this role; return reproducing commands and evidence to the main agent for the `/resolve-findings` decision and affected-check retest.
+Give each observed criterion failure and process-check failure a stable
+`HARNESS-F-###` ID and report it exactly once as a `Required` row in the shared
+`Findings` field. Process-check findings can come from launch, a poll, a
+transport-failure check, or release entry; record the role, report path,
+exception headline, exit code, and retained evidence path in that finding.
+Do not repeat those values in criterion rows, `Evidence`, or `Residuals`.
+Criterion rows cite the finding ID instead. `FAIL` the criterion that was live
+when a process-check failure was observed. A criterion whose endpoint crashed
+before it could be exercised is `BLOCKED` and may cite that same process
+finding; do not silently retry it. A process finding observed outside any
+criterion, such as at release entry, still fails the run.
+Do not diagnose or edit a failure in this role; return reproducing commands and
+evidence to the main agent for the `/resolve-findings` decision and
+affected-check retest.
 
 Captures stay on disk. The `screenshot` result `{path, width, height}` is the evidence — cite it by path. Loading an image into context is a deliberate act for a check that genuinely needs pixels, and the report names which check and why.
 
 If a required command, parameter, result field, query, or input primitive is missing, return that criterion `BLOCKED`. Name the missing capability and the narrowest harness extension that would expose it. The main agent decides whether the authorized change includes that extension or whether user authority/criterion revision is required. Never fake state with pixel guessing or log scraping, create an out-of-scope runtime edit, waive the gate with a follow-up plan, or silently skip the criterion.
 
-End delegated process verification with:
+Return one criterion row per acceptance criterion, followed by one shared
+handoff envelope:
 
 ```text
-Files changed: none
-Functions/regions touched: none
-Residuals:
-- <failed criterion, crash finding (role, report path, headline, evidence path), blocked prerequisite/missing capability, or none>
+Criterion results:
+- <criterion ID> — PASS | FAIL | BLOCKED — <command/query/scene/UI and evidence selector, or HARNESS-F-### when that finding holds the evidence>
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <HARNESS-F-### Required report-path:selector — observed criterion or process-check failure — evidence; or none>
+Changed files: none
+Decisive checks: <one row per executable command or query and its result>
+Build required: none
+Evidence: <capture or non-finding report/log path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <missing capability or environment, or none>
 ```
 
-Return the complete report inline. A failed or blocked in-scope criterion remains incomplete until the capability/environment is supplied or the user explicitly revises acceptance.
+Any `FAIL` or out-of-criterion process finding makes the shared `Status`
+`NEEDS_ACTION`, including a run that also has blocked criteria. Otherwise, any
+blocked prerequisite, capability, or environment makes it `BLOCKED`; when
+every criterion passes, it is `PASS`.
+Return the complete report inline. A failed or blocked in-scope criterion
+remains incomplete until the capability/environment is supplied or the user
+explicitly revises acceptance.
 
 ## References
 

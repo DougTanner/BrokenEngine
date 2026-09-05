@@ -42,26 +42,38 @@
    expectation of the dispatch, not a gate the Done condition tests.
 
    After that preparation handoff, and before the Plan review reviewers and the
-   step 6 approval presentation, main runs `/plan-alternatives` when its trigger
+   step 7 approval presentation, main runs `/plan-alternatives` when its trigger
    fires.
 
    Done when the execution card carries every field of the card template in
-   [`../SKILL.md`](../SKILL.md) `## Handoff`.
+   [`../SKILL.md`](../SKILL.md) `### Execution card presentation/template` and
+   the preparation handoff cites it as one file path plus `##` selector.
 
-   When `/plan-audit` will read a scratch snapshot instead of the claimed Plan path,
-   the preparation `implementer` writes the complete resolved Plan—mechanism, corrections,
-   exact `## In scope` and `## Out of scope` sections with content intact, and complete
-   execution card—and cites its path plus `## Execution card` selector under `Evidence` for `/plan-audit`.
-5. Invoke step 3's claim script idempotently immediately before the final
+   When `/plan-audit` will read a scratch snapshot instead of the claimed Plan
+   path, the preparation `implementer` writes the complete resolved Plan—its
+   mechanism, corrections, exact `## In scope` and `## Out of scope` sections
+   with content intact, and complete execution card—and cites its path plus
+   `## Execution card` selector under `Evidence` for `/plan-audit`.
+5. Run the Plan review step in root
+   [AGENTS.md](../../../../AGENTS.md), after preparation and alternatives and
+   before the final claim refresh. Tier 3 retains the additional route in
+   [tier3-workflow.md](tier3-workflow.md). Done when every required review has
+   completed and accepted findings are resolved, or a missing mandatory
+   reviewer is reported as a blocker.
+6. Invoke step 3's claim script idempotently immediately before the final
    preparation handoff. When that result carries a `sync` object, the tree
    moved under the preparation evidence: diff `sync.from..sync.to` against the
-   paths the preparation handoff cited and re-dispatch step 4 when they
-   intersect. Done when it reports the held claim.
-6. Present for approval per `### Implementation approval` in
+   paths the preparation handoff cited. When they intersect, return to step 4,
+   rerun the affected Plan review checks in step 5, and repeat this final refresh
+   before approval; reuse review evidence whose inputs did not change. Done when
+   it reports the held claim and the preparation and required Plan review
+   evidence match the current tree.
+7. Present for approval per `### Implementation approval` in
    [`../SKILL.md`](../SKILL.md). Done when the user's decision arrives.
-7. Implement the approved change. Done when its own acceptance checks pass.
-8. Run the checkpoint exactly once, however the run ends: after step 7's
-   acceptance checks, before step 9, and before `/finalize-changes` prepares the
+8. Implement the approved change. Done when its own acceptance checks pass.
+9. Run the checkpoint exactly once, however the run ends: after step 8's
+   acceptance checks, before step 10 when that step applies, and before
+   `/finalize-changes` prepares the
    landing commit, so a Plan it produces is an ordinary new worktree file riding
    the same squash with no landing-commit join. Every terminal path of the run
    reaches this step before the run ends: a `none-available` or other claim
@@ -71,7 +83,9 @@
    Main never performs either review itself; it dispatches them per
    [run-checkpoint.md](run-checkpoint.md). Done when both follow-up lines are
    recorded per run-checkpoint.md.
-9. Exit the claim before landing-commit creation: an `implementer` runs
+10. Only after implementation is accepted and verified, or after the user
+   explicitly authorizes rejection, exit the held claim before landing-commit
+   creation: an `implementer` runs
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Complete-NextPlan.ps1`
    with no arguments for completion, appending `-Reject` only after explicit
    user-authorized rejection.
@@ -82,14 +96,32 @@
    the claim stays held until landing succeeds, and `/finalize-changes` deletes
    it after primary advances.
 
+## Post-checkpoint outcomes
+
+| Run outcome | Claim disposition | Next action |
+| --- | --- | --- |
+| implementation accepted and verified | held | run `Complete-NextPlan.ps1`, then the landing gate |
+| user explicitly authorizes rejection | held | run `Complete-NextPlan.ps1 -Reject`, then the landing gate |
+| claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
+| approval refused, or a blocker whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly |
+| blocker before an authoritative claim disposition is available | unknown | follow the supplied `nextAction`, run the checkpoint once per host, report the error and unknown claim state, and stop; do not infer from `claim: null`, query claim status, or mutate a claim |
+| user separately and explicitly directs deferral, or the run is already deferred | released/absent only through `Defer-NextPlan.ps1`'s documented result | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate, otherwise report and stop |
+| authoritative result explicitly reports that no claim is held, including `none-available` | absent | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate, otherwise report and stop |
+
+A followup-only landing does not run a Plan completion or rejection operation
+and does not release a different held claim. A refused or blocked run that
+creates checkpoint work leaves that work with the retained session. `claim:
+null` alone never proves claim absence; only the authoritative result's outcome
+or disposition does. An unknown-disposition blocker adds no recovery probe:
+its supplied `nextAction` and the checkpoint are the complete route.
+
 ## Rules
 
 - The preparation worker must never run the mutation-capable claim script.
 - Every result is acted on per its `nextAction`, and for a `-Plan`-targeted
   invocation the manager never selects or claims a different candidate in that
   run.
-- The context baseline is provisional until a claim reports a `sync` object.
-  Never create/adopt a worktree or inspect machine-local claims directly.
+- Never create or adopt a worktree, or inspect machine-local claims directly.
 - Which reviewer runs at which tier is the Plan review step of root
   [AGENTS.md](../../../../AGENTS.md); Tier 3 additionally follows
   [tier3-workflow.md](tier3-workflow.md). Missing a mandatory reviewer blocks.

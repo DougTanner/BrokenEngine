@@ -23,26 +23,34 @@ Adapted from an external MIT-licensed skill; see [LICENSE](LICENSE).
 - The user says "diagnose" or "debug this".
 - The user reports something misbehaving, desyncing, mismatched CRC, or slow.
 
+## Inputs
+
+Require the reported symptom and expected behavior, the reproduction scope,
+the session baseline when one exists, and every supplied log, capture, command
+result, or other evidence. Name any missing input needed to build a reproducing
+signal.
+
 ## Handoff
 
 ```markdown
 Root cause: <one sentence, with file:line>
-Evidence: <inspection, command output, or log lines that prove it>
+Diagnosis evidence: <inspection, command output, or log lines that prove it>
 Reproducing signal: <exact command or inspection, and its red result>
 Hypotheses ruled out: <hypothesis — the check that killed it>
 Proposed acceptance check: <check matching the signal — harness scenario, replay check, compile result, or profiling baseline>
 Instrumentation removed: yes — <marker searched> | none added
+Status: PASS | BLOCKED
+Findings: <none>
+Changed files: none
+Decisive checks: <one row per hypothesis check and result>
+Build required: <exact targets the manager must rebuild, or none>
+Evidence: <existing or Temp/ path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <unproven branch, missing environment/input, or none>
 ```
 
-Follow those extension fields with the shared handoff lines
-(`../../references/subagent-reporting.md`, `## Handoffs`); this diagnosis-only
-workflow reports `Status: DIAGNOSED | BLOCKED` instead of the shared values and
-always reports `Changed files: none`, `Build required` names the exact targets
-the manager must rebuild or `none`, and an unproven branch or missing
-environment belongs in `Residuals`.
-
-Use `DIAGNOSED` only with a confirmed root cause. Use `BLOCKED` when no
-reproducing signal could be built, naming what you need.
+Use `PASS` only with a proven root cause. Use `BLOCKED` when the diagnosis
+cannot be proven, naming what evidence, input, or environment is still needed.
 
 ## References
 

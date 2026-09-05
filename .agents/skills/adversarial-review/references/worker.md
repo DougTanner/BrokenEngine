@@ -24,7 +24,7 @@ the handoff form live in [`../SKILL.md`](../SKILL.md).
    approved acceptance criterion.
 4. Emit one single-claim request per
    [`/verify-external-claims`](../../verify-external-claims/SKILL.md),
-   `## External Claim Requests`, for every kept finding that depends on a
+   `## Inputs`, for every kept finding that depends on a
    non-obvious external API, language, specification, or library claim. Done
    when each such finding has its request row, or no finding depends on one.
 

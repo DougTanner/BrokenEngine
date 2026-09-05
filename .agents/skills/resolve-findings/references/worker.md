@@ -34,5 +34,5 @@ and the handoff form.
 - Do not establish disputed external API, language, specification, or library
   behavior from memory: emit one single-claim request per
   `/verify-external-claims` (`../../verify-external-claims/SKILL.md`,
-  `## External Claim Requests`). A pending verdict keeps the item unresolved and
+  `## Inputs`). A pending verdict keeps the item unresolved and
   the handoff `NEEDS_ACTION`.

@@ -32,12 +32,46 @@ a new Collection, manager, or subsystem API.
 
 Use the supplied system description, or ask for one when absent.
 
-Run from the main invoking context. A delegated worker never dispatches another
-worker; if this skill is entered where delegation is forbidden, return a
-main-context dispatch requirement instead of approximating the independent
-designs inline.
+Main runs this orchestration. Supply every child the authoritative shared task
+brief, the design brief and fixed scope/compatibility constraints. A delegated
+worker never dispatches another worker; if this skill is entered where
+delegation is forbidden, return a main-context dispatch requirement instead of
+approximating the independent designs inline.
 
 ## Handoff
+
+Each researcher and planner returns the complete shared handoff from
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+with `Residuals` last. Add these domain fields before `Status`:
+
+```text
+Researcher extension:
+Pattern evidence: <similar systems, caller patterns, conventions, manager/workbuffer use, and collection shapes with file:line or symbol>
+
+Planner extension:
+Design axis: Minimal surface | Data locality | Caller ergonomics
+Interface declarations: <header-style declarations>
+Representative usage: <dominant call-site example>
+Hidden complexity: <internal machinery and ownership>
+Runtime contracts: <client/server guards, allocation, threading, frame phase, and deterministic-state effect>
+Collections and members: <each proposed Collection or SOA member, or none>
+Trade-offs: <interface depth, SOA fit, dispatch safety, and costs>
+
+Shared handoff:
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <none>
+Changed files: none
+Decisive checks: <repository evidence or design constraint checks>
+Build required: none
+Evidence: <existing or Temp/ path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <missing evidence, unresolved constraint, or none>
+```
+
+The researcher uses only the researcher extension; each planner uses only the
+planner extension. Main consumes those child handoffs, then owns the comparison
+packet and user-facing decision below; that presentation is outside the child
+envelopes.
 
 ### Implicit detection
 

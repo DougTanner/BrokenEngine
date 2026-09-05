@@ -71,42 +71,28 @@ another round.
 
 Order findings by impact. `Critical` means data loss, broken functionality,
 determinism failure, or an equivalent contract breach; every other reported
-finding is `Required`. Omit empty optional sections.
+finding is `Required`. Give each finding a stable `CXX###` ID. Omit empty
+optional extension rows. Correctness and scope-authorization failures both go
+in the shared `Findings` field.
 
-```markdown
-## C++ Review Results
-
-### Findings
-- `path:line` — **Critical | Required:** <reachable failure, evidence, smallest correction>
-
-### Scope
-- `path:lines` — **unauthorized | overbuilt | kiss:** <cited clause or absent authorization, evidence>
-
-### API Verification Requests
-<single checkable requests>
-
-### Size Observations
-- `path` (`N bt-token-v1`) — <cohesive split and why it is a manager follow-up candidate>
-
-### Files Reviewed
-- `path` — <regions and affected paths traced>
-
-### Recommendation
-PASS | NEEDS_ACTION | BLOCKED
-
-Functions/regions touched: none
+```text
 Scope: PASS | NEEDS_ACTION | not applicable (Tier 1) | not supplied
+API verification requests: <single checkable requests, or none>
+Files reviewed: <path — regions and affected paths traced, one row each>
 Project membership trigger: /update-vcxproj — <paths/reason> | none
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <CXX### Critical|Required path:line — claim — evidence and smallest correction; or none>
+Changed files: none
+Decisive checks: <one row per trace/check and result>
+Build required: none
+Evidence: <existing or Temp/ path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <pre-existing defect, incomplete trace, pending external verdict, size observation, or none>
 ```
 
-Follow those extension fields with the shared handoff lines
-(`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
-review never changes a file and never requires a build, and a pre-existing
-defect, incomplete trace, or pending external verdict belongs in `Residuals`.
-
-For a clean review, state `PASS — no issues found`, list the evidence and files,
-and keep the unchanged footer. Never return `LGTM` without decisive trace
-evidence.
+Use `NEEDS_ACTION` when a finding or pending external verdict requires action,
+`BLOCKED` when required review evidence is unavailable, and `PASS` only when
+the review is clean. Never return `LGTM` without decisive trace evidence.
 
 ## References
 

@@ -41,11 +41,36 @@ Choose exactly one mode from the invocation:
 
 If no path is supplied, ask for one.
 
+Require the target path and mode, applicable threshold, session baseline and
+ownership snapshot when tracked changes are possible, approved scope and
+acceptance criteria, and consuming build targets. Approved-plan execution also
+requires the approved plan and deltas plus any runtime-observable acceptance
+criteria.
+
 ## Handoff
+
+Every mode returns one complete shared handoff from
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+after its domain extension. Keep the existing source-size and boundary evidence
+in the appropriate extension and keep `Residuals` last.
+
+### Review Observation
+
+```text
+Size observation: <file> — <n>/<threshold> bt-token-v1 — <concrete cohesive split opportunity or no qualifying reduction>
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <none>
+Changed files: none
+Decisive checks: <Measure-Tokens invocation and result>
+Build required: none
+Evidence: <measurement output or path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <accepted out-of-scope observation requiring /create-follow-up-plans, missing path, or none>
+```
 
 ### Standalone Plan Draft
 
-Return one recommended design with:
+Return one recommended-design extension:
 
 ```markdown
 ## File Reduction: <file>
@@ -61,6 +86,19 @@ Return one recommended design with:
 - <risk> -> <decisive check>
 ```
 
+Then return its shared envelope:
+
+```text
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <none>
+Changed files: none
+Decisive checks: <measurement, source map, caller/dependency, and project-membership checks>
+Build required: none
+Evidence: <source map and plan draft path plus selectors, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <contradictory boundary evidence, missing input, or none>
+```
+
 The draft must choose the boundary, filenames, ownership, interface shape,
 shared-symbol placement, and implementation order. Include all affected files
 and consuming build targets; do not leave alternative designs for a later
@@ -68,8 +106,26 @@ implementer to decide.
 
 ### Approved Execution
 
-Return exact changed regions, notes on which other code sites may be affected,
-build targets, checks, and residuals to the parent Change Workflow.
+```text
+Reduction result: <original and final bt-token-v1 sizes; approved moves completed>
+Runtime acceptance requests: <setup, action, observation, and required evidence per criterion, or none>
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <none>
+Changed files: <exact changed file and region rows>
+Decisive checks: <remeasurement and focused static/search checks>
+Build required: <exact consuming targets, configuration/platform, and selected project-member .cpp rows>
+Evidence: <measurement/check output or path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Self-audit resolved: <Claim -> Check -> Result; fix/recheck, or none>
+Affected-site triggers: <moved symbol/include/project-affinity pattern and search scope, or none found>
+Propagation required: /update-affected-code — <C++ scope>
+Reviewer focus areas: <approved boundary, ownership, includes, affinity, and behavior preservation>
+Residuals: <plan contradiction, file still above threshold, or none>
+```
+
+Main schedules `/compile` and any runtime verification at their owning Change
+Workflow stages; approved execution returns those exact requests and does not
+claim they ran inline.
 
 ## References
 

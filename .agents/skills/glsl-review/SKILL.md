@@ -29,37 +29,34 @@ From the task brief (`../../references/subagent-reporting.md`, `## Task brief`):
 `Baseline` for the repository root, the full 40-character SHA, and a committed
 head when one applies; `Scope` for any untracked shader files to include; and
 `Fixed decisions` for the change's risk tier, which decides whether the scope
-authorization pass runs.
+authorization pass runs. Also require the authorization source: either the
+approved plan's exact in-scope and out-of-scope text or an explicit list of the
+authorizing user instructions, plus the execution card when one exists.
 
 ## Handoff
 
-Order findings by severity and omit empty sections:
+Order findings by severity, give each one a stable `GLSL###` ID, and omit empty
+optional extension rows. Correctness, performance, and scope-authorization
+failures all go in the shared `Findings` field.
 
-```markdown
-## GLSL Review Results
-
-### Findings
-- P1 `path:line` — failure, reachable evidence, and smallest correction
-
-### Scope
-- `path:lines` — **unauthorized | overbuilt | kiss:** <cited clause or absent authorization, evidence>
-
-### External Claim Verification Requests
-<single checkable requests>
-
-### Files Reviewed
-- `path`
-
-### Recommendation
-PASS | NEEDS_ACTION
-
-Functions/regions touched: none
+```text
 Scope: PASS | NEEDS_ACTION | not applicable (Tier 1) | not supplied
+External claim verification requests: <single checkable requests, or none>
+Files reviewed: <path — regions and affected paths traced, one row each>
+Sibling review required: /repo-code-review — <shader-facing shared headers> | none
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <GLSL### Critical|Required path:line — claim — evidence and smallest correction; or none>
+Changed files: none
+Decisive checks: <one row per trace/check and result>
+Build required: none
+Evidence: <existing or Temp/ path plus selector, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <pre-existing issue, incomplete review, pending external verdict, size observation, or none>
 ```
 
-Follow those extension fields with the shared handoff lines (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only review never changes a file and never requires a build, and pending verification, a pre-existing issue, or an incomplete review item belongs in `Residuals`.
-
-If no issue is found, return `PASS — no issues found`, list the files reviewed, and include the unchanged footer.
+Use `NEEDS_ACTION` when a finding or pending external verdict requires action,
+`BLOCKED` when required review evidence is unavailable, and `PASS` only when
+the review is clean.
 
 ## References
 

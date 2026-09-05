@@ -45,10 +45,11 @@ function Get-NextPlanContext {
 	} catch { if (Test-NextPlanStateBlocker $_) { throw $_.Exception }; throw (New-NextPlanStateBlocker $_.Exception.Message) }
 }
 function Invoke-NextPlanProcess([string] $Executable,[string[]] $Arguments,[string] $WorkingDirectory) { return Invoke-FinalizeNativeText -Executable $Executable -Arguments $Arguments -WorkingDirectory $WorkingDirectory }
-function Get-NextPlanClaimStatus($Context) {
+function Get-NextPlanClaimStatus($Context,[string] $ExactPlan) {
 	# The returned argument array is also the argument array a mutating claim command takes, and the JSON is parsed
 	# before the caller weighs the exit code, so unreadable output reaches the caller's catch path instead of a code test.
 	$claimArguments = @('--repo',$Context.CommonDirectory,'--worktree',$Context.Worktree,'--owner',$Context.Owner,'--session',$Context.Session)
+	if (-not [string]::IsNullOrWhiteSpace($ExactPlan)) { $claimArguments += @('--plan',$ExactPlan) }
 	$response = Invoke-NextPlanProcess $Context.WorktreeCli (@('plan','claim-status') + $claimArguments) $Context.Worktree
 	$status = ConvertFrom-NextPlanProcessJson $response 'plan claim-status'
 	return [pscustomobject]@{ Arguments=$claimArguments; ExitCode=$response.ExitCode; Status=$status }

@@ -24,7 +24,7 @@ report template live in [`../SKILL.md`](../SKILL.md).
 6. Report the smallest correction, without implementing it. Done when every
    surviving finding carries one correction.
 7. Emit a single-claim [`/verify-external-claims`](../../verify-external-claims/SKILL.md)
-   request (`## External Claim Requests`) for every candidate finding that
+   request (`## Inputs`) for every candidate finding that
    depends on a non-obvious external API, language, specification, OS, or
    library fact. Done when each such candidate carries one request.
 8. Withhold every such candidate from the confirmed findings until the caller

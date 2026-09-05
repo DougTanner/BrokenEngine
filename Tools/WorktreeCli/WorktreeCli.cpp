@@ -18,7 +18,8 @@ namespace toolcli
 			rOutput << "       WorktreeCli.exe plan validate --repo COMMON-DIR --worktree CHECKOUT [--plan Documents/Plans/...md] [--lint-only]\n";
 			rOutput << "       WorktreeCli.exe plan list --repo COMMON-DIR --worktree CHECKOUT\n";
 			rOutput << "       WorktreeCli.exe plan claim-next --repo COMMON-DIR --primary-worktree PRIMARY --worktree SESSION --branch TARGET --owner TOKEN --session TOKEN [--plan Documents/Plans/...md]\n";
-			rOutput << "       WorktreeCli.exe plan claim-status|unclaim --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN\n";
+			rOutput << "       WorktreeCli.exe plan claim-status --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN [--plan Documents/Plans/...md]\n";
+			rOutput << "       WorktreeCli.exe plan unclaim --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN\n";
 			rOutput << "       WorktreeCli.exe plan complete --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN\n";
 			rOutput << "       WorktreeCli.exe plan reject --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN --user-authorized-rejection\n";
 			rOutput << "       WorktreeCli.exe build [--files <cpp...> --] <project-or-solution> <MSBuild args...>\n";

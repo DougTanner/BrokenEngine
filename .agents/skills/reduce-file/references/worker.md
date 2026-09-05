@@ -63,11 +63,15 @@ live in [`../SKILL.md`](../SKILL.md).
 8. In approved execution, do steps 8-13: make only the approved moves and
    required caller/include propagation. Done when the approved moves are
    complete.
-9. For every added or removed `.cpp` or `.h`, route project and filter
-   membership through `/update-vcxproj`; do not hand-edit project XML. Done when
-   the membership routing is complete.
-10. Build the affected targets through `/compile` for every new `.cpp` or `.h`.
-    Done when the affected-target build is complete.
+9. For every added or removed `.cpp` or `.h`, return the project/filter
+   membership change as an `/update-vcxproj` trigger; do not hand-edit project
+   XML. Done when every membership change is present in the handoff.
+10. Return exact `Build required` rows for every affected target, naming
+    configuration/platform and each selected project-member `.cpp`; for changed
+    headers, name every consuming target. Return each runtime-observable
+    acceptance criterion as a runtime request naming setup, action, observation,
+    and required evidence. Main schedules `/compile` and runtime verification at
+    their owning stages. Done when those requests are complete, or none apply.
 11. Remeasure every changed and new C++ file and record each resulting size.
     Done when each has a recorded fresh measurement.
 12. Run focused static checks. Done when they have run.

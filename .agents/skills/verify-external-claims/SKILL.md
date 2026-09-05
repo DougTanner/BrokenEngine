@@ -15,7 +15,7 @@ allowed-tools: [Read, Grep, Glob, Agent]
 
 Resolve requested external facts for the caller to decide.
 
-## External Claim Requests
+## Inputs
 
 Require each request to contain:
 
@@ -27,7 +27,8 @@ Require each request to contain:
 
 ## Handoff
 
-Return the complete evidence inline:
+Main runs this skill and dispatches one `locator` as its evidence worker. Main
+returns the complete evidence inline:
 
 ```text
 Sources:

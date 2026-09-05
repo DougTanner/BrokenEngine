@@ -47,7 +47,7 @@ measures. Require the shared handoff form in
 `../../references/subagent-reporting.md`, extended with:
 
 ```text
-Status: PASS | BLOCKED
+Status: PASS | NEEDS_ACTION | BLOCKED
 Changed files: none
 Decisive checks: provenance; sessions read; sourced timeline; pauses; conformance, minimality, and process evidence
 Timeline: one row per lifecycle event named in `references/concerns.md` that occurred, in time order, each `<time> | <event> | <citation>`
@@ -59,6 +59,9 @@ Build required: none
 Executor: <own model id> <own effort>
 Residuals: missing transcript or unverifiable fact, or none
 ```
+
+Use `NEEDS_ACTION` when the retrospective produces actionable findings, `PASS`
+only when it is clean, and `BLOCKED` when required evidence is missing.
 
 ## References
 

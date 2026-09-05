@@ -62,11 +62,20 @@ External claim verdicts:
 - <stable claim ID> — VERIFIED | REFUTED | UNRESOLVED — <direct implication>
 Decision detail file: <Temp/ path> — <decision-rows selector> — <execution-card-rows selector>
 Required next step: none | incorporate refinements | incorporate library integration pivot and run fresh /plan-audit | run /external-design-interface, incorporate its design pivot, and run fresh /plan-audit
-Files changed: none
-Functions/regions touched: none
-Residuals:
-- <unresolved decision or none>
+Status: PASS | NEEDS_ACTION | BLOCKED
+Findings: <none>
+Changed files: none
+Decisive checks: <plan revision, audit evidence, and closing checks, one row each>
+Build required: none
+Evidence: <decision detail file plus selectors, or none>
+Executor: <own model id> <own effort>, each unknown when unreadable
+Residuals: <unresolved decision, missing input, or none>
 ```
+
+Use `PASS` when no question, refinement, pivot, or unresolved external claim
+remains; `NEEDS_ACTION` when the manager must interview, incorporate a
+refinement or pivot, or obtain an external verdict; and `BLOCKED` when a
+required input or repository fact cannot be obtained.
 
 That file keeps one row per decision
 (`<decision ID> — <selected choice> — <section and exact refinement>`) and one

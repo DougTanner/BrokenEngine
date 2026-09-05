@@ -81,6 +81,9 @@ Review and resolve correctness review dispatch; the Verify the acceptance table
 step in root [AGENTS.md](../../../../AGENTS.md) owns how it is authored and
 verified.
 
+The post-checkpoint outcome table in [worker.md](worker.md) owns the
+authoritative claim disposition and whether a landing is followup-only.
+
 Friction first observed after this checkpoint — including friction in running
 the claim-exit script and in `/finalize-changes` itself — is recorded through
 `/create-follow-up-plans` by an `implementer` and lands at a later gate as its

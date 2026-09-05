@@ -118,7 +118,7 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 - When a proposed finding depends on a non-obvious external API, language,
   specification, or library fact, do not treat it as established: request it per
   [`../../verify-external-claims/SKILL.md`](../../verify-external-claims/SKILL.md),
-  `## External Claim Requests`, naming the dependent `PA-F-###`. A pending
+  `## Inputs`, naming the dependent `PA-F-###`. A pending
   verdict makes the audit `NEEDS_ACTION`, not a confirmed finding.
 - Do not edit any repository file, run `/agent-harness`, or interview the user.
   The manager owns all judgment; delegation conduct is in
