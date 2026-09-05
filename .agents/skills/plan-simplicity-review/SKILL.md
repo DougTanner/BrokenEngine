@@ -105,9 +105,10 @@ Steps reviewed: <added-code and modified-artifact steps>
 ```
 
 A clean result returns that `PASS` statement, that one extension field, and the
-shared handoff lines. A clean run writes that `Temp/` file only when its
-per-question judgment notes must travel; otherwise those notes stay in the
-reviewer's own context.
+shared handoff lines, and nothing else — no preamble and no per-question
+judgment notes. Those notes stay in the reviewer's own context, or travel in
+that same gitignored `Temp/` file, cited under `Evidence`, when they must
+travel.
 
 Follow that extension field with the shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
