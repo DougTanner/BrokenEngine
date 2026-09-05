@@ -53,16 +53,19 @@ The measurement's own state never blocks the friction lens.
 | transcript path unresolvable | nothing — no reviewer is dispatched, because there is no run evidence to review | `blocked (transcript-unavailable)` on both `Friction follow-ups:` and `Context-efficiency follow-ups:`, routed through the post-checkpoint rule below |
 | Codex main session | nothing — no lens runs | `none (codex)` on both lines |
 
-The `Friction follow-ups:` line records `<Plan path(s) or none>` in every row
-that does not name it. The `Context-efficiency follow-ups:` line's
-`blocked (<code>)` form covers those codes and `transcript-unavailable`. The
-reviewer skips the context-efficiency lens in every blocked and error case. All
-of those states are themselves tooling friction the same reviewer sees in the
-transcript it is already reading, so none of them needs recovery machinery of
-its own. A Codex session's measurement reads Claude transcripts only, and this
-repository documents no way for a Codex main to name its own live transcript, so
-Codex coverage of all three concerns stays with `/next-plan-review` after
-landing.
+The `Handoff line recorded` column is main's own record after `## Follow-up
+routing`, not reviewer output: `/next-plan-checkpoint-review` returns findings
+and its own summary block, and main writes both follow-up lines from what that
+routing produced. The `Friction follow-ups:` line records `<Plan path(s) or
+none>` in every row that does not name it. The `Context-efficiency follow-ups:`
+line's `blocked (<code>)` form covers those codes and `transcript-unavailable`.
+The reviewer skips the context-efficiency lens in every blocked and error case.
+All of those states are themselves tooling friction the same reviewer sees in
+the transcript it is already reading, so none of them needs recovery machinery
+of its own. A Codex session's measurement reads Claude transcripts only, and
+this repository documents no way for a Codex main to name its own live
+transcript, so Codex coverage of all three concerns stays with
+`/next-plan-review` after landing.
 
 ## Follow-up routing
 

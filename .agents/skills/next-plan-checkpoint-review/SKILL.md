@@ -28,7 +28,11 @@ envelope are the evidence; this judges them.
 
 ## Inputs
 
-- The absolute path of the reviewed run's transcript.
+- The absolute path of the reviewed run's transcript, from which the reviewer
+  selects records only through the bundled
+  `scripts/Get-TranscriptProjection.ps1` and never filters by other means;
+  `references/worker.md` owns that invocation and how a selected record is
+  opened.
 - The `broken-engine-context-efficiency/v1` envelope text, or the state main
   measured instead: `pass`, `blocked (<code>)`, or
   `blocked (breach-rows-truncated)`. Never run the measuring script or read
