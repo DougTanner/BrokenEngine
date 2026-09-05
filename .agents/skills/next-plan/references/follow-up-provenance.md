@@ -19,12 +19,13 @@ selection section, or from `git branch --show-current` and
 ## Conversation session ID
 
 Those sources name the worktree only, so none of them yields the conversation
-session ID `/next-plan-review` needs to find a transcript. Main reads it from
-the `CLAUDE_CODE_SESSION_ID` environment variable in its own session shell when
-the friction is recorded, because the value differs per conversation and resume
-and a subagent shell reports that subagent's own ID. Codex sessions record no
-conversation session ID, because `/next-plan-review` discovers Codex transcripts
-by bounded commit window.
+session ID `/next-plan-review` needs to find a transcript. Any shell of the
+session reads it from the `CLAUDE_CODE_SESSION_ID` environment variable, a
+dispatched worker's shell included, because a subagent shell carries the parent
+session's value; the value differs per conversation and resume, so read it when
+the friction is recorded. Codex sessions record no conversation session ID,
+because `/next-plan-review` discovers Codex transcripts by bounded commit
+window.
 
 ## Friction observed in a different session
 

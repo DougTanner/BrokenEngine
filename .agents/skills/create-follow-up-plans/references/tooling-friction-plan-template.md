@@ -17,8 +17,7 @@ session `/next-plan-review` must reach — while the `Landing ref` line names a
 ref whose tree actually contains this Plan:
 - Client: claude | codex
 - Conversation session ID: <lowercase uuid on Claude, read from
-  CLAUDE_CODE_SESSION_ID in main's own session shell — a subagent shell reports
-  that subagent's own ID; none on Codex, whose transcripts /next-plan-review
+  CLAUDE_CODE_SESSION_ID; none on Codex, whose transcripts /next-plan-review
   discovers by bounded commit window>
 - Worktree/branch UUID: <lowercase uuid, the same one the Session branch and
   Worktree lines carry — selection evidence only, never production proof>
