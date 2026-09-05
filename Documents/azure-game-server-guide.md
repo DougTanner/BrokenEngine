@@ -2,19 +2,6 @@
 
 Solo-developer setup for running `BrokenEngineSandboxServer.exe` on an Azure Windows VM: intermittent usage, deterministic replay, Visual Studio 2026 integration. Prices are approximate East US pay-as-you-go rates as of July 2026 — verify current numbers at the [Azure pricing calculator](https://azure.microsoft.com/en-us/pricing/calculator/).
 
-## Contents
-
-1. [Why Azure for this server](#1-why-azure-for-this-server)
-2. [VM sizing and fixed costs](#2-vm-sizing-and-fixed-costs)
-3. [Dev/Test offer — Windows at Linux rates](#3-devtest-offer--windows-at-linux-rates)
-4. [Cost scenarios](#4-cost-scenarios)
-5. [Step-by-step setup](#5-step-by-step-setup)
-6. [Deploying the Broken Engine server](#6-deploying-the-broken-engine-server)
-7. [Day-to-day workflow](#7-day-to-day-workflow)
-8. [Visual Studio 2026 remote debugging](#8-visual-studio-2026-remote-debugging)
-9. [Security and patching](#9-security-and-patching)
-10. [Cost tips and cheat sheet](#10-cost-tips-and-cheat-sheet)
-
 ## 1. Why Azure for this server
 
 - **Deallocate billing model.** Stop the VM from the Azure Portal and compute billing stops immediately. Disk, OS, installed software, and the deployed server stay intact — no snapshot/redeploy cycle. Ideal for a few hours of testing per day.

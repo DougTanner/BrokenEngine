@@ -4,16 +4,6 @@ The invoking context's review steps, plus the lens checklists and finding
 contracts the dispatched reviewers run. Triggers, inputs, and the handoff form
 live in [`../SKILL.md`](../SKILL.md).
 
-## Contents
-
-- [Steps](#steps)
-  - [Lens A — Dependencies and Layering](#lens-a--dependencies-and-layering)
-  - [Lens B — Simulation and Threading](#lens-b--simulation-and-threading)
-  - [Lens C — Client/Server and Data Shape](#lens-c--clientserver-and-data-shape)
-  - [Lens D — Cohesion and Generation Residue](#lens-d--cohesion-and-generation-residue)
-  - [Lens E — ThirdParty Replacement](#lens-e--thirdparty-replacement)
-- [Rules](#rules)
-
 ## Steps
 
 1. Resolve the scope before dispatch:

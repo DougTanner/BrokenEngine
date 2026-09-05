@@ -4,22 +4,6 @@ Harness steps and rules for the worker dispatched with
 [`../SKILL.md`](../SKILL.md), which owns the purpose, the triggers, the inputs,
 and the handoff this run returns.
 
-## Contents
-
-- [Steps](#steps)
-  - [Select the project](#select-the-project)
-  - [Provision and claim](#provision-and-claim)
-  - [Ownership and takeover](#ownership-and-takeover)
-  - [Launch](#launch)
-    - [Additional simultaneous client](#additional-simultaneous-client)
-  - [Invoke commands](#invoke-commands)
-  - [Authoritative verification](#authoritative-verification)
-  - [Lifecycle and release](#lifecycle-and-release)
-  - [Process verification report](#process-verification-report)
-- [Rules](#rules)
-  - [Performance investigations](#performance-investigations)
-  - [Durable caveats](#durable-caveats)
-
 ## Steps
 
 1. Use server port `27100`, client port `27101`, and the absolute adopted

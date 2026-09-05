@@ -3,13 +3,6 @@
 Steps and judgment rules for the dispatched `reviewer`. Triggers, inputs, and
 the handoff form live in [`../SKILL.md`](../SKILL.md).
 
-## Contents
-
-- [Steps](#steps)
-- [Applicability](#applicability)
-- [Review questions](#review-questions)
-- [Rules](#rules)
-
 ## Steps
 
 1. Load the supplied snapshot bytes once and retain that immutable snapshot for

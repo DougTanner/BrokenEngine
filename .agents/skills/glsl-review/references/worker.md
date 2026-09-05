@@ -3,14 +3,6 @@
 Steps and rules for the dispatched reviewer. The public contract — purpose,
 triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md).
 
-## Contents
-
-- [Steps](#steps)
-- [Rules](#rules)
-- [Broken Engine Contracts](#broken-engine-contracts)
-- [Performance Review](#performance-review)
-- [Vulkan and Extension Checks](#vulkan-and-extension-checks)
-
 ## Steps
 
 1. Take the changed shader files and regions from the read-only inventory: `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character SHA> -Regions` (add `-Head <commit>` for a committed head). It writes no file and prints one `broken-engine-session-change-inventory/v1` object: every `entries` row whose `class` is `glsl` or `dual-language-header` is in scope, and those class rules are the only statement of which `.h` files are shader sources — never restate or reconstruct that classification inline. The `regions` rows give the changed ranges. Done when every in-scope `entries` row and its changed ranges are listed.

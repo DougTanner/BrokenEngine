@@ -3,12 +3,6 @@
 Read this reference when assessing main-session token efficiency, control-work
 share, and execution-model routing for [`/next-plan-review`](../SKILL.md).
 
-## Contents
-
-- [Measure main-session token efficiency](#measure-main-session-token-efficiency)
-- [Measure control-work share](#measure-control-work-share)
-- [Verify execution-model routing](#verify-execution-model-routing)
-
 ## Measure main-session token efficiency
 
 The main session runs the most expensive model, so concern 4 asks what entered

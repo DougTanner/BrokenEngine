@@ -4,12 +4,6 @@ The edit steps, the per-operation reference, and the rules for the worker
 dispatched with [`../SKILL.md`](../SKILL.md), which owns the purpose, the
 inputs, and the limits of this skill.
 
-## Contents
-
-- [Steps](#steps)
-  - [Edit operations](#edit-operations)
-- [Rules](#rules)
-
 ## Steps
 
 1. Resolve the target in this order. Done when one existing `.md` path is in hand.

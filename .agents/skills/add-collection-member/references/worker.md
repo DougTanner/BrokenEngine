@@ -3,16 +3,6 @@
 The layout-change steps and the judgment rules the runner applies. The purpose
 and the triggers live in [`../SKILL.md`](../SKILL.md).
 
-## Contents
-
-- [Steps](#steps)
-  - [Choose the variant](#choose-the-variant)
-  - [Place the column](#place-the-column)
-  - [Carry, initialize, and propagate](#carry-initialize-and-propagate)
-  - [Verify](#verify)
-- [Rules](#rules)
-  - [Framework references](#framework-references)
-
 ## Steps
 
 ### Choose the variant

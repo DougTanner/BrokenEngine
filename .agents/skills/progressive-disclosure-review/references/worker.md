@@ -37,13 +37,12 @@ Steps and rules for the dispatched reviewer. The public
    result, and the script/reference that owns the computation or where it
    should be extracted.
 
-4. Measure each changed skill markdown file with `pwsh -NoProfile -File
+4. Measure each changed `SKILL.md` with `pwsh -NoProfile -File
    .agents/scripts/Measure-Tokens.ps1 -Path <file>`. A `SKILL.md` body over
    10,000 `bt-token-v1` needs a stated reason why the detail cannot move to a
-   reference or script, 15,000 is the ceiling, and a reference file over 2,000
-   needs a table of contents. Done when every changed skill markdown file has a
-   measurement and each threshold breach is a `NEEDS_ACTION` finding, not
-   advice.
+   reference or script, and 15,000 is the ceiling. Done when every changed
+   `SKILL.md` has a measurement and each threshold breach is a
+   `NEEDS_ACTION` finding, not advice.
 
 ## Rules
 

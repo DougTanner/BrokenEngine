@@ -3,13 +3,6 @@
 The diagnosis steps and the rules for the worker dispatched with
 [`../SKILL.md`](../SKILL.md), which owns the purpose and the triggers.
 
-## Contents
-
-- [Steps](#steps)
-- [Rules](#rules)
-  - [Confusable locations](#confusable-locations)
-  - [Common error patterns](#common-error-patterns)
-
 ## Steps
 
 1. Set up the Python dispatch. Every Python script below runs through the shared wrapper, which resolves the interpreter itself (via the shared `.agents/scripts/Detect-Python.ps1` probe) and reports it as data. From the session worktree root, each call takes the form below. Done when this dispatch form is the one every later script call uses.

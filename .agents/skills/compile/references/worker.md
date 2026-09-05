@@ -4,11 +4,6 @@ Build steps and rules for the worker dispatched with
 [`../SKILL.md`](../SKILL.md), which owns the purpose, the triggers, the inputs,
 and the handoff this run returns.
 
-## Contents
-
-- [Steps](#steps)
-- [Rules](#rules)
-
 ## Steps
 
 1. Resolve identities, the changed-path set, and the data-mode directories by

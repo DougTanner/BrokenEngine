@@ -25,15 +25,6 @@ below likewise redirects its single-line stdout to the ignored repository-relati
 what the landing invocations pass as `-ApprovalReviewResultFile`; its values are
 never re-typed by hand.
 
-## Contents
-
-- [Invocation](#invocation)
-- [Contracts](#contracts)
-  - [Primary movement check](#primary-movement-check)
-  - [Approval review receipt](#approval-review-receipt)
-  - [Landing and recovery](#landing-and-recovery)
-  - [Session fork-point repair](#session-fork-point-repair)
-
 ## Invocation
 
 Use the root AGENTS.md canonical form — from the session worktree root, one

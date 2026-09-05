@@ -3,18 +3,6 @@
 The phase steps and judgment rules the pipeline runs. Triggers, the target
 input, and the report form live in [`../SKILL.md`](../SKILL.md).
 
-## Contents
-
-- [Steps](#steps)
-  - [Execution context](#execution-context)
-  - [Phase 0: Scoped Metric Evidence](#phase-0-scoped-metric-evidence)
-    - [Triage Gate](#triage-gate)
-  - [Phase 1: Architecture Shape](#phase-1-architecture-shape)
-  - [Phase 2: In-Function Mechanics](#phase-2-in-function-mechanics)
-  - [Phase 3: Findings Verification](#phase-3-findings-verification)
-  - [Phase 4: Route, Verify, and Land](#phase-4-route-verify-and-land)
-- [Rules](#rules)
-
 ## Steps
 
 ### Execution context

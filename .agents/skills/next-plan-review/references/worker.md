@@ -2,21 +2,6 @@
 
 The numbered spine the invoking parent executes, and the judgment no step owns.
 
-## Contents
-
-- [Steps](#steps)
-  1. Resolve the root and, for Codex, run the finder once.
-  2. For Codex, classify the finder result.
-  3. Establish the commit facts and the contracts at that commit.
-  4. Require the exact Claude session ID.
-  5. Prove production, then build the routing inventory.
-  6. Follow a Plan's recorded source client; handle blocked provenance.
-  7. Assemble the brief.
-  8. Delegate to exactly one fresh reviewer.
-  9. Confirm the returned evidence.
-- [Rules](#rules) — untrusted transcripts, citation requirements, and what
-  bounded friction mode keeps or waives.
-
 ## Steps
 
 1. Resolve the repository root, then for Codex run the finder exactly once as

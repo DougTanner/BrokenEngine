@@ -3,12 +3,6 @@
 The dispatch steps and the rules for the session running this skill. Triggers,
 inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 
-## Contents
-
-- [Steps](#steps)
-- [Rules](#rules)
-  - [Fallback](#fallback)
-
 ## Steps
 
 1. Write the judgment content yourself into `-ScopeFile`: the exact scope, the

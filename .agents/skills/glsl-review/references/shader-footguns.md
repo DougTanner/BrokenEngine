@@ -2,18 +2,6 @@
 
 Use this reference to reason about changed shader code. It records review distinctions, not unconditional findings. External behavior remains pending until `/verify-external-claims` resolves an atomic proposition.
 
-## Table of Contents
-
-- [Official source set](#official-source-set)
-- [Numerical domains](#numerical-domains)
-- [Coordinates, interpolation, and sampling](#coordinates-interpolation-and-sampling)
-- [Synchronization and data races](#synchronization-and-data-races)
-- [Subgroups](#subgroups)
-- [CPU/GLSL layout and dependency propagation](#cpuglsl-layout-and-dependency-propagation)
-- [Performance evidence](#performance-evidence)
-- [Algorithm checks](#algorithm-checks)
-- [Optional stages and features](#optional-stages-and-features)
-
 ## Official source set
 
 Use only these official sources in external-claim requests. Give the exact applicable section or anchor in the request when known.

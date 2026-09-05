@@ -6,14 +6,6 @@ file on entry, after [`../SKILL.md`](../SKILL.md), whose `## Inputs`,
 authoritative; script commands, result contracts, and lease rules are in
 [`scripts.md`](scripts.md).
 
-## Contents
-
-- [Bundled scripts](#bundled-scripts)
-- [Steps](#steps)
-- [Rules](#rules)
-- [Recovery](#recovery)
-- [Exceptional references](#exceptional-references)
-
 ## Bundled scripts
 
 Every script this skill runs lives under `../scripts/`; load `scripts.md`

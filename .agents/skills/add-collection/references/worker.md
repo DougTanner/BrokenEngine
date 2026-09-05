@@ -4,16 +4,6 @@ The variant, wiring, version, and verification steps, and the judgment rules the
 runner applies. The purpose and the triggers live in
 [`../SKILL.md`](../SKILL.md).
 
-## Contents
-
-- [Steps](#steps)
-  - [Choose the variant](#choose-the-variant)
-  - [Write the pair](#write-the-pair)
-  - [Register and version](#register-and-version)
-  - [Settle and verify](#settle-and-verify)
-- [Rules](#rules)
-  - [Framework references](#framework-references)
-
 ## Steps
 
 ### Choose the variant

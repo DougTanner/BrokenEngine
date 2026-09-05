@@ -14,12 +14,6 @@ that returns findings only — except `/comment-review`, the checklist review th
 root `AGENTS.md` role table assigns to `mechanic` — and the tool restrictions a
 skill body states are prose boundaries rather than host enforcement.
 
-## Contents
-
-- [Task brief](#task-brief)
-- [Handoffs](#handoffs)
-- [Whether a worker is still running, and interruption](#whether-a-worker-is-still-running-and-interruption)
-
 ## Task brief
 
 Every delegation supplies one self-contained brief on this form:

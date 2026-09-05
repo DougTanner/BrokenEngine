@@ -3,13 +3,6 @@
 The save steps and the rules for the worker dispatched with
 [`../SKILL.md`](../SKILL.md), which owns the purpose and the inputs.
 
-## Contents
-
-- [Steps](#steps)
-- [Rules](#rules)
-  - [Round-trip caveats to surface](#round-trip-caveats-to-surface)
-  - [Failure modes](#failure-modes)
-
 ## Steps
 
 1. Resolve the input path. Done when one input `.md` path and one output path are fixed.
