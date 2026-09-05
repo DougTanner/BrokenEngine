@@ -75,18 +75,18 @@ finding is `Required`. Give each finding a stable `CXX###` ID. Omit empty
 optional extension rows. Correctness and scope-authorization failures both go
 in the shared `Findings` field.
 
+Return the shared handoff form in
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+extended with these fields:
+
 ```text
 Scope: PASS | NEEDS_ACTION | not applicable (Tier 1) | not supplied
 API verification requests: <single checkable requests, or none>
 Files reviewed: <path — regions and affected paths traced, one row each>
 Project membership trigger: /update-vcxproj — <paths/reason> | none
-Status: PASS | NEEDS_ACTION | BLOCKED
 Findings: <CXX### Critical|Required path:line — claim — evidence and smallest correction; or none>
 Changed files: none
-Decisive checks: <one row per trace/check and result>
 Build required: none
-Evidence: <existing or Temp/ path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <pre-existing defect, incomplete trace, pending external verdict, size observation, or none>
 ```
 

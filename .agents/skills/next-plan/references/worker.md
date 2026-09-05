@@ -103,17 +103,10 @@
 | implementation accepted and verified | held | run `Complete-NextPlan.ps1`, then the landing gate |
 | user explicitly authorizes rejection | held | run `Complete-NextPlan.ps1 -Reject`, then the landing gate |
 | claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
-| approval refused, or a blocker whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly |
-| blocker before an authoritative claim disposition is available | unknown | follow the supplied `nextAction`, run the checkpoint once per host, report the error and unknown claim state, and stop; do not infer from `claim: null`, query claim status, or mutate a claim |
-| user separately and explicitly directs deferral, or the run is already deferred | released/absent only through `Defer-NextPlan.ps1`'s documented result | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate, otherwise report and stop |
-| authoritative result explicitly reports that no claim is held, including `none-available` | absent | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate, otherwise report and stop |
-
-A followup-only landing does not run a Plan completion or rejection operation
-and does not release a different held claim. A refused or blocked run that
-creates checkpoint work leaves that work with the retained session. `claim:
-null` alone never proves claim absence; only the authoritative result's outcome
-or disposition does. An unknown-disposition blocker adds no recovery probe:
-its supplied `nextAction` and the checkpoint are the complete route.
+| approval refused, or a blocker whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |
+| blocker before an authoritative claim disposition is available | unknown | follow the supplied `nextAction`, run the checkpoint once, report the error and unknown claim state, and stop, retaining all work with the session; `claim: null` alone never proves claim absence, so add no recovery probe and do not query claim status or mutate a claim |
+| user separately and explicitly directs deferral, or the run is already deferred | released/absent only through `Defer-NextPlan.ps1`'s documented result | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate, which runs no Plan completion or rejection and releases no other held claim, otherwise report and stop |
+| authoritative result explicitly reports that no claim is held, including `none-available` | absent | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate as the previous row defines it, otherwise report and stop |
 
 ## Rules
 

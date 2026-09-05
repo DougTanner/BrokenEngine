@@ -32,7 +32,11 @@ signal.
 
 ## Handoff
 
-```markdown
+Return the shared handoff form in
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+extended with these fields:
+
+```text
 Root cause: <one sentence, with file:line>
 Diagnosis evidence: <inspection, command output, or log lines that prove it>
 Reproducing signal: <exact command or inspection, and its red result>
@@ -40,12 +44,8 @@ Hypotheses ruled out: <hypothesis — the check that killed it>
 Proposed acceptance check: <check matching the signal — harness scenario, replay check, compile result, or profiling baseline>
 Instrumentation removed: yes — <marker searched> | none added
 Status: PASS | BLOCKED
-Findings: <none>
 Changed files: none
-Decisive checks: <one row per hypothesis check and result>
 Build required: <exact targets the manager must rebuild, or none>
-Evidence: <existing or Temp/ path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <unproven branch, missing environment/input, or none>
 ```
 

@@ -22,38 +22,22 @@ site — tuple, version, CRC, persistence, creation, transfer, hydration, identi
 
 ## Inputs
 
-Require the approved change, target collection and member, intended ownership
-and shared/client reachability, known producers, consumers, lifecycle and
-integration sites, the session baseline, acceptance criteria, and the approved
-save/replay version and compatibility decision. The enclosing implementer's
-brief supplies those values and its ownership snapshot.
+The enclosing implementer's brief supplies the task-brief fields in
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+and its ownership snapshot. This checklist also consumes the target collection
+and member, the intended ownership and shared/client reachability, the known
+producers, consumers, lifecycle and integration sites, and the approved
+save/replay version and compatibility decision.
 
 ## Handoff
 
-Fold this specialist's results into the enclosing `/implement-plan` shared
-handoff rather than returning a second envelope:
-
-```text
-Runtime acceptance requests: <setup, action, observation, and required evidence per criterion, or none>
-Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <none>
-Changed files: <each declaration, tuple, version, CRC, persistence, initialization, transfer, hydration, identity, or query region>
-Decisive checks: <collection-layout auditor and focused producer/consumer traces>
-Build required: <every consuming client/server target, configuration/platform, and selected project-member .cpp; every consuming target for changed headers>
-Evidence: <focused check output or path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
-Self-audit resolved: <member-specific Claim -> Check -> Result rows>
-Affected-site triggers: <member/layout/version/CRC/lifecycle pattern and search scope>
-Propagation required: /update-affected-code — <C++ scope>
-Reviewer focus areas: <tuple position, carry-forward, initialization, transfer, hydration, or identity invariants>
-Residuals: <stale exemplar, unresolved CRC/version/compatibility decision, or none>
-```
-
-This is the enclosing implementer's complete shared handoff from
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
-with the `/implement-plan` extension fields and member runtime requests;
-`Residuals` remains last. Main owns the returned build and runtime requests at
-their Change Workflow stages.
+This specialist returns no envelope of its own; its results fold into the
+enclosing [`/implement-plan`](../implement-plan/SKILL.md) handoff. Name every
+consuming client/server target under `Build required`, one runtime-observable
+criterion per `Runtime acceptance requests` row, the tuple-position,
+carry-forward, initialization, transfer, hydration, and identity invariants
+under `Reviewer focus areas`, and a stale exemplar or unresolved
+CRC/version/compatibility decision under `Residuals`.
 
 ## References
 

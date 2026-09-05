@@ -42,15 +42,16 @@ Require all of the following before starting:
 
 ## Handoff
 
-Return the block below inline. Interview questions carry their full wording in
-the block, because the manager runs the interview from that text and must not
-read a file mid-question. The decision-and-refinement rows, the execution-card
-rows, the execution card itself, the refined implementation plan, reproduction
-recipes, and any other bulk evidence go to one file under `Temp/`, returned as
-that path plus a per-section selector per
-`../../references/subagent-reporting.md`, never as inline text. `Plan delta` is
-relative to the frozen plan text; any behavior, scope, architecture,
-acceptance, or verification change is meaningful.
+Return the shared handoff form in
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+extended with the fields below, inline. Interview questions carry their full
+wording in the block, because the manager runs the interview from that text and
+must not read a file mid-question. The decision-and-refinement rows, the
+execution-card rows, the execution card itself, the refined implementation plan,
+reproduction recipes, and any other bulk evidence go to one file under `Temp/`,
+returned as that path plus a per-section selector, never as inline text.
+`Plan delta` is relative to the frozen plan text; any behavior, scope,
+architecture, acceptance, or verification change is meaningful.
 
 ```text
 Plan: <exact path or inline plan title>
@@ -62,13 +63,8 @@ External claim verdicts:
 - <stable claim ID> — VERIFIED | REFUTED | UNRESOLVED — <direct implication>
 Decision detail file: <Temp/ path> — <decision-rows selector> — <execution-card-rows selector>
 Required next step: none | incorporate refinements | incorporate library integration pivot and run fresh /plan-audit | run /external-design-interface, incorporate its design pivot, and run fresh /plan-audit
-Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <none>
 Changed files: none
-Decisive checks: <plan revision, audit evidence, and closing checks, one row each>
 Build required: none
-Evidence: <decision detail file plus selectors, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <unresolved decision, missing input, or none>
 ```
 

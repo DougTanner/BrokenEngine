@@ -29,11 +29,11 @@ Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, a
 
 ## Handoff
 
-Report each criterion `PASS`, `FAIL`, or `BLOCKED` with exact command/query/scene/UI/screenshot/log evidence. Treat setup limitations as blocked checks.
-
-Give each observed criterion failure and process-check failure a stable
-`HARNESS-F-###` ID and report it exactly once as a `Required` row in the shared
-`Findings` field. Process-check findings can come from launch, a poll, a
+Report each criterion `PASS`, `FAIL`, or `BLOCKED` with exact
+command/query/scene/UI/screenshot/log evidence, and treat a setup limitation as
+a blocked check. Give each observed criterion failure and process-check failure
+a stable `HARNESS-F-###` ID and report it exactly once as a `Required` row in
+the shared `Findings` field. Process-check findings can come from launch, a poll, a
 transport-failure check, or release entry; record the role, report path,
 exception headline, exit code, and retained evidence path in that finding.
 Do not repeat those values in criterion rows, `Evidence`, or `Residuals`.
@@ -50,19 +50,16 @@ Captures stay on disk. The `screenshot` result `{path, width, height}` is the ev
 
 If a required command, parameter, result field, query, or input primitive is missing, return that criterion `BLOCKED`. Name the missing capability and the narrowest harness extension that would expose it. The main agent decides whether the authorized change includes that extension or whether user authority/criterion revision is required. Never fake state with pixel guessing or log scraping, create an out-of-scope runtime edit, waive the gate with a follow-up plan, or silently skip the criterion.
 
-Return one criterion row per acceptance criterion, followed by one shared
-handoff envelope:
+Return the shared handoff form in
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+extended with these fields, one criterion row per acceptance criterion:
 
 ```text
 Criterion results:
 - <criterion ID> — PASS | FAIL | BLOCKED — <command/query/scene/UI and evidence selector, or HARNESS-F-### when that finding holds the evidence>
-Status: PASS | NEEDS_ACTION | BLOCKED
 Findings: <HARNESS-F-### Required report-path:selector — observed criterion or process-check failure — evidence; or none>
 Changed files: none
-Decisive checks: <one row per executable command or query and its result>
 Build required: none
-Evidence: <capture or non-finding report/log path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <missing capability or environment, or none>
 ```
 

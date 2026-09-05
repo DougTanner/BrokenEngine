@@ -50,9 +50,8 @@ its numbering at 5.
 10. When a landing gate applies (defined in root `AGENTS.md`), complete
     `/finalize-changes`; there is no step that adds a plan row after the change
     lands. Done when that gate is either completed or shown not to apply.
-11. Return this run's final shared handoff in the
-    [`../SKILL.md`](../SKILL.md) Handoff shape, with its profiling report
-    extension first. Done when that complete handoff is returned.
+11. Return this run's profiling report in the [`../SKILL.md`](../SKILL.md)
+    Handoff shape. Done when that report is returned.
 
 ## Rules
 

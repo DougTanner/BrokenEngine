@@ -46,13 +46,8 @@ unaffected results.
 Claim: <Plan path or none; resolved state when claimed>
 Classification: Tier 1 | Tier 2 | Tier 3 and trigger
 Execution card: <file path plus ## selector>
-Status: PASS | NEEDS_ACTION | BLOCKED
 Findings: <review roles only; one row each: ID Critical|Required|Recommended path:line — claim — evidence, or none>
-Changed files: <one row each, path and region; or none>
-Decisive checks: <one row each, command or read and its result>
 Build required: <exact targets, or none>
-Evidence: <existing or Temp/ path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <blocker or none>
 ```
 

@@ -49,24 +49,18 @@ criteria.
 
 ## Handoff
 
-Every mode returns one complete shared handoff from
+Every mode below except Review Observation returns one complete shared handoff
+from
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
 after its domain extension. Keep the existing source-size and boundary evidence
 in the appropriate extension and keep `Residuals` last.
 
 ### Review Observation
 
-```text
-Size observation: <file> — <n>/<threshold> bt-token-v1 — <concrete cohesive split opportunity or no qualifying reduction>
-Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <none>
-Changed files: none
-Decisive checks: <Measure-Tokens invocation and result>
-Build required: none
-Evidence: <measurement output or path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
-Residuals: <accepted out-of-scope observation requiring /create-follow-up-plans, missing path, or none>
-```
+This mode returns no handoff of its own. The reviewing skill reports the
+observation as one `size observation` row in its own `Residuals`:
+`<file> — <n>/<threshold> bt-token-v1 — <concrete cohesive split opportunity or
+no qualifying reduction>`.
 
 ### Standalone Plan Draft
 
@@ -86,18 +80,9 @@ Return one recommended-design extension:
 - <risk> -> <decisive check>
 ```
 
-Then return its shared envelope:
-
-```text
-Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <none>
-Changed files: none
-Decisive checks: <measurement, source map, caller/dependency, and project-membership checks>
-Build required: none
-Evidence: <source map and plan draft path plus selectors, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
-Residuals: <contradictory boundary evidence, missing input, or none>
-```
+Then return the shared handoff form with `Changed files: none`,
+`Build required: none`, and `Residuals: <contradictory boundary evidence,
+missing input, or none>`.
 
 The draft must choose the boundary, filenames, ownership, interface shape,
 shared-symbol placement, and implementation order. Include all affected files
@@ -108,20 +93,14 @@ implementer to decide.
 
 ```text
 Reduction result: <original and final bt-token-v1 sizes; approved moves completed>
-Runtime acceptance requests: <setup, action, observation, and required evidence per criterion, or none>
-Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <none>
-Changed files: <exact changed file and region rows>
-Decisive checks: <remeasurement and focused static/search checks>
-Build required: <exact consuming targets, configuration/platform, and selected project-member .cpp rows>
-Evidence: <measurement/check output or path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
-Self-audit resolved: <Claim -> Check -> Result; fix/recheck, or none>
-Affected-site triggers: <moved symbol/include/project-affinity pattern and search scope, or none found>
-Propagation required: /update-affected-code — <C++ scope>
-Reviewer focus areas: <approved boundary, ownership, includes, affinity, and behavior preservation>
 Residuals: <plan contradiction, file still above threshold, or none>
 ```
+
+Return the `/implement-plan` extension fields with it, including
+`Runtime acceptance requests` —
+[`../implement-plan/SKILL.md`](../implement-plan/SKILL.md) `## Handoff` — with
+`Reviewer focus areas` naming the approved boundary, ownership, includes,
+affinity, and behavior preservation.
 
 Main schedules `/compile` and any runtime verification at their owning Change
 Workflow stages; approved execution returns those exact requests and does not

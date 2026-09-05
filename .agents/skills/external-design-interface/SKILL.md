@@ -42,7 +42,7 @@ approximating the independent designs inline.
 
 Each researcher and planner returns the complete shared handoff from
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
-with `Residuals` last. Add these domain fields before `Status`:
+with `Residuals` last. Add these domain fields before the shared fields:
 
 ```text
 Researcher extension:
@@ -56,17 +56,10 @@ Hidden complexity: <internal machinery and ownership>
 Runtime contracts: <client/server guards, allocation, threading, frame phase, and deterministic-state effect>
 Collections and members: <each proposed Collection or SOA member, or none>
 Trade-offs: <interface depth, SOA fit, dispatch safety, and costs>
-
-Shared handoff:
-Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <none>
-Changed files: none
-Decisive checks: <repository evidence or design constraint checks>
-Build required: none
-Evidence: <existing or Temp/ path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
-Residuals: <missing evidence, unresolved constraint, or none>
 ```
+
+This read-only workflow changes no file and requires no build, so both workers
+return `Changed files: none` and `Build required: none`.
 
 The researcher uses only the researcher extension; each planner uses only the
 planner extension. Main consumes those child handoffs, then owns the comparison

@@ -57,6 +57,7 @@ Propagation required: /update-affected-code — <code scope> | N/A — no code c
 Build required: <target, configuration/platform, selected project-member .cpp;
   for headers, consuming targets and configuration/platform; or none>
 Reviewer focus areas: <verify X holds when Y, or none>
+Runtime acceptance requests: <setup, action, observation, and required evidence per criterion, or none>
 Residuals: <contradiction, incomplete item, or blocker with evidence, or none>
 ```
 

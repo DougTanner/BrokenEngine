@@ -49,16 +49,16 @@ conversation history. Do not turn either case into an open-ended repository audi
 
 ## Handoff
 
+Return the shared handoff form in
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+extended with these fields:
+
 ```text
 API verification requests: <symbol/rule — exact proposition — dependent finding ID — applicability — official source; or none>
 Traced clean: <hypotheses traced and decisive refutation, or not applicable>
-Status: PASS | NEEDS_ACTION | BLOCKED
 Findings: <ADV### Critical|Required path:line — claim — reachable evidence and smallest correction; or none>
 Changed files: none
-Decisive checks: <one row per disproof trace/check and result>
 Build required: none
-Evidence: <existing or Temp/ path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <pre-existing/out-of-scope defect, missing evidence, or none>
 ```
 

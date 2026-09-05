@@ -39,18 +39,18 @@ Order findings by severity, give each one a stable `GLSL###` ID, and omit empty
 optional extension rows. Correctness, performance, and scope-authorization
 failures all go in the shared `Findings` field.
 
+Return the shared handoff form in
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+extended with these fields:
+
 ```text
 Scope: PASS | NEEDS_ACTION | not applicable (Tier 1) | not supplied
 External claim verification requests: <single checkable requests, or none>
 Files reviewed: <path — regions and affected paths traced, one row each>
 Sibling review required: /repo-code-review — <shader-facing shared headers> | none
-Status: PASS | NEEDS_ACTION | BLOCKED
 Findings: <GLSL### Critical|Required path:line — claim — evidence and smallest correction; or none>
 Changed files: none
-Decisive checks: <one row per trace/check and result>
 Build required: none
-Evidence: <existing or Temp/ path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <pre-existing issue, incomplete review, pending external verdict, size observation, or none>
 ```
 
