@@ -43,11 +43,14 @@ Return the handoff plus the `<out>` path — the retained full critique on disk 
 and do not paste extra narration beyond the concise handoff into the session.
 
 On genuine failure the handoff is `CODEX-UNAVAILABLE: <short reason>` with the
-unchanged target, blocked pending explicit user authorization per
-[`references/worker.md`](references/worker.md) `### Fallback`. With that
-authorization the brief names the assigned skill and states that the user
-authorized the fallback in this session; `.claude/agents/reviewer.md` owns what
-else it carries.
+unchanged target. Only explicit user authorization given in the current session
+unblocks it, by routing the same unchanged assignment to the Opus `reviewer`
+subagent. With that authorization the brief names the assigned skill and states
+that the user authorized the fallback in this session;
+`.claude/agents/reviewer.md` owns what else it carries, and
+[`references/worker.md`](references/worker.md) `### Fallback` owns the
+failure-time mechanics: what counts as genuine failure, the single `-NoRetry`
+re-dispatch, and the `general-purpose` last resort.
 
 ## References
 

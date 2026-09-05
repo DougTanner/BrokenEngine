@@ -175,15 +175,17 @@ pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <
 one: its result is final, and a second malformed result is reported as
 `CODEX-UNAVAILABLE` under the rule below.
 
-On a genuine failure, stop and report `CODEX-UNAVAILABLE: <short reason>` with
-the unchanged target. When the wait status is `failed`, take that short reason
-from the receipt's own `reason` field, without a further diagnostic call. This
-is a blocking failure: never dispatch a substitute reviewer automatically.
+On a genuine failure, stop and return the `CODEX-UNAVAILABLE` handoff that
+[`../SKILL.md`](../SKILL.md) `## Handoff` defines. When the wait status is
+`failed`, take its short reason from the receipt's own `reason` field, without a
+further diagnostic call. This is a blocking failure: never dispatch a substitute
+reviewer automatically.
 
-Only explicit user authorization in the current session unblocks it, by routing the same
-unchanged assignment to the normal Opus `reviewer` subagent — or, if that subagent type is
-also unavailable, at most once to `subagent_type: "general-purpose"` with `model: "opus"`
-and the reviewer or auditor role stated at the top of the prompt.
+The user authorization that unblocks it, and its target, are in
+[`../SKILL.md`](../SKILL.md) `## Handoff`. If the `reviewer` subagent type is
+also unavailable, route at most once to `subagent_type: "general-purpose"` with
+`model: "opus"` and the reviewer or auditor role stated at the top of the
+prompt.
 
 Do not retry Codex beyond the single re-dispatch above or add another reviewer
 for consensus.
