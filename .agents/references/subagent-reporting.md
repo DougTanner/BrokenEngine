@@ -47,6 +47,14 @@ Import-Module ./.agents/scripts/AgentWorktreeSession.psm1
 Get-AgentWorktreeSessionContext
 ```
 
+Inside a `/next-plan` run, copy these values from the `Get-NextPlanContext`
+output already in context: `SessionBranch` is `Branch`, `Session` is
+`SessionId`, `Primary` is `PrimaryRoot`, and `TargetBranch` is `PrimaryBranch`;
+`Worktree` and `PrimaryTip` keep their names. Use the recorded `Baseline`
+governed by `.agents/skills/next-plan/references/claim-results.md`,
+`## Session baseline and the sync object`. Do not run
+`Get-AgentWorktreeSessionContext` separately.
+
 The leading `./` is required — without it PowerShell treats the path as a
 module name and searches `PSModulePath` instead of the worktree.
 
