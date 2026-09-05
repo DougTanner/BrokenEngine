@@ -35,8 +35,8 @@ handoff form: [`../SKILL.md`](../SKILL.md).
    (exit `1`). Done when every collected reference is classified: model
    invocation or chaining is a workflow requirement, and a command only the user
    types is an example.
-7. List confirmed passes under `Accurate checks`. Done when the handoff form in
-   [`../SKILL.md`](../SKILL.md) is filled and returned.
+7. Return the handoff form in [`../SKILL.md`](../SKILL.md). Done when every
+   declared field is filled and returned.
 
 ## Rules
 

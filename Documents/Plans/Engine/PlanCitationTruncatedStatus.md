@@ -80,6 +80,15 @@ re-planning instead of expanding scope.
 - Moving the script, which `Documents/Plans/Engine/ExecutionCardFile.md` owns
 - Unrelated skills/scripts; any transcript path or transcript text in the repo
 
+## Coordination
+`Documents/Plans/Engine/PlanCitationResultFold.md` folds the returned
+`citations` payload of this same script down to counts plus the unresolved
+records, changing the record count the shed loop and `truncated` observe.
+Neither Plan requires the other first. Whichever lands second must re-read the
+other's landed change and keep it working: this Plan's status selection must
+still read whatever signal survives that fold, and that Plan must not remove or
+bypass the `truncated` signal this Plan's status selection depends on.
+
 ## Risk tier and invariants
 Expected Tier 2 (scoped behavior of one tool at an existing boundary — the
 emitted status/code of a review-support script); escalate if the fix reaches
