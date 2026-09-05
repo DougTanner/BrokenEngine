@@ -113,6 +113,17 @@ The diff alone does not prove the behavior, so, in a scratch repository:
 3. A `-CurrentWorktree` naming a directory that does not exist fails with the
    existing "Current worktree does not exist" error.
 
+## Coordination
+
+No directional prerequisite (`dependsOn: []`).
+`Documents/Plans/Engine/FinalizeVerifiedCandidateRebaseReResolution.md` changes
+the same script's whole-tree verified-candidate comparison (`:353`) and the
+`references/scripts.md` and `references/worker.md` prose this Plan reads as
+unchanged; this Plan moves the two verified-candidate assertions at `:278-279`.
+The two fixes are independent and either may land first, but whichever lands
+second re-reads the current bytes of both files before editing, because the
+cited line numbers will have moved.
+
 ## Notes
 
 Change Workflow tier for the fix: **Tier 2** — scoped behavior of one tool
