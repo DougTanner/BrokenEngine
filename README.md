@@ -143,7 +143,7 @@ The wrapper already supplies the dangerous permission bypass; no additional sett
 The following tested `~/.codex/config.toml` profile uses medium reasoning for normal work, xhigh reasoning in plan mode, and a large manual context window. Model availability can change, so this is a preference rather than a CLI version requirement:
 
 ```toml
-model = "gpt-5.6-sol"
+model = "gpt-6-astra"
 model_context_window = 1000000
 model_auto_compact_token_limit = 900000
 model_reasoning_effort = "medium"

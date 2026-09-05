@@ -42,7 +42,7 @@ This table is the authoritative spawned-agent routing policy; role definitions a
 - Host plan mode never substitutes for Change Workflow steps: a plan produced there still gets Step 3's `/plan-audit` (and the Tier-3 additions) before implementation
 - Every delegated review or audit the table above assigns to `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including the child reviewer a parent/manager orchestrator such as `/next-plan-review` dispatches itself from the invoking parent. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
 
-ChatGPT Codex: Fable -> gpt-5.6-sol max; Opus and Sonnet -> gpt-5.6-luna max.
+ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-5.6-sol medium); Sonnet -> Luna (gpt-5.6-luna max).
 
 ## IMPORTANT: Change Workflow (YOU MUST follow this when changing anything tracked in this repository)
 
