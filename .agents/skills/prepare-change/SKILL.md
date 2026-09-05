@@ -3,9 +3,10 @@ name: prepare-change
 description: >-
   Prepare a change before its plan reviews: gather the repository evidence that
   fixes the risk tier and, at Tier 2+, draft the implementation plan as a file
-  and the execution card. Use for the Change Workflow Step 1 and Step 2 `implementer`
-  preparation of a change that is not a claimed executable Plan. Preparation
-  only; never implements the change.
+  and the execution card. Use for the `implementer` preparation the Change
+  Workflow Approve and classify and Prepare and explore alternatives steps
+  require, for a change that is not a claimed executable Plan. Preparation only;
+  never implements the change.
 allowed-tools: [Read, Write, Edit, Glob, Grep]
 ---
 
@@ -14,13 +15,15 @@ allowed-tools: [Read, Write, Edit, Glob, Grep]
 ## Purpose
 
 One `implementer` produces the repository evidence that fixes the risk tier, and,
-for the Tier-2+ plan preparation Step 2 dispatches, the implementation plan as a
-file with the draft execution card inside it. A Tier-1 dispatch made only to
+for the Tier-2+ plan preparation the Prepare and explore alternatives step
+dispatches, the implementation plan as a file with the draft execution card
+inside it. A Tier-1 dispatch made only to
 classify the work returns the evidence alone.
 
 ## When to use
 
-- The Step 1 and Step 2 `implementer` preparation bullets in root
+- The `implementer` preparation bullets of the Approve and classify and Prepare
+  and explore alternatives steps in root
   [AGENTS.md](../../../AGENTS.md) — Tier 2 and above, or any tier where
   classifying the work needs repository evidence.
 - Not for a claimed executable Plan: [`../next-plan/SKILL.md`](../next-plan/SKILL.md)
@@ -59,8 +62,9 @@ the plan or card text in the handoff.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the steps and rules the
-  dispatched worker follows.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The steps and rules the dispatched
+  worker follows.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   — task-brief fields and the shared handoff form.
 - [`../plan-audit/SKILL.md`](../plan-audit/SKILL.md) — the plan-file and

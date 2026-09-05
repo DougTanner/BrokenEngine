@@ -28,9 +28,9 @@ changes primary. `Show-FinalizeApprovalReview.ps1` is the one script this worker
 fills in and returns for main to run verbatim instead of invoking it itself.
 A script that cannot be run as documented is a bug: stop and report it.
 
-Under its landing lease, finalization follows the [root
-`AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and the exact
-mechanics in [`scripts.md`](scripts.md).
+Under its landing lease, finalization follows the [root `AGENTS.md` Verify and
+land step's landing invariant](../../../../AGENTS.md) and the exact mechanics in
+[`scripts.md`](scripts.md).
 
 The caller releases its reconciliation lease through
 `../scripts/Invoke-FinalizeLockClaim.ps1 -Release` before the confirmation pause, so
@@ -79,7 +79,9 @@ every other lease is foreign.
    - Fill it from the hygiene handoffs that already exist — the session-change
      inventory's `triggers` object reports which ones the session owes:
      `/code-style-review` for changed C++, `/update-vcxproj`, `/validate-skill`,
-     `/update-claude-docs`, `/progressive-disclosure-review`.
+     `/update-claude-docs`, `/progressive-disclosure-review` — and from the
+     Review and resolve correctness step's `/comment-review` handoff for
+     changed C++ or GLSL.
    - Never withhold the table waiting for a missing one: give each triggered
      handoff that does not exist its own row with the status that reference
      assigns a missing artifact.
@@ -107,8 +109,8 @@ every other lease is foreign.
      handoff in [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts), is
      consumed as a usable non-conflict terminal, and proceeds directly to the
      `SmartGit launch:` line in step 6 and the existing landing summary.
-   - Apply the
-     [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and
+   - Apply the [root `AGENTS.md` Verify and land step's landing
+     invariant](../../../../AGENTS.md) and
      [`scripts.md#landing-and-recovery`](scripts.md#landing-and-recovery) for the
      movement and lease rules.
    - A candidate/session change still returns its changed bytes through normal
@@ -144,8 +146,9 @@ every other lease is foreign.
    - Main runs the launch line, then presents the summary immediately before the
      authoritative confirmation question. That summary is a terminal return: the
      worker ends its turn with it as its final answer.
-   - Steps 1-8 change nothing on primary, so a brief that says to stop before any
-     primary change still ends with this summary, per `SKILL.md` `## Inputs`.
+   - This worker's steps 1-8 change nothing on primary, so a brief that says to
+     stop before any primary change still ends with this summary, per
+     `SKILL.md` `## Inputs`.
    - Done when that single handoff has been returned.
 9. Claim the landing lock.
    - Only that affirmative response permits the same worker to claim the landing
@@ -159,9 +162,9 @@ every other lease is foreign.
       on it, and step 14 disposes of such a block like any other blocked landing.
     - For a claimed Plan pass `-ReleasePlanClaim` so the machine-local claim is
       deleted best-effort.
-    - Under the landing lease, landing follows the
-      [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and the
-      exact mechanics in [`scripts.md`](scripts.md).
+    - Under the landing lease, landing follows the [root `AGENTS.md` Verify and
+      land step's landing invariant](../../../../AGENTS.md) and the exact
+      mechanics in [`scripts.md`](scripts.md).
     - Done when landing has returned its result.
 11. Read the advance and cleanup landing performed.
     - Landing advances primary by compare-and-swap with rollback, resets and
@@ -185,8 +188,8 @@ every other lease is foreign.
     - Done when the deletion is recorded as performed or as that residual.
 14. Dispose of a landing blocked by primary advancing.
     - If primary advanced before the advance succeeds, landing does its own
-      bounded rebase and retry, following the
-      [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) and
+      bounded rebase and retry, following the [root `AGENTS.md` Verify and land
+      step's landing invariant](../../../../AGENTS.md) and
       [`scripts.md`](scripts.md) for the resulting disposition.
     - Never rebase or resolve by hand.
     - Act on the blocked result's reported `disposition` and `lock` projection

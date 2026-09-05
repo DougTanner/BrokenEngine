@@ -24,7 +24,18 @@ not an untracked file, which includes a gitignored path such as one under
 `Temp/`; `prompt.head-untracked-conflict` — a commit-valued head has no untracked
 side; `prompt.assigned-skill-unknown` — `-AssignedSkill` names no skill file, so
 fix the name or pass `-AdHocRole`; `prompt.execution-card-required` — a
-`plan-audit` scope carries no `execution card` marker.
+`plan-audit` scope carries no `execution card` marker;
+`prompt.execution-card-incomplete` — that scope's execution card leaves the
+named field(s) unfilled or carries none of them, so fill each one in
+`-ScopeFile` and re-run.
+
+## Error exit codes
+
+Exit `1` is a script error rather than a block, and its `code` names the failing
+step. `prompt.execution-card-check-failed` is one of them: the checker behind
+the two execution-card codes above could not be run or returned no usable
+result, and the message carries that checker's own `code` and `message` when it
+produced them.
 
 ## Review run receipt
 

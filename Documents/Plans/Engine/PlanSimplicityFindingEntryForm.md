@@ -2,7 +2,8 @@
 # Fix: `/plan-simplicity-review` — mandated finding entry is a paragraph, so each finding is delivered twice
 
 ## Context
-Observed while running Change Workflow Step 2 for a `/next-plan` claim in this
+Observed while running the Change Workflow Plan review step for a `/next-plan`
+claim in this
 session: the dispatched `reviewer` returned finding `PSR-F-001` as a long inline
 block that pasted a grep census, a precedent comparison, and the cost comparison,
 and then repeated a condensed restatement of the same finding under the shared
@@ -60,7 +61,8 @@ occurrence/likelihood, simpler-alternative, and cost-comparison reasoning to the
 gitignored `Temp/` file `:100-103` already sanctions, extending that allowance
 from clean results to results with findings. That removes the second copy by
 removing the reason to write one, without weakening what the reviewer must
-decide. An alternative worth weighing at Step 1 is to leave the entry form long
+decide. An alternative worth weighing at the Approve and classify step is to
+leave the entry form long
 and instead state at `:92` that `Findings` carries only the one-line summary with
 the full entries cited under `Evidence`; it keeps more text in the handoff and is
 the smaller edit, but it leaves the same content in two places by design.
@@ -98,7 +100,8 @@ instead of expanding scope.
 ## Risk tier and invariants
 Expected Tier 2 (scoped tool behavior: the mandated output contract of one
 review skill, which parents consume); this author's classification, for main to
-confirm at Step 1. It drops to Tier 1 only if the resulting edit provably changes
+confirm at the Approve and classify step. It drops to Tier 1 only if the
+resulting edit provably changes
 no content a reviewer must emit. Invariants to preserve: every fact the current
 entry form requires a reviewer to decide — class, concrete problem, occurrence
 evidence, simpler alternative, cost comparison, disposition — still reaches the

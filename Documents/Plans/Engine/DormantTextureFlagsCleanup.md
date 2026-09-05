@@ -117,5 +117,6 @@ Screenshot/TextureCache readback path. No `/glsl-review`, `/update-vcxproj`,
 server build is triggered because the approved change does not touch GLSL,
 project membership, shared serialization, or a correctness-dependent caller
 outside this wrapper. The mandatory `/update-affected-code` propagation pass
-still runs after the future C++ change, as required by root Step 3, and records
+still runs after the future C++ change, as required by the root Implement and
+propagate step, and records
 that no affected caller was found if the exact search remains empty.

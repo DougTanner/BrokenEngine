@@ -37,5 +37,6 @@ justifies extraction. It is not an outlier or Phase-0 hint metric.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the invocation steps and the
-  per-mode contracts.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The invocation steps and the per-mode
+  contracts.

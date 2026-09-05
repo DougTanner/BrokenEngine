@@ -35,6 +35,15 @@
    `implementer`, reading source itself only for a decision it must make that
    the Plan and the returned handoff cannot settle.
 
+   The brief bounds the card's verification evidence: each acceptance item
+   comes back as a `path:line` citation plus a verdict, not verbatim source
+   text, except an item whose purpose is proposed replacement text. That is an
+   expectation of the dispatch, not a gate the Done condition tests.
+
+   After that preparation handoff, and before the Plan review reviewers and the
+   step 6 approval presentation, main runs `/plan-alternatives` when its trigger
+   fires.
+
    Done when the execution card carries every field of the card template in
    [`../SKILL.md`](../SKILL.md) `## Handoff`. When the `/plan-audit` input is a
    scratch snapshot instead of the claimed Plan path, that snapshot carries the
@@ -76,7 +85,7 @@
   run.
 - The context baseline is provisional until a claim reports a `sync` object.
   Never create/adopt a worktree or inspect machine-local claims directly.
-- Which reviewer runs at which tier is Step 2 of root
+- Which reviewer runs at which tier is the Plan review step of root
   [AGENTS.md](../../../../AGENTS.md); Tier 3 additionally follows
   [tier3-workflow.md](tier3-workflow.md). Missing a mandatory reviewer blocks.
 - An affirmative response approves only the latest unchanged presentation. A

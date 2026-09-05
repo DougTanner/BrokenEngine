@@ -58,7 +58,8 @@ Steps and rules for the dispatched reviewer. The public
   to `/validate-skill`.
 - Leave `AGENTS.md` content correctness, chain sync, and leaf/hub size targets
   to `/update-claude-docs`.
-- Leave C++ comment style and formatting to `/code-style-review`.
-- Leave scope authorization and unnecessary extra work to the Step-5
-  correctness review of each changed artifact type
+- Leave C++ and GLSL comment content to `/comment-review` and formatting to
+  `/code-style-review`.
+- Leave scope authorization and unnecessary extra work to the Review and
+  resolve correctness review of each changed artifact type
   ([`scope-authorization.md`](../../../references/scope-authorization.md)).

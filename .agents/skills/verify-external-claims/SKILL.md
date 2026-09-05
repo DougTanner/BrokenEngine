@@ -46,6 +46,7 @@ citations; do not replace evidence with a summary.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: the identifier,
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: the identifier,
   delegation, and result-handling steps, and the rules. Main itself runs those
   steps, dispatching the `locator`, so main reads this file to run the skill.

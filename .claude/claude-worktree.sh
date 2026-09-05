@@ -28,6 +28,11 @@ while (($#)); do
 			;;
 	esac
 done
+# A reattach restores the worktree identity only; the conversation lives in Claude Code's own history
+# for that directory, so open its session picker instead of starting a fresh conversation.
+if ((${#reattach_flag[@]})); then
+	client_args+=("--resume")
+fi
 # Carry client arguments out of band; passing them to pwsh -File would bind them to parameters of the
 # session script instead of forwarding them. Start-AgentWorktreeSession.ps1 decodes and clears this.
 # Assign on its own line: `export VAR="$(...)"` would discard a base64 failure under `set -e` and

@@ -112,7 +112,7 @@ The fixed terminal mapping is:
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
 | 0 | `pass` | `ok`, `primary.tree-identical` | Continue to the SmartGit launch line and the landing summary. |
-| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Step 8 landing invariant](../../../../AGENTS.md) owns primary-movement policy. No conditional/preconfirmation landing lease is acquired; the normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
+| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Verify and land step's landing invariant](../../../../AGENTS.md) owns primary-movement policy. No conditional/preconfirmation landing lease is acquired; the normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
 | 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 

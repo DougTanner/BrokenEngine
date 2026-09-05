@@ -1,8 +1,8 @@
 # Scope Authorization
 
-The Step-5 correctness review of each changed artifact type also checks its own
-changed regions for scope authorization, diff-observable minimality, and
-diff-observable simplicity. It applies to Tier-2+ changes only.
+The Review and resolve correctness step's review of each changed artifact type
+also checks its own changed regions for scope authorization, diff-observable
+minimality, and diff-observable simplicity. It applies to Tier-2+ changes only.
 
 Authorization source: the approved plan's `## In scope` and `## Out of scope`
 sections, or the explicit user-instruction list for unplanned work, plus the

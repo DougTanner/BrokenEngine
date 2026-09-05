@@ -29,7 +29,14 @@ main when it runs the skill itself.
 ask verbatim is a subsection of `Handoff`.
 
 `SKILL.md` links `references/worker.md` from `References` as its worker-entry
-line. `SKILL.md` on its own must suffice for main to dispatch the worker and to
+line, which opens with the private marker so a session that only dispatches
+never loads the private steps into its context:
+
+```
+- [`references/worker.md`](references/worker.md) — private: read it only if you are the session executing this skill. <what it holds>.
+```
+
+`SKILL.md` on its own must suffice for main to dispatch the worker and to
 present or ask anything verbatim; a `SKILL.md` missing text main must deliver
 verbatim is the failure this rule prevents. Text main reads to decide whether or
 how to dispatch — triggers, inputs, verbatim presentations and questions — is
@@ -52,4 +59,6 @@ term.
   files.
 - Each section lives in the file `## Section order` names; `SKILL.md` carries
   only what main reads.
+- `SKILL.md` links `references/worker.md` with the private marker line from
+  `## Public and private files`.
 - Size and layering pass `/progressive-disclosure-review`.

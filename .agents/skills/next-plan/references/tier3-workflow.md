@@ -1,8 +1,8 @@
 # Tier 3 Preparation
 
 This route inherits the global Change Workflow from the root
-[AGENTS.md](../../../../AGENTS.md) Step 8 and the Implementation approval
-section of [`/next-plan`](../SKILL.md); Tier 3 risk does not add another
+[AGENTS.md](../../../../AGENTS.md) Verify and land step and the Implementation
+approval section of [`/next-plan`](../SKILL.md); Tier 3 risk does not add another
 approval or resume gate. This reference owns only the additional Tier-3
 preparation, review, and implementation actions below.
 

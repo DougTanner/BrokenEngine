@@ -32,7 +32,11 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    `-ScopeFile`, or no such check applies.
 3. Include the assigned skill's own required evidence in that same file before
    dispatching: `plan-audit`'s draft execution card (`../../plan-audit/SKILL.md`).
-   The script blocks the dispatch when that card is absent.
+   The script blocks the dispatch when that card is absent or leaves a field
+   unfilled.
+
+   Copy the card's fields into `-ScopeFile` even when a plan file or snapshot
+   named there also carries them: that inline copy is the one the script judges.
 
    Done when that evidence is in `-ScopeFile`.
 4. For a reviewer role with no skill file, pass a descriptive role name as

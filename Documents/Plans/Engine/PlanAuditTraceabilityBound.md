@@ -2,7 +2,8 @@
 # Fix: `/plan-audit` — unbounded `Traceability checked:` field returns as a paragraph
 
 ## Context
-Observed while running Change Workflow Step 2 for a `/next-plan` claim in this
+Observed while running the Change Workflow Plan review step for a `/next-plan`
+claim in this
 session: the dispatched `reviewer` returned the `Traceability checked:` extension
 field as a roughly 1,400-character single paragraph that mixed
 requirement-to-check mappings, an importer census, and a walkthrough of how it
@@ -55,7 +56,8 @@ site or check, with any supporting detail — an importer census, an unresolved 
 ambiguous citation — cited as path plus selector rather than narrated, and
 anything that still does not fit moved to a gitignored `Temp/` file cited under
 the shared handoff's `Evidence` field, exactly as `## Handoffs` already directs
-for oversized material. An alternative worth weighing at Step 1 is to state only
+for oversized material. An alternative worth weighing at the Approve and
+classify step is to state only
 a row cap on the field and leave its internal shape to the auditor; it is a
 smaller edit but it does not stop the narration that caused the observed
 paragraph.
@@ -98,7 +100,8 @@ instead of expanding scope.
 ## Risk tier and invariants
 Expected Tier 2 (scoped tool behavior: the mandated output contract of one review
 skill, which parents consume); this author's classification, for main to confirm
-at Step 1. It drops to Tier 1 only if the resulting edit provably changes no
+at the Approve and classify step. It drops to Tier 1 only if the resulting edit
+provably changes no
 content an auditor must emit. Invariants to preserve: the traceability judgment
 itself — that every plan requirement and invariant maps to an implementation site
 or check — still reaches the manager; the clean-result `PASS` statement and the

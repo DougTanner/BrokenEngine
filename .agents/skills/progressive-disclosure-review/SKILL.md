@@ -3,11 +3,11 @@ name: progressive-disclosure-review
 description: >-
   Review session-changed instruction prose — AGENTS.md, CLAUDE.md,
   `.agents/skills/**/*.md`, `.agents/references/**/*.md` — against the root
-  AGENTS.md
-  progressive-disclosure directive. Use during Change Workflow Step 6 after
-  `/update-claude-docs` whenever the session changed such a file, and when a
-  reviewer suspects a skill body restates a reference, a script, or a parent
-  AGENTS.md, or exceeds the skill size thresholds. Findings only; never edits.
+  AGENTS.md progressive-disclosure directive. Use during the Change Workflow
+  Apply the triggered cleanup step after `/update-claude-docs` whenever the
+  session changed such a file, and when a reviewer suspects a skill body
+  restates a reference, a script, or a parent AGENTS.md, or exceeds the skill
+  size thresholds. Findings only; never edits.
 allowed-tools: [Read, Grep, Glob, PowerShell]
 ---
 
@@ -21,7 +21,8 @@ directive is the sole statement of the layering; this skill only enforces it.
 
 ## When to use
 
-- Change Workflow Step 6, after `/update-claude-docs`, whenever the session
+- The Change Workflow Apply the triggered cleanup step, after
+  `/update-claude-docs`, whenever the session
   changed `AGENTS.md`, `CLAUDE.md`, `.agents/skills/**/*.md`, or
   `.agents/references/**/*.md`.
 - When a reviewer suspects a skill body restates a reference, a script, or a
@@ -68,6 +69,13 @@ Example:
 `Changed files` and `Build required` are `none` because this findings-only
 review never edits a file.
 
+A focused re-review returns this same handoff, carrying one `Findings` row per
+re-checked finding, whose leading `file:line` is that finding's first-round
+location, whose `class:` stays that finding's first-round class, whose
+`evidence:` cites what the re-check read, and whose trailing slot states the
+re-checked verdict — `resolved`, or the remaining problem — in place of the fix
+direction.
+
 Whatever gates on this handoff for changed instruction prose, the block must
 carry four things, none of which may be dropped or reworded: the
 `Skill: progressive-disclosure-review` marker line, the `Files checked:` line, a
@@ -85,5 +93,6 @@ meaningful under the standard defaults; this review adds no extra rounds.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — steps and rules for the
-  dispatched reviewer.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Steps and rules for the dispatched
+  reviewer.

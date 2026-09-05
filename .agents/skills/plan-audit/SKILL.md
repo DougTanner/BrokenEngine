@@ -54,7 +54,11 @@ For each finding:
 
 > `PA-F-###` Critical|Required|Recommended `plan-path:line` — category — concrete problem — evidence: `repository-path:line` — proposed improvement
 
-Those entries are the rows of the shared handoff's `Findings` field.
+Each finding's problem, evidence, and proposed improvement appear exactly once,
+as one single-line `Findings` row of the shared handoff in the form above; every
+other field that refers to a finding (such as `API Verification Requests:`)
+names it by its `PA-F-###` ID and adds only its own required content, never
+restating that finding's problem, evidence, or proposed improvement.
 
 If clean, state `PASS — no meaningful plan flaws found.` Return:
 
@@ -63,6 +67,10 @@ API Verification Requests: <single checkable requests or none>
 Traceability checked: <requirements/invariants <-> implementation sites/checks>
 Required next step: Tier 3 -> manager decision, then /external-grill-plan | Tier 2 -> manager decision
 ```
+
+Beyond those extension fields, statements the audit checked and cleared stay in
+the auditor's own context and travel only as a gitignored `Temp/` file cited
+under `Evidence`, never as inline prose.
 
 Follow those extension fields with the shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
@@ -77,5 +85,6 @@ returns to the manager.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the audit steps and rules the
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The audit steps and rules the
   dispatched reviewer runs.

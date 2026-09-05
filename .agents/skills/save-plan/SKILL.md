@@ -26,5 +26,6 @@ Invoking this skill is the user's explicit approval to commit or land the saved 
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: the body,
-  review, classification, and write steps, and the rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: the body, review,
+  classification, and write steps, and the rules.

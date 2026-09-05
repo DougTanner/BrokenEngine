@@ -112,9 +112,9 @@ boundary, and the handoff form live in [`../SKILL.md`](../SKILL.md).
     that missing verification seam as a residual instead of proposing
     architecture work to create one. Done when that residual is reported.
 21. Return the handoff form in [`../SKILL.md`](../SKILL.md). The manager takes
-    the handoff into Change Workflow Step 1, which classifies the fix and
-    routes it to `/resolve-findings` or a plan. Done when that handoff form is
-    returned.
+    the handoff into the Change Workflow Approve and classify step, which
+    classifies the fix and routes it to `/resolve-findings` or a plan. Done when
+    that handoff form is returned.
 
 ## Rules
 

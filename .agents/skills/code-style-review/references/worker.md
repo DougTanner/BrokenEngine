@@ -37,10 +37,10 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    adjudication is decided against. Hand-read the selected ranges for the rules
    the scanner does not cover: 3, 14, 16 (including its vector `.at()` clause),
    21, 49, 51, 56, 61, 62, and the "always write `std::`" half of 41. Those
-   hand-read rules, the rules the scanner's `style-rule-<n>` kinds cover, and
-   rule 64 in step 18 are this review's whole style mandate; every other guide
-   rule is outside it. Done when the guide is in hand and those rules have been
-   read across every selected range.
+   hand-read rules and the rules the scanner's `style-rule-<n>` kinds cover are
+   this review's whole style mandate; every other guide rule is outside it.
+   Done when the guide is in hand and those rules have been read across every
+   selected range.
 7. Run the session-added candidate scanner once: `pwsh -NoProfile -File
    .agents/scripts/Find-SessionCandidates.ps1 -RepositoryRoot <absolute
    repository toplevel> -Baseline <full 40-character SHA>`,
@@ -62,8 +62,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    the surrounding code; the rows are a starting list, not the finding set.
    Rule 29 needs the base class, which is off the line, so look it up.
    - The rows carry their own rule number, so this step covers whatever kinds
-     the run emits; the mandate's remaining rules are hand-read in step 6, plus
-     rule 64 in step 18.
+     the run emits; the mandate's remaining rules are hand-read in step 6.
    - Done when every style row is accepted as a finding or rejected.
 10. Auto-fix only when the resulting C++ meaning is demonstrably unchanged.
     Examples include whitespace, argument layout, an exact deduced type
@@ -94,15 +93,6 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
     distinction from the scanner.
     - Done when a search for their exact text or existing unique debug tag
       returns zero remaining matches in session-added C++.
-17. In selected C++ comments, remove `AGENTS.md` or `CLAUDE.md` navigation text
-    only when the remaining technical statement stays complete, taking the same
-    added-versus-pre-existing distinction from the scanner's hits of that kind.
-    - Delete a comment whose sole content is the pointer; otherwise preserve
-      its technical content and repair punctuation.
-    - Done when every such hit is deleted or preserved.
-18. Classify the selected changed comments by
-    [`comment-classification.md`](comment-classification.md). Done when each
-    one is preserved, rewritten, or routed as that reference directs.
 
 ## Rules
 
@@ -110,10 +100,6 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
   review is not a landing gate (defined in root `AGENTS.md`).
 - Shader style is out of scope; do not review or route it. The only shader
   edits are the reference updates that propagate a C++ rename (steps 12-15).
-- Rule 15 permits `auto` for XMVECTOR/XMMATRIX results, a type obvious from a
-  template parameter on the right, iterators, structured bindings, and a
-  lambda expression assigned directly to the variable. It remains forbidden
-  in plain range-based loops.
 - Rule 49 forwarding findings are routed, not auto-fixed — see
   `/repo-code-review` (`../../repo-code-review/SKILL.md`).
 - The untracked rule differs per script: the step-2 inventory covers an
@@ -121,7 +107,10 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
   and its `counts.unlistedUntracked` reports how many it did not list; the
   step-7 scanner takes `-IncludeUntracked` as a switch and enumerates the
   untracked files itself.
-- Every judgment in steps 9 and 16-18 stays here, because the scanner's
+- Comment content — what a comment says and whether it should exist — is
+  `/comment-review` work; this review touches a comment only as the step-16
+  residue removal directs.
+- Every judgment in steps 9 and 16 stays here, because the scanner's
   contract (`.agents/scripts/Find-SessionCandidates.ps1`) is read-only and
   candidates-only.
 - Never add a debug tag merely to defer cleanup, and do not alter pre-existing

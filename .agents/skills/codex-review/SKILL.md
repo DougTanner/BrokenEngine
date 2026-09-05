@@ -1,10 +1,12 @@
 ---
 name: codex-review
 description: >-
-  Primary Claude Code route running any delegated reviewer or auditor role on
-  Codex/Sol headless. Codex callers stop because they are already the Sol
-  mapping (see the root AGENTS.md role table). Use for every Change Workflow review dispatch in Claude Code
-  except the child reviewer a parent/manager orchestrator (such as /next-plan-review) dispatches itself.
+  Retained but inactive route that runs one delegated reviewer or auditor role
+  on Codex headless (gpt-5.6-sol). Not part of the Change Workflow: the root
+  AGENTS.md role table runs every review on the Opus `reviewer` subagent. Use
+  only when the user explicitly asks to run a named review on Codex. Codex
+  callers never invoke it.
+disable-model-invocation: true
 allowed-tools: [Read, Bash, Agent]
 ---
 
@@ -12,29 +14,18 @@ allowed-tools: [Read, Bash, Agent]
 
 ## Purpose
 
-Runs one delegated reviewer or auditor role (Sol on Codex, per the root
-[AGENTS.md](../../../AGENTS.md) role table) headless and returns its findings,
-without the reviewed evidence entering this session.
+Runs one delegated reviewer or auditor role on Codex headless (gpt-5.6-sol)
+and returns its findings, without the reviewed evidence entering this session.
 
 ## When to use
 
-Claude Code runs every delegated reviewer or auditor role — `plan-audit`,
-`plan-simplicity-review`, `repo-code-review`, `glsl-review`,
-`progressive-disclosure-review`, `adversarial-review`,
-`next-plan-checkpoint-review`, `session-audit`, and external review lenses —
-on Codex/Sol through this skill.
-Parent/manager orchestrators that dispatch their own child reviewer, including
-`/next-plan-review`, are excluded, and so is the child reviewer they dispatch:
-that child routes per the delegated-review routing bullet in the root
-[AGENTS.md](../../../AGENTS.md). A session that already holds the explicit
-user authorization [`references/worker.md`](references/worker.md)
-`### Fallback` requires, given up front because Codex is unavailable, is
-excluded too: it routes the same unchanged assignment straight to the Opus
-`reviewer` subagent instead of spending a dispatch known to fail. A
-`/codex-review` invocation of an assigned skill constitutes the
-delegated-`reviewer` execution context; it is not an "inline run" in the
-assigned skills' vocabulary. Codex callers must stop instead of invoking
-this skill recursively — their reviewer role already resolves to Sol.
+Only when the user explicitly asks, in the current session, to run a named
+review or audit skill on Codex. The Change Workflow never routes here: the root
+[AGENTS.md](../../../AGENTS.md) role table runs every delegated review on the
+Opus `reviewer` subagent, and this package is retained so the route can be
+re-enabled later. A `/codex-review` invocation of an assigned skill constitutes
+the delegated-`reviewer` execution context; it is not an "inline run" in the
+assigned skills' vocabulary. Codex callers never invoke it.
 
 ## Inputs
 
@@ -54,12 +45,12 @@ and do not paste extra narration beyond the concise handoff into the session.
 On genuine failure the handoff is `CODEX-UNAVAILABLE: <short reason>` with the
 unchanged target, blocked pending explicit user authorization per
 [`references/worker.md`](references/worker.md) `### Fallback`. With that
-authorization — given after such a failure, or up front per `## When to use` —
-the brief names the assigned skill and states that the user authorized the
-fallback in this session; `.claude/agents/reviewer.md` owns what else it
-carries.
+authorization the brief names the assigned skill and states that the user
+authorized the fallback in this session; `.claude/agents/reviewer.md` owns what
+else it carries.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the dispatch steps, the
-  fallback, and the conduct rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The dispatch steps, the fallback, and
+  the conduct rules.

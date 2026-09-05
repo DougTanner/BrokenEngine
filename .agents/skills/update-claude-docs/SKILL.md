@@ -51,5 +51,6 @@ Audit and audit-and-fix modes return the quality report defined in
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: the steps and
-  rules for every mode, and the references they use.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: the steps and rules for
+  every mode, and the references they use.

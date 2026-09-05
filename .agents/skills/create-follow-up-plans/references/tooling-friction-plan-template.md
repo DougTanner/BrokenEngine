@@ -78,5 +78,6 @@ build/bootstrap coordination. Never embed transcript paths or home paths.
 
 ## Acceptance criteria
 - The recorded symptom no longer reproduces under the documented invocation
-- /validate-skill passes for any changed SKILL.md; plan validate exits 0
+- /validate-skill passes wherever the root AGENTS.md Apply the triggered
+  cleanup step triggers it; plan validate exits 0
 ```

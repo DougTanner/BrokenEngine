@@ -58,9 +58,6 @@ applies. The source input, the landing pre-approval, and the report form live in
      behavior per the trigger in
      [`../../plan-simplicity-review/SKILL.md`](../../plan-simplicity-review/SKILL.md)
      `## When to use`.
-   - In Claude Code that dispatch goes through `/codex-review`; a Codex caller
-     is already the Sol mapping and dispatches the `reviewer` directly, per that
-     skill's own rule.
 
    Done when the trigger is evaluated and, where it fired, the review has
    returned.

@@ -19,7 +19,8 @@ package.
 - When frontmatter, `agents/openai.yaml`, invocation policy, trigger quality, or
   bundled links need review.
 - Dispatch per `.agents/references/subagent-reporting.md`; the fresh delegated
-  `reviewer` running it may be the Step 5 combined pass of `/coherence-review`
+  `reviewer` running it may be the Review and resolve correctness combined pass
+  of `/coherence-review`
   (`.agents/skills/coherence-review/SKILL.md`).
 
 ## Inputs
@@ -49,5 +50,6 @@ Use `PASS` only when both mechanical runs succeed and no Critical finding remain
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — steps and rules for the
-  dispatched reviewer.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Steps and rules for the dispatched
+  reviewer.

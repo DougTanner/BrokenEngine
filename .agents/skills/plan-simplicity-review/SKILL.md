@@ -2,15 +2,15 @@
 name: plan-simplicity-review
 description: >-
   Review an implementation plan that adds new code or modifies
-  non-documentation behavior (root AGENTS.md Step 2 owns when to dispatch; this
-  skill's `## When to use` owns what counts as new code and behavior) for
-  YAGNI/KISS violations before implementation: ultra-rare edge-case handling,
-  speculative hardening, problems a plainly simpler mechanism or a deferred
-  ASSERT would solve, and bandaid fixes that suppress a symptom instead of
-  removing its root cause. Runs at every tier inside one delegated `reviewer`,
-  in parallel with /plan-audit where that runs; skip a plan for which the
-  trigger does not fire. Findings only, with no edits, harness work, user
-  interview, or further delegation.
+  non-documentation behavior (the root AGENTS.md Plan review step owns when to
+  dispatch; this skill's `## When to use` owns what counts as new code and
+  behavior) for YAGNI/KISS violations before implementation: ultra-rare
+  edge-case handling, speculative hardening, problems a plainly simpler
+  mechanism or a deferred ASSERT would solve, and bandaid fixes that suppress
+  a symptom instead of removing its root cause. Runs at every tier inside
+  one delegated `reviewer`, in parallel with /plan-audit where that runs;
+  skip a plan for which the trigger does not fire. Findings only, with no
+  edits, harness work, user interview, or further delegation.
 allowed-tools: [Read, Grep, Glob, PowerShell]
 ---
 
@@ -111,7 +111,7 @@ missing.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the reviewer's steps and
-  judgment rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The reviewer's steps and judgment rules.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   — delegated execution context and the shared handoff form.

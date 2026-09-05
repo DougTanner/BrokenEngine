@@ -133,7 +133,7 @@ Preserve these invariants:
 
 ## Notes
 
-Origin: `/next-plan` Step 2 plan-audit finding `PA-F-001`
+Origin: `/next-plan` Plan review step plan-audit finding `PA-F-001`
 (`Temp/next-plan-skinjoint/audit-out.md`) and the preparation residual from the
 session implementing `Documents/Plans/Engine/SkinJointCountNarrowing.md`, whose
 `## Out of scope` explicitly excludes raising the 128

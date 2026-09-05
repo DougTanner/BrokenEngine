@@ -45,5 +45,6 @@ Return the shared handoff from `.agents/references/subagent-reporting.md`
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: the steps and
-  the rules governing them.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: the steps and the rules
+  governing them.

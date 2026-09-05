@@ -27,9 +27,15 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    [`../../verify-acceptance/references/worker.md`](../../verify-acceptance/references/worker.md)
    `## Tier evidence ceiling`. Done when every template field is filled under
    that heading.
-5. Re-read the drafted file and confirm the two scope headings, the card
-   heading, and each filled card field are present in it. Done when that
-   read confirms all three.
+5. Confirm the drafted file's structure with one run from the worktree root:
+
+   ```powershell
+   pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <drafted plan path>
+   ```
+
+   Write in whatever `headings.inScopePresent`, `headings.outOfScopePresent`, or
+   `card.missingFields` reports as absent, then re-run. Done when both heading
+   values are true and `card.missingFields` is empty.
 
 ## Rules
 

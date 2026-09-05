@@ -42,6 +42,6 @@ CRITICAL>` plus a brief justification; External-Claim Residuals.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the invoking context's review
-  steps, plus the lens checklists and finding contracts the dispatched reviewers
-  run.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The invoking context's review steps,
+  plus the lens checklists and finding contracts the dispatched reviewers run.

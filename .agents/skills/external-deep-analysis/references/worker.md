@@ -176,9 +176,9 @@ input, and the report form live in [`../SKILL.md`](../SKILL.md).
 33. Route every accepted candidate through `create-follow-up-plans`, passing
     oversized files with their required `/reduce-file <path>` instruction
     intact. Done when every accepted candidate is routed.
-34. Follow root `AGENTS.md` Change Workflow Steps 7 and 8 through
-    `finalize-changes` for acceptance and landing. Done when the applicable
-    finalization outcome is known.
+34. Follow the root `AGENTS.md` Change Workflow Verify the acceptance table and
+    Verify and land steps through `finalize-changes` for acceptance and
+    landing. Done when the applicable finalization outcome is known.
 
 ## Rules
 

@@ -119,7 +119,8 @@ transition after `rebase.conflicted`.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the finalizer's bundled-script
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The finalizer's bundled-script
   invocation order and lease-ownership rules, numbered workflow steps, worker
   rules, recovery, and reference triggers. Main needs only `SKILL.md` to
   dispatch the worker and to give the confirmation above; the worker loads

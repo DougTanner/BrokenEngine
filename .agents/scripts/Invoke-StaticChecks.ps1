@@ -1,5 +1,6 @@
-# The Step-4 static checks an implementer runs itself, selected from the session change inventory and
-# run in one pass: `validate-skill` for each changed SKILL.md, `plan-scheduler` for a changed Plan, and
+# The static checks an implementer runs itself at the Run targeted pre-review checks
+# step, selected from the session change inventory and run in one pass: `validate-skill`
+# for each changed skill package, `plan-scheduler` for a changed Plan, and
 # `markdown-links` for every changed markdown file. The first two compose the existing bundled scripts
 # and carry their results through unaltered; only the markdown link and anchor check is new here. The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
@@ -217,26 +218,84 @@ function New-CheckRow([string] $Name, [bool] $Triggered, [string] $Status, $Deta
 	return [ordered]@{ name = $Name; triggered = $Triggered; status = $Status; detail = $Detail }
 }
 
+function Get-SkillPackageName([string] $Path) {
+	# Every file under `.agents/skills/<package>/` belongs to that package; a path elsewhere has none.
+	if ([string]::IsNullOrEmpty($Path)) { return $null }
+	if ($Path -cmatch '^\.agents/skills/([^/]+)/') { return $Matches[1] }
+	return $null
+}
+
+function Get-HeadSkillPackageName() {
+	# The sweep's candidate packages come from the head side itself — the head tree's path set under -Head,
+	# and the working tree otherwise — so a package only the working tree holds is never swept for a
+	# commit-valued head. Whether a candidate has a SKILL.md is still decided by Test-HeadPath.
+	$names = [Collections.Generic.List[string]]::new()
+	if ([string]::IsNullOrEmpty($script:HeadSha)) {
+		$directory = Join-Path $script:Root ('.agents/skills' -replace '/', [IO.Path]::DirectorySeparatorChar)
+		if (Test-Path -LiteralPath $directory -PathType Container) {
+			foreach ($child in (Get-ChildItem -LiteralPath $directory -Directory)) {
+				$names.Add($child.Name)
+			}
+		}
+		return , $names
+	}
+	# Asking for any path fills the cached head path set this enumeration then reads.
+	[void] (Test-HeadPath '.agents/skills')
+	foreach ($path in $script:HeadPaths) {
+		$name = Get-SkillPackageName $path
+		if ($null -ne $name -and -not $names.Contains($name)) { $names.Add($name) }
+	}
+	return , $names
+}
+
 function Invoke-ValidateSkillCheck([object] $Inventory) {
-	$triggered = [bool] $Inventory.triggers.validateSkill
+	# Any changed file inside a skill package can invalidate that package, so the targets are derived from
+	# the package name on both sides of every changed path — a rename out of a package can break the
+	# package it left — instead of from the `skill` class, which covers SKILL.md alone. Get-ChangedPath is
+	# not reusable here: it drops deletions, and a deleted bundled file is exactly a case to catch.
+	$sweepPath = '.agents/skills/validate-skill/scripts/Validate-Skill.ps1'
+	$names = [Collections.Generic.List[string]]::new()
+	$sweep = $false
+	foreach ($entry in $Inventory.entries) {
+		if ($entry.path -ceq $sweepPath -or $entry.oldPath -ceq $sweepPath) { $sweep = $true }
+		foreach ($side in @($entry.path, $entry.oldPath)) {
+			$name = Get-SkillPackageName $side
+			if ($null -ne $name -and -not $names.Contains($name)) { $names.Add($name) }
+		}
+	}
+	# A change to the validator itself can change every package's verdict, so it sweeps the whole tree.
+	if ($sweep) {
+		foreach ($name in (Get-HeadSkillPackageName)) { if (-not $names.Contains($name)) { $names.Add($name) } }
+	}
+	# Only a package with a head-side SKILL.md is validatable; pointing the validator at a package
+	# directory without one is a setup error. Pinning the trigger after this test therefore keeps a diff
+	# that touches only such a directory from triggering the check at all.
+	$paths = [Collections.Generic.List[string]]::new()
+	foreach ($name in $names) {
+		$path = ".agents/skills/$name/SKILL.md"
+		if ((Test-HeadPath $path) -and -not $paths.Contains($path)) { $paths.Add($path) }
+	}
+	$triggered = $paths.Count -gt 0 -or [bool] $Inventory.triggers.validateSkill
 	if (-not $triggered) { return New-CheckRow 'validate-skill' $false 'skipped' $null }
-	$paths = Get-ChangedPath $Inventory { param($entry) $entry.class -ceq 'skill' }
 	if ($paths.Count -eq 0) {
 		if ([bool] $Inventory.truncated) { return New-CheckRow 'validate-skill' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed skill packages could not be selected.' }) }
-		# A deleted skill package still sets the trigger from its baseline side, and has no head side to validate.
-		return New-CheckRow 'validate-skill' $true 'pass' ([ordered]@{ reason = 'The changed skill package left no head-side path to validate, as a deletion does.' })
 	}
 	$results = [Collections.Generic.List[object]]::new()
 	$status = 'pass'
+	$passedCount = 0
 	foreach ($path in $paths) {
 		$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) @('-NoProfile', '-File', $script:ValidateSkillScript, '-Path', (Join-Path $script:Root ($path -replace '/', [IO.Path]::DirectorySeparatorChar))) $script:Root
 		# Exit 1 is the validator's ordinary INVALID result; only its exit 2 setup error blocks the check.
 		$rowStatus = switch ($run.ExitCode) { 0 { 'pass' } 1 { 'fail' } default { 'blocked' } }
 		if ($rowStatus -ceq 'blocked' -or ($rowStatus -ceq 'fail' -and $status -cne 'blocked')) { $status = $rowStatus }
+		# Every package names itself and its exit code, but only the packages that did not pass carry the
+		# validator's output; a passing package would otherwise contribute an unbounded block of lines for a
+		# result its exit code already states, and a sweep runs every package.
+		if ($rowStatus -ceq 'pass') { $passedCount++; $results.Add([ordered]@{ path = $path; exitCode = $run.ExitCode }); continue }
 		$lines = @(($run.Stdout -split "`r`n|`n|`r") | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 		$results.Add([ordered]@{ path = $path; exitCode = $run.ExitCode; lines = [object[]] $lines })
 	}
-	return New-CheckRow 'validate-skill' $true $status ([ordered]@{ results = [object[]] $results.ToArray() })
+	return New-CheckRow 'validate-skill' $true $status ([ordered]@{ passedCount = $passedCount; results = [object[]] $results.ToArray() })
 }
 
 function Invoke-PlanSchedulerCheck([object] $Inventory) {

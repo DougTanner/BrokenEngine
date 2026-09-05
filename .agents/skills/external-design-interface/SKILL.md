@@ -25,7 +25,8 @@ Use this skill when interface design is requested or only implicitly
 detected — a new Collection, manager, or subsystem API. Do not suggest or use
 it for bug fixes, single-function additions, implementation of an already
 approved interface, or adding a member to an existing Collection; that last case
-routes to `/add-collection-member`.
+routes to `/add-collection-member`. This skill replaces `/plan-alternatives` for
+a new Collection, manager, or subsystem API.
 
 ## Inputs
 
@@ -57,8 +58,9 @@ choose a public interface when multiple meaningfully different shapes remain.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the brief, research, design,
-  and synthesis steps the workflow runs.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The brief, research, design, and
+  synthesis steps the workflow runs.
 - [`ScratchInterfacePrototypes.md`](../../../Documents/Features/Agents/ScratchInterfacePrototypes.md)
   — Option 2, a separate future Feature, not a mode of this skill.
 - [`IsolatedInterfacePrototypeWorktrees.md`](../../../Documents/Features/Agents/IsolatedInterfacePrototypeWorktrees.md)

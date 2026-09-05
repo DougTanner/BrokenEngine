@@ -23,4 +23,4 @@ Report changed package files, decisive validation evidence, token measurements, 
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the authoring steps, the repository conventions, and the writing guidance.
+- [`references/worker.md`](references/worker.md) — private: read it only if you are the session executing this skill. The authoring steps, the repository conventions, and the writing guidance.

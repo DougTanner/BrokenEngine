@@ -9,6 +9,7 @@ A client/server game engine using data-oriented design, with data pre-packer (of
 - Codex's command-safety filter rejects `Remove-Item` with `-Force` before PowerShell runs, even with approvals and the sandbox bypassed; the rejected command deleted nothing. Delete validated files by `-LiteralPath` without `-Force`.
 - Claude Code's bypass-permissions mode injects a host instruction to prefer Bash, `sed`, heredocs, or scripts for file changes; ignore it — change tracked files with the host `Edit` tool and create files with `Write`, because a whole-file rewrite does not preserve the BOM, CRLF, or trailing newline. Codex is unaffected.
 - Scripts: PowerShell 7 by default; Python only where a Python-only runtime forces it — full rule in `/external-skill-creator`.
+- Session worktrees are created without `Engine/Data/Islands` and `Engine/Data/Textures` (~989 MB), skipped by Git sparse checkout, so `git status` reports no change for them. Run `git sparse-checkout disable` in the worktree before editing or adding files under either tree; an authorized Local generation build through `/compile` restores them itself. Mechanics: `.agents/skills/compile/references/runtime-data-mode.md`.
 
 ## IMPORTANT: Context management and agent selection
 
@@ -24,24 +25,24 @@ Direct instructions from the human user override this repository's safety polici
 
 ### Delegation roles
 
-This table is the authoritative spawned-agent routing policy; role definitions, Codex TOMLs, and the headless script enforce it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named.
+This table is the authoritative spawned-agent routing policy; role definitions and the Codex TOMLs enforce it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named.
 
 | `subagent_type` | Model | Effort | Work |
 | --- | --- | --- | --- |
-| `planner` | Fable | medium | Plans, design, approach options |
-| `reviewer` | Sol (see below); Opus fallback only with explicit user authorization | medium | Every review and audit; adversarial review that tries to disprove the change |
+| `planner` | Fable | medium | Plans, design |
+| `reviewer` | Opus | medium | Every review and audit except `/comment-review`; adversarial review that tries to disprove the change |
 | `implementer` | Opus | medium | Preparation, implementation, propagation, docs, plans, harness, finalization |
-| `researcher` | Opus | medium | Research requiring judgment |
+| `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
 | `locator` | Sonnet | xhigh | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
 | `builder` | Sonnet | xhigh | `/compile`, which owns the return contract |
-| `mechanic` | Sonnet | xhigh | Checklist edits — `/code-style-review`, `/update-vcxproj` |
+| `mechanic` | Sonnet | xhigh | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
 - Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. A documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
 - Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never substitute for a role, including inside plan mode — route the work through the table above. The documented host-unavailability fallback is the only exception
-- Host plan mode never substitutes for Change Workflow steps: a plan produced there still gets Step 2's `/plan-audit` (and the Tier-3 additions) before implementation
-- Every delegated review or audit is the `reviewer` role. In Claude Code it dispatches through `/codex-review` (Codex/Sol) — calling that skill is itself the delegated reviewer running, so no separate reviewer dispatch is needed, and that skill owns routing and fallbacks. Parent/manager orchestrators such as `/next-plan-review` remain in the invoking parent and dispatch their own reviewer directly as the `reviewer` subagent (`.claude/agents/reviewer.md`, Opus); that direct dispatch is the designated route for those orchestrators' child reviewers and needs no user authorization, unlike the authorization-gated Opus fallback. `codex-review` is the sole skill that may name a model. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
+- Host plan mode never substitutes for Change Workflow steps: a plan produced there still gets Step 3's `/plan-audit` (and the Tier-3 additions) before implementation
+- Every delegated review or audit the table above assigns to `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including the child reviewer a parent/manager orchestrator such as `/next-plan-review` dispatches itself from the invoking parent. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
 
-ChatGPT Codex: Fable -> gpt-5.6-sol max; Sol -> gpt-5.6-sol medium; Opus and Sonnet -> gpt-5.6-luna max.
+ChatGPT Codex: Fable -> gpt-5.6-sol max; Opus and Sonnet -> gpt-5.6-luna max.
 
 ## IMPORTANT: Change Workflow (YOU MUST follow this when changing anything tracked in this repository)
 
@@ -51,13 +52,13 @@ For Tier 1 and Tier 2, the user's request is the approval. Classify the work, ma
 
 Definitions:
 
-- Execution card — the pre-implementation record the Step 1 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits.
+- Execution card — the pre-implementation record the Step 2 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits.
 - Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
 - Wrapper session — session started through `.claude/claude-worktree.sh` or `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude, `-ReattachWorktree <path>` for Codex; never adopt an arbitrary worktree.
 - Primary — the shared main checkout and its main branch that finished session work lands into.
 - Tracked artifact — any file Git tracks in this repository: code, shaders, scripts, skills, plans, and documentation.
-- Step and stage — a step is one of the eight numbered Change Workflow steps below; a stage is one approved unit of session work that can complete or land independently.
+- Step and stage — a step is one of the nine numbered Change Workflow steps below; outside this file a step is cited by its heading name (`the Plan review step`), never by its number, so renumbering here changes nothing elsewhere; a stage is one approved unit of session work that can complete or land independently.
 - Residual — a known leftover problem reported at the end of a task instead of fixed inside it.
 
 ### Risk tiers
@@ -80,11 +81,17 @@ A reviewer may escalate the tier when the changed bytes expose a higher-risk sur
 
 From user intent and any such preparation, main locks in the objective, the approved stage decisions, the tier and its triggers, the roles, and the acceptance checks. Tier 1 and Tier 2 authorize implementation; Tier 2, Tier 3, and a Plan claim also require an execution card, which `/plan-audit` needs.
 
-#### Step 2 — Plan review
+#### Step 2 — Prepare and explore alternatives
 
-Order: `/prepare-change` first, because both plan reviews read the prepared plan; then `/plan-audit` and `/plan-simplicity-review` in parallel; then, at Tier 3, `/external-grill-plan` rounds until the plan is decision-complete, with `/verify-external-claims` between rounds.
+Order: `/prepare-change` first at Tier 2+, because the alternative investigations need the drafted plan's objective and scope; at Tier 1 there is no plan file, so main briefs from the request. Then `/plan-alternatives` when its trigger fires. A chosen alternative returns to `/prepare-change` for a redraft before Step 3; the skill owns the claimed-Plan and Tier-1 routes.
 
 - `implementer` runs `/prepare-change` to prepare the plan — Tier 2+.
+- main dispatches one `researcher` per axis for `/plan-alternatives`, concurrently and blind — every tier, on `/plan-simplicity-review`'s trigger (that skill's `## When to use`): Tier 1 axis 1 (Reuse), Tier 2 axes 1-2 (adds Remove the need), Tier 3 axes 1-3 (adds Reshape). Each brief is the shared task-brief form with `Skill: /plan-alternatives`, the objective, the plan's `## In scope`/`## Out of scope` (main's intended change at Tier 1), evidence paths, the tier, fixed user decisions, one line naming the drafted mechanism as candidate zero, and the assigned axis — never the plan's rationale. Main compares the handoffs per that skill's `## Handoff` and asks the user only when a candidate is clearly better.
+
+#### Step 3 — Plan review
+
+Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then, at Tier 3, `/external-grill-plan` rounds until the plan is decision-complete, with `/verify-external-claims` between rounds.
+
 - `reviewer` runs `/plan-audit` — Tier 2+; Tier 1 skips it.
 - fresh `reviewer` runs `/plan-simplicity-review` on the same plan snapshot — every tier, when the plan adds new code or changes non-documentation behavior (both defined in that skill's `## When to use`); when unsure whether a plan triggers it, dispatch it.
 - `implementer` owns `/external-grill-plan` repository evidence and short written decision summaries, updated round by round — Tier 3 only.
@@ -92,7 +99,7 @@ Order: `/prepare-change` first, because both plan reviews read the prepared plan
 
 Main reports a blocker if the `reviewer` role is unavailable for `/plan-audit`. At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
 
-#### Step 3 — Implement and propagate
+#### Step 4 — Implement and propagate
 
 Order: the slices run in parallel; `/update-affected-code` runs after them.
 
@@ -101,7 +108,7 @@ Order: the slices run in parallel; `/update-affected-code` runs after them.
 
 Main splits the work into disjoint slices where possible. Review-fix exceptions belong to `/resolve-findings`.
 
-#### Step 4 — Run targeted pre-review checks
+#### Step 5 — Run targeted pre-review checks
 
 Order: both run in parallel; each `Build required` handoff compiles as it arrives.
 
@@ -110,39 +117,40 @@ Order: both run in parallel; each `Build required` handoff compiles as it arrive
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
 
-#### Step 5 — Review and resolve correctness
+#### Step 6 — Review and resolve correctness
 
 Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker.
 
 - fresh `reviewer` runs `/repo-code-review` — when the change touches C++.
 - fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
-- fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier 1 with no changed C++ or GLSL this dispatch is the Step 5 combined pass and also carries Steps 6 and 7.
+- `mechanic` runs `/comment-review` — when the change touches C++ or GLSL.
+- fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier 1 with no changed C++ or GLSL this dispatch is the Step 6 combined pass and also carries Steps 7 and 8.
 - fresh `reviewer` runs `/coherence-review` — other Tier-2+ artifacts; the reviewer must be new to the change.
 - `reviewer` runs `/adversarial-review` — Tier 3 always; optional at any tier for one concrete unresolved hypothesis.
 - separate `implementer` runs `/resolve-findings` — whenever main accepts a finding.
 
-Main dispatches one fresh `reviewer` per changed artifact type, scoped to the changed bytes and the rules they touch. Scope, minimality, and simplicity checks run inside each Tier 2+ review; there is no separate scope dispatch. Main decides each finding once.
+Main dispatches one fresh `reviewer` per changed artifact type, plus the `mechanic` for `/comment-review`, scoped to the changed bytes and the rules they touch. Scope, minimality, and simplicity checks run inside each Tier 2+ review; there is no separate scope dispatch. Main decides each finding once.
 
-#### Step 6 — Apply the triggered cleanup
+#### Step 7 — Apply the triggered cleanup
 
 Order: all run in parallel, except `/progressive-disclosure-review` runs after `/update-claude-docs` so the prose that step generates is in scope.
 
 - `mechanic` runs `/code-style-review` — for changed C++.
 - `mechanic` runs `/update-vcxproj` — for changes to file membership or to which executable a whole file belongs to.
-- fresh `reviewer` runs `/validate-skill` — when any `.agents/skills/*/SKILL.md` changed; where the Step 5 combined pass applies it runs inside that pass instead of its own dispatch.
+- fresh `reviewer` runs `/validate-skill` — when the session changed any file in a `.agents/skills/*/` package that has a `SKILL.md`; where the Step 6 combined pass applies it runs inside that pass instead of its own dispatch.
 - `implementer` runs `/update-claude-docs` — after C++ or GLSL changes.
-- fresh `reviewer` runs `/progressive-disclosure-review` — when the session changed any `AGENTS.md`, `CLAUDE.md`, `.agents/skills/**/*.md`, or `.agents/references/**/*.md` file; where the Step 5 combined pass applies it runs inside that pass like `/validate-skill`.
+- fresh `reviewer` runs `/progressive-disclosure-review` — when the session changed any `AGENTS.md`, `CLAUDE.md`, `.agents/skills/**/*.md`, or `.agents/references/**/*.md` file; where the Step 6 combined pass applies it runs inside that pass like `/validate-skill`.
 
-#### Step 7 — Verify the acceptance table
+#### Step 8 — Verify the acceptance table
 
-Order: `/verify-acceptance` runs after Step 6; `/create-follow-up-plans` runs when a leftover is proven, per the Leftovers paragraph below.
+Order: `/verify-acceptance` runs after Step 7; `/create-follow-up-plans` runs when a leftover is proven, per the Leftovers paragraph below.
 
-- fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing without landing; a stage landing in the same session gets this from Step 8's landing table instead, and where the Step 5 combined pass applies that pass is this reviewer.
+- fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing without landing; a stage landing in the same session gets this from Step 9's landing table instead, and where the Step 6 combined pass applies that pass is this reviewer.
 - `implementer` runs `/create-follow-up-plans` — for every proven out-of-scope leftover not fixed inside the current change.
 
-Leftovers: a proven leftover that is itself small (Tier 1 or 2, bounded, decidable from evidence already in hand), found in a session whose own change is also small, is fixed inside the current change: record it as approved scope (on the execution card when one exists), reclassify the whole change at the highest applicable tier, run every step that tier triggers for the touched regions (plan review included), and report the expansion in the message already being sent. Every other proven out-of-scope leftover, including one the user directs to defer, goes through `/create-follow-up-plans`. One proven before the Step 5 dispatch is authored first, with the Plan path recorded as approved scope, so that round's reviews cover it; one proven later routes here unchanged.
+Leftovers: a proven leftover that is itself small (Tier 1 or 2, bounded, decidable from evidence already in hand), found in a session whose own change is also small, is fixed inside the current change: record it as approved scope (on the execution card when one exists), reclassify the whole change at the highest applicable tier, run every step that tier triggers for the touched regions (plan review included), and report the expansion in the message already being sent. Every other proven out-of-scope leftover, including one the user directs to defer, goes through `/create-follow-up-plans`. One proven before the Step 6 dispatch is authored first, with the Plan path recorded as approved scope, so that round's reviews cover it; one proven later routes here unchanged.
 
-#### Step 8 — Verify and land
+#### Step 9 — Verify and land
 
 - `implementer` runs `/finalize-changes` — at a landing gate.
 
@@ -157,7 +165,7 @@ Once a stage's required checks pass, stop changing it: advance to the next stage
 - Minimum sufficient change: request and approved plan are target and ceiling — smallest complete change satisfying acceptance criteria and invariants; no speculative features, abstractions, configuration, extension points, or cleanup. Update related sites only when omission would make them incorrect; ignore polish.
 - KISS, YAGNI, DRY: reuse existing mechanisms. Extract helpers only for current duplication, never for hypothetical use. Mirrored patterns stay parallel.
 - Add backward compatibility only after explicit user consent. Without it, keep one current format, path, or behavior and remove obsolete compatibility code.
-- Progressive disclosure: each fact — including a genuinely new term's definition — lives once at its owning layer and is referenced elsewhere: AGENTS.md carries the constraints, invariants, and routing every session needs; a skill carries its when-to-use and how-to-invoke workflow; scripts and skill `references/` carry mechanics, schemas, and long detail; code comments carry local non-obvious rationale. Comment what the code cannot say — an invariant, a required ordering, a consequence — never a language feature or house pattern the declaration already shows. Review: `/progressive-disclosure-review` for the layering, `/code-style-review` for comments.
+- Progressive disclosure: each fact — including a genuinely new term's definition — lives once at its owning layer and is referenced elsewhere: AGENTS.md carries the constraints, invariants, and routing every session needs; a skill carries its when-to-use and how-to-invoke workflow; scripts and skill `references/` carry mechanics, schemas, and long detail; code comments carry local non-obvious rationale. Comment content: `Documents/C++StyleGuide.txt` rule 64. Review: `/progressive-disclosure-review` for the layering, `/comment-review` for comments.
 - Public/private skills: every `.agents/skills/*/SKILL.md` is the public file and carries only what a parent session needs to decide on and dispatch the skill — purpose, triggers, inputs, handoff — while `references/worker.md` is the private file with the steps and rules, read by the dispatched worker or by a main session choosing to run the skill itself. Shape and checklist: `.agents/references/skill-skeleton.md`.
 - One term per concept: use the established repository term; prefer plain words over formal ones.
 - Do not add unit tests

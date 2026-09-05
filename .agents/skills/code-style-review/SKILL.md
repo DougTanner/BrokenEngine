@@ -19,6 +19,8 @@ plus the session's residue removed and semantic candidates routed to the caller.
   caller supplies.
 - Not for shader-only or non-C++ changes, and not for behavior or interface
   defects, which are `/repo-code-review` work.
+- Not for comment content — what a comment says and whether it should exist —
+  which is `/comment-review` work.
 
 ## Inputs
 
@@ -50,5 +52,6 @@ Residuals: <unresolved item, or none>
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: the numbered
-  review, rename, and cleanup steps and the judgment rules behind them.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: the numbered review,
+  rename, and cleanup steps and the judgment rules behind them.

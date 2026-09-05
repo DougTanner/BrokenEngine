@@ -4,7 +4,8 @@ description: >-
   Review session-changed C++ for reachable correctness defects and Broken
   Engine contract violations. Use after C++ changes or when the user asks to
   review, check, or audit C++ code. Excludes shader-only and non-C++ changes;
-  style and formatting belong to code-style-review.
+  comment quality belongs to comment-review and style and formatting to
+  code-style-review.
 allowed-tools: [Read, Grep, Glob, Bash, PowerShell]
 ---
 
@@ -21,8 +22,8 @@ Delegation form: `../../references/subagent-reporting.md`.
 - After a session changes C++, or when the user asks to review, check, or audit
   C++ code.
 - Not for shader-only or non-C++ changes, and not for style, formatting,
-  naming, general comment quality, or documentation, which belong to
-  `/code-style-review`.
+  naming, or documentation, which belong to `/code-style-review`, nor general
+  comment quality, which belongs to `/comment-review`.
 
 ## Inputs
 
@@ -109,7 +110,8 @@ evidence.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — steps and rules for the
-  dispatched reviewer.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Steps and rules for the dispatched
+  reviewer.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   — task brief and shared handoff form.

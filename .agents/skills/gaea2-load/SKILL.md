@@ -20,5 +20,6 @@ Convert a Gaea 2 `.terrain` JSON into:
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the load steps and the
-  output-format notes.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The load steps and the output-format
+  notes.

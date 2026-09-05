@@ -105,5 +105,6 @@ Capture stdout, parse it, and read:
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — build steps and rules for the
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Build steps and rules for the
   dispatched worker.

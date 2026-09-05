@@ -21,5 +21,6 @@ following the repository User Interaction rules.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the restatement steps and
-  the rules they follow.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The restatement steps and the rules
+  they follow.

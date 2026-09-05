@@ -65,5 +65,6 @@ dispatched by the manager rather than passed checks.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: propagation
-  steps and rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: propagation steps and
+  rules.

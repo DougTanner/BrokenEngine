@@ -33,5 +33,6 @@ moving, or rewiring nodes, or changing node properties.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the edit steps and the
-  per-operation rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The edit steps and the per-operation
+  rules.

@@ -61,5 +61,6 @@ tracked bytes landed.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the phase steps and rules the
-  pipeline runs.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The phase steps and rules the pipeline
+  runs.

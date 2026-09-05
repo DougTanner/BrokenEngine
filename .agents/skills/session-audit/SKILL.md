@@ -114,7 +114,8 @@ dispatching any fix.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the audit steps the
-  dispatched reviewer runs.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The audit steps the dispatched reviewer
+  runs.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   — task brief and shared handoff form.

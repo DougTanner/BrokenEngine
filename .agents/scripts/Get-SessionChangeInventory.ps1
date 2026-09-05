@@ -40,6 +40,8 @@ $script:ManifestExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
 $script:ZeroOid = '0000000000000000000000000000000000000000'
 
 $script:Root = $null
+$script:HeadSha = ''
+$script:HeadPaths = $null
 $script:BlobHashes = @{}
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:InventoryScriptPath = $PSCommandPath
@@ -252,11 +254,35 @@ function Test-InstructionDocPath([string] $Path) {
 	return $Path.StartsWith('.agents/skills/') -or $Path.StartsWith('.agents/references/')
 }
 
+function Test-InventoryHeadPath([string] $Path) {
+	# A commit-valued head is answered from its tree, so a file the working tree happens to hold but
+	# that commit does not is never treated as present.
+	if ([string]::IsNullOrEmpty($script:HeadSha)) { return Test-Path -LiteralPath (Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)) -PathType Leaf }
+	if ($null -eq $script:HeadPaths) {
+		$script:HeadPaths = [Collections.Generic.HashSet[string]]::new([string[]] @())
+		foreach ($line in ((Invoke-InventoryGit @('ls-tree', '-r', '--name-only', '-z', $script:HeadSha)).Stdout -split "`0")) {
+			if (-not [string]::IsNullOrEmpty($line)) { [void] $script:HeadPaths.Add($line) }
+		}
+	}
+	return $script:HeadPaths.Contains($Path)
+}
+
+function Get-SkillPackageManifestPath([string] $Path) {
+	# Every file under `.agents/skills/<package>/` belongs to that package; a path elsewhere has none.
+	if ([string]::IsNullOrEmpty($Path)) { return $null }
+	if ($Path -cmatch '^\.agents/skills/([^/]+)/') { return ".agents/skills/$($Matches[1])/SKILL.md" }
+	return $null
+}
+
 function Get-RoutingTrigger([object[]] $Entries) {
 	$classes = [Collections.Generic.HashSet[string]]::new([string[]] @())
 	$membershipClasses = [Collections.Generic.HashSet[string]]::new([string[]] @())
 	# Instruction docs span the doc and skill classes, so this one trigger is decided from the paths.
 	$instructionDoc = $false
+	# Any changed file inside a skill package that has a head-side SKILL.md can invalidate that package,
+	# which the `skill` class (SKILL.md alone) does not cover, so this trigger is decided from the paths
+	# too — both sides, because a rename out of a package can break the package it left.
+	$validateSkill = $false
 	foreach ($entry in $Entries) {
 		[void] $classes.Add($entry.Class)
 		if ($null -ne $entry.OldClass) { [void] $classes.Add($entry.OldClass) }
@@ -266,6 +292,12 @@ function Get-RoutingTrigger([object[]] $Entries) {
 		}
 		if (Test-InstructionDocPath $entry.Path) { $instructionDoc = $true }
 		if ($null -ne $entry.OldPath -and (Test-InstructionDocPath $entry.OldPath)) { $instructionDoc = $true }
+		if (-not $validateSkill) {
+			foreach ($side in @($entry.Path, $entry.OldPath)) {
+				$manifest = Get-SkillPackageManifestPath $side
+				if ($null -ne $manifest -and (Test-InventoryHeadPath $manifest)) { $validateSkill = $true; break }
+			}
+		}
 	}
 	$cpp = $classes.Contains('cpp') -or $classes.Contains('dual-language-header')
 	$glsl = $classes.Contains('glsl') -or $classes.Contains('dual-language-header')
@@ -274,10 +306,11 @@ function Get-RoutingTrigger([object[]] $Entries) {
 		repoCodeReview = $cpp
 		glslReview = $glsl
 		codeStyleReview = $cpp
+		commentReview = $cpp -or $glsl
 		updateAffectedCode = $cpp -or $glsl
 		updateVcxproj = $sourceMembership
 		updateClaudeDocs = $cpp -or $glsl
-		validateSkill = $classes.Contains('skill')
+		validateSkill = $validateSkill
 		progressiveDisclosureReview = $instructionDoc
 		planTouched = $classes.Contains('plan')
 	}
@@ -612,6 +645,7 @@ try {
 			Complete-SessionChangeInventory 2 'blocked' 'inventory.head-unresolved' "The head revision does not resolve to a commit in this repository: '$Head'."
 		}
 		$headSha = $headRun.Stdout.Trim()
+		$script:HeadSha = $headSha
 		$result.headSha = $headSha
 	}
 	if ($EmitManifest) {

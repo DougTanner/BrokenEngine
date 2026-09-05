@@ -24,8 +24,8 @@ reaches the reviewer by the append below.
 
 ## Dispatch
 
-Main dispatches one fresh `reviewer` for `/next-plan-checkpoint-review` through
-`/codex-review`, with a scope file on this template. The envelope label is the
+Main dispatches one fresh `reviewer` subagent for `/next-plan-checkpoint-review`
+with a scope file on this template. The envelope label is the
 scope file's last line, and a captured envelope becomes its value only by
 appending the captured file's bytes on the line after it, from the PowerShell
 tool:
@@ -66,15 +66,17 @@ landing.
 
 ## Follow-up routing
 
-For each accepted finding that Step 7's own fix-it-here rule in root
+For each accepted finding that the Verify the acceptance table step's own
+fix-it-here rule in root
 [AGENTS.md](../../../../AGENTS.md) does not fix inside this session, an
 `implementer` routes it through `/create-follow-up-plans` as a tooling-friction
 or isolation proposal, supplying the observed symptom with its citation plus the
 provenance block sourced per [follow-up-provenance.md](follow-up-provenance.md).
 An `active-change-blocker` finding never becomes a follow-up Plan: it returns
 to the current change as a blocker. This Plan is a leftover routed after the
-Step 5 review dispatch; Step 7 in root [AGENTS.md](../../../../AGENTS.md) owns
-how it is authored and verified.
+Review and resolve correctness review dispatch; the Verify the acceptance table
+step in root [AGENTS.md](../../../../AGENTS.md) owns how it is authored and
+verified.
 
 Friction first observed after this checkpoint — including friction in running
 the claim-exit script and in `/finalize-changes` itself — is recorded through

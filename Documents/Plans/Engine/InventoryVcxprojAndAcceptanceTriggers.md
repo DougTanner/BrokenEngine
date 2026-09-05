@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-03T21:09:52.909Z","dependsOn":["Documents/Plans/Engine/ExecutionCardChecker.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-03T21:09:52.909Z","dependsOn":[]} -->
 # Emit vcxproj candidates and the triggered acceptance-table skeleton from the session inventory
 
 ## Context
@@ -70,7 +70,8 @@ the agent transcribes the trigger set by hand.
 - The receipt's existing usability reporting — `status` and `truncated` — which
   this Plan neither reshapes nor adds a field beside
 - A `coherenceReview` trigger, and any resolver that turns the trigger set into
-  the Step 3-7 dispatch list: neither exists, and the Plan that proposed them was
+  the dispatch list for the Implement and propagate through Verify the
+  acceptance table steps: neither exists, and the Plan that proposed them was
   completed by reducing the duplicated workflow prose to one owning statement
   instead, so this Plan adds neither
 - Project XML itself: the inventory names candidates, `/update-vcxproj` still
@@ -84,7 +85,8 @@ the agent transcribes the trigger set by hand.
 
 ## Risk tier and invariants
 Expected Tier 2 (scoped behavior of one tool plus two consuming skills); this
-author's classification, confirmed by main at Step 1. Invariants to preserve:
+author's classification, confirmed by main at the Approve and classify step.
+Invariants to preserve:
 `triggers` keeps every existing boolean field and its name, because
 `/finalize-changes` reads them at `worker.md:79-82`; counts and triggers keep
 describing the complete inventory, never the truncated emission (`:664`); the
@@ -103,3 +105,13 @@ mapping are unchanged; no triggered row can be omitted from the skeleton.
   `finalize-changes/references/worker.md:79-85` produces today
 - For a docs-only session the skeleton carries no `/code-style-review` row
 - `Validate-Skill.ps1` reports `VALID` for every changed `SKILL.md`
+
+## Coordination
+The change that added the `/comment-review` skill already edited two regions
+this Plan's `## In scope` names: `Get-RoutingTrigger` now returns a
+`commentReview` key (`$cpp -or $glsl`) beside the existing boolean keys, and
+`finalize-changes/references/worker.md:79-85` now lists `/comment-review` for
+changed C++ or GLSL among the owed handoffs. Both are existing state for this
+Plan, not new work: keep the `commentReview` key, and have the
+`-EmitAcceptanceSkeleton` rows carry a `/comment-review` row wherever that
+trigger is true.

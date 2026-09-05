@@ -11,8 +11,9 @@ allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestio
 ## Purpose
 
 WorktreeCli alone validates metadata, selects, claims, prepares final state, and releases
-claims; `Documents/Features` is never scheduler input. Root [AGENTS.md](../../../AGENTS.md)
-Step 8 owns the cross-skill stage order, and `/finalize-changes` the landing confirmation.
+claims; `Documents/Features` is never scheduler input. The Verify and land step of root
+[AGENTS.md](../../../AGENTS.md) owns the cross-skill stage order, and
+`/finalize-changes` the landing confirmation.
 
 ## When to use
 
@@ -76,8 +77,9 @@ whether to retain the Plan or to explicitly authorize obsolete final cleanup.
 
 ## References
 
-- [references/worker.md](references/worker.md) — the run order; main, running
-  this skill itself, reads it as its own steps and rules.
+- [references/worker.md](references/worker.md) — private: read it only if you
+  are the session executing this skill. The run order; main, running this skill
+  itself, reads it as its own steps and rules.
 - [references/claim-results.md](references/claim-results.md) — how each claim,
   listing, and claim-exit result is read.
 - [references/tier3-workflow.md](references/tier3-workflow.md) — the additional

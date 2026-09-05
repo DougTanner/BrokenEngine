@@ -75,5 +75,6 @@ everything else reported is required, never optional.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the steps and rules the
-  dispatched reviewer follows.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The steps and rules the dispatched
+  reviewer follows.

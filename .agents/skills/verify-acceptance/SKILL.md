@@ -2,10 +2,10 @@
 name: verify-acceptance
 description: >-
   Verify a completing stage's acceptance table: map every approved criterion and
-  invariant to evidence that settles it on its own. Use at Change Workflow
-  Step 7 when a stage completes without landing. Runs inside one fresh
-  read-only delegated `reviewer`; findings only, never edits, and never the
-  landing acceptance table.
+  invariant to evidence that settles it on its own. Use at the Change Workflow
+  Verify the acceptance table step when a stage completes without landing. Runs
+  inside one fresh read-only delegated `reviewer`; findings only, never edits,
+  and never the landing acceptance table.
 allowed-tools: [Read, Grep, Glob, PowerShell]
 ---
 
@@ -19,12 +19,14 @@ saying whether the stage's approved checks have all closed.
 
 ## When to use
 
-- Change Workflow Step 7 in root [AGENTS.md](../../../AGENTS.md), for a stage
-  completing without landing.
-- Not for a stage that lands in the same session: that table comes from Step 8's
-  landing table, which [`/finalize-changes`](../finalize-changes/SKILL.md) owns
-  and builds itself from the prepared diff.
-- Not as a separate dispatch where the Step 5 combined pass applies:
+- The Change Workflow Verify the acceptance table step in root
+  [AGENTS.md](../../../AGENTS.md), for a stage completing without landing.
+- Not for a stage that lands in the same session: that table comes from the
+  Verify and land step's landing table, which
+  [`/finalize-changes`](../finalize-changes/SKILL.md) owns and builds itself
+  from the prepared diff.
+- Not as a separate dispatch where the Review and resolve correctness combined
+  pass applies:
   [`/coherence-review`](../coherence-review/SKILL.md)'s combined pass is that
   reviewer and runs this skill's mapping as its acceptance component.
 
@@ -62,5 +64,6 @@ row is `NEEDS_ACTION` with a matching `Findings` row. `Changed files` and
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the mapping steps and rules
-  the dispatched reviewer runs.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The mapping steps and rules the
+  dispatched reviewer runs.

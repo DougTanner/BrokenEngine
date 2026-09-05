@@ -68,7 +68,8 @@ the assigned build/runtime role and routes its concise result or later fix work.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the steps and rules the
-  dispatched worker follows.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The steps and rules the dispatched
+  worker follows.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   — task-brief fields and the shared handoff form.

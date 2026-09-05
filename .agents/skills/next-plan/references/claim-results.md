@@ -56,7 +56,8 @@ names no match; the matching Plan paths are in the result's `candidates` array.
 `Complete-NextPlan.ps1` reports the changed paths the landing commit must
 contain as `changes.items[].path`, counted by `changes.totalCount`, with
 `changes.truncated` flagging more paths than the listed items, and returns
-`nextAction: finalize-changes`.
+`nextAction: finalize-changes` only on the `ok` result; every other completion
+result returns `stop-report-to-user`.
 
 `Defer-NextPlan.ps1` reports the uncommitted work it leaves in place as
 `retained`: a bounded `paths` list with the full `count`. The claim script's
@@ -66,8 +67,8 @@ pass result.
 
 ## `nextAction`
 
-Every claim and deferral result carries a `nextAction` naming the one thing to
-do next, drawn from these four values:
+Every claim, deferral, and completion result carries a `nextAction` naming the
+one thing to do next, drawn from these five values:
 
 - `prepare` — this session holds the claim; continue the preparation workflow.
 - `stop-report-to-user` — the run stops here; report the result and let the user
@@ -75,3 +76,5 @@ do next, drawn from these four values:
 - `resume-with-flag` — a `-Plan` run found an unclean worktree; the rerun with
   `-ResumeRetained` is gated by the [worker.md](worker.md) resume rule.
 - `retry-later` — tell the user, and the same command can be run again later.
+- `finalize-changes` — the Plan terminal state is prepared; land the change
+  through `/finalize-changes`.

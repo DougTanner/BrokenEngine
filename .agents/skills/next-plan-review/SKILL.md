@@ -18,7 +18,7 @@ Plan claims, or inspect unrelated sessions. The invoking parent runs this skill 
 ## When to use
 
 Run only in the invoking parent/manager context. Never route this skill
-through `/codex-review` or another delegated `reviewer`; this skill dispatches
+through a delegated `reviewer`; this skill dispatches
 its required fresh reviewer itself, routed per the delegated-review routing
 bullet in the root [AGENTS.md](../../../AGENTS.md).
 
@@ -62,5 +62,6 @@ Residuals: missing transcript or unverifiable fact, or none
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the steps and rules the
-  invoking parent executes.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The steps and rules the invoking parent
+  executes.

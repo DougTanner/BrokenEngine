@@ -78,5 +78,6 @@ without expanding the boundary.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the inspection steps and the
-  evidence rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The inspection steps and the evidence
+  rules.

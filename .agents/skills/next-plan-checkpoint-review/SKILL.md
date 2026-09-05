@@ -23,7 +23,7 @@ envelope are the evidence; this judges them.
 
 - Dispatched from the `/next-plan` run checkpoint, and only from there.
 - Run in the delegated execution context of
-  `../../references/subagent-reporting.md`, dispatched via `/codex-review`;
+  `../../references/subagent-reporting.md`, dispatched as the `reviewer` subagent;
   inline review is prohibited.
 
 ## Inputs
@@ -89,5 +89,6 @@ block in `../../references/subagent-reporting.md`, keeping `Build required` and
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: the numbered
-  run order for all three lenses, and the rules no step owns.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: the numbered run order
+  for all three lenses, and the rules no step owns.

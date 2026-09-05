@@ -73,5 +73,6 @@ build targets, checks, and residuals to the parent Change Workflow.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: the
-  qualification, boundary-analysis, and execution steps, and the rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: the qualification,
+  boundary-analysis, and execution steps, and the rules.

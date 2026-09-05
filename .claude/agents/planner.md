@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Producing plans and designs — implementation plans, interface/API design proposals, and approach options weighed against repository constraints.
+description: Producing plans and designs — implementation plans and interface/API design proposals.
 model: fable
 effort: medium
 disallowedTools: Agent

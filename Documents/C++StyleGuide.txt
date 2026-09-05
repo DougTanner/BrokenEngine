@@ -296,7 +296,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
 63. Do not use XMVector3Rotate() or XMVector3InverseRotate() in "DirectX Math", they return a rounding-residue W that violates the W invariant (positions W=1.0, directions W=0.0). Both raw names are compile-poisoned in ExternalHeaders.h: Use XMVector3RotateSafe(), not XMVector3Rotate()
 
-64. Comments describe the present code: the constraint, invariant, required ordering, or consequence the code as it now stands cannot say itself. Never describe the previous implementation, the change that produced the current code, or a comparison against replaced code:
+64. Comments describe the present code: the constraint, invariant, required ordering, or consequence the code as it now stands cannot say itself. Every statement a comment makes must be true of the adjacent code as it stands. Never describe the previous implementation, the change that produced the current code, or a comparison against replaced code:
 
 	Bad (narrates the replaced implementation):
 	// 258 XMVECTORs on the stack push this function past the 16 KiB the analysis build allows, so the origins
@@ -305,3 +305,21 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 	Good (states the present constraint):
 	// This function's locals must fit the 16 KiB stack budget the analysis build allows, so the 258 origins
 	// live in the workbuffer; its frames start 16-byte aligned, so XMVECTOR storage is safe there.
+
+A comment also never restates the signature or a house pattern in template fields (Parameters, Returns, Thread-safety), never uses banner separators, never merely explains a language feature or house pattern the declaration already shows, never carries an AGENTS.md or CLAUDE.md navigation pointer as its content, never describes a hypothetical or future code path, and never argues that the code is correct:
+
+	Bad (template fields restating the declaration):
+	// Executes an external process with captured stdin/stdout/stderr and returns the output and exit code
+	// Parameters:
+	//   rExecutableFile - Full path to the executable to run
+	//   rCommandLine - Command-line arguments (wide string). Modified by CreateProcessW so cannot be const
+	// Returns: ExecutableResult containing combined stdout/stderr output and the process exit code
+	// Creates pipes for process communication, runs the process with CREATE_NO_WINDOW flag,
+	// captures all output until the process terminates or closes its output handles
+	// Used by DataPacker to run build tools like glslangValidator and ffmpeg
+	// Thread-safety: Thread-safe - uses local resources and process isolation
+
+	Good (only what the declaration cannot say):
+	// CreateProcessW writes into rCommandLine, so it cannot be const.
+
+What a comment should say, in the fewest sentences that carry it: an invariant, a required ordering and the consequence of breaking it, a lifetime or threading contract, a platform, driver, or toolchain workaround, or a relationship to code elsewhere the local code cannot show.

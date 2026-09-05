@@ -117,9 +117,37 @@ try {
 		$owner = $uuid
 		$identity = [pscustomobject]@{ Primary = $primary; Worktree = $worktree; Branch = $branch; TargetBranch = $primary.Branch; Baseline = $primary.Head }
 		New-Item -ItemType Directory -Path $worktreeRoot -Force | Out-Null
-		& git -C $root worktree add -b $branch $worktree $primary.Head
+		# The per-worktree sparse configuration below requires this repository extension, which Git
+		# would otherwise write into the primary config implicitly on the first 'sparse-checkout set'.
+		# Setting it here, only when it is missing, keeps that single primary write a deliberate,
+		# idempotent maintenance step of the creation path.
+		if ((@(& git -C $root config --get extensions.worktreeConfig) -join '').Trim() -cne 'true') {
+			& git -C $root config extensions.worktreeConfig true
+			if ($LASTEXITCODE -ne 0) { throw "Failed to enable extensions.worktreeConfig in '$root'." }
+		}
+		& git -C $root worktree add --no-checkout -b $branch $worktree $primary.Head
 		if ($LASTEXITCODE -ne 0) { throw "Failed to create worktree '$worktree'." }
 		$worktreeCreated = $true
+		# Check out everything except the tracked Engine/Data subtrees over ~100 MB that no ordinary build
+		# reads - only the authorized Local generation build does, and it restores them itself. That
+		# criterion, not these two names, is what the list expresses. The worktree is created empty so the
+		# skipped bytes are never written at all. Any failure of the sparse step falls back to today's full
+		# checkout, and the assertion below then holds on both paths. If the fallback itself fails, session
+		# start stops with the partial worktree preserved.
+		try {
+			& git -C $worktree sparse-checkout set --no-cone '/*' '!/Engine/Data/Islands/' '!/Engine/Data/Textures/'
+			if ($LASTEXITCODE -ne 0) { throw "'git sparse-checkout set' exited $LASTEXITCODE." }
+			& git -C $worktree checkout
+			if ($LASTEXITCODE -ne 0) { throw "'git checkout' exited $LASTEXITCODE." }
+		}
+		catch {
+			Write-Warning "Sparse checkout of '$worktree' failed, so it falls back to a full checkout: $($_.Exception.Message)"
+			& git -C $worktree sparse-checkout disable
+			if ($LASTEXITCODE -ne 0) { throw "'git sparse-checkout disable' exited $LASTEXITCODE during the full-checkout fallback for '$worktree'." }
+			& git -C $worktree checkout
+			if ($LASTEXITCODE -ne 0) { throw "'git checkout' exited $LASTEXITCODE during the full-checkout fallback for '$worktree'." }
+		}
+		if (-not (Test-Path -LiteralPath (Join-Path $worktree 'AGENTS.md') -PathType Leaf)) { throw "Worktree '$worktree' checked out no files: '$worktree\AGENTS.md' is missing." }
 	}
 
 	# Both paths reach here with a validated identity and its durable session owner.

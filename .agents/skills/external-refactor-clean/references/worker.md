@@ -49,8 +49,9 @@ schema live in [`../SKILL.md`](../SKILL.md).
      assertions, swallowed failures, ambiguous default returns, reachable
      empty/single/zero boundary gaps, and acquire/release paths not protected by
      RAII;
-   - dense narration comments and intra-file naming or TODO drift as local
-     residue; hand actual formatting enforcement to `/code-style-review`.
+   - intra-file naming drift as local residue; hand dense narration comments,
+     and `TODO` or other future-work comments, to `/comment-review`, and actual
+     formatting enforcement to `/code-style-review`.
 
    Done when every inspected function has been checked against each category.
 8. Require concrete reachability or data-flow evidence. Parameter count,

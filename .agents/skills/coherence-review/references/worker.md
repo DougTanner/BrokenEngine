@@ -22,15 +22,15 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    wording and formatting problems in those regions yourself and self-check each
    edit, and route what you cannot fix that way with the semantic findings. Done
    when each such problem is either fixed and self-checked, or reported.
-5. In Tier-1 mode, run in this same context, in full, every Step 6 reviewer-role
-   check the change triggers — today `/validate-skill` for a changed
-   `.agents/skills/*/SKILL.md`, and `/progressive-disclosure-review` for a
-   changed `AGENTS.md`, `CLAUDE.md`, `.agents/skills/**/*.md`, or
-   `.agents/references/**/*.md` file; never route one to another worker. Each
-   passes on its own skill's pass condition. Done when each triggered skill has
-   run in full and its handoff is placed as `../SKILL.md` `## Handoff` states.
-6. In Tier-1 mode, when Step 7 applies — a stage completing without landing —
-   verify the acceptance table as
+5. In Tier-1 mode, run in this same context, in full, every reviewer-role check
+   the Apply the triggered cleanup step of root
+   [AGENTS.md](../../../../AGENTS.md) lists — today `/validate-skill` and
+   `/progressive-disclosure-review`, each on the trigger that step states;
+   never route one to another worker. Each passes on its own skill's pass
+   condition. Done when each triggered skill has run in full and its handoff is
+   placed as `../SKILL.md` `## Handoff` states.
+6. In Tier-1 mode, when the Verify the acceptance table step applies — a stage
+   completing without landing — verify the acceptance table as
    [`../../verify-acceptance/SKILL.md`](../../verify-acceptance/SKILL.md)
    requires, under the Tier-1 evidence ceiling it applies. This component passes
    when every approved criterion and invariant maps to such evidence. Done when
@@ -38,11 +38,12 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 
 ## Rules
 
-- The Step 6 mechanic and implementer checks — `/code-style-review`,
-  `/update-vcxproj`, `/update-claude-docs` — are not reviewer dispatches and are
-  unaffected by the combined mode.
+- The Apply the triggered cleanup mechanic and implementer checks —
+  `/code-style-review`, `/update-vcxproj`, `/update-claude-docs` — are not
+  reviewer dispatches and are unaffected by the combined mode.
 - Change no repository file apart from the wording and formatting fixes step 4
   requires; every semantic problem is a finding for the manager to decide.
-- Step 5's fix-round rule is unchanged: main decides once, accepted fixes go to a
-  separate `implementer`, and only affected regions are re-reviewed. A re-run
-  restates only the criterion rows whose evidence the fix changed.
+- The Review and resolve correctness step's fix-round rule is unchanged: main
+  decides once, accepted fixes go to a separate `implementer`, and only affected
+  regions are re-reviewed. A re-run restates only the criterion rows whose
+  evidence the fix changed.

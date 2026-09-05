@@ -45,7 +45,7 @@ or contract fact that is meaningfully false. Changelog narration, wording,
 formatting, and documentation coherence belong outside this review.
 
 Route comments that merely explain a language feature or established house
-pattern to `/code-style-review`; they are not correctness findings.
+pattern to `/comment-review`; they are not correctness findings.
 
 ### Trust boundaries and failure channels
 

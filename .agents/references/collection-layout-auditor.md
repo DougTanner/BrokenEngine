@@ -28,14 +28,6 @@ pwsh -NoProfile -File .agents/scripts/Test-CollectionLayout.ps1
 Pass `-Path` to narrow the sweep to specific headers or directories,
 `;`-separated for more than one.
 
-`.agents/scripts/Test-CollectionLayoutFixtures.ps1` owns
-`Test-CollectionLayout.ps1`'s executable fixture coverage. It takes no
-parameters:
-
-```powershell
-pwsh -NoProfile -File .agents/scripts/Test-CollectionLayoutFixtures.ps1
-```
-
 ## Result
 
 It prints one `broken-engine-collection-layout/v1` JSON object with

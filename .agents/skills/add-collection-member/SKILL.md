@@ -15,5 +15,6 @@ site — tuple, version, CRC, persistence, creation, transfer, hydration, identi
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: the
-  layout-change steps and the rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: the layout-change steps
+  and the rules.

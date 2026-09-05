@@ -50,5 +50,6 @@ Never claim a build ran.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — worker entry: reconcile and
-  validate steps, and the ownership rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Worker entry: reconcile and validate
+  steps, and the ownership rules.

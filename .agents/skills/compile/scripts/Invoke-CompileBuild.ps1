@@ -338,6 +338,19 @@ try {
 	if (-not (Test-JsonProperty $context 'devEnvDir') -or [string]::IsNullOrWhiteSpace($context.devEnvDir)) {
 		Stop-CompileInvoke 'dev-env-dir.unresolved' 'The generation build requires DevEnvDir, which the compile context did not report.'
 	}
+	# Session worktrees are created with the two large Engine/Data art subtrees skipped by sparse
+	# checkout, and this is the one build that reads them as DataPacker inputs, so restore the full
+	# working tree first. Disabling sparse checkout is idempotent and keeps uncommitted edits.
+	# The sparse state itself is the predicate: files created under a skipped tree recreate its
+	# directory without restoring the tracked bytes, so presence would report a false restore.
+	$sparseState = Start-CompileChild 'git' @('-C', $script:Root, 'config', '--get', 'core.sparseCheckout') $true
+	if ($sparseState.Stdout.Trim() -ieq 'true') {
+		$restore = Start-CompileChild 'git' @('-C', $script:Root, 'sparse-checkout', 'disable') $true
+		if (-not [string]::IsNullOrWhiteSpace($restore.Stdout)) { Write-CompileDiagnostic $restore.Stdout.Trim() }
+		if ($restore.ExitCode -ne 0) {
+			Stop-CompileInvoke 'data.sparse-restore-failed' "git sparse-checkout disable exited $($restore.ExitCode) in '$($script:Root)', so the generation build may still be missing sparse-skipped Engine\Data inputs."
+		}
+	}
 	$dataPacker = Join-Path $script:Root 'DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe'
 	if (-not (Test-Path -LiteralPath $dataPacker -PathType Leaf)) {
 		Stop-CompileInvoke 'datapacker.missing' "The worktree DataPacker is missing: '$dataPacker'. Build -Target DataPacker first."

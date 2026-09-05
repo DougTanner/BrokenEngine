@@ -112,8 +112,10 @@ steps change product, user interface, tooling, or public interface behavior.
   [`../../../references/authority-order.md`](../../../references/authority-order.md).
 - Correctness, traceability, and citation verification belong to `/plan-audit`,
   running in parallel on the same snapshot where that review runs — leave them
-  there; post-implementation diff minimality belongs to the Step-5 correctness
-  reviews.
+  there; post-implementation diff minimality belongs to the Review and resolve
+  correctness reviews.
+- Rival approaches belong to `/plan-alternatives`, which ran before this review,
+  so findings here stay within the plan's chosen approach.
 - A clean pass is the expected common outcome, because this pass must not become
   its own source of over-engineering.
 - Classify occurrence and likelihood evidence explicitly:

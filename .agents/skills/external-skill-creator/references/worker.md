@@ -8,14 +8,15 @@ The authoring steps, the repository conventions, and the writing guidance. Trigg
 2. Ask the user only about meaningful gaps. Done when no meaningful gap is left unanswered.
 3. Inspect applicable repository instructions and nearby skills. Done when each has been read.
 4. Read `../../validate-skill/references/frontmatter-schema.md` before writing frontmatter and [`client-compatibility.md`](client-compatibility.md) before adding client-specific behavior. Done when each is read before the work it gates.
-5. Choose the smallest useful package: `SKILL.md` for the durable workflow; `references/` for details loaded on demand; `scripts/` for repeatable mechanics; `assets/` for output resources. Done when every chosen file has one of those roles.
-6. Draft imperative, general instructions, explaining constraints where the reason helps judgment. Done when every workflow action is drafted that way.
-7. Re-read the result with fresh eyes. Done when the whole package has been re-read.
-8. Measure every changed Markdown file with the measurement command `/progressive-disclosure-review` owns, checking the result against the thresholds that skill states. Done when every changed file has a measurement compared against those thresholds.
-9. Remove duplicated guidance, speculative options, and examples that do not clarify a non-trivial requirement. Done when none of those remain.
-10. Restate each rule positively as the action to take, keeping a prohibition only where it cannot be stated positively and pairing it with what to do instead. Done when every rule is positive or paired that way.
-11. End each workflow step on a checkable done-condition. Done when every step has one.
-12. Run the repository `validate-skill` workflow on the finished skill. Fix every mechanical or Critical finding and rerun until it passes; treat `BLOCKED` as a stop condition. Done when the validator passes or a `BLOCKED` result stopped the run.
+5. Choose the smallest useful package around the two files every skill has, the public `SKILL.md` and the private `references/worker.md`, split as `../../../references/skill-skeleton.md` `## Section order` and `## Public and private files` state; then other `references/` for details loaded on demand, `scripts/` for repeatable mechanics, and `assets/` for output resources. Done when every section sits in the file the skeleton names and every other file has one of those roles.
+6. Link `references/worker.md` from `## References` with the private marker line `skill-skeleton.md` `## Public and private files` gives, and open `references/worker.md` with a short header naming what `../SKILL.md` owns. Done when both are present.
+7. Draft imperative, general instructions, explaining constraints where the reason helps judgment. Done when every workflow action is drafted that way.
+8. Re-read the result with fresh eyes. Done when the whole package has been re-read.
+9. Measure every changed Markdown file with the measurement command `/progressive-disclosure-review` owns, checking the result against the thresholds that skill states. Done when every changed file has a measurement compared against those thresholds.
+10. Remove duplicated guidance, speculative options, and examples that do not clarify a non-trivial requirement. Done when none of those remain.
+11. Restate each rule positively as the action to take, keeping a prohibition only where it cannot be stated positively and pairing it with what to do instead. Done when every rule is positive or paired that way.
+12. End each workflow step on a checkable done-condition. Done when every step has one.
+13. Run the repository `validate-skill` workflow on the finished skill. Fix every mechanical or Critical finding and rerun until it passes; treat `BLOCKED` as a stop condition. Done when the validator passes or a `BLOCKED` result stopped the run.
 
 ## Rules
 
@@ -30,7 +31,7 @@ The authoring steps, the repository conventions, and the writing guidance. Trigg
 - Use the shared frontmatter schema as the sole repository contract. Do not copy fields from a client installation into repository frontmatter without extending the schema and validator together.
 - Keep the body lean because it remains in context after invocation; `/progressive-disclosure-review` owns the measurement command and the body and reference size thresholds.
 - Write `scripts/` in PowerShell 7. Use Python only when a Python-only runtime or library forces it (RenderDoc, Gaea 2 terrain tooling, the code-quality-metrics analyzer). Host Python is located through `.agents/scripts/Detect-Python.ps1` (x64 CPython 3.12+, the repository-wide floor) or the skill's own pinned bootstrap; an external tool's embedded or version-matched interpreter (RenderDoc, per the agent-harness renderdoc reference) follows that tool's rules instead. A new Python script requires explicit justification.
-- Follow `../../../references/skill-skeleton.md` for the body shape and public/private file split of every skill.
+- `../../../references/skill-skeleton.md` owns the section order, the public/private file split, and the private marker line of every skill; steps 5 and 6 apply it, and its reviewer checklist is the shape check before validation.
 
 ### Writing Guidance
 

@@ -18,5 +18,6 @@ Convert a `Temp/<name>.md` (plus its `.passthrough.json` sidecar) back to a Gaea
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the save steps, the
-  round-trip caveats, and the failure modes.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The save steps, the round-trip caveats,
+  and the failure modes.

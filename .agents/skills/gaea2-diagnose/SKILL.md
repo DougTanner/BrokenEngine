@@ -23,5 +23,6 @@ The Gaea 2 UI reports failures with a vague modal ("File is corrupt or missing a
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the log streams, the
-  diagnosis steps, and the common error patterns.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The log streams, the diagnosis steps,
+  and the common error patterns.

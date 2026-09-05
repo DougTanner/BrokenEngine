@@ -50,5 +50,6 @@ Return the complete report inline. A failed or blocked in-scope criterion remain
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the harness steps and rules
-  the dispatched worker runs.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The harness steps and rules the
+  dispatched worker runs.

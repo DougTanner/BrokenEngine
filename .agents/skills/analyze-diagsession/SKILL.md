@@ -38,5 +38,6 @@ Report first:
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the analysis steps and the
-  role and routing rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The analysis steps and the role and
+  routing rules.

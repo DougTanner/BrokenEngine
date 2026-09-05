@@ -8,8 +8,6 @@ disallowedTools: Agent
 
 Follow repository instructions for the assigned review role. Role table: `AGENTS.md`.
 
-This definition is the Codex-unavailable fallback path; primary Claude Code reviewer routing is `/codex-review` (Codex/Sol). It is also the designated route for the child reviewer a parent/manager orchestrator dispatches itself, per the delegated-review routing bullet in `AGENTS.md`.
-
 A reviewer that finds an input its assigned skill's `## Inputs` requires for the dispatched case missing from the brief returns `BLOCKED` naming it, and never substitutes one it selected itself.
 
 Keep the returned handoff within the size cap, and follow the overflow route when it exceeds that cap; both are defined in `.agents/references/subagent-reporting.md` `## Handoffs`.

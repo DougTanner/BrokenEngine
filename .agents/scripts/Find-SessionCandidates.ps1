@@ -1,6 +1,6 @@
 # Added-lines-only candidate scanner for /code-style-review: it reports candidate temporary
-# instrumentation, navigation comments, and style-rule candidates on lines this session added, so a
-# review never has to separate them from pre-existing code by hand. The scan reports candidates only —
+# instrumentation and style-rule candidates on lines this session added, so a review never has to
+# separate them from pre-existing code by hand. The scan reports candidates only —
 # it never decides whether a hit is temporary or a row is a violation, never edits a file, and writes
 # nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is safe under a
 # read-only sandbox. Stdout carries only the result document.
@@ -29,7 +29,7 @@ $script:MaximumOutputBytes = 131072
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
 $script:CppClasses = @('cpp', 'dual-language-header')
 # One entry per candidate kind: the residue kinds .agents/skills/code-style-review/references/worker.md
-# steps 16-17 remove, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 9
+# step 16 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 9
 # adjudicates. The order is the order a line is attributed: a line reports the first kind that matches
 # it. An entry's Except clears a match that is one of the rule's permitted forms. That worker's step 6
 # hand-read list is the complement of the style-rule-<n> kinds here, so update it with this table.
@@ -41,7 +41,6 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'assert-false'; Pattern = '(?i)\bassert\s*\(\s*false\s*\)' }
 	@{ Kind = 'fixme'; Pattern = '(?://|/\*|^\s*\*).*\bFIXME\b' }
 	@{ Kind = 'hack'; Pattern = '(?://|/\*|^\s*\*).*\bHACK\b' }
-	@{ Kind = 'navigation-comment'; Pattern = '(?://|/\*|^\s*\*).*\b(?:AGENTS|CLAUDE)\.md\b' }
 	@{ Kind = 'style-rule-15'; Pattern = '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
 	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|\btypename(?:\.\.\.)?\s+[A-Z]*[a-z])' }
 	@{ Kind = 'style-rule-27'; Pattern = '\b\d+\.(?:\d+(?:[eE][-+]?\d+)?)?(?:[^\w.]|$)|\b\d+\.f\b|(?:^|[^\w.])\.\d+(?:f|\b)' }

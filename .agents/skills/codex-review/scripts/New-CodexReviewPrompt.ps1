@@ -51,6 +51,7 @@ $script:DiffRange = @()
 $script:DiffPath = @()
 $script:Untracked = @()
 $script:ScopeText = $null
+$script:ScopeFullPath = $null
 
 $result = [ordered]@{
 	schemaVersion = 'broken-engine-codex-review-prompt/v1'
@@ -335,12 +336,52 @@ function Write-PromptTargets([string] $Text) {
 
 function Test-PromptScopeEvidence() {
 	# /plan-audit needs evidence produced earlier in the workflow that the reviewer cannot recover from
-	# the diff: the draft execution card. Without this check a scope that omits it costs a whole review
-	# round. The scope text is only read here: section (b) still copies the caller's bytes verbatim.
-	# Case-insensitively, because the producing skills head the card differently — 'Draft execution card'
-	# and 'Execution card:' — and both carry the same marker words.
-	if ($AssignedSkill -eq 'plan-audit' -and -not $script:ScopeText.Contains('execution card', [StringComparison]::OrdinalIgnoreCase)) {
+	# the diff: the draft execution card, with every field filled. Without this check a scope that omits
+	# a field costs a whole review round. The card is duplicated inline into -ScopeFile, and that inline
+	# copy is the one judged here; the scope text is otherwise only read, and section (b) still copies
+	# the caller's bytes verbatim. The plan-audit checker owns the marker match and the field rules, so
+	# it runs as a child process here rather than being reimplemented.
+	if ($AssignedSkill -ne 'plan-audit') { return }
+	$checker = Join-Path $script:Root '.agents/skills/plan-audit/scripts/Test-PlanCitations.ps1'
+	if (-not (Test-Path -LiteralPath $checker -PathType Leaf)) {
+		Complete-CodexReviewPrompt 1 'error' 'prompt.execution-card-check-failed' "The execution-card checker is missing: '$checker'."
+	}
+	$start = [Diagnostics.ProcessStartInfo]::new()
+	$start.FileName = (Get-Process -Id $PID).Path
+	$start.WorkingDirectory = $script:Root
+	$start.UseShellExecute = $false
+	$start.CreateNoWindow = $true
+	$start.RedirectStandardOutput = $true
+	$start.RedirectStandardError = $true
+	$start.StandardOutputEncoding = $script:Utf8
+	$start.StandardErrorEncoding = $script:Utf8
+	foreach ($argument in @('-NoProfile', '-File', $checker, $script:ScopeFullPath)) { [void] $start.ArgumentList.Add($argument) }
+	$process = [Diagnostics.Process]::new()
+	$process.StartInfo = $start
+	if (-not $process.Start()) { throw 'Could not start pwsh for the execution-card check.' }
+	$stdoutTask = $process.StandardOutput.ReadToEndAsync()
+	$stderrTask = $process.StandardError.ReadToEndAsync()
+	$process.WaitForExit()
+	$exitCode = $process.ExitCode
+	$stdout = $stdoutTask.GetAwaiter().GetResult()
+	$stderr = $stderrTask.GetAwaiter().GetResult()
+	$process.Dispose()
+	# The checker writes its whole envelope to stdout on every exit, so a parsed envelope carries the
+	# child's own code and message even when it failed.
+	$envelope = $null
+	if (-not [string]::IsNullOrWhiteSpace($stdout)) { try { $envelope = $stdout | ConvertFrom-Json -Depth 32 } catch { } }
+	$card = if ($null -ne $envelope -and $null -ne $envelope.PSObject.Properties['card']) { $envelope.card } else { $null }
+	if ($exitCode -ne 0 -or $null -eq $card) {
+		if ($null -eq $envelope -and -not [string]::IsNullOrWhiteSpace($stderr)) { Write-PromptStderr $stderr }
+		$detail = if ($null -eq $envelope) { 'it returned no usable result' } else { "$($envelope.code): $($envelope.message)" }
+		Complete-CodexReviewPrompt 1 'error' 'prompt.execution-card-check-failed' "The execution-card check on -ScopeFile failed with exit $($exitCode): $detail"
+	}
+	if (-not $card.present) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.execution-card-required' "/plan-audit needs the draft execution card in -ScopeFile, which carries no 'execution card' marker."
+	}
+	$missing = @($card.missingFields)
+	if ($missing.Count -gt 0) {
+		Complete-CodexReviewPrompt 2 'blocked' 'prompt.execution-card-incomplete' "The -ScopeFile execution card leaves these field(s) unfilled: $($missing -join ', '). Fill each one, then re-run."
 	}
 }
 
@@ -411,6 +452,9 @@ try {
 	if (-not (Test-Path -LiteralPath $ScopeFile -PathType Leaf)) {
 		Complete-CodexReviewPrompt 1 'error' 'prompt.scope-file-missing' "-ScopeFile must be an existing file holding the manager-authored scope text: '$ScopeFile'."
 	}
+	# Resolved once, so the scope text read below and the card check's child process cannot disagree
+	# about which file they read.
+	$script:ScopeFullPath = [IO.Path]::GetFullPath($ScopeFile)
 	$script:PromptFile = [IO.Path]::GetFullPath($PromptPath)
 	if (Test-Path -LiteralPath $script:PromptFile) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.path-exists' "-PromptPath already exists and is never overwritten: '$($script:PromptFile)'."
@@ -428,7 +472,7 @@ try {
 	$roleInstruction = (Get-PromptFragment $templateText 'role-instruction').Replace('{{ASSIGNED_SKILL}}', $AssignedSkill)
 	$guardrails = Get-PromptFragment $templateText 'guardrails'
 	$outputContract = Get-PromptFragment $templateText 'output-contract'
-	$script:ScopeText = [IO.File]::ReadAllText($ScopeFile)
+	$script:ScopeText = [IO.File]::ReadAllText($script:ScopeFullPath)
 
 	# Not $inventory: a script-scope local by that name would overwrite the $script:Inventory script
 	# path, which the targets run below still needs.

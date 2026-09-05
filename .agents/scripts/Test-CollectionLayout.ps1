@@ -20,10 +20,7 @@
 param(
 	# One or more collection headers or directories; `pwsh -File` cannot pass an array, so several
 	# paths travel as one ';'-separated value.
-	[string[]] $Path,
-	# Substitute source for the Frame::kiVersion sum. Supplying it also narrows the version check's
-	# collection universe to -Path, which is what lets fixtures run against a synthetic sum.
-	[string] $FrameSource
+	[string[]] $Path
 )
 
 Set-StrictMode -Version Latest
@@ -750,11 +747,9 @@ try
 
 	if ([string]::IsNullOrEmpty($inputError))
 	{
-		# A substitute sum source implies a substitute collection universe, so the version check
-		# then uses -Path; otherwise it always sweeps the full default collection directories, so a
-		# narrowed -Path cannot fabricate a stale-term violation.
-		$substituteFrameSource = -not [string]::IsNullOrWhiteSpace($FrameSource)
-		$frameSourcePath = Resolve-InputPath $(if ($substituteFrameSource) { $FrameSource } else { $script:DefaultFrameSource })
+		# The version check always sweeps the full default collection directories, so a narrowed
+		# -Path cannot fabricate a stale-term violation.
+		$frameSourcePath = Resolve-InputPath $script:DefaultFrameSource
 		if (-not [IO.File]::Exists($frameSourcePath))
 		{
 			$inputError = "Frame source does not exist: $frameSourcePath"
@@ -762,16 +757,9 @@ try
 		else
 		{
 			$versionFiles = [Collections.Generic.List[string]]::new()
-			if ($substituteFrameSource)
+			foreach ($defaultPath in $script:DefaultPaths)
 			{
-				foreach ($file in $layoutFiles) { $null = $versionFiles.Add($file) }
-			}
-			else
-			{
-				foreach ($defaultPath in $script:DefaultPaths)
-				{
-					foreach ($file in [IO.Directory]::GetFiles((Resolve-InputPath $defaultPath), '*.h', [IO.SearchOption]::AllDirectories)) { $null = $versionFiles.Add($file) }
-				}
+				foreach ($file in [IO.Directory]::GetFiles((Resolve-InputPath $defaultPath), '*.h', [IO.SearchOption]::AllDirectories)) { $null = $versionFiles.Add($file) }
 			}
 
 			$parsed = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)

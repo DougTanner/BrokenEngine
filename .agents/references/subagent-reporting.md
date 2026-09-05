@@ -10,8 +10,9 @@ Root `AGENTS.md`'s rule that subagents never spawn subagents is enforced by
 role definition.
 
 A delegated review or audit runs solely inside one fresh delegated `reviewer`
-that returns findings only, and the tool restrictions a skill body states are
-prose boundaries rather than host enforcement.
+that returns findings only — except `/comment-review`, the checklist review the
+root `AGENTS.md` role table assigns to `mechanic` — and the tool restrictions a
+skill body states are prose boundaries rather than host enforcement.
 
 ## Contents
 
@@ -62,9 +63,13 @@ records; `.agents/skills/next-plan/references/follow-up-provenance.md`,
 
 On a direct `reviewer` dispatch the targets file where the assigned skill
 requires one, and the changed-file inventory where the assigned skill documents
-a run, come the same way from `.agents/scripts/Get-SessionChangeInventory.ps1` —
-`.agents/skills/repo-code-review/SKILL.md` `## Inputs` for the `-EmitTargets`
-form — rather than being retyped into the brief.
+a run, come from that documented run of
+`.agents/scripts/Get-SessionChangeInventory.ps1`, which supplies the script's
+mandatory `-RepositoryRoot` and `-Baseline` along with any switch the skill
+requires — `.agents/skills/repo-code-review/SKILL.md` `## Inputs` for the
+`-EmitTargets` form, and `.agents/skills/adversarial-review/SKILL.md`
+`## Inputs` for the plain changed-file inventory run — rather than from a call
+composed ad hoc or from anything retyped into the brief.
 
 Use `none` when a field has no value. Add only fields required by the invoked
 skill. Cite repository paths; do not paste root instructions, skill bodies, the

@@ -116,5 +116,6 @@ Do not return summaries such as "clarify threading" or "use option A."
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the grill steps, the decision
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The grill steps, the decision
   checklist, and the closing checks.

@@ -63,4 +63,4 @@ If no issue is found, return `PASS — no issues found`, list the files reviewed
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the dispatched reviewer's steps and rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you are the session executing this skill. The dispatched reviewer's steps and rules.

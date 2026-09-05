@@ -53,7 +53,7 @@ extended with one compact item table and these fields:
 ```markdown
 | Item | Result | Confirmed root cause and evidence | Fixed region | Focused check |
 |---|---|---|---|---|
-| <item> | FIXED or UNRESOLVED | <file:line or log evidence> | <region or none> | <check and result> |
+| <item> | FIXED or UNRESOLVED | <path:line or log evidence> | <path:line or none> | <check and result> |
 
 PLAN DELTA REQUIRED: no | yes — <reason and manager action>
 Self-audit resolved: <Claim -> Check -> Result; fix/recheck, or none>
@@ -73,12 +73,14 @@ dispatches independent verification as a separate role after the fix and
 required checks complete. Use `PASS` when every
 assigned item is fixed with no fix-work residual, `NEEDS_ACTION` when manager
 action remains, and `BLOCKED` when missing required evidence prevents work.
-Per-finding application detail stays inline unless it would exceed the size
-limits in `../../references/subagent-reporting.md` `## Handoffs`, in which case
-it moves to one `Temp/` file cited under `Evidence` as path plus one selector
-per finding, leaving only the item table rows inline.
+Never quote rewritten or resulting text; cite it under `Evidence` as path plus
+one selector per finding. When per-finding application detail still exceeds the
+size limits in `../../references/subagent-reporting.md` `## Handoffs`, move it
+to one `Temp/` file cited under `Evidence` the same way, leaving only the item
+table rows inline.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — fix steps and rules for the
-  dispatched worker.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Fix steps and rules for the dispatched
+  worker.

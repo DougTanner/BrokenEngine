@@ -36,5 +36,6 @@ Return the script's complete report, including:
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the run steps and the rules
-  bounding them.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The run steps and the rules bounding
+  them.

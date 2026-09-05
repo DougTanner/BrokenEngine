@@ -20,7 +20,7 @@ Every skill that needs host Python requires x64 CPython 3.12 or newer. `code-qua
 git -c core.symlinks=true clone --recurse-submodules <repository-url>
 ```
 
-This clone is the **primary checkout**. Agent sessions run in linked worktrees that share its immutable build outputs; the steps below prepare those outputs once.
+This clone is the **primary checkout**. Agent sessions run in linked worktrees that share its immutable build outputs; the steps below prepare those outputs once. Session creation also needs per-worktree Git configuration, which requires `git config extensions.worktreeConfig true` in this clone once; the first wrapper run (step 6) applies it for you if it is not set, and it changes nothing about the primary checkout itself.
 
 The first recursive submodule initialization requires network access. For an existing checkout that needs the metrics dependency, run `git submodule update --init --recursive -- ThirdParty/scb-check`; its first fetch also requires network access. The first `code-quality-metrics` run also requires network access to bootstrap its locked dependencies.
 
@@ -42,6 +42,8 @@ The session wrappers need no one-time coordination-state initialization:
 - Codex CLI, from PowerShell 7 at the primary checkout root: `.\.codex\codex-worktree.ps1`
 
 At each session start the wrapper creates a UUID-named worktree (or resolves the existing one when reattaching), writes the session's private-Git receipt into it, rebuilds the shared primary binaries incrementally — the AgentTools executables (WorktreeCli, AgentHarness) and ThirdParty in Debug/Profile/Release — so they always match primary HEAD, re-exports the primary game data with the rebuilt DataPacker, provisions links to the primary ThirdParty/tool outputs, verifies the worktree's `.claude/skills` link resolves, pre-builds the worktree's DataPacker, and launches the agent CLI inside the worktree. Do not bypass the wrapper.
+
+A newly created worktree skips the `Engine/Data/Islands` and `Engine/Data/Textures` source trees (~989 MB) through Git sparse checkout, so those paths are simply absent from disk; Git treats them as unchanged rather than deleted. Run `git sparse-checkout disable` in that worktree to bring them back before editing or adding an asset under either tree — an authorized Local generation build restores them on its own. Reattaching changes nothing here: an existing worktree is never sparsified after creation.
 
 The export runs at any start that does not skip it (step 5), new session or reattach. It can move primary data under sessions already running, failing their next data check and forcing a recompile there, and a rare island bake or another session's DataPacker run can hold session start long enough to time other starts out. An export error stops session start, so a broken committed asset blocks every session — including reattaching to a worktree with a rebase in progress, whose banner is then never shown — until it is fixed in the primary checkout outside an agent session.
 

@@ -105,7 +105,8 @@ re-planning instead of expanding scope.
 
 ## Risk tier and invariants
 Expected Tier 1 (mechanical documentation prose, no public signature or
-invariant exposure); this author's classification, to be confirmed at Step 1.
+invariant exposure); this author's classification, to be confirmed at the
+Approve and classify step.
 Escalate if root-causing shows the fix must change script behavior. Invariants to
 preserve: a brief's machine-derivable values still come from script output and
 are never retyped from memory or scrollback; the leading `./` module-import rule

@@ -46,5 +46,5 @@ reproducing signal could be built, naming what you need.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — the numbered diagnosis steps
-  and rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The numbered diagnosis steps and rules.
