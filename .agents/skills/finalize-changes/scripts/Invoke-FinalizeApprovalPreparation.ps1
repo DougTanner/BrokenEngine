@@ -5,12 +5,12 @@
 # the shared structural sanity check.
 #
 # The command validates the original candidate, collapses a linear multi-commit
-# session range to one deterministic tree-identical commit with the current primary
-# tip as its sole parent, atomically replaces only the expected session ref, rolls
-# back a replacement whose postconditions fail, and reruns the structural sanity
-# check against the final tip. The replacement commit inherits the oldest session
-# commit's message unless -CommitMessageFile supplies one, which also forces a
-# replacement commit for a single-commit range so the new message is carried.
+# session range to one deterministic tree-identical commit with the session's
+# merge-base with primary as its sole parent, atomically replaces only the expected
+# session ref, rolls back a replacement whose postconditions fail, and reruns the
+# structural sanity check against the final tip. The replacement commit inherits the
+# oldest session commit's message unless -CommitMessageFile supplies one, which also
+# forces a replacement commit for a single-commit range so the new message is carried.
 # Callers never reconstruct its Git commands
 # inline. The review window opens during this finalizer dispatch, before its
 # handoff: Show-FinalizeApprovalReview.ps1 owns that SmartGit boundary, and the
@@ -22,8 +22,9 @@
 # `candidate.commit` naming the exact same validated approval and landing
 # candidate. The tree identity checks preserve
 # content across a squash; the returned tip replaces the pre-squash session tip in
-# every approval-bound field. A later primary advance does not rerun this script —
-# rebase the approved candidate directly. A preparation blocker leaves primary
+# every approval-bound field. A primary advance does not move the candidate's
+# merge-base parent and does not rerun this script; landing replays the approved
+# candidate onto the live primary tip. A preparation blocker leaves primary
 # unchanged; if a replacement occurred, rollback: restored-original is required
 # before retrying from current state.
 [CmdletBinding()]
@@ -326,27 +327,27 @@ try
 	$result.tips.originalSession = $actualTip
 	$result.tips.primary = $ExpectedPrimaryTip
 
-	$range = @((Get-GitText @('rev-list', '--reverse', "$ExpectedPrimaryTip..$actualTip")) -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+	# The squash grafts the session tree onto this base, so a base the session already contains
+	# can never drop intervening primary commits, and an advanced primary needs no rebase here:
+	# landing replays the candidate onto the live primary tip. $ExpectedPrimaryTip is the operand
+	# because it is already expanded, validated, and proven equal to the live primary head, while
+	# $PrimaryBranch is never ref-format-checked.
+	$base = Get-GitText @('merge-base', $ExpectedPrimaryTip, $actualTip)
+	if ($base -cnotmatch '^[0-9a-f]{40}\z')
+	{
+		throw "git merge-base did not return one commit ID: '$base'."
+	}
+
+	$range = @((Get-GitText @('rev-list', '--reverse', "$base..$actualTip")) -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 	$result.squash.commitCount = $range.Count
 	if ($range.Count -eq 0)
 	{
 		Throw-Preparation 2 'git.session-range-empty' 'Session has no approval candidate above primary.'
 	}
-	$mergeCommits = Get-GitText @('rev-list', '--min-parents=2', "$ExpectedPrimaryTip..$actualTip")
+	$mergeCommits = Get-GitText @('rev-list', '--min-parents=2', "$base..$actualTip")
 	if (-not [string]::IsNullOrWhiteSpace($mergeCommits))
 	{
 		Throw-Preparation 2 'git.session-range-has-merge' 'Session range contains a merge commit.'
-	}
-	# The squash grafts the session tree onto the primary tip, so a primary tip the session
-	# does not already contain would silently drop the intervening primary commits.
-	$ancestry = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity, 'merge-base', '--is-ancestor', $ExpectedPrimaryTip, $actualTip) $script:CurrentIdentity
-	if ($ancestry.ExitCode -eq 1)
-	{
-		Throw-Preparation 2 'git.primary-not-ancestor' 'Session tip does not contain the current primary tip; rebase the session onto primary before approval preparation.'
-	}
-	if ($ancestry.ExitCode -ne 0)
-	{
-		throw "git merge-base --is-ancestor failed: $($ancestry.Stderr.Trim())."
 	}
 	$originalTree = Get-GitText @('rev-parse', "$actualTip^{tree}")
 	if ($verifiedCandidateCommitBound -and $originalTree -cne $VerifiedCandidateTree) { Throw-Preparation 2 'candidate.tree-changed' 'Reconciled session tree no longer equals the reviewed candidate tree.' }
@@ -364,7 +365,7 @@ try
 	}
 	else
 	{
-		$replacementTip = New-ReplacementCommit $originalTree $ExpectedPrimaryTip $range[0] $script:OverrideMessage
+		$replacementTip = New-ReplacementCommit $originalTree $base $range[0] $script:OverrideMessage
 		$script:ReplacementTip = $replacementTip
 		$result.squash.replacementCommit = $replacementTip
 		$update = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity, 'update-ref', $script:SessionRef, $replacementTip, $actualTip) $script:CurrentIdentity
@@ -382,8 +383,8 @@ try
 		$result.squash.approvedTree = $approvedTree
 		$parents = @((Get-GitText @('rev-list', '--parents', '-n', '1', $replacementTip)) -split ' ')
 		$result.squash.approvedParent = $parents[1]
-		$approvedRangeCount = [int](Get-GitText @('rev-list', '--count', "$ExpectedPrimaryTip..$replacementTip"))
-		if ($resolvedTip -cne $replacementTip -or $parents.Count -ne 2 -or $parents[1] -cne $ExpectedPrimaryTip -or $approvedRangeCount -ne 1 -or $approvedTree -cne $originalTree -or -not (Test-CleanSession))
+		$approvedRangeCount = [int](Get-GitText @('rev-list', '--count', "$base..$replacementTip"))
+		if ($resolvedTip -cne $replacementTip -or $parents.Count -ne 2 -or $parents[1] -cne $base -or $approvedRangeCount -ne 1 -or $approvedTree -cne $originalTree -or -not (Test-CleanSession))
 		{
 			Throw-Preparation 2 'git.squash-postcondition-failed' 'Squashed session did not preserve the required parent, tree, range, ref, and clean-state invariants.'
 		}

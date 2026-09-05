@@ -31,6 +31,14 @@ finalizer produces the landing acceptance table itself, inside the workflow in
 `references/worker.md`, from the prepared diff final preparation and
 reconciliation produced — do not reuse an earlier table.
 
+The brief also carries the typed review and hygiene handoffs the dispatching
+session holds for the rows that table cites, either verbatim or as a `Temp/`
+path plus selector per
+[`subagent-reporting.md`](../../references/subagent-reporting.md) `## Handoffs`.
+A handoff the session never received is not a dispatch blocker; the worker gives
+its row a status under the acceptance-table step in
+[`references/worker.md`](references/worker.md).
+
 This skill owns final Plan preparation, landing-commit creation, reconciliation,
 acceptance-table production, the landing summary, the landing confirmation,
 locked primary change, claim deletion, and recovery.
@@ -41,7 +49,6 @@ primary-movement check and, only once that check reaches a usable terminal
 result, runs the SmartGit approval review and returns the completed table, that
 review's status, and the landing summary in a single handoff. Main presents that
 summary and asks the confirmation below, with no tool call in between.
-A stale-base result loops back to main before any SmartGit review is run.
 
 "Stop before any primary change" names the confirmation pause below, never an
 earlier stop.

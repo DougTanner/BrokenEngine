@@ -131,12 +131,12 @@ reconstructs the assessment from Git output.
   bytes from the supplied immutable BaseCommit; it never uses a working-tree
   JSONL suffix. The producer alone decides what the new row contains.
 - `Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
-  one commit on the current primary tip, and blocks with
-  `git.primary-not-ancestor` when the session tip does not already contain that
-  primary tip; the caller recovers it from the session worktree root with the
-  ordinary linear `git rebase refs/heads/<primary-branch>` — never the `--onto`
-  form and never another ref — and then re-invokes this script with
-  `-ExpectedCurrentTip` re-resolved to the rebased session tip and
+  one commit whose parent is the session's merge-base with primary, and never
+  requires the session to already contain the live primary tip. Recovering a
+  `primary.path-overlap` block from the primary-movement check runs the ordinary
+  linear `git rebase refs/heads/<primary-branch>` from the session worktree root
+  — never the `--onto` form and never another ref — and then re-invokes this
+  script with `-ExpectedCurrentTip` re-resolved to the rebased session tip and
   `-ExpectedPrimaryTip` re-resolved to the live primary tip, its other arguments
   unchanged; that rebase also invalidates any `<baseline>` already resolved for
   `Invoke-FinalizeCandidateCommit.ps1`, which `## Invocation` requires

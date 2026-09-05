@@ -48,15 +48,15 @@ every other lease is foreign.
    - The claim stays held. Final preparation is not completion.
    - Done when that command has returned those changed paths, or when no claimed
      Plan finished.
-2. Create the authorized source landing commit, then squash and rebase it onto
-   the current primary tip.
+2. Create the authorized source landing commit, then squash it onto the
+   session's merge-base with primary.
    - Reconciliation never advances primary.
-   - Inspect dependency overlap and any place the rebase merged cleanly but
-     changed the code's meaning.
+   - Inspect dependency overlap.
    - When the landing content changed after the commit was first created, pass
      approval preparation the `-CommitMessageFile` override `scripts.md`
      documents so the prepared commit's message describes what it now contains.
-   - Done when one prepared commit sits on the current primary tip.
+   - Done when one prepared commit whose parent is the session's merge-base with
+     primary exists.
 3. Fill the acceptance table on the resulting diff.
    - Load and follow
      [`landing-acceptance-table.md`](landing-acceptance-table.md) first, which
@@ -201,14 +201,6 @@ every other lease is foreign.
   `--rebase-merges`.
 - Resolve checkout, primary, and session identity from
   `Get-AgentWorktreeSessionContext`.
-- If approval preparation reports stale-base (`git.primary-not-ancestor`), stop
-  and report the result to the manager. After the manager classifies it, if
-  recovery is authorized, this same finalizer performs the documented ordinary
-  linear `git rebase` and re-invokes approval preparation. Keep existing
-  conflict, caller-owned-path, confirmation, lock, and primary-advance
-  boundaries: do not invent conflict behavior, alter caller-owned paths or
-  scope; the detailed recovery mechanics remain in
-  [`scripts.md`](scripts.md).
 
 ## Recovery
 
@@ -242,11 +234,15 @@ every other lease is foreign.
   ref/tree mismatch, acquires or adopts the landing lease, resets and verifies the
   primary checkout, then continues ordinary recovery; initial non-recovery sanity
   remains strict. Then delete the claim.
-- Approval preparation blocked with `git.primary-not-ancestor` (primary advanced
-  under the session): use the single rebase invocation and re-invocation rule
-  stated in [`scripts.md`](scripts.md)'s
-  `Invoke-FinalizeApprovalPreparation.ps1` entry. This is not the
-  rewritten-history case below, which the fork-point repair script handles
+- The movement check blocked with `primary.path-overlap` (foreign primary
+  movement touched a session-owned path): stop and report the result to the
+  manager. When the manager authorizes recovery, this same finalizer performs
+  the single ordinary linear rebase and the re-invocation of approval
+  preparation with re-resolved tips stated in [`scripts.md`](scripts.md)'s
+  `Invoke-FinalizeApprovalPreparation.ps1` entry, inspecting any place that
+  rebase merged cleanly but changed the code's meaning, re-runs step 3 for the
+  changed regions, and re-runs the movement check. This is
+  not the rewritten-history case below, which the fork-point repair script handles
   ([`scripts.md#session-fork-point-repair`](scripts.md#session-fork-point-repair)).
 - Primary history rewritten under the session: reattaching through the wrapper
   repairs this, rebasing the session branch onto the new primary tip; the step-4
