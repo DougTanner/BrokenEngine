@@ -275,8 +275,6 @@ try
 	Assert-Input ($verifiedCandidateCommitBound -eq $verifiedCandidateTreeBound) 'Verified candidate commit and tree must be supplied together.'
 	if ($verifiedCandidateCommitBound) {
 		Assert-Input ($VerifiedCandidateCommit -cmatch '^[0-9a-f]{40}$' -and $VerifiedCandidateTree -cmatch '^[0-9a-f]{40}$') 'Verified candidate identities must be lowercase 40-character object IDs.'
-		Assert-Input (Test-FinalizeGitSuccess $CurrentWorktree @('rev-parse', '--verify', "$VerifiedCandidateCommit^{commit}")) 'Verified candidate commit does not exist.'
-		Assert-Input ((Invoke-FinalizeGit $CurrentWorktree @('rev-parse', "$VerifiedCandidateCommit^{tree}")).Trim() -ceq $VerifiedCandidateTree) 'Verified candidate tree does not match its commit.'
 	}
 	if ($commitMessageFileBound)
 	{
@@ -287,6 +285,10 @@ try
 
 	$script:CurrentIdentity = Get-FinalizeExistingWindowsIdentity $CurrentWorktree 'Current worktree'
 	$script:PrimaryIdentity = Get-FinalizeExistingWindowsIdentity $PrimaryWorktree 'Primary worktree'
+	if ($verifiedCandidateCommitBound) {
+		Assert-Input (Test-FinalizeGitSuccess $script:CurrentIdentity @('rev-parse', '--verify', "$VerifiedCandidateCommit^{commit}")) 'Verified candidate commit does not exist.'
+		Assert-Input ((Invoke-FinalizeGit $script:CurrentIdentity @('rev-parse', "$VerifiedCandidateCommit^{tree}")).Trim() -ceq $VerifiedCandidateTree) 'Verified candidate tree does not match its commit.'
+	}
 	# Only abbreviated inputs are expanded, here, so every later comparison against Git output reads a full ID;
 	# a full 40-character input keeps the unchanged path that never resolved it.
 	$expandedTips = @()
