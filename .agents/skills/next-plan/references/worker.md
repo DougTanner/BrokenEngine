@@ -41,19 +41,28 @@
    text, except an item whose purpose is proposed replacement text. That is an
    expectation of the dispatch, not a gate the Done condition tests.
 
+   When the preparation handoff will cite a scratch snapshot as `/plan-audit`'s
+   plan input rather than the claimed Plan path, the brief has the preparation
+   `implementer` write the complete resolved Plan—its mechanism, corrections,
+   the claimed Plan's `## In scope` and `## Out of scope` sections copied
+   verbatim as top-level headings with their content intact, and the complete
+   execution card—cite its path plus `## Execution card` selector under
+   `Evidence` for `/plan-audit`, and, before returning that handoff, run
+`pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <snapshot path>`
+   and report that result's `headings.inScopePresent` and
+   `headings.outOfScopePresent` values as one `Decisive checks` row.
+
    After that preparation handoff, and before the Plan review reviewers and the
    step 7 approval presentation, main runs `/plan-alternatives` when its trigger
    fires.
 
    Done when the execution card carries every field of the card template in
-   [`../SKILL.md`](../SKILL.md) `### Execution card presentation/template` and
-   the preparation handoff cites it as one file path plus `##` selector.
-
-   When `/plan-audit` will read a scratch snapshot instead of the claimed Plan
-   path, the preparation `implementer` writes the complete resolved Plan—its
-   mechanism, corrections, exact `## In scope` and `## Out of scope` sections
-   with content intact, and complete execution card—and cites its path plus
-   `## Execution card` selector under `Evidence` for `/plan-audit`.
+   [`../SKILL.md`](../SKILL.md) `### Execution card presentation/template`, the
+   preparation handoff cites it as one file path plus `##` selector, and, when
+   that handoff cites a scratch snapshot as `/plan-audit`'s plan input rather
+   than the claimed Plan path, its `Decisive checks` row for that snapshot
+   reports `headings.inScopePresent` and `headings.outOfScopePresent` both
+   `true`.
 5. Run the Plan review step in root
    [AGENTS.md](../../../../AGENTS.md), after preparation and alternatives and
    before the final claim refresh. Tier 3 retains the additional route in
