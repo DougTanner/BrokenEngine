@@ -71,25 +71,32 @@ retitles, or clarifies behavior that stays exactly as it was.
 
 For each finding:
 
-> `PSR-F-###` Critical|Required|Recommended `plan-path:line` (for an inline
-> plan, the line in the supplied plan text) — class:
-> rare-edge-case | speculative-hardening | overbuilt-mechanism |
-> assert-and-defer | bandaid-fix | plan-not-worth-executing — concrete problem
-> — evidence: `<stable locator: repository-path:line, plan-path:line,
-> supplied artifact selector, or named command/output;
-> "none supplied" only when Q1 classifies the case as hypothetical because
-> occurrence evidence is missing>` — occurrence/likelihood: `<Q1
-> classification and supporting evidence>` —
-> simpler alternative(s): `<applicable Q3-Q9 result; for bandaid-fix include
-> Q6's root-cause fix sketch, and for plan-not-worth-executing state what
-> replaces the plan (nothing or a much smaller change)>` — cost comparison:
-> `<Q2 comparison>` — disposition: `<Q2
-> disposition: simplify | user-judgment (options + recommendation)>`
+> `PSR-F-###` Critical|Required|Recommended `plan-path:line` — class — concrete problem — simpler alternative — disposition: simplify | user-judgment — evidence: `<locator>`
+
+Each finding's concrete problem, simpler alternative, and disposition appear
+exactly once, as one single-line `Findings` row of the shared handoff in the
+form above; every other field that refers to a finding names it by its
+`PSR-F-###` ID and adds only its own required content, never restating that
+finding's problem, alternative, or disposition. For an inline plan,
+`plan-path:line` is the line in the supplied plan text. The class is one of
+`rare-edge-case`, `speculative-hardening`, `overbuilt-mechanism`,
+`assert-and-defer`, `bandaid-fix`, `plan-not-worth-executing`. The simpler
+alternative is the applicable Q3-Q9 result, including Q6's root-cause fix sketch
+for a `bandaid-fix`; for a `user-judgment` disposition it is instead the options
+with their one-line costs and a recommendation. The evidence locator is one
+stable `repository-path:line`, `plan-path:line`, supplied artifact selector, or
+named command output; write `none supplied` only when Q1 classifies the case as
+hypothetical because occurrence evidence is missing.
 
 A `plan-not-worth-executing` finding cites the plan's goal or title line and is
 always the only finding in the report.
 
-Those entries are the rows of the shared handoff's `Findings` field.
+Its row states what replaces the plan — nothing, or a much smaller change.
+
+For a run with findings, the Q1 occurrence/likelihood classification and its
+supporting detail, the full Q2 cost comparison, and the per-question judgment
+notes travel in a gitignored `Temp/` file, under one `## PSR-F-###` heading per
+finding, cited under `Evidence`. The handoff does not restate them.
 
 If clean, state `PASS — plan changes are minimally scoped.` Return:
 
@@ -98,13 +105,13 @@ Steps reviewed: <added-code and modified-artifact steps>
 ```
 
 A clean result returns that `PASS` statement, that one extension field, and the
-shared handoff lines; per-question judgment notes stay in the reviewer's own
-context, cited as a gitignored `Temp/` file under `Evidence` only when they must
-travel.
+shared handoff lines. A clean run writes that `Temp/` file only when its
+per-question judgment notes must travel; otherwise those notes stay in the
+reviewer's own context.
 
 Follow that extension field with the shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
-review never changes a file and never requires a build.
+review never changes a tracked file and never requires a build.
 
 Use `NEEDS_ACTION` for findings and `BLOCKED` only when a required input is
 missing.
