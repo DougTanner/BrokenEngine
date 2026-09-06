@@ -55,8 +55,11 @@ extended with these fields:
 
 - `API verification requests` — one row each: symbol/rule, exact proposition,
   dependent finding ID, applicability, official source; or none.
-- `Traced clean` — hypotheses traced and decisive refutation, or not
-  applicable.
+- `Traced clean` — one row each on the form
+  `<hypothesis> — <decisive refutation> path:line`; or not applicable. A longer
+  trace follows the over-cap file rule in
+  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+  `## Handoffs`.
 - `Residuals` — pre-existing/out-of-scope defect, missing evidence, or none;
   last.
 

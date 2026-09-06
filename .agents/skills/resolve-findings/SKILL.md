@@ -56,6 +56,10 @@ extended with one compact item table and these fields:
 | <item> | FIXED or UNRESOLVED | <path:line or log evidence> | <path:line or none> | <check and result> |
 ```
 
+Each cell holds its value and at most one clause; the reasoning behind it
+follows the over-cap file rule in `../../references/subagent-reporting.md`,
+`## Handoffs`.
+
 - `PLAN DELTA REQUIRED` — `no`, or `yes` with the reason and the manager
   action.
 - `Self-audit resolved` — one row each: Claim -> Check -> Result, with its fix
