@@ -485,6 +485,15 @@ void NavData::Read(std::istream& rStream)
 	for (int32_t i = 0; i < iVertexCount; ++i)
 	{
 		common::Read(rStream, vertices.at(i));
+		const XMFLOAT2& rVertex = vertices.at(i);
+		if (!std::isfinite(rVertex.x))
+		{
+			throw common::CorruptStreamException("NavData::Read vertices");
+		}
+		if (!std::isfinite(rVertex.y))
+		{
+			throw common::CorruptStreamException("NavData::Read vertices");
+		}
 	}
 
 	int32_t iPolygonCount = 0;
