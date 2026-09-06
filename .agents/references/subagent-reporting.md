@@ -32,7 +32,7 @@ Governing paths: <repository paths that bind this work>
 Baseline: <full SHA and worktree/branch from Get-AgentWorktreeSessionContext>
 Acceptance: <checks and expected observations>
 Prohibitions: <task-specific bans, or none>
-Return: <return format, normally the shared handoff>
+Return: <the shared handoff plus the named skill's declared extension fields, or the typed report that skill's `## Handoff` requires>
 ```
 
 `Required sections` names which skill-specific report sections the caller will
@@ -108,8 +108,11 @@ Executor: <own model id> <own effort>, each unknown when unreadable
 Residuals: <actionable blocker or none>
 ```
 
-Every row is one line. Do not quote code and do not repeat a row from another
-field. A field over 10 rows, or a whole handoff over 40 lines or 20,000
+That fenced form is the whole return — nothing precedes or follows it except the
+extension fields, row forms, and typed blocks the assigned skill's `## Handoff`
+declares — and `Status` carries exactly one of the three tokens alone on its
+line. Every row is one line. Do not quote code and do not repeat a row from
+another field. A field over 10 rows, or a whole handoff over 40 lines or 20,000
 characters, moves its full material to an existing file or log, or to a `Temp/`
 file when no existing file holds it, and cites it under `Evidence` as path plus
 selector. A selector into a Markdown file is a `##` heading in it. The handoff
@@ -133,11 +136,12 @@ unreadable.
 
 A skill extends this form only by adding rows inside an existing field or by
 declaring extra fields in its own `## Handoff` section, each one line or one row
-per item, never a paragraph. `Build required` stays present and `Residuals`
-stays last. A target that `/compile` builds in Release only carries
-`Release|x64` and no other configuration/platform under `Build required`.
-Independent review and verification use a context that did not produce the
-work. A focused correction/retest also uses an independent context.
+per item, never a paragraph, and never by re-rendering the form itself.
+`Build required` stays present and `Residuals` stays last. A target that
+`/compile` builds in Release only carries `Release|x64` and no other
+configuration/platform under `Build required`. Independent review and
+verification use a context that did not produce the work. A focused
+correction/retest also uses an independent context.
 
 A worker ends its turn with the handoff as its final answer and never enters an
 open-ended wait after delivering it; continuation goes through the host's resume

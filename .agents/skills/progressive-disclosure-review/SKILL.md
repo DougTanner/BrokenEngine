@@ -69,11 +69,6 @@ Example:
 `Changed files` and `Build required` are `none` because this findings-only
 review never edits a file.
 
-Apart from the three declared lines above, files read and checks that passed get
-no block of their own: a check whose result decided something is a
-`Decisive checks` row, a fixed decision the dispatching brief supplied is input
-rather than a result and is not restated back, and everything else is omitted.
-
 A focused re-review returns this same handoff, carrying one `Findings` row per
 re-checked finding, whose leading `file:line` is that finding's first-round
 location, whose `class:` stays that finding's first-round class, whose

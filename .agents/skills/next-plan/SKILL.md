@@ -42,14 +42,12 @@ whose result requires a card or implementation change, and one count of the
 unaffected statements; it never asks for a per-statement enumeration of
 unaffected results.
 
-```text
-Claim: <Plan path or none; resolved state when claimed>
-Classification: Tier 1 | Tier 2 | Tier 3 and trigger
-Execution card: <file path plus ## selector>
-Findings: <review roles only; one row each: ID Critical|Required|Recommended path:line — claim — evidence, or none>
-Build required: <exact targets, or none>
-Residuals: <blocker or none>
-```
+- `Claim` — the Plan path, or none; with the resolved state when claimed.
+- `Classification` — `Tier 1`, `Tier 2`, or `Tier 3`, and the trigger.
+- `Execution card` — the file path plus its `##` selector.
+- `Findings` — review-role findings only.
+- `Build required` — the exact targets, or none.
+- `Residuals` — blocker, or none; last.
 
 ### Execution card presentation/template
 

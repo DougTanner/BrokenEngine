@@ -54,30 +54,33 @@ extended with one compact item table and these fields:
 | Item | Result | Confirmed root cause and evidence | Fixed region | Focused check |
 |---|---|---|---|---|
 | <item> | FIXED or UNRESOLVED | <path:line or log evidence> | <path:line or none> | <check and result> |
-
-PLAN DELTA REQUIRED: no | yes — <reason and manager action>
-Self-audit resolved: <Claim -> Check -> Result; fix/recheck, or none>
-Affected-site triggers: <kind — symbol/pattern and search scope, or none found>
-Propagation required: /update-affected-code — <code scope> | N/A — no code changed
-Build required: <target, configuration/platform, selected project-member .cpp;
-  for headers, every consuming target and configuration/platform; or none>
-External/API verification requests: <symbol/rule — proposition — dependent item
-  — version/configuration — candidate official source, or none>
-Reviewer focus areas: <condition the independent verifier must try to disprove, or none>
-Residuals: <unresolved/out-of-scope item, evidence, and next owner/action, or none>
 ```
 
-Keep `Residuals` last. Name each changed file once. A requested build is
+- `PLAN DELTA REQUIRED` — `no`, or `yes` with the reason and the manager
+  action.
+- `Self-audit resolved` — one row each: Claim -> Check -> Result, with its fix
+  and recheck; or none.
+- `Affected-site triggers` — one row each: kind, symbol/pattern, and search
+  scope; or `none found`.
+- `Propagation required` — `/update-affected-code` with the code scope, or
+  `N/A — no code changed`.
+- `Build required` — target, configuration/platform, and selected
+  project-member `.cpp`; for headers, every consuming target and
+  configuration/platform; or none.
+- `External/API verification requests` — one row each: symbol/rule,
+  proposition, dependent item, version/configuration, and candidate official
+  source; or none.
+- `Reviewer focus areas` — the condition the independent verifier must try to
+  disprove, or none.
+- `Residuals` — unresolved/out-of-scope item, its evidence, and the next
+  owner/action; or none; last.
+
+Name each changed file once. A requested build is
 `builder` work dispatched by the manager, not a passed check. The manager
 dispatches independent verification as a separate role after the fix and
 required checks complete. Use `PASS` when every
 assigned item is fixed with no fix-work residual, `NEEDS_ACTION` when manager
 action remains, and `BLOCKED` when missing required evidence prevents work.
-Never quote rewritten or resulting text; cite it under `Evidence` as path plus
-one selector per finding. When per-finding application detail still exceeds the
-size limits in `../../references/subagent-reporting.md` `## Handoffs`, move it
-to one `Temp/` file cited under `Evidence` the same way, leaving only the item
-table rows inline.
 
 ## References
 

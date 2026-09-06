@@ -36,18 +36,19 @@ Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with these fields:
 
-```text
-Root cause: <one sentence, with file:line>
-Diagnosis evidence: <inspection, command output, or log lines that prove it>
-Reproducing signal: <exact command or inspection, and its red result>
-Hypotheses ruled out: <hypothesis — the check that killed it>
-Proposed acceptance check: <check matching the signal — harness scenario, replay check, compile result, or profiling baseline>
-Instrumentation removed: yes — <marker searched> | none added
-Status: PASS | BLOCKED
-Changed files: none
-Build required: <exact targets the manager must rebuild, or none>
-Residuals: <unproven branch, missing environment/input, or none>
-```
+- `Root cause` — one sentence, with file:line.
+- `Diagnosis evidence` — the inspection, command output, or log lines that
+  prove it.
+- `Reproducing signal` — the exact command or inspection, and its red result.
+- `Hypotheses ruled out` — one row each: the hypothesis, and the check that
+  killed it.
+- `Proposed acceptance check` — a check matching the signal: harness scenario,
+  replay check, compile result, or profiling baseline.
+- `Instrumentation removed` — `yes` with the marker searched, or `none added`.
+- `Build required` — the exact targets the manager must rebuild, or none.
+- `Residuals` — unproven branch, missing environment/input, or none; last.
+
+`Changed files` is `none` because a diagnosis never edits a file.
 
 Use `PASS` only with a proven root cause. Use `BLOCKED` when the diagnosis
 cannot be proven, naming what evidence, input, or environment is still needed.

@@ -52,16 +52,26 @@ If a required command, parameter, result field, query, or input primitive is mis
 
 Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
-extended with these fields, one criterion row per acceptance criterion:
+extended with these fields:
+
+- `Criterion results` — one row per acceptance criterion, on the row form
+  below.
+- `Residuals` — missing capability or environment, or none; last.
+
+Each `Criterion results` row is one line on this form:
 
 ```text
-Criterion results:
-- <criterion ID> — PASS | FAIL | BLOCKED — <command/query/scene/UI and evidence selector, or HARNESS-F-### when that finding holds the evidence>
-Findings: <HARNESS-F-### Required report-path:selector — observed criterion or process-check failure — evidence; or none>
-Changed files: none
-Build required: none
-Residuals: <missing capability or environment, or none>
+<criterion ID> — PASS | FAIL | BLOCKED — command/query/scene/UI and evidence selector, or HARNESS-F-### when that finding holds the evidence
 ```
+
+Each `Findings` row is one line on this form:
+
+```text
+HARNESS-F-### Required report-path:selector — observed criterion or process-check failure — evidence
+```
+
+`Changed files` and `Build required` are `none` because this role runs the
+harness and never edits a file.
 
 Any `FAIL` or out-of-criterion process finding makes the shared `Status`
 `NEEDS_ACTION`, including a run that also has blocked criteria. Otherwise, any

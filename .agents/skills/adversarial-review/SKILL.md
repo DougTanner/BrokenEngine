@@ -53,14 +53,21 @@ Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with these fields:
 
+- `API verification requests` — one row each: symbol/rule, exact proposition,
+  dependent finding ID, applicability, official source; or none.
+- `Traced clean` — hypotheses traced and decisive refutation, or not
+  applicable.
+- `Residuals` — pre-existing/out-of-scope defect, missing evidence, or none;
+  last.
+
+Each `Findings` row is one line on this form:
+
 ```text
-API verification requests: <symbol/rule — exact proposition — dependent finding ID — applicability — official source; or none>
-Traced clean: <hypotheses traced and decisive refutation, or not applicable>
-Findings: <ADV### Critical|Required path:line — claim — reachable evidence and smallest correction; or none>
-Changed files: none
-Build required: none
-Residuals: <pre-existing/out-of-scope defect, missing evidence, or none>
+ADV### Critical|Required path:line — claim — reachable evidence and smallest correction
 ```
+
+`Changed files` and `Build required` are `none` because this findings-only
+review never edits a file.
 
 Use `NEEDS_ACTION` for findings or pending external verification and `BLOCKED`
 only when required evidence could not be obtained. Critical means data loss,

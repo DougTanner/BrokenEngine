@@ -13,8 +13,10 @@ reviewer applies to it. Frontmatter and package mechanics belong to
    [`subagent-reporting.md`](subagent-reporting.md) the skill consumes.
 4. `Steps` (`references/worker.md`) — numbered, one imperative each, each ending
    on a checkable done-condition, no paragraph over 4 lines.
-5. `Handoff` (`SKILL.md`) — the shared form from `subagent-reporting.md`,
-   `## Handoffs`, plus any declared extension fields.
+5. `Handoff` (`SKILL.md`) — the skill's extension fields, fixed shared values,
+   and narrowed row forms as plain lines, or as a row-form fence holding no
+   shared field name; it never re-renders the shared form from
+   [`subagent-reporting.md`](subagent-reporting.md), `## Handoffs`.
 6. `Rules` (`references/worker.md`) — judgment no step owns, as bullets.
 7. `References` (`SKILL.md`) — each linked file owning one topic.
 
@@ -61,4 +63,6 @@ term.
   only what main reads.
 - `SKILL.md` links `references/worker.md` with the private marker line from
   `## Public and private files`.
+- `## Handoff` follows `## Section order` item 5: it renders no return fence
+  holding a shared handoff field.
 - Size and layering pass `/progressive-disclosure-review`.

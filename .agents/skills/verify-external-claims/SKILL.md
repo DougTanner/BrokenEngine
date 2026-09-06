@@ -28,15 +28,25 @@ Require each request to contain:
 ## Handoff
 
 Main runs this skill and dispatches one `locator` as its evidence worker. Main
-returns the complete evidence inline:
+returns the complete evidence inline, with one row per claim under each of
+`Sources`, `Decisive checks`, and `Per-proposition verdicts`.
+
+Each `Sources` row is one line on this form:
 
 ```text
-Sources:
-- <claim ID> — <official source identity and version/revision/tag/commit; exact section/symbol/citation; optional official immutable link | none — exact unavailable evidence>
-Decisive checks:
-- <claim ID> — applicability: <path:line and target/version/extensions/features/flags | none — exact missing configuration>; rule: <short evidence that settles the question on its own | none — exact missing primary evidence>
-Per-proposition verdicts:
-- <claim ID> — VERIFIED | REFUTED | UNRESOLVED — <exact proposition> — <direct implication for dependent item, without deciding it>
+<claim ID> — <official source identity and version/revision/tag/commit; exact section/symbol/citation; optional official immutable link | none — exact unavailable evidence>
+```
+
+Each `Decisive checks` row is one line on this form:
+
+```text
+<claim ID> — applicability: <path:line and target/version/extensions/features/flags | none — exact missing configuration>; rule: <short evidence that settles the question on its own | none — exact missing primary evidence>
+```
+
+Each `Per-proposition verdicts` row is one line on this form:
+
+```text
+<claim ID> — VERIFIED | REFUTED | UNRESOLVED — <exact proposition> — <direct implication for dependent item, without deciding it>
 ```
 
 Complete the report with the remaining shared handoff lines

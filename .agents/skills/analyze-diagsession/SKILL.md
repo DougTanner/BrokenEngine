@@ -33,12 +33,12 @@ Each locator returns the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with these fields:
 
-```text
-Source context: <hotspot cluster; full function bodies, call sites, enclosing loop/frame phase, container/comparator types, and file:line quotes>
-Changed files: none
-Build required: none
-Residuals: <missing source context or symbols, or none>
-```
+- `Source context` — the hotspot cluster: full function bodies, call sites,
+  enclosing loop/frame phase, container/comparator types, and file:line quotes.
+- `Residuals` — missing source context or symbols, or none; last.
+
+`Changed files` and `Build required` are `none` because this read-only
+locator run edits no file.
 
 Main interprets the measurements, confirms source attribution, and performs the
 existing follow-up routing. Its own result is a profiling report, not a handoff,

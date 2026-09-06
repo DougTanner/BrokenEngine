@@ -55,9 +55,7 @@ with these declared extension fields:
 - `Scope: PASS | NEEDS_ACTION | not applicable (Tier 1) | not supplied`
 - `Coherence` — one line per semantic finding, naming its shared `Findings` row
   by ID and adding only what that one-line row cannot carry, or an explicit
-  no-finding statement. Outside the verbatim cleanup handoffs below, files read
-  and checks that passed get no block of their own: a check whose result decided
-  something is a `Decisive checks` row, and everything else is omitted.
+  no-finding statement.
 - `Apply the triggered cleanup` — Tier-1 mode only; one row per triggered
   cleanup skill, naming the skill, its status, and the `Findings` row IDs it
   reports.

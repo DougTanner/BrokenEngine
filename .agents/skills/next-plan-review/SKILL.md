@@ -37,28 +37,32 @@ included, runs the full audit in [`references/worker.md`](references/worker.md).
 
 ## Handoff
 
-The handoff enters the main session's context whole, so it carries decision
-evidence as one-line rows, never the reasoning that produced it, and no row
-restates another row's evidence — a later row refers to the earlier one; large
-evidence is named by selector as the shared form requires. The whole handoff
-stays under 16,000 characters, which leaves room for the host's result wrapper
-under the 20,000-character per-result budget the `/next-plan` checkpoint
-measures. Require the shared handoff form in
+The handoff enters the main session's context whole, so it stays under 16,000
+characters, which leaves room for the host's result wrapper under the
+20,000-character per-result budget the `/next-plan` checkpoint measures.
+Require the shared handoff form in
 `../../references/subagent-reporting.md`, extended with:
 
-```text
-Status: PASS | NEEDS_ACTION | BLOCKED
-Changed files: none
-Decisive checks: provenance; sessions read; sourced timeline; pauses; conformance, minimality, and process evidence
-Timeline: one row per lifecycle event named in `references/concerns.md` that occurred, in time order, each `<time> | <event> | <citation>`
-Root cause: up to seven rows, in time order, each `<event> | <evidence> | <session ID> <timestamp or record>`
-Assessment: one row per assessed concern, `<concern> | <verdict> | <one-sentence basis> | <citation>`, ending with the alternative-explanation answer
-Control-work evidence: one row per agent/session in the `references/report.md` control-work table's column order, totals only, plus the citation for each total
-Model-routing evidence: one row per direct child/headless attempt in the `references/report.md` routing table's column order — attempts sharing route, configuration, proof source, and verdict may share one row that lists every attempt's citation — then one aggregate row
-Build required: none
-Executor: <own model id> <own effort>
-Residuals: missing transcript or unverifiable fact, or none
-```
+- `Decisive checks` — provenance; sessions read; sourced timeline; pauses;
+  conformance, minimality, and process evidence.
+- `Timeline` — one row per lifecycle event named in `references/concerns.md`
+  that occurred, in time order, each `<time> | <event> | <citation>`.
+- `Root cause` — up to seven rows, in time order, each
+  `<event> | <evidence> | <session ID> <timestamp or record>`.
+- `Assessment` — one row per assessed concern,
+  `<concern> | <verdict> | <one-sentence basis> | <citation>`, ending with the
+  alternative-explanation answer.
+- `Control-work evidence` — one row per agent/session in the
+  `references/report.md` control-work table's column order, totals only, plus
+  the citation for each total.
+- `Model-routing evidence` — one row per direct child/headless attempt in the
+  `references/report.md` routing table's column order; attempts sharing route,
+  configuration, proof source, and verdict may share one row that lists every
+  attempt's citation; then one aggregate row.
+- `Residuals` — missing transcript or unverifiable fact, or none; last.
+
+`Changed files` and `Build required` are `none` because this retrospective
+changes no file.
 
 Use `NEEDS_ACTION` when the retrospective produces actionable findings, `PASS`
 only when it is clean, and `BLOCKED` when required evidence is missing.

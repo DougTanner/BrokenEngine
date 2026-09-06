@@ -76,17 +76,16 @@ Return the shared handoff form in
   the Local generation-authorization trigger, and whether the Gaea guard was
   applied (or the exact explicit Gaea-regeneration authorization).
 
-End with:
+That shared form's other fields stay as it defines them; these are narrowed
+here:
 
-```text
-Status: PASS | NEEDS_ACTION | BLOCKED
-Changed files: none
-Decisive checks: <one row per build: target, configuration, status, exitCode, failureKind>
-Build required: none
-Evidence: <retainedLog.path per build>
-Executor: <own model id> <own effort>
-Residuals: <failed or skipped required build, or none>
-```
+- `Decisive checks` — one row per build: target, configuration, status,
+  exitCode, failureKind.
+- `Evidence` — the `retainedLog.path` per build.
+- `Residuals` — a failed or skipped required build, or none; last.
+
+`Changed files` and `Build required` are `none` because this skill changes no
+file itself.
 
 ### Structured build result
 

@@ -170,9 +170,3 @@ Invariants to preserve:
 
 ## Coordination
 No mandatory constraint binds this Plan to another live Plan.
-`Documents/Plans/Engine/PlanSimplicityHandoffSingleCopy.md` and
-`Documents/Plans/Engine/NextPlanSnapshotScopeHeadingGate.md` also concern handoff
-size, but both place `.agents/references/subagent-reporting.md` explicitly out of
-scope and change only their own skills' `## Handoff` sections, so their regions
-are disjoint from this one. Whichever of the three lands later re-locates its
-regions by content rather than by the line numbers recorded here.

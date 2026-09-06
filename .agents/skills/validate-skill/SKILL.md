@@ -32,19 +32,16 @@ Accept one repository skill directory or its `SKILL.md`. The optional Codex `age
 Return the shared handoff from `.agents/references/subagent-reporting.md`
 `## Handoffs`, with these declared extension fields:
 
-```markdown
-Status: PASS | NEEDS_ACTION | BLOCKED
-Mechanical evidence:
-- command, exit, decisive output
-Critical findings:
-- `path:line` — finding and concrete correction
-- none
-Recommended findings:
-- `path:line` — advisory improvement
-- none
+- `Decisive checks` — one row per mechanical run: the command, its exit, and
+  its decisive output.
+
+Each `Findings` row is one line on this form:
+
+```text
+VS### Critical|Recommended path:line — finding — correction
 ```
 
-Use `PASS` only when both mechanical runs succeed and no Critical finding remains. Use `NEEDS_ACTION` for target content or semantic Critical findings. Use `BLOCKED` for setup, invocation, read, or internal-validator failures. A Critical finding blocks a passing result; a Recommended finding is advisory and does not. Per-package detail of a multi-package run stays inline unless it would exceed the size limits in `.agents/references/subagent-reporting.md` `## Handoffs`, in which case it moves to one `Temp/` file cited under `Evidence` as path plus one selector per package, leaving only the summary rows inline.
+Use `PASS` only when every mechanical run succeeds and no Critical finding remains. Use `NEEDS_ACTION` for target content or semantic Critical findings. Use `BLOCKED` for setup, invocation, read, or internal-validator failures. A Critical finding blocks a passing result; a Recommended finding is advisory and does not.
 
 ## References
 

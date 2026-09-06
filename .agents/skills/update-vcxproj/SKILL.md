@@ -32,16 +32,18 @@ explicit mode:
 ## Handoff
 
 Return the shared handoff form in `../../references/subagent-reporting.md`,
-extended with the per-path membership outcome:
+extended with the per-path membership outcome, one row per path on this form:
 
 ```text
-<path> — <client|server|both|DataPacker|AgentHarness|WorktreeCli|AgentTools|non-member>
-  <project> — filter <path|none> — verified|fixed|NOTE <detail>|FAIL <detail>
-Regions touched: <item groups/filter declarations, or none>
-Build required: <exact target/configuration/platform, or none>
-Reviewer focus: <authority, affinity, or XML risk, or none>
-Residuals: <FAIL/conflict/NOTE requiring action, or none>
+<path> — <client|server|both|DataPacker|AgentHarness|WorktreeCli|AgentTools|non-member> — <project> — filter <path|none> — verified|fixed|NOTE <detail>|FAIL <detail>
 ```
+
+and with these fields:
+
+- `Regions touched` — item groups and filter declarations, or none.
+- `Build required` — the exact target/configuration/platform, or none.
+- `Reviewer focus` — authority, affinity, or XML risk; or none.
+- `Residuals` — a FAIL, conflict, or NOTE requiring action; or none; last.
 
 Use `Debug|x64` for game client/server unless approved otherwise,
 `Release|x64` for DataPacker, and the AgentTools promotion route for

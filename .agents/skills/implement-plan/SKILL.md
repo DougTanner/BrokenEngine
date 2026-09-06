@@ -50,18 +50,22 @@ Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with these fields:
 
-```text
-Self-audit resolved: <Claim -> Check -> Result; fix/recheck, or none>
-Affected-site triggers: <kind — symbol/pattern and search scope, or none found>
-Propagation required: /update-affected-code — <code scope> | N/A — no code changed
-Build required: <target, configuration/platform, selected project-member .cpp;
-  for headers, consuming targets and configuration/platform; or none>
-Reviewer focus areas: <verify X holds when Y, or none>
-Runtime acceptance requests: <setup, action, observation, and required evidence per criterion, or none>
-Residuals: <contradiction, incomplete item, or blocker with evidence, or none>
-```
+- `Self-audit resolved` — one row each: Claim -> Check -> Result, with its fix
+  and recheck; or none.
+- `Affected-site triggers` — one row each: kind, symbol/pattern, and search
+  scope; or `none found`.
+- `Propagation required` — `/update-affected-code` with the code scope, or
+  `N/A — no code changed`.
+- `Build required` — target, configuration/platform, and selected
+  project-member `.cpp`; for headers, every consuming target and
+  configuration/platform; or none.
+- `Reviewer focus areas` — verify X holds when Y, or none.
+- `Runtime acceptance requests` — setup, action, observation, and required
+  evidence per criterion; or none.
+- `Residuals` — contradiction, incomplete item, or blocker with evidence; or
+  none; last.
 
-`Residuals` stays last. Name each changed file once. Build requests must be
+Name each changed file once. Build requests must be
 executable without rediscovery: each changed `.cpp` names its exact target,
 configuration/platform, and selected project-member path; each changed header
 names every consuming target and configuration/platform. The manager dispatches

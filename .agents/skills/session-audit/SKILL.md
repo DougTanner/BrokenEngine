@@ -96,12 +96,15 @@ extended with the audit result block and these narrowed lines:
 
 ### Traced Clean
 <Only when clean: hypotheses traced, decisive refutations, and `PASS — audit complete; stop.`>
-
-Changed files: none
-Decisive checks: <inventory plus trace/read and result per authorized hypothesis>
-Build required: none
-Residuals: <pre-existing defect, incomplete trace, pending external verdict, or none>
 ```
+
+- `Decisive checks` — the inventory, plus the trace or read and its result per
+  authorized hypothesis.
+- `Residuals` — pre-existing defect, incomplete trace, pending external
+  verdict, or none; last.
+
+`Changed files` and `Build required` are `none` because this findings-only
+audit never edits a file.
 
 Use `NEEDS_ACTION` for findings or pending external verification and `BLOCKED`
 only for missing required evidence. Critical means data loss, broken

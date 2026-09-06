@@ -50,18 +50,19 @@ handoff.
 ## Handoff
 
 Return the shared handoff form in `../../references/subagent-reporting.md`,
-extended with one outcome per trigger:
+extended with these fields:
 
-```text
-Trigger outcomes: <trigger — RESOLVED with updated sites or verified no-op;
-  REFUTED with evidence; or UNRESOLVED with owner/action>
-Project membership trigger: /update-vcxproj — <paths/reason> | none
-Build required: <exact targets/configuration/platform and project-member paths,
-  or none>
-Reviewer focus areas: <contract and failure condition to try to disprove, or none>
-Residuals: <affected site not updated, incomplete search, ownership conflict,
-  or unclassified hit, or none>
-```
+- `Trigger outcomes` — one outcome per trigger: `RESOLVED` with the updated
+  sites or the verified no-op, `REFUTED` with evidence, or `UNRESOLVED` with
+  its owner and action.
+- `Project membership trigger` — `/update-vcxproj` with the paths and reason,
+  or none.
+- `Build required` — the exact targets, configuration/platform, and
+  project-member paths; or none.
+- `Reviewer focus areas` — the contract and failure condition to try to
+  disprove, or none.
+- `Residuals` — affected site not updated, incomplete search, ownership
+  conflict, unclassified hit, or none; last.
 
 Name each changed file once. `PASS` requires every trigger resolved or refuted
 and every planned search complete; requested builds remain `builder` work

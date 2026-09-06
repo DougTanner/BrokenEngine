@@ -104,12 +104,6 @@ If clean, state `PASS — plan changes are minimally scoped.` Return:
 Steps reviewed: <added-code and modified-artifact steps>
 ```
 
-A clean result returns that `PASS` statement, that one extension field, and the
-shared handoff lines, and nothing else — no preamble and no per-question
-judgment notes. Those notes stay in the reviewer's own context, or travel in
-that same gitignored `Temp/` file, cited under `Evidence`, when they must
-travel.
-
 Follow that extension field with the shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
 review never changes a tracked file and never requires a build.

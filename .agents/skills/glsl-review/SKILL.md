@@ -43,16 +43,23 @@ Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with these fields:
 
+- `Scope` — `PASS`, `NEEDS_ACTION`, `not applicable (Tier 1)`, or
+  `not supplied`.
+- `External claim verification requests` — single checkable requests, or none.
+- `Files reviewed` — one row per path: the regions and affected paths traced.
+- `Sibling review required` — `/repo-code-review` and the shader-facing shared
+  headers, or none.
+- `Residuals` — pre-existing issue, incomplete review, pending external
+  verdict, size observation, or none; last.
+
+Each `Findings` row is one line on this form:
+
 ```text
-Scope: PASS | NEEDS_ACTION | not applicable (Tier 1) | not supplied
-External claim verification requests: <single checkable requests, or none>
-Files reviewed: <path — regions and affected paths traced, one row each>
-Sibling review required: /repo-code-review — <shader-facing shared headers> | none
-Findings: <GLSL### Critical|Required path:line — claim — evidence and smallest correction; or none>
-Changed files: none
-Build required: none
-Residuals: <pre-existing issue, incomplete review, pending external verdict, size observation, or none>
+GLSL### Critical|Required path:line — claim — evidence and smallest correction
 ```
+
+`Changed files` and `Build required` are `none` because this findings-only
+review never edits a file.
 
 Use `NEEDS_ACTION` when a finding or pending external verdict requires action,
 `BLOCKED` when required review evidence is unavailable, and `PASS` only when

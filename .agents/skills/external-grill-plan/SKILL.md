@@ -45,28 +45,36 @@ Require all of the following before starting:
 Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with the fields below, inline. Interview questions carry their full
-wording in the block, because the manager runs the interview from that text and
-must not read a file mid-question. The decision-and-refinement rows, the
+wording in the `Interview questions` rows, because the manager runs the
+interview from that text and must not read a file mid-question. The decision-and-refinement rows, the
 execution-card rows, the execution card itself, the refined implementation plan,
 reproduction recipes, and any other bulk evidence go to one file under `Temp/`,
 returned as that path plus a per-section selector, never as inline text.
 `Plan delta` is relative to the frozen plan text; any behavior, scope,
 architecture, acceptance, or verification change is meaningful.
 
+- `Plan` — the exact path, or the inline plan title.
+- `Plan-audit evidence` — the audited plan revision and its result.
+- `Plan delta` — `none`, `not meaningful`, or `meaningful`.
+- `Interview questions` — one row per question, carrying its full wording in
+  the `### Decision Interaction` shape; or none.
+- `External claim verdicts` — one row per claim, on the row form below.
+- `Decision detail file` — the `Temp/` path, its decision-rows selector, and
+  its execution-card-rows selector.
+- `Required next step` — `none`, `incorporate refinements`, `incorporate
+  library integration pivot and run fresh /plan-audit`, or `run
+  /external-design-interface, incorporate its design pivot, and run fresh
+  /plan-audit`.
+- `Residuals` — unresolved decision, missing input, or none; last.
+
+Each `External claim verdicts` row is one line on this form:
+
 ```text
-Plan: <exact path or inline plan title>
-Plan-audit evidence: <audited plan revision and result>
-Plan delta: none | not meaningful | meaningful
-Interview questions:
-- <full question in the `### Decision Interaction` shape, or none>
-External claim verdicts:
-- <stable claim ID> — VERIFIED | REFUTED | UNRESOLVED — <direct implication>
-Decision detail file: <Temp/ path> — <decision-rows selector> — <execution-card-rows selector>
-Required next step: none | incorporate refinements | incorporate library integration pivot and run fresh /plan-audit | run /external-design-interface, incorporate its design pivot, and run fresh /plan-audit
-Changed files: none
-Build required: none
-Residuals: <unresolved decision, missing input, or none>
+<stable claim ID> — VERIFIED | REFUTED | UNRESOLVED — <direct implication>
 ```
+
+`Changed files` and `Build required` are `none` because this review changes no
+file.
 
 Use `PASS` when no question, refinement, pivot, or unresolved external claim
 remains; `NEEDS_ACTION` when the manager must interview, incorporate a

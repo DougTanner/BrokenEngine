@@ -74,9 +74,9 @@ Skip this phase in audit-only mode.
     knowledge, or an independent role. Done when each of those items appears in
     the handoff.
 13. Re-run any focused check whose inputs the audit changed. Evidence whose
-    inputs are unchanged may be reused. Done when those checks pass, the
-    handoff reflects every audit fix, and the full applicable static pass
-    remains assigned after propagation as
+    inputs are unchanged may be reused. Done when those checks pass, every
+    audit fix is reported under `Self-audit resolved`, and the full applicable
+    static pass remains assigned after propagation as
     [`../../../references/static-checks.md`](../../../references/static-checks.md)
     assigns them.
 

@@ -65,6 +65,10 @@ Markdown links whose relative destination begins with `references/`, `scripts/`,
 
 `VOCAB001` checks handoff vocabulary. Inside any fenced code block in `SKILL.md`, a line at column zero beginning exactly `Status:` or `Findings:` followed by a space or the end of the line carries closed vocabulary. After removing `<...>` placeholders, each `|`-separated value of a `Status:` line must be one of the status words, and each value of a `Findings:` line one of the severity words, that the shared handoff form in `.agents/references/subagent-reporting.md` `## Handoffs` lists. Prose outside a fenced block, and a line starting with anything else such as `Routed Findings:` or a list marker, is not checked.
 
+## Handoff form
+
+`HANDOFF001` checks that a `## Handoff` section does not re-render the shared handoff form. Inside a fenced code block under a `## Handoff` heading in `SKILL.md`, a line at column zero beginning `Status:`, `Findings:`, `Changed files:`, `Decisive checks:`, `Build required:`, `Evidence:`, `Executor:`, or `Residuals:` is reported at its own line. All eight names are invalid there, including a fixed-value row, which is written as prose instead. `.agents/references/subagent-reporting.md` `## Handoffs` owns the form. A `Status:` or `Findings:` line reports both `HANDOFF001` and, when its token is off-vocabulary, `VOCAB001`.
+
 ## Codex companion file
 
 `interface`, `policy`, and `dependencies` are independently optional top-level objects in `agents/openai.yaml`; at least one must exist. Quote every string, indent with spaces, and omit comments. A present object requires:
@@ -89,4 +93,4 @@ Repository targets must be below `.agents/skills/`. Pass `-Fixture` only for a d
 - One or more line-ordered `INVALID <path>:<line> <code>: <message>` diagnostics with exit `1`: target content is invalid.
 - `SETUP_ERROR <code>: <message>` with exit `2`: invocation, path resolution, file read, or internal validation failed.
 
-For validator changes, create disposable packages under a temporary directory; never track fixtures. Require `VALID`/0 from a valid `-Fixture` package, `INVALID`/1 after corrupting a known field, `SETUP_ERROR`/2 for a nonexistent target, and `VALID`/0 from the repository self-check.
+For validator changes, create disposable packages under a temporary directory; never track fixtures. Require `VALID`/0 from a valid `-Fixture` package, `INVALID`/1 after corrupting a known field, `INVALID`/1 carrying `HANDOFF001` from a fixture whose `## Handoff` fence contains a `Status:` line, `SETUP_ERROR`/2 for a nonexistent target, and `VALID`/0 from the repository self-check.

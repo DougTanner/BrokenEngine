@@ -79,16 +79,23 @@ Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with these fields:
 
+- `Scope` — `PASS`, `NEEDS_ACTION`, `not applicable (Tier 1)`, or
+  `not supplied`.
+- `API verification requests` — single checkable requests, or none.
+- `Files reviewed` — one row per path: the regions and affected paths traced.
+- `Project membership trigger` — `/update-vcxproj` with the paths and reason,
+  or none.
+- `Residuals` — pre-existing defect, incomplete trace, pending external
+  verdict, size observation, or none; last.
+
+Each `Findings` row is one line on this form:
+
 ```text
-Scope: PASS | NEEDS_ACTION | not applicable (Tier 1) | not supplied
-API verification requests: <single checkable requests, or none>
-Files reviewed: <path — regions and affected paths traced, one row each>
-Project membership trigger: /update-vcxproj — <paths/reason> | none
-Findings: <CXX### Critical|Required path:line — claim — evidence and smallest correction; or none>
-Changed files: none
-Build required: none
-Residuals: <pre-existing defect, incomplete trace, pending external verdict, size observation, or none>
+CXX### Critical|Required path:line — claim — evidence and smallest correction
 ```
+
+`Changed files` and `Build required` are `none` because this findings-only
+review never edits a file.
 
 Use `NEEDS_ACTION` when a finding or pending external verdict requires action,
 `BLOCKED` when required review evidence is unavailable, and `PASS` only when

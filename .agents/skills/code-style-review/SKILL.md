@@ -36,19 +36,17 @@ Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
 `## Handoffs`, extended with these fields placed before `Residuals`:
 
-```text
-Scope: session-changed ranges | caller-supplied cleanup scope
-Fixes Applied: <one row each: file:line — Rule N — correction, or none>
-Renames and Required Builds: <one row each: old → new — propagated C++
-  references, or none>
-Build required: <exact affected targets, or none>
-Routed Findings: <one row each: file:line — proposed finding —
-  classification/domain-review route, or none>
-Documentation Residuals: <one row each: identifier — file:line —
-  `/update-claude-docs` or caller, or none>
-Functions/regions touched: <function or region, or none>
-Residuals: <unresolved item, or none>
-```
+- `Scope` — session-changed ranges, or the caller-supplied cleanup scope.
+- `Fixes Applied` — one row per fix: file:line, Rule N, correction; or none.
+- `Renames and Required Builds` — one row per rename: old → new, propagated
+  C++ references; or none.
+- `Build required` — the exact affected targets, or none.
+- `Routed Findings` — one row per routed candidate: file:line, proposed
+  finding, classification or domain-review route; or none.
+- `Documentation Residuals` — one row each: identifier, file:line, and
+  `/update-claude-docs` or the caller; or none.
+- `Functions/regions touched` — one row per function or region, or none.
+- `Residuals` — unresolved item, or none; last.
 
 ## References
 

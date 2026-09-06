@@ -769,11 +769,12 @@ function Split-VocabularyTokens
 
 function Get-InstructionFindings
 {
-	param([string[]] $Lines, [string[]] $OwnedSections, [bool] $ScanVocabulary)
+	param([string[]] $Lines, [string[]] $OwnedSections, [bool] $IsSkillFile)
 
 	$findings = [System.Collections.Generic.List[object]]::new()
 	$insideFence = $false
 	$highestRank = -1
+	$currentSection = ''
 	for ($i = 0; $i -lt $Lines.Count; $i++)
 	{
 		$lineText = $Lines[$i]
@@ -788,6 +789,7 @@ function Get-InstructionFindings
 			if ($lineText -cmatch '^##[ \t]+(.+?)[ \t]*$')
 			{
 				$heading = $Matches[1]
+				$currentSection = $heading
 				$rank = [Array]::IndexOf($script:skeletonSectionOrder, $heading)
 				if ($rank -lt 0)
 				{
@@ -807,9 +809,13 @@ function Get-InstructionFindings
 			}
 			continue
 		}
-		if (-not $ScanVocabulary)
+		if (-not $IsSkillFile)
 		{
 			continue
+		}
+		if ($currentSection -ceq 'Handoff' -and $lineText -cmatch '^(?:Status|Findings|Changed files|Decisive checks|Build required|Evidence|Executor|Residuals):')
+		{
+			$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'HANDOFF001'; Message = 'shared handoff field re-declared inside a ## Handoff fence; .agents/references/subagent-reporting.md ## Handoffs owns the form' })
 		}
 		if ($lineText -cmatch '^Status:(?:[ ](.*))?$')
 		{

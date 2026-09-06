@@ -91,10 +91,9 @@ implementer to decide.
 
 ### Approved Execution
 
-```text
-Reduction result: <original and final bt-token-v1 sizes; approved moves completed>
-Residuals: <plan contradiction, file still above threshold, or none>
-```
+- `Reduction result` — the original and final `bt-token-v1` sizes, and the
+  approved moves completed.
+- `Residuals` — plan contradiction, file still above threshold, or none; last.
 
 Return the `/implement-plan` extension fields with it, including
 `Runtime acceptance requests` —

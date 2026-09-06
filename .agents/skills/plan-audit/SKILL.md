@@ -66,10 +66,6 @@ Traceability checked: <one requirement or invariant> <-> <implementation site or
 Required next step: Tier 3 -> manager decision, then /external-grill-plan | Tier 2 -> manager decision
 ```
 
-Beyond those extension fields, statements the audit checked and cleared stay in
-the auditor's own context and travel only as a gitignored `Temp/` file cited
-under `Evidence`, never as inline prose.
-
 Follow those extension fields with the shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
 audit never changes a file and never requires a build.

@@ -55,6 +55,7 @@ Done when exactly one row's route was taken for each proposal.
 - Inspect missing facts; never invent evidence or behavior.
 - Read `Documents/AGENTS.md` and `Documents/Plans/AGENTS.md` completely. Their current Plan shape, metadata, dependency, and Coordination rules override this skill. This skill creates debt Plans only. Report a capability addition for main-agent routing to manual `Documents/Features/`; do not disguise it as debt.
 - Reject an in-scope acceptance failure, including required structural work: it remains a blocker in the active change.
+- Reject a proposal whose symptom is a worker's deviation from a handoff form the emitting skill correctly declares, stating that the skill's text is already correct and the deviation is worker conduct.
 - Also reject stale, disproven, fixed, stylistic-only, and evidence-free proposals, stating why. Evidence-free proposals — "the skill felt awkward", no citation — stay rejected in the tooling-friction categories below too.
 - Tooling friction observed during a `/next-plan` run is a separate category.
 - So is a script or documented tool invocation that returned an oversized result flooding the main context, cited by the context-efficiency envelope (tool, invocation, measured size, checkpoint).

@@ -16,8 +16,13 @@ are the isolation lens.
    measuring command, the truncation flag, and the skipped context-efficiency
    lens. Done when a truncated input has exactly one such finding.
 3. Exclude from friction: ordinary review findings about the change;
-   user-driven iteration; documented normal stops such as `none-available`.
-   Done when no finding rests on one of these.
+   user-driven iteration; documented normal stops such as `none-available`; a
+   worker's deviation from the handoff form its skill correctly declares, which
+   is never a friction finding and is instead one `Residuals` row naming the
+   worker role and the rule broken. A skill `## Handoff` that itself conflicts
+   with `../../../references/subagent-reporting.md` `## Handoffs` is not
+   excluded: it stays a `fixable-defect` finding on that skill as emitter. Done
+   when no finding rests on one of these.
 4. Classify a failure in a skill or script the claimed Plan itself changes as
    `active-change-blocker`, not a follow-up. Done when every friction finding
    carries a class.
