@@ -929,3 +929,4 @@
 {"index":927,"date":"2026-09-06","captureMode":"carry-forward","verbosity":0.037446571269,"structuralErosion":0.539584785679,"supported":525,"parsed":524}
 {"index":928,"date":"2026-09-06","captureMode":"carry-forward","verbosity":0.037446571269,"structuralErosion":0.539584785679,"supported":525,"parsed":524}
 {"index":929,"date":"2026-09-06","captureMode":"cpp-change","verbosity":0.037443092075,"structuralErosion":0.539432331283,"supported":525,"parsed":524}
+{"index":930,"date":"2026-09-06","captureMode":"cpp-change","verbosity":0.037431267647,"structuralErosion":0.539951293875,"supported":525,"parsed":524}

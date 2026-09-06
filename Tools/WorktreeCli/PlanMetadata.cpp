@@ -93,6 +93,26 @@ namespace toolcli
 				const size_t uiJsonBegin = kMarkerPrefix.size();
 				const size_t uiJsonLength = marker.size() - uiJsonBegin - kMarkerSuffix.size();
 				const nlohmann::json metadata = nlohmann::json::parse(std::string(marker.substr(uiJsonBegin, uiJsonLength)));
+				if (metadata.contains("dependsOn") && metadata["dependsOn"].is_array())
+				{
+					std::vector<std::wstring> dependencies;
+					bool bComplete = true;
+					for (const nlohmann::json& dependency : metadata["dependsOn"])
+					{
+						std::wstring path;
+						if (!dependency.is_string() || !NormalizePlanPath(Utf8ToWide(dependency.get<std::string>()), path))
+						{
+							bComplete = false;
+							break;
+						}
+						dependencies.push_back(std::move(path));
+					}
+					if (bComplete)
+					{
+						rPlan.dependencies = std::move(dependencies);
+						rPlan.bDependenciesKnown = true;
+					}
+				}
 				if (metadata.size() != 2 || !metadata.contains("createdUtc") || !metadata["createdUtc"].is_string() || !metadata.contains("dependsOn") || !metadata["dependsOn"].is_array())
 				{
 					rPlan.diagnostic = "metadata requires exactly createdUtc and dependsOn";
@@ -105,15 +125,10 @@ namespace toolcli
 					return false;
 				}
 				rPlan.createdUtc = metadata["createdUtc"].get<std::string>();
-				for (const nlohmann::json& dependency : metadata["dependsOn"])
+				if (!rPlan.bDependenciesKnown)
 				{
-					std::wstring path;
-					if (!dependency.is_string() || !NormalizePlanPath(Utf8ToWide(dependency.get<std::string>()), path))
-					{
-						rPlan.diagnostic = "dependency is not a canonical Documents/Plans Markdown path";
-						return false;
-					}
-					rPlan.dependencies.push_back(std::move(path));
+					rPlan.diagnostic = "dependency is not a canonical Documents/Plans Markdown path";
+					return false;
 				}
 				if (!std::is_sorted(rPlan.dependencies.begin(), rPlan.dependencies.end(), Utf8PathLess) || std::adjacent_find(rPlan.dependencies.begin(), rPlan.dependencies.end()) != rPlan.dependencies.end())
 				{
@@ -157,6 +172,7 @@ namespace toolcli
 			rPlan.bValid = false;
 			rPlan.diagnostic = "manual";
 			rPlan.dependencies.clear();
+			rPlan.bDependenciesKnown = true;
 		}
 
 		// Every plan document carries byte-zero metadata, so a marker-less one is a defect rather than a reference file.

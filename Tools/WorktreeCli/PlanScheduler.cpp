@@ -1021,7 +1021,19 @@ namespace toolcli
 			std::vector<ChildRewrite> rewrites;
 			for (const auto& [path, plan] : plans)
 			{
-				if (path == target || std::find(plan.dependencies.begin(), plan.dependencies.end(), target) == plan.dependencies.end())
+				if (path == target)
+				{
+					continue;
+				}
+				if (plan.diagnostic == "missing")
+				{
+					continue;
+				}
+				if (!plan.bDependenciesKnown)
+				{
+					return Failure("child-invalid", kiExitStateConflict);
+				}
+				if (std::find(plan.dependencies.begin(), plan.dependencies.end(), target) == plan.dependencies.end())
 				{
 					continue;
 				}

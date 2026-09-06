@@ -17,6 +17,7 @@ namespace toolcli
 		std::string digest;
 		std::string createdUtc;
 		std::vector<std::wstring> dependencies;
+		bool bDependenciesKnown = false;
 		bool bValid = false;
 		std::string diagnostic;
 	};
