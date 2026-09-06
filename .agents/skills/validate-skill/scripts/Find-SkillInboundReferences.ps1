@@ -1,7 +1,6 @@
-# Raw inbound-reference sweep for one skill name over the fixed root set in
-# validate-skill's Workflow step 4. The script classifies nothing: it reports
-# literal hits, and the validating agent decides which are invocation
-# requirements and which are user-typed examples.
+# Raw inbound-reference sweep for one skill name over the fixed root set. The
+# script classifies nothing: it reports literal hits, and the validating agent
+# decides which are invocation requirements and which are user-typed examples.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $SkillName
