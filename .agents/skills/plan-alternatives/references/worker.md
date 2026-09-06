@@ -6,8 +6,9 @@ dispatch recipe lives in root `AGENTS.md`.
 
 ## Steps
 
-1. Read the brief and the evidence paths it cites. Done when the objective, the
-   scope, the fixed decisions, and candidate zero are each recorded.
+1. Read the brief text and the evidence paths it cites. Done when the
+   objective, the scope, the fixed decisions, and candidate zero are each
+   recorded.
 2. Search the repository for a mechanism on the assigned axis, which is one of:
 
    - Reuse — an existing repository mechanism or pattern that already solves
@@ -38,6 +39,9 @@ dispatch recipe lives in root `AGENTS.md`.
   brief and the repository rather than asking main for more.
 - Each researcher works blind, from its own brief alone, and never sees another
   researcher's candidate.
+- A file under `Documents/Plans/` is never an evidence path. Leave one unread
+  whether the brief names it or a search surfaces it, and work from the scope
+  the brief states.
 - Keep every candidate on the assigned axis; leave a strong idea belonging to
   another axis out.
 - Drop a candidate that cannot name its mechanism or its files, and report the
