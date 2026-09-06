@@ -561,10 +561,143 @@ void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohmann::json
 	rResult["clientGridCoord"] = {coord.x, coord.y};
 }
 
+// The packet client_packet_fault_fixture armed, empty while unarmed. It is delivered by
+// InjectArmedClientPacketFault below rather than here: AgentCommandServer::Drain wraps every command handler in
+// catch (const std::exception&), which would swallow the ASSERT the client's corrupt-stream catch raises and turn
+// the fatal path into an ordinary command failure.
+std::vector<uint8_t> sArmedPacketFault;
+
+// client_packet_fault_fixture: arm one malformed server->client packet. Schema: {"case":"engine_envelope"|
+// "status_change"|"game_packet"}. kbDebugInput-gated because it deliberately ends the process, mirroring
+// crash_report_fixture.
+void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+{
+	if constexpr (!kbDebugInput)
+	{
+		throw std::runtime_error("client_packet_fault_fixture requires kbDebugInput build");
+	}
+	else
+	{
+		// Heap: validation errors, the armed packet buffer, and the JSON result
+		ScopedSuppressAllocationTracking suppress;
+
+		if (!rParams.is_object() || rParams.size() != 1 || !rParams.contains("case") || !rParams.at("case").is_string())
+		{
+			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope|status_change|game_packet\"}");
+		}
+		const std::string caseName = rParams.at("case").get<std::string>();
+		if (caseName != "engine_envelope" && caseName != "status_change" && caseName != "game_packet")
+		{
+			throw std::runtime_error("client_packet_fault_fixture 'case' must be engine_envelope|status_change|game_packet");
+		}
+		if (!sArmedPacketFault.empty())
+		{
+			throw std::runtime_error("client_packet_fault_fixture is already armed");
+		}
+		if (gpGame == nullptr || gpClientSession == nullptr || gpClientSession->mpRuntime->mpClient == nullptr ||
+			!(gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnected))
+		{
+			throw std::runtime_error("client_packet_fault_fixture requires a connected client");
+		}
+		engine::Client& rClient = *gpClientSession->mpRuntime->mpClient;
+
+		std::vector<uint8_t> packet;
+		if (caseName == "engine_envelope")
+		{
+			// Truncated full-state envelope: the shared reader runs out of bytes inside the fixed fields, so
+			// NetworkMessages::Read throws under its own literal before any slot classification runs.
+			packet = {static_cast<uint8_t>(engine::PacketType::kServerCoordFullState), 0, 0};
+		}
+		else if (caseName == "status_change")
+		{
+			// A structurally valid coord-update envelope for a live slot whose compressed status-change payload
+			// carries an out-of-range uncompressed-size prefix, so the failure is the status-change decoder's own
+			// reader rather than the shared envelope reader.
+			int64_t iSlot = -1;
+			for (int64_t i = 0; i < std::ssize(rClient.mCoordSlots); ++i)
+			{
+				if (rClient.mCoordSlots.at(i).eState == engine::CoordSubscriptionState::kActive)
+				{
+					iSlot = i;
+					break;
+				}
+			}
+			if (iSlot < 0)
+			{
+				throw std::runtime_error("client_packet_fault_fixture 'status_change' requires an active coord slot");
+			}
+
+			uint8_t payloadBytes[8] {};
+			constexpr int32_t kiOutOfRangeUncompressedSize = std::numeric_limits<int32_t>::max();
+			std::memcpy(payloadBytes, &kiOutOfRangeUncompressedSize, sizeof(int32_t));
+
+			engine::NetworkMessages::ServerCoordUpdateMessage message {};
+			message.uiSlotIndex = static_cast<uint8_t>(iSlot);
+			message.uiEpoch = rClient.mCoordSlots.at(iSlot).ackState.uiEpoch;
+			message.iTick = gpGame->TickCounter();
+			// Left at zero: a nonzero echo would write this packet's RTT and jitter smoothing state before the
+			// payload is decoded, polluting client timing state the fixture is not exercising.
+			message.iEchoedTimestampNs = 0;
+			message.compressedPayload = {.pData = payloadBytes, .iSize = static_cast<int32_t>(sizeof(payloadBytes))};
+
+			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+			common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+			engine::NetworkMessages::Write(rWorkbuffer, message);
+			std::string_view built = rWorkbuffer.View();
+			const uint8_t* pBuilt = reinterpret_cast<const uint8_t*>(built.data());
+			packet.assign(pBuilt, pBuilt + built.size());
+		}
+		else
+		{
+			// Undersized assign-player payload: Client::Receive queues it as an opaque game packet, so the
+			// injection drains the queue itself and the game player-event parser rejects its size there.
+			packet = {static_cast<uint8_t>(GamePacketType::kServerAssignPlayer), 0};
+		}
+
+		rResult["case"] = caseName;
+		rResult["type"] = packet.front();
+		rResult["size"] = std::ssize(packet);
+		rResult["armed"] = true;
+		sArmedPacketFault = std::move(packet);
+	}
+}
+
 } // namespace
+
+void InjectArmedClientPacketFault()
+{
+	if (sArmedPacketFault.empty()) [[likely]]
+	{
+		return;
+	}
+
+	// Heap: the armed buffer moves out and is released here, so the disarm survives a fatal dispatch
+	ScopedSuppressAllocationTracking suppress;
+	std::vector<uint8_t> packet = std::move(sArmedPacketFault);
+	sArmedPacketFault.clear();
+
+	if (gpClientSession == nullptr || gpClientSession->mpRuntime->mpClient == nullptr)
+	{
+		return;
+	}
+	const bool bGamePacket = packet.front() >= static_cast<uint8_t>(engine::PacketType::kGamePacketStart);
+	gpClientSession->mpRuntime->mpClient->Receive(packet);
+	if (bGamePacket)
+	{
+		// Receive only queues a game packet, and the first act of the next PollAndDrain is Client::Poll, which
+		// clears that queue before ClientSession::ProcessReceivedGamePackets would ever see the packet. Drain it
+		// here instead, still outside Drain's catch, so the game parser's corrupt-stream ASSERT reaches wWinMain.
+		gpClientSession->ProcessReceivedGamePackets();
+	}
+}
 
 bool ExecuteAgentCommandClient(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
 {
+	if (cmd == "client_packet_fault_fixture")
+	{
+		CommandClientPacketFaultFixture(rParams, rResult);
+		return true;
+	}
 	if (cmd == "client_full_state_fixture")
 	{
 		CommandClientFullStateFixture(rParams, rResult);

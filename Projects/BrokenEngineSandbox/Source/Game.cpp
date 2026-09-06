@@ -1,5 +1,6 @@
 #include "Game.h"
 
+#include "Agent/AgentCommands.h"
 #include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Input/Input.h"
@@ -559,6 +560,11 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 {
 	if constexpr (kbDebugInput)
 	{
+		// Deliver an armed client_packet_fault_fixture packet here: this is the first client main-loop point after
+		// the agent drain that sits outside AgentCommandServer::Drain's catch, so the corrupt-stream ASSERT reaches
+		// wWinMain's handler instead of being answered as a command failure.
+		InjectArmedClientPacketFault();
+
 		// Return drives two independent game actions; poll the edge once and let both branches read it.
 		bool bReturnPressed = rInputPoll.KeyboardPressed(VK_RETURN);
 		bool bCycleMenuIslandPressed = rInputPoll.KeyboardPressed('E');

@@ -18,6 +18,12 @@ void ExecuteAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nl
 // returns true if handled. Defined in the client-vcxproj-only AgentCommandsClient.cpp. Throws on bad params (trust
 // boundary), caught by AgentCommandServer::Drain().
 bool ExecuteAgentCommandClient(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult);
+
+// Delivers the malformed packet client_packet_fault_fixture armed, then disarms; a no-op when nothing is armed.
+// Must be called from the client main loop outside AgentCommandServer::Drain, whose catch would otherwise swallow
+// the corrupt-stream ASSERT the delivery is meant to raise. A game-range packet is parsed here too, because the
+// engine only queues it and the next client poll clears that queue first. Defined in AgentCommandsClient.cpp.
+void InjectArmedClientPacketFault();
 #endif
 
 #if defined(BT_SERVER)

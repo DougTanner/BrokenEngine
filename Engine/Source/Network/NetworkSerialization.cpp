@@ -279,10 +279,10 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 		return 0;
 	}
 
-	// Trust boundary (network input): drive every read through a bounded cursor and reject the whole batch on any
-	// malformed byte — a short group header, a shortfall mid-item, an out-of-range type byte, or a decoded count past
-	// iMaxCount — rather than over-reading pEnd or applying a prefix. All-or-nothing at both ends: the send side drops
-	// an over-cap batch whole, so a partially applied batch here would silently desync instead of resyncing via CRC.
+	// Trust boundary (network input): drive every read through a bounded cursor and throw on any malformed byte — a
+	// short group header, a shortfall mid-item, an out-of-range type byte, or a decoded count past iMaxCount — rather
+	// than over-reading pEnd or applying a prefix. All-or-nothing at both ends: the send side drops an over-cap batch
+	// whole, and nothing decoded here is published before the throw, so a corrupt batch cannot partially apply.
 	// StatusChangeItemWireSize above is the per-type read-width mirror.
 	BoundedCursor cursor {static_cast<const uint8_t*>(pSource), static_cast<const uint8_t*>(pSource) + iSourceSize};
 	int64_t iOutputCount = 0;
@@ -295,7 +295,7 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 		if (!cursor.Has(kiGroupHeaderSize))
 		{
 			LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: truncated group header ({} of {} bytes, deserialized {})", cursor.Remaining(), kiGroupHeaderSize, iOutputCount);
-			return 0;
+			NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
 		}
 
 		uint8_t uiType = ReadUint8(cursor.pCursor);
@@ -304,13 +304,13 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 		if (uiType >= kiTypeCount)
 		{
 			LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: out-of-range type byte {} (deserialized {})", static_cast<int>(uiType), iOutputCount);
-			return 0;
+			NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
 		}
 
 		if (iOutputCount + static_cast<int64_t>(uiGroupCount) > iMaxCount)
 		{
 			LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: decoded count {} exceeds cap {} (type {})", iOutputCount + static_cast<int64_t>(uiGroupCount), iMaxCount, static_cast<int>(uiType));
-			return 0;
+			NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
 		}
 
 		game::StatusChangeType eType = static_cast<game::StatusChangeType>(uiType);
@@ -321,7 +321,7 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 			if (!cursor.Has(iItemWireSize))
 			{
 				LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: truncated mid-group (type {}, deserialized {})", static_cast<int>(uiType), iOutputCount);
-				return 0;
+				NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
 			}
 
 			game::StatusChange& rChange = pDest[iOutputCount++];
@@ -412,7 +412,7 @@ int64_t CompressStatusChangeBatch(const game::StatusChange* pChanges, int64_t iC
 	if (iCompressedSize <= 0)
 	{
 		// Belt (the caller sizes pDest to fit any valid capped batch): a 0 return means the batch did not fit. Drop it
-		// rather than ship the 4-byte prefix alone, which the client would decode as zero changes and silently desync.
+		// rather than ship the 4-byte prefix alone, which the receive side would reject as a corrupt payload.
 		LOG(kNetwork, kError, "CompressStatusChangeBatch: LZ4 compression failed (items {}, serialized {}, dest capacity {})", iCount, iSerializedSize, iDestCapacity);
 		return 0;
 	}
@@ -424,7 +424,7 @@ int64_t DecompressStatusChangeBatch(const void* pSource, int64_t iSourceSize, ga
 {
 	if (iSourceSize <= static_cast<int64_t>(sizeof(int32_t)))
 	{
-		return 0;
+		NetworkMessages::ThrowCorruptStream("DecompressStatusChangeBatch");
 	}
 
 	// Read uncompressed size prefix
@@ -439,7 +439,7 @@ int64_t DecompressStatusChangeBatch(const void* pSource, int64_t iSourceSize, ga
 	if (iUncompressedSize <= 0 || iUncompressedSize > kiMaxSerializedStatusChangeBatchBytes)
 	{
 		LOG(kNetwork, kWarning, "DecompressStatusChangeBatch: out-of-range uncompressed size prefix {} (bound {})", iUncompressedSize, kiMaxSerializedStatusChangeBatchBytes);
-		return 0;
+		NetworkMessages::ThrowCorruptStream("DecompressStatusChangeBatch");
 	}
 
 	// LZ4 writes iResult bytes and only those bytes are deserialized; bounded reads stop at iResult, so no zero-fill or
@@ -453,7 +453,7 @@ int64_t DecompressStatusChangeBatch(const void* pSource, int64_t iSourceSize, ga
 	if (iResult <= 0)
 	{
 		LOG(kNetwork, kWarning, "DecompressStatusChangeBatch: LZ4 decompression failed (error {})", iResult);
-		return 0;
+		NetworkMessages::ThrowCorruptStream("DecompressStatusChangeBatch");
 	}
 
 	int64_t iCount = DeserializeStatusChangeBatch(pDecompressed, iResult, pDest, iMaxCount);

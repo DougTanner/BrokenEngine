@@ -40,8 +40,12 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 		.pEntries = entries,
 		.iEntryCapacity = NetworkManager::kiMaxEnetCoordSlots,
 	};
-	if (!NetworkMessages::Read(packetData, message)
-		|| static_cast<int64_t>(packetData.size()) != NetworkMessages::ClientAckStreamMessage::GetSize(message.uiSlotCount))
+	NetworkMessages::Read(packetData, message);
+
+	// A layout failure already threw above and is recorded by the dispatch catch; this cross-check only
+	// catches a readable packet whose declared slot count disagrees with its byte length, so no packet is
+	// counted twice.
+	if (static_cast<int64_t>(packetData.size()) != NetworkMessages::ClientAckStreamMessage::GetSize(message.uiSlotCount))
 	{
 		RecordContractViolation(iClientId, "ackstream size", packetData[0], static_cast<int64_t>(packetData.size()));
 		return;
@@ -147,10 +151,7 @@ void Server::ClientDesyncReport(std::span<const uint8_t> packetData, int64_t iCl
 	}
 
 	NetworkMessages::ClientDesyncReportMessage message {};
-	if (!NetworkMessages::Read(packetData, message))
-	{
-		return;
-	}
+	NetworkMessages::Read(packetData, message);
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	if (now < pClient->desyncReportDeadline)
@@ -178,10 +179,7 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPe
 	}
 
 	NetworkMessages::ClientDebugFrameRequestMessage message {};
-	if (!NetworkMessages::Read(packetData, message))
-	{
-		return;
-	}
+	NetworkMessages::Read(packetData, message);
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	if (now < pClient->debugFrameRequestDeadline)
@@ -248,10 +246,7 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPe
 void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, int64_t iClientId)
 {
 	NetworkMessages::ClientHelloMessage message {};
-	if (!NetworkMessages::Read(packetData, message))
-	{
-		return;
-	}
+	NetworkMessages::Read(packetData, message);
 
 	uint32_t uiClientProtocolVersion = message.uiProtocolVersion;
 	if (uiClientProtocolVersion != kuiProtocolVersion)
@@ -343,10 +338,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClientId)
 {
 	NetworkMessages::ClientSubscribeMessage message {};
-	if (!NetworkMessages::Read(packetData, message))
-	{
-		return;
-	}
+	NetworkMessages::Read(packetData, message);
 
 	GridCoord coord = message.coord;
 
@@ -418,10 +410,7 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 void Server::ClientUnsubscribe(std::span<const uint8_t> packetData, int64_t iClientId)
 {
 	NetworkMessages::ClientUnsubscribeMessage message {};
-	if (!NetworkMessages::Read(packetData, message))
-	{
-		return;
-	}
+	NetworkMessages::Read(packetData, message);
 
 	uint8_t uiSlotIndex = message.uiSlotIndex;
 	uint16_t uiEpoch = message.uiEpoch;
@@ -452,10 +441,7 @@ void Server::ClientUnsubscribe(std::span<const uint8_t> packetData, int64_t iCli
 void Server::ClientResyncRequest(std::span<const uint8_t> packetData, int64_t iClientId)
 {
 	NetworkMessages::ClientResyncRequestMessage message {};
-	if (!NetworkMessages::Read(packetData, message))
-	{
-		return;
-	}
+	NetworkMessages::Read(packetData, message);
 
 	ClientConnection* pClient = FindHandshakenClient(iClientId);
 	if (pClient == nullptr)

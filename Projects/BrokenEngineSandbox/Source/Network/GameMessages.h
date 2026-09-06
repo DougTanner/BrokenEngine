@@ -124,14 +124,18 @@ struct FleetSyncMessage
 		ASSERT(rWorkbuffer.Count<uint8_t>() == iExpectedSize);
 	}
 
-	static bool ReadPayload(const std::vector<uint8_t>& rPayload, std::vector<Fleet>& rOutFleets)
+	// Reads the payload with MessageReader directly rather than through NetworkMessages::Read, so it raises the
+	// shared corruption signal itself, under its own reader-name literal. rOutFleets is written as the payload is
+	// decoded, so a throw can leave it partially filled; callers read into a scratch vector and commit only after
+	// this returns.
+	static void ReadPayload(const std::vector<uint8_t>& rPayload, std::vector<Fleet>& rOutFleets)
 	{
 		engine::NetworkMessages::MessageReader reader {std::span<const uint8_t>(rPayload.data(), rPayload.size())};
 		int64_t iFleetCount = 0;
 		reader.BoundedCount(iFleetCount, kiFleetHeaderSize, 0);
 		if (!reader.IsValid())
 		{
-			return false;
+			engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 		}
 
 		rOutFleets.resize(static_cast<size_t>(iFleetCount));
@@ -142,13 +146,13 @@ struct FleetSyncMessage
 			VisitFleetHeader(reader, rFleet, iMemberCount);
 			if (!reader.IsValid())
 			{
-				return false;
+				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 			}
 			if (rFleet.iFlagshipIndex < 0 ||
 				(iMemberCount == 0 && rFleet.iFlagshipIndex != 0) ||
 				(iMemberCount > 0 && rFleet.iFlagshipIndex >= iMemberCount))
 			{
-				return false;
+				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 			}
 
 			rFleet.members.resize(static_cast<size_t>(iMemberCount));
@@ -160,12 +164,15 @@ struct FleetSyncMessage
 				rMember.bAlive = uiAlive != 0;
 				if (!reader.IsValid())
 				{
-					return false;
+					engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 				}
 			}
 		}
 
-		return reader.IsValid() && reader.AtEnd();
+		if (!reader.AtEnd())
+		{
+			engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
+		}
 	}
 };
 

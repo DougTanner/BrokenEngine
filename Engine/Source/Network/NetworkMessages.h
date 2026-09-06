@@ -314,6 +314,17 @@ private:
 	bool mbHasTick = false;
 };
 
+// The one corruption signal on the receive path: a reader that decided the peer's bytes are impossible
+// raises this, and the dispatch catch owning that direction decides the response (client-fatal, server
+// drop-and-count). pcReader is the static reader-name literal CorruptStreamException's contract requires;
+// the suppress scope covers std::runtime_error's own string copy for the reader sites that have no
+// ambient one.
+[[noreturn]] inline void ThrowCorruptStream(const char* pcReader)
+{
+	ScopedSuppressAllocationTracking suppress;
+	throw common::CorruptStreamException(pcReader);
+}
+
 template <typename TMessage>
 inline void Write(common::Workbuffer& rWorkbuffer, TMessage& rMessage)
 {
@@ -322,11 +333,14 @@ inline void Write(common::Workbuffer& rWorkbuffer, TMessage& rMessage)
 }
 
 template <typename TMessage>
-inline bool Read(std::span<const uint8_t> packetData, TMessage& rMessage)
+inline void Read(std::span<const uint8_t> packetData, TMessage& rMessage)
 {
 	MessageReader reader {packetData};
 	TMessage::Visit(reader, rMessage);
-	return reader.IsValid();
+	if (!reader.IsValid())
+	{
+		ThrowCorruptStream("NetworkMessages::Read");
+	}
 }
 
 struct AckStreamEntry

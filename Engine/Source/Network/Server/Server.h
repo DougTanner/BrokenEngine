@@ -199,6 +199,10 @@ public:
 	// Callers MUST NOT touch their ClientConnection* afterward -- the client may have been removed.
 	void RecordContractViolation(int64_t iClientId, const char* pcReason, uint8_t uiPacketType, int64_t iSize);
 
+	// Wire dispatch entry point for one received packet. Public so a harness fixture can inject a
+	// deliberately malformed packet through the real admission, dispatch, and violation path.
+	void Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer);
+
 private:
 	friend class ServerSessionRuntime;
 	void Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode);
@@ -213,7 +217,6 @@ private:
 	void Disconnect(ENetEvent& rEvent);
 	void DispatchIncoming(ENetEvent& rEvent, bool bFastForward);
 	void Receive(ENetEvent& rEvent);
-	void Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer);
 
 	ClientConnection* FindHandshakenClient(int64_t iClientId);
 

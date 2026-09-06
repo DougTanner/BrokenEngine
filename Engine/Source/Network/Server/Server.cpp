@@ -312,10 +312,11 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 	}
 	catch (const std::exception& rException)
 	{
-		// Trust boundary: a corrupt count/size in a received payload throws CorruptStreamException
-		// (or .at()/bad_alloc) from the reader before any client state is mutated (handlers land
-		// parsed values in locals first). Drop the single packet and let the client resend/reconnect,
-		// rather than tearing down the peer, and count it as a contract violation.
+		// Trust boundary: a reader that decided this client's bytes are impossible throws
+		// CorruptStreamException (a local .at()/bad_alloc lands here too) before any client state is
+		// mutated, because handlers land parsed values in locals first. This catch is the single recorder
+		// for such a packet -- the readers themselves count nothing: drop the packet whole and charge one
+		// contract violation, which tears down the peer only once the violation threshold is reached.
 		LOG(kNetwork, kDebug, "Server::Receive dropped corrupt packet (type {}) Client: {}: {}", static_cast<uint8_t>(eType), iClientId, rException.what());
 		RecordContractViolation(iClientId, "corrupt payload", packetData[0], static_cast<int64_t>(packetData.size()));
 	}
@@ -363,7 +364,8 @@ void Server::BufferFrame(int64_t iTick, const std::pair<GridCoord, GridUpdateDat
 				else
 				{
 					// Compression failed despite the sized scratch — drop the payload (logged kError by the codec)
-					// rather than buffer an empty prefix the client would decode as zero changes and silently desync.
+					// rather than buffer an empty prefix, which the client's status-change decoder rejects as a corrupt
+					// payload — a fatal response to the server's own encoding failure.
 					LOG(kNetwork, kError, "Server::BufferFrame compression failed, dropping payload Coord: ({},{}) Frame: {} Count: {}", rCoord.x, rCoord.y, iTick, iStatusChangeCount);
 				}
 			}

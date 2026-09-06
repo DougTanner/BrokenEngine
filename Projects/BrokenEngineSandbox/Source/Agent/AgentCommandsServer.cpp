@@ -223,6 +223,59 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json
 	rResult["entryCount"] = iEntryCount;
 }
 
+// engine_packet_fault_fixture: dispatch one malformed engine packet through the real Server::Receive path, so the
+// admission gates, the dispatch catch, and RecordContractViolation all run. Ungated, mirroring
+// game_packet_fault_fixture, because it only drops a packet. Both cases use kClientAckStream: it is the one
+// client-sendable engine row whose [min,max] size range admits a packet the reader can still reject, so the failure
+// lands in decode rather than at the exact-size admission gate.
+void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
+{
+	if (!rParams.is_object() || rParams.size() != 1 || !rParams.contains("case") || !rParams.at("case").is_string())
+	{
+		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
+	}
+
+	const std::string caseName = rParams.at("case").get<std::string>();
+	if (caseName != "truncated" && caseName != "size_mismatch")
+	{
+		throw std::runtime_error("engine_packet_fault_fixture 'case' must be truncated|size_mismatch");
+	}
+
+	int64_t iClientId = 0;
+	ENetPeer* pPeer = nullptr;
+	int64_t iHandshakenClientCount = 0;
+	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
+	{
+		if (rClient.bHandshakeComplete)
+		{
+			iClientId = rClient.iClientId;
+			pPeer = rClient.pPeer;
+			++iHandshakenClientCount;
+		}
+	}
+	if (iHandshakenClientCount != 1 || pPeer == nullptr)
+	{
+		throw std::runtime_error("engine_packet_fault_fixture requires exactly one handshaken client");
+	}
+
+	// One declared ack entry in both cases. "truncated" carries only 10 of the 37 bytes that entry needs, so the
+	// shared reader throws and the dispatch catch records "corrupt payload"; "size_mismatch" carries a readable
+	// entry plus one trailing byte, so the reader succeeds and the handler's exact-size cross-check records
+	// "ackstream size" locally. The two are mutually exclusive, so one packet is counted exactly once.
+	const int64_t iSize = caseName == "truncated" ? 10 : 38;
+	std::vector<uint8_t> packet(static_cast<size_t>(iSize), 0);
+	packet.at(0) = static_cast<uint8_t>(engine::PacketType::kClientAckStream);
+	packet.at(1) = 1;
+
+	// RecordContractViolation may remove the client, so nothing below touches the connection again.
+	engine::gpServer->Receive(packet, pPeer);
+
+	rResult["clientId"] = iClientId;
+	rResult["case"] = caseName;
+	rResult["type"] = packet.at(0);
+	rResult["size"] = iSize;
+}
+
 void CommandPause(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!rParams.contains("paused") || !rParams.at("paused").is_boolean())
@@ -1027,6 +1080,11 @@ bool ExecuteAgentCommandServer(std::string_view cmd, const nlohmann::json& rPara
 	if (cmd == "game_packet_fault_fixture")
 	{
 		CommandGamePacketFaultFixture(rParams, rResult);
+		return true;
+	}
+	if (cmd == "engine_packet_fault_fixture")
+	{
+		CommandEnginePacketFaultFixture(rParams, rResult);
 		return true;
 	}
 	if (cmd == "pause")

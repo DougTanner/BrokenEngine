@@ -81,6 +81,9 @@ public:
 
 private:
 	friend class engine::ClientSessionRuntime;
+	// The client_packet_fault_fixture delivery must drain its own injected game packet: the next runtime poll clears
+	// the received-packet queue before this session would read it.
+	friend void InjectArmedClientPacketFault();
 
 	void OnConnectionRejected(const char* pcReason);
 	void OnConnectionFailed();

@@ -19,43 +19,28 @@ void ParsePlayerEvents(std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rR
 		{
 			if (rPayload.size() != static_cast<size_t>(GameMessages::AssignPlayerMessage::kiSize))
 			{
-				continue;
+				engine::NetworkMessages::ThrowCorruptStream("ParsePlayerEvents kServerAssignPlayer");
 			}
 			GameMessages::AssignPlayerMessage message {};
-			if (!engine::NetworkMessages::Read(rPayload, message))
-			{
-				continue;
-			}
+			engine::NetworkMessages::Read(rPayload, message);
 			rOutEventsArena.PushBack(ReceivedPlayerEvent{PlayerEventType::kAssigned, engine::global_id_t {message.iGlobalPlayerId}, message.coord});
 		}
 		else if (eType == GamePacketType::kServerPlayerState)
 		{
 			if (rPayload.size() != static_cast<size_t>(GameMessages::PlayerStateMessage::kiSize))
 			{
-				continue;
+				engine::NetworkMessages::ThrowCorruptStream("ParsePlayerEvents kServerPlayerState");
 			}
 			GameMessages::PlayerStateMessage message {};
-			if (!engine::NetworkMessages::Read(rPayload, message))
-			{
-				continue;
-			}
+			engine::NetworkMessages::Read(rPayload, message);
 			const GameMessages::PlayerStateDescriptor* pDescriptor = GameMessages::FindPlayerStateDescriptor(message.uiWireType);
 			if (pDescriptor == nullptr)
 			{
-				continue;
+				engine::NetworkMessages::ThrowCorruptStream("ParsePlayerEvents kServerPlayerState wire type");
 			}
 			rOutEventsArena.PushBack(ReceivedPlayerEvent{pDescriptor->eEventType, engine::global_id_t {message.iGlobalPlayerId}, message.coord});
 		}
 	}
-}
-
-// Network payload is a trust boundary: every read is bounded against the payload end and
-// wire-supplied counts are validated before driving any resize. Returns false on a malformed
-// payload; rOutFleets may be partially written on failure, so callers parse into a scratch
-// vector and commit only on success.
-static bool ParseFleetSyncPayload(const std::vector<uint8_t>& rPayload, std::vector<Fleet>& rOutFleets)
-{
-	return GameMessages::FleetSyncMessage::ReadPayload(rPayload, rOutFleets);
 }
 
 bool ParseFleetSync(std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, std::vector<Fleet>& rOutFleets)
@@ -72,18 +57,13 @@ bool ParseFleetSync(std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawP
 			continue;
 		}
 
-		// Parse into a local list and commit only on success so a malformed sync is never
-		// partially applied and cannot clobber a valid sync parsed earlier in this drain
+		// Network payload is a trust boundary: ReadPayload bounds every read against the payload end and
+		// throws on malformed input. Parse into a local list and commit only once it returns, so a
+		// malformed sync is never partially applied and cannot clobber a valid sync parsed earlier in this drain
 		std::vector<Fleet> parsedFleets;
-		if (ParseFleetSyncPayload(it->second, parsedFleets))
-		{
-			rOutFleets = std::move(parsedFleets);
-			bApplied = true;
-		}
-		else
-		{
-			LOG(kNetwork, kWarning, "ParseFleetSync MalformedPayload Size: {}", it->second.size());
-		}
+		GameMessages::FleetSyncMessage::ReadPayload(it->second, parsedFleets);
+		rOutFleets = std::move(parsedFleets);
+		bApplied = true;
 
 		it = rRawPackets.erase(it);
 	}

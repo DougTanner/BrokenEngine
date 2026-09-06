@@ -94,6 +94,10 @@ public:
 	void SendResyncRequest();
 	void Disconnect();
 
+	// Wire dispatch entry point for one received packet. Public so a harness fixture can inject a
+	// deliberately malformed packet through the real dispatch, catch, and response path.
+	void Receive(std::span<const uint8_t> packetData);
+
 	enum class ClientStateFlags : uint8_t
 	{
 		kConnected                = 1 << 0,
@@ -143,7 +147,6 @@ private:
 	void FreeSlot(int64_t iSlot);
 	void DispatchIncoming(ENetEvent& rEvent, bool bFastForward);
 	void Receive(ENetEvent& rEvent);
-	void Receive(std::span<const uint8_t> packetData);
 	void ServerCoordFullState(std::span<const uint8_t> packetData);
 	void ServerCoordStaticData(std::span<const uint8_t> packetData);
 	void ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool bProcessRtt);

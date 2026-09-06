@@ -62,6 +62,15 @@ void ClientSession::ProcessReceivedGamePackets()
 			ApplyPlayerEvent(pPlayerEvents[i]);
 		}
 	}
+	catch (const common::CorruptStreamException& rException)
+	{
+		// Trust boundary: only a reader that decided the server's bytes are impossible throws this type, and a client
+		// cannot keep playing against a server it cannot decode — assert so the process ends with a crash report naming
+		// the reader. The std::exception catch below is log-and-continue, so an ordinary local failure is never blamed
+		// on the peer. ParsePlayerEvents decodes two packet types, so what() carries which one failed.
+		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt player-event packet: {}", rException.what());
+		ASSERT(false);
+	}
 	catch (const std::exception& rException)
 	{
 		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing player events: {}", rException.what());
@@ -80,6 +89,11 @@ void ClientSession::ProcessReceivedGamePackets()
 				UpdateDesiredCoords(SubscriptionChangeReason::kFleetSync);
 			}
 		}
+	}
+	catch (const common::CorruptStreamException& rException)
+	{
+		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt packet (type {}): {}", static_cast<uint8_t>(GamePacketType::kServerFleetSync), rException.what());
+		ASSERT(false);
 	}
 	catch (const std::exception& rException)
 	{

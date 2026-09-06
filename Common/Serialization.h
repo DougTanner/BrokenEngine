@@ -5,9 +5,10 @@ namespace common
 
 // Thrown by deserialization readers when a count/size/capacity field from a trust boundary
 // (save file, replay stream, network payload, .pack chunk) is implausible — negative, inverted
-// (count > capacity), or larger than the stream/chunk could possibly back. Save, replay, and network
-// readers catch it at their load/receive boundary (logged + payload skipped or load aborted) instead of
-// overrunning a buffer or driving an unbounded allocation; pack readers do not catch it — bad .pack data
+// (count > capacity), or larger than the stream/chunk could possibly back. Save and replay readers catch it
+// at their load boundary (logged + load aborted) instead of overrunning a buffer or driving an unbounded
+// allocation; the two network directions answer it asymmetrically, per Engine/Source/Network/AGENTS.md
+// "Corrupt Input Policy"; pack readers do not catch it — bad .pack data
 // halts, so it reaches the crash-report path. The message is a
 // static reader-name literal (no std::format on the throw path; std::runtime_error's own string copy is
 // benign — every thrower runs under a load-path allocation-suppress scope).

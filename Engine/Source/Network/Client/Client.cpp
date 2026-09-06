@@ -295,18 +295,25 @@ void Client::Receive(std::span<const uint8_t> packetData)
 				}
 				else
 				{
-					LOG(kNetwork, kWarning, "Client::Receive unknown packet type {}", static_cast<uint8_t>(eType));
+					// The protocol-version gate makes both sides share this type table, so an engine type byte
+					// the client cannot name is corrupt server data rather than an unsupported feature.
+					NetworkMessages::ThrowCorruptStream("Client::Receive");
 				}
 				break;
 		}
 	}
+	// Trust boundary: only a reader that decided the server's bytes are impossible throws CorruptStreamException,
+	// and a client cannot keep playing against a server it cannot decode — assert so the crash report names the reader.
+	// The std::exception catch below is log-and-continue, so an ordinary local failure (bad_alloc, .at(), file I/O
+	// beneath a handler) is never blamed on the peer.
+	catch (const common::CorruptStreamException& rException)
+	{
+		LOG(kNetwork, kError, "Client::Receive dropped corrupt packet (type {}): {}", static_cast<uint8_t>(eType), rException.what());
+		ASSERT(false);
+	}
 	catch (const std::exception& rException)
 	{
-		// Trust boundary: a corrupt count/size in a received payload throws CorruptStreamException
-		// (or .at()/bad_alloc) from the reader before any slot state is mutated (full-state/static
-		// reads land in locals first). Drop the single packet and let the server resend, rather than
-		// tearing down the client.
-		LOG(kNetwork, kWarning, "Client::Receive dropped corrupt packet (type {}): {}", static_cast<uint8_t>(eType), rException.what());
+		LOG(kNetwork, kWarning, "Client::Receive dropped packet after local failure (type {}): {}", static_cast<uint8_t>(eType), rException.what());
 	}
 }
 

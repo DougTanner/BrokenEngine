@@ -79,7 +79,9 @@ void ServerSession::ParseReceivedGamePackets()
 		GamePacketType eType = static_cast<GamePacketType>(rPacket.uiPacketType);
 
 		// Contract gate (trust boundary): validate every game-range packet once before dispatch (drop -> count -> escalate).
-		// The per-case size checks and ValidateNavigationDelay clamps below remain as backstops.
+		// Every client-sendable game contract row has min == max (GamePacketType.h), so this gate settles each admitted
+		// payload's size exactly and the cases below add no per-case size check; only residual semantic validation
+		// a row cannot express — the ValidateNavigationDelay clamp — stays.
 		const engine::ClientPacketContract contract = NetworkSessionContract::GetClientPacketContract(eType);
 		if (!engine::gpServer->AdmitGamePacket(rPacket, contract))
 		{
@@ -93,10 +95,6 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientUpdatePlayerRequest:
 				{
 					// 8B global player ID + 1B bUseMissiles + 4B fNavigationDelay = 13 bytes (type byte already stripped)
-					if (rPacket.payload.size() < 13)
-					{
-						break;
-					}
 					const uint8_t* pCursor = rPacket.payload.data();
 					engine::global_id_t globalId {};
 					globalId.iValue = engine::ReadInt64(pCursor);
@@ -113,10 +111,6 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientDeleteFleetRequest:
 				{
 					// 16B fleetGuid = 16 bytes (type byte already stripped)
-					if (rPacket.payload.size() < 16)
-					{
-						break;
-					}
 					const uint8_t* pCursor = rPacket.payload.data();
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
@@ -127,10 +121,6 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientSpawnIntoFleetRequest:
 				{
 					// 16B fleetGuid = 16 bytes (type byte already stripped)
-					if (rPacket.payload.size() < 16)
-					{
-						break;
-					}
 					const uint8_t* pCursor = rPacket.payload.data();
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
@@ -141,10 +131,6 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientRespawnInFleetRequest:
 				{
 					// 16B fleetGuid + 8B memberIndex = 24 bytes (type byte already stripped)
-					if (rPacket.payload.size() < 24)
-					{
-						break;
-					}
 					const uint8_t* pCursor = rPacket.payload.data();
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
@@ -156,10 +142,6 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientFleetNavigationDelay:
 				{
 					// 16B fleetGuid + 4B delay = 20 bytes (type byte already stripped)
-					if (rPacket.payload.size() < 20)
-					{
-						break;
-					}
 					const uint8_t* pCursor = rPacket.payload.data();
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
@@ -215,10 +197,6 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientPauseRequest:
 				{
 					// 1B paused (type byte already stripped)
-					if (rPacket.payload.size() < 1)
-					{
-						break;
-					}
 					const uint8_t* pCursor = rPacket.payload.data();
 					bool bPaused = engine::ReadUint8(pCursor) != 0;
 					gpGame->mGameFlags.Set(engine::GameFlags::kPaused, bPaused);
@@ -228,10 +206,6 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientTimespeedRequest:
 				{
 					// 1B direction (type byte already stripped); 0 = slower, 1 = faster
-					if (rPacket.payload.size() < 1)
-					{
-						break;
-					}
 					const uint8_t* pCursor = rPacket.payload.data();
 					uint8_t uiDirection = engine::ReadUint8(pCursor);
 					StepTimescale(uiDirection != 0);
