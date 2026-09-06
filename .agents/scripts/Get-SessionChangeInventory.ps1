@@ -507,8 +507,16 @@ function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $U
 		$symbol = $Matches[5].TrimEnd("`r").Trim()
 		if ($symbol.Length -gt $script:MaximumSymbolLength) { $symbol = $symbol.Substring(0, $script:MaximumSymbolLength) }
 		$kind = if ($oldCount -eq 0) { 'added' } elseif ($newCount -eq 0) { 'deleted' } else { 'modified' }
+		# A non-null symbol is Git's preceding-context hint from the pre-change side (nearest preceding
+		# unindented line, usually the enclosing declaration), never the region's own text, so it is emitted
+		# only for the $script:SourceMembershipClasses classes; that set picks which regions carry one.
+		# The fixed ordinary-file mode and $false are safe: Get-PathClass uses the mode only to divert a
+		# gitlink, whose hunk header carries no context text, and the flag only to relabel 'other', while a
+		# binary path emits no @@ header at all.
+		$regionPath = if ($null -ne $newPath) { $newPath } else { $oldPath }
+		$carriesSymbol = $script:SourceMembershipClasses -ccontains (Get-PathClass $regionPath '100644' $false)
 		$regions.Add([ordered]@{
-			path = if ($null -ne $newPath) { $newPath } else { $oldPath }
+			path = $regionPath
 			kind = $kind
 			startLine = if ($newCount -eq 0) { $null } else { $newStart }
 			endLine = if ($newCount -eq 0) { $null } else { $newStart + $newCount - 1 }
@@ -516,7 +524,7 @@ function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $U
 			oldEndLine = if ($oldCount -eq 0) { $null } else { $oldStart + $oldCount - 1 }
 			addedLines = $newCount
 			deletedLines = $oldCount
-			symbol = if ([string]::IsNullOrEmpty($symbol)) { $null } else { $symbol }
+			symbol = if ($carriesSymbol -and -not [string]::IsNullOrEmpty($symbol)) { $symbol } else { $null }
 		})
 	}
 	# Wrap so a zero- or one-element table stays a collection instead of unrolling (see

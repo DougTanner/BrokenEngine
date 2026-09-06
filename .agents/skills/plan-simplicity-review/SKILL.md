@@ -98,7 +98,7 @@ supporting detail, the full Q2 cost comparison, and the per-question judgment
 notes travel in a gitignored `Temp/` file, under one `## PSR-F-###` heading per
 finding, cited under `Evidence`. The handoff does not restate them.
 
-If clean, state `PASS — plan changes are minimally scoped.` Return:
+Return:
 
 ```text
 Steps reviewed: <added-code and modified-artifact steps>

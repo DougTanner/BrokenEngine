@@ -58,7 +58,7 @@ other field that refers to a finding (such as `API Verification Requests:`)
 names it by its `PA-F-###` ID and adds only its own required content, never
 restating that finding's problem, evidence, or proposed improvement.
 
-If clean, state `PASS — no meaningful plan flaws found.` Return:
+Return:
 
 ```text
 API Verification Requests: <single checkable requests or none>
