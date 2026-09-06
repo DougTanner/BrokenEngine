@@ -112,7 +112,7 @@ Main splits the work into disjoint slices where possible. Review-fix exceptions 
 
 Order: the full applicable static pass runs after propagation; each `Build required` handoff compiles as it arrives and may run in parallel with that pass. Focused implementation self-checks remain inside the implementation slices.
 
-- an `implementer` runs the full applicable static pass in `.agents/references/static-checks.md` after propagation — every tier.
+- an `implementer` runs the full applicable static pass in `.agents/references/static-checks.md` after propagation — every tier; main cites that reference in the brief's `Governing paths` and the `implementer` reads it there, so main need not read it.
 - `builder` runs `/compile` — every `Build required` handoff, before the covered work advances.
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
