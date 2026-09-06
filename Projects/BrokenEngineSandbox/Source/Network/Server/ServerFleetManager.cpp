@@ -13,11 +13,6 @@ namespace game
 
 #if defined(BT_SERVER)
 
-// DoS ceiling on per-client fleet count — well above any real use; bounds mFleets against a spamming client.
-constexpr int64_t kiMaxFleetsPerClient = 16;
-// Per-fleet member cap — parity with Frame.cpp's kiMaxFleetSize (16); bounds Fleet::members against a spamming client.
-constexpr size_t kiMaxFleetMembers = 16;
-
 ServerFleetManager::ServerFleetManager()
 {
 	mRandomEngine.TimeSeed();
@@ -142,9 +137,9 @@ void ServerFleetManager::ProcessSpawnIntoFleetRequests()
 		}
 
 		const Fleet& rFleet = it->second.at(static_cast<size_t>(iFleetIndex));
-		if (rFleet.members.size() >= kiMaxFleetMembers)
+		if (rFleet.members.size() >= kuiMaxFleetMembers)
 		{
-			LOG(kNetwork, kWarning, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, kiMaxFleetMembers);
+			LOG(kNetwork, kWarning, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, kuiMaxFleetMembers);
 			continue;
 		}
 
@@ -318,9 +313,9 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 		// New member — cap per-fleet member count so a spamming client can't grow members unboundedly.
 		// At cap, drop this spawn from the fleet roster entirely (return before flagship mutation)
 		// rather than skip only the push: a phantom member would corrupt flagship assignment.
-		if (rFleet.members.size() >= kiMaxFleetMembers)
+		if (rFleet.members.size() >= kuiMaxFleetMembers)
 		{
-			LOG(kNetwork, kWarning, "ServerFleetManager::OnPlayerSpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kiMaxFleetMembers);
+			LOG(kNetwork, kWarning, "ServerFleetManager::OnPlayerSpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kuiMaxFleetMembers);
 			return;
 		}
 		rFleet.members.push_back(FleetMember {globalPlayerId, true, engine::kOriginCoord});

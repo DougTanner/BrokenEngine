@@ -17,6 +17,11 @@ namespace game
 
 struct ClientSpawnInfo;
 
+// DoS ceiling on per-client fleet count — well above any real use; bounds mFleets against a spamming client.
+constexpr int64_t kiMaxFleetsPerClient = 16;
+// Per-fleet member cap — parity with Frame.cpp's kiMaxFleetSize (16); bounds Fleet::members against a spamming client.
+constexpr size_t kuiMaxFleetMembers = 16;
+
 struct PendingCreateFleetRequest
 {
 	int64_t iClientId = 0;
