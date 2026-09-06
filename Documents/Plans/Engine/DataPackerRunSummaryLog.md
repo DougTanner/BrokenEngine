@@ -29,7 +29,7 @@ ref whose tree actually contains this Plan:
 - Worktree: .claude\worktrees\BrokenEngine\9e8570fa-0b70-4aaf-95e6-5e3699d37cfb
 - Landing ref: claude/9e8570fa-0b70-4aaf-95e6-5e3699d37cfb
   Fallback once the recorded ref is gone:
-  `git log --diff-filter=A --format=%H -- Documents/Plans/Engine/DataPackerRunSummaryLog.md`,
+  `git log --follow --diff-filter=A --format=%H -- Documents/Plans/Engine/DataPackerRunSummaryLog.md`,
   but a periodic Plan-history squash can make it return an unrelated aggregate
   commit, so review its result only when the commit is attributable to one
   session alone (its diff limited to that session's files); never review an

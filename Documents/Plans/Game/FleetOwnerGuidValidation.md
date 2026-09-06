@@ -48,7 +48,7 @@ Preserve these invariants:
 
 ## Coordination
 
-`Documents/Plans/Engine/FleetOwnerGuidUniqueness.md` owns duplicate owner-key insertion, `Documents/Plans/Engine/FleetGuidSentinelValidation.md` owns per-Fleet identity, and `Documents/Plans/Engine/FleetCountBoundsValidation.md` owns policy ceilings. Keep owner emptiness independent while sharing staged-read rejection and isolated adoption.
+`Documents/Plans/Game/FleetOwnerGuidUniqueness.md` owns duplicate owner-key insertion, `Documents/Plans/Game/FleetGuidSentinelValidation.md` owns per-Fleet identity, and `Documents/Plans/Game/FleetCountBoundsValidation.md` owns policy ceilings. Keep owner emptiness independent while sharing staged-read rejection and isolated adoption.
 
 ## Notes
 

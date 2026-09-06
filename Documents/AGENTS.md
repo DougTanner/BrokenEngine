@@ -23,4 +23,4 @@ Design-time documents live in three sibling directories:
 
 Decision-complete means every choice needed to implement is already made: no open options, no TBDs.
 
-Deciding test: *is this decision-complete work?* No → `Investigations/`. Yes, and it gives the engine a capability it didn't have before → `Features/`; otherwise → `Plans/`. Every plan document under `Plans/` carries a byte-zero, Git-tracked metadata marker; a marker-less one is a validation error, not a manual document. WorktreeCli selects executable Plans deterministically by immutable creation time and normalized path. Each tree uses area subfolders (`Engine/`, `Frame/`, `Graphics/`, etc.).
+Deciding test: *is this decision-complete work?* No → `Investigations/`. Yes, and it gives the engine a capability it didn't have before → `Features/`; otherwise → `Plans/`. Every plan document under `Plans/` carries a byte-zero, Git-tracked metadata marker; a marker-less one is a validation error, not a manual document. WorktreeCli selects executable Plans deterministically by immutable creation time and normalized path. Each tree uses area subfolders; `Plans/AGENTS.md` defines the Plans areas.

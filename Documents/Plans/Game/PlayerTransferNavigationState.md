@@ -172,7 +172,7 @@ timer, ownership, or input-validation boundaries.
 
 ## Coordination
 
-`Documents/Plans/Engine/SpaceshipTransferBehaviorFlags.md` independently
+`Documents/Plans/Game/SpaceshipTransferBehaviorFlags.md` independently
 changes `TransferData`, the Spaceship per-arm codec width (65 bytes after its
 added flag), and the protocol/replay version gates; that arm does not by itself
 require raising the current 120-byte shared maximum.  No dependency is

@@ -21,7 +21,16 @@ Completion uses `plan complete`; explicit rejection uses `plan reject --user-aut
 
 ## Plan files
 
-Plans live in area subdirectories, never directly at `Plans/`. An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
+Plans live in area subdirectories, never directly at `Plans/`. The area is decided by the files the plan's critical-files and `## In scope` sections name, not by what motivated it:
+
+- `Engine/` — the runtime and asset pipeline: `Engine/`, `Common/`, `DataPacker/`, shaders, and the `AGENTS.md` files that document them.
+- `Game/` — the game built on the engine, under `Projects/`: gameplay collections, spawning and transfer, fleets, player input, game save and settings, and game-side agent commands.
+- `Tools/` — the C++ tools under `Tools/`: WorktreeCli, AgentHarness, ToolCommon.
+- `ChangeWorkflow/` — how agents work rather than what the product does: the root `AGENTS.md`, `.agents/`, `.claude/`, `.codex/`, skills and their scripts, the wrapper and scheduler scripts, and this file.
+
+A plan whose named files span areas goes to the area owning most of them; a tie stays in `Engine/`.
+
+An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
 
 The two scope sections are the control the finished change is measured against: the Review and resolve correctness step's review of each changed artifact type treats a changed region no `## In scope` clause covers, or one an `## Out of scope` line names, as unauthorized. A boundary written vaguely is a boundary that cannot be enforced.
 

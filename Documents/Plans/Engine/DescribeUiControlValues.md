@@ -52,7 +52,7 @@ tree actually contains this Plan:
 - Worktree: .claude\worktrees\BrokenEngine\d2db039b-b414-4862-b6b6-4f2df98bee44
 - Landing ref: claude/d2db039b-b414-4862-b6b6-4f2df98bee44
   Fallback once the recorded ref is gone:
-  `git log --diff-filter=A --format=%H -- Documents/Plans/Engine/DescribeUiControlValues.md`,
+  `git log --follow --diff-filter=A --format=%H -- Documents/Plans/Engine/DescribeUiControlValues.md`,
   but a periodic Plan-history squash can make it return an unrelated aggregate
   commit, so review its result only when the commit is attributable to one
   session alone (its diff limited to that session's files); never review an

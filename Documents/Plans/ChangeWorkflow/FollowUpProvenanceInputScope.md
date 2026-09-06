@@ -38,7 +38,7 @@ ref whose tree actually contains this Plan:
 - Landing ref: claude/0c3c3845-ec0f-4533-af6b-469c0303a5e6, this session's
   branch, whose landing commit will contain this Plan.
   Fallback once the recorded ref is gone:
-  `git log --diff-filter=A --format=%H -- Documents/Plans/Engine/FollowUpProvenanceInputScope.md`,
+  `git log --follow --diff-filter=A --format=%H -- Documents/Plans/ChangeWorkflow/FollowUpProvenanceInputScope.md`,
   but a periodic Plan-history squash can make it return an unrelated aggregate
   commit, so review its result only when the commit is attributable to one
   session alone (its diff limited to that session's files); never review an
@@ -139,6 +139,6 @@ Invariants to preserve:
 ## Coordination
 No mandatory constraint binds this Plan to another live Plan. No live Plan names
 `.agents/skills/create-follow-up-plans/SKILL.md`;
-`Documents/Plans/Engine/DeadPlanClosureReferenceScript.md` places any change to
+`Documents/Plans/ChangeWorkflow/DeadPlanClosureReferenceScript.md` places any change to
 `.agents/skills/create-follow-up-plans/references/worker.md` out of its own
 scope, and this Plan does not touch that file either, so the two are disjoint.

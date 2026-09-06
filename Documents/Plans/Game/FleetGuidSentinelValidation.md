@@ -88,8 +88,8 @@ Preserve these invariants:
 
 ## Coordination
 
-`Documents/Plans/Engine/FleetFlagshipIndexValidation.md` and
-`Documents/Plans/Engine/FleetOwnerGuidUniqueness.md` validate other predicates
+`Documents/Plans/Game/FleetFlagshipIndexValidation.md` and
+`Documents/Plans/Game/FleetOwnerGuidUniqueness.md` validate other predicates
 at the same staged Fleet reader.  Keep the reserved FleetGuid sentinel check
 independent, preserve the common failure path, and re-derive line ranges before
 implementation.

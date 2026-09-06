@@ -148,7 +148,7 @@ Preserve these invariants:
 
 ## Coordination
 
-`Documents/Plans/Engine/PlayerTransferNavigationState.md` independently
+`Documents/Plans/Game/PlayerTransferNavigationState.md` independently
 changes `TransferData`, the Player per-arm codec width (its planned arm is 152
 bytes), and the protocol/replay version gates.  That 152-byte arm independently
 requires and informs the shared maximum change.  No dependency is required.

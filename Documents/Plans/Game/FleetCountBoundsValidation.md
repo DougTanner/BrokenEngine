@@ -47,7 +47,7 @@ Preserve these invariants:
 
 ## Coordination
 
-`Documents/Plans/Engine/FleetFlagshipIndexValidation.md`, `Documents/Plans/Engine/FleetOwnerGuidValidation.md`, `Documents/Plans/Engine/FleetGuidSentinelValidation.md`, and `Documents/Plans/Engine/FleetOwnerGuidUniqueness.md` own separate staged Fleet predicates. Keep count ceilings independent while sharing the common corrupt-save failure and isolated adoption boundary.
+`Documents/Plans/Game/FleetFlagshipIndexValidation.md`, `Documents/Plans/Game/FleetOwnerGuidValidation.md`, `Documents/Plans/Game/FleetGuidSentinelValidation.md`, and `Documents/Plans/Game/FleetOwnerGuidUniqueness.md` own separate staged Fleet predicates. Keep count ceilings independent while sharing the common corrupt-save failure and isolated adoption boundary.
 
 ## Notes
 

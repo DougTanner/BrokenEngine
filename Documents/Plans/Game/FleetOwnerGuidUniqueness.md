@@ -86,8 +86,8 @@ Preserve these invariants:
 
 ## Coordination
 
-`Documents/Plans/Engine/FleetFlagshipIndexValidation.md` and
-`Documents/Plans/Engine/FleetGuidSentinelValidation.md` share the staged Fleet
+`Documents/Plans/Game/FleetFlagshipIndexValidation.md` and
+`Documents/Plans/Game/FleetGuidSentinelValidation.md` share the staged Fleet
 read boundary but own different invariants.  Keep owner-key insertion checking
 independent, preserve the common corrupt-save path, and re-derive line ranges
 before implementation.

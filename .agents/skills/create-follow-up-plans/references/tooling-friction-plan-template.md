@@ -37,7 +37,7 @@ ref whose tree actually contains this Plan:
   session branch, because the branch above was landed before this Plan
   existed.>
   Fallback once the recorded ref is gone:
-  `git log --diff-filter=A --format=%H -- <this plan path>`, but a periodic
+  `git log --follow --diff-filter=A --format=%H -- <this plan path>`, but a periodic
   Plan-history squash can make it return an unrelated aggregate commit, so
   review its result only when the commit is attributable to one session alone
   (its diff limited to that session's files); never review an aggregate or

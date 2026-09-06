@@ -89,7 +89,7 @@ resolve correctly today.
 - The citation token grammar at `$script:CitationPattern`, including the landed
   rule that a token must contain at least one `/`, which must not be reopened
 - The success-exit status and code of the same script, including its behavior on
-  a truncated result, which `Documents/Plans/Engine/PlanCitationTruncatedStatus.md`
+  a truncated result, which `Documents/Plans/ChangeWorkflow/PlanCitationTruncatedStatus.md`
   owns
 - The caps (`MaximumCitations`, `MaximumTextLength`, `MaximumOutputBytes`) and
   the shed ordering
@@ -100,7 +100,7 @@ resolve correctly today.
   citations are written
 
 ## Coordination
-`Documents/Plans/Engine/PlanCitationTruncatedStatus.md` changes the success-exit
+`Documents/Plans/ChangeWorkflow/PlanCitationTruncatedStatus.md` changes the success-exit
 status and code of this same script, a region disjoint from the resolution
 region this Plan changes. Neither Plan requires the other first, and neither
 constrains the other's chosen behavior. Whichever lands second re-reads the

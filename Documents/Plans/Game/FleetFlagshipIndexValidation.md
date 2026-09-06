@@ -93,8 +93,8 @@ Preserve these invariants:
 
 ## Coordination
 
-`Documents/Plans/Engine/FleetGuidSentinelValidation.md` and
-`Documents/Plans/Engine/FleetOwnerGuidUniqueness.md` also validate
+`Documents/Plans/Game/FleetGuidSentinelValidation.md` and
+`Documents/Plans/Game/FleetOwnerGuidUniqueness.md` also validate
 `ServerFleetSerialization.cpp`.  Keep flagship/member relation, FleetGuid
 sentinel, and owner-map key uniqueness as separate predicates at the same
 staged-read failure boundary, and re-derive line ranges before implementation.
