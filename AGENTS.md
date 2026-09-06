@@ -119,7 +119,7 @@ Full builds and runtime or harness scenarios remain acceptance-table work.
 
 #### Step 6 — Review and resolve correctness
 
-Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker.
+Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/verify-external-claims` runs whenever a review or `/resolve-findings` handoff raises requests, before main decides the dependent finding or resolution; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker.
 
 - fresh `reviewer` runs `/repo-code-review` — when the change touches C++.
 - fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
@@ -127,6 +127,7 @@ Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
 - fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier 1 with no changed C++ or GLSL this dispatch is the Step 6 combined pass and also carries Steps 7 and 8.
 - fresh `reviewer` runs `/coherence-review` — other Tier-2+ artifacts; the reviewer must be new to the change.
 - `reviewer` runs `/adversarial-review` — Tier 3 always; optional at any tier for one concrete unresolved hypothesis.
+- main runs `/verify-external-claims`, dispatching one `locator` as its evidence worker — for the external claims a review or `/resolve-findings` handoff raises.
 - separate `implementer` runs `/resolve-findings` — whenever main accepts a finding.
 
 Main dispatches one fresh `reviewer` per changed artifact type, plus the `mechanic` for `/comment-review`, scoped to the changed bytes and the rules they touch. Scope, minimality, and simplicity checks run inside each Tier 2+ review; there is no separate scope dispatch. Main decides each finding once.
