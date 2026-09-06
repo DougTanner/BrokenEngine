@@ -42,10 +42,7 @@ reload/decommit/recommit surface, texture chunk state reset, and memory
 statistics — which is why a cohesive boundary is plausible but must be chosen
 against the then-current file.
 
-No live Plan owns this file's size. `Documents/Plans/Engine/BakeRouteFileSizeReduction.md`
-is the same kind of work on a different file
-(`DataPacker/Source/ExportJobs/Island/BakeRoute.cpp`) and does not touch
-`PackChunks.cpp`. Several live Plans edit regions of `PackChunks.cpp` for
+No live Plan owns this file's size. Several live Plans edit regions of `PackChunks.cpp` for
 behavior reasons; none of them changes its length. See `## Coordination`.
 
 ## Design
