@@ -1,14 +1,15 @@
 #pragma once
 
 #include "FileManager.h" // EagerChunk/LazyChunk/ChunkState/MovableAtomicChunkState/LoadRequest/LoadPriority/MemoryStats + IsEagerChunk/IsServerChunk decls live here
+#include "PackChunkLoader.h"
 
 namespace engine
 {
 
 // The packed-asset chunk engine, owned by FileManager via std::unique_ptr.
-// Holds the eager pack buffers, the lazy chunk maps + atomic eState machine, the background loading-thread pool
-// and its sync primitives, and the single-VirtualAlloc lazy memory pool. Not a *Manager: no gp* global, not
-// aggregated into Engine.h; included only by PackChunks.cpp and FileManager.cpp.
+// Holds the eager pack buffers, the lazy chunk maps + atomic eState machine, the private background loader,
+// and the single-VirtualAlloc lazy memory pool. Not a *Manager: no gp* global, not
+// aggregated into Engine.h; included only by PackChunks.cpp, PackChunkLoader.cpp, and FileManager.cpp.
 class PackChunks
 {
 public:
@@ -16,7 +17,7 @@ public:
 	explicit PackChunks(const std::filesystem::path& rDataDirectory);
 	~PackChunks();
 
-	PackChunks(const PackChunks&) = delete; // Owns std::threads whose lambdas capture `this`; deleting copy also suppresses the implicit move
+	PackChunks(const PackChunks&) = delete; // Its by-value loader borrows `this`; deleting copy also suppresses the implicit move
 	PackChunks& operator=(const PackChunks&) = delete;
 
 	const std::unordered_map<common::crc_t, EagerChunk>& GetEagerChunkMap() const;
@@ -52,10 +53,9 @@ public:
 	MemoryStats GetMemoryStats(data::DataTypes eDataType) const;
 
 private:
+	friend class PackChunkLoader;
 
 	void LoadPackFiles();
-	void LoadingThread(int64_t iThreadIndex);
-	void LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex);
 	[[nodiscard]] bool RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, uint64_t uiOffset, uint64_t uiLength);
 	std::filesystem::path GetDataFilePath(data::DataTypes eDataType, std::string_view extension) const;
 
@@ -75,24 +75,6 @@ private:
 	std::unordered_map<common::crc_t, EagerChunk> mEagerChunkMap;  // Scene, Model, Shader, Raw
 	std::unordered_map<common::crc_t, LazyChunk> mLazyChunkMap;  // Audio, Islands, Texture
 
-	// N background loading threads, assigned inside the async eager-load task (mLoadingFuture), not the ctor body.
-	// Each LoadingThread pops from the shared priority queue and reads the sync members below
-	// (mWakeCondition/mQueueMutex/mRequestQueue/mShutdown), owning a private read buffer + decompress scratch
-	// (indexed by thread index). ~PackChunks first drains mLoadingFuture (ensuring these assignments have
-	// happened), then sets mShutdown + notify_all()s + join()s every thread before those members destruct.
-	// Count is deliberately small: each thread doubles the read-buffer + decompress-scratch memory footprint.
-	static constexpr int64_t kiLoadingThreadCount = 2;
-	std::thread mLoadingThreads[kiLoadingThreadCount];
-	std::condition_variable mWakeCondition;
-	std::condition_variable mCompletionCondition;
-	mutable std::mutex mQueueMutex;
-	std::priority_queue<LoadRequest> mRequestQueue;
-	std::atomic<bool> mShutdown {false};
-
-	// Jobs popped from mRequestQueue but not yet finished, guarded by mQueueMutex. Queue-empty alone cannot say the
-	// loaders are idle, because a popped job runs outside the lock; WaitForLoadersIdle needs both.
-	int64_t miActiveLoadJobs = 0;
-
 	// Eager-load completion, assigned in LoadPackFiles. mutable: the first GetEagerChunkMap() drains it
 	// (a lazy completion behind the const accessor).
 	mutable std::future<void> mLoadingFuture;
@@ -107,7 +89,7 @@ private:
 
 	// Per-loading-thread sector-aligned read buffers (one per thread, indexed by thread index; reused across that
 	// thread's chunk reads). Size is shared — identical for every thread.
-	std::byte* mpReadBuffers[kiLoadingThreadCount] {};
+	std::byte* mpReadBuffers[PackChunkLoader::kiLoadingThreadCount] {};
 	int64_t miReadBufferSize = 0;
 	int64_t miSectorSize = 0;
 	int64_t miPageSize = 0; // VM page granularity for lazy-chunk sub-range decommit/recommit
@@ -118,11 +100,13 @@ private:
 
 	// Per-loading-thread scratch buffers for compressed chunks (LZ4 or zlib; one per thread, indexed by thread index).
 	// Each sized at boot to the largest compressed chunk on disk; reused per chunk. Size is shared.
-	std::byte* mpDecompressScratches[kiLoadingThreadCount] {};
+	std::byte* mpDecompressScratches[PackChunkLoader::kiLoadingThreadCount] {};
 	int64_t miDecompressScratchSize = 0;
 
 	// Sub-read size for chunked disk reads (256KB balances NVMe throughput vs L3 cache pressure)
 	static constexpr int64_t kiSubReadSize = 256 * 1024;
+
+	PackChunkLoader mLoader;
 };
 
 } // namespace engine
