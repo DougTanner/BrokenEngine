@@ -45,9 +45,6 @@ unaffected results.
 - `Claim` — the Plan path, or none; with the resolved state when claimed.
 - `Classification` — `Tier 1`, `Tier 2`, or `Tier 3`, and the trigger.
 - `Execution card` — the file path plus its `##` selector.
-- `Findings` — review-role findings only.
-- `Build required` — the exact targets, or none.
-- `Residuals` — blocker, or none; last.
 
 ### Execution card presentation/template
 
