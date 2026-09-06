@@ -935,3 +935,4 @@
 {"index":933,"date":"2026-09-06","captureMode":"carry-forward","verbosity":0.037427791296,"structuralErosion":0.540093955592,"supported":525,"parsed":524}
 {"index":934,"date":"2026-09-06","captureMode":"cpp-change","verbosity":0.037399309551,"structuralErosion":0.539635769271,"supported":525,"parsed":524}
 {"index":935,"date":"2026-09-06","captureMode":"cpp-change","verbosity":0.037254065681,"structuralErosion":0.538628356667,"supported":527,"parsed":526}
+{"index":936,"date":"2026-09-06","captureMode":"carry-forward","verbosity":0.037254065681,"structuralErosion":0.538628356667,"supported":527,"parsed":526}

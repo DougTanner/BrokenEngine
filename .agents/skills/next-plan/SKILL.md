@@ -82,6 +82,19 @@ replacement presentation.
 When preparation shows the problem the Plan describes is gone, ask the user
 whether to retain the Plan or to explicitly authorize obsolete final cleanup.
 
+### IMPORTANT: Session-complete marker
+
+The user closes the session tab on this line alone, so it must be
+unambiguous. When, and only when, the `/finalize-changes` handoff carries its
+`SESSION COMPLETE` line under the conditions its `## Handoff` states — the
+Plan was completed or rejected and its file removed, landing onto primary
+succeeded, the claim was released, the worktree is clean, and every objective
+stage is complete or explicitly deferred to a named unclaimed Plan — main's
+final message of that turn ends with the bare line `SESSION COMPLETE` as its
+very last line, after the `Follow-up Plans created:` footer, and asks the user
+nothing. Every other ending — retained claim, blocker, refused approval,
+deferral, unknown claim state, or work still to land — never prints that line.
+
 ## References
 
 - [references/worker.md](references/worker.md) — private: read it only if you

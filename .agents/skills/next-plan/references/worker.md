@@ -110,6 +110,10 @@
    and returns `nextAction: finalize-changes`. Done when that result is in hand;
    the claim stays held until landing succeeds, and `/finalize-changes` deletes
    it after primary advances.
+11. End the run per `### IMPORTANT: Session-complete marker` in
+   [`../SKILL.md`](../SKILL.md): print `SESSION COMPLETE` as the last line only
+   when the `/finalize-changes` handoff carried it. Done when the final
+   message's last line matches that rule for the run's outcome.
 
 ## Post-checkpoint outcomes
 

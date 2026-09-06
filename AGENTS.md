@@ -179,7 +179,7 @@ Once a stage's required checks pass, stop changing it: advance to the next stage
 - Explain fully when asked; use headings and bullet points so a longer explanation stays skimmable.
 - Reporting work: state what was built and what was verified separately, and name every required check still open; "done" means those checks have closed. A defect is stated with its evidence and effect, never as a verdict or count alone.
 - Comparing options: use the same criteria, evidence, detail, and tone for each; recommend one, but never sell the favorite by its benefit and the alternative by its risk.
-- Footer: the main session's final message of any turn that ran Change Workflow work ends with `Follow-up Plans created:` followed by one repo-relative path per Plan created that turn, tagged `landed in <commit>` or `unlanded in worktree`, or the single word `none`.
+- Footer: the main session's final message of any turn that ran Change Workflow work ends with `Follow-up Plans created:` followed by one repo-relative path per Plan created that turn, tagged `landed in <commit>` or `unlanded in worktree`, or the single word `none`. Only the `/next-plan` session-complete marker may follow it.
 
 ### Resolving Ambiguity
 
