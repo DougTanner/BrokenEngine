@@ -114,13 +114,6 @@ function Get-ContextCanonicalDirectory([string] $Path, [string] $Code, [string] 
 	return $canonical
 }
 
-function Select-ContextInput([string] $Supplied, [string] $EnvironmentName) {
-	if (-not [string]::IsNullOrWhiteSpace($Supplied)) { return $Supplied.Trim() }
-	$hint = [Environment]::GetEnvironmentVariable($EnvironmentName)
-	if (-not [string]::IsNullOrWhiteSpace($hint)) { return $hint.Trim() }
-	return $null
-}
-
 function Get-ContextNormalizedPaths([string] $Text) {
 	$paths = [Collections.Generic.List[string]]::new()
 	foreach ($line in ($Text -split "`n")) {
@@ -184,8 +177,8 @@ function Test-ContextIdeDirectory([string] $Directory) {
 }
 
 try {
-	# Identity precedence per input: explicit parameter, then wrapper environment hint, then derived default.
-	$rootInput = Select-ContextInput $RepositoryRoot 'BROKEN_ENGINE_WORKTREE_PATH'
+	# Identity precedence per input: explicit parameter, then derived default.
+	$rootInput = if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) { $null } else { $RepositoryRoot.Trim() }
 	if ($null -eq $rootInput) {
 		$rootInput = (Get-ContextGitText @('-C', $PSScriptRoot, 'rev-parse', '--show-toplevel') 'repository-root.unresolved' 'Could not derive the repository root from this script location:').Trim()
 	}
@@ -196,7 +189,7 @@ try {
 	}
 	$script:Result.repositoryRoot = $root
 
-	$primaryInput = Select-ContextInput $PrimaryCheckout 'BROKEN_ENGINE_PRIMARY_CHECKOUT'
+	$primaryInput = if ([string]::IsNullOrWhiteSpace($PrimaryCheckout)) { $null } else { $PrimaryCheckout.Trim() }
 	if ($null -eq $primaryInput) {
 		$commonDirectory = Get-ContextCanonicalDirectory (Get-ContextGitText @('-C', $root, 'rev-parse', '--path-format=absolute', '--git-common-dir') 'primary-checkout.unresolved' 'Could not resolve the Git common directory:').Trim() 'primary-checkout.unresolved' 'Git common directory'
 		$primaryInput = [IO.Path]::GetDirectoryName($commonDirectory)

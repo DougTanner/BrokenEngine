@@ -17,9 +17,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
 
    - Append `-RepositoryRoot`/`-PrimaryCheckout`/`-Baseline` only when the
      caller explicitly supplied that input; an empty or unset value counts as
-     not supplied, so omit the parameter and let the env-hint/derived-default
-     fallback apply. Pass the same explicitly supplied values to the build
-     invocation.
+     not supplied, so omit the parameter and let the derived default apply.
+     Pass the same explicitly supplied values to the build invocation.
    - `-IncludeDevEnvDir` is not an agent-run option: the build entry point
      requests DevEnvDir itself for an authorized Local generation build.
 
@@ -224,9 +223,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 - The build entry point re-resolves the same context internally on every call,
   so step 1's run informs your decision and never feeds values into a later
   command. Each of its inputs takes an explicitly supplied parameter first, then
-  the wrapper environment hint (`BROKEN_ENGINE_WORKTREE_PATH`,
-  `BROKEN_ENGINE_PRIMARY_CHECKOUT`), then the derived default. The baseline takes
-  no environment hint; step 2's `baseline` field states how it resolves.
+  the derived default; step 2's `baseline` field states how the baseline
+  resolves.
 - Never reconstruct these operations inline: no hand-typed changed-path
   `git diff`/`git ls-files` commands, no hand-resolved repository root, primary
   checkout, or baseline, and no inline `vswhere`/`DevEnvDir` discovery. A

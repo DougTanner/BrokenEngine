@@ -27,31 +27,6 @@ Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'WorktreeCliSessionExclusion.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $PSScriptRoot 'AgentWorktreeSession.psm1') -Force -DisableNameChecking
 
-$environmentNames = @(
-	'BROKEN_ENGINE_CLIENT_ARGUMENTS',
-	'BROKEN_ENGINE_SESSION_OWNER',
-	'BROKEN_ENGINE_WORKTREE_PATH',
-	'BROKEN_ENGINE_SESSION_BRANCH',
-	'BROKEN_ENGINE_PRIMARY_CHECKOUT',
-	'BROKEN_ENGINE_TARGET_BRANCH',
-	'BROKEN_ENGINE_AGENT_CLIENT'
-)
-$previousEnvironment = @{}
-foreach ($name in $environmentNames) { $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
-
-function Restore-AgentWorktreeEnvironment {
-	foreach ($name in $environmentNames) { [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process') }
-}
-
-function Set-AgentWorktreeEnvironment([object] $Identity, [string] $Owner) {
-	$env:BROKEN_ENGINE_SESSION_OWNER = $Owner
-	$env:BROKEN_ENGINE_WORKTREE_PATH = $Identity.Worktree
-	$env:BROKEN_ENGINE_SESSION_BRANCH = $Identity.Branch
-	$env:BROKEN_ENGINE_PRIMARY_CHECKOUT = $Identity.Primary.Root
-	$env:BROKEN_ENGINE_TARGET_BRANCH = $Identity.TargetBranch
-	$env:BROKEN_ENGINE_AGENT_CLIENT = $Client
-}
-
 function Assert-AgentWorktreeSkillsLink([string] $Worktree) {
 	$skillsLink = Join-Path $Worktree '.claude\skills'
 	$skillsItem = Get-Item -LiteralPath $skillsLink -Force -ErrorAction SilentlyContinue
@@ -88,7 +63,6 @@ try {
 			if ([string]::IsNullOrWhiteSpace($branch) -and (Test-Path -LiteralPath $headName)) { $branch = (Get-Content -LiteralPath $headName -Raw).Trim() -replace '^refs/heads/', '' }
 		}
 		if ($branch -cnotmatch "^$Client/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$") { throw "Worktree '$reattachTarget' is not checked out on a $Client session branch: '$branch'." }
-		$owner = $branch.Substring($Client.Length + 1)
 		if ($rebaseInProgress) { $baseline = @(Invoke-AgentGit @('-C', $reattachTarget, 'merge-base', 'HEAD', $primary.Head))[0].Trim() }
 		else {
 			# The primary branch name and the primary HEAD are read separately, so they disagree if that
@@ -113,8 +87,6 @@ try {
 		$worktree = Join-Path $worktreeRoot $uuid
 		if (Test-Path -LiteralPath $worktree) { throw "Generated worktree path already exists: '$worktree'." }
 		if (@(Invoke-AgentGit @('-C', $root, 'branch', '--list', $branch)).Count -ne 0) { throw "Generated branch already exists: '$branch'." }
-		# The branch uuid is the session owner, so reattach recovers the same identity from Git alone.
-		$owner = $uuid
 		$identity = [pscustomobject]@{ Primary = $primary; Worktree = $worktree; Branch = $branch; TargetBranch = $primary.Branch; Baseline = $primary.Head }
 		New-Item -ItemType Directory -Path $worktreeRoot -Force | Out-Null
 		# The per-worktree sparse configuration below requires this repository extension, which Git
@@ -150,8 +122,6 @@ try {
 		if (-not (Test-Path -LiteralPath (Join-Path $worktree 'AGENTS.md') -PathType Leaf)) { throw "Worktree '$worktree' checked out no files: '$worktree\AGENTS.md' is missing." }
 	}
 
-	# Both paths reach here with a validated identity and its durable session owner.
-	Set-AgentWorktreeEnvironment $identity $owner
 	# Record the branch this session lands onto; Get-AgentWorktreeSessionContext refuses to resolve a
 	# session worktree without it. Rewritten on every create and reattach, so it reflects the primary
 	# branch observed at the most recent wrapper start.
@@ -209,8 +179,5 @@ catch {
 	[Console]::Error.WriteLine($_.Exception.Message)
 	if ($worktreeCreated) { [Console]::Error.WriteLine("Preserved partial worktree '$($identity.Worktree)' and branch '$($identity.Branch)' for recovery.") }
 	$exitCode = 1
-}
-finally {
-	Restore-AgentWorktreeEnvironment
 }
 exit $exitCode
