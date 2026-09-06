@@ -54,13 +54,22 @@ Return the shared handoff form in
 [`subagent-reporting.md`](../../references/subagent-reporting.md),
 `## Handoffs`, extended with the build reporting below.
 
-- For a delegated call, return the complete results inline after applying the
-  execution and result discipline in
-  [`references/worker.md`](references/worker.md). Keep overall/per-project
-  status, data mode/path, and decisive blockers visible.
-- Include every build's captured `broken-engine-build-result/v1` envelope
-  verbatim in the handoff, and read every reported field from it, never from
-  scraped terminal text.
+- For a delegated call, return the results after applying the execution and
+  result discipline in [`references/worker.md`](references/worker.md). Keep
+  overall/per-project status, data mode/path, and decisive blockers visible; the
+  bullets below govern what each build carries inline.
+- Write every build's captured `broken-engine-build-result/v1` envelope verbatim
+  into one `Temp/AgentBuildEnvelopes/` Markdown file unique to this dispatch —
+  the directory created beforehand if absent — under a single `##` heading for
+  the dispatch with one fenced block per build: the first build's own PowerShell
+  call creates that file and heading, and each later build's own call appends
+  its block to the same file, each using that call's own captured output rather
+  than a new script or a retyped envelope. Read every reported field from the
+  envelope, never from scraped terminal text.
+- Include a build's envelope verbatim inline as well, unless that build is a
+  clean success — `status: success`, `failureKind: none`, `exitCode: 0`,
+  `retainedLog.complete: true`, and no `severity: error` diagnostic — for which
+  the handoff carries only the fields the bullets below require.
 - Final status per project: `status` plus `exitCode` and `failureKind`.
 - Every `severity: error` diagnostic's `raw` line verbatim, plus all `messages`
   entries; note `diagnosticsTruncated: true` and point at the retained log for
@@ -81,11 +90,12 @@ here:
 
 - `Decisive checks` — one row per build: target, configuration, status,
   exitCode, failureKind.
-- `Evidence` — the `retainedLog.path` per build.
+- `Evidence` — the `retainedLog.path` per build, and this dispatch's envelope
+  file as path plus selector.
 - `Residuals` — a failed or skipped required build, or none; last.
 
 `Changed files` and `Build required` are `none` because this skill changes no
-file itself.
+tracked file; the envelope file is ignored `Temp/` output.
 
 ### Structured build result
 

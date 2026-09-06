@@ -1,6 +1,6 @@
 ---
 name: builder
-description: Builds via /compile. Returns every build's `broken-engine-build-result/v1` envelope verbatim plus decisive error and warning lines verbatim, per /compile's Handoff contract.
+description: Builds via /compile. Returns the build reporting /compile's `## Handoff` defines.
 model: sonnet
 effort: xhigh
 disallowedTools: Agent

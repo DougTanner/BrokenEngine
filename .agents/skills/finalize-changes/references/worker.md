@@ -74,7 +74,8 @@ every other lease is foreign.
    - A triggered `/progressive-disclosure-review` handoff counts as existing on
      the terms the landing acceptance table states for that row.
    - Consume every typed receipt verbatim, each `broken-engine-build-result/v1`
-     envelope included, never summarized.
+     envelope included, never summarized, reading an envelope the brief cites as
+     a `Temp/` path plus selector from that file.
    - A meaningful change to that diff re-runs review of the changed regions
      only.
    - Done when every row of that table carries a status.
