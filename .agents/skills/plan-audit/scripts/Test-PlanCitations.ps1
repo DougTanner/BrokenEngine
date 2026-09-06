@@ -18,7 +18,6 @@ $script:RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\..'
 $script:CitationPattern = '^[A-Za-z0-9_./-]+\.(h|cpp|md|ps1|py|txt|glsl)(:[0-9]+(-[0-9]+)?)?$'
 $script:MaximumCitations = 48
 $script:MaximumTextLength = 160
-$script:MaximumExcerptLength = 120
 $script:MaximumMessageLength = 256
 $script:MaximumOutputBytes = 32768
 # The execution-card fields in the order ../../next-plan/SKILL.md '## Handoff' lists them. A Section
@@ -170,14 +169,9 @@ function Get-CitationRecords
 			$lines = Get-FileLines $cache $resolved.fullPath
 			$pathExists = $null -ne $lines -or [IO.File]::Exists($resolved.fullPath)
 			$lineExists = $null
-			$excerpt = $null
 			if ($null -ne $lineNumber)
 			{
 				$lineExists = $null -ne $lines -and $lineNumber -ge 1 -and $lineNumber -le $lines.Count
-				if ($lineExists)
-				{
-					$excerpt = $lines[$lineNumber - 1].Trim()
-				}
 			}
 
 			$null = $records.Add([pscustomobject]@{
@@ -187,7 +181,6 @@ function Get-CitationRecords
 				pathExists = $pathExists
 				lineNumber = $lineNumber
 				lineExists = $lineExists
-				excerpt = $excerpt
 			})
 		}
 	}
@@ -254,7 +247,6 @@ function Convert-ToOutputCitation
 
 	$citation = New-CappedText $Record.citation $script:MaximumTextLength
 	$path = New-CappedText $Record.path $script:MaximumTextLength
-	$excerpt = if ($null -eq $Record.excerpt) { $null } else { New-CappedText $Record.excerpt $script:MaximumExcerptLength }
 	return [pscustomobject][ordered]@{
 		citation = $citation.text
 		citationTruncated = $citation.truncated
@@ -264,8 +256,6 @@ function Convert-ToOutputCitation
 		pathExists = $Record.pathExists
 		lineNumber = $Record.lineNumber
 		lineExists = $Record.lineExists
-		excerpt = if ($null -eq $excerpt) { $null } else { $excerpt.text }
-		excerptTruncated = if ($null -eq $excerpt) { $false } else { $excerpt.truncated }
 	}
 }
 
@@ -284,21 +274,30 @@ function Set-CitationPayload
 {
 	param([Collections.Generic.List[object]]$Records)
 
+	# Only unresolved records are emitted, so the result size tracks the leads an auditor must chase
+	# instead of the citation count. The comparisons are explicit against $false because a citation
+	# without a ':line' part leaves lineExists $null, and that record resolved.
+	$unresolvedCount = @($Records | Where-Object { $_.pathExists -eq $false -or $_.lineExists -eq $false }).Count
 	$items = [Collections.Generic.List[object]]::new()
 	foreach ($record in $Records | Select-Object -First $script:MaximumCitations)
 	{
-		$null = $items.Add((Convert-ToOutputCitation $record))
+		if ($record.pathExists -eq $false -or $record.lineExists -eq $false)
+		{
+			$null = $items.Add((Convert-ToOutputCitation $record))
+		}
 	}
 
-	# Shed the lowest-priority records until the whole envelope fits the output cap.
+	# Shed the lowest-priority records until the whole envelope fits the output cap. Both counts and
+	# truncated speak about unresolved records only: an unresolved record the citation cap or this loop
+	# dropped stays counted, and a resolved record never sets them.
 	while ($true)
 	{
 		$script:Result.citations = [ordered]@{
 			items = @($items)
 			totalCount = $Records.Count
-			omittedCount = $Records.Count - $items.Count
+			omittedCount = $unresolvedCount - $items.Count
 		}
-		$script:Result.truncated = $items.Count -lt $Records.Count -or @($items | Where-Object { $_.citationTruncated -or $_.pathTruncated -or $_.excerptTruncated }).Count -gt 0
+		$script:Result.truncated = $items.Count -lt $unresolvedCount -or @($items | Where-Object { $_.citationTruncated -or $_.pathTruncated }).Count -gt 0
 		$json = $script:Result | ConvertTo-Json -Depth 8 -Compress
 		if ([Text.Encoding]::UTF8.GetByteCount($json) -le $script:MaximumOutputBytes -or $items.Count -eq 0)
 		{

@@ -15,14 +15,20 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    ```
 
    It writes nothing and returns one `broken-engine-plan-citations/v1` JSON
-   object on stdout: a record per backtick citation matching its grammar, with
-   path existence, line existence, and a short excerpt. Done when that JSON
-   object is in hand.
+   object on stdout: `citations.totalCount` for every backtick citation that
+   matches its grammar and whose path resolves inside the worktree, and a record
+   in `citations.items` only for one that did not resolve, carrying its path and
+   line number. A citation whose path points outside the worktree is skipped and
+   never counted; a citation that resolved is counted and not listed. Done when
+   that JSON object is in hand.
 3. The result caps how many records it returns, so read `truncated` and
-   `omittedCount` and resolve any omitted citation through the direct reads step
-   1 already requires; the prohibition above is against re-deriving what the
-   script already returned, not against your own reading. Done when no omitted
-   citation is left unresolved.
+   `omittedCount`: `omittedCount` is how many unresolved records those caps
+   dropped, and `truncated` is true when a cap dropped an unresolved record or
+   cut an emitted citation or path string to its length limit, so `truncated`
+   can be true with `omittedCount` zero. Resolve any omitted citation through the
+   direct reads step 1 already requires; the prohibition above is against
+   re-deriving what the script already returned, not against your own reading.
+   Done when no omitted citation is left unresolved.
 4. It renders no verdict, and a token it ignores is never a finding. An
    unresolved citation is a lead you must investigate — the plan may create that
    file, or the line may have moved — and never an automatic finding. Done when
