@@ -169,8 +169,17 @@ namespace toolcli
 
 		int HandleRefresh(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, const std::wstring& rOwner)
 		{
-			std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, CurrentUtcTicks()) : std::nullopt;
-			if (!lease || lease->owner != WideToUtf8(rOwner))
+			const uint64_t uiCurrentTicks = CurrentUtcTicks();
+			std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, uiCurrentTicks) : std::nullopt;
+			if (!lease)
+			{
+				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
+			}
+			if (lease->owner != WideToUtf8(rOwner))
+			{
+				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
+			}
+			if (uiCurrentTicks >= lease->uiExpiresTicks)
 			{
 				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 			}
