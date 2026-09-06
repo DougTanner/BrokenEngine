@@ -67,9 +67,10 @@ void ServerClientManager::NewClients()
 
 		LogConnectingClientDiagnostic(rClient);
 
-		if (gpServerSession->RelinkFromFrames(rClient.iClientId, rClient.clientGuid, ServerSession::RelinkContext::kConnect) > 0)
+		int64_t iRelinkedPlayerCount = gpServerSession->RelinkFromFrames(rClient.iClientId, rClient.clientGuid, ServerSession::RelinkContext::kConnect);
+		gpServerSession->mpFleetManager->OnClientConnected(rClient.iClientId, rClient.clientGuid);
+		if (iRelinkedPlayerCount > 0)
 		{
-			gpServerSession->mpFleetManager->OnClientConnected(rClient.iClientId, rClient.clientGuid);
 			continue;
 		}
 

@@ -154,6 +154,10 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 		common::Read(rFileStream, uiGuidHigh);
 		common::Read(rFileStream, uiGuidLow);
 		engine::ClientGuid guid {uiGuidHigh, uiGuidLow};
+		if (guid.IsEmpty())
+		{
+			throw common::CorruptStreamException("Fleet owner ClientGuid");
+		}
 		int64_t iFleetCount = 0;
 		common::Read(rFileStream, iFleetCount);
 		// Trust boundary (save / replay file): bound the fleet count against the cap before constructing the vector
