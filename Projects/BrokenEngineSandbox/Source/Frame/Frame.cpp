@@ -12,6 +12,21 @@ namespace game
 
 using enum GameFlags;
 
+constexpr float kfSpaceshipSpawnInterval = 0.5f;
+
+static float AdmitSpawnTimer(float fSpawnTimer)
+{
+	if (!std::isfinite(fSpawnTimer))
+	{
+		return 0.0f;
+	}
+	if (fSpawnTimer >= kfSpaceshipSpawnInterval)
+	{
+		throw common::CorruptStreamException("FrameInterpolate fSpawnTimer");
+	}
+	return fSpawnTimer;
+}
+
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
@@ -430,10 +445,9 @@ void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 	}
 
 	// Spawn one spaceship per player every half second
-	constexpr float kfSpawnInterval = 0.5f;
-	while (rInterpolate.fSpawnTimer >= kfSpawnInterval)
+	while (rInterpolate.fSpawnTimer >= kfSpaceshipSpawnInterval)
 	{
-		rInterpolate.fSpawnTimer -= kfSpawnInterval;
+		rInterpolate.fSpawnTimer -= kfSpaceshipSpawnInterval;
 		SpawnSpaceshipGroup(rFrame, rStaticData);
 	}
 }
@@ -675,7 +689,7 @@ void FrameInterpolate::Read(std::istream& rStream)
 	static_cast<engine::FrameInterpolateBase&>(*this).Read(rStream);
 
 	common::Read(rStream, fSpawnTimer);
-	fSpawnTimer = std::isfinite(fSpawnTimer) ? fSpawnTimer : 0.0f;
+	fSpawnTimer = AdmitSpawnTimer(fSpawnTimer);
 	common::Read(rStream, gameFlags);
 
 	engine::CollectionRead(rStream, *pPlayers, pPlayers->Members());
@@ -688,7 +702,7 @@ void FrameInterpolate::ServerRead(std::istream& rStream)
 	static_cast<engine::FrameInterpolateBase&>(*this).ServerRead(rStream);
 
 	common::Read(rStream, fSpawnTimer);
-	fSpawnTimer = std::isfinite(fSpawnTimer) ? fSpawnTimer : 0.0f;
+	fSpawnTimer = AdmitSpawnTimer(fSpawnTimer);
 	common::Read(rStream, gameFlags);
 
 	engine::SharedCollectionRead(rStream, *pPlayers);
