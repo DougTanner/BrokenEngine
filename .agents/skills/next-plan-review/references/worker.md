@@ -77,7 +77,7 @@ The numbered spine the invoking parent executes, and the judgment no step owns.
      itself produce, that session can neither span nor select it, so the required
      proof becomes attribution of the commit to that session.
    - Accept as that attribution its recorded landing ref, or the
-     `git log --diff-filter=A` fallback commit only when that commit is
+     `git log --follow --diff-filter=A` fallback commit only when that commit is
      attributable to that session alone.
    - Report `Transcript provenance: BLOCKED` when the named transcript cannot be
      tied to the recorded session, and when the commit is not so attributable;
