@@ -27,6 +27,11 @@
    current code, on the single task brief in
    [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md).
 
+   That brief carries `Skill: none` — `/prepare-change` excludes a claimed
+   executable Plan — and a `Return:` naming the shared handoff form plus the
+   extension fields [`../SKILL.md`](../SKILL.md) `## Handoff` declares, so
+   exactly one handoff contract binds the worker.
+
    The Plan is immutable, current code wins, and every delegation states that
    Plan and card statements are hypotheses, so every contradiction returns to
    main as a card correction rather than an edit.
