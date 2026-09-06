@@ -61,10 +61,6 @@ Return the shared handoff form in
 - Every build's captured `broken-engine-build-result/v1` envelope is recorded
   verbatim in this dispatch's envelope file under `Temp/AgentBuildEnvelopes/`.
   Read every reported field from the envelope, never from scraped terminal text.
-- Include a build's envelope verbatim inline as well, unless that build is a
-  clean success — `status: success`, `failureKind: none`, `exitCode: 0`,
-  `retainedLog.complete: true`, and no `severity: error` diagnostic — for which
-  the handoff carries only the fields the bullets below require.
 - Final status per project: `status` plus `exitCode` and `failureKind`.
 - Every `severity: error` diagnostic's `raw` line verbatim, plus all `messages`
   entries; note `diagnosticsTruncated: true` and point at the retained log for

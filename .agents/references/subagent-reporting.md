@@ -117,10 +117,7 @@ characters, moves its full material to an existing file or log, or to a `Temp/`
 file when no existing file holds it, and cites it under `Evidence` as path plus
 selector. A selector into a Markdown file is a `##` heading in it. The handoff
 itself still carries everything main needs; the file is for the workers main
-dispatches next, cited to them as path plus selector. A typed envelope a role
-must return verbatim, such as the `broken-engine-build-result/v1` envelope the
-`builder` returns and the typed receipts `/finalize-changes` consumes, is exempt
-and does not count toward these limits.
+dispatches next, cited to them as path plus selector.
 
 Both `Executor` values are what the host reports to the worker itself: the model
 identity the host states in the worker's own context, and the effort from the

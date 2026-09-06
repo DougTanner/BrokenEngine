@@ -20,11 +20,10 @@ reviewer applies to it. Frontmatter and package mechanics belong to
    that reference's 'What main does with each field' table, mandate inline only
    what the table gives main an action for, and no more text than that action
    needs, however short the excess is; that reference's `## Handoffs` size caps
-   and their verbatim-envelope exemption still govern the return. An extension
-   field's own line counts when main acts on it as it acts on the field it
-   extends, text main must present or ask verbatim stays inline per
-   `## Public and private files`, and everything else is cited as path plus
-   selector.
+   still govern the return. An extension field's own line counts when main acts
+   on it as it acts on the field it extends, text main must present or ask
+   verbatim stays inline per `## Public and private files`, and everything else
+   is cited as path plus selector.
 6. `Rules` (`references/worker.md`) — judgment no step owns, as bullets.
 7. `References` (`SKILL.md`) — each linked file owning one topic.
 
