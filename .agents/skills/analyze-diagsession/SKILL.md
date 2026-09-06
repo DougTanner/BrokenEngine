@@ -33,12 +33,20 @@ Each locator returns the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with these fields:
 
-- `Source context` — the hotspot cluster: full function bodies, call sites,
-  enclosing loop/frame phase, container/comparator types, and file:line quotes.
+- `Source context` — the hotspot cluster's file:line quotes, enclosing
+  loop/frame phase, and container/comparator types.
 - `Residuals` — missing source context or symbols, or none; last.
 
-`Changed files` and `Build required` are `none` because this read-only
-locator run edits no file.
+The full function bodies and the call-site listings do not travel inline. Each
+locator writes them to its own gitignored
+`Temp/analyze-diagsession/<capture>-<hotspot cluster>.md` file, whose name uses
+a filename-safe form of the cluster label, under one `## <hotspot cluster>`
+heading that keeps the label itself, and cites that path plus that `##`
+selector under `Evidence`. Main reads them there when confirming source
+attribution needs more than the `Source context` line.
+
+`Changed files` and `Build required` are `none` because this locator run edits
+no tracked file.
 
 Main interprets the measurements, confirms source attribution, and performs the
 existing follow-up routing. Its own result is a profiling report, not a handoff,

@@ -42,7 +42,8 @@ its numbering at 5.
    frame-phase context, and container/comparator types behind template hits.
    Include memory helpers when their clustered share is meaningful. Done when
    every locator's source-context extension and complete shared handoff have
-   returned and main has interpreted them.
+   returned, each `Evidence` citing that locator's `Temp/analyze-diagsession/`
+   file plus its `## <hotspot cluster>` selector, and main has interpreted them.
 9. Route proven optimization residuals through `/create-follow-up-plans`, which
    owns duplicate checks, Plan shape, tracked metadata, and dependencies; no
    Plan claim is required. Do not author Plan files directly. Done when every

@@ -16,7 +16,15 @@ reviewer applies to it. Frontmatter and package mechanics belong to
 5. `Handoff` (`SKILL.md`) — the skill's extension fields, fixed shared values,
    and narrowed row forms as plain lines, or as a row-form fence holding no
    shared field name; it never re-renders the shared form from
-   [`subagent-reporting.md`](subagent-reporting.md), `## Handoffs`.
+   [`subagent-reporting.md`](subagent-reporting.md), `## Handoffs`. Applying
+   that reference's 'What main does with each field' table, mandate inline only
+   what the table gives main an action for, and no more text than that action
+   needs, however short the excess is; that reference's `## Handoffs` size caps
+   and their verbatim-envelope exemption still govern the return. An extension
+   field's own line counts when main acts on it as it acts on the field it
+   extends, text main must present or ask verbatim stays inline per
+   `## Public and private files`, and everything else is cited as path plus
+   selector.
 6. `Rules` (`references/worker.md`) — judgment no step owns, as bullets.
 7. `References` (`SKILL.md`) — each linked file owning one topic.
 
@@ -64,5 +72,6 @@ term.
 - `SKILL.md` links `references/worker.md` with the private marker line from
   `## Public and private files`.
 - `## Handoff` follows `## Section order` item 5: it renders no return fence
-  holding a shared handoff field.
+  holding a shared handoff field, and it mandates inline only what item 5
+  allows.
 - Size and layering pass `/progressive-disclosure-review`.

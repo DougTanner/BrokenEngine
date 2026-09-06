@@ -81,13 +81,14 @@ these inputs from conversation history.
 ## Handoff
 
 Return the shared handoff form in `../../references/subagent-reporting.md`,
-extended with the audit result block and these narrowed lines:
+extended with the audit result block and these narrowed lines, giving each
+finding a stable `SA###` ID:
 
 ```markdown
 ## Session Audit Results
 
 ### Findings
-- `path:line` — **Critical | Required:** — mode — <reachable failure and evidence>
+- <shared `Findings` row ID> — mode — <only what that one-line row cannot carry>
 - none
 
 ### API Verification Requests
