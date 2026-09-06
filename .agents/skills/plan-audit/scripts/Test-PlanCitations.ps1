@@ -15,7 +15,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $script:RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\..'))
-$script:CitationPattern = '^[A-Za-z0-9_./-]+\.(h|cpp|md|ps1|py|txt|glsl)(:[0-9]+(-[0-9]+)?)?$'
+# A citation must carry at least one '/': nearly every real citation is a repository-relative path, while
+# a backticked bare filename is usually prose; the rare bare Name.md:line citation loses its line check by design.
+$script:CitationPattern = '^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.(h|cpp|md|ps1|py|txt|glsl)(:[0-9]+(-[0-9]+)?)?$'
 $script:MaximumCitations = 48
 $script:MaximumTextLength = 160
 $script:MaximumMessageLength = 256
