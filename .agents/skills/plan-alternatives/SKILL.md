@@ -46,10 +46,10 @@ is the shared task-brief form in
 
 ## Handoff
 
-Each researcher returns these extension fields, one row each, followed by the
-shared handoff lines with `Build required: none` and `Status: PASS` for a
-returned candidate or a reported empty axis (neither is a finding); `BLOCKED`
-only when the brief or a cited path cannot be read:
+Each researcher returns these extension fields, one row each and each row one
+line, followed by the shared handoff lines with `Build required: none` and
+`Status: PASS` for a returned candidate or a reported empty axis (neither is a
+finding); `BLOCKED` only when the brief or a cited path cannot be read:
 
 ```text
 Axis: <1 Reuse | 2 Remove the need | 3 Reshape>
@@ -60,6 +60,10 @@ Adds/Deletes: <what it adds; what it deletes>
 Invariant surfaces: <surfaces it touches, or none>
 Pays off when: <the condition that makes it the right call>
 ```
+
+Supporting or quoted source text stays out of every row; a researcher that wants
+to show its sourcing cites the existing repository path plus selector under
+`Evidence` instead.
 
 ### Comparison
 
