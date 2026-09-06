@@ -143,87 +143,95 @@ void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
 	}
 }
 
-void ServerTransferManager::ApplyPreparedTransfers(std::span<const ClientTransferInfo> clientTransfers, bool bFilterDestinationLiveness)
+void ServerTransferManager::ApplyPreparedTransfers(common::ScopedWorkbufferArena& rTransfersArena, bool bFilterDestinationLiveness)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
-	// Capture pre-transfer CRCs from frame state populated by RunFrameTick before the transfer tail. The
-	// destination frame is changed in place by SpawnTransfers, so index these values before that mutation.
-	auto pPreCrcs = rWorkbuffer.PushBuffer<common::crc_t*>(std::ssize(mTransfers) * static_cast<int64_t>(sizeof(common::crc_t)));
-	int64_t iPreCrcIndex = 0;
-	for (const auto& [rCoord, rTransfers] : mTransfers)
 	{
-		const game::Frame& rDestFrame = *game::gpGame->mCoordFrames.at(rCoord).pNext;
-		pPreCrcs[iPreCrcIndex++] = rDestFrame.postRender.sharedCrc;
-	}
+		common::ScopedWorkbufferArena preCrcsArena = rWorkbuffer.Push();
 
-	SpawnTransfers(bFilterDestinationLiveness);
-
-	// Recompute CRCs for destination frames after transfers modified them. RunFrameTick computes CRCs before
-	// arrived transfers land, so this is required for both live publication and replay publication.
-	iPreCrcIndex = 0;
-	for (const auto& [rCoord, rTransfers] : mTransfers)
-	{
-		game::Frame& rDestFrame = *game::gpGame->mCoordFrames.at(rCoord).pNext;
-		rDestFrame.postRender.sharedCrc = rDestFrame.Crcs();
-
-		char acCrcPre[20] {}, acCrcPost[20] {};
-		common::ToHex(std::span<char, 20>(acCrcPre), pPreCrcs[iPreCrcIndex++]);
-		common::ToHex(std::span<char, 20>(acCrcPost), rDestFrame.postRender.sharedCrc);
-
-		char acPlayerIds[192] {};
-		int64_t iPlayerIdCount = 0;
-		size_t iPosition = 0;
-		for (const game::StatusChange& rTransfer : rTransfers)
+		// Capture pre-transfer CRCs from frame state populated by RunFrameTick before the transfer tail. The
+		// destination frame is changed in place by SpawnTransfers, so index these values before that mutation.
+		for (const auto& [rCoord, rTransfers] : mTransfers)
 		{
-			if (rTransfer.eType != game::StatusChangeType::kTransferPlayer || iPlayerIdCount >= 8)
-			{
-				continue;
-			}
+			const game::Frame& rDestFrame = *game::gpGame->mCoordFrames.at(rCoord).pNext;
+			preCrcsArena.PushBack(rDestFrame.postRender.sharedCrc);
+		}
 
-			static constexpr size_t kiReserve = 24; // ", " + max 20-digit int64
-			if (iPosition + kiReserve > sizeof(acPlayerIds))
+		SpawnTransfers(bFilterDestinationLiveness);
+
+		// Recompute CRCs for destination frames after transfers modified them. RunFrameTick computes CRCs before
+		// arrived transfers land, so this is required for both live publication and replay publication.
+		int64_t iPreCrcIndex = 0;
+		for (const auto& [rCoord, rTransfers] : mTransfers)
+		{
+			game::Frame& rDestFrame = *game::gpGame->mCoordFrames.at(rCoord).pNext;
+			const common::crc_t preCrc = preCrcsArena.Span<const common::crc_t>()[iPreCrcIndex++];
+			rDestFrame.postRender.sharedCrc = rDestFrame.Crcs();
+
+			char acCrcPre[20] {}, acCrcPost[20] {};
+			common::ToHex(std::span<char, 20>(acCrcPre), preCrc);
+			common::ToHex(std::span<char, 20>(acCrcPost), rDestFrame.postRender.sharedCrc);
+
+			char acPlayerIds[192] {};
+			int64_t iPlayerIdCount = 0;
+			size_t iPosition = 0;
+			for (const game::StatusChange& rTransfer : rTransfers)
 			{
-				break;
+				if (rTransfer.eType != game::StatusChangeType::kTransferPlayer)
+				{
+					continue;
+				}
+
+				if (iPlayerIdCount >= 8)
+				{
+					continue;
+				}
+
+				static constexpr size_t kiReserve = 24; // ", " + max 20-digit int64
+				if (iPosition + kiReserve > sizeof(acPlayerIds))
+				{
+					break;
+				}
+
+				if (iPlayerIdCount > 0)
+				{
+					acPlayerIds[iPosition++] = ',';
+					acPlayerIds[iPosition++] = ' ';
+				}
+				int iWritten = std::snprintf(acPlayerIds + iPosition, sizeof(acPlayerIds) - iPosition, "%lld", std::get<game::TransferData>(rTransfer.data).globalPlayerId.iValue);
+				if (iWritten <= 0)
+				{
+					break;
+				}
+				iPosition += static_cast<size_t>(iWritten);
+				++iPlayerIdCount;
 			}
 
 			if (iPlayerIdCount > 0)
 			{
-				acPlayerIds[iPosition++] = ',';
-				acPlayerIds[iPosition++] = ' ';
+				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {} PlayerIds: [{}]", rCoord.x, rCoord.y, rTransfers.size(), engine::CountRegistryRows(game::Frame::OwnershipLayer(rDestFrame)), rDestFrame.postRender.pBlasters->iCount, rDestFrame.postRender.pSpaceships->iCount, rDestFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost, acPlayerIds);
 			}
-			int iWritten = std::snprintf(acPlayerIds + iPosition, sizeof(acPlayerIds) - iPosition, "%lld", std::get<game::TransferData>(rTransfer.data).globalPlayerId.iValue);
-			if (iWritten <= 0)
+			else
 			{
-				break;
-			}
-			iPosition += static_cast<size_t>(iWritten);
-			++iPlayerIdCount;
-		}
-
-		if (iPlayerIdCount > 0)
-		{
-			LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {} PlayerIds: [{}]", rCoord.x, rCoord.y, rTransfers.size(), engine::CountRegistryRows(game::Frame::OwnershipLayer(rDestFrame)), rDestFrame.postRender.pBlasters->iCount, rDestFrame.postRender.pSpaceships->iCount, rDestFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost, acPlayerIds);
-		}
-		else
-		{
-			bool bAnySubscribed = false;
-			for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
-			{
-				if (rClient.FindSlotForCoord(rCoord) >= 0)
+				bool bAnySubscribed = false;
+				for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
 				{
-					bAnySubscribed = true;
-					break;
+					if (rClient.FindSlotForCoord(rCoord) >= 0)
+					{
+						bAnySubscribed = true;
+						break;
+					}
 				}
-			}
-			if (bAnySubscribed)
-			{
-				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {}", rCoord.x, rCoord.y, rTransfers.size(), engine::CountRegistryRows(game::Frame::OwnershipLayer(rDestFrame)), rDestFrame.postRender.pBlasters->iCount, rDestFrame.postRender.pSpaceships->iCount, rDestFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost);
+				if (bAnySubscribed)
+				{
+					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {}", rCoord.x, rCoord.y, rTransfers.size(), engine::CountRegistryRows(game::Frame::OwnershipLayer(rDestFrame)), rDestFrame.postRender.pBlasters->iCount, rDestFrame.postRender.pSpaceships->iCount, rDestFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost);
+				}
 			}
 		}
 	}
 
-	TrackClientTransfers(clientTransfers);
+	TrackClientTransfers(rTransfersArena.Span<const ClientTransferInfo>());
 }
 
 void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferInfo> clientTransfers)
@@ -289,7 +297,6 @@ void ServerTransferManager::HarvestTransfers()
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena transfersArena = rWorkbuffer.Push();
 	CollectTransfers(transfersArena);
-	std::span<const ClientTransferInfo> clientTransfers = transfersArena.Span<const ClientTransferInfo>();
 	for (auto& [rCoord, rTransfers] : game::gpServerSession->mReplayTransferFixtures)
 	{
 		auto it = game::gpGame->mCoordFrames.find(rCoord);
@@ -316,7 +323,7 @@ void ServerTransferManager::HarvestTransfers()
 		gpReplay->CaptureHarvestedTransfers(rCoord, rTransfers, *game::gpGame->mCoordFrames.at(rCoord).pNext);
 	}
 
-	ApplyPreparedTransfers(clientTransfers, true);
+	ApplyPreparedTransfers(transfersArena, true);
 }
 
 void ServerTransferManager::PrepareReplayTransfers(engine::GridCoord coord, std::span<const game::StatusChange> recordedTransfers)
@@ -359,7 +366,7 @@ void ServerTransferManager::ApplyReplayTransfers()
 		}
 	}
 
-	ApplyPreparedTransfers(clientTransfersArena.Span<const ClientTransferInfo>(), false);
+	ApplyPreparedTransfers(clientTransfersArena, false);
 }
 
 void ServerTransferManager::ResetState()

@@ -37,7 +37,7 @@ private:
 	void CollectTransfers(common::ScopedWorkbufferArena& rTransfersArena);
 	void SortTransfersByType();
 	void SpawnTransfers(bool bFilterDestinationLiveness);
-	void ApplyPreparedTransfers(std::span<const ClientTransferInfo> clientTransfers, bool bFilterDestinationLiveness);
+	void ApplyPreparedTransfers(common::ScopedWorkbufferArena& rTransfersArena, bool bFilterDestinationLiveness);
 	void TrackClientTransfers(std::span<const ClientTransferInfo> clientTransfers);
 };
 
