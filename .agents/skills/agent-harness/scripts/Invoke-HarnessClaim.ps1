@@ -233,8 +233,9 @@ try {
 
 	# The project harness doc owns the executable names and their Output directory, so the launch
 	# block stays the single source of truth: only those three assignments are read, and the doc's
-	# hardcoded Debug suffix becomes the requested configuration. Missing executables block here,
-	# before provisioning and before the lock, so a build routes through /compile and re-enters.
+	# hardcoded Debug suffix becomes the requested configuration's suffix — none for Release, whose
+	# TargetName is the bare project name. Missing executables block here, before provisioning and
+	# before the lock, so a build routes through /compile and re-enters.
 	$harnessDocument = Join-Path $root 'Projects\BrokenEngineSandbox\Documents\AgentHarness.md'
 	$launchText = ''
 	if (Test-Path -LiteralPath $harnessDocument -PathType Leaf) {
@@ -253,8 +254,9 @@ try {
 	$requiredExecutables = @($serverMatch.Groups[1].Value)
 	if (-not $ServerOnly) { $requiredExecutables += $clientMatch.Groups[1].Value }
 	$missingExecutables = @()
+	$suffix = if ($Configuration -ieq 'Release') { '' } else { ".$Configuration" }
 	foreach ($executable in $requiredExecutables) {
-		$configured = [regex]::Replace($executable, '\.Debug\.exe$', ".$Configuration.exe")
+		$configured = [regex]::Replace($executable, '\.Debug\.exe$', "$suffix.exe")
 		if (-not (Test-Path -LiteralPath (Join-Path $outputDirectory $configured) -PathType Leaf)) {
 			$missingExecutables += $configured
 		}

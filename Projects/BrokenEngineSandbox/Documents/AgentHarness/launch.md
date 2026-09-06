@@ -32,7 +32,7 @@ Baseline the server's crash-report candidates before starting it. This launch bl
 pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role 'server' -GameName 'Broken Engine Sandbox Server' -ConfiguredAppDataRoot '<absolute app-data root>'
 ```
 
-Then launch the server and retain its exact PID and process-start identity:
+Then launch the server and retain its exact PID and process-start identity. The `$ServerExe` and `$ClientExe` names below are the Debug ones: under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names in every such assignment in this recipe.
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'

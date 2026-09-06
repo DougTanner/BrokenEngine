@@ -74,7 +74,10 @@ and the handoff this run returns.
    - When another session holds the lock, it provisions once and then retries
      only the claim until it succeeds or its 500-second wait budget expires, so
      the invocation above is itself the wait — never hand-write a poll loop,
-     invent a sleep window, or pass a wait budget of your own.
+     invent a sleep window, or pass a wait budget of your own; give the call the
+     maximum available host command timeout so that budget is not preempted, or
+     run it through a host background-execution parameter and read its result in
+     the same turn.
    - Pass the latest `/compile` result's normalized `GameDataDirectory` verbatim
      as `-GameDataDirectory` — the same packed data the launch below selects
      with `--data-directory`.
@@ -206,10 +209,11 @@ and the handoff this run returns.
 ### Launch
 
 16. Fix this launch's configuration and directory arguments. Done when the
-    configuration suffix, `--loopback-only`, the log parents, and both directory
+    executable names, `--loopback-only`, the log parents, and both directory
     overrides are fixed for this launch.
 
-    - Use the compiled configuration suffix.
+    - Use the executable names the project launch recipe states for the compiled
+      configuration.
     - Ordinary same-machine runs pass `--loopback-only`.
     - Create log parents under `<absolute adopted worktree>\Temp`.
     - Do not change process working directories; `--data-directory` is the only

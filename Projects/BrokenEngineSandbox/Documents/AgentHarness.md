@@ -29,7 +29,7 @@ $ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
 $ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
 ```
 
-The Debug suffix is replaced by the requested configuration only by the claim script; do not edit this hub for another build.
+Only the claim script maps these Debug names to the requested configuration — `.Profile.exe` for Profile, and the unsuffixed `.exe` for Release; do not edit this hub for another build.
 
 ## Focused references
 
