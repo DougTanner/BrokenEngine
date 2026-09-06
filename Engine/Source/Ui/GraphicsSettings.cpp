@@ -101,6 +101,18 @@ void SaveGraphicsSettings()
 namespace
 {
 
+void LoadFiniteGraphicsSetting(Wrapper& rSetting, float fValue)
+{
+	if (std::isfinite(fValue))
+	{
+		rSetting.Set(fValue);
+	}
+	else
+	{
+		rSetting.ResetToDefault();
+	}
+}
+
 // The file is opaque input: an out-of-range byte would index past every quality-level table.
 void LoadGraphicsQualityLevel(Wrapper& rLevel, uint8_t uiLevel)
 {
@@ -123,13 +135,13 @@ bool LoadGraphicsSettings()
 		gMultisampling.Set(graphicsSettings.flags & GraphicsSettingsFlags::kMultisampling);
 		gSampleCount.Set<VkSampleCountFlagBits>(graphicsSettings.eSampleCount);
 		gAnisotropy.Set(graphicsSettings.flags & GraphicsSettingsFlags::kAnisotropy);
-		gMaxAnisotropy.Set(graphicsSettings.fMaxAnisotropy);
+		LoadFiniteGraphicsSetting(gMaxAnisotropy, graphicsSettings.fMaxAnisotropy);
 		gSampleShading.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSampleShading);
-		gMinSampleShading.Set(graphicsSettings.fMinSampleShading);
-		gMipLodBias.Set(graphicsSettings.fMipLodBias);
+		LoadFiniteGraphicsSetting(gMinSampleShading, graphicsSettings.fMinSampleShading);
+		LoadFiniteGraphicsSetting(gMipLodBias, graphicsSettings.fMipLodBias);
 		gSmokeEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmoke);
-		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
-		gSunMoonMinimumAmbient.Set(graphicsSettings.fMinimumAmbient);
+		LoadFiniteGraphicsSetting(gSmokeSimulationArea, graphicsSettings.fSmokeSimulationArea);
+		LoadFiniteGraphicsSetting(gSunMoonMinimumAmbient, graphicsSettings.fMinimumAmbient);
 		if (std::isfinite(graphicsSettings.fLightingUpdateCadence))
 		{
 			gLightingUpdateCadence.Set(graphicsSettings.fLightingUpdateCadence);
