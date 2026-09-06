@@ -22,6 +22,13 @@ struct DataTypeEntry
 	std::string_view headerFile;
 };
 
+struct DataPackerRunSummary
+{
+	int64_t miCleanJobs = 0;
+	int64_t miExportedJobs = 0;
+	int64_t miFailedJobs = 0;
+};
+
 // Source of truth for the data-type enum, display names, and per-type CRC header
 // includes. The order here defines the integer values of the generated DataTypes
 // enum and is consumed by the runtime via `kpcDataTypeNames[kDataType...]`.
@@ -433,7 +440,7 @@ static void SortAndCheckDuplicateExportJobs(std::vector<std::unique_ptr<T>>& rEx
 }
 
 template <IsExportJob T>
-static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rTemporaryPackFile, std::vector<std::unique_ptr<T>>& rExportJobs)
+static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rTemporaryPackFile, std::vector<std::unique_ptr<T>>& rExportJobs, DataPackerRunSummary& rRunSummary)
 {
 	// Open temporary manifest file and write header
 	std::fstream temporaryManifestFileStream(rTemporaryManifestFile, std::ios::out | std::ios::binary);
@@ -467,9 +474,19 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 
 			temporaryPackFileStream.write(reinterpret_cast<char*>(rData.data()), rData.size());
 			common::AlignOutputStream(temporaryPackFileStream);
+
+			if (rpExportJob->mbDirty)
+			{
+				++rRunSummary.miExportedJobs;
+			}
+			else
+			{
+				++rRunSummary.miCleanJobs;
+			}
 		}
 		catch (const std::exception& rException)
 		{
+			++rRunSummary.miFailedJobs;
 			failures.push_back({.assetPath = rpExportJob->mInputPath, .message = rException.what()});
 		}
 	}
@@ -488,7 +505,7 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 }
 
 template <IsExportJob T>
-static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std::filesystem::path& rPackFile, const std::filesystem::path& rHeaderFile, std::vector<std::unique_ptr<T>>& rExportJobs)
+static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std::filesystem::path& rPackFile, const std::filesystem::path& rHeaderFile, std::vector<std::unique_ptr<T>>& rExportJobs, DataPackerRunSummary& rRunSummary)
 {
 	if (gpFileManager->EnsureLocal(FileManager::OutputRoot::kData) == FileManager::EnsureLocalResult::kCancelled)
 	{
@@ -521,7 +538,7 @@ static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std
 	temporaryHeaderFile /= T::kName;
 	temporaryHeaderFile += ".h.tmp";
 
-	std::vector<diagnostic::ExportFailure> failures = WriteTemporaryExportFiles(temporaryManifestFile, temporaryPackFile, rExportJobs);
+	std::vector<diagnostic::ExportFailure> failures = WriteTemporaryExportFiles(temporaryManifestFile, temporaryPackFile, rExportJobs, rRunSummary);
 
 	bool bFailed = !failures.empty();
 	if (bFailed)
@@ -574,7 +591,7 @@ static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std
 }
 
 template <IsExportJob T>
-bool RunExportJobs()
+bool RunExportJobs(DataPackerRunSummary& rRunSummary)
 {
 	bool bDirty = gpFileManager->mbCleanExport;
 
@@ -610,18 +627,19 @@ bool RunExportJobs()
 
 	if (!bDirty)
 	{
+		rRunSummary.miCleanJobs += static_cast<int64_t>(exportJobs.size());
 		return true;
 	}
 
-	return RunDirtyExport(manifestFile, packFile, headerFile, exportJobs);
+	return RunDirtyExport(manifestFile, packFile, headerFile, exportJobs, rRunSummary);
 }
 
 template <typename... Ts>
-static bool RunAllMainExports()
+static bool RunAllMainExports(DataPackerRunSummary& rRunSummary)
 {
 	// Comma fold so every export runs even if an earlier one fails.
 	bool bSuccess = true;
-	((bSuccess &= RunExportJobs<Ts>()), ...);
+	((bSuccess &= RunExportJobs<Ts>(rRunSummary)), ...);
 	return bSuccess;
 }
 
@@ -680,7 +698,7 @@ static void GenerateDataHeader(const std::filesystem::path& rOutPath)
 	WriteIfChanged(content.str(), rOutPath, "Data.h");
 }
 
-bool MainThread(int argc, char* argv[])
+bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 {
 	common::ThreadLocal threadLocal(1024, std::nullopt, false);
 	common::Multithreading multithreading(std::max<int64_t>(0, common::HardwareCoreCount() - 3));
@@ -699,14 +717,14 @@ bool MainThread(int argc, char* argv[])
 	bool bSuccess = true;
 
 	// Scene and Island need to be first as they can create new textures and models
-	bSuccess &= RunExportJobs<ExportScene>();
+	bSuccess &= RunExportJobs<ExportScene>(rRunSummary);
 	BakeIslandIntermediates();
-	bSuccess &= RunExportJobs<ExportIsland>();
+	bSuccess &= RunExportJobs<ExportIsland>(rRunSummary);
 
 	GenerateIrradianceCubemaps();
 	GeneratePreFilteredCubemaps();
 
-	bSuccess &= RunAllMainExports<ExportAudio, ExportModel, ExportShader, ExportTexture, ExportRaw>();
+	bSuccess &= RunAllMainExports<ExportAudio, ExportModel, ExportShader, ExportTexture, ExportRaw>(rRunSummary);
 
 	GenerateDataTypesHeader(gpFileManager->mOutputDirectory / "DataTypes.h");
 	GenerateDataHeader(gpFileManager->mOutputDirectory / "Data.h");
@@ -739,7 +757,26 @@ static bool RunCommand(int argc, char* argv[])
 		}
 		return MaterializeData(argv);
 	}
-	return MainThread(argc, argv);
+
+	const std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+	DataPackerRunSummary runSummary;
+	const auto logSummary = [&runSummary, startTime](bool bSuccess)
+	{
+		const double fElapsedSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
+		LOG(kDefault, kInfo, "Data Packer summary: {} jobs clean, {} exported, {} failed; {}s; result={}", runSummary.miCleanJobs, runSummary.miExportedJobs, runSummary.miFailedJobs, fElapsedSeconds, bSuccess ? "success" : "failed");
+	};
+
+	try
+	{
+		const bool bSuccess = MainThread(argc, argv, runSummary);
+		logSummary(bSuccess);
+		return bSuccess;
+	}
+	catch (...)
+	{
+		logSummary(false);
+		throw;
+	}
 }
 
 static bool RunCommandWithExceptionHandling(int argc, char* argv[])
