@@ -58,14 +58,9 @@ Return the shared handoff form in
   result discipline in [`references/worker.md`](references/worker.md). Keep
   overall/per-project status, data mode/path, and decisive blockers visible; the
   bullets below govern what each build carries inline.
-- Write every build's captured `broken-engine-build-result/v1` envelope verbatim
-  into one `Temp/AgentBuildEnvelopes/` Markdown file unique to this dispatch —
-  the directory created beforehand if absent — under a single `##` heading for
-  the dispatch with one fenced block per build: the first build's own PowerShell
-  call creates that file and heading, and each later build's own call appends
-  its block to the same file, each using that call's own captured output rather
-  than a new script or a retyped envelope. Read every reported field from the
-  envelope, never from scraped terminal text.
+- Every build's captured `broken-engine-build-result/v1` envelope is recorded
+  verbatim in this dispatch's envelope file under `Temp/AgentBuildEnvelopes/`.
+  Read every reported field from the envelope, never from scraped terminal text.
 - Include a build's envelope verbatim inline as well, unless that build is a
   clean success — `status: success`, `failureKind: none`, `exitCode: 0`,
   `retainedLog.complete: true`, and no `severity: error` diagnostic — for which

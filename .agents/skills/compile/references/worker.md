@@ -203,6 +203,20 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
     requested target has returned. Done when the handoff `../SKILL.md` defines
     is returned.
 
+    - Create `Temp/AgentBuildEnvelopes/` if absent, in a call of its own before
+      the first build call in step 9, as the root `AGENTS.md` bundled-scripts
+      rule requires. `Temp/` is gitignored, so the directory is absent in a
+      fresh worktree.
+    - Write every build's captured `broken-engine-build-result/v1` envelope
+      verbatim into one Markdown file there, unique to this dispatch and named
+      `compile-<UTC yyyyMMddTHHmmssfffZ>-<process id>.md`.
+    - The file carries a single `##` heading for the dispatch, with one fenced
+      block per build.
+    - The first build's own PowerShell call in step 9 creates the file and the
+      heading, and each later build's own call appends its block to the same
+      file. Each block is written from that call's own captured output — never a
+      new script, never a retyped envelope.
+
 ## Rules
 
 - `WorktreeCli build` serializes writers per target basename inside the current
