@@ -25,7 +25,7 @@ package.
 
 ## Inputs
 
-Accept one repository skill directory or its `SKILL.md`. The optional Codex `agents/openai.yaml` is validated with the package. Disposable fixtures may be outside `.agents/skills/` only with `-Fixture`.
+Accept one repository skill directory or its `SKILL.md`, passed as `-Path`. The optional Codex `agents/openai.yaml` is validated with the package. Disposable fixtures may be outside `.agents/skills/` only with `-Fixture`.
 
 ## Handoff
 
