@@ -43,8 +43,9 @@ therefore reads a tree at the primary tip as of that invocation,
 absent from a stale worktree; a Plan that lands on primary afterwards is picked
 up by the next invocation. A `claim.session-diverged` result carries no
 `divergence` object: its `message` lists every commit the session holds and
-primary lacks, and under `-ResumeRetained` it may also carry the `retained`
-projection.
+primary lacks, names the repair-script recovery route for a session whose
+primary branch was rewritten under it, and under `-ResumeRetained` it may also
+carry the `retained` projection.
 
 ## Reading the queue listing
 

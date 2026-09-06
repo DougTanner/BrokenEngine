@@ -1,6 +1,7 @@
 # Repairs a session branch in place after the primary branch was rewritten under it: replays the
 # session's own commits onto the new primary tip and rewrites the session baseline file. Run it from
-# the session worktree root; `/finalize-changes` is its sole documented caller.
+# the session worktree root. `/finalize-changes` and the diverged-session block message of
+# `/next-plan`'s claim script are its documented callers.
 [CmdletBinding()]
 param()
 

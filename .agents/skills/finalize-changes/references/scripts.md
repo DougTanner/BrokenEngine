@@ -336,7 +336,9 @@ unverifiable claim stays untouched until its normal expiry or external repair.
 
 `.agents/scripts/Repair-SessionForkPoint.ps1` repairs one session branch whose
 fork point left the primary branch's history because primary was rewritten under
-it. `finalize-changes` is its sole documented caller; the `Recovery` entry in
+it. `finalize-changes` and the `claim.session-diverged` block message of
+`.agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1` are its documented
+callers; for the `finalize-changes` route, the `Recovery` entry in
 [`worker.md`](worker.md#recovery) owns when to run it. It takes no parameters,
 resolves the session from the worktree root it is run in, touches no lock, lease,
 or primary ref, and never rebases primary.
