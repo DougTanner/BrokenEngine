@@ -183,7 +183,26 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
     alone. Done when each invocation is classified as a build result or a block.
 
     - `broken-engine-build-result/v1` — WorktreeCli ran and its envelope is
-      passed through byte-verbatim, with its own exit code preserved.
+      passed through byte-verbatim, with its own exit code preserved. Its
+      fields:
+      - `status` (`success`/`fail`), `failureKind` (`none`/`tool`/`msbuild`),
+        and `exitCode` — the process exit code keeps its existing meaning
+        (MSBuild's exit code once launched; `1` for tool failures including a
+        retained-log failure after a successful build).
+      - `target`/`worktreeRoot` normalized identities, `arguments`,
+        `selectedFiles`, `invalidatedObjects`.
+      - `lock` outcome (`acquired`/`timeout`/`failed`) with the lock path and
+        waited seconds.
+      - `msbuild` discovery/launch state and MSBuild's own exit code.
+      - `retainedLog` — the complete combined MSBuild stdout+stderr stream in
+        observed read order, untruncated, below the invoking worktree's ignored
+        `Temp/AgentBuildLogs/`. `complete: false` or a missing log is a
+        build-result failure, never an omitted side effect.
+      - `diagnostics` — structured MSBuild error/warning entries (`severity`,
+        `code`, `file`, `line`, `column`, `project`, `message`, `raw`), capped
+        with `diagnosticsTruncated: true` when the raw log holds more;
+        `messages` carries tool failures and unmatched fatal lines.
+      - `elapsedMilliseconds` and `startedAt`.
     - `broken-engine-compile-invoke-result/v1` — the build never ran.
       `status`/`code`/`message` name the block; exit `2` is a structured block
       (parameter contract, context, provisioning, missing AgentTools or target,
