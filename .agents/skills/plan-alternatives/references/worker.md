@@ -6,9 +6,10 @@ dispatch recipe lives in root `AGENTS.md`.
 
 ## Steps
 
-1. Read the brief text and the evidence paths it cites. Done when the
-   objective, the scope, the fixed decisions, and candidate zero are each
-   recorded.
+1. Read the brief text and the evidence paths it cites. Treat only the brief's
+   `Fixed decisions` as binding; candidate-zero behavior is a benchmark, not an
+   implicit requirement. Done when the objective, scope, fixed decisions, and
+   candidate zero are each recorded separately.
 2. Search the repository for a mechanism on the assigned axis, which is one of:
 
    - Reuse — an existing repository mechanism or pattern that already solves
@@ -20,13 +21,15 @@ dispatch recipe lives in root `AGENTS.md`.
    - Reshape — the same objective in a different place: another layer, frame
      phase, executable, or data layout.
 
-   Done when the search has produced one mechanism or the evidence that the axis
-   offers none.
+   Before proposing new state, trace the relevant existing ordering, ownership,
+   and failure guarantees. Done when the search has produced one mechanism or the
+   evidence that the axis offers none, and those guarantees have been identified.
 3. Name the candidate's concrete mechanism and the 3-5 critical files it
    changes. Done when both are named, or the candidate is dropped as unnameable.
-4. State what the candidate adds, what it deletes, which invariant surfaces it
-   touches, and when it would be the right call. Done when each of those is
-   stated.
+4. State what the candidate adds, what it deletes, which invariant surfaces and
+   existing guarantees it uses, its new identity/lifecycle/reset/recovery state and
+   verification-only machinery, and when it would be the right call. Done when each
+   handoff row is stated, using `none` where the cost or guarantee is absent.
 5. Return the `../SKILL.md` `## Handoff` extension fields followed by the shared
    handoff lines, or `no viable candidate on this axis` in `Candidate` with the
    reason in `Mechanism`. Done when the handoff carries every declared field.
