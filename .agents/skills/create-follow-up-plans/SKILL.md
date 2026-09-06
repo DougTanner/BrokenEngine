@@ -26,6 +26,10 @@ under `Documents/Plans/<area>/`, with tracked scheduler metadata.
 - `Fixed decisions` — prior reviewer or user decisions to preserve.
 - `Evidence` — direct finding evidence, the originating step and unmet
   acceptance criterion, and related residuals.
+- `Session provenance` — supplied only for a tooling-friction or
+  context-efficiency follow-up; an ordinary debt follow-up takes none. A
+  `/next-plan` run sources the values per
+  `.agents/skills/next-plan/references/follow-up-provenance.md`.
 
 ## Handoff
 
