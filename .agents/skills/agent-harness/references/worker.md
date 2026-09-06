@@ -545,7 +545,8 @@ and the handoff this run returns.
     when each principle holds for every criterion this run verifies:
 
     - Verify with the narrowest observable combination of the project's scene,
-      UI, screenshot, server-query, and log commands. `describe_ui`,
+      UI, screenshot, server-query, and log commands. Read supported numeric
+      control values from `describe_ui` before using a capture. `describe_ui`,
       scene/server queries, and `get_logs` close a criterion more cheaply than
       pixels; reach for a capture only when the criterion is genuinely about
       what was rendered.

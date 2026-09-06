@@ -692,7 +692,7 @@ nlohmann::json BuildDescribeUi(const GameBase& rGame)
 			{
 				continue; // no label recorded (invisible / no ItemInfo) — not addressable, omit
 			}
-			items.push_back(
+			nlohmann::json item =
 			{
 				{"label", rItem.pcLabel},
 				{"window", rItem.pcWindow},
@@ -702,7 +702,12 @@ nlohmann::json BuildDescribeUi(const GameBase& rGame)
 				{"inputable", (rItem.iStatusFlags & ImGuiItemStatusFlags_Inputable) != 0},
 				{"hovered", (rItem.iStatusFlags & ImGuiItemStatusFlags_HoveredRect) != 0},
 				{"visible", (rItem.iStatusFlags & ImGuiItemStatusFlags_Visible) != 0},
-			});
+			};
+			if (rItem.pcValue[0] != '\0')
+			{
+				item["value"] = rItem.pcValue;
+			}
+			items.push_back(std::move(item));
 		}
 	}
 	result["windows"] = std::move(windows);

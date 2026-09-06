@@ -130,6 +130,7 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiId, const XMFLOAT4& rf4Rect, const c
 	rItem.iStatusFlags = bVisible ? static_cast<int32_t>(ImGuiItemStatusFlags_Visible) : 0;
 	rItem.bDisabled = bDisabled;
 	rItem.pcLabel[0] = '\0';
+	rItem.pcValue[0] = '\0';
 	CopyTruncate(rItem.pcWindow, sizeof(rItem.pcWindow), pcWindow);
 	if (iPendingLabel >= 0)
 	{
@@ -174,6 +175,42 @@ void AgentUiRegistry::HookItemInfo(ImGuiID uiId, const char* pcLabel, int32_t iS
 	}
 	// The pre-ItemAdd status belongs to the prior item for tabs; only the label crosses into pending state.
 	CopyTruncate(mPendingLabels[iPendingLabel].pcLabel, sizeof(mPendingLabels[iPendingLabel].pcLabel), pcLabel);
+}
+
+void AgentUiRegistry::RecordItemValue(ImGuiID uiId, const char* pcValue)
+{
+	int64_t iCount = miItemCount[miWrite];
+	for (int64_t i = iCount - 1; i >= 0; --i)
+	{
+		AgentUiItem& rItem = mItems[miWrite][i];
+		if (rItem.uiId == uiId)
+		{
+			CopyTruncate(rItem.pcValue, sizeof(rItem.pcValue), pcValue);
+			return;
+		}
+	}
+}
+
+void AgentUiRegistry::RecordItemChecked(ImGuiID uiId, bool bChecked)
+{
+	int64_t iCount = miItemCount[miWrite];
+	for (int64_t i = iCount - 1; i >= 0; --i)
+	{
+		AgentUiItem& rItem = mItems[miWrite][i];
+		if (rItem.uiId == uiId)
+		{
+			rItem.iStatusFlags |= static_cast<int32_t>(ImGuiItemStatusFlags_Checkable);
+			if (bChecked)
+			{
+				rItem.iStatusFlags |= static_cast<int32_t>(ImGuiItemStatusFlags_Checked);
+			}
+			else
+			{
+				rItem.iStatusFlags &= ~static_cast<int32_t>(ImGuiItemStatusFlags_Checked);
+			}
+			return;
+		}
+	}
 }
 
 void AgentUiRegistry::Swap()

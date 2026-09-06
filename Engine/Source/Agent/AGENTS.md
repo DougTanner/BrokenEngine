@@ -14,7 +14,7 @@ Engine-owned agent infrastructure provides a loopback TCP JSON channel, main-thr
 - Only one request is in flight. Deferred handlers return a poll function; later drains publish its first result under the original request ID. Connection generations (the reuse counter) discard replies from disconnected clients, and the drain-count timeout prevents a lost async result from blocking the channel indefinitely.
 - Command handlers throw for invalid external input. `Drain()` converts exceptions to the protocol failure envelope.
 - `AgentInput` is client-only and runs one frame-stepped synthetic script at a time. It feeds ImGui events and overlays the published `RawInput` snapshot that engine key bindings read. Physical input suppression is owned by the startup/input path.
-- `AgentUiRegistry` is client-only and double-buffers fixed-capacity ImGui window/item snapshots. Publish after `ImGui::Render()`; label resolution reads only the completed buffer.
+- `AgentUiRegistry` is client-only and double-buffers fixed-capacity ImGui window/item snapshots, including optional current numeric text from menu controls created with `MenuUtils::WrapperSlider` and `MenuUtils::WrapperPlusMinus` and checked state supplied by `MenuUtils::RadioRow`. Publish after `ImGui::Render()`; label resolution and `describe_ui` read only the completed buffer.
 - Synthetic ImGui mouse position is reissued after the Win32 backend so physical cursor polling cannot overwrite it. It remains pinned for post-script UI inspection until the next script begins.
 
 ## Constraints

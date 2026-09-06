@@ -1,5 +1,8 @@
 #include "Ui/MenuUtils.h"
 
+#if defined(BT_CLIENT)
+#include "Agent/AgentUiRegistry.h"
+#endif
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
 namespace engine
@@ -57,12 +60,21 @@ bool WrapperToggle(std::string_view label, engine::Wrapper* pWrapper)
 bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::string_view format)
 {
 	float fValue = pWrapper->Get();
+	bool bChanged = false;
 	if (ImGui::SliderFloat(label.data(), &fValue, pWrapper->GetMin(), pWrapper->GetMax(), format.data()))
 	{
 		pWrapper->Set(fValue);
-		return true;
+		bChanged = true;
 	}
-	return false;
+#if defined(BT_CLIENT)
+	if (gpAgentUiRegistry != nullptr)
+	{
+		char pcValue[64];
+		std::snprintf(pcValue, sizeof(pcValue), format.data(), pWrapper->Get());
+		gpAgentUiRegistry->RecordItemValue(ImGui::GetID(label.data()), pcValue);
+	}
+#endif
+	return bChanged;
 }
 
 bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> aOptions)
@@ -99,6 +111,16 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 		}
 	}
 
+#if defined(BT_CLIENT)
+	if (gpAgentUiRegistry != nullptr)
+	{
+		const float fFinal = pWrapper->Get();
+		for (const std::pair<const char*, float>& rOption : aOptions)
+		{
+			gpAgentUiRegistry->RecordItemChecked(ImGui::GetID(rOption.first), fFinal == rOption.second);
+		}
+	}
+#endif
 	ImGui::PopID();
 	return bChanged;
 }
@@ -109,6 +131,10 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float f
 	ImGui::Text("%s", label.data());
 	ImGui::SameLine();
 	ImGui::PushID(label.data());
+#if defined(BT_CLIENT)
+	const ImGuiID uiMinusId = ImGui::GetID("-");
+	const ImGuiID uiPlusId = ImGui::GetID("+");
+#endif
 	if (ImGui::Button("-"))
 	{
 		pWrapper->Set(pWrapper->Get() - fStep);
@@ -122,6 +148,15 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float f
 		pWrapper->Set(pWrapper->Get() + fStep);
 		bChanged = true;
 	}
+#if defined(BT_CLIENT)
+	if (gpAgentUiRegistry != nullptr)
+	{
+		char pcValue[64];
+		std::snprintf(pcValue, sizeof(pcValue), "%.0f%%", pWrapper->Get() * 100.0f);
+		gpAgentUiRegistry->RecordItemValue(uiMinusId, pcValue);
+		gpAgentUiRegistry->RecordItemValue(uiPlusId, pcValue);
+	}
+#endif
 	ImGui::PopID();
 	return bChanged;
 }

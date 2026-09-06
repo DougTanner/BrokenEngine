@@ -5,15 +5,16 @@
 namespace engine
 {
 
-// One completed-frame ImGui widget record. Filled by the imgui test-engine hooks (ImGuiTestEngineHook_ItemAdd /
-// _ItemInfo) during ImGui::NewFrame..Render into the write table, made readable after ImGui::Render() by Swap().
+// One completed-frame ImGui widget record. Filled during ImGui::NewFrame..Render into the write table, then made
+// readable after ImGui::Render() by Swap().
 struct AgentUiItem
 {
 	ImGuiID uiId = 0;
 	char pcLabel[64] {};
+	char pcValue[64] {};
 	char pcWindow[32] {};
 	XMFLOAT4 f4Rect {}; // pixels: {minX, minY, maxX, maxY}
-	int32_t iStatusFlags = 0; // ImGuiItemStatusFlags_ bits; ItemAdd supplies Visible, ItemInfo the remaining bits
+	int32_t iStatusFlags = 0; // ImGuiItemStatusFlags_ bits supplied by ItemAdd, ItemInfo, and menu helpers
 	bool bDisabled = false;
 };
 
@@ -32,10 +33,10 @@ struct AgentUiPendingLabel
 	char pcLabel[64] {};
 };
 
-// Double-buffered fixed-capacity snapshot of every ImGui widget/window per completed frame. The four imgui
-// test-engine hook externs (implemented in AgentUiRegistry.cpp) fill the write table each frame; Swap() (after
-// ImGui::Render()) publishes it as the read table, so readers (describe_ui, label resolution) always see the last
-// COMPLETED frame. Zero steady-state heap: the tables are member arrays sized once at construction.
+// Double-buffered fixed-capacity snapshot of every ImGui widget/window per completed frame. The imgui test-engine
+// hooks fill item metadata and numeric wrappers attach displayed values; Swap() (after ImGui::Render()) publishes
+// the write table, so readers (describe_ui, label resolution) always see the last COMPLETED frame. Zero steady-state
+// heap: the tables are member arrays sized once at construction.
 class AgentUiRegistry
 {
 public:
@@ -49,6 +50,10 @@ public:
 	// Write-table fill (called from the imgui hooks during ImGui::NewFrame..Render).
 	void HookItemAdd(ImGuiID uiId, const XMFLOAT4& rf4Rect, const char* pcWindow, bool bDisabled, bool bVisible);
 	void HookItemInfo(ImGuiID uiId, const char* pcLabel, int32_t iStatusFlags);
+
+	// Attach menu-control metadata to an item already submitted in the current write table.
+	void RecordItemValue(ImGuiID uiId, const char* pcValue);
+	void RecordItemChecked(ImGuiID uiId, bool bChecked);
 
 	// Publish the write table as the read table and snapshot the window list. Call after ImGui::Render().
 	void Swap();
