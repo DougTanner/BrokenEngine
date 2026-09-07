@@ -13,9 +13,9 @@ allowed-tools: [Read, Grep, Glob, PowerShell]
 
 ## Purpose
 
-The filled acceptance table for a completing stage: one row per approved
-criterion and invariant, each with the evidence that settles it, and a status
-saying whether the stage's approved checks have all closed.
+The acceptance verdict for a completing stage: how many approved criteria and
+invariants passed, a row for each that did not citing its evidence or the
+missing check, and a status saying whether the approved checks have all closed.
 
 ## When to use
 
@@ -53,14 +53,18 @@ Return the shared handoff form in
 with one declared extension section above `Findings`:
 
 ```text
-Criteria:
-<criterion or invariant> — <evidence> — PASS | FAIL
+Criteria: <passed>/<total> passed
+<criterion or invariant> — <evidence citation> — FAIL
 ```
 
-One row per approved criterion and invariant, one line each, in the approved
-order. `Status` is `PASS` only when every row is `PASS`; any `FAIL` or unsettled
-row is `NEEDS_ACTION` with a matching `Findings` row. `Changed files` and
-`Build required` are `none`, because this read-only review changes no file.
+Only the approved criteria and invariants that did not pass follow the count
+line, in the approved order; an unsettled item counts as not passed and its row
+cites the check it lacks. The evidence cell cites where the settling observation
+lives — a path plus selector, or the `Decisive checks` row that settles it — and
+never restates it. `Status` is `PASS` only when the count line reports every
+item passed; any listed row is `NEEDS_ACTION` with a matching `Findings` row.
+`Changed files` and `Build required` are `none`, because this read-only review
+changes no file.
 
 ## References
 

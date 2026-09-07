@@ -34,7 +34,7 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    [`../../verify-acceptance/SKILL.md`](../../verify-acceptance/SKILL.md)
    requires, under the Tier-1 evidence ceiling it applies. This component passes
    when every approved criterion and invariant maps to such evidence. Done when
-   the `Criteria` rows are complete.
+   the `Criteria` field is filled per that handoff.
 
 ## Rules
 
@@ -45,5 +45,4 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   requires; every semantic problem is a finding for the manager to decide.
 - The Review and resolve correctness step's fix-round rule is unchanged: main
   decides once, accepted fixes go to a separate `implementer`, and only affected
-  regions are re-reviewed. A re-run restates only the criterion rows whose
-  evidence the fix changed.
+  regions are re-reviewed.

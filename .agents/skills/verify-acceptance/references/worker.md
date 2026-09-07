@@ -25,7 +25,8 @@ owns the triggers, inputs, and handoff form.
    exceeds that tier's ceiling.
 
 5. Fill the `Criteria` section and set `Status` per the public `SKILL.md`
-   handoff. Done when every row carries evidence and a verdict.
+   handoff. Done when the count line reports every approved item and each
+   non-passing item has a row.
 
 ## Tier evidence ceiling
 

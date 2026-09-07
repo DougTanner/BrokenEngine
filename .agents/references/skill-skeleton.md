@@ -23,7 +23,12 @@ reviewer applies to it. Frontmatter and package mechanics belong to
    still govern the return. An extension field's own line counts when main acts
    on it as it acts on the field it extends, text main must present or ask
    verbatim stays inline per `## Public and private files`, and everything else
-   is cited as path plus selector.
+   is cited as path plus selector. A field that judges each item of a supplied
+   list carries a `<n>/<total>` count line, `<n>` named for what it counts,
+   closed by the field's own passing word (`passed`, `traced`, `settled`),
+   followed only by the items that did not pass, each citing where its settling
+   evidence lives as a path plus selector or as the handoff row that holds it,
+   never restating it.
 6. `Rules` (`references/worker.md`) — judgment no step owns, as bullets.
 7. `References` (`SKILL.md`) — each linked file owning one topic.
 
