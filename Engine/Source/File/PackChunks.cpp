@@ -348,17 +348,33 @@ void PackChunks::LoadPackFiles()
 	int64_t iPoolOffset = 0;
 	for (auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
-		iPoolOffset += common::RoundUp<int64_t, common::kiAlignmentBytes>(rLazyChunk.iDataSize);
+		if (rLazyChunk.iDataSize > std::numeric_limits<int64_t>::max() - (common::kiAlignmentBytes - 1))
+		{
+			FailMissingRequiredAsset(mPackFilePaths[DataTypeFromFlags(rLazyChunk.header.flags)], "lazy chunk size exceeds aligned pool-slot range");
+		}
+		int64_t iAlignedDataSize = common::RoundUp<int64_t, common::kiAlignmentBytes>(rLazyChunk.iDataSize);
+		if (iPoolOffset > std::numeric_limits<int64_t>::max() - iAlignedDataSize)
+		{
+			FailMissingRequiredAsset(mDataDirectory, "aggregate lazy chunk pool size exceeds supported range");
+		}
+		iPoolOffset += iAlignedDataSize;
 	}
 	miLazyPoolSize = iPoolOffset;
-	mpLazyPool = static_cast<std::byte*>(VirtualAlloc(nullptr, miLazyPoolSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-
-	// Assign each lazy chunk its pre-allocated region in the pool
-	iPoolOffset = 0;
-	for (auto& [crc, rLazyChunk] : mLazyChunkMap)
+	if (miLazyPoolSize > 0)
 	{
-		rLazyChunk.pData = mpLazyPool + iPoolOffset;
-		iPoolOffset += common::RoundUp<int64_t, common::kiAlignmentBytes>(rLazyChunk.iDataSize);
+		mpLazyPool = static_cast<std::byte*>(VirtualAlloc(nullptr, miLazyPoolSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+		if (mpLazyPool == nullptr)
+		{
+			FailMissingRequiredAsset(mDataDirectory, "lazy chunk pool allocation failed");
+		}
+
+		// Assign each lazy chunk its pre-allocated region in the pool
+		iPoolOffset = 0;
+		for (auto& [crc, rLazyChunk] : mLazyChunkMap)
+		{
+			rLazyChunk.pData = mpLazyPool + iPoolOffset;
+			iPoolOffset += common::RoundUp<int64_t, common::kiAlignmentBytes>(rLazyChunk.iDataSize);
+		}
 	}
 
 	// Per-thread decompress scratch (sized to largest compressed chunk on disk; only allocated if any chunks are
@@ -368,6 +384,10 @@ void PackChunks::LoadPackFiles()
 		for (std::byte*& rDecompressScratch : mpDecompressScratches)
 		{
 			rDecompressScratch = static_cast<std::byte*>(VirtualAlloc(nullptr, miDecompressScratchSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+			if (rDecompressScratch == nullptr)
+			{
+				FailMissingRequiredAsset(mDataDirectory, "decompression scratch allocation failed");
+			}
 		}
 	}
 
@@ -410,6 +430,10 @@ void PackChunks::LoadPackFiles()
 	for (std::byte*& rReadBuffer : mpReadBuffers)
 	{
 		rReadBuffer = static_cast<std::byte*>(_aligned_malloc(miReadBufferSize, static_cast<size_t>(miSectorSize)));
+		if (rReadBuffer == nullptr)
+		{
+			FailMissingRequiredAsset(mDataDirectory, "aligned read-buffer allocation failed");
+		}
 	}
 
 	mLoadingFuture = std::async(std::launch::async, [this]()
