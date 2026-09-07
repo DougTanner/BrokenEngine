@@ -2,9 +2,9 @@
 
 ## Discovery
 
-Glob `**/AGENTS.md` and sibling `CLAUDE.md` files in the authorized audit scope. Exclude `ThirdParty/`, `Documents/Plans/`, `Documents/Features/`, and `Engine/Source/Graphics/Managers/*.AGENTS.md`. Do not include `CLAUDE.local.md` or another local override unless explicitly requested.
+Glob `**/AGENTS.md` and sibling `CLAUDE.md` files in the authorized audit scope. Exclude `ThirdParty/`, `Documents/Plans/`, and `Documents/Features/`. Do not include `CLAUDE.local.md` or another local override unless explicitly requested.
 
-Grade only AGENTS.md. Check stubs separately and bidirectionally: every directory AGENTS.md has a sibling CLAUDE.md containing exactly `@AGENTS.md`, every such CLAUDE.md has a same-directory AGENTS.md, and linked `*.AGENTS.md` files have no stub requirement.
+Grade only AGENTS.md. Check stubs separately and bidirectionally: every directory AGENTS.md has a sibling CLAUDE.md containing exactly `@AGENTS.md`, and every such CLAUDE.md has a same-directory AGENTS.md.
 
 ## Rubric
 

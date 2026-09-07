@@ -24,15 +24,11 @@ $script:AgentScriptCommon = Join-Path $script:RepositoryRoot '.agents\scripts\Ag
 $script:MaximumOutputBytes = 8192
 $script:MaximumMessageLength = 256
 
-# Repository-relative globs kept out of the stub-pairing sweep, matching exactly
-# the exclusions .agents/skills/update-claude-docs/SKILL.md documents. The
-# Managers glob covers linked `*.AGENTS.md` references, which are not directory
-# memory and own no stub.
+# Repository-relative globs kept out of the stub-pairing sweep.
 $script:StubSweepExclusions = @(
 	'ThirdParty/*',
 	'Documents/Plans/*',
 	'Documents/Features/*',
-	'Engine/Source/Graphics/Managers/*.AGENTS.md',
 	'CLAUDE.local.md',
 	'*/CLAUDE.local.md'
 )

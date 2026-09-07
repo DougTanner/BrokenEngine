@@ -39,9 +39,8 @@ the modes, the inputs, and the handoff.
        change affects, and report pre-existing unrelated excess without
        trimming it.
    - `stubPairs` — the repository-wide bidirectional pairing sweep, excluding
-     `ThirdParty/`, `Documents/Plans/`, `Documents/Features/`, the linked
-     `Engine/Source/Graphics/Managers/*.AGENTS.md` references, and local
-     overrides.
+     the paths `.agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1`
+     `$script:StubSweepExclusions` lists.
      - `stub.missing` is a directory `AGENTS.md` with no sibling `CLAUDE.md`,
        `stub.orphan` a `CLAUDE.md` with no same-directory `AGENTS.md`,
        `stub.malformed` a stub whose bytes are not exactly `@AGENTS.md` plus
