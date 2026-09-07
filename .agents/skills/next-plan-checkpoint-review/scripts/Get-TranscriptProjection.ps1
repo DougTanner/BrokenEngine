@@ -1,8 +1,10 @@
-# Prints one row per tool call, per tool result, and per string-content record of a Claude Code JSONL transcript,
-# given as an absolute path, for the checkpoint isolation lens: a record with several of those yields several rows,
-# and a record with none yields none. The rows are:
+# Prints one row per tool call, per tool result, per main-assistant text element, and per string-content record of a
+# Claude Code JSONL transcript, given as an absolute path, for the checkpoint isolation lens: a record with several
+# of those yields several rows, and a record with none yields none. The rows are:
 # `<line> use <tool> <input summary capped at 160 chars>`
 # `<line> result <tool_use_id> len <chars>`
+# `<line> result <tool_use_id> len <chars> error` — only when `is_error` is true.
+# `<line> assistant-text len <chars> <text>` — original text length; whitespace collapsed and payload capped at 160 chars.
 # `<line> <record type> text len <chars>` — a string-content record: a task-notification handoff or an `attachment` record's prompt.
 # `<line>` is the 1-based transcript line; sidechain records and blank lines print nothing.
 
@@ -28,6 +30,15 @@ foreach ($line in [IO.File]::ReadLines($TranscriptPath)) {
 			$summary = ($element.input | ConvertTo-Json -Compress -Depth 100) -replace '\s+', ' '
 			'{0} use {1} {2}' -f $n, $element.name, $summary.Substring(0, [Math]::Min(160, $summary.Length))
 		}
-		elseif ($element.type -eq 'tool_result') { '{0} result {1} len {2}' -f $n, $element.tool_use_id, ($element.content | ConvertTo-Json -Compress -Depth 100).Length }
+		elseif ($element.type -eq 'tool_result') {
+			$result = '{0} result {1} len {2}' -f $n, $element.tool_use_id, ($element.content | ConvertTo-Json -Compress -Depth 100).Length
+			if ($element.is_error -eq $true) { $result += ' error' }
+			$result
+		}
+		elseif ($record.type -eq 'assistant' -and $element.type -eq 'text') {
+			$text = [string] $element.text
+			$summary = $text -replace '\s+', ' '
+			'{0} assistant-text len {1} {2}' -f $n, $text.Length, $summary.Substring(0, [Math]::Min(160, $summary.Length))
+		}
 	}
 }
