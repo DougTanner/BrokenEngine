@@ -152,8 +152,13 @@
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md' -ResumeRetained`
   That switch is valid only with `-Plan` and changes no file. A retained-work
   resume is the one exception to step 1's clean wrapper-created worktree.
-- The checkpoint review covers friction observable in the transcript up to its
-  own dispatch; `/next-plan-review` covers the rest after landing.
+- On Claude, the checkpoint review covers friction, oversized-result telemetry,
+  and isolation evidence after the previous checkpoint's dispatch in the same
+  transcript, or from transcript start when none exists, through immediately
+  before its own dispatch, excluding only the previous checkpoint's correlated
+  completed handoff; `/next-plan-review` covers the rest after landing. Codex
+  runs no live checkpoint lens and leaves all three concerns to
+  `/next-plan-review`.
 - [claim-results.md](claim-results.md) owns how each claim, listing, and
   claim-exit result is read, including the `sync` and `nextAction` fields, the
   listing's snapshot limits and tier-constrained reading procedure, and the

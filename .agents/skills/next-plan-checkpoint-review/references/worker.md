@@ -26,12 +26,20 @@ are the isolation lens.
 4. Classify a failure in a skill or script the claimed Plan itself changes as
    `active-change-blocker`, not a follow-up. Done when every friction finding
    carries a class.
-5. Cover friction observable in the supplied transcript at any point in the run
-   up to this dispatch, including a stop before or without a claim. Running the
-   claim-exit script and `/finalize-changes` happens after the dispatch and is
-   outside this review; `## Follow-up routing` in
+5. Before applying any lens, establish this checkpoint's transcript span
+   through step 11's projection. End immediately before this review's own
+   dispatch. If the same transcript contains an immediately preceding
+   `/next-plan-checkpoint-review` dispatch, start immediately after that
+   dispatch and exclude only its correlated completed-handoff record; otherwise
+   start at the transcript beginning. Retain every other record between the
+   boundaries. Apply the span to friction and isolation records and, by
+   `toolUseId`, to context-efficiency `topResults`. Running the claim-exit
+   script and `/finalize-changes` happens after this dispatch and is outside
+   this review; `## Follow-up routing` in
    `../../next-plan/references/run-checkpoint.md` and `/next-plan-review` own
-   those. Done when the covered span ends at this dispatch.
+   those. Done when no finding or checked telemetry row comes from outside the
+   span or from the excluded handoff, including a run that stopped before or
+   without a claim.
 6. Precision guard: name in each friction finding the exact command or script
    path, the observed output or malformed result, and the rework, workaround, or
    skipped step it forced. No citation, no finding. Done when every friction
@@ -66,6 +74,15 @@ are the isolation lens.
 11. Read the transcript only through the bundled script, never whole-file, whose
     header comment states the row shapes:
     `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath <transcript path>`
+
+    In the projection, inspect candidate `use Agent` rows and open only the
+    candidate records needed to identify this review's
+    `/next-plan-checkpoint-review` dispatch and, when present, the immediately
+    preceding matching dispatch and their tool-use IDs. These locate step 5's
+    boundaries. Locate the preceding dispatch's correlated completed-handoff
+    record by matching its tool-use ID to a `result` row or to the tool-use-ID
+    tag in an opened task-notification/queued-attachment string record. Do not
+    assume the delegation tool is named `Task`.
 
     Open a record the rows select with `Read` at that row's line number as
     `offset` with `limit` 1; the `len` column only selects which records to open
