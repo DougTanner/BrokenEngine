@@ -169,18 +169,3 @@ commit `80896f33661aaab99cf180a96db54600099be652`.  A live-plan search found no
 duplicate owner for this transfer-verbatim navigation/aim root cause;
 `PlayerFireTimerValidation.md` and the other transfer Plans cover independent
 timer, ownership, or input-validation boundaries.
-
-## Coordination
-
-`Documents/Plans/Game/SpaceshipTransferBehaviorFlags.md` independently
-changes `TransferData`, the Spaceship per-arm codec width (65 bytes after its
-added flag), and the protocol/replay version gates; that arm does not by itself
-require raising the current 120-byte shared maximum.  No dependency is
-required.  Whichever Plan lands second must re-derive the current field order
-and each per-arm width from the then-current baseline, verify the shared
-`kiMaxStatusChangeBytesPerItem` remains sufficient for the resulting largest
-arm, and raise it only if that largest arm exceeds the then-current maximum,
-while preserving the fields and version changes from the first Plan.  This
-Plan's 152-byte Player arm independently requires and informs its shared-
-maximum change; it must not hard-code a next version or reorder the Spaceship
-arm's fields.

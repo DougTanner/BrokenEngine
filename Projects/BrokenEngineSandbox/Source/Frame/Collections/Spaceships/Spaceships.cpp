@@ -582,6 +582,7 @@ void SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInf
 	rCurrentInterpolate.puiRegistryIds[iIndex] = engine::registry_id_t::Generate(rFrame.postRender);
 
 	// Initialize post-render state
+	// Flags describe reactions to the previous frame, so each spawned row starts from defaults.
 	rCurrentPostRender.pFlags[iIndex] = {};
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
 	rCurrentPostRender.pVecDamageDirections[iIndex] = XMVectorZero();
