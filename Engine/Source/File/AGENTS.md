@@ -7,6 +7,8 @@
 Each process resolves a data root for assets and an AppData root for user files once, at `FileManager` construction. A file carrying a struct layout goes through one shared version header, and one-shot writes land atomically.
 
 - Client and server launches must use the same data root; neither process can check that for itself.
+- `FileManager` publishes `gpFileManager` only after platform directory setup and packed-asset construction succeed; code reachable during construction must not consume the global.
+- Directory creation and required boot-asset failures log their exact path and reason once, then throw `std::runtime_error`. Handle that type only around `FileManager` construction and eager-load completion, with `std::system_error` rethrown first; widening the handler over `MainThread` would misclassify unrelated runtime failures as startup exits.
 - Change an on-disk layout and its owning version together; that version is the only thing stopping an old file from being read as a new one.
 - Report failure detail through out-references beside a success return or success out-param; never store a failure reason for a later query.
 
@@ -21,6 +23,7 @@ Server-only. The whole simulation grid is one versioned file, written atomically
 Runtime reads assets only from `.pack` files described by `.manifest` files. Eager pack types are read whole at startup; lazy ones are fetched on demand by background loader threads that publish each chunk's state with release/acquire ordering. The server opens only the pack types it consumes.
 
 - Keep the eager/lazy split and the server's accepted set aligned with what DataPacker emits; nothing at runtime checks that split.
+- Eager pack acquisition checks file size, open, and complete read before validating or publishing chunks. The existing eager-load future remains the failure carrier; every lazy chunk wait consumes it before waiting on loader threads, and any startup path that returns before the first such wait consumes it explicitly, so a failed task cannot be mistaken for successful startup.
 - `WaitForChunks` blocks until a chunk is ready, but an already queued request is not reprioritized.
 - The caller owns exclusion for the chunks it resets; the reset code itself locks nothing. Device loss and island eviction are today's only callers, each draining differently — the loader threads for one, the renderer's Vulkan descriptor window for the other. Keep the two in step, and settle the exclusion before adding a third.
 - Sorting, filtering, or re-emitting the ordered Islands chunk table changes the pack integrity token the client sends in its connection handshake ([Network](../../../Documents/Architecture/Network.md)), so every client fails to connect while the reported error points at the data build instead.

@@ -44,12 +44,6 @@ struct Record
 	std::vector<ExportFailure> exportFailures;
 };
 
-class AlreadyReportedError final : public std::runtime_error
-{
-public:
-	using std::runtime_error::runtime_error;
-};
-
 enum class DiskSpaceDecision
 {
 	kProceed,

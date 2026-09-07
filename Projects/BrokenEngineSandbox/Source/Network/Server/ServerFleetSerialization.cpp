@@ -66,7 +66,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	// already tolerate an out-of-range index gracefully — only the negative value crashes. See plan residual.
 	if (rFleet.iFlagshipIndex < 0)
 	{
-		throw common::CorruptStreamException("Fleet iFlagshipIndex");
+		throw std::ios_base::failure("Fleet iFlagshipIndex");
 	}
 	int32_t iWantedX = 0;
 	int32_t iWantedY = 0;
@@ -156,7 +156,7 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 		engine::ClientGuid guid {uiGuidHigh, uiGuidLow};
 		if (guid.IsEmpty())
 		{
-			throw common::CorruptStreamException("Fleet owner ClientGuid");
+			throw std::ios_base::failure("Fleet owner ClientGuid");
 		}
 		int64_t iFleetCount = 0;
 		common::Read(rFileStream, iFleetCount);

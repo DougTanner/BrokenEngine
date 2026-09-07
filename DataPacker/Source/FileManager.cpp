@@ -348,10 +348,11 @@ void PublishMaterializedOutput(const std::filesystem::path& rSource, const std::
 
 }
 
-FileManager::FileManager(std::span<char*> argvSpan, InitializationMode eMode)
+FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitializationResult, InitializationMode eMode)
 {
 	ASSERT(gpFileManager == nullptr);
 
+	reInitializationResult = EnsureLocalResult::kAlreadyLocal;
 	gpFileManager = this;
 	wchar_t pcForbidExpensiveExport[2] {};
 	DWORD uiForbidExpensiveExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT", pcForbidExpensiveExport, static_cast<DWORD>(std::size(pcForbidExpensiveExport)));
@@ -385,7 +386,11 @@ FileManager::FileManager(std::span<char*> argvSpan, InitializationMode eMode)
 	// Extract project name from project data directory
 	mProjectName = mpInputDirectories[1].parent_path().filename().string();
 	mOutputDirectory = std::filesystem::absolute(mOutputDirectory).lexically_normal();
-	InitializeWorktreeOutputs(eMode);
+	reInitializationResult = InitializeWorktreeOutputs(eMode);
+	if (reInitializationResult == EnsureLocalResult::kCancelled || reInitializationResult == EnsureLocalResult::kFailed)
+	{
+		return;
+	}
 	if (mDataOutput.meState == OutputRootState::kAbsent)
 	{
 		EstablishOutputDestinationParent(mOutputDirectory);
@@ -427,7 +432,7 @@ FileManager::FileManager(std::span<char*> argvSpan, InitializationMode eMode)
 	LOG(kDefault, kDebug, "Output directory: \"{}\"", mOutputDirectory.string());
 }
 
-void FileManager::InitializeWorktreeOutputs(InitializationMode eMode)
+FileManager::EnsureLocalResult FileManager::InitializeWorktreeOutputs(InitializationMode eMode)
 {
 	mDataOutput.mDestination = mOutputDirectory;
 	std::array<OutputRootInfo*, 2> roots { &mDataOutput, &mAttributionOutput };
@@ -461,7 +466,7 @@ void FileManager::InitializeWorktreeOutputs(InitializationMode eMode)
 	std::optional<LinkedWorktreeIdentity> identity = DiscoverLinkedWorktreeIdentity(repositoryRoot, mProjectName, mOutputDirectory, RejectUnvalidatedReparse);
 	if (!identity)
 	{
-		return;
+		return EnsureLocalResult::kAlreadyLocal;
 	}
 	diagnostic::MarkValidatedLinkedWorktree();
 	std::filesystem::path primaryThirdPartyDirectory = identity->primaryRoot / "ThirdParty";
@@ -476,13 +481,23 @@ void FileManager::InitializeWorktreeOutputs(InitializationMode eMode)
 		const std::filesystem::path expectedAttribution = identity->expectedOutput.parent_path() / "Attribution";
 		mAttributionOutput.mSource = identity->primaryRoot / expectedAttribution.lexically_relative(repositoryRoot);
 	}
+	EnsureLocalResult eInitializationResult = EnsureLocalResult::kAlreadyLocal;
 	for (OutputRootInfo* pRoot : outputRoots)
 	{
-		ReconcileWorktreeOutput(*pRoot);
+		const EnsureLocalResult eResult = ReconcileWorktreeOutput(*pRoot);
+		if (eResult == EnsureLocalResult::kCancelled || eResult == EnsureLocalResult::kFailed)
+		{
+			return eResult;
+		}
+		if (eResult == EnsureLocalResult::kMaterialized)
+		{
+			eInitializationResult = eResult;
+		}
 	}
+	return eInitializationResult;
 }
 
-void FileManager::ReconcileWorktreeOutput(OutputRootInfo& rRoot)
+FileManager::EnsureLocalResult FileManager::ReconcileWorktreeOutput(OutputRootInfo& rRoot)
 {
 	EstablishOutputDestinationParent(rRoot.mDestination);
 	if (rRoot.meState == OutputRootState::kAbsent && IsReparsePoint(rRoot.mSource))
@@ -511,12 +526,10 @@ void FileManager::ReconcileWorktreeOutput(OutputRootInfo& rRoot)
 			{
 				throw std::runtime_error(std::format("CreateSymbolicLinkW failed for destination {} from source {} (Win32 {})", rRoot.mDestination.string(), rRoot.mSource.string(), uiError));
 			}
-			if (MaterializeOutput(rRoot) == EnsureLocalResult::kCancelled)
-			{
-				throw diagnostic::AlreadyReportedError("Output materialization cancelled");
-			}
+			return MaterializeOutput(rRoot);
 		}
 	}
+	return EnsureLocalResult::kAlreadyLocal;
 }
 
 FileManager::OutputRootInfo& FileManager::GetOutputRoot(OutputRoot eRoot)
@@ -570,12 +583,12 @@ FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rR
 			.eIcon = diagnostic::ModalIcon::kNone,
 		};
 		diagnostic::Report(record);
-		throw diagnostic::AlreadyReportedError(record.message);
+		return EnsureLocalResult::kFailed;
 	}
 	diagnostic::DiskSpaceDecision eDiskSpaceDecision = diagnostic::ReportMaterializationDiskSpace(inventory.uiAllocation, available.QuadPart, rRoot.mSource, rRoot.mDestination);
 	if (eDiskSpaceDecision == diagnostic::DiskSpaceDecision::kFailed)
 	{
-		throw diagnostic::AlreadyReportedError("Insufficient disk space to materialize worktree output");
+		return EnsureLocalResult::kFailed;
 	}
 	if (eDiskSpaceDecision == diagnostic::DiskSpaceDecision::kCancelled)
 	{

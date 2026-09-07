@@ -22,7 +22,7 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 	}
 	if (fSpawnTimer >= kfSpaceshipSpawnInterval)
 	{
-		throw common::CorruptStreamException("FrameInterpolate fSpawnTimer");
+		throw std::ios_base::failure("FrameInterpolate fSpawnTimer");
 	}
 	return fSpawnTimer;
 }

@@ -73,7 +73,29 @@ void SetAgentFullscreenOverride(std::optional<bool> fullscreen)
 #endif
 bool ProcessMessages();
 
-void MainThread(HINSTANCE hinstance)
+static int HandleEagerLoadCompletion()
+{
+	try
+	{
+		(void)gpFileManager->GetEagerChunkMap();
+	}
+	catch (const std::system_error&)
+	{
+		throw;
+	}
+	catch (const std::runtime_error& rException)
+	{
+		if (!AgentLaunched())
+		{
+			MessageBox(nullptr, rException.what(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+		}
+		return 1;
+	}
+
+	return 0;
+}
+
+int MainThread(HINSTANCE hinstance)
 {
 	common::ThreadLocal threadLocal(10 * 1024 * 1024);
 
@@ -166,10 +188,16 @@ void MainThread(HINSTANCE hinstance)
 			{
 				pAgentCommandServer = std::make_unique<AgentCommandServer>(gLaunchOptions.iAgentPort);
 			}
-			catch (const AgentCommandServer::StartupException&)
+			catch (const std::system_error&)
 			{
-				// Ctor already logged the concrete error. Fail fast so no uncontrollable agent-launched process lingers.
-				return;
+				throw;
+			}
+			catch (const std::runtime_error&)
+			{
+				// Ctor already logged the concrete error. Drain eager startup work while managers are still alive so a
+				// pending required-asset failure is handled before normal cleanup.
+				(void)HandleEagerLoadCompletion();
+				return 1;
 			}
 			gpAgentCommandServer = pAgentCommandServer.get();
 #if defined(BT_CLIENT)
@@ -267,6 +295,10 @@ void MainThread(HINSTANCE hinstance)
 	// Wait for islands to load and initialize heightmaps before Graphics ctor. Terrain mesh CPU
 	// slices are reclaimed immediately afterward; Graphics records its stable empty arena at boot.
 	gpProfileManager->BootStart(kBootTimerWaitForIslands);
+	if (HandleEagerLoadCompletion() != 0)
+	{
+		return 1;
+	}
 	gpIslandTerrain->WaitForElevationMaps();
 	gpProfileManager->BootStop(kBootTimerWaitForIslands);
 
@@ -322,6 +354,10 @@ void MainThread(HINSTANCE hinstance)
 #else
 	// Server: create terrain collision data (no Graphics)
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
+	if (HandleEagerLoadCompletion() != 0)
+	{
+		return 1;
+	}
 	gpIslandTerrain->WaitForElevationMaps(game::NavThresholdElevation(gBaseHeight.Get()), game::NavClearanceMeters());
 
 	auto pGame = std::make_unique<game::Game>();
@@ -423,9 +459,13 @@ void MainThread(HINSTANCE hinstance)
 			gpTextureUploadManager->RethrowException();
 			pGame->Render();
 		}
-		catch (DeviceLostException& rDeviceLostException)
+		catch (const std::system_error& rException)
 		{
-			LOG(kDefault, kDebug, "Caught rDeviceLostException: {}", rDeviceLostException.what());
+			if (rException.code() != VkErrorCode(VK_ERROR_DEVICE_LOST))
+			{
+				throw;
+			}
+			LOG(kDefault, kDebug, "Caught Vulkan device loss: {}", rException.what());
 			pGraphics.reset();
 			pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
 		}
@@ -483,6 +523,7 @@ void MainThread(HINSTANCE hinstance)
 
 	PostQuitMessage(0);
 	ProcessMessages();
+	return 0;
 }
 
 #if defined(BT_CLIENT)
@@ -859,26 +900,47 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANC
 #if defined(BT_CLIENT)
 	auto pTextureUploadManager = std::make_unique<engine::TextureUploadManager>();
 #endif
-	auto pFileManager = std::make_unique<engine::FileManager>();
-
-	if (IsDebuggerPresent() != 0) [[unlikely]]
-	{
-		engine::MainThread(hInstance);
-	}
-	else [[likely]]
+	std::unique_ptr<engine::FileManager> pFileManager;
+	int iResult = 0;
+	try
 	{
 		try
 		{
-			engine::MainThread(hInstance);
+			pFileManager = std::make_unique<engine::FileManager>();
 		}
-		catch (const std::exception& rException)
+		catch (const std::system_error&)
 		{
-			engine::HandleException(&rException);
+			throw;
 		}
-		catch (...)
+		catch (const std::runtime_error& rException)
 		{
-			engine::HandleException();
+			if (!engine::AgentLaunched())
+			{
+				MessageBox(nullptr, rException.what(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+			}
+			iResult = 1;
 		}
+
+		if (pFileManager != nullptr)
+		{
+			iResult = engine::MainThread(hInstance);
+		}
+	}
+	catch (const std::exception& rException)
+	{
+		if (IsDebuggerPresent() != 0) [[unlikely]]
+		{
+			throw;
+		}
+		engine::HandleException(&rException);
+	}
+	catch (...)
+	{
+		if (IsDebuggerPresent() != 0) [[unlikely]]
+		{
+			throw;
+		}
+		engine::HandleException();
 	}
 
 #if defined(BT_CLIENT)
@@ -886,5 +948,5 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANC
 	Windows::Foundation::Uninitialize();
 #endif
 
-	return 0;
+	return iResult;
 }

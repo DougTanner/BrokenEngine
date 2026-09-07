@@ -21,14 +21,14 @@ PackChunks::PackChunks(const std::filesystem::path& rDataDirectory)
 PackChunks::~PackChunks()
 {
 	// Drain the eager-load task first: the loading threads are assigned inside it (see LoadPackFiles), so a join
-	// before the task runs would hit not-yet-joinable threads. On the client GetEagerChunkMap() already
-	// drained it during boot (valid() is then false); on the server nothing else ever drains it. get()
-	// rethrows if the task threw (OOM, thread-create failure); swallow it so a
+	// before the task runs would hit not-yet-joinable threads. Startup normally drains it before using eager data
+	// or waiting for lazy chunks (valid() is then false). get() rethrows if the task threw; swallow it so a
 	// destructor never terminates the process, and let PackChunkLoader::Stop() skip never-started threads.
 	if (mLoadingFuture.valid())
 	{
 		try
 		{
+			common::ScopedExpectedThrows scopedExpectedThrows;
 			mLoadingFuture.get();
 		}
 		catch (...)
@@ -118,9 +118,8 @@ data::DataTypes DataTypeFromFlags(const common::ChunkFlags_t& rFlags)
 
 // External-data trust boundary: a wholly missing or corrupt required .manifest/.pack is unrecoverable —
 // limping with an empty/garbage chunk set defers the failure to every later consumer and ships a broken game.
-// LoadPackFiles runs in the FileManager ctor (Main.cpp), constructed before MainThread's try/catch, so a thrown
-// ASSERT here std::terminates into the SIGABRT crash-report hook, which tells the player nothing about the real
-// cause. Fail loud with the actionable reinstall message and exit cleanly instead.
+// FileManager construction and its eager task both feed the startup-specific catch in Main.cpp. Keep the exact
+// diagnostic here so synchronous and worker-carried failures use the same actionable reinstall message.
 [[noreturn]] static void FailMissingRequiredAsset(const std::filesystem::path& rAssetPath, std::string_view reason)
 {
 	LOG(kLoading, kError, "Required asset \"{}\" is missing or corrupt: {}", rAssetPath.string(), reason);
@@ -130,11 +129,8 @@ data::DataTypes DataTypeFromFlags(const common::ChunkFlags_t& rFlags)
 	message += "\n\n";
 	message += reason;
 	message += "\n\nPlease reinstall or verify your game files.";
-	if (!AgentLaunched())
-	{
-		MessageBox(nullptr, message.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
-	}
-	ExitProcess(0);
+	common::ScopedExpectedThrows scopedExpectedThrows;
+	throw std::runtime_error(message);
 }
 
 // External-data trust boundary: every pointer, slice, and decoder argument built below comes from a manifest
@@ -451,27 +447,30 @@ void PackChunks::LoadPackFiles()
 			std::vector<std::byte>& rPackBytes = mPackFileData[i];
 
 			// If eager loading, read the entire .pack file into memory
-			rPackBytes.resize(std::filesystem::file_size(mPackFilePaths[i]));
+			std::error_code packFileSizeError;
+			uintmax_t uiPackFileSize = std::filesystem::file_size(mPackFilePaths[i], packFileSizeError);
+			if (packFileSizeError)
+			{
+				FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
+			}
+			rPackBytes.resize(uiPackFileSize);
 			std::fstream packStream(mPackFilePaths[i], std::ios::in | std::ios::binary);
-			const std::streamsize iRequestedReadSize = static_cast<std::streamsize>(rPackBytes.size());
-			packStream.read(reinterpret_cast<char*>(rPackBytes.data()), iRequestedReadSize);
 			if (!packStream)
 			{
-				FailMissingRequiredAsset(mPackFilePaths[i], "eager pack read incomplete");
+				FailMissingRequiredAsset(mPackFilePaths[i], "pack file could not be opened for eager loading");
 			}
-			if (packStream.gcount() != iRequestedReadSize)
+			packStream.read(reinterpret_cast<char*>(rPackBytes.data()), rPackBytes.size());
+			if (!packStream || packStream.gcount() != static_cast<std::streamsize>(rPackBytes.size()))
 			{
-				FailMissingRequiredAsset(mPackFilePaths[i], "eager pack read incomplete");
+				FailMissingRequiredAsset(mPackFilePaths[i], "pack file truncated during eager loading");
 			}
 			packStream.close();
 
 			// Process chunks from pack file
-			uint64_t uiPackFileSize = rPackBytes.size();
+			uiPackFileSize = rPackBytes.size();
 			for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
 			{
 				// Add to eager chunk map
-				// Exit rather than throw: a throw here skips starting the loading threads below, so the main thread
-				// would block on its first chunk request before anything reads the future that rethrows.
 				if (const char* pcReason = ValidateChunkLocation(uiPackFileSize, rChunkLocation); pcReason != nullptr)
 				{
 					FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
@@ -502,6 +501,7 @@ const std::unordered_map<common::crc_t, EagerChunk>& PackChunks::GetEagerChunkMa
 	if (mLoadingFuture.valid()) [[unlikely]]
 	{
 		gpProfileManager->BootStart(kBootTimerWaitForDataFile);
+		common::ScopedExpectedThrows scopedExpectedThrows;
 		mLoadingFuture.get();
 		gpProfileManager->BootStop(kBootTimerWaitForDataFile);
 	}
@@ -552,6 +552,7 @@ void PackChunks::ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset
 
 void PackChunks::WaitForChunks(std::span<const common::crc_t> crcs)
 {
+	(void)GetEagerChunkMap();
 	mLoader.WaitForChunks(crcs);
 }
 

@@ -5,16 +5,7 @@
 namespace engine
 {
 
-class DeviceLostException : public std::exception
-{
-public:
-
-	DeviceLostException(const char* pcWhat)
-	: std::exception(pcWhat)
-	{
-	}
-};
-
+std::error_code VkErrorCode(VkResult vkResult) noexcept;
 void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_location loc);
 
 void VkNameImpl(VkObjectType type, uint64_t handle, std::string_view name);

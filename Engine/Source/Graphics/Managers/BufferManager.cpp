@@ -53,27 +53,27 @@ BufferManager::BufferManager()
 		// int64 iSize would pass the upper bound and convert to a huge memcpy size_t.
 		if (rChunk.pHeader->iSize <= 0 || rChunk.pHeader->iSize > rChunk.iDataSize)
 		{
-			throw common::CorruptStreamException("BufferManager model");
+			throw std::ios_base::failure("BufferManager model");
 		}
 
 		const common::ModelHeader& rModelHeader = rChunk.pHeader->modelHeader;
 		if (rModelHeader.iIndexCount < 0 || rModelHeader.iIndexCount > UINT32_MAX || rModelHeader.iVertexCount < 0 || rModelHeader.iStride <= 0)
 		{
-			throw common::CorruptStreamException("BufferManager model");
+			throw std::ios_base::failure("BufferManager model");
 		}
 
 		int64_t iIndexElementSize = common::ModelHeader::UsesU16Indices(rModelHeader.iVertexCount) ? sizeof(uint16_t) : sizeof(uint32_t);
 		if (rModelHeader.iIndexCount > (std::numeric_limits<int64_t>::max() - 3) / iIndexElementSize
 		 || rModelHeader.iVertexCount > std::numeric_limits<int64_t>::max() / rModelHeader.iStride)
 		{
-			throw common::CorruptStreamException("BufferManager model");
+			throw std::ios_base::failure("BufferManager model");
 		}
 
 		int64_t iVerticesOffset = common::ModelHeader::VerticesOffset(rModelHeader.iIndexCount, iIndexElementSize);
 		int64_t iVertexBytes = rModelHeader.iVertexCount * rModelHeader.iStride;
 		if (iVerticesOffset > rChunk.pHeader->iSize || iVertexBytes > rChunk.pHeader->iSize - iVerticesOffset)
 		{
-			throw common::CorruptStreamException("BufferManager model");
+			throw std::ios_base::failure("BufferManager model");
 		}
 
 		auto [it, bInserted] = mModelMap.try_emplace(rCrc, BufferInfo

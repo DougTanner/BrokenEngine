@@ -45,7 +45,7 @@ std::istream& operator>>(std::istream& rStream, FrameInput& rInput)
 		// the wrong payload byte count, silently desyncing the rest of the stream — reject it.
 		if (!IsKnownStatusChangeType(rChange.eType))
 		{
-			throw common::CorruptStreamException("FrameInput StatusChange type");
+			throw std::ios_base::failure("FrameInput StatusChange type");
 		}
 		rChange.data = DefaultDataForType(rChange.eType);
 		std::visit([&](auto& payload) { common::Read(rStream, payload); }, rChange.data);

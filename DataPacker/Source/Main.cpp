@@ -44,13 +44,14 @@ static constexpr DataTypeEntry kDataTypes[] =
 };
 static constexpr size_t kDataTypeCount = std::size(kDataTypes);
 
-static void WriteIfChanged(const std::string& rContent, const std::filesystem::path& rPath, const char* logName)
+static bool WriteIfChanged(const std::string& rContent, const std::filesystem::path& rPath, const char* logName)
 {
 	if (!common::ContentsEqual(rContent, rPath))
 	{
-		if (gpFileManager->EnsureLocal(FileManager::OutputRoot::kData) == FileManager::EnsureLocalResult::kCancelled)
+		const FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
+		if (eResult == FileManager::EnsureLocalResult::kCancelled || eResult == FileManager::EnsureLocalResult::kFailed)
 		{
-			throw diagnostic::AlreadyReportedError("Output materialization cancelled");
+			return false;
 		}
 		std::fstream stream(rPath, std::ios::out | std::ios::binary);
 		stream << rContent;
@@ -58,6 +59,7 @@ static void WriteIfChanged(const std::string& rContent, const std::filesystem::p
 		VERIFY_SUCCESS(stream.good());
 		LOG(kDefault, kDebug, "Re-generated {}", logName);
 	}
+	return true;
 }
 
 // Generated symbol name -> the relative file that produced it. PathToCppVariable strips every non-identifier byte, so
@@ -502,11 +504,12 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 }
 
 template <IsExportJob T>
-static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std::filesystem::path& rPackFile, const std::filesystem::path& rHeaderFile, std::vector<std::unique_ptr<T>>& rExportJobs, DataPackerRunSummary& rRunSummary)
+static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const std::filesystem::path& rManifestFile, const std::filesystem::path& rPackFile, const std::filesystem::path& rHeaderFile, std::vector<std::unique_ptr<T>>& rExportJobs, DataPackerRunSummary& rRunSummary)
 {
-	if (gpFileManager->EnsureLocal(FileManager::OutputRoot::kData) == FileManager::EnsureLocalResult::kCancelled)
+	const FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
+	if (eResult == FileManager::EnsureLocalResult::kCancelled || eResult == FileManager::EnsureLocalResult::kFailed)
 	{
-		throw diagnostic::AlreadyReportedError("Output materialization cancelled");
+		return std::unexpected(eResult);
 	}
 
 	LOG(kDefault, kDebug, "\"{}\" is dirty, running export", T::kName);
@@ -588,7 +591,7 @@ static bool RunDirtyExport(const std::filesystem::path& rManifestFile, const std
 }
 
 template <IsExportJob T>
-bool RunExportJobs(DataPackerRunSummary& rRunSummary)
+std::expected<bool, FileManager::EnsureLocalResult> RunExportJobs(DataPackerRunSummary& rRunSummary)
 {
 	bool bDirty = gpFileManager->mbCleanExport;
 
@@ -632,15 +635,28 @@ bool RunExportJobs(DataPackerRunSummary& rRunSummary)
 }
 
 template <typename... Ts>
-static bool RunAllMainExports(DataPackerRunSummary& rRunSummary)
+static std::expected<bool, FileManager::EnsureLocalResult> RunAllMainExports(DataPackerRunSummary& rRunSummary)
 {
-	// Comma fold so every export runs even if an earlier one fails.
-	bool bSuccess = true;
-	((bSuccess &= RunExportJobs<Ts>(rRunSummary)), ...);
-	return bSuccess;
+	// Contained export failures still run later types; terminal materialization results stop the fold.
+	std::expected<bool, FileManager::EnsureLocalResult> result = true;
+	([&]()
+	{
+		if (!result)
+		{
+			return;
+		}
+		std::expected<bool, FileManager::EnsureLocalResult> exportResult = RunExportJobs<Ts>(rRunSummary);
+		if (!exportResult)
+		{
+			result = std::unexpected(exportResult.error());
+			return;
+		}
+		*result &= *exportResult;
+	}(), ...);
+	return result;
 }
 
-static void GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
+static bool GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
 {
 	std::stringstream content;
 	content << "#pragma once" << std::endl;
@@ -675,10 +691,10 @@ static void GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
 	content << std::endl;
 	content << "} // namespace data" << std::endl;
 
-	WriteIfChanged(content.str(), rOutPath, "DataTypes.h");
+	return WriteIfChanged(content.str(), rOutPath, "DataTypes.h");
 }
 
-static void GenerateDataHeader(const std::filesystem::path& rOutPath)
+static bool GenerateDataHeader(const std::filesystem::path& rOutPath)
 {
 	std::stringstream content;
 	content << "#pragma once" << std::endl;
@@ -692,7 +708,7 @@ static void GenerateDataHeader(const std::filesystem::path& rOutPath)
 		content << "#include \"" << rEntry.headerFile << "\"" << std::endl;
 	}
 
-	WriteIfChanged(content.str(), rOutPath, "Data.h");
+	return WriteIfChanged(content.str(), rOutPath, "Data.h");
 }
 
 bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
@@ -707,27 +723,57 @@ bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 
 	Texture::StaticInit();
 
-	auto pFileManager = std::make_unique<FileManager>(std::span(argv, argc));
+	FileManager::EnsureLocalResult eInitializationResult = FileManager::EnsureLocalResult::kAlreadyLocal;
+	auto pFileManager = std::make_unique<FileManager>(std::span(argv, argc), eInitializationResult);
+	if (eInitializationResult == FileManager::EnsureLocalResult::kCancelled || eInitializationResult == FileManager::EnsureLocalResult::kFailed)
+	{
+		pFileManager.reset();
+		return false;
+	}
 
 	MigrateLegacyIntermediates();
 
 	bool bSuccess = true;
 
 	// Scene and Island need to be first as they can create new textures and models
-	bSuccess &= RunExportJobs<ExportScene>(rRunSummary);
+	std::expected<bool, FileManager::EnsureLocalResult> exportResult = RunExportJobs<ExportScene>(rRunSummary);
+	if (!exportResult)
+	{
+		return false;
+	}
+	bSuccess &= *exportResult;
 	BakeIslandIntermediates();
-	bSuccess &= RunExportJobs<ExportIsland>(rRunSummary);
+	exportResult = RunExportJobs<ExportIsland>(rRunSummary);
+	if (!exportResult)
+	{
+		return false;
+	}
+	bSuccess &= *exportResult;
 
 	GenerateIrradianceCubemaps();
 	GeneratePreFilteredCubemaps();
 
-	bSuccess &= RunAllMainExports<ExportAudio, ExportModel, ExportShader, ExportTexture, ExportRaw>(rRunSummary);
+	exportResult = RunAllMainExports<ExportAudio, ExportModel, ExportShader, ExportTexture, ExportRaw>(rRunSummary);
+	if (!exportResult)
+	{
+		return false;
+	}
+	bSuccess &= *exportResult;
 
-	GenerateDataTypesHeader(gpFileManager->mOutputDirectory / "DataTypes.h");
-	GenerateDataHeader(gpFileManager->mOutputDirectory / "Data.h");
+	if (!GenerateDataTypesHeader(gpFileManager->mOutputDirectory / "DataTypes.h"))
+	{
+		return false;
+	}
+	if (!GenerateDataHeader(gpFileManager->mOutputDirectory / "Data.h"))
+	{
+		return false;
+	}
 
 	// Copy license files from ThirdParty directories to Attribution directory in output
-	attribution::CopyThirdPartyLicenses();
+	if (!attribution::CopyThirdPartyLicenses())
+	{
+		return false;
+	}
 
 	LOG(kDefault, kDebug, "");
 
@@ -738,8 +784,15 @@ bool MaterializeData(char* argv[])
 {
 	common::ThreadLocal threadLocal(1024, std::nullopt, false);
 	std::array<char*, 4> fileManagerArguments { argv[0], argv[2], argv[3], argv[4] };
-	auto pFileManager = std::make_unique<FileManager>(fileManagerArguments, FileManager::InitializationMode::kDataOnly);
-	return gpFileManager->EnsureLocal(FileManager::OutputRoot::kData) != FileManager::EnsureLocalResult::kCancelled;
+	FileManager::EnsureLocalResult eInitializationResult = FileManager::EnsureLocalResult::kAlreadyLocal;
+	auto pFileManager = std::make_unique<FileManager>(fileManagerArguments, eInitializationResult, FileManager::InitializationMode::kDataOnly);
+	if (eInitializationResult == FileManager::EnsureLocalResult::kCancelled || eInitializationResult == FileManager::EnsureLocalResult::kFailed)
+	{
+		pFileManager.reset();
+		return false;
+	}
+	const FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
+	return eResult != FileManager::EnsureLocalResult::kCancelled && eResult != FileManager::EnsureLocalResult::kFailed;
 }
 
 static bool RunCommand(int argc, char* argv[])
@@ -782,9 +835,6 @@ static bool RunCommandWithExceptionHandling(int argc, char* argv[])
 	try
 	{
 		bSuccess = RunCommand(argc, argv);
-	}
-	catch (const diagnostic::AlreadyReportedError&)
-	{
 	}
 	catch (const std::exception& rException)
 	{

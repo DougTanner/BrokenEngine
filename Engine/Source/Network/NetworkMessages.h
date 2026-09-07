@@ -316,13 +316,12 @@ private:
 
 // The one corruption signal on the receive path: a reader that decided the peer's bytes are impossible
 // raises this, and the dispatch catch owning that direction decides the response (client-fatal, server
-// drop-and-count). pcReader is the static reader-name literal CorruptStreamException's contract requires;
-// the suppress scope covers std::runtime_error's own string copy for the reader sites that have no
-// ambient one.
+// drop-and-count). pcReader identifies the reader; the suppress scope covers std::ios_base::failure's
+// string copy for reader sites that have no ambient one.
 [[noreturn]] inline void ThrowCorruptStream(const char* pcReader)
 {
 	ScopedSuppressAllocationTracking suppress;
-	throw common::CorruptStreamException(pcReader);
+	throw std::ios_base::failure(pcReader);
 }
 
 template <typename TMessage>

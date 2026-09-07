@@ -314,7 +314,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 	catch (const std::exception& rException)
 	{
 		// Trust boundary: a reader that decided this client's bytes are impossible throws
-		// CorruptStreamException (a local .at()/bad_alloc lands here too) before any client state is
+		// std::ios_base::failure (a local .at()/bad_alloc lands here too) before any client state is
 		// mutated, because handlers land parsed values in locals first. This catch is the single recorder
 		// for such a packet -- the readers themselves count nothing: drop the packet whole and charge one
 		// contract violation, which tears down the peer only once the violation threshold is reached.

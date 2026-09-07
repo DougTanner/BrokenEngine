@@ -62,11 +62,11 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 	// off the buffer, so reject against the structural maxima before any of them is used.
 	// uiMaterialCount == 0 is rejected here (not just > max) so the trust boundary throws uniformly:
 	// mpPipelines.at(0) is read unconditionally in RecordDrawIndirect / UpdateStorageBufferDescriptors, so a
-	// zero count must fail through CorruptStreamException rather than a downstream ASSERT of a different type.
+	// zero count must fail through std::ios_base::failure rather than a downstream ASSERT of a different type.
 	if (rSceneHeader.uiTextureCount > common::SceneHeader::kiMaxTextures || rSceneHeader.uiMaterialCount == 0
 	 || rSceneHeader.uiMaterialCount > common::SceneHeader::kiMaxMaterials)
 	{
-		throw common::CorruptStreamException("ModelPipeline::Create");
+		throw std::ios_base::failure("ModelPipeline::Create");
 	}
 
 	miMaterialCount = rSceneHeader.uiMaterialCount;
@@ -86,7 +86,7 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 	// bounded against the structural maxima above, so the multiply cannot overflow int64.
 	if (iMaterialDataOffset + rSceneHeader.uiMaterialCount * static_cast<int64_t>(sizeof(common::MaterialShaderData)) > rChunk.pHeader->iSize)
 	{
-		throw common::CorruptStreamException("ModelPipeline::Create");
+		throw std::ios_base::failure("ModelPipeline::Create");
 	}
 
 	const uint32_t* puiIndexStarts = reinterpret_cast<const uint32_t*>(rChunk.pData + iIndexStartsOffset);
@@ -98,7 +98,7 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 		uint32_t uiIndexStart = puiIndexStarts[i];
 		if ((i > 0 && uiIndexStart < uiPreviousIndexStart) || static_cast<int64_t>(uiIndexStart) > pipelineInfo.pVertexBuffer->mInfo.iCount)
 		{
-			throw common::CorruptStreamException("ModelPipeline::Create");
+			throw std::ios_base::failure("ModelPipeline::Create");
 		}
 		uiPreviousIndexStart = uiIndexStart;
 	}

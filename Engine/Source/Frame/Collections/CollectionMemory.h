@@ -130,14 +130,14 @@ void AllocateAndAssign(TStruct& rStruct, int64_t iCapacity, TTuple&& members)
 	if (iBufferSize > common::kiMaxDeserializedBytes)
 	{
 		ResetDataToNull(rStruct, members);
-		throw common::CorruptStreamException("AllocateAndAssign");
+		throw std::ios_base::failure("AllocateAndAssign");
 	}
 
 	common::AlignedUniquePtr<std::byte> pNewData = common::MakeAligned<std::byte>(iBufferSize);
 	if (pNewData == nullptr)
 	{
 		ResetDataToNull(rStruct, members);
-		throw common::CorruptStreamException("AllocateAndAssign");
+		throw std::ios_base::failure("AllocateAndAssign");
 	}
 
 	// Publish the capacity and physical layout only after a successful install.

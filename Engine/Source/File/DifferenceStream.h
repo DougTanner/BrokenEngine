@@ -640,7 +640,7 @@ private:
 			mFullFramesStream >> rSavedFrame;
 			bReadSucceeded = static_cast<bool>(mFullFramesStream);
 		}
-		catch (const common::CorruptStreamException&)
+		catch (const std::ios_base::failure&)
 		{
 			bReadSucceeded = false;
 		}

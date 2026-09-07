@@ -148,7 +148,7 @@ void WriteModelDescriptor(Pipeline& rPipeline, const DescriptorInfo& rDescriptor
 				}
 				if (uiTextureIndex >= rSceneHeader.uiTextureCount)
 				{
-					throw common::CorruptStreamException("PipelineDescriptorWriter material");
+					throw std::ios_base::failure("PipelineDescriptorWriter material");
 				}
 				return static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[uiTextureIndex]));
 			};

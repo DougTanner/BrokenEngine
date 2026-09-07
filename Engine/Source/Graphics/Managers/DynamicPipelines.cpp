@@ -24,19 +24,19 @@ static void ResolveModelChunkShaders(common::crc_t sceneCrc, Buffer*& rpModelBuf
 	const auto sceneIt = rChunkMap.find(sceneCrc);
 	if (sceneIt == rChunkMap.end())
 	{
-		throw common::CorruptStreamException("DynamicPipelines scene");
+		throw std::ios_base::failure("DynamicPipelines scene");
 	}
 
 	if (!(sceneIt->second.pHeader->flags & common::ChunkFlags::kScene))
 	{
-		throw common::CorruptStreamException("DynamicPipelines scene");
+		throw std::ios_base::failure("DynamicPipelines scene");
 	}
 
 	const common::SceneHeader& rSceneHeader = sceneIt->second.pHeader->sceneHeader;
 	const auto modelIt = gpBufferManager->mModelMap.find(rSceneHeader.modelCrc);
 	if (modelIt == gpBufferManager->mModelMap.end())
 	{
-		throw common::CorruptStreamException("DynamicPipelines scene");
+		throw std::ios_base::failure("DynamicPipelines scene");
 	}
 
 	rpModelBuffer = &modelIt->second;
@@ -103,7 +103,7 @@ void DynamicPipelines::CreateModelPipeline(common::crc_t crc, std::string_view n
 
 		mModelPipelineMaps[kDynamicModelPipelineModel].insert_or_assign(crc, pPipeline);
 	}
-	catch (const common::CorruptStreamException& rException)
+	catch (const std::ios_base::failure& rException)
 	{
 		char pcHex[20] {};
 		LOG(kLoading, kError, "Corrupt scene chunk for {}model pipeline \"{}\" (scene CRC {}): {}", "", name, common::ToHex(std::span(pcHex), sceneCrc), rException.what());
@@ -159,7 +159,7 @@ void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_
 
 		mModelPipelineMaps[kDynamicModelPipelineModelShadow].insert_or_assign(crc, pPipelineShadow);
 	}
-	catch (const common::CorruptStreamException& rException)
+	catch (const std::ios_base::failure& rException)
 	{
 		char pcHex[20] {};
 		LOG(kLoading, kError, "Corrupt scene chunk for {}model pipeline \"{}\" (scene CRC {}): {}", "shadow ", pipelineName, common::ToHex(std::span(pcHex), sceneCrc), rException.what());

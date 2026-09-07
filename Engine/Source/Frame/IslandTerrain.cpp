@@ -168,13 +168,13 @@ void IslandTerrain::WaitForElevationMaps()
 		 || rIslandHeader.iHeightmapHeight <= 0 || rIslandHeader.iMeshVertexCount <= 0 || rIslandHeader.iMeshIndexCount <= 0
 		 || rIslandHeader.iValidAreaVertexCount < 0)
 		{
-			throw common::CorruptStreamException("IslandTerrain::WaitForElevationMaps");
+			throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");
 		}
 
 		int64_t iBytesRemaining = rLazyChunk.header.iSize;
 		if (rIslandHeader.iHeightmapWidth > iBytesRemaining / static_cast<int64_t>(sizeof(uint16_t)) / rIslandHeader.iHeightmapHeight)
 		{
-			throw common::CorruptStreamException("IslandTerrain::WaitForElevationMaps");
+			throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");
 		}
 		int64_t iHeightmapBytes = static_cast<int64_t>(rIslandHeader.iHeightmapWidth) * rIslandHeader.iHeightmapHeight * static_cast<int64_t>(sizeof(uint16_t));
 		iBytesRemaining -= iHeightmapBytes;
@@ -183,7 +183,7 @@ void IslandTerrain::WaitForElevationMaps()
 		{
 			if (iElementCount > iBytesRemaining / iElementBytes)
 			{
-				throw common::CorruptStreamException("IslandTerrain::WaitForElevationMaps");
+				throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");
 			}
 			int64_t iSectionBytes = iElementCount * iElementBytes;
 			iBytesRemaining -= iSectionBytes;
@@ -195,7 +195,7 @@ void IslandTerrain::WaitForElevationMaps()
 		int64_t iValidAreaBytes = consumeSection(rIslandHeader.iValidAreaVertexCount, static_cast<int64_t>(sizeof(XMFLOAT2)));
 		if (iBytesRemaining != 0)
 		{
-			throw common::CorruptStreamException("IslandTerrain::WaitForElevationMaps");
+			throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");
 		}
 		int64_t iMeshBytes = rLazyChunk.header.iSize - iHeightmapBytes - iValidAreaBytes;
 

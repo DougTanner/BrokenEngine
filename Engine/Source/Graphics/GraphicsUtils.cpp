@@ -9,6 +9,27 @@
 namespace engine
 {
 
+std::error_code VkErrorCode(VkResult vkResult) noexcept
+{
+	class VulkanErrorCategory final : public std::error_category
+	{
+	public:
+
+		const char* name() const noexcept override
+		{
+			return "Vulkan";
+		}
+
+		std::string message(int iValue) const override
+		{
+			return string_VkResult(static_cast<VkResult>(iValue));
+		}
+	};
+
+	static const VulkanErrorCategory category;
+	return {static_cast<int>(vkResult), category};
+}
+
 void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_location loc)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
@@ -34,7 +55,7 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 
 	if (vkResult == VK_ERROR_DEVICE_LOST)
 	{
-		throw DeviceLostException(pcException);
+		throw std::system_error(VkErrorCode(vkResult), pcException);
 	}
 
 	DEBUG_BREAK();

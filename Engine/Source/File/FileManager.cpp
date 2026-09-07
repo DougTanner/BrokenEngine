@@ -14,6 +14,21 @@ using enum FileFlags;
 namespace
 {
 
+[[noreturn]] static void FailCreateDirectory(std::string_view directoryKind, const std::filesystem::path& rDirectoryPath, const std::error_code& rError)
+{
+	LOG(kLoading, kError, "Failed to create {} directory \"{}\" (error {}: {})", directoryKind, rDirectoryPath.string(), rError.value(), rError.message());
+	std::string message = "Failed to create the ";
+	message += directoryKind;
+	message += " directory:\n\n";
+	message += rDirectoryPath.string();
+	message += "\n\nError ";
+	message += std::to_string(rError.value());
+	message += ": ";
+	message += rError.message();
+	common::ScopedExpectedThrows scopedExpectedThrows;
+	throw std::runtime_error(message);
+}
+
 class Sha256Hasher
 {
 public:
@@ -107,8 +122,6 @@ FileManager::FileManager()
 {
 	ASSERT(gpFileManager == nullptr);
 
-	gpFileManager = this;
-
 	// Get Windows AppData directory and append game name
 	if (!gLaunchOptions.appDataDirectory.empty())
 	{
@@ -131,7 +144,12 @@ FileManager::FileManager()
 		CoTaskMemFree(pWideChar);
 	}
 	mAppDataDirectory.append(game::kGameName);
-	std::filesystem::create_directory(mAppDataDirectory);
+	std::error_code appDataDirectoryError;
+	std::filesystem::create_directory(mAppDataDirectory, appDataDirectoryError);
+	if (appDataDirectoryError)
+	{
+		FailCreateDirectory("AppData", mAppDataDirectory, appDataDirectoryError);
+	}
 	LOG(kLoading, kDebug, "AppData directory: \"{}\"", mAppDataDirectory.string());
 
 	// Get Windows temp directory and append game name
@@ -140,7 +158,12 @@ FileManager::FileManager()
 	mTempDirectory = pcDirectory;
 	mTempDirectory.append(game::kGameName);
 	LOG(kLoading, kDebug, "Temp directory: \"{}\"", mTempDirectory.string());
-	std::filesystem::create_directory(mTempDirectory);
+	std::error_code tempDirectoryError;
+	std::filesystem::create_directory(mTempDirectory, tempDirectoryError);
+	if (tempDirectoryError)
+	{
+		FailCreateDirectory("temp", mTempDirectory, tempDirectoryError);
+	}
 
 	std::filesystem::path dataDirectory;
 	if (!gLaunchOptions.dataDirectory.empty())
@@ -159,6 +182,8 @@ FileManager::FileManager()
 	}
 
 	mpPackChunks = std::make_unique<PackChunks>(dataDirectory);
+
+	gpFileManager = this;
 }
 
 FileManager::~FileManager()

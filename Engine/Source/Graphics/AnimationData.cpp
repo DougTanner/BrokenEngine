@@ -46,7 +46,7 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 	// max but larger than the chunk's actual animation bytes is rejected instead of walking off the eager pack buffer.
 	if (iAnimationBytes < static_cast<int64_t>(sizeof(mHeader)))
 	{
-		throw common::CorruptStreamException("AnimationData::Load");
+		throw std::ios_base::failure("AnimationData::Load");
 	}
 
 	// Copy animation and skeleton counts from eager pack memory.
@@ -66,7 +66,7 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 		|| mHeader.uiKeyframeCount > common::kiMaxDeserializedCapacity
 		|| mHeader.uiCubicKeyframeCount > common::kiMaxDeserializedCapacity)
 	{
-		throw common::CorruptStreamException("AnimationData::Load");
+		throw std::ios_base::failure("AnimationData::Load");
 	}
 
 	LOG(kLoading, kDebug, "AnimationData::Load: animations {}, channels {}, keyframes {}, cubicKeyframes {}, nodes {}, skinJoints {}", mHeader.uiAnimationCount, mHeader.uiChannelCount, mHeader.uiKeyframeCount, mHeader.uiCubicKeyframeCount, mHeader.skeleton.uiNodeCount, mHeader.skeleton.uiSkinJointCount);
@@ -79,7 +79,7 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 	{
 		if (iOffset > iAnimationBytes - iSectionBytes) // overflow-safe form of iOffset + iSectionBytes > iAnimationBytes
 		{
-			throw common::CorruptStreamException("AnimationData::Load");
+			throw std::ios_base::failure("AnimationData::Load");
 		}
 		iOffset += iSectionBytes;
 		pAnimationData += iSectionBytes;
@@ -120,14 +120,14 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 	{
 		if (mpSkinJointToNode[i] >= mHeader.skeleton.uiNodeCount)
 		{
-			throw common::CorruptStreamException("AnimationData::Load");
+			throw std::ios_base::failure("AnimationData::Load");
 		}
 	}
 	for (uint32_t i = 0; i < mHeader.uiMaterialCount; ++i)
 	{
 		if (static_cast<int32_t>(mpMaterialInfos[i].iParentNodeIndex) >= static_cast<int32_t>(mHeader.skeleton.uiNodeCount))
 		{
-			throw common::CorruptStreamException("AnimationData::Load");
+			throw std::ios_base::failure("AnimationData::Load");
 		}
 	}
 	for (uint32_t i = 0; i < mHeader.uiChannelCount; ++i)
@@ -137,7 +137,7 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 		if (rChannel.uiNodeIndex >= mHeader.skeleton.uiNodeCount || rChannel.uiKeyframeCount == 0
 		 || rChannel.uiKeyframeStart > uiKeyframeTotal || rChannel.uiKeyframeCount > uiKeyframeTotal - rChannel.uiKeyframeStart)
 		{
-			throw common::CorruptStreamException("AnimationData::Load");
+			throw std::ios_base::failure("AnimationData::Load");
 		}
 	}
 	for (uint32_t i = 0; i < mHeader.uiAnimationCount; ++i)
@@ -145,7 +145,7 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 		const common::AnimationClip& rClip = mpAnimations[i];
 		if (rClip.uiChannelStart > mHeader.uiChannelCount || rClip.uiChannelCount > mHeader.uiChannelCount - rClip.uiChannelStart)
 		{
-			throw common::CorruptStreamException("AnimationData::Load");
+			throw std::ios_base::failure("AnimationData::Load");
 		}
 	}
 
@@ -155,7 +155,7 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 		int64_t iParentIndex = mpNodes[i].iParentIndex;
 		if (iParentIndex != -1 && (iParentIndex < 0 || iParentIndex >= static_cast<int64_t>(i)))
 		{
-			throw common::CorruptStreamException("AnimationData::Load");
+			throw std::ios_base::failure("AnimationData::Load");
 		}
 	}
 
@@ -480,7 +480,7 @@ void LoadAnimationDataFromEagerChunks()
 			{
 				rAnimationData.Load(rChunk.pData + iAnimationSectionOffset, rChunk.iDataSize - iAnimationSectionOffset, rCrc);
 			}
-			catch (const common::CorruptStreamException& rException)
+			catch (const std::ios_base::failure& rException)
 			{
 				char pcHex[20] {};
 				LOG(kLoading, kError, "Corrupt animation data for GLTF CRC {}: {}", common::ToHex(std::span(pcHex), rCrc), rException.what());

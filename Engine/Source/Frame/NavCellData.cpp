@@ -488,11 +488,11 @@ void NavData::Read(std::istream& rStream)
 		const XMFLOAT2& rVertex = vertices.at(i);
 		if (!std::isfinite(rVertex.x))
 		{
-			throw common::CorruptStreamException("NavData::Read vertices");
+			throw std::ios_base::failure("NavData::Read vertices");
 		}
 		if (!std::isfinite(rVertex.y))
 		{
-			throw common::CorruptStreamException("NavData::Read vertices");
+			throw std::ios_base::failure("NavData::Read vertices");
 		}
 	}
 
@@ -523,7 +523,7 @@ void NavData::Read(std::istream& rStream)
 	// BuildCellNavData only rebases the offsets it copies.
 	if (iPolygonCount > 0 && polygonOffsets.at(0) != 0)
 	{
-		throw common::CorruptStreamException("NavData::Read topology");
+		throw std::ios_base::failure("NavData::Read topology");
 	}
 
 	// Range-check every offset before any span arithmetic, so no later subtraction runs on a hostile value.
@@ -531,7 +531,7 @@ void NavData::Read(std::istream& rStream)
 	{
 		if (polygonOffsets.at(i) < 0 || polygonOffsets.at(i) > iVertexCount - 3)
 		{
-			throw common::CorruptStreamException("NavData::Read topology");
+			throw std::ios_base::failure("NavData::Read topology");
 		}
 	}
 
@@ -540,7 +540,7 @@ void NavData::Read(std::istream& rStream)
 		auto [iStart, iEnd] = PolygonRange(polygonOffsets, i, iVertexCount);
 		if (iEnd - iStart < 3)
 		{
-			throw common::CorruptStreamException("NavData::Read topology");
+			throw std::ios_base::failure("NavData::Read topology");
 		}
 	}
 
@@ -548,7 +548,7 @@ void NavData::Read(std::istream& rStream)
 	{
 		if (visEdgeA.at(i) < 0 || visEdgeA.at(i) >= iVertexCount || visEdgeB.at(i) < 0 || visEdgeB.at(i) >= iVertexCount)
 		{
-			throw common::CorruptStreamException("NavData::Read topology");
+			throw std::ios_base::failure("NavData::Read topology");
 		}
 	}
 

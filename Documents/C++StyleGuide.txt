@@ -65,7 +65,7 @@ Use the following rules for C++ code
 
 	for (size_t i = 0; i < mIslands.size(); ++i)
 
-9. Exceptions for fatal errors only (things that would cause the program to crash), not control flow
+9. Exceptions are for fatal errors only (things that would cause the program to crash), not control flow. Use standard-library exception types by default. Define a custom exception only when it adds useful functionality, such as concrete data or behavior; do not add an empty derived type merely to rename or categorize a failure.
 
 10. "/" for header include paths, not "\\": #include "Graphics/Graphics.h"
 

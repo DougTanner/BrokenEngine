@@ -331,11 +331,17 @@ void TextureUploadManager::UploadThread()
 
 			SubmitChunkUpload(rLazyChunk, vkImageMemoryBarrier, bDone);
 		}
-		catch (DeviceLostException&)
+		catch (const std::system_error& rException)
 		{
+			if (rException.code() != VkErrorCode(VK_ERROR_DEVICE_LOST))
+			{
+				mException = std::current_exception();
+				mbThreadExited.store(true, std::memory_order_release);
+				mIdleConditionVariable.notify_all();
+				break;
+			}
+
 			// Device lost during upload -- DestroyTransferResources will clean up GPU resources.
-			// Caught before the fatal catch-all below (DeviceLostException derives from std::exception)
-			// so device loss keeps its distinct re-upload recovery rather than the fatal path below.
 			if (mCurrentCrc != 0)
 			{
 				LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(mCurrentCrc);

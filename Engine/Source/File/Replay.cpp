@@ -521,7 +521,7 @@ void Replay::SaveLoadReplay()
 				int64_t iManifestVersion = 0;
 				if (!ReadReplayManifestValue(manifestStream, iManifestVersion))
 				{
-					throw common::CorruptStreamException("ReplayManifest version");
+					throw std::ios_base::failure("ReplayManifest version");
 				}
 				if (iManifestVersion != kiReplayManifestVersion)
 				{
@@ -533,23 +533,23 @@ void Replay::SaveLoadReplay()
 				ReplayManifest manifest;
 				if (!ReadReplayManifestValue(manifestStream, manifest.iInitialTick))
 				{
-					throw common::CorruptStreamException("ReplayManifest initial tick");
+					throw std::ios_base::failure("ReplayManifest initial tick");
 				}
 				int64_t iCoordCount = 0;
 				if (!ReadReplayManifestValue(manifestStream, iCoordCount))
 				{
-					throw common::CorruptStreamException("ReplayManifest activation count");
+					throw std::ios_base::failure("ReplayManifest activation count");
 				}
 				const int64_t iInitialTick = manifest.iInitialTick;
 				if (iInitialTick < 0 || iInitialTick > std::numeric_limits<int64_t>::max() - 1)
 				{
-					throw common::CorruptStreamException("ReplayManifest initial tick");
+					throw std::ios_base::failure("ReplayManifest initial tick");
 				}
 				// Trust boundary (replay manifest file): bound the record count before reserve.
 				common::ValidateDeserializedCount(iCoordCount, 16, manifestStream, "ReplayManifest records");
 				if (iCoordCount <= 0)
 				{
-					throw common::CorruptStreamException("ReplayManifest empty records");
+					throw std::ios_base::failure("ReplayManifest empty records");
 				}
 				manifest.records.reserve(iCoordCount);
 				for (int64_t i = 0; i < iCoordCount; ++i)
@@ -557,42 +557,42 @@ void Replay::SaveLoadReplay()
 					ReplayManifestRecord record {};
 					if (!ReadReplayManifestValue(manifestStream, record.iActivationTick) || !ReadReplayManifestValue(manifestStream, record.coord.x) || !ReadReplayManifestValue(manifestStream, record.coord.y))
 					{
-						throw common::CorruptStreamException("ReplayManifest activation record");
+						throw std::ios_base::failure("ReplayManifest activation record");
 					}
 					if (record.iActivationTick < iInitialTick)
 					{
-						throw common::CorruptStreamException("ReplayManifest non-canonical record");
+						throw std::ios_base::failure("ReplayManifest non-canonical record");
 					}
 					if (record.iActivationTick > std::numeric_limits<int64_t>::max() - 1)
 					{
-						throw common::CorruptStreamException("ReplayManifest non-canonical record");
+						throw std::ios_base::failure("ReplayManifest non-canonical record");
 					}
 					if (!manifest.records.empty() && !ReplayManifestRecordLess(manifest.records.back(), record))
 					{
-						throw common::CorruptStreamException("ReplayManifest non-canonical record");
+						throw std::ios_base::failure("ReplayManifest non-canonical record");
 					}
 					manifest.records.push_back(record);
 				}
 				uint8_t uiHasFullFrames = 0;
 				if (!ReadReplayManifestValue(manifestStream, uiHasFullFrames) || uiHasFullFrames > 1)
 				{
-					throw common::CorruptStreamException("ReplayManifest fullframes flag");
+					throw std::ios_base::failure("ReplayManifest fullframes flag");
 				}
 				manifest.bHasFullFrames = uiHasFullFrames != 0;
 				if (manifest.bHasFullFrames != kbReplayFullFrames)
 				{
-					throw common::CorruptStreamException("ReplayManifest fullframes build mismatch");
+					throw std::ios_base::failure("ReplayManifest fullframes build mismatch");
 				}
 
 				int64_t iInventoryCount = 0;
 				if (!ReadReplayManifestValue(manifestStream, iInventoryCount))
 				{
-					throw common::CorruptStreamException("ReplayManifest inventory count");
+					throw std::ios_base::failure("ReplayManifest inventory count");
 				}
 				common::ValidateDeserializedCount(iInventoryCount, 57, manifestStream, "ReplayManifest inventory");
 				if (iInventoryCount <= 0)
 				{
-					throw common::CorruptStreamException("ReplayManifest empty inventory");
+					throw std::ios_base::failure("ReplayManifest empty inventory");
 				}
 				manifest.inventory.reserve(iInventoryCount);
 				for (int64_t i = 0; i < iInventoryCount; ++i)
@@ -601,37 +601,37 @@ void Replay::SaveLoadReplay()
 					ReplayManifestInventoryEntry entry;
 					if (!ReadReplayManifestValue(manifestStream, uiKind))
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory entry");
+						throw std::ios_base::failure("ReplayManifest inventory entry");
 					}
 					if (uiKind > static_cast<uint8_t>(ReplayArtifactKind::kFullFrames))
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory entry");
+						throw std::ios_base::failure("ReplayManifest inventory entry");
 					}
 					if (!ReadReplayManifestValue(manifestStream, entry.uiCoordKey))
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory entry");
+						throw std::ios_base::failure("ReplayManifest inventory entry");
 					}
 					if (!ReadReplayManifestValue(manifestStream, entry.iActivationTick))
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory entry");
+						throw std::ios_base::failure("ReplayManifest inventory entry");
 					}
 					if (!ReadReplayManifestValue(manifestStream, entry.digest.iByteCount))
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory entry");
+						throw std::ios_base::failure("ReplayManifest inventory entry");
 					}
 					if (entry.digest.iByteCount < 0)
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory entry");
+						throw std::ios_base::failure("ReplayManifest inventory entry");
 					}
 					entry.eKind = static_cast<ReplayArtifactKind>(uiKind);
 					manifestStream.read(reinterpret_cast<char*>(entry.digest.sha256.data()), static_cast<std::streamsize>(entry.digest.sha256.size()));
 					if (!manifestStream)
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory digest");
+						throw std::ios_base::failure("ReplayManifest inventory digest");
 					}
 					if (!manifest.inventory.empty() && !ReplayInventoryEntryLess(manifest.inventory.back(), entry))
 					{
-						throw common::CorruptStreamException("ReplayManifest non-canonical inventory");
+						throw std::ios_base::failure("ReplayManifest non-canonical inventory");
 					}
 					manifest.inventory.push_back(entry);
 				}
@@ -639,33 +639,33 @@ void Replay::SaveLoadReplay()
 				manifestStream.read(reinterpret_cast<char*>(generationDigest.data()), static_cast<std::streamsize>(generationDigest.size()));
 				if (!manifestStream || manifestStream.peek() != std::char_traits<char>::eof())
 				{
-					throw common::CorruptStreamException("ReplayManifest trailing data");
+					throw std::ios_base::failure("ReplayManifest trailing data");
 				}
 
 				ReplayManifest expectedManifest = manifest;
 				if (!BuildExpectedReplayInventory(expectedManifest, false) || expectedManifest.inventory.size() != manifest.inventory.size())
 				{
-					throw common::CorruptStreamException("ReplayManifest inventory shape");
+					throw std::ios_base::failure("ReplayManifest inventory shape");
 				}
 				for (size_t i = 0; i < manifest.inventory.size(); ++i)
 				{
 					if (expectedManifest.inventory.at(i).eKind != manifest.inventory.at(i).eKind)
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory identity");
+						throw std::ios_base::failure("ReplayManifest inventory identity");
 					}
 					if (expectedManifest.inventory.at(i).uiCoordKey != manifest.inventory.at(i).uiCoordKey)
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory identity");
+						throw std::ios_base::failure("ReplayManifest inventory identity");
 					}
 					if (expectedManifest.inventory.at(i).iActivationTick != manifest.inventory.at(i).iActivationTick)
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory identity");
+						throw std::ios_base::failure("ReplayManifest inventory identity");
 					}
 				}
 				std::array<uint8_t, 32> expectedGenerationDigest {};
 				if (!ComputeReplayGenerationDigest(manifest, expectedGenerationDigest) || expectedGenerationDigest != generationDigest)
 				{
-					throw common::CorruptStreamException("ReplayManifest generation digest");
+					throw std::ios_base::failure("ReplayManifest generation digest");
 				}
 				for (const ReplayManifestInventoryEntry& rEntry : manifest.inventory)
 				{
@@ -674,7 +674,7 @@ void Replay::SaveLoadReplay()
 					if (!engine::gpFileManager->ComputeOrdinaryFileSha256({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, filename, actualDigest)
 					 || actualDigest.iByteCount != rEntry.digest.iByteCount || actualDigest.sha256 != rEntry.digest.sha256)
 					{
-						throw common::CorruptStreamException("ReplayManifest inventory file");
+						throw std::ios_base::failure("ReplayManifest inventory file");
 					}
 				}
 				const std::vector<ReplayManifestRecord>& recordedRecords = manifest.records;
@@ -715,19 +715,19 @@ void Replay::SaveLoadReplay()
 					}
 					if (!bLoaded)
 					{
-						throw common::CorruptStreamException("ReplayManifest stream bounds");
+						throw std::ios_base::failure("ReplayManifest stream bounds");
 					}
 					if (staged.pendingReader.pReader->GetStartTick() != rRecord.iActivationTick)
 					{
-						throw common::CorruptStreamException("ReplayManifest stream bounds");
+						throw std::ios_base::failure("ReplayManifest stream bounds");
 					}
 					if (staged.pendingReader.pReader->GetSavedEnd().interpolate.iTick < rRecord.iActivationTick)
 					{
-						throw common::CorruptStreamException("ReplayManifest stream bounds");
+						throw std::ios_base::failure("ReplayManifest stream bounds");
 					}
 					if (staged.pendingReader.pReader->GetSavedEnd().interpolate.iTick > std::numeric_limits<int64_t>::max() - 1)
 					{
-						throw common::CorruptStreamException("ReplayManifest stream bounds");
+						throw std::ios_base::failure("ReplayManifest stream bounds");
 					}
 					stagedReaders.push_back(std::move(staged));
 				}
@@ -741,7 +741,7 @@ void Replay::SaveLoadReplay()
 					{
 						if (rStagedReader.record.iActivationTick <= previousIt->second)
 						{
-							throw common::CorruptStreamException("ReplayManifest overlapping coordinate generations");
+							throw std::ios_base::failure("ReplayManifest overlapping coordinate generations");
 						}
 						previousIt->second = iSavedEndTick;
 					}
@@ -749,7 +749,7 @@ void Replay::SaveLoadReplay()
 
 				if (recordedRecords.front().iActivationTick != iInitialTick)
 				{
-					throw common::CorruptStreamException("ReplayManifest missing initial record");
+					throw std::ios_base::failure("ReplayManifest missing initial record");
 				}
 
 				// Parse the grid into isolated state. Its membership must correlate with the manifest before Reset
@@ -766,7 +766,7 @@ void Replay::SaveLoadReplay()
 				initialCoords.reserve(stagedReaders.size());
 				if (stagedGrid.iTick != iInitialTick)
 				{
-					throw common::CorruptStreamException("ReplayManifest grid initial tick mismatch");
+					throw std::ios_base::failure("ReplayManifest grid initial tick mismatch");
 				}
 				for (const StagedReplayReader& rStagedReader : stagedReaders)
 				{
@@ -776,7 +776,7 @@ void Replay::SaveLoadReplay()
 						const auto gridFrameIt = stagedGrid.coordFrames.find(rStagedReader.record.coord);
 						if (gridFrameIt == stagedGrid.coordFrames.end())
 						{
-							throw common::CorruptStreamException("ReplayManifest initial coord absent from grid");
+							throw std::ios_base::failure("ReplayManifest initial coord absent from grid");
 						}
 						const game::Frame& rGridFrame = *gridFrameIt->second.pCurrent;
 						const game::Frame& rSavedStart = *rStagedReader.pendingReader.pSavedStart;
@@ -784,13 +784,13 @@ void Replay::SaveLoadReplay()
 						 || std::bit_cast<uint32_t>(rSavedStart.interpolate.fCurrentTime) != std::bit_cast<uint32_t>(stagedGrid.fCurrentTime)
 						 || rSavedStart.Crc() != rGridFrame.Crc())
 						{
-							throw common::CorruptStreamException("ReplayManifest initial stream does not match grid");
+							throw std::ios_base::failure("ReplayManifest initial stream does not match grid");
 						}
 					}
 				}
 				if (initialCoords.size() != stagedGrid.coordFrames.size())
 				{
-					throw common::CorruptStreamException("ReplayManifest initial coords do not match grid");
+					throw std::ios_base::failure("ReplayManifest initial coords do not match grid");
 				}
 
 				const ReplayTransferCaptureInfo recordingCaptureInfo = mReplayTransferCaptureInfo;

@@ -3,6 +3,6 @@
 namespace attribution
 {
 
-void CopyThirdPartyLicenses();
+bool CopyThirdPartyLicenses();
 
 }

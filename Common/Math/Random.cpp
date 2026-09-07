@@ -38,7 +38,7 @@ void RandomEngine::SetSerializedState(uint64_t uiValue)
 	// the run. Refuse the stream instead of silently repairing it, which would diverge from the recording.
 	if (uiValue == 0)
 	{
-		throw CorruptStreamException("RandomEngine::SetSerializedState");
+		throw std::ios_base::failure("RandomEngine::SetSerializedState");
 	}
 	uiState = uiValue;
 }

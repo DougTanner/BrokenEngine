@@ -16,6 +16,7 @@ public:
 		kAlreadyLocal,
 		kMaterialized,
 		kCancelled,
+		kFailed,
 	};
 
 	enum class InitializationMode
@@ -24,7 +25,7 @@ public:
 		kDataOnly,
 	};
 
-	FileManager(std::span<char*> argvSpan, InitializationMode eMode = InitializationMode::kFull);
+	FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitializationResult, InitializationMode eMode = InitializationMode::kFull);
 	~FileManager();
 
 	std::filesystem::path mpInputDirectories[2];
@@ -59,8 +60,8 @@ private:
 		OutputRootState meState = OutputRootState::kLocal;
 	};
 
-	void InitializeWorktreeOutputs(InitializationMode eMode);
-	void ReconcileWorktreeOutput(OutputRootInfo& rRoot);
+	EnsureLocalResult InitializeWorktreeOutputs(InitializationMode eMode);
+	EnsureLocalResult ReconcileWorktreeOutput(OutputRootInfo& rRoot);
 	EnsureLocalResult MaterializeOutput(OutputRootInfo& rRoot);
 	OutputRootInfo& GetOutputRoot(OutputRoot eRoot);
 

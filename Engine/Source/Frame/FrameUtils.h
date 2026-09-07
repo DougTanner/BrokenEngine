@@ -358,7 +358,7 @@ void ValidateCollectionPair(const INTERPOLATE& rInterpolate, const POST_RENDER& 
 {
 	if (rInterpolate.iCount != rPostRender.iCount || rInterpolate.iCapacity != rPostRender.iCapacity)
 	{
-		throw common::CorruptStreamException("Frame collection pair count/capacity mismatch");
+		throw std::ios_base::failure("Frame collection pair count/capacity mismatch");
 	}
 }
 

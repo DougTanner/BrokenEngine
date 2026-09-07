@@ -75,6 +75,7 @@ using namespace std::chrono_literals;
 #include <ctime>
 #include <deque>
 #include <exception>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>

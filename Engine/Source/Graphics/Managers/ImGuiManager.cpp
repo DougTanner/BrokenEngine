@@ -119,7 +119,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 	// Trust boundary: on-disk ChunkHeader::iSize drives the TTF byte length ImGui reads from pData; bound it to the eager chunk's true extent before the copy (reject non-positive too — a negative int64 passes the upper bound and reaches stb_truetype as a negative int).
 	if (rFontChunk.pHeader->iSize <= 0 || rFontChunk.pHeader->iSize > rFontChunk.iDataSize)
 	{
-		throw common::CorruptStreamException("ImGuiManager font");
+		throw std::ios_base::failure("ImGuiManager font");
 	}
 	ImGui::GetIO().Fonts->AddFontFromMemoryTTF(rFontChunk.pData, static_cast<int>(rFontChunk.pHeader->iSize), 26.0f, &fontConfig);
 

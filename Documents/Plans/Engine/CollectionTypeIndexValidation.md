@@ -26,7 +26,7 @@ The author's recommendation is to extend `ExplosionsInterpolate::PostRead` to
 check every deserialized `puiTypeIndices` value against the immutable
 `ExplosionsInterpolate::sTypes` registry before the loaded collection can be
 adopted. Treat `kuiInvalidTypeIndex` and any value outside the registry as
-corrupt input and throw the existing `CorruptStreamException`; retain trail
+corrupt input and throw `std::ios_base::failure`; retain trail
 count normalization and the current startup-only registration order. Keep
 other collection registries outside this focused candidate unless the same
 read path proves they are part of this exact explosion record.
@@ -70,8 +70,8 @@ Preserve these invariants:
   server registration order remain unchanged.
 
 Tier rationale: the fix is one pre-specified range test over an existing column
-inside the existing `ExplosionsInterpolate::PostRead` hook, throwing the
-existing `CorruptStreamException`. Serialized layout, registry contents, and
+inside the existing `ExplosionsInterpolate::PostRead` hook, throwing
+`std::ios_base::failure`. Serialized layout, registry contents, and
 valid explosion rows are untouched, so only corrupt input changes outcome.
 
 ## Acceptance criteria

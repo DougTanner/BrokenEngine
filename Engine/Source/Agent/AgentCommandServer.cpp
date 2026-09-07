@@ -38,7 +38,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 		if (mListenSocket == INVALID_SOCKET)
 		{
 			LOG(kNetwork, kError, "AgentCommandServer socket creation failed: {}", WSAGetLastError());
-			throw StartupException("agent socket creation failed");
+			throw std::runtime_error("agent socket creation failed");
 		}
 
 		BOOL bReuseAddress = TRUE;
@@ -57,7 +57,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 		if (iBindError != WSAEADDRINUSE || iAttempt + 1 >= kiMaxBindAttempts)
 		{
 			LOG(kNetwork, kError, "AgentCommandServer bind to 127.0.0.1:{} failed: {}", iPort, iBindError);
-			throw StartupException("agent bind failed");
+			throw std::runtime_error("agent bind failed");
 		}
 
 		if (iAttempt == 0)
@@ -72,7 +72,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 		LOG(kNetwork, kError, "AgentCommandServer listen on 127.0.0.1:{} failed: {}", iPort, WSAGetLastError());
 		closesocket(mListenSocket);
 		mListenSocket = INVALID_SOCKET;
-		throw StartupException("agent listen failed");
+		throw std::runtime_error("agent listen failed");
 	}
 
 	u_long uiNonBlocking = 1;
@@ -81,7 +81,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 		LOG(kNetwork, kError, "AgentCommandServer listener non-blocking configuration failed: {}", WSAGetLastError());
 		closesocket(mListenSocket);
 		mListenSocket = INVALID_SOCKET;
-		throw StartupException("agent listener non-blocking configuration failed");
+		throw std::runtime_error("agent listener non-blocking configuration failed");
 	}
 
 	LOG(kNetwork, kInfo, "AgentCommandServer listening on 127.0.0.1:{}", iPort);

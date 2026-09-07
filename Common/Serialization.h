@@ -3,24 +3,6 @@
 namespace common
 {
 
-// Thrown by deserialization readers when a count/size/capacity field from a trust boundary
-// (save file, replay stream, network payload, .pack chunk) is implausible — negative, inverted
-// (count > capacity), or larger than the stream/chunk could possibly back. Save and replay readers catch it
-// at their load boundary (logged + load aborted) instead of overrunning a buffer or driving an unbounded
-// allocation; the two network directions answer it asymmetrically, per Engine/Source/Network/AGENTS.md
-// "Corrupt Input Policy"; pack readers do not catch it — bad .pack data
-// halts, so it reaches the crash-report path. The message is a
-// static reader-name literal (no std::format on the throw path; std::runtime_error's own string copy is
-// benign — every thrower runs under a load-path allocation-suppress scope).
-class CorruptStreamException : public std::runtime_error
-{
-public:
-	explicit CorruptStreamException(const char* pcReader)
-		: std::runtime_error(pcReader)
-	{
-	}
-};
-
 // Generous absolute ceiling on a deserialized SOA capacity. Far above any plausible per-collection
 // element count, far below an allocation that would exhaust memory — converts a hostile capacity into
 // a clean reject-and-log instead of a bad_alloc.
@@ -50,7 +32,7 @@ inline void ValidateDeserializedCount(int64_t iCount, int64_t iElementBytes, std
 {
 	if (iCount < 0 || iElementBytes <= 0 || iCount > StreamBytesRemaining(rStream) / iElementBytes)
 	{
-		throw CorruptStreamException(pcReader);
+		throw std::ios_base::failure(pcReader);
 	}
 }
 
@@ -64,7 +46,7 @@ inline void ValidateDeserializedCountCapacity(int64_t iCount, int64_t iCapacity,
 	if (iCount < 0 || iCapacity < 0 || iCount > iCapacity || iCapacity > kiMaxDeserializedCapacity
 	 || (iElementBytes > 0 && iCapacity > kiMaxDeserializedBytes / iElementBytes))
 	{
-		throw CorruptStreamException(pcReader);
+		throw std::ios_base::failure(pcReader);
 	}
 	ValidateDeserializedCount(iCount, iElementBytes, rStream, pcReader);
 }

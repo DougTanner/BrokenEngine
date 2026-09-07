@@ -178,7 +178,7 @@ void PublishPendingCopies(const std::vector<PendingCopy>& rPendingCopies)
 }
 }
 
-void CopyThirdPartyLicenses()
+bool CopyThirdPartyLicenses()
 {
 	std::filesystem::path thirdPartyDirectory = gpFileManager->mThirdPartyDirectory;
 	std::filesystem::path attributionDirectory = gpFileManager->GetAttributionDirectory();
@@ -186,13 +186,15 @@ void CopyThirdPartyLicenses()
 
 	if (pendingCopies.empty())
 	{
-		return;
+		return true;
 	}
-	if (gpFileManager->EnsureLocal(FileManager::OutputRoot::kAttribution) == FileManager::EnsureLocalResult::kCancelled)
+	const FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kAttribution);
+	if (eResult == FileManager::EnsureLocalResult::kCancelled || eResult == FileManager::EnsureLocalResult::kFailed)
 	{
-		throw diagnostic::AlreadyReportedError("Attribution materialization cancelled");
+		return false;
 	}
 	PublishPendingCopies(pendingCopies);
+	return true;
 }
 
 }

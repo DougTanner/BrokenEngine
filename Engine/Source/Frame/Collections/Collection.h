@@ -212,7 +212,7 @@ struct OptionalIdToIndex<T, FLAGS>
 		common::ValidateDeserializedCount(iSize, sizeof(int64_t), rStream, "OptionalIdToIndex::Read");
 		if (iSize != iCount)
 		{
-			throw common::CorruptStreamException("OptionalIdToIndex::Read");
+			throw std::ios_base::failure("OptionalIdToIndex::Read");
 		}
 		idToIndexMap.clear();
 		idToIndexMap.reserve(iSize);
@@ -231,18 +231,18 @@ struct OptionalIdToIndex<T, FLAGS>
 			common::Read(rStream, iValue);
 			if (iValue < 0 || iValue >= iCount)
 			{
-				throw common::CorruptStreamException("OptionalIdToIndex::Read");
+				throw std::ios_base::failure("OptionalIdToIndex::Read");
 			}
 			uint64_t uiBit = 1ULL << (iValue & 63);
 			if ((pSeen[iValue >> 6] & uiBit) != 0)
 			{
-				throw common::CorruptStreamException("OptionalIdToIndex::Read");
+				throw std::ios_base::failure("OptionalIdToIndex::Read");
 			}
 			pSeen[iValue >> 6] |= uiBit;
 			// A duplicate stream key must not silently overwrite: it would leave a live row unindexed.
 			if (!idToIndexMap.try_emplace(key, iValue).second)
 			{
-				throw common::CorruptStreamException("OptionalIdToIndex::Read");
+				throw std::ios_base::failure("OptionalIdToIndex::Read");
 			}
 		}
 	}

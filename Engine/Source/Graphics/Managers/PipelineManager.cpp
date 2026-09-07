@@ -52,7 +52,7 @@ PipelineManager::PipelineManager()
 		{
 			char pcHex[20] {};
 			LOG(kLoading, kError, "Corrupt shader chunk {}: implausible binding/attribute counts {} / {}", common::ToHex(std::span(pcHex), rCrc), rShaderHeader.iDescriptorSetLayoutBindings, rShaderHeader.iVertexInputAttributeDescriptions);
-			throw common::CorruptStreamException("PipelineManager shader");
+			throw std::ios_base::failure("PipelineManager shader");
 		}
 
 		const int64_t iSetIndicesOffset = common::ShaderHeader::SetIndicesOffset(rShaderHeader.iDescriptorSetLayoutBindings);
@@ -65,7 +65,7 @@ PipelineManager::PipelineManager()
 		{
 			char pcHex[20] {};
 			LOG(kLoading, kError, "Corrupt shader chunk {}: section extent exceeds chunk bytes", common::ToHex(std::span(pcHex), rCrc));
-			throw common::CorruptStreamException("PipelineManager shader");
+			throw std::ios_base::failure("PipelineManager shader");
 		}
 
 		ShaderInfo info

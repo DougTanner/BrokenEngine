@@ -347,11 +347,11 @@ void Client::Receive(std::span<const uint8_t> packetData)
 				break;
 		}
 	}
-	// Trust boundary: only a reader that decided the server's bytes are impossible throws CorruptStreamException,
+	// Trust boundary: only a reader that decided the server's bytes are impossible throws std::ios_base::failure,
 	// and a client cannot keep playing against a server it cannot decode — assert so the crash report names the reader.
 	// The std::exception catch below is log-and-continue, so an ordinary local failure (bad_alloc, .at(), file I/O
 	// beneath a handler) is never blamed on the peer.
-	catch (const common::CorruptStreamException& rException)
+	catch (const std::ios_base::failure& rException)
 	{
 		LOG(kNetwork, kError, "Client::Receive dropped corrupt packet (type {}): {}", static_cast<uint8_t>(eType), rException.what());
 		ASSERT(false);

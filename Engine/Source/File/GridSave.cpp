@@ -82,7 +82,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 	int64_t iFrameCount = 0;
 	common::Read(fileStream, iFrameCount);
 	// Trust boundary (save file): a corrupt count/capacity anywhere in the grid / fleet / frame
-	// deserialization throws CorruptStreamException (or .at()/bad_alloc) — abort the load gracefully
+	// deserialization throws std::ios_base::failure (or .at()/bad_alloc) — abort the load gracefully
 	// (return false) so a hand-crafted or truncated save file can't overrun a buffer or crash the server.
 	bool bHasLoadedClock = false;
 	try
@@ -96,7 +96,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 		// leaves the fresh-fallback game minting from a clean base rather than a garbage/advanced one.
 		if (rStagedGrid.iNextGlobalId <= 0)
 		{
-			throw common::CorruptStreamException("iNextGlobalId");
+			throw std::ios_base::failure("iNextGlobalId");
 		}
 
 		game::ReadSaveState(fileStream, rStagedGrid.saveState);
@@ -108,7 +108,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			auto [itFrames, bInserted] = rStagedGrid.coordFrames.try_emplace(coord);
 			if (!bInserted)
 			{
-				throw common::CorruptStreamException("duplicate grid coord");
+				throw std::ios_base::failure("duplicate grid coord");
 			}
 
 			engine::CoordFrames& rSub = itFrames->second;
@@ -127,7 +127,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			{
 				if (iTick < 0 || iTick > std::numeric_limits<int64_t>::max() - engine::TimeStep::kiMaxAccumulatorTicks || !std::isfinite(fCurrentTime))
 				{
-					throw common::CorruptStreamException("invalid frame clock");
+					throw std::ios_base::failure("invalid frame clock");
 				}
 
 				rStagedGrid.iTick = iTick;
@@ -136,7 +136,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			}
 			else if (iTick != rStagedGrid.iTick || std::bit_cast<uint32_t>(fCurrentTime) != std::bit_cast<uint32_t>(rStagedGrid.fCurrentTime))
 			{
-				throw common::CorruptStreamException("inconsistent frame clocks");
+				throw std::ios_base::failure("inconsistent frame clocks");
 			}
 		}
 
@@ -144,7 +144,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 		// must match a frame just read; a mismatch is a torn grid.
 		if (!rStagedGrid.coordFrames.contains(rStagedGrid.clientGridCoord))
 		{
-			throw common::CorruptStreamException("client grid coord absent from frames");
+			throw std::ios_base::failure("client grid coord absent from frames");
 		}
 
 	}

@@ -62,7 +62,7 @@ void ClientSession::ProcessReceivedGamePackets()
 			ApplyPlayerEvent(pPlayerEvents[i]);
 		}
 	}
-	catch (const common::CorruptStreamException& rException)
+	catch (const std::ios_base::failure& rException)
 	{
 		// Trust boundary: only a reader that decided the server's bytes are impossible throws this type, and a client
 		// cannot keep playing against a server it cannot decode — assert so the process ends with a crash report naming
@@ -90,7 +90,7 @@ void ClientSession::ProcessReceivedGamePackets()
 			}
 		}
 	}
-	catch (const common::CorruptStreamException& rException)
+	catch (const std::ios_base::failure& rException)
 	{
 		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt packet (type {}): {}", static_cast<uint8_t>(GamePacketType::kServerFleetSync), rException.what());
 		ASSERT(false);
