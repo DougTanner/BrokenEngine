@@ -43,8 +43,12 @@
 
    The brief bounds the card's verification evidence: each acceptance item
    comes back as a `path:line` citation plus a verdict, not verbatim source
-   text, except an item whose purpose is proposed replacement text. That is an
-   expectation of the dispatch, not a gate the Done condition tests.
+   text, except an item whose purpose is proposed replacement text. A
+   preparation handoff that returns a quantitative feasibility estimate as a
+   Finding must name the check proving that the measured trial preserved the
+   source document's rule or item inventory, or report the estimate as
+   unvalidated. That is an expectation of the dispatch, not a gate the Done
+   condition tests.
 
    When the preparation handoff will cite a scratch snapshot as the Plan
    review reviews' plan input rather than the claimed Plan path, the brief has
