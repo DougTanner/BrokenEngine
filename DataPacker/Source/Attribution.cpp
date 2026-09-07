@@ -27,6 +27,29 @@ bool IsReparsePoint(const std::filesystem::path& rPath)
 	return uiAttributes != INVALID_FILE_ATTRIBUTES && (uiAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
+void ValidateAttributionDestination(const std::filesystem::path& rAttributionDirectory, const std::filesystem::path& rDestination)
+{
+	std::filesystem::path currentPath = rAttributionDirectory;
+	for (const std::filesystem::path& rComponent : rDestination.lexically_relative(rAttributionDirectory))
+	{
+		currentPath /= rComponent;
+		DWORD uiAttributes = GetFileAttributesW(currentPath.native().c_str());
+		if (uiAttributes == INVALID_FILE_ATTRIBUTES)
+		{
+			DWORD uiError = GetLastError();
+			if (uiError == ERROR_FILE_NOT_FOUND || uiError == ERROR_PATH_NOT_FOUND)
+			{
+				return;
+			}
+			throw std::runtime_error(std::format("Cannot validate attribution destination: {} (Win32 {})", currentPath.string(), uiError));
+		}
+		if ((uiAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+		{
+			throw std::runtime_error(std::format("Unsupported attribution destination reparse point: {}", currentPath.string()));
+		}
+	}
+}
+
 std::vector<std::filesystem::directory_entry> DiscoverLibraries(const std::filesystem::path& rThirdPartyDirectory)
 {
 	std::vector<std::filesystem::directory_entry> libraries;
@@ -128,8 +151,9 @@ std::vector<PendingCopy> BuildPendingCopies(const std::filesystem::path& rThirdP
 {
 	std::vector<PendingCopy> pendingCopies;
 
-	auto AddPendingCopy = [&pendingCopies](const std::filesystem::path& rSourceFile, const std::filesystem::path& rDestination, std::string_view libraryName)
+	auto AddPendingCopy = [&pendingCopies, &rAttributionDirectory](const std::filesystem::path& rSourceFile, const std::filesystem::path& rDestination, std::string_view libraryName)
 	{
+		ValidateAttributionDestination(rAttributionDirectory, rDestination);
 		if (!std::filesystem::exists(rDestination) || std::filesystem::last_write_time(rSourceFile) > std::filesystem::last_write_time(rDestination))
 		{
 			pendingCopies.push_back({.source = rSourceFile, .destination = rDestination, .libraryName = std::string(libraryName)});
