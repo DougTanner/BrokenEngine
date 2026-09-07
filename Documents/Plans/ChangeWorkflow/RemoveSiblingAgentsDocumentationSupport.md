@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-07T16:14:50.126Z","dependsOn":["Documents/Plans/Engine/GraphicsManagerDocumentationConsolidation.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-07T16:14:50.126Z","dependsOn":[]} -->
 # Remove sibling AGENTS detail-document support
 
 ## Context

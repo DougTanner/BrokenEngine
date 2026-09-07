@@ -26,7 +26,7 @@ explosion particle CRC (`Engine/Source/Graphics/Managers/TextureManager.cpp:242-
 
 The controlling contracts are `Engine/Source/Frame/Collections/Explosions/AGENTS.md:1-6,15-17`,
 `Engine/Source/Frame/Collections/AGENTS.md:17`, and
-`Engine/Source/Graphics/Managers/TextureManager.AGENTS.md`: the visible child
+`Engine/Source/Graphics/Managers/AGENTS.md#texturemanager`: the visible child
 effect must use its authored texture, and lazy textures enter adoption after
 a request. The boundary is fresh-manager client resource recreation before
 particle staging; PointLights/lighting-preblur recovery is outside this Plan.
@@ -51,7 +51,7 @@ client-only guard, and leave partial pipeline/swapchain recreation alone.
 - `Engine/Source/Graphics/Managers/ParticleManager.cpp:25-55` and `TextureDescriptors.cpp:693-713` — descriptor assignment without lazy-load admission.
 - `Engine/Source/Graphics/Graphics.cpp:437-458,751-782` and `Engine/Source/File/PackChunks.cpp:851-909` — full recreation/reset.
 - `Engine/Source/Graphics/Managers/TextureManager.cpp:92-97,165-213,242-258` — fresh placeholders and priority requests.
-- `Engine/Source/Frame/Collections/Explosions/AGENTS.md` and `Engine/Source/Graphics/Managers/TextureManager.AGENTS.md` — effect and lazy-resource contracts.
+- `Engine/Source/Frame/Collections/Explosions/AGENTS.md` and `Engine/Source/Graphics/Managers/AGENTS.md#texturemanager` — effect and lazy-resource contracts.
 
 ## In scope
 

@@ -28,8 +28,8 @@ when no salted registration exists (`Engine/Source/Graphics/Managers/TextureDesc
 
 The controlling contracts are `Engine/Source/Frame/Collections/AGENTS.md:17`,
 `Engine/Source/Frame/Collections/PointLights/AGENTS.md`,
-`Engine/Source/Graphics/Managers/TextureManager.AGENTS.md`, and
-`Engine/Source/Graphics/Managers/PipelineManager.AGENTS.md`: registered
+`Engine/Source/Graphics/Managers/AGENTS.md#texturemanager`, and
+`Engine/Source/Graphics/Managers/AGENTS.md#pipelinemanager`: registered
 client type side effects must feed lazy loading and blurred deposits, and
 dynamic collection resources must repopulate after recreation. The boundary
 is the fresh-manager PointLights graphics-resource hook, including every
@@ -62,7 +62,7 @@ contracts into this one.
 - `Engine/Source/GameBase.cpp:20-23` — one-time registration owner.
 - `Engine/Source/Graphics/Graphics.cpp:437-462,751-782` and `Engine/Source/Graphics/Managers/PipelineManager.cpp:168-171` — fresh-manager lifecycle.
 - `Engine/Source/Graphics/Managers/TextureManager.cpp:92-97,165-213`, `TextureDescriptors.cpp:716-724`, and `Engine/Source/File/PackChunks.cpp:851-909` — placeholder, pre-blur, and lazy-state behavior.
-- `Engine/Source/Frame/Collections/PointLights/AGENTS.md` and `Engine/Source/Graphics/Managers/TextureManager.AGENTS.md` — resource invariants.
+- `Engine/Source/Frame/Collections/PointLights/AGENTS.md` and `Engine/Source/Graphics/Managers/AGENTS.md#texturemanager` — resource invariants.
 
 ## In scope
 

@@ -43,4 +43,4 @@ These apply to every ImGui screen in the repository, engine or game.
 
 - `TweaksScreen/AGENTS.md` - `TweaksScreenBase` multi-section runtime parameter UI bound to Wrapper globals
 - `../../../../Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md` - Game HUD and `game::TweaksScreen`
-- `../../Graphics/Managers/ImGuiManager.AGENTS.md` - Screen invocation, submission, scaling, and opaque regions
+- `../../Graphics/Managers/AGENTS.md#imguimanager` - Screen invocation, submission, scaling, and opaque regions
