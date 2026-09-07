@@ -40,13 +40,26 @@ skill-specific inputs:
   supplied, or none;
 - whether the session's approved plan or acceptance table includes an
   agent-harness scenario; a delegator requesting the build states this trigger;
-- for a BrokenEngineSandbox build, any Local generation or Gaea authorization a
-  user-approved plan or acceptance criterion grants, and any deletion-only
-  reference-search evidence the caller supplies; routine Shared builds need
-  neither — [references/runtime-data-mode.md](references/runtime-data-mode.md)
+- for a BrokenEngineSandbox build, the resolved data mode, carried with the
+  Local generation authorization a user-approved plan or acceptance
+  criterion grants, the deletion-only reference-search evidence, or the stated
+  basis for Shared, plus any Gaea authorization the same plan or criterion
+  grants — [references/runtime-data-mode.md](references/runtime-data-mode.md)
   owns which authorizations are valid;
 - whether an approved plan explicitly requires PREfast verification —
   [references/prefast-mode.md](references/prefast-mode.md).
+
+For a BrokenEngineSandbox build, resolve that data mode before writing the
+brief, with one read-only run of the resolver from the worktree root —
+`pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1`,
+adding `-RepositoryRoot`, `-PrimaryCheckout`, or `-Baseline` only for an input
+the caller explicitly supplied. Its `dataBuildMode` is the path-rule answer;
+[references/runtime-data-mode.md](references/runtime-data-mode.md) owns the
+remaining judgment triggers, which can still select Local when the script
+reports Shared. A Local mode needs that reference's Local generation
+authorization present in the brief before the build may generate. The worker
+re-resolves the same context itself, so the brief carries the mode and its
+authorization, never the resolver's JSON.
 
 ## Handoff
 
