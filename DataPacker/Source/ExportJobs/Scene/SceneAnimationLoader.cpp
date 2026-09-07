@@ -3,13 +3,98 @@
 namespace
 {
 
-// Returns a pointer to an accessor's tightly-packed float data (keyframe times / values).
-const float* AccessorFloats(const tinygltf::Model& rModel, int iAccessor)
+bool IsValidIndex(int iIndex, size_t uiSize)
 {
-	const tinygltf::Accessor& rAccessor = rModel.accessors[iAccessor];
-	ASSERT(rAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-	const tinygltf::BufferView& rBufferView = rModel.bufferViews[rAccessor.bufferView];
-	return reinterpret_cast<const float*>(&(rModel.buffers[rBufferView.buffer].data[rAccessor.byteOffset + rBufferView.byteOffset]));
+	return iIndex >= 0 && static_cast<size_t>(iIndex) < uiSize;
+}
+
+size_t CheckedAnimationSize(size_t uiCount, size_t uiElementSize, const std::string& rContext)
+{
+	if (uiElementSize != 0 && uiCount > std::numeric_limits<size_t>::max() / uiElementSize)
+	{
+		throw std::runtime_error(std::format("{} has a byte size that overflows size_t.", rContext));
+	}
+	return uiCount * uiElementSize;
+}
+
+const float* AccessorFloats(const tinygltf::Model& rModel, int iAccessor, size_t uiRequiredBytes, const std::string& rContext)
+{
+	if (!IsValidIndex(iAccessor, rModel.accessors.size()))
+	{
+		throw std::runtime_error(std::format("{} references accessor {} out of range (accessor count {}).", rContext, iAccessor, rModel.accessors.size()));
+	}
+
+	const tinygltf::Accessor& rAccessor = rModel.accessors.at(static_cast<size_t>(iAccessor));
+	if (rAccessor.sparse.isSparse)
+	{
+		throw std::runtime_error(std::format("{} has sparse accessor {}.", rContext, iAccessor));
+	}
+	if (rAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
+	{
+		throw std::runtime_error(std::format("{} accessor {} does not use FLOAT components.", rContext, iAccessor));
+	}
+	if (rAccessor.count == 0)
+	{
+		throw std::runtime_error(std::format("{} accessor {} has zero elements.", rContext, iAccessor));
+	}
+	if (!IsValidIndex(rAccessor.bufferView, rModel.bufferViews.size()))
+	{
+		throw std::runtime_error(std::format("{} accessor {} references buffer view {} out of range (buffer view count {}).", rContext, iAccessor, rAccessor.bufferView, rModel.bufferViews.size()));
+	}
+
+	const tinygltf::BufferView& rBufferView = rModel.bufferViews.at(static_cast<size_t>(rAccessor.bufferView));
+	if (!IsValidIndex(rBufferView.buffer, rModel.buffers.size()))
+	{
+		throw std::runtime_error(std::format("{} accessor {} buffer view {} references buffer {} out of range (buffer count {}).", rContext, iAccessor, rAccessor.bufferView, rBufferView.buffer, rModel.buffers.size()));
+	}
+	if (rBufferView.byteStride != 0)
+	{
+		throw std::runtime_error(std::format("{} accessor {} buffer view {} has unsupported animation byte stride {}.", rContext, iAccessor, rAccessor.bufferView, rBufferView.byteStride));
+	}
+
+	int32_t iComponentSize = tinygltf::GetComponentSizeInBytes(static_cast<uint32_t>(rAccessor.componentType));
+	int32_t iComponentCount = tinygltf::GetNumComponentsInType(static_cast<uint32_t>(rAccessor.type));
+	if (iComponentSize <= 0)
+	{
+		throw std::runtime_error(std::format("{} accessor {} has an invalid component or element type.", rContext, iAccessor));
+	}
+	if (iComponentCount <= 0)
+	{
+		throw std::runtime_error(std::format("{} accessor {} has an invalid component or element type.", rContext, iAccessor));
+	}
+
+	const tinygltf::Buffer& rBuffer = rModel.buffers.at(static_cast<size_t>(rBufferView.buffer));
+	if (rBufferView.byteOffset > rBuffer.data.size() || rBufferView.byteLength > rBuffer.data.size() - rBufferView.byteOffset)
+	{
+		throw std::runtime_error(std::format("{} accessor {} buffer view {} lies outside buffer {}.", rContext, iAccessor, rAccessor.bufferView, rBufferView.buffer));
+	}
+
+	size_t uiElementSize = CheckedAnimationSize(static_cast<size_t>(iComponentSize), static_cast<size_t>(iComponentCount), rContext);
+	size_t uiAccessorBytes = CheckedAnimationSize(rAccessor.count, uiElementSize, rContext);
+	if (rAccessor.byteOffset > rBufferView.byteLength || uiAccessorBytes > rBufferView.byteLength - rAccessor.byteOffset)
+	{
+		throw std::runtime_error(std::format("{} accessor {} lies outside buffer view {}.", rContext, iAccessor, rAccessor.bufferView));
+	}
+	if (uiRequiredBytes > uiAccessorBytes)
+	{
+		throw std::runtime_error(std::format("{} requires {} bytes but accessor {} declares only {} bytes.", rContext, uiRequiredBytes, iAccessor, uiAccessorBytes));
+	}
+
+	size_t uiBufferOffset = rBufferView.byteOffset + rAccessor.byteOffset;
+	if (rAccessor.byteOffset % alignof(float) != 0)
+	{
+		throw std::runtime_error(std::format("{} accessor {} float data is misaligned.", rContext, iAccessor));
+	}
+	if (uiBufferOffset % alignof(float) != 0)
+	{
+		throw std::runtime_error(std::format("{} accessor {} float data is misaligned.", rContext, iAccessor));
+	}
+	if (uiRequiredBytes > rBuffer.data.size() - uiBufferOffset)
+	{
+		throw std::runtime_error(std::format("{} accessor {} read lies outside buffer {}.", rContext, iAccessor, rBufferView.buffer));
+	}
+
+	return reinterpret_cast<const float*>(rBuffer.data.data() + uiBufferOffset);
 }
 
 bool KeepAnimationChannel(const tinygltf::Model& rModel, const tinygltf::AnimationChannel& rGltfChannel)
@@ -176,7 +261,11 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOut)
 				continue;
 			}
 
-			const tinygltf::AnimationSampler& rSampler = rAnim.samplers[rGltfChannel.sampler];
+			if (!IsValidIndex(rGltfChannel.sampler, rAnim.samplers.size()))
+			{
+				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\") references sampler {} out of range (sampler count {}).", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rAnim.samplers.size()));
+			}
+			const tinygltf::AnimationSampler& rSampler = rAnim.samplers.at(static_cast<size_t>(rGltfChannel.sampler));
 
 			common::AnimationChannel channel {};
 			if (!MapAnimationChannel(rGltfChannel, rSampler, channel))
@@ -184,23 +273,32 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOut)
 				continue;
 			}
 
-			// Keyframe times come from the input accessor (which also supplies the keyframe count); values from the output accessor
-			const tinygltf::Accessor& rInputAccessor = rModel.accessors[rSampler.input];
-			if (rInputAccessor.sparse.isSparse)
+			std::string context = std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {})", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler);
+			if (!IsValidIndex(rSampler.input, rModel.accessors.size()))
 			{
-				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) has sparse input accessor {}.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rSampler.input));
+				throw std::runtime_error(std::format("{} references input accessor {} out of range (accessor count {}).", context, rSampler.input, rModel.accessors.size()));
 			}
-			if (rModel.accessors[rSampler.output].sparse.isSparse)
+			if (!IsValidIndex(rSampler.output, rModel.accessors.size()))
 			{
-				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) has sparse output accessor {}.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rSampler.output));
+				throw std::runtime_error(std::format("{} references output accessor {} out of range (accessor count {}).", context, rSampler.output, rModel.accessors.size()));
 			}
 
-			const float* pfTimes = AccessorFloats(rModel, rSampler.input);
-			const float* pfValues = AccessorFloats(rModel, rSampler.output);
+			const tinygltf::Accessor& rInputAccessor = rModel.accessors.at(static_cast<size_t>(rSampler.input));
+			size_t uiInputBytes = CheckedAnimationSize(rInputAccessor.count, sizeof(float), context);
 
 			channel.uiKeyframeCount = static_cast<uint32_t>(rInputAccessor.count);
 
 			int iValueStride = (channel.uiTargetPath == common::AnimationChannel::kTargetPathRotation) ? 4 : 3; // Rotation is vec4, others vec3
+			size_t uiOutputElementCount = rInputAccessor.count;
+			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline)
+			{
+				uiOutputElementCount = CheckedAnimationSize(uiOutputElementCount, 3, context);
+			}
+			size_t uiOutputFloatCount = CheckedAnimationSize(uiOutputElementCount, static_cast<size_t>(iValueStride), context);
+			size_t uiOutputBytes = CheckedAnimationSize(uiOutputFloatCount, sizeof(float), context);
+
+			const float* pfTimes = AccessorFloats(rModel, rSampler.input, uiInputBytes, context + " input");
+			const float* pfValues = AccessorFloats(rModel, rSampler.output, uiOutputBytes, context + " output");
 
 			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline) // CUBICSPLINE
 			{
