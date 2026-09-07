@@ -140,26 +140,27 @@ void WriteModelDescriptor(Pipeline& rPipeline, const DescriptorInfo& rDescriptor
 			const common::MaterialShaderData* pMaterialShaderData = reinterpret_cast<const common::MaterialShaderData*>(rChunk.pData + iArraysSize);
 			shaders::PbrMaterialLayout* pCurrent = static_cast<shaders::PbrMaterialLayout*>(pData);
 			const int64_t kiOldMaterialSize = offsetof(shaders::PbrMaterialLayout, fColorTextureIndex);
-			for (int64_t j = 0; j < rSceneHeader.uiMaterialCount; ++j)
+			auto ResolveTextureIndex = [&](int32_t iTextureSet, uint8_t uiTextureIndex)
 			{
-				// Trust boundary: the five texture-index fields are on-disk uint8s that index the texture-CRC array
-				// aliased over the scene chunk (pTextureCrcs[uiTextureCount]); an out-of-range index OOB-reads the
-				// chunk. ModelPipeline::Create already bounded uiTextureCount/uiMaterialCount for this sceneCrc.
-				const common::MaterialShaderData& rMaterial = pMaterialShaderData[j];
-				if (rMaterial.uiColorTextureIndex >= rSceneHeader.uiTextureCount
-					|| rMaterial.uiPhysicalDescriptorTextureIndex >= rSceneHeader.uiTextureCount
-					|| rMaterial.uiNormalTextureIndex >= rSceneHeader.uiTextureCount
-					|| rMaterial.uiOcclusionTextureIndex >= rSceneHeader.uiTextureCount
-					|| rMaterial.uiEmissiveTextureIndex >= rSceneHeader.uiTextureCount)
+				if (iTextureSet < 0)
+				{
+					return 0.0f;
+				}
+				if (uiTextureIndex >= rSceneHeader.uiTextureCount)
 				{
 					throw common::CorruptStreamException("PipelineDescriptorWriter material");
 				}
+				return static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[uiTextureIndex]));
+			};
+			for (int64_t j = 0; j < rSceneHeader.uiMaterialCount; ++j)
+			{
+				const common::MaterialShaderData& rMaterial = pMaterialShaderData[j];
 				std::memcpy(pCurrent, &pMaterialShaderData[j].f4BaseColorFactor, kiOldMaterialSize);
-				pCurrent->fColorTextureIndex = static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[pMaterialShaderData[j].uiColorTextureIndex]));
-				pCurrent->fPhysicalDescriptorTextureIndex = static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[pMaterialShaderData[j].uiPhysicalDescriptorTextureIndex]));
-				pCurrent->fNormalTextureIndex = static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[pMaterialShaderData[j].uiNormalTextureIndex]));
-				pCurrent->fOcclusionTextureIndex = static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[pMaterialShaderData[j].uiOcclusionTextureIndex]));
-				pCurrent->fEmissiveTextureIndex = static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[pMaterialShaderData[j].uiEmissiveTextureIndex]));
+				pCurrent->fColorTextureIndex = ResolveTextureIndex(rMaterial.iColorTextureSet, rMaterial.uiColorTextureIndex);
+				pCurrent->fPhysicalDescriptorTextureIndex = ResolveTextureIndex(rMaterial.iPhysicalDescriptorTextureSet, rMaterial.uiPhysicalDescriptorTextureIndex);
+				pCurrent->fNormalTextureIndex = ResolveTextureIndex(rMaterial.iNormalTextureSet, rMaterial.uiNormalTextureIndex);
+				pCurrent->fOcclusionTextureIndex = ResolveTextureIndex(rMaterial.iOcclusionTextureSet, rMaterial.uiOcclusionTextureIndex);
+				pCurrent->fEmissiveTextureIndex = ResolveTextureIndex(rMaterial.iEmissiveTextureSet, rMaterial.uiEmissiveTextureIndex);
 				pCurrent++;
 			}
 		});
