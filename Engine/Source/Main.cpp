@@ -351,6 +351,10 @@ void MainThread(HINSTANCE hinstance)
 
 	gpProfileManager->BootLog();
 
+	common::ScopedLambda disableAllocationTracking([]()
+	{
+		EnableAllocationTracking(false);
+	});
 	EnableAllocationTracking(true);
 	pGame->mTimeStep.mRealTime.Reset();
 
