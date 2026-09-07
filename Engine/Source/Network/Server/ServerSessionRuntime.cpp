@@ -304,7 +304,7 @@ void ServerSessionRuntime::SyncActiveFrames()
 			continue;
 		}
 
-		mrSession.OnFrameRetiring(it->first, it->second.pCurrent);
+		mrSession.OnFrameRetiring(it->first, std::move(it->second.pCurrent));
 		it = game::gpGame->mCoordFrames.erase(it);
 	}
 }

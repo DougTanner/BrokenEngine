@@ -45,6 +45,7 @@ struct ClientConnection
 		// Server::ClientAckStream's bounded window closes on it.
 		// Server-local: the client derives the same tick from the full state itself, so this stays off the wire.
 		int64_t iPendingFullStateTick = -1;
+		bool bHoldUpdatesUntilFullStateAck = false;
 	};
 
 	ENetPeer* pPeer = nullptr;

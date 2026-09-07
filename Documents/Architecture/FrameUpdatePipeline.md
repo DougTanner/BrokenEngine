@@ -55,7 +55,11 @@ flowchart LR
 
 ## Replay Transfer Publication
 
-Replay transfers are recorded on the exact tick that harvested them, in the difference stream's post-dispatch channel rather than inside any `FrameInput`; the authoritative state and network publication stay on that same harvest tick. For an event at `E`, the recording path calls `RecordPostDispatch(E)` with the harvested transfers. The channel is named for when its transfers are applied, not for when its record is read: during playback, `SyncReplayTick` loads the record for exactly `E` and stages the transfer before the frame dispatch for `E`, and `FinalizeFrameTick` then applies the staged transfer after that dispatch and publishes the destination for `E`. A reader that remains live is added to the simulation set for its first dispatch at `E + 1`. A terminal reader validates its terminal input/end frame before retirement, and the next replay loop starts in a later fixed-tick iteration.
+Replay transfers are recorded on the exact tick that harvested them, in the difference stream's post-dispatch channel rather than inside any `FrameInput`; the authoritative state and network publication stay on that same harvest tick. For an event at `E`, the recording path calls `RecordPostDispatch(E)` with the harvested transfers. The channel is named for when its transfers are applied, not for when its record is read: during playback, `SyncReplayTick` first checksum-validates and removes any prior generation whose terminal tick is `E`, then activates a later generation due at `E`, loads that generation's exact-tick post-dispatch record, and stages its transfer before the frame dispatch for `E`. The active set was fixed before that activation, so the returned coordinate is absent from this dispatch. `FinalizeFrameTick` applies the staged transfer after dispatch and publishes the destination for `E`; the next iteration refreshes the replay active set and gives the new generation its first simulation dispatch at `E + 1`. At most one reader owns a coordinate at a time.
+
+`SyncReplayTick` returns a dispatch decision to the shared server loop. `kStopBeforeDispatch` always runs `SaveLoadReplay` and breaks the current fixed-tick iteration before frame dispatch. A corrupt replay abort has no load flag, so `SaveLoadReplay` does not reload and the server rolls its tick/time back and rebuilds normal active/next-frame state before the break. When the last reader retires, Replay arms `kLoadReplay` before returning the same stop decision; `SaveLoadReplay` reloads the initial replay state, and its first dispatch occurs in a later fixed-tick iteration.
+
+Network publication observes the returned coordinate only after the transfer has been applied, its CRC recomputed, and the Frames swapped. If an existing subscription spans the coordinate's absent interval, the current tick is also the first entry in its newly created server delta ring and lies beyond the slot's prior ACK floor. Before serializing that returning delta, the server sends the current Frame as the existing reliable full state and holds updates and resends until a matching accepted ACK reaches that full-state tick. A newer restart replaces the held target; an explicit resync already sent at the same tick supplies the full state without a duplicate. The replay activation and wire formats remain unchanged.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -64,8 +68,17 @@ flowchart TB
         recordE["Dispatch E"] --> harvestE["Post-dispatch harvest E"] --> channelE["RecordPostDispatch E"]
     end
     subgraph playback["Playback"]
-        loadE["LoadPostDispatch E + stage transfers"] --> dispatchE["Dispatch active set E"]
-        dispatchE --> publishE["Apply replay transfers + publish coord E"] --> activateE1["Activate destination for simulation"] --> dispatchE1["Dispatch destination E + 1"]
+        retireE["Validate + remove prior terminal reader E"] --> activateE["Activate returned generation E"] --> loadE["LoadPostDispatch E + stage transfers"]
+        loadE --> dispatchE["Dispatch pre-activation active set E"] --> publishE["Apply replay transfers + publish coord E"]
+        publishE --> rebaselineE["Subscribed restarted stream: full state E + hold deltas"] --> ackE["Matching ACK reaches E"] --> releaseE["Release later deltas"]
+        publishE --> refreshE1["Next iteration: refresh active set"] --> dispatchE1["First returned-coordinate dispatch E + 1"]
+    end
+    subgraph stop["Stop before dispatch"]
+        decision["kStopBeforeDispatch"] --> saveLoad["SaveLoadReplay"]
+        saveLoad --> abort["Abort: rollback + rebuild normal state"]
+        saveLoad --> loop["Loop: reload initial replay state"]
+        abort --> breakTick["Break current iteration"]
+        loop --> breakTick
     end
 ```
 

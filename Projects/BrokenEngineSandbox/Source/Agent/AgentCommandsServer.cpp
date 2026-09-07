@@ -307,9 +307,17 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 		{
 			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kGrid;
 		}
+		else if (stage == "transfer_capture")
+		{
+			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kTransferCapture;
+		}
 		else if (stage == "coordinate_writer")
 		{
 			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter;
+		}
+		else if (stage == "fullframes_record")
+		{
+			eFailurePoint = engine::Replay::ReplayPersistenceFailurePoint::kFullFramesRecord;
 		}
 		else if (stage == "metadata")
 		{
@@ -325,7 +333,7 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 		}
 		else
 		{
-			throw std::runtime_error("'stage' must be invalidation|grid|coordinate_writer|metadata|inventory|final_manifest");
+			throw std::runtime_error("'stage' must be invalidation|grid|transfer_capture|coordinate_writer|fullframes_record|metadata|inventory|final_manifest");
 		}
 
 		if ((eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kManifestInvalidation ||
@@ -334,23 +342,25 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 			throw std::runtime_error(engine::gpReplay->IsRecording() ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
 		}
 
-		if ((eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter) != rParams.contains("coord"))
+		const bool bRequiresCoord = eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter ||
+			eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kFullFramesRecord;
+		if (bRequiresCoord != rParams.contains("coord"))
 		{
-			throw std::runtime_error(eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter ? "coordinate_writer requires 'coord'" : "'coord' is only valid for coordinate_writer");
+			throw std::runtime_error(bRequiresCoord ? "selected stage requires 'coord'" : "'coord' is only valid for coordinate_writer or fullframes_record");
 		}
 
 		engine::GridCoord coord {};
-		if (eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter)
+		if (bRequiresCoord)
 		{
 			coord = CoordFromParam(rParams);
 		}
 		if (!engine::gpReplay->ArmReplayPersistenceFailure(eFailurePoint, coord))
 		{
-			throw std::runtime_error("coordinate_writer 'coord' has no replay writer with an end frame");
+			throw std::runtime_error("selected 'coord' has no replay writer with an end frame");
 		}
 
 		rResult["stage"] = stage;
-		if (eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter)
+		if (bRequiresCoord)
 		{
 			rResult["coord"] = {coord.x, coord.y};
 		}

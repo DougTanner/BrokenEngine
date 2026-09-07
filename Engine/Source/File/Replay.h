@@ -23,6 +23,20 @@ public:
 		kMetadata,
 		kInventory,
 		kFinalManifest,
+		kTransferCapture,
+	};
+
+	enum class ReplayTransferCaptureResult : uint8_t
+	{
+		kNotRecording,
+		kCaptured,
+		kRecordingInvalidated,
+	};
+
+	enum class ReplayTickDecision : uint8_t
+	{
+		kDispatch,
+		kStopBeforeDispatch,
 	};
 
 	struct ReplayTransferCaptureInfo
@@ -42,12 +56,12 @@ public:
 	~Replay();
 
 	void SaveLoadReplay();
-	bool SyncReplayTick(); // false when final replay reader retires and this fixed-tick iteration must stop before dispatch
+	[[nodiscard]] ReplayTickDecision SyncReplayTick();
 
 	bool IsRecording() const { return !mReplayWriters.empty(); }
 	void ResetStreams();
-	void CaptureHarvestedTransfers(GridCoord coord, std::span<const game::StatusChange> transfers, const game::Frame& rPreTransferFrame);
-	void RetainReplayEndFrame(GridCoord coord, std::unique_ptr<game::Frame>& rpFrame);
+	[[nodiscard]] ReplayTransferCaptureResult CaptureAcceptedTransfers(GridCoord destination, std::span<const game::StatusChange> sortedTransfers, const game::Frame& rPreTransferFrame);
+	void RetireCoordinate(GridCoord coord, std::unique_ptr<game::Frame> pLastCompleteFrame);
 	bool DropRetainedReplayEndFrame(GridCoord coord);
 	bool ArmReplayPersistenceFailure(ReplayPersistenceFailurePoint eFailurePoint, GridCoord coord = {});
 
@@ -74,20 +88,23 @@ private:
 
 	struct PendingReplayReader
 	{
+		GridCoord coord {};
 		std::unique_ptr<DifferenceStreamReader<game::Frame, game::FrameInput>> pReader;
 		std::unique_ptr<game::Frame> pSavedStart;
 		game::FrameInput initialInput;
 		int64_t iActivationTick = 0;
 	};
 
-	std::unordered_map<GridCoord, ReplayWriterState> mReplayWriters;
+	std::unordered_map<GridCoord, std::vector<ReplayWriterState>> mReplayWriters;
 	std::unordered_map<GridCoord, std::unique_ptr<DifferenceStreamReader<game::Frame, game::FrameInput>>> mReplayReaders;
-	std::unordered_map<GridCoord, PendingReplayReader> mPendingReplayReaders;
+	std::vector<PendingReplayReader> mPendingReplayReaders;
 	int64_t miReplayInitialTick = 0;
 	ReplayPersistenceFailurePoint meReplayPersistenceFailurePoint = ReplayPersistenceFailurePoint::kNone;
 	GridCoord mReplayPersistenceFailureCoord {};
+	int64_t miReplayPersistenceFailureActivationTick = -1;
 
-	bool ConsumeReplayPersistenceFailure(ReplayPersistenceFailurePoint eFailurePoint, GridCoord coord = {});
+	bool ConsumeReplayPersistenceFailure(ReplayPersistenceFailurePoint eFailurePoint, GridCoord coord = {}, int64_t iActivationTick = -1);
+	void InvalidateReplayRecording();
 	void UpdateTerminalReplayWriter(GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame);
 	void ActivateReplayReader(GridCoord coord, PendingReplayReader&& rPendingReader);
 };

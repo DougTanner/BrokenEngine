@@ -320,7 +320,12 @@ void ServerTransferManager::HarvestTransfers()
 	// that already contains the transferred entities.
 	for (const auto& [rCoord, rTransfers] : mTransfers)
 	{
-		gpReplay->CaptureHarvestedTransfers(rCoord, rTransfers, *game::gpGame->mCoordFrames.at(rCoord).pNext);
+		const Replay::ReplayTransferCaptureResult eCaptureResult =
+			gpReplay->CaptureAcceptedTransfers(rCoord, rTransfers, *game::gpGame->mCoordFrames.at(rCoord).pNext);
+		if (eCaptureResult == Replay::ReplayTransferCaptureResult::kRecordingInvalidated) [[unlikely]]
+		{
+			LOG(kDefault, kError, "Replay transfer capture failed; recording invalidated");
+		}
 	}
 
 	ApplyPreparedTransfers(transfersArena, true);

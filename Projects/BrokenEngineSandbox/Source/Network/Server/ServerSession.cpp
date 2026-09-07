@@ -279,9 +279,9 @@ void ServerSession::AddGameRequiredCoords()
 	}
 }
 
-void ServerSession::OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame>& rpFrame)
+void ServerSession::OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame> pFrame)
 {
-	engine::gpReplay->RetainReplayEndFrame(coord, rpFrame);
+	engine::gpReplay->RetireCoordinate(coord, std::move(pFrame));
 }
 
 void ServerSession::SendAssignPlayer(int64_t iClientId, engine::global_id_t globalId, engine::GridCoord coord)

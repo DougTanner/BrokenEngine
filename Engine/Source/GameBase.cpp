@@ -375,19 +375,19 @@ void GameBase::ServerUpdate()
 
 		if (gpReplay->IsRecording() || mbReplaying || (mGameFlags & GameFlags::kSaveReplay)) [[unlikely]]
 		{
-			if (!gpReplay->SyncReplayTick())
+			if (gpReplay->SyncReplayTick() == Replay::ReplayTickDecision::kStopBeforeDispatch)
 			{
 				if constexpr (kbProfiling)
 				{
 					gpProfileManager->LatchRawCpuTimers(false, miTickCounter);
 					bRawCpuTimersNoDispatchLatched = true;
 				}
-				// The final replay reader retired before dispatch. Reload now so server display/network observers never
-				// see an empty grid between updates, but start simulating the new loop on the next update.
+				// Loop completion reloads before observers see an empty grid. Replay abort leaves no load request,
+				// so SaveLoadReplay is a no-op and the normal active state is restored below.
 				gpReplay->SaveLoadReplay();
 				if (!mbReplaying)
 				{
-					// The reload failed after this iteration advanced the sim clock but before it finalized a frame.
+					// Replay stopped after this iteration advanced the sim clock but before it finalized a frame.
 					// Restore the exact pre-tick values so buffered-frame indexing remains contiguous.
 					miTickCounter = iPreviousTickCounter;
 					mfCurrentTime = fPreviousCurrentTime;

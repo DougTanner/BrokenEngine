@@ -80,7 +80,7 @@ private:
 
 	// ServerSessionRuntime::ComputeActiveSet hooks
 	void AddGameRequiredCoords();
-	void OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame>& rpFrame);
+	void OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame> pFrame);
 
 };
 

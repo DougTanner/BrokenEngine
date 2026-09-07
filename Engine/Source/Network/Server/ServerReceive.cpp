@@ -73,8 +73,8 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 		// Adopting a full state re-baselines the client's floor to that full state's tick, so the floor legitimately
 		// moves backward when the client had already received later ticks. Admit exactly that regression, never below
 		// the tick whose authoritative state the client now holds. The acks the client sent before it adopted still
-		// carry higher floors and satisfy the strict guard, which is why the pending tick is consumed here — by the
-		// regressed ack it exists for — rather than by the first ack that merely reaches it.
+		// carry higher floors and satisfy the strict guard, so they cannot consume a backward target. A held restart
+		// target is consumed when an accepted ACK crosses it; a backward target is consumed by the bounded regression.
 		bool bFullStateRebaseline = rSlot.iPendingFullStateTick >= 0
 			&& miLatestBufferedTick - rSlot.iPendingFullStateTick <= kiPendingFullStateWindowTicks
 			&& iSlotAckFloor < rSlot.ack.iAckFloor
@@ -86,10 +86,14 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 			// Clamp to server's latest sent tick to prevent future ACK floors
 			iSlotAckFloor = std::min(iSlotAckFloor, miLatestBufferedTick);
 			AckState& rAckState = rSlot.ack;
+			bool bFullStateAck = bFullStateRebaseline
+				|| (rSlot.bHoldUpdatesUntilFullStateAck
+					&& rSlot.iPendingFullStateTick >= 0
+					&& rAckState.iAckFloor < rSlot.iPendingFullStateTick
+					&& iSlotAckFloor >= rSlot.iPendingFullStateTick);
 			if (bFullStateRebaseline)
 			{
 				LOG(kNetwork, kDebug, "Server::ClientAckStream Full-state floor re-baseline Client: {} Slot: {} Floor: {} -> {} FullStateTick: {}", iClientId, uiSlotIndex, rAckState.iAckFloor, iSlotAckFloor, rSlot.iPendingFullStateTick);
-				rSlot.iPendingFullStateTick = -1;
 			}
 			if (iSlotAckFloor == rAckState.iAckFloor)
 			{
@@ -102,6 +106,11 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 				rAckState.iAckFloor = iSlotAckFloor;
 				rAckState.uiReceivedBitfieldLow = uiSlotBitfieldLow;
 				rAckState.uiReceivedBitfieldHigh = uiSlotBitfieldHigh;
+			}
+			if (bFullStateAck)
+			{
+				rSlot.iPendingFullStateTick = -1;
+				rSlot.bHoldUpdatesUntilFullStateAck = false;
 			}
 		}
 		else if (uiSlotEpoch != rSlot.ack.uiEpoch)
