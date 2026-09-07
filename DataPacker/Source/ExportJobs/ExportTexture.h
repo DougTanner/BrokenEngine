@@ -12,7 +12,7 @@ public:
 
 	// The per-job .chunk cache stores the encoded chunk, so a compression change must dirty every cache
 	// to force re-export; the type-wide dirty check can otherwise stream a clean per-job chunk verbatim.
-	static constexpr int64_t kiVersion = Version(14);
+	static constexpr int64_t kiVersion = Version(15);
 
 	ExportTexture(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
 	: ExportJob(rChunkFlags, rFile, kiVersion)

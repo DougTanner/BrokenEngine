@@ -208,8 +208,19 @@ void ExportTexture::ProcessLiveCubemap(VkFormat vkFormat)
 		for (int64_t i = 0; i < 6; ++i)
 		{
 			Texture texture(mInputPath / pFaceNames[i], FileType::kImage);
-			iWidth = texture.miWidth;
-			iHeight = texture.miHeight;
+			if (i == 0)
+			{
+				iWidth = texture.miWidth;
+				iHeight = texture.miHeight;
+				if (iWidth != iHeight)
+				{
+					throw std::runtime_error(std::format("Live cubemap \"{}\" face \"{}\" has dimensions {}x{}; required a square face.", mInputPath.string(), pFaceNames[i], iWidth, iHeight));
+				}
+			}
+			else if (texture.miWidth != iWidth || texture.miHeight != iHeight)
+			{
+				throw std::runtime_error(std::format("Live cubemap \"{}\" face \"{}\" has dimensions {}x{}; required {}x{} to match face \"{}\".", mInputPath.string(), pFaceNames[i], texture.miWidth, texture.miHeight, iWidth, iHeight, pFaceNames[0]));
+			}
 			texture.Export(data, vkFormat, TextureOptions::kVerifyNoAlpha);
 		}
 	}

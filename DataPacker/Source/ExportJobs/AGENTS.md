@@ -17,7 +17,7 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
 
 `Handles()` determines both ownership and initial chunk flags. Filename tags and path components are inputs the output actually depends on: `[C]` marks cubemaps, `[BC4]`/`[BC5]`/`[BC7]` select block formats, and a `Raw` component marks raw assets. Shader stage flags and compression flags are added by their owning jobs. Scene discovery ignores `Intermediates` paths so generated Gaea meshes do not become standalone scenes.
 
-Regular images generate a full mip chain; raw BCn/R16 and half-float intermediates preserve their supplied mip/face layout; KTX and live six-face cubemaps preserve cubemap ordering. Every final texture chunk is LZ4-compressed. Regular-path BC5 textures also publish the per-mip slope-variance data consumed by water shading; raw and cubemap paths do not synthesize it.
+Regular images generate a full mip chain; raw BCn/R16 and half-float intermediates preserve their supplied mip/face layout; KTX and live six-face cubemaps preserve cubemap ordering. Before encoding each live-cubemap face, the exporter requires the first face to be square and later faces to match its dimensions. Every final texture chunk is LZ4-compressed. Regular-path BC5 textures also publish the per-mip slope-variance data consumed by water shading; raw and cubemap paths do not synthesize it.
 
 Texture encoding and chunk routing are described in `Texture/AGENTS.md`. Island/Gaea ingest is described in `Island/AGENTS.md`.
 
