@@ -93,6 +93,7 @@ void ExportTexture::ProcessKtxCubemap()
 {
 	gli::texture texture = LoadGliFromPath(mInputPath);
 	ASSERT(!texture.empty() && texture.target() == gli::TARGET_CUBE);
+	ASSERT(mChunkFlags & kCubemap);
 
 	gli::texture_cube textureCube(texture);
 	ASSERT(textureCube.format() == gli::FORMAT_RGBA16_SFLOAT_PACK16);
