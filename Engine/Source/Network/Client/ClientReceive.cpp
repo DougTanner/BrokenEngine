@@ -243,6 +243,10 @@ void Client::ServerCoordFullState(std::span<const uint8_t> packetData)
 	}
 
 	std::unique_ptr<game::Frame> pFrame = DecompressAndReadFrame(message.iUncompressedSize, message.compressedPayload);
+	if (pFrame->interpolate.iTick != iTick)
+	{
+		NetworkMessages::ThrowCorruptStream("Client::ServerCoordFullState");
+	}
 
 	if (actions & FullStateFlags::kClearPlaceholder)
 	{
