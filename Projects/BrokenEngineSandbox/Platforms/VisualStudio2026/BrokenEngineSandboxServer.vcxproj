@@ -374,6 +374,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsShared.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h" />
+    <ClInclude Include="..\..\Source\Agent\AgentCommandsServerFaultFixtures.h" />
     <ClInclude Include="..\..\Source\Save\GameSaveLoad.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkCursor.h" />
@@ -489,6 +490,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Agent\AgentCommands.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentCommandsServer.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentCommandsServerQueries.cpp" />
+    <ClCompile Include="..\..\Source\Agent\AgentCommandsServerFaultFixtures.cpp" />
     <ClCompile Include="..\..\Source\Save\GameSaveLoad.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp">

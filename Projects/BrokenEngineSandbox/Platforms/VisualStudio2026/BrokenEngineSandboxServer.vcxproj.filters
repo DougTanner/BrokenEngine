@@ -450,6 +450,9 @@
     <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h">
       <Filter>Game\Agent</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\AgentCommandsServerFaultFixtures.h">
+      <Filter>Game\Agent</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Save\GameSaveLoad.h">
       <Filter>Game\Save</Filter>
     </ClInclude>
@@ -756,6 +759,9 @@
       <Filter>Game\Agent</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Agent\AgentCommandsServerQueries.cpp">
+      <Filter>Game\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\AgentCommandsServerFaultFixtures.cpp">
       <Filter>Game\Agent</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Save\GameSaveLoad.cpp">
