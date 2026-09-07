@@ -131,8 +131,8 @@ public:
 	void BoundedCount(int64_t& riCount, int64_t iItemMinSize, int64_t iTrailingBytes)
 	{
 		Field(riCount);
-		if (!mbValid || riCount < 0 || iTrailingBytes > mCursor.Remaining() ||
-			riCount > (mCursor.Remaining() - iTrailingBytes) / iItemMinSize)
+		if (!mbValid || riCount < 0 || iTrailingBytes > mCursor.Remaining()
+		 || riCount > (mCursor.Remaining() - iTrailingBytes) / iItemMinSize)
 		{
 			mbValid = false;
 		}

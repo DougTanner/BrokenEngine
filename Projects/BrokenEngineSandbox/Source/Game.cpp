@@ -237,8 +237,8 @@ void Game::ComputeActiveSet()
 					float fNeighborMaxX = fCellMaxX + fOffsetX;
 					float fNeighborMinY = fCellMinY + fOffsetY;
 					float fNeighborMaxY = fCellMaxY + fOffsetY;
-					if (f4Visible.x < fNeighborMaxX && f4Visible.z > fNeighborMinX
-					 && f4Visible.w < fNeighborMaxY && f4Visible.y > fNeighborMinY)
+					if (f4Visible.x < fNeighborMaxX && f4Visible.z > fNeighborMinX && f4Visible.w < fNeighborMaxY
+					 && f4Visible.y > fNeighborMinY)
 					{
 						engine::GridCoord neighbor {.x = mClientGridCoord.x + i, .y = mClientGridCoord.y + j};
 						mVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
@@ -531,8 +531,7 @@ void Game::ChangeFrame(GameFlags_t gameFlags)
 	gpClientSession->mpRuntime->Disconnect();
 #endif
 
-	if ((gameFlags & GameFlags::kMainMenu && InMainMenu()) ||
-	    (gameFlags & GameFlags::kGame && !InMainMenu()))
+	if ((gameFlags & GameFlags::kMainMenu && InMainMenu()) || (gameFlags & GameFlags::kGame && !InMainMenu()))
 	{
 		DEBUG_BREAK();
 		return;
@@ -673,9 +672,8 @@ void Game::CaptureClientStateIfChanged()
 
 	const float fNewCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget;
 
-	if (newFleetGuid == mRememberedFleetGuid
-		&& newShipId == mRememberedFocusedShipId
-		&& fNewCameraEyeHeightTarget == mfRememberedCameraEyeHeightTarget)
+	if (newFleetGuid == mRememberedFleetGuid && newShipId == mRememberedFocusedShipId
+	 && fNewCameraEyeHeightTarget == mfRememberedCameraEyeHeightTarget)
 	{
 		return;
 	}

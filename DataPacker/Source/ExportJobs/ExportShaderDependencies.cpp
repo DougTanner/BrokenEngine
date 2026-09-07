@@ -143,11 +143,8 @@ static const std::string* FindMatchingDependencyRoot(const std::vector<std::stri
 	for (const std::string& rRootPrefix : rRootPrefixes)
 	{
 		std::string lowerPrefix = common::ToLower(rRootPrefix);
-		if (uiOffset + lowerPrefix.size() <= rLowerContent.size()
-			&& rLowerContent.compare(uiOffset, lowerPrefix.size(), lowerPrefix) == 0
-			&& (uiOffset + lowerPrefix.size() == rLowerContent.size()
-				|| rLowerContent[uiOffset + lowerPrefix.size()] == '\\'
-				|| rLowerContent[uiOffset + lowerPrefix.size()] == '/'))
+		if (uiOffset + lowerPrefix.size() <= rLowerContent.size() && rLowerContent.compare(uiOffset, lowerPrefix.size(), lowerPrefix) == 0
+		 && (uiOffset + lowerPrefix.size() == rLowerContent.size() || rLowerContent[uiOffset + lowerPrefix.size()] == '\\' || rLowerContent[uiOffset + lowerPrefix.size()] == '/'))
 		{
 			return &rRootPrefix;
 		}

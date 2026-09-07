@@ -164,9 +164,8 @@ bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRender& rCu
 	// re-seed. The mode-4 entry block (new destination) sets this true too. When false, the cached
 	// rVecAiDirection is reused unchanged and the NavQueryDirection call is skipped. RNG draws, arrival
 	// checks, and mode transitions stay unconditional regardless.
-	bool bRecompute = bReseededDirection
-		|| (iNavDirection != iEntryNavDirection)
-		|| (((rFrame.interpolate.iTick + rCurrent.pGlobalPlayerIds[i].iValue) % kiNavRecomputeInterval) == 0);
+	bool bRecompute = bReseededDirection || (iNavDirection != iEntryNavDirection)
+	               || (((rFrame.interpolate.iTick + rCurrent.pGlobalPlayerIds[i].iValue) % kiNavRecomputeInterval) == 0);
 
 	// The throttle carries the shared world-space bearing for up to kiNavRecomputeInterval ticks. Recompute when
 	// either the kfNavLookahead point or current position is inside a nav polygon: lookahead alone misses ships

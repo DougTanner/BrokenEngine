@@ -616,8 +616,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	// Non-client mouse messages (WM_NCMOUSEMOVE etc.) are deliberately NOT added to the bypass ranges: the backend may
 	// queue a physical pos from them, but ImGuiManager::Prepare's re-pin/sentinel is always the last mouse-pos event
 	// before NewFrame, so gating them is unnecessary and is not done.
-	const bool bInputMessage = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST)
-		|| (message >= WM_KEYFIRST && message <= WM_KEYLAST);
+	const bool bInputMessage = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || (message >= WM_KEYFIRST && message <= WM_KEYLAST);
 	if (!(bInputSuppressed && bInputMessage))
 	{
 		if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam) != 0)

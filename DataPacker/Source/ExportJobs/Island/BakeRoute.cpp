@@ -161,9 +161,9 @@ bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::fil
 			continue;
 		}
 		if (!std::filesystem::exists(cacheLeafDirectory / kpcBakedDimensionsFile)
-			|| !std::filesystem::exists(cacheLeafDirectory / "MeshProcessed.bin")
-			|| !std::filesystem::exists(cacheLeafDirectory / "Elevation.r32")
-			|| !std::filesystem::exists(cacheLeafDirectory / "AmbientOcclusion.r16"))
+		 || !std::filesystem::exists(cacheLeafDirectory / "MeshProcessed.bin")
+		 || !std::filesystem::exists(cacheLeafDirectory / "Elevation.r32")
+		 || !std::filesystem::exists(cacheLeafDirectory / "AmbientOcclusion.r16"))
 		{
 			return true;
 		}

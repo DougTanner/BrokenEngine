@@ -62,7 +62,7 @@ inline void ValidateDeserializedCountCapacity(int64_t iCount, int64_t iCapacity,
 	// The byte-ceiling clause divides (never multiplies) so the bound cannot overflow; iElementBytes <= 0 is
 	// left to ValidateDeserializedCount below, which throws on it.
 	if (iCount < 0 || iCapacity < 0 || iCount > iCapacity || iCapacity > kiMaxDeserializedCapacity
-		|| (iElementBytes > 0 && iCapacity > kiMaxDeserializedBytes / iElementBytes))
+	 || (iElementBytes > 0 && iCapacity > kiMaxDeserializedBytes / iElementBytes))
 	{
 		throw CorruptStreamException(pcReader);
 	}

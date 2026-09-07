@@ -163,9 +163,10 @@ void IslandTerrain::WaitForElevationMaps()
 		// Validate every count from the pack header before forming payload pointers or reclaiming a range.
 		// iSize excludes the lazy-pool's alignment pad, so it must describe the layout exactly and fit the
 		// actual resident extent.
-		if (common::IsCompressed(rLazyChunk.header.flags) || rLazyChunk.pData == nullptr || rLazyChunk.iDataSize <= 0 || rLazyChunk.header.iSize <= 0 || rLazyChunk.header.iSize > rLazyChunk.iDataSize
-			|| rIslandHeader.iHeightmapWidth <= 0 || rIslandHeader.iHeightmapHeight <= 0
-			|| rIslandHeader.iMeshVertexCount <= 0 || rIslandHeader.iMeshIndexCount <= 0 || rIslandHeader.iValidAreaVertexCount < 0)
+		if (common::IsCompressed(rLazyChunk.header.flags) || rLazyChunk.pData == nullptr || rLazyChunk.iDataSize <= 0
+		 || rLazyChunk.header.iSize <= 0 || rLazyChunk.header.iSize > rLazyChunk.iDataSize || rIslandHeader.iHeightmapWidth <= 0
+		 || rIslandHeader.iHeightmapHeight <= 0 || rIslandHeader.iMeshVertexCount <= 0 || rIslandHeader.iMeshIndexCount <= 0
+		 || rIslandHeader.iValidAreaVertexCount < 0)
 		{
 			throw common::CorruptStreamException("IslandTerrain::WaitForElevationMaps");
 		}

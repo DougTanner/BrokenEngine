@@ -203,6 +203,8 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
 51. Keep function parameters AND arguments all on the same line, regardless of line length. This applies to BOTH function declarations and function call sites. Never split a call's arguments across multiple lines just because the line is long — long is fine. The only exception is when an argument is itself a lambda or a struct/initializer-list literal, in which case the `{}` goes on the next line per rule 2 (and the other arguments still stay on the call line).
 
+	Ordinary Boolean expressions follow a length threshold instead: a Boolean assignment or initializer, an if()/while() condition, or a returned Boolean expression that joins onto one line of 140 columns or fewer stays on one line — never split it at && or ||. Past 140 columns you may split it, but you are not required to. When you do split, use as few lines as possible: fill each line with operands up to 140 columns and break only at a top-level && or ||, which then starts the next line. The parentheses of "if (", "else if (" and "while (", and a pair that encloses the whole right-hand side of an assignment or return, are the opener, so the && or || directly inside them are the top-level break points and the operand aligns after the "if (", "else if (", "while (", "= (" or "return ("; never break inside any other parentheses. Count the closing ) and any terminating ; toward the line's columns, and let a single operand that cannot fit stand alone on its line even when it passes 140. Indent each continuation line with tabs up to the statement's own indent level and then pad with spaces so its operand starts in the same column as the first operand on the opening line, with "&& " or "|| " immediately to the left of that column — tabs for indentation, spaces for alignment, tabs counting as 4 columns. The exception is the same one stated above for arguments.
+
 	Declaration (good):
 	void CreateBuffer(std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VkDeviceMemory& rVkDeviceMemory);
 
@@ -219,6 +221,22 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 	{
 		// ...
 	});
+
+	Condition (bad — wrapped although it joins to 122 columns):
+	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState
+		|| rSlot.eState == CoordSubscriptionState::kSubscribing)
+
+	Condition (good — joins to 140 or fewer, so one line):
+	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState || rSlot.eState == CoordSubscriptionState::kSubscribing)
+
+	Condition past 140 (allowed split — greedy fill, leading operator, aligned):
+	if (uiSlotIndex < std::ssize(pClient->slots) && (pClient->slots.at(uiSlotIndex).subscription.flags & SubscriptionFlags::kActive)
+	 && pClient->slots.at(uiSlotIndex).ack.uiEpoch == uiEpoch)
+
+	Assignment past 140 (same rules; alignment padding is spaces after the statement's tabs):
+		bAcceptRawCpuTimers = iFullTicks == 1 && mTimeStep.miTimeMultiply == 1 && mTimeStep.miTimeDivide == 1
+		                   && !(mGameFlags & GameFlags::kPaused) && !gpReplay->IsRecording() && !mbReplaying
+		                   && !(mGameFlags & GameFlags::kSaveReplay);
 
 52. Put a space before "{}" universal initializers, ex: uuid_t uuid {}; XMFLOAT2 f2MousePosition {};
 

@@ -291,8 +291,9 @@ public:
 		mCurrentDifference = rInitialDifference;
 		common::Read(headerStream, mDifferenceCount);
 		headerStream >> mSavedEnd;
-		if (!headerStream || mDifferenceCount < 0 || rSavedStart.interpolate.iTick < 0 ||
-			mSavedEnd.interpolate.iTick < rSavedStart.interpolate.iTick || mSavedEnd.interpolate.iTick > std::numeric_limits<int64_t>::max() - 1)
+		if (!headerStream || mDifferenceCount < 0 || rSavedStart.interpolate.iTick < 0
+		 || mSavedEnd.interpolate.iTick < rSavedStart.interpolate.iTick
+		 || mSavedEnd.interpolate.iTick > std::numeric_limits<int64_t>::max() - 1)
 		{
 			LOG(kDefault, kWarning, "DifferenceStreamReader header is invalid");
 			return;
@@ -343,8 +344,8 @@ public:
 			// A coord activated by a transfer records that transfer at its own start tick, so unlike a
 			// difference record the start tick is in range. The terminal tick is not: recording stops
 			// before it is dispatched, so no post-dispatch event can exist there.
-			if (iTick < miStartTick || iTick > mSavedEnd.interpolate.iTick ||
-				(!mPostDispatchRecords.empty() && iTick <= std::get<0>(mPostDispatchRecords.back())))
+			if (iTick < miStartTick || iTick > mSavedEnd.interpolate.iTick
+			 || (!mPostDispatchRecords.empty() && iTick <= std::get<0>(mPostDispatchRecords.back())))
 			{
 				LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section has non-canonical tick data");
 				return;
@@ -411,8 +412,8 @@ public:
 					return;
 				}
 			}
-			if (iTick <= miStartTick || iTick > mSavedEnd.interpolate.iTick + 1 ||
-				(!mDifferences.empty() && iTick <= std::get<0>(mDifferences.back())))
+			if (iTick <= miStartTick || iTick > mSavedEnd.interpolate.iTick + 1
+			 || (!mDifferences.empty() && iTick <= std::get<0>(mDifferences.back())))
 			{
 				LOG(kDefault, kWarning, "Recorded frames file has non-canonical tick data");
 				return;

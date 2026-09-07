@@ -321,13 +321,9 @@ void GameBase::ServerUpdate()
 	bool bAcceptRawCpuTimers = false;
 	if constexpr (kbProfiling)
 	{
-		bAcceptRawCpuTimers = iFullTicks == 1 &&
-			mTimeStep.miTimeMultiply == 1 &&
-			mTimeStep.miTimeDivide == 1 &&
-			!(mGameFlags & GameFlags::kPaused) &&
-			!gpReplay->IsRecording() &&
-			!mbReplaying &&
-			!(mGameFlags & GameFlags::kSaveReplay);
+		bAcceptRawCpuTimers = iFullTicks == 1 && mTimeStep.miTimeMultiply == 1 && mTimeStep.miTimeDivide == 1
+		                   && !(mGameFlags & GameFlags::kPaused) && !gpReplay->IsRecording() && !mbReplaying
+		                   && !(mGameFlags & GameFlags::kSaveReplay);
 	}
 	gpServer->BroadcastTimespeedIfChanged();
 	if (mGameFlags & GameFlags::kPaused) [[unlikely]]
@@ -738,8 +734,8 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 			{
 				const game::Frame& rFrame = RenderFrame(rCoord);
 				CoordFrames& rSub = mCoordFrames.at(rCoord);
-				if (rFrame.interpolate.iTick < rSub.iLastRenderedTick ||
-					(rFrame.interpolate.iTick == rSub.iLastRenderedTick && rFrame.interpolate.fCurrentTime < rSub.fLastRenderedTime))
+				if (rFrame.interpolate.iTick < rSub.iLastRenderedTick
+				 || (rFrame.interpolate.iTick == rSub.iLastRenderedTick && rFrame.interpolate.fCurrentTime < rSub.fLastRenderedTime))
 				{
 					LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {} Time: {} LastTime: {}", rCoord.x, rCoord.y, rFrame.interpolate.iTick, rSub.iLastRenderedTick, common::Wb(rFrame.interpolate.fCurrentTime, 4), common::Wb(rSub.fLastRenderedTime, 4));
  					DEBUG_BREAK();
@@ -967,8 +963,7 @@ void GameBase::SwapFrames()
 	{
 		game::gpGame->EnsureNextFrames();
 	}
-	else if (mCoordFrames.contains(game::gpGame->mClientGridCoord)
-		&& mCoordFrames.at(game::gpGame->mClientGridCoord).pNext == nullptr)
+	else if (mCoordFrames.contains(game::gpGame->mClientGridCoord) && mCoordFrames.at(game::gpGame->mClientGridCoord).pNext == nullptr)
 	{
 		// Heap: make_unique<Frame> for replay target coordinate
 		ScopedSuppressAllocationTracking suppress;

@@ -109,7 +109,7 @@ std::filesystem::path GetRepositoryRootFromExecutable()
 	std::filesystem::path executablePath(std::wstring(executableBuffer.data(), uiLength));
 	const std::wstring executableName = executablePath.filename().native();
 	if (CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.exe", -1, TRUE) != CSTR_EQUAL
-		&& CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.Debug.exe", -1, TRUE) != CSTR_EQUAL)
+	 && CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.Debug.exe", -1, TRUE) != CSTR_EQUAL)
 	{
 		throw std::runtime_error(std::format("DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\\Platforms\\VisualStudio2026\\Output\\DataPacker.exe or DataPacker.Debug.exe)", executablePath.string()));
 	}

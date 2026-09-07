@@ -167,9 +167,8 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	}
 
 	int64_t iExpectedRawSize = common::ComputeImageByteSize(vkFormat, iWidth, iHeight, iMipMaps, 1, 1);
-	if (iExpectedRawSize <= 0
-		|| static_cast<uintmax_t>(iExpectedRawSize) > static_cast<uintmax_t>(std::numeric_limits<uLongf>::max())
-		|| static_cast<uintmax_t>(iExpectedRawSize) > static_cast<uintmax_t>(std::numeric_limits<uLong>::max()))
+	if (iExpectedRawSize <= 0 || static_cast<uintmax_t>(iExpectedRawSize) > static_cast<uintmax_t>(std::numeric_limits<uLongf>::max())
+	 || static_cast<uintmax_t>(iExpectedRawSize) > static_cast<uintmax_t>(std::numeric_limits<uLong>::max()))
 	{
 		return;
 	}

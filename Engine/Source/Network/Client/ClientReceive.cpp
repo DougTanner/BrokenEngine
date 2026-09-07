@@ -13,9 +13,8 @@ namespace engine
 
 static std::unique_ptr<game::Frame> DecompressAndReadFrame(int32_t iUncompressedSize, const NetworkMessages::PacketPayload& rCompressedPayload)
 {
-	if (iUncompressedSize <= 0 || rCompressedPayload.iSize <= 0
-		|| static_cast<int64_t>(iUncompressedSize) > kiMaxUncompressedFrameBytes
-		|| rCompressedPayload.pData == nullptr)
+	if (iUncompressedSize <= 0 || rCompressedPayload.iSize <= 0 || static_cast<int64_t>(iUncompressedSize) > kiMaxUncompressedFrameBytes
+	 || rCompressedPayload.pData == nullptr)
 	{
 		NetworkMessages::ThrowCorruptStream("DecompressAndReadFrame");
 	}
@@ -103,8 +102,7 @@ Client::FullStateFlags_t Client::ClassifyFullState(uint8_t uiSlotIndex, uint16_t
 		return FullStateFlags::kRejectAsGhost;
 	}
 
-	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState
-		|| rSlot.eState == CoordSubscriptionState::kSubscribing)
+	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState || rSlot.eState == CoordSubscriptionState::kSubscribing)
 	{
 		// Stale full-state from a previous subscription to a different coord
 		if (rSlot.coord != coord)
@@ -128,9 +126,7 @@ Client::FullStateFlags_t Client::ClassifyFullState(uint8_t uiSlotIndex, uint16_t
 	// A genuine resend re-activates the slot at the resend tick via ServerCoordFullState's
 	// commit block; a stale/ghost full state (wrong coord or superseded epoch) still falls
 	// through to the reject below.
-	if (rSlot.eState == CoordSubscriptionState::kActive
-		&& rSlot.coord == coord
-		&& uiEpoch == rSlot.ackState.uiEpoch)
+	if (rSlot.eState == CoordSubscriptionState::kActive && rSlot.coord == coord && uiEpoch == rSlot.ackState.uiEpoch)
 	{
 		return FullStateFlags::kCommit;
 	}
@@ -289,16 +285,15 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 	}
 
 	const ClientCoordSlot& rSlot = mCoordSlots.at(uiSlotIndex);
-	if (rSlot.eState != CoordSubscriptionState::kWaitingFullState
-		&& rSlot.eState != CoordSubscriptionState::kSubscribing
-		&& rSlot.eState != CoordSubscriptionState::kUnsubscribed)
+	if (rSlot.eState != CoordSubscriptionState::kWaitingFullState && rSlot.eState != CoordSubscriptionState::kSubscribing
+	 && rSlot.eState != CoordSubscriptionState::kUnsubscribed)
 	{
 		return;
 	}
 
 	// Stale static data from a previous subscription to a different coord (recycled slot) — silently drop (the full-state path owns ghost unsubscribe)
 	if ((rSlot.eState == CoordSubscriptionState::kWaitingFullState || rSlot.eState == CoordSubscriptionState::kSubscribing)
-		&& rSlot.coord != coord)
+	 && rSlot.coord != coord)
 	{
 		return;
 	}
@@ -309,7 +304,7 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 	}
 	// The other two admitted states carry no server-assigned epoch, so they are guarded by the retained epoch instead
 	if ((rSlot.eState == CoordSubscriptionState::kSubscribing || rSlot.eState == CoordSubscriptionState::kUnsubscribed)
-		&& IsStaleRetainedEpoch(uiSlotIndex, uiEpoch, coord))
+	 && IsStaleRetainedEpoch(uiSlotIndex, uiEpoch, coord))
 	{
 		return;
 	}
@@ -416,7 +411,7 @@ void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool
 		if (bProcessRtt)
 		{
 			if (std::shared_ptr<ClientStaleUpdateFixtureState> pState = mStaleUpdateFixture.lock(); pState != nullptr
-				&& !(pState->flags & ClientStaleUpdateFixtureFlags::kCaptured))
+			 && !(pState->flags & ClientStaleUpdateFixtureFlags::kCaptured))
 			{
 				// Heap: the fixture owns one exact packet copy and releases it before recursive delivery.
 				pState->packet.assign(packetData.begin(), packetData.end());

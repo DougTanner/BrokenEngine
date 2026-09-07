@@ -148,9 +148,8 @@ struct FleetSyncMessage
 			{
 				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 			}
-			if (rFleet.iFlagshipIndex < 0 ||
-				(iMemberCount == 0 && rFleet.iFlagshipIndex != 0) ||
-				(iMemberCount > 0 && rFleet.iFlagshipIndex >= iMemberCount))
+			if (rFleet.iFlagshipIndex < 0 || (iMemberCount == 0 && rFleet.iFlagshipIndex != 0)
+			 || (iMemberCount > 0 && rFleet.iFlagshipIndex >= iMemberCount))
 			{
 				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 			}

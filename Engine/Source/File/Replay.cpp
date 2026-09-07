@@ -118,8 +118,8 @@ bool AppendReplayManifestPayload(const ReplayManifest& rManifest, std::vector<st
 		return false;
 	}
 	const size_t uiFixedBytes = sizeof(int64_t) * 4 + 1;
-	if (rManifest.records.size() > (std::numeric_limits<size_t>::max() - uiFixedBytes) / 16 ||
-		rManifest.inventory.size() > (std::numeric_limits<size_t>::max() - uiFixedBytes - rManifest.records.size() * 16) / 57)
+	if (rManifest.records.size() > (std::numeric_limits<size_t>::max() - uiFixedBytes) / 16
+	 || rManifest.inventory.size() > (std::numeric_limits<size_t>::max() - uiFixedBytes - rManifest.records.size() * 16) / 57)
 	{
 		return false;
 	}
@@ -208,8 +208,9 @@ bool BuildExpectedReplayInventory(ReplayManifest& rManifest, bool bHashFiles)
 	std::ranges::sort(rManifest.inventory, ReplayInventoryEntryLess);
 	for (size_t i = 1; i < rManifest.inventory.size(); ++i)
 	{
-		if (rManifest.inventory.at(i - 1).eKind == rManifest.inventory.at(i).eKind && rManifest.inventory.at(i - 1).uiCoordKey == rManifest.inventory.at(i).uiCoordKey &&
-			rManifest.inventory.at(i - 1).iActivationTick == rManifest.inventory.at(i).iActivationTick)
+		if (rManifest.inventory.at(i - 1).eKind == rManifest.inventory.at(i).eKind
+		 && rManifest.inventory.at(i - 1).uiCoordKey == rManifest.inventory.at(i).uiCoordKey
+		 && rManifest.inventory.at(i - 1).iActivationTick == rManifest.inventory.at(i).iActivationTick)
 		{
 			return false;
 		}
@@ -670,8 +671,8 @@ void Replay::SaveLoadReplay()
 				{
 					engine::FileContentDigest actualDigest;
 					const std::filesystem::path filename = ReplayArtifactFilename(rEntry.eKind, rEntry.uiCoordKey, rEntry.iActivationTick);
-					if (!engine::gpFileManager->ComputeOrdinaryFileSha256({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, filename, actualDigest) ||
-						actualDigest.iByteCount != rEntry.digest.iByteCount || actualDigest.sha256 != rEntry.digest.sha256)
+					if (!engine::gpFileManager->ComputeOrdinaryFileSha256({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, filename, actualDigest)
+					 || actualDigest.iByteCount != rEntry.digest.iByteCount || actualDigest.sha256 != rEntry.digest.sha256)
 					{
 						throw common::CorruptStreamException("ReplayManifest inventory file");
 					}
@@ -779,9 +780,9 @@ void Replay::SaveLoadReplay()
 						}
 						const game::Frame& rGridFrame = *gridFrameIt->second.pCurrent;
 						const game::Frame& rSavedStart = *rStagedReader.pendingReader.pSavedStart;
-						if (rSavedStart.interpolate.iTick != iInitialTick ||
-							std::bit_cast<uint32_t>(rSavedStart.interpolate.fCurrentTime) != std::bit_cast<uint32_t>(stagedGrid.fCurrentTime) ||
-							rSavedStart.Crc() != rGridFrame.Crc())
+						if (rSavedStart.interpolate.iTick != iInitialTick
+						 || std::bit_cast<uint32_t>(rSavedStart.interpolate.fCurrentTime) != std::bit_cast<uint32_t>(stagedGrid.fCurrentTime)
+						 || rSavedStart.Crc() != rGridFrame.Crc())
 						{
 							throw common::CorruptStreamException("ReplayManifest initial stream does not match grid");
 						}
@@ -996,8 +997,8 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 						std::fstream fullFramesStream = engine::gpFileManager->OpenFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, fullFramesPath);
 						fullFramesStream.seekg(0, std::ios::end);
 						const std::streamoff iBeforeBytes = fullFramesStream.tellg();
-						bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0 &&
-							iBeforeBytes <= std::numeric_limits<std::streamsize>::max();
+						bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0
+						                         && iBeforeBytes <= std::numeric_limits<std::streamsize>::max();
 						std::vector<std::byte> prefix;
 						if (bFullFramesTruncated)
 						{

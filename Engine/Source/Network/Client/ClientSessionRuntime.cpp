@@ -266,15 +266,14 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 			pState->flags.Set(ClientStaleUpdateFixtureFlags::kBoundExpired);
 			mpClient->mStaleUpdateFixture.reset();
 		}
-		else if ((pState->flags & ClientStaleUpdateFixtureFlags::kCaptured)
-			&& pState->iCapturePolls > pState->iCapturedAtPoll + 1
-			&& pState->uiSlotIndex < mpClient->mCoordSlots.size())
+		else if ((pState->flags & ClientStaleUpdateFixtureFlags::kCaptured) && pState->iCapturePolls > pState->iCapturedAtPoll + 1
+		      && pState->uiSlotIndex < mpClient->mCoordSlots.size())
 		{
 			ClientCoordSlot& rSlot = mpClient->mCoordSlots.at(pState->uiSlotIndex);
 			auto coordIt = game::gpGame->mCoordFrames.find(pState->coord);
-			if (rSlot.eState == CoordSubscriptionState::kActive && rSlot.coord == pState->coord
-				&& rSlot.ackState.uiEpoch == pState->uiEpoch && rSlot.ackState.iAckFloor >= pState->iTick
-				&& coordIt != game::gpGame->mCoordFrames.end() && coordIt->second.iConfirmedTick >= pState->iTick)
+			if (rSlot.eState == CoordSubscriptionState::kActive && rSlot.coord == pState->coord && rSlot.ackState.uiEpoch == pState->uiEpoch
+			 && rSlot.ackState.iAckFloor >= pState->iTick && coordIt != game::gpGame->mCoordFrames.end()
+			 && coordIt->second.iConfirmedTick >= pState->iTick)
 			{
 				pState->iAckFloorBefore = rSlot.ackState.iAckFloor;
 				pState->iConfirmedBefore = coordIt->second.iConfirmedTick;

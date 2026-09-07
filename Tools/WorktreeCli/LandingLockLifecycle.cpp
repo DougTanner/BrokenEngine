@@ -68,8 +68,8 @@ namespace toolcli::landing
 		{
 			return std::nullopt;
 		}
-		if (lease.uiHeartbeatTicks > (std::numeric_limits<uint64_t>::max)() - static_cast<uint64_t>(lease.iDurationSeconds) * 10'000'000ull ||
-			lease.uiExpiresTicks != lease.uiHeartbeatTicks + static_cast<uint64_t>(lease.iDurationSeconds) * 10'000'000ull)
+		if (lease.uiHeartbeatTicks > (std::numeric_limits<uint64_t>::max)() - static_cast<uint64_t>(lease.iDurationSeconds) * 10'000'000ull
+		 || lease.uiExpiresTicks != lease.uiHeartbeatTicks + static_cast<uint64_t>(lease.iDurationSeconds) * 10'000'000ull)
 		{
 			return std::nullopt;
 		}

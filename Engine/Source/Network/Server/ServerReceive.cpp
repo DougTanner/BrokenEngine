@@ -62,8 +62,7 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 		uint64_t uiSlotBitfieldHigh = rEntry.uiReceivedBitfieldHigh;
 
 		// Invalid-index or inactive slots match neither branch below; skip after the reads so the cursor stays aligned
-		if (!(uiSlotIndex < std::ssize(pClient->slots) &&
-			(pClient->slots.at(uiSlotIndex).subscription.flags & SubscriptionFlags::kActive)))
+		if (!(uiSlotIndex < std::ssize(pClient->slots) && (pClient->slots.at(uiSlotIndex).subscription.flags & SubscriptionFlags::kActive)))
 		{
 			continue;
 		}
@@ -76,21 +75,16 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 		// carry higher floors and satisfy the strict guard, so they cannot consume a backward target. A held restart
 		// target is consumed when an accepted ACK crosses it; a backward target is consumed by the bounded regression.
 		bool bFullStateRebaseline = rSlot.iPendingFullStateTick >= 0
-			&& miLatestBufferedTick - rSlot.iPendingFullStateTick <= kiPendingFullStateWindowTicks
-			&& iSlotAckFloor < rSlot.ack.iAckFloor
-			&& iSlotAckFloor >= rSlot.iPendingFullStateTick;
+		                         && miLatestBufferedTick - rSlot.iPendingFullStateTick <= kiPendingFullStateWindowTicks
+		                         && iSlotAckFloor < rSlot.ack.iAckFloor && iSlotAckFloor >= rSlot.iPendingFullStateTick;
 
-		if (uiSlotEpoch == rSlot.ack.uiEpoch &&
-			(iSlotAckFloor >= rSlot.ack.iAckFloor || bFullStateRebaseline))
+		if (uiSlotEpoch == rSlot.ack.uiEpoch && (iSlotAckFloor >= rSlot.ack.iAckFloor || bFullStateRebaseline))
 		{
 			// Clamp to server's latest sent tick to prevent future ACK floors
 			iSlotAckFloor = std::min(iSlotAckFloor, miLatestBufferedTick);
 			AckState& rAckState = rSlot.ack;
 			bool bFullStateAck = bFullStateRebaseline
-				|| (rSlot.bHoldUpdatesUntilFullStateAck
-					&& rSlot.iPendingFullStateTick >= 0
-					&& rAckState.iAckFloor < rSlot.iPendingFullStateTick
-					&& iSlotAckFloor >= rSlot.iPendingFullStateTick);
+			                  || (rSlot.bHoldUpdatesUntilFullStateAck && rSlot.iPendingFullStateTick >= 0 && rAckState.iAckFloor < rSlot.iPendingFullStateTick && iSlotAckFloor >= rSlot.iPendingFullStateTick);
 			if (bFullStateRebaseline)
 			{
 				LOG(kNetwork, kDebug, "Server::ClientAckStream Full-state floor re-baseline Client: {} Slot: {} Floor: {} -> {} FullStateTick: {}", iClientId, uiSlotIndex, rAckState.iAckFloor, iSlotAckFloor, rSlot.iPendingFullStateTick);
@@ -430,9 +424,8 @@ void Server::ClientUnsubscribe(std::span<const uint8_t> packetData, int64_t iCli
 		return;
 	}
 
-	if (uiSlotIndex < std::ssize(pClient->slots)
-		&& (pClient->slots.at(uiSlotIndex).subscription.flags & SubscriptionFlags::kActive)
-		&& pClient->slots.at(uiSlotIndex).ack.uiEpoch == uiEpoch)
+	if (uiSlotIndex < std::ssize(pClient->slots) && (pClient->slots.at(uiSlotIndex).subscription.flags & SubscriptionFlags::kActive)
+	 && pClient->slots.at(uiSlotIndex).ack.uiEpoch == uiEpoch)
 	{
 		GridCoord coord = pClient->slots.at(uiSlotIndex).subscription.coord;
 		pClient->FreeSlot(uiSlotIndex);

@@ -29,8 +29,8 @@ static engine::ClientGuid TransferDataClientGuid(const game::TransferData& rData
 static bool IsDestinationLive(engine::GridCoord destination)
 {
 	auto destinationIt = game::gpGame->mCoordFrames.find(destination);
-	if (destinationIt != game::gpGame->mCoordFrames.end() && destinationIt->second.pCurrent != nullptr &&
-		engine::CountRegistryRows(game::Frame::OwnershipLayer(*destinationIt->second.pCurrent)) > 0)
+	if (destinationIt != game::gpGame->mCoordFrames.end() && destinationIt->second.pCurrent != nullptr
+	 && engine::CountRegistryRows(game::Frame::OwnershipLayer(*destinationIt->second.pCurrent)) > 0)
 	{
 		return true;
 	}
@@ -388,8 +388,8 @@ bool ServerTransferManager::QueueReplayTransferFixture(engine::GridCoord destina
 		return false;
 	}
 
-	if (!game::IsTransferType(transfer.eType) || !std::holds_alternative<game::TransferData>(transfer.data) ||
-		(transfer.eType != game::StatusChangeType::kTransferPlayer && !IsDestinationLive(destination)))
+	if (!game::IsTransferType(transfer.eType) || !std::holds_alternative<game::TransferData>(transfer.data)
+	 || (transfer.eType != game::StatusChangeType::kTransferPlayer && !IsDestinationLive(destination)))
 	{
 		return false;
 	}

@@ -63,8 +63,8 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 	// uiMaterialCount == 0 is rejected here (not just > max) so the trust boundary throws uniformly:
 	// mpPipelines.at(0) is read unconditionally in RecordDrawIndirect / UpdateStorageBufferDescriptors, so a
 	// zero count must fail through CorruptStreamException rather than a downstream ASSERT of a different type.
-	if (rSceneHeader.uiTextureCount > common::SceneHeader::kiMaxTextures
-		|| rSceneHeader.uiMaterialCount == 0 || rSceneHeader.uiMaterialCount > common::SceneHeader::kiMaxMaterials)
+	if (rSceneHeader.uiTextureCount > common::SceneHeader::kiMaxTextures || rSceneHeader.uiMaterialCount == 0
+	 || rSceneHeader.uiMaterialCount > common::SceneHeader::kiMaxMaterials)
 	{
 		throw common::CorruptStreamException("ModelPipeline::Create");
 	}

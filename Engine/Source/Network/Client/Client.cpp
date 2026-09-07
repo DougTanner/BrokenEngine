@@ -166,9 +166,8 @@ void Client::RecoverTimedOutSubscriptions()
 	for (int64_t i = 0; i < std::ssize(mCoordSlots); ++i)
 	{
 		ClientCoordSlot& rSlot = mCoordSlots.at(i);
-		if (rSlot.eState == CoordSubscriptionState::kUnsubscribed
-			|| rSlot.eState == CoordSubscriptionState::kActive
-			|| now - rSlot.transitionStartTime < kSubscriptionTransitionTimeout)
+		if (rSlot.eState == CoordSubscriptionState::kUnsubscribed || rSlot.eState == CoordSubscriptionState::kActive
+		 || now - rSlot.transitionStartTime < kSubscriptionTransitionTimeout)
 		{
 			continue;
 		}
@@ -229,8 +228,8 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 					auto it = std::ranges::find_if(mDelayedPackets, [](const DelayedPacket& rPacket)
 					{
 						return rPacket.data.size() >= 2
-							&& static_cast<PacketType>(rPacket.data.at(0)) == PacketType::kServerConnectionResponse
-							&& rPacket.data.at(1) == 0;
+						    && static_cast<PacketType>(rPacket.data.at(0)) == PacketType::kServerConnectionResponse
+						    && rPacket.data.at(1) == 0;
 					});
 					if (it != mDelayedPackets.end())
 					{

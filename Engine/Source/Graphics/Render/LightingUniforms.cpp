@@ -17,10 +17,8 @@ static bool IsVisibleAreaInsideHeldCombineCrop(const XMFLOAT4& rf4VisibleArea, c
 {
 	float fHeldCombineTexelX = (rf4HeldLightingArea.z - rf4HeldLightingArea.x) / fCombineTextureWidth;
 	float fHeldCombineTexelY = (rf4HeldLightingArea.y - rf4HeldLightingArea.w) / fCombineTextureHeight;
-	return rf4VisibleArea.x >= rf4HeldVisibleArea.x - fHeldCombineTexelX
-		&& rf4VisibleArea.z <= rf4HeldVisibleArea.z + fHeldCombineTexelX
-		&& rf4VisibleArea.y <= rf4HeldVisibleArea.y + fHeldCombineTexelY
-		&& rf4VisibleArea.w >= rf4HeldVisibleArea.w - fHeldCombineTexelY;
+	return rf4VisibleArea.x >= rf4HeldVisibleArea.x - fHeldCombineTexelX && rf4VisibleArea.z <= rf4HeldVisibleArea.z + fHeldCombineTexelX
+	    && rf4VisibleArea.y <= rf4HeldVisibleArea.y + fHeldCombineTexelY && rf4VisibleArea.w >= rf4HeldVisibleArea.w - fHeldCombineTexelY;
 }
 
 struct LightingTemporalAreaLatch
@@ -81,7 +79,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	static XMFLOAT4 sf4HeldVisibleArea {};
 	static bool sbHeldVisibleArea = false;
 	sbLightingRefreshFrame = bScheduledRefresh || !sTemporalAreaLatch.bInitialized || !sbHeldVisibleArea
-		|| (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rVisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
+	                      || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rVisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
 	if (sbLightingRefreshFrame)
 	{
 		rGlobalLayout.fLightingTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbLightingTemporalReset, gLightingTemporalBlend.Get(), rGlobalLayout.f4LightingAreaPrevious);

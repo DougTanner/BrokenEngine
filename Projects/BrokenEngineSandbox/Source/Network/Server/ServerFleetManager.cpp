@@ -327,9 +327,9 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 	int64_t iThisMemberIndex = (rSpawnInfo.iMemberIndex >= 0)
 		? rSpawnInfo.iMemberIndex
 		: std::ssize(rFleet.members) - 1;
-	bool bHasAliveFlagship = rFleet.iFlagshipIndex < std::ssize(rFleet.members) &&
-		rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).bAlive &&
-		iThisMemberIndex != rFleet.iFlagshipIndex;
+	bool bHasAliveFlagship = rFleet.iFlagshipIndex < std::ssize(rFleet.members)
+	                      && rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).bAlive
+	                      && iThisMemberIndex != rFleet.iFlagshipIndex;
 	if (!bHasAliveFlagship)
 	{
 		rFleet.iFlagshipIndex = iThisMemberIndex;
@@ -375,8 +375,7 @@ void ServerFleetManager::OnClientConnected(int64_t iClientId, const engine::Clie
 		for (Fleet& rFleet : fleetIt->second)
 		{
 			RefreshFleetMembers(rFleet, ownedPlayers);
-			if (rFleet.iFlagshipIndex < std::ssize(rFleet.members) &&
-				!rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).bAlive)
+			if (rFleet.iFlagshipIndex < std::ssize(rFleet.members) && !rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).bAlive)
 			{
 				mNavigation.ShiftFlagshipAfterDeath(rClientGuid, rFleet);
 			}
@@ -435,13 +434,11 @@ void ServerFleetManager::ResetFleetForLoad(Fleet& rFleet, const engine::ClientGu
 	RefreshFleetMembers(rFleet, gpServerSession->mClientPlayers.Owned(FindClientIdForGuid(rClientGuid)));
 
 	// Shift flagship to next alive member if current flagship is dead
-	if (rFleet.iFlagshipIndex < std::ssize(rFleet.members) &&
-		!rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).bAlive)
+	if (rFleet.iFlagshipIndex < std::ssize(rFleet.members) && !rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).bAlive)
 	{
 		mNavigation.ShiftFlagshipAfterDeath(rClientGuid, rFleet);
 	}
-	else if (rFleet.iFlagshipIndex < std::ssize(rFleet.members) &&
-		rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).bAlive)
+	else if (rFleet.iFlagshipIndex < std::ssize(rFleet.members) && rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).bAlive)
 	{
 		// Flagship still alive — set wantedCoord and queue update
 		rFleet.wantedCoord = rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex)).coord;
@@ -465,8 +462,7 @@ ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord
 	}
 
 	const Fleet& rFleet = fleetIt->second.at(static_cast<size_t>(iFleetIndex));
-	bool bIsFlagship = (iMemberIndex == rFleet.iFlagshipIndex) ||
-		(iMemberIndex < 0 && rFleet.members.empty());
+	bool bIsFlagship = (iMemberIndex == rFleet.iFlagshipIndex) || (iMemberIndex < 0 && rFleet.members.empty());
 
 	FleetLookupFlags_t flags {FleetLookupFlags::kFound};
 	flags.Set(FleetLookupFlags::kIsFlagship, bIsFlagship);

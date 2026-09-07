@@ -274,19 +274,17 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		{
 			const engine::AckState& rBefore = ackStates.at(i);
 			const engine::AckState& rAfter = pClient->slots.at(i).ack;
-			bAckSlotsUnchanged = rAfter.iAckFloor == rBefore.iAckFloor &&
-				rAfter.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow &&
-				rAfter.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh &&
-				rAfter.uiEpoch == rBefore.uiEpoch;
+			bAckSlotsUnchanged = rAfter.iAckFloor == rBefore.iAckFloor && rAfter.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow
+			                  && rAfter.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh && rAfter.uiEpoch == rBefore.uiEpoch;
 		}
 
-		const bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1 &&
-			pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;
+		const bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1
+		                             && pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;
 		const bool bHandshakeRestored = bHandshakeComplete && pClient->bHandshakeComplete;
 		const bool bTypeCountUnchanged = pClient->tickTypeCounts[uiPacketType] == uiTypeCount;
-		const bool bAckStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcks &&
-			pClient->bFloorStalled == bFloorStalled &&
-			pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcks;
+		const bool bAckStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcks
+		                             && pClient->bFloorStalled == bFloorStalled
+		                             && pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcks;
 		const bool bTimestampUnchanged = pClient->iClientTimestampNs == iClientTimestampNs;
 		const bool bContractViolationsUnchanged = pClient->iContractViolations == iContractViolations;
 		if (!bAdmissionAdvanced)

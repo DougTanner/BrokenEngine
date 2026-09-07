@@ -522,8 +522,7 @@ void Collision::CommitCandidate(const CollisionCandidate& rCandidate)
 {
 	CollisionLayer& rLayerA = Collision::sLayers.at(rCandidate.uiLayerA);
 	CollisionLayer& rLayerB = Collision::sLayers.at(rCandidate.uiLayerB);
-	if ((rLayerA.pFlags[rCandidate.iObjectA] & kAlreadyCollided) ||
-		(rLayerB.pFlags[rCandidate.iObjectB] & kAlreadyCollided))
+	if ((rLayerA.pFlags[rCandidate.iObjectA] & kAlreadyCollided) || (rLayerB.pFlags[rCandidate.iObjectB] & kAlreadyCollided))
 	{
 		return;
 	}

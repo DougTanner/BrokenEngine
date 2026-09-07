@@ -64,7 +64,7 @@ BufferManager::BufferManager()
 
 		int64_t iIndexElementSize = common::ModelHeader::UsesU16Indices(rModelHeader.iVertexCount) ? sizeof(uint16_t) : sizeof(uint32_t);
 		if (rModelHeader.iIndexCount > (std::numeric_limits<int64_t>::max() - 3) / iIndexElementSize
-			|| rModelHeader.iVertexCount > std::numeric_limits<int64_t>::max() / rModelHeader.iStride)
+		 || rModelHeader.iVertexCount > std::numeric_limits<int64_t>::max() / rModelHeader.iStride)
 		{
 			throw common::CorruptStreamException("BufferManager model");
 		}

@@ -200,7 +200,7 @@ bool IslandTerrain::AnyRestorationPending() const
 bool IslandTerrain::IsEvictionPending(const IslandTemplate& rTemplate) const
 {
 	return rTemplate.miTextureSlot != 0 && rTemplate.mbGpuResident && rTemplate.miRefCount == 0
-		&& (gpGraphics->muiFrameCounter - rTemplate.muiLastUsedRenderFrame) > kuiGraceRenderFrames;
+	    && (gpGraphics->muiFrameCounter - rTemplate.muiLastUsedRenderFrame) > kuiGraceRenderFrames;
 }
 
 bool IslandTerrain::IsRestorationPending(common::crc_t islandCrc, const IslandTemplate& rTemplate) const
@@ -420,8 +420,9 @@ void IslandTerrain::RestorationSweep()
 			IslandTemplate* pEvictTemplate = nullptr;
 			for (auto& [rCandidateCrc, rCandidate] : mIslands)
 			{
-				if (rCandidateCrc != rCrc && rCandidate.meMeshResidency == IslandMeshResidency::kResident && rCandidate.mbGpuResident && rCandidate.miRefCount == 0
-					&& (pEvictTemplate == nullptr || rCandidate.muiLastUsedRenderFrame < pEvictTemplate->muiLastUsedRenderFrame))
+				if (rCandidateCrc != rCrc && rCandidate.meMeshResidency == IslandMeshResidency::kResident && rCandidate.mbGpuResident
+				 && rCandidate.miRefCount == 0
+				 && (pEvictTemplate == nullptr || rCandidate.muiLastUsedRenderFrame < pEvictTemplate->muiLastUsedRenderFrame))
 				{
 					evictCrc = rCandidateCrc;
 					pEvictTemplate = &rCandidate;

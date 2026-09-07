@@ -163,9 +163,8 @@ void Server::SendUpdate(ClientConnection& rClient, int64_t iTick)
 			continue;
 		}
 
-		bool bRestartedStream = mPerCoordBufferedFrames.at(coord).front().iTick == iTick
-			&& rSlot.ack.iAckFloor >= 0
-			&& iTick > rSlot.ack.iAckFloor + 1;
+		bool bRestartedStream = mPerCoordBufferedFrames.at(coord).front().iTick == iTick && rSlot.ack.iAckFloor >= 0
+		                     && iTick > rSlot.ack.iAckFloor + 1;
 		if (bRestartedStream)
 		{
 			rSlot.bHoldUpdatesUntilFullStateAck = true;

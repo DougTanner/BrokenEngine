@@ -164,9 +164,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 					}
 				}
 			}
-			if (miFocusedPlayerInFleetIndex < 0
-				&& rFleet.iFlagshipIndex >= 0
-				&& rFleet.iFlagshipIndex < std::ssize(rFleet.members))
+			if (miFocusedPlayerInFleetIndex < 0 && rFleet.iFlagshipIndex >= 0 && rFleet.iFlagshipIndex < std::ssize(rFleet.members))
 			{
 				miFocusedPlayerInFleetIndex = rFleet.iFlagshipIndex;
 			}

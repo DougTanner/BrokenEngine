@@ -51,17 +51,13 @@ bool IsWindowsReservedDeviceBasename(std::string_view utf8)
 
 	// Win32 also resolves the superscript spellings COM¹/COM²/COM³ and LPT¹/LPT²/LPT³ to the same devices.
 	// Those trailing characters are the two UTF-8 bytes 0xC2 0xB9/0xB2/0xB3, so match the bytes directly.
-	if (basename.size() == 5 &&
-		(basename.starts_with("COM") || basename.starts_with("LPT")) &&
-		basename[3] == '\xC2' &&
-		(basename[4] == '\xB9' || basename[4] == '\xB2' || basename[4] == '\xB3'))
+	if (basename.size() == 5 && (basename.starts_with("COM") || basename.starts_with("LPT")) && basename[3] == '\xC2'
+	 && (basename[4] == '\xB9' || basename[4] == '\xB2' || basename[4] == '\xB3'))
 	{
 		return true;
 	}
 
-	return basename.size() == 4 &&
-		(basename.starts_with("COM") || basename.starts_with("LPT")) &&
-		basename[3] >= '1' && basename[3] <= '9';
+	return basename.size() == 4 && (basename.starts_with("COM") || basename.starts_with("LPT")) && basename[3] >= '1' && basename[3] <= '9';
 }
 
 // Trust boundary: the agent-supplied save/load filename lands in the user's appdata directory. Reject anything
@@ -342,8 +338,8 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 			throw std::runtime_error(engine::gpReplay->IsRecording() ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
 		}
 
-		const bool bRequiresCoord = eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter ||
-			eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kFullFramesRecord;
+		const bool bRequiresCoord = eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kCoordinateWriter
+		                         || eFailurePoint == engine::Replay::ReplayPersistenceFailurePoint::kFullFramesRecord;
 		if (bRequiresCoord != rParams.contains("coord"))
 		{
 			throw std::runtime_error(bRequiresCoord ? "selected stage requires 'coord'" : "'coord' is only valid for coordinate_writer or fullframes_record");
@@ -513,8 +509,8 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 		{
 			throw std::runtime_error("cannot queue replay transfer fixture during replay playback");
 		}
-		const bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused) &&
-			(gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !engine::gpReplay->IsRecording();
+		const bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused)
+		                        && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !engine::gpReplay->IsRecording();
 		if (!engine::gpReplay->IsRecording() && !bPendingStart)
 		{
 			throw std::runtime_error("replay_transfer_fixture requires active recording or a paused pending recording start");
@@ -606,8 +602,8 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 				{
 					XMVECTOR vecCandidate = XMVectorSet(f4Area.x + (static_cast<float>(iGridX) + 0.5f) * fPitchX, f4Area.w + (static_cast<float>(iGridY) + 0.5f) * fPitchY, engine::gBaseHeight.Get(), 1.0f);
 					XMVECTOR vecNextCandidate = XMVectorSet(XMVectorGetX(vecCandidate) + engine::kfDeltaTime, XMVectorGetY(vecCandidate), engine::gBaseHeight.Get(), 1.0f);
-					if (engine::gpIslandTerrain->FrameElevation(rDestinationStaticData, vecCandidate) < engine::gBaseHeight.Get() &&
-						engine::gpIslandTerrain->FrameElevation(rDestinationStaticData, vecNextCandidate) < engine::gBaseHeight.Get())
+					if (engine::gpIslandTerrain->FrameElevation(rDestinationStaticData, vecCandidate) < engine::gBaseHeight.Get()
+					 && engine::gpIslandTerrain->FrameElevation(rDestinationStaticData, vecNextCandidate) < engine::gBaseHeight.Get())
 					{
 						vecPosition = vecCandidate;
 						bFoundTerrainClearPosition = true;
@@ -795,9 +791,8 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 		{
 			throw std::runtime_error("navQueryActivation requires a profiling server");
 		}
-		else if ((gpGame->mGameFlags & engine::GameFlags::kPaused) ||
-			(gpGame->mGameFlags & engine::GameFlags::kSaveReplay) ||
-			(gpGame->mGameFlags & engine::GameFlags::kLoadReplay))
+		else if ((gpGame->mGameFlags & engine::GameFlags::kPaused) || (gpGame->mGameFlags & engine::GameFlags::kSaveReplay)
+		      || (gpGame->mGameFlags & engine::GameFlags::kLoadReplay))
 		{
 			throw std::runtime_error("navQueryActivation requires an unpaused normal server state");
 		}

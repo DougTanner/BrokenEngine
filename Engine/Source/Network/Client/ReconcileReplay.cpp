@@ -341,9 +341,8 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 	// Invariant: full replay must not repeat identical work. If iConfirmedTick and serverUpdates
 	// are unchanged since the last full replay attempt, the result would be the same.
 	int64_t iCurrentUpdateCount = static_cast<int64_t>(rFrames.serverUpdates.size());
-	if (rFrames.iConfirmedTick == rFrames.iLastReplayConfirmedTick
-		&& iCurrentUpdateCount == rFrames.iLastReplayServerUpdateCount
-		&& !HasDuePendingFullState(rFrames, rInputs.iTargetTick))
+	if (rFrames.iConfirmedTick == rFrames.iLastReplayConfirmedTick && iCurrentUpdateCount == rFrames.iLastReplayServerUpdateCount
+	 && !HasDuePendingFullState(rFrames, rInputs.iTargetTick))
 	{
 		DEBUG_BREAK();
 	}

@@ -210,8 +210,7 @@ void BakeOne(const std::filesystem::path& rGaeaExecutable, const std::filesystem
 		// a non-64-aligned region edge to reach kiCropAlignment. The only requirement is that every
 		// natural per-chunk span stays >= kiCropAlignment, so each region is large enough to hold an
 		// aligned crop (texturePixels is already a multiple of kiCropAlignment, so 1x1 always passes).
-		if ((iTexturePixels / rRoute.iColumns) < kiCropAlignment
-			|| (iTexturePixels / rRoute.iRows) < kiCropAlignment)
+		if ((iTexturePixels / rRoute.iColumns) < kiCropAlignment || (iTexturePixels / rRoute.iRows) < kiCropAlignment)
 		{
 			throw std::runtime_error(std::format("\"{}\" route \"{}\" splits texturePixels {} into {}x{} chunks, but a per-chunk pixel span ({}x{}) would be smaller than the {}-pixel crop alignment. Lower the subdivision or raise texturePixels.", islandJsonFile.string(), rRoute.pcLabel, iTexturePixels, rRoute.iColumns, rRoute.iRows, iTexturePixels / rRoute.iColumns, iTexturePixels / rRoute.iRows, kiCropAlignment));
 		}

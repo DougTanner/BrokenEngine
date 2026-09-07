@@ -154,8 +154,8 @@ namespace toolcli::coordination
 		}
 		std::vector<UCHAR> hashObject(uiObjectLength);
 		BCRYPT_HASH_HANDLE hHash = nullptr;
-		if (::BCryptCreateHash(hAlgorithm, &hHash, hashObject.data(), uiObjectLength, nullptr, 0, 0) < 0 ||
-			::BCryptHashData(hHash, reinterpret_cast<PUCHAR>(const_cast<char*>(value.data())), static_cast<ULONG>(value.size()), 0) < 0)
+		if (::BCryptCreateHash(hAlgorithm, &hHash, hashObject.data(), uiObjectLength, nullptr, 0, 0) < 0
+		 || ::BCryptHashData(hHash, reinterpret_cast<PUCHAR>(const_cast<char*>(value.data())), static_cast<ULONG>(value.size()), 0) < 0)
 		{
 			if (hHash != nullptr)
 			{

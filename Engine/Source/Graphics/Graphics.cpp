@@ -304,9 +304,8 @@ bool Graphics::ExtentSettled() const
 	// after a failed tail acquire/present (tier escalated, mbSwapchainRecreateDeferred still false) — a retired swapchain
 	// that has not yet been recreated, which extent equality alone would falsely report as settled.
 	return mFramebufferExtent2D.width == gWantedFramebufferExtent2D.width
-		&& mFramebufferExtent2D.height == gWantedFramebufferExtent2D.height
-		&& !mbSwapchainRecreateDeferred
-		&& meDestroyType < DestroyType::kSwapchain;
+	    && mFramebufferExtent2D.height == gWantedFramebufferExtent2D.height && !mbSwapchainRecreateDeferred
+	    && meDestroyType < DestroyType::kSwapchain;
 }
 
 bool Graphics::SurfaceExtentZeroArea(VkSurfaceCapabilitiesKHR& rVkSurfaceCapabilitiesKHR)
@@ -316,8 +315,8 @@ bool Graphics::SurfaceExtentZeroArea(VkSurfaceCapabilitiesKHR& rVkSurfaceCapabil
 	// Re-check the tier: CHECK_VK above can escalate meDestroyType to kSurface (VK_ERROR_SURFACE_LOST_KHR), and a
 	// surface-loss teardown must never be deferred (the zeroed caps struct would read as a zero-area extent).
 	return rVkSurfaceCapabilitiesKHR.currentExtent.width != 0xFFFFFFFF
-		&& (rVkSurfaceCapabilitiesKHR.currentExtent.width == 0 || rVkSurfaceCapabilitiesKHR.currentExtent.height == 0)
-		&& meDestroyType < DestroyType::kSurface;
+	    && (rVkSurfaceCapabilitiesKHR.currentExtent.width == 0 || rVkSurfaceCapabilitiesKHR.currentExtent.height == 0)
+	    && meDestroyType < DestroyType::kSurface;
 }
 
 void Graphics::Create()

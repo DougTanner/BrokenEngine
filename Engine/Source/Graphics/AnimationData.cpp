@@ -134,10 +134,8 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 	{
 		const common::AnimationChannel& rChannel = mpChannels[i];
 		uint32_t uiKeyframeTotal = rChannel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline ? mHeader.uiCubicKeyframeCount : mHeader.uiKeyframeCount;
-		if (rChannel.uiNodeIndex >= mHeader.skeleton.uiNodeCount
-			|| rChannel.uiKeyframeCount == 0
-			|| rChannel.uiKeyframeStart > uiKeyframeTotal
-			|| rChannel.uiKeyframeCount > uiKeyframeTotal - rChannel.uiKeyframeStart)
+		if (rChannel.uiNodeIndex >= mHeader.skeleton.uiNodeCount || rChannel.uiKeyframeCount == 0
+		 || rChannel.uiKeyframeStart > uiKeyframeTotal || rChannel.uiKeyframeCount > uiKeyframeTotal - rChannel.uiKeyframeStart)
 		{
 			throw common::CorruptStreamException("AnimationData::Load");
 		}
@@ -145,8 +143,7 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 	for (uint32_t i = 0; i < mHeader.uiAnimationCount; ++i)
 	{
 		const common::AnimationClip& rClip = mpAnimations[i];
-		if (rClip.uiChannelStart > mHeader.uiChannelCount
-			|| rClip.uiChannelCount > mHeader.uiChannelCount - rClip.uiChannelStart)
+		if (rClip.uiChannelStart > mHeader.uiChannelCount || rClip.uiChannelCount > mHeader.uiChannelCount - rClip.uiChannelStart)
 		{
 			throw common::CorruptStreamException("AnimationData::Load");
 		}

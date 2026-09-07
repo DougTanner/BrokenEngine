@@ -186,10 +186,9 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 	for (const engine::PendingNewSubscription& rSubscription : rNewSubscriptions)
 	{
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rSubscription.iClientId);
-		bool bSlotStillValid = (pClient != nullptr
-			&& rSubscription.iSlot < std::ssize(pClient->slots)
-			&& (pClient->slots.at(rSubscription.iSlot).subscription.flags & engine::SubscriptionFlags::kActive)
-			&& pClient->slots.at(rSubscription.iSlot).subscription.coord == rSubscription.coord);
+		bool bSlotStillValid = (pClient != nullptr && rSubscription.iSlot < std::ssize(pClient->slots)
+		                     && (pClient->slots.at(rSubscription.iSlot).subscription.flags & engine::SubscriptionFlags::kActive)
+		                     && pClient->slots.at(rSubscription.iSlot).subscription.coord == rSubscription.coord);
 		if (!bSlotStillValid)
 		{
 			continue;

@@ -360,8 +360,8 @@ const char* FormatName(VkFormat vkFormat)
 
 constexpr bool IsFourByteColor(VkFormat vkFormat)
 {
-	return vkFormat == VK_FORMAT_R8G8B8A8_UNORM || vkFormat == VK_FORMAT_R8G8B8A8_SRGB
-		|| vkFormat == VK_FORMAT_B8G8R8A8_UNORM || vkFormat == VK_FORMAT_B8G8R8A8_SRGB;
+	return vkFormat == VK_FORMAT_R8G8B8A8_UNORM || vkFormat == VK_FORMAT_R8G8B8A8_SRGB || vkFormat == VK_FORMAT_B8G8R8A8_UNORM
+	    || vkFormat == VK_FORMAT_B8G8R8A8_SRGB;
 }
 
 constexpr bool IsBgra(VkFormat vkFormat)

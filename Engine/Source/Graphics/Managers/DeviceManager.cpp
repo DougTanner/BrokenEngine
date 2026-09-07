@@ -458,10 +458,9 @@ void DeviceManager::LoadPipelineCache()
 								std::memcpy(&header, cacheData.data() + sizeof(uiStoredCrc), sizeof(header));
 								const VkPhysicalDeviceProperties& rProps = gpInstanceManager->mVkPhysicalDeviceProperties;
 								const bool bCompatible = header.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
-									&& header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
-									&& header.vendorID == rProps.vendorID
-									&& header.deviceID == rProps.deviceID
-									&& std::memcmp(header.pipelineCacheUUID, rProps.pipelineCacheUUID, VK_UUID_SIZE) == 0;
+								                      && header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
+								                      && header.vendorID == rProps.vendorID && header.deviceID == rProps.deviceID
+								                      && std::memcmp(header.pipelineCacheUUID, rProps.pipelineCacheUUID, VK_UUID_SIZE) == 0;
 
 								if (bCompatible)
 								{

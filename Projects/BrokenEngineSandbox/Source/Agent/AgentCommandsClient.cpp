@@ -53,8 +53,8 @@ nlohmann::json BuildFullStateFixtureCoordState(engine::GridCoord coord)
 		result["lastServerUpdateTick"] = rFrames.serverUpdates.rbegin()->first;
 	}
 
-	bool bRingValid = rFrames.iSnapshotHead >= 0 && rFrames.iSnapshotHead < engine::kiNetworkBufferSize
-		&& rFrames.iSnapshotCount >= 0 && rFrames.iSnapshotCount <= engine::kiNetworkBufferSize;
+	bool bRingValid = rFrames.iSnapshotHead >= 0 && rFrames.iSnapshotHead < engine::kiNetworkBufferSize && rFrames.iSnapshotCount >= 0
+	               && rFrames.iSnapshotCount <= engine::kiNetworkBufferSize;
 	int64_t iPreviousTick = -1;
 	for (int64_t i = 0; bRingValid && i < rFrames.iSnapshotCount; ++i)
 	{
@@ -73,7 +73,7 @@ nlohmann::json BuildFullStateFixtureCoordState(engine::GridCoord coord)
 		{
 			int64_t iConfirmedPhysical = engine::SnapshotIndex(rFrames.iSnapshotHead, rFrames.iConfirmedOffset);
 			bRingValid = rFrames.snapshots[iConfirmedPhysical] != nullptr
-				&& rFrames.snapshots[iConfirmedPhysical]->interpolate.iTick == rFrames.iConfirmedTick;
+			          && rFrames.snapshots[iConfirmedPhysical]->interpolate.iTick == rFrames.iConfirmedTick;
 		}
 	}
 	result["ringValid"] = bRingValid;
@@ -302,16 +302,14 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		nlohmann::json afterAdoption = BuildFullStateFixtureCoordState(coord);
 		bool bObsoleteUpdatesAbsent = rFrames.serverUpdates.empty() || rFrames.serverUpdates.begin()->first > iPendingTick;
 		bool bRenderBaseNotOlder = rFrames.iLastRenderedTick < 0 || rFrames.iSnapshotCount <= 0
-			|| rFrames.snapshots[rFrames.iSnapshotHead]->interpolate.iTick >= rFrames.iLastRenderedTick;
+		                        || rFrames.snapshots[rFrames.iSnapshotHead]->interpolate.iTick >= rFrames.iLastRenderedTick;
 		bool bPendingCleared = !rFrames.pendingFullState.has_value();
-		bool bAdoptedTicksMatch = rFrames.iConfirmedTick == iPendingTick
-			&& rFrames.iHighWaterValidatedTick == iPendingTick
-			&& rFrames.iLastFullStateTick == iPendingTick;
-		bool bRingHeadIsAdopted = rFrames.iSnapshotCount > 0
-			&& rFrames.snapshots[rFrames.iSnapshotHead] != nullptr
-			&& rFrames.snapshots[rFrames.iSnapshotHead]->interpolate.iTick == iPendingTick;
-		bool bDirectAdoptionProven = bDirectAdoptionRequired && !adoptionDesync.bDesync && bPendingCleared
-			&& bAdoptedTicksMatch && rFrames.iConfirmedOffset == 0 && bObsoleteUpdatesAbsent && bRingHeadIsAdopted;
+		bool bAdoptedTicksMatch = rFrames.iConfirmedTick == iPendingTick && rFrames.iHighWaterValidatedTick == iPendingTick
+		                       && rFrames.iLastFullStateTick == iPendingTick;
+		bool bRingHeadIsAdopted = rFrames.iSnapshotCount > 0 && rFrames.snapshots[rFrames.iSnapshotHead] != nullptr
+		                       && rFrames.snapshots[rFrames.iSnapshotHead]->interpolate.iTick == iPendingTick;
+		bool bDirectAdoptionProven = bDirectAdoptionRequired && !adoptionDesync.bDesync && bPendingCleared && bAdoptedTicksMatch
+		                          && rFrames.iConfirmedOffset == 0 && bObsoleteUpdatesAbsent && bRingHeadIsAdopted;
 
 		rResult["pendingTick"] = iPendingTick;
 		rResult["deferTargetTick"] = iDeferTargetTick;
@@ -656,7 +654,7 @@ void CommandClientStaleUpdateFixture(const nlohmann::json& rParams, [[maybe_unus
 		{
 			auto coordIt = gpGame->mCoordFrames.find(rSlot.coord);
 			if (rSlot.eState == engine::CoordSubscriptionState::kActive && coordIt != gpGame->mCoordFrames.end()
-				&& coordIt->second.iConfirmedTick >= 0)
+			 && coordIt->second.iConfirmedTick >= 0)
 			{
 				bHasActiveConfirmedCoord = true;
 				break;
@@ -777,7 +775,7 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		for (int64_t i = 0; i < std::ssize(rClient.mCoordSlots); ++i)
 		{
 			if (rClient.mCoordSlots.at(i).eState == engine::CoordSubscriptionState::kUnsubscribed
-				&& rClient.mReceivedCoordUpdates.at(i).empty())
+			 && rClient.mReceivedCoordUpdates.at(i).empty())
 			{
 				iSlot = i;
 				break;
@@ -810,7 +808,7 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		rClient.Receive(rWorkbuffer.Span<uint8_t>());
 		bool bAcceptToUnsubscribing = rSlot.eState == engine::CoordSubscriptionState::kUnsubscribing;
 		bool bPolicyUnchanged = desiredBefore == rRuntime.mDesiredCoords && stickyBefore == rRuntime.mUnwantedTimestamps
-			&& queueBefore == rRuntime.mSubscriptionQueue;
+		                     && queueBefore == rRuntime.mSubscriptionQueue;
 		if (!bCancelledToUnsubscribed)
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture immediate transition or policy check failed");
@@ -853,7 +851,7 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			}
 			engine::CoordSubscriptionState eState = pClient->mCoordSlots.at(iSlot).eState;
 			if (pState->eOutcome == engine::ClientCancelledSubscriptionFixtureOutcome::kAcked
-				&& eState == engine::CoordSubscriptionState::kUnsubscribed)
+			 && eState == engine::CoordSubscriptionState::kUnsubscribed)
 			{
 				nlohmann::json result;
 				result["coord"] = {coord.x, coord.y};
@@ -918,8 +916,8 @@ void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rPar
 		{
 			throw std::runtime_error("client_packet_fault_fixture is already armed");
 		}
-		if (gpGame == nullptr || gpClientSession == nullptr || gpClientSession->mpRuntime->mpClient == nullptr ||
-			!(gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnected))
+		if (gpGame == nullptr || gpClientSession == nullptr || gpClientSession->mpRuntime->mpClient == nullptr
+		 || !(gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnected))
 		{
 			throw std::runtime_error("client_packet_fault_fixture requires a connected client");
 		}

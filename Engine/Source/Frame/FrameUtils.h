@@ -76,11 +76,8 @@ inline SegmentHit XM_CALLCONV TracePointToFrameExit(FXMVECTOR vecArea, FXMVECTOR
 	float fPercent = std::numeric_limits<float>::max();
 
 	bool bStartsOutside = f4Start.x < bounds.fMinX || f4Start.x > bounds.fMaxX || f4Start.y < bounds.fMinY || f4Start.y > bounds.fMaxY;
-	bool bStartsOnNonInwardBoundary =
-		(f4Start.x == bounds.fMinX && fDeltaX <= 0.0f) ||
-		(f4Start.x == bounds.fMaxX && fDeltaX >= 0.0f) ||
-		(f4Start.y == bounds.fMinY && fDeltaY <= 0.0f) ||
-		(f4Start.y == bounds.fMaxY && fDeltaY >= 0.0f);
+	bool bStartsOnNonInwardBoundary = (f4Start.x == bounds.fMinX && fDeltaX <= 0.0f) || (f4Start.x == bounds.fMaxX && fDeltaX >= 0.0f)
+	                               || (f4Start.y == bounds.fMinY && fDeltaY <= 0.0f) || (f4Start.y == bounds.fMaxY && fDeltaY >= 0.0f);
 	if (bStartsOutside || bStartsOnNonInwardBoundary)
 	{
 		fPercent = 0.0f;
@@ -140,8 +137,7 @@ inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecP
 	float fPositionX = XMVectorGetX(vecPosition);
 	float fPositionY = XMVectorGetY(vecPosition);
 
-	return !(fPositionX > rBounds.fMinX && fPositionX < rBounds.fMaxX &&
-	         fPositionY > rBounds.fMinY && fPositionY < rBounds.fMaxY);
+	return !(fPositionX > rBounds.fMinX && fPositionX < rBounds.fMaxX && fPositionY > rBounds.fMinY && fPositionY < rBounds.fMaxY);
 }
 
 inline void XM_CALLCONV ComputeTransferDelta(const FrameBounds& rBounds, FXMVECTOR vecPosition, int8_t& rDeltaX, int8_t& rDeltaY)

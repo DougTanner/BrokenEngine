@@ -46,9 +46,9 @@ PipelineManager::PipelineManager()
 		// computed. Boot-required shader; a throw propagates to MainThread's try/catch (HandleException — crash
 		// report + exit) — boot hard-fail.
 		if (rShaderHeader.iDescriptorSetLayoutBindings < 0
-			|| rShaderHeader.iDescriptorSetLayoutBindings > common::ShaderHeader::kiMaxDescriptorSetLayoutBindings
-			|| rShaderHeader.iVertexInputAttributeDescriptions < 0
-			|| rShaderHeader.iVertexInputAttributeDescriptions > common::ShaderHeader::kiMaxVertexInputAttributeDescriptions)
+		 || rShaderHeader.iDescriptorSetLayoutBindings > common::ShaderHeader::kiMaxDescriptorSetLayoutBindings
+		 || rShaderHeader.iVertexInputAttributeDescriptions < 0
+		 || rShaderHeader.iVertexInputAttributeDescriptions > common::ShaderHeader::kiMaxVertexInputAttributeDescriptions)
 		{
 			char pcHex[20] {};
 			LOG(kLoading, kError, "Corrupt shader chunk {}: implausible binding/attribute counts {} / {}", common::ToHex(std::span(pcHex), rCrc), rShaderHeader.iDescriptorSetLayoutBindings, rShaderHeader.iVertexInputAttributeDescriptions);

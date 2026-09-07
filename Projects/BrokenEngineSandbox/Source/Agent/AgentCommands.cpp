@@ -68,19 +68,19 @@ XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn)
 [[maybe_unused]] bool MissileSharedRowMatches(const MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
 {
 	return rMissiles.pFlags[i] == MissileSharedRowFlags(i, iSeed)
-		&& XMVector4Equal(rMissiles.pVecVelocities[i], MissileSharedRowVector(i, iSeed, 0))
-		&& XMVector4Equal(rMissiles.pVecExplosionDirections[i], MissileSharedRowVector(i, iSeed, 3))
-		&& XMVector4Equal(rMissiles.pVecStoredDirections[i], MissileSharedRowVector(i, iSeed, 6))
-		&& rMissiles.puiRegistryTargets[i] == MissileSharedRowTarget(i, iSeed)
-		&& rMissiles.pfTimes[i] == MissileSharedRowScalar(i, iSeed, 9)
-		&& rMissiles.pfDeltaRotationDelays[i] == MissileSharedRowScalar(i, iSeed, 10)
-		&& rMissiles.pfDeltaRotations[i] == MissileSharedRowScalar(i, iSeed, 11)
-		&& rMissiles.pfNextJitter[i] == MissileSharedRowScalar(i, iSeed, 12)
-		&& rMissiles.pfDeltaRotationMax[i] == MissileSharedRowScalar(i, iSeed, 13)
-		&& rMissiles.pfAccelerations[i] == MissileSharedRowScalar(i, iSeed, 14)
-		&& rMissiles.pfPitches[i] == MissileSharedRowScalar(i, iSeed, 15)
-		&& rMissiles.pfExhaustLengths[i] == MissileSharedRowScalar(i, iSeed, 16)
-		&& rMissiles.pAlignments[i] == MissileSharedRowAlignment(i, iSeed);
+	    && XMVector4Equal(rMissiles.pVecVelocities[i], MissileSharedRowVector(i, iSeed, 0))
+	    && XMVector4Equal(rMissiles.pVecExplosionDirections[i], MissileSharedRowVector(i, iSeed, 3))
+	    && XMVector4Equal(rMissiles.pVecStoredDirections[i], MissileSharedRowVector(i, iSeed, 6))
+	    && rMissiles.puiRegistryTargets[i] == MissileSharedRowTarget(i, iSeed)
+	    && rMissiles.pfTimes[i] == MissileSharedRowScalar(i, iSeed, 9)
+	    && rMissiles.pfDeltaRotationDelays[i] == MissileSharedRowScalar(i, iSeed, 10)
+	    && rMissiles.pfDeltaRotations[i] == MissileSharedRowScalar(i, iSeed, 11)
+	    && rMissiles.pfNextJitter[i] == MissileSharedRowScalar(i, iSeed, 12)
+	    && rMissiles.pfDeltaRotationMax[i] == MissileSharedRowScalar(i, iSeed, 13)
+	    && rMissiles.pfAccelerations[i] == MissileSharedRowScalar(i, iSeed, 14)
+	    && rMissiles.pfPitches[i] == MissileSharedRowScalar(i, iSeed, 15)
+	    && rMissiles.pfExhaustLengths[i] == MissileSharedRowScalar(i, iSeed, 16)
+	    && rMissiles.pAlignments[i] == MissileSharedRowAlignment(i, iSeed);
 }
 
 // Drives the real MissilesPostRender deserialization helpers through logical capacities 100 -> 70 -> 60 -> 150 on one
@@ -190,20 +190,16 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 
 #if defined(BT_SERVER)
 		// The server build serializes Members() directly, so it must equal SharedMembers() (wire/CRC parity).
-		rResult["serverMembersEqualShared"] =
-			engine::IsMemberTupleSubset(dest.Members(), dest.SharedMembers())
-			&& engine::IsMemberTupleSubset(dest.SharedMembers(), dest.Members());
+		rResult["serverMembersEqualShared"] = engine::IsMemberTupleSubset(dest.Members(), dest.SharedMembers())
+		                                   && engine::IsMemberTupleSubset(dest.SharedMembers(), dest.Members());
 #endif
 
 		// A >100-row read must reallocate exactly once, growing the physical layout and publishing it only after success.
 		RunRead("read150", 150, 150, 4);
 
-		bool bReuseOk = steps[1]["reused"].get<bool>()
-			&& steps[2]["reused"].get<bool>()
-			&& !steps[3]["reused"].get<bool>()
-			&& steps[1]["physicalCapacity"].get<int64_t>() == 100
-			&& steps[2]["physicalCapacity"].get<int64_t>() == 100
-			&& steps[3]["physicalCapacity"].get<int64_t>() == 150;
+		bool bReuseOk = steps[1]["reused"].get<bool>() && steps[2]["reused"].get<bool>() && !steps[3]["reused"].get<bool>()
+		             && steps[1]["physicalCapacity"].get<int64_t>() == 100 && steps[2]["physicalCapacity"].get<int64_t>() == 100
+		             && steps[3]["physicalCapacity"].get<int64_t>() == 150;
 
 		bool bPassed = (iSharedMismatches == 0) && bReuseOk;
 #if defined(BT_CLIENT)
@@ -405,10 +401,10 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 			{
 				engine::RegistryResult result {};
 				bResolveStableAfterPermutation = bResolveStableAfterPermutation
-					&& engine::ResolveRegistryHandle(context, puiSourceIds[i], result)
-					&& result.id == puiSourceIds[i]
-					&& XMVector4Equal(result.vecCurrentPosition, pVecSourceCurrent[i])
-					&& XMVector4Equal(result.vecPreviousPosition, pVecSourcePrevious[i]);
+				                              && engine::ResolveRegistryHandle(context, puiSourceIds[i], result)
+				                              && result.id == puiSourceIds[i]
+				                              && XMVector4Equal(result.vecCurrentPosition, pVecSourceCurrent[i])
+				                              && XMVector4Equal(result.vecPreviousPosition, pVecSourcePrevious[i]);
 			}
 		}
 
@@ -585,8 +581,8 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		for (int64_t i = 0; i < kiOwnerCount; ++i)
 		{
 			bForeignLookupMatches = bForeignLookupMatches
-				&& engine::RegistryUuidByGlobalId(foreignLayer, pOwnerGlobalIds[i]) == puiOwnerIds[i].ToUuid()
-				&& engine::RegistryUuidByGlobalId(foreignLayer, pOwnerGlobalIds[i]) == engine::RegistryUuidByGlobalId(ownerLayer, pOwnerGlobalIds[i]);
+			                     && engine::RegistryUuidByGlobalId(foreignLayer, pOwnerGlobalIds[i]) == puiOwnerIds[i].ToUuid()
+			                     && engine::RegistryUuidByGlobalId(foreignLayer, pOwnerGlobalIds[i]) == engine::RegistryUuidByGlobalId(ownerLayer, pOwnerGlobalIds[i]);
 		}
 		const bool bUuidLookupHit = engine::RegistryUuidByGlobalId(ownerLayer, pOwnerGlobalIds[2]) == puiOwnerIds[2].ToUuid();
 		const bool bUuidLookupMiss = engine::RegistryUuidByGlobalId(ownerLayer, kMissingGlobalId) == engine::uuid_t {};
@@ -630,11 +626,10 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		rResult["assignMissChangedNothing"] = bAssignMissChangedNothing;
 
 		rResult["passed"] = bRadiusRejected && bAlignmentRejected && bRankingCorrect && bResolveStableAfterPermutation
-			&& !bRemovedIdResolves && bReleaseClearedHandle && bReacquireCorrect
-			&& bHighCountRankingCorrect && bHighCountReleaseCleared && bHighCountReleaseCountCorrect && bTieCorrect
-			&& bOwnershipCountCorrect && bForeignLookupMatches && bUuidLookupHit && bUuidLookupMiss
-			&& bUuidLookupWithoutGlobalIds && bAssignHitReturnedTrue && bAssignHitIsolated
-			&& bAssignMissReturnedFalse && bAssignMissChangedNothing;
+		                 && !bRemovedIdResolves && bReleaseClearedHandle && bReacquireCorrect && bHighCountRankingCorrect
+		                 && bHighCountReleaseCleared && bHighCountReleaseCountCorrect && bTieCorrect && bOwnershipCountCorrect
+		                 && bForeignLookupMatches && bUuidLookupHit && bUuidLookupMiss && bUuidLookupWithoutGlobalIds
+		                 && bAssignHitReturnedTrue && bAssignHitIsolated && bAssignMissReturnedFalse && bAssignMissChangedNothing;
 	}
 }
 

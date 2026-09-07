@@ -95,9 +95,8 @@ void SetupExceptionHandling()
 					break;
 
 				case DBG_PRINTEXCEPTION_C:
-					if (giMyOutputDebugString == 0
-						&& pExceptionPointers->ExceptionRecord->NumberParameters >= 2
-						&& pExceptionPointers->ExceptionRecord->ExceptionInformation[1] != 0)
+					if (giMyOutputDebugString == 0 && pExceptionPointers->ExceptionRecord->NumberParameters >= 2
+					 && pExceptionPointers->ExceptionRecord->ExceptionInformation[1] != 0)
 					{
 						LOG(kDefault, kVerbose, "DBG_PRINTEXCEPTION_C: {}", reinterpret_cast<char*>(pExceptionPointers->ExceptionRecord->ExceptionInformation[1]));
 					}

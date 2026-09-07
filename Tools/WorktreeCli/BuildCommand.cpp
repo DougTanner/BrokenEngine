@@ -254,8 +254,8 @@ namespace toolcli
 				{
 					line.remove_suffix(1);
 				}
-				if (line.empty() || line.size() > kuiMaxDiagnosticLineLength ||
-					(line.find("error") == std::string_view::npos && line.find("warning") == std::string_view::npos))
+				if (line.empty() || line.size() > kuiMaxDiagnosticLineLength
+				 || (line.find("error") == std::string_view::npos && line.find("warning") == std::string_view::npos))
 				{
 					return;
 				}
@@ -540,10 +540,10 @@ namespace toolcli
 			try
 			{
 				nlohmann::json evaluation = nlohmann::json::parse(queryResult->output);
-				if (!evaluation.is_object() || !evaluation.contains("Properties") || !evaluation["Properties"].is_object() ||
-					!evaluation["Properties"].contains("IntDir") || !evaluation["Properties"]["IntDir"].is_string() ||
-					!evaluation.contains("Items") || !evaluation["Items"].is_object() ||
-					!evaluation["Items"].contains("ClCompile") || !evaluation["Items"]["ClCompile"].is_array())
+				if (!evaluation.is_object() || !evaluation.contains("Properties") || !evaluation["Properties"].is_object()
+				 || !evaluation["Properties"].contains("IntDir") || !evaluation["Properties"]["IntDir"].is_string()
+				 || !evaluation.contains("Items") || !evaluation["Items"].is_object() || !evaluation["Items"].contains("ClCompile")
+				 || !evaluation["Items"]["ClCompile"].is_array())
 				{
 					FailBuild("MSBuild evaluation omitted or malformed IntDir or ClCompile");
 					return std::nullopt;

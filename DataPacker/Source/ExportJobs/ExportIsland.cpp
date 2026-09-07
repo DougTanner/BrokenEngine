@@ -300,8 +300,10 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 
 	int32_t iMeshVertexCount = 0;
 	int32_t iMeshIndexCount = 0;
-	if (!meshStream.read(reinterpret_cast<char*>(&iMeshVertexCount), sizeof(iMeshVertexCount)) || meshStream.gcount() != static_cast<std::streamsize>(sizeof(iMeshVertexCount))
-		|| !meshStream.read(reinterpret_cast<char*>(&iMeshIndexCount), sizeof(iMeshIndexCount)) || meshStream.gcount() != static_cast<std::streamsize>(sizeof(iMeshIndexCount)))
+	if (!meshStream.read(reinterpret_cast<char*>(&iMeshVertexCount), sizeof(iMeshVertexCount))
+	 || meshStream.gcount() != static_cast<std::streamsize>(sizeof(iMeshVertexCount))
+	 || !meshStream.read(reinterpret_cast<char*>(&iMeshIndexCount), sizeof(iMeshIndexCount))
+	 || meshStream.gcount() != static_cast<std::streamsize>(sizeof(iMeshIndexCount)))
 	{
 		throw std::runtime_error(std::format("Failed to read the processed mesh header from \"{}\".", meshFile.string()));
 	}
@@ -358,20 +360,17 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	// drives every downstream size; it is written last per leaf, so its presence is guaranteed if the
 	// bake succeeded. The committed BC outputs are saved to the leaf root (not Intermediates).
 	BakedDimensions baked = ReadBakedDimensions(rInputPath);
-	if (baked.iFullTexturePixels <= 0 || baked.iFullTexturePixels > std::numeric_limits<int32_t>::max()
-		|| baked.iCropX < 0 || baked.iCropY < 0 || baked.iCropWidth <= 0 || baked.iCropHeight <= 0
-		|| baked.iCropWidth > std::numeric_limits<int32_t>::max() || baked.iCropHeight > std::numeric_limits<int32_t>::max()
-		|| baked.iCropWidth % kiElevationDivisor != 0 || baked.iCropHeight % kiElevationDivisor != 0
-		|| baked.iCropX > std::numeric_limits<int64_t>::max() - baked.iCropWidth
-		|| baked.iCropY > std::numeric_limits<int64_t>::max() - baked.iCropHeight
-		|| baked.iCropX + baked.iCropWidth > baked.iFullTexturePixels
-		|| baked.iCropY + baked.iCropHeight > baked.iFullTexturePixels)
+	if (baked.iFullTexturePixels <= 0 || baked.iFullTexturePixels > std::numeric_limits<int32_t>::max() || baked.iCropX < 0
+	 || baked.iCropY < 0 || baked.iCropWidth <= 0 || baked.iCropHeight <= 0 || baked.iCropWidth > std::numeric_limits<int32_t>::max()
+	 || baked.iCropHeight > std::numeric_limits<int32_t>::max() || baked.iCropWidth % kiElevationDivisor != 0
+	 || baked.iCropHeight % kiElevationDivisor != 0 || baked.iCropX > std::numeric_limits<int64_t>::max() - baked.iCropWidth
+	 || baked.iCropY > std::numeric_limits<int64_t>::max() - baked.iCropHeight || baked.iCropX + baked.iCropWidth > baked.iFullTexturePixels
+	 || baked.iCropY + baked.iCropHeight > baked.iFullTexturePixels)
 	{
 		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid crop dimensions: crop ({},{} + {}x{}) in full texture {}.", rInputPath.string(), baked.iCropX, baked.iCropY, baked.iCropWidth, baked.iCropHeight, baked.iFullTexturePixels));
 	}
-	if (!std::isfinite(baked.fWidthMeters) || baked.fWidthMeters <= 0.0f
-		|| !std::isfinite(baked.fHeightMeters) || baked.fHeightMeters <= 0.0f
-		|| !std::isfinite(baked.fElevationMeters) || baked.fElevationMeters <= 0.0f)
+	if (!std::isfinite(baked.fWidthMeters) || baked.fWidthMeters <= 0.0f || !std::isfinite(baked.fHeightMeters)
+	 || baked.fHeightMeters <= 0.0f || !std::isfinite(baked.fElevationMeters) || baked.fElevationMeters <= 0.0f)
 	{
 		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid world dimensions: {}x{} m footprint, {} m elevation.", rInputPath.string(), baked.fWidthMeters, baked.fHeightMeters, baked.fElevationMeters));
 	}

@@ -44,8 +44,8 @@ inline ConvexHull2D BuildWorldHull(const XMFLOAT2* pLocalVertices, int32_t iLoca
 // non-overlapping (lets islands pack flush).
 inline bool AabbsOverlap2D(const ConvexHull2D& rA, const ConvexHull2D& rB)
 {
-	return rA.f2AabbMin.x < rB.f2AabbMax.x && rB.f2AabbMin.x < rA.f2AabbMax.x
-	    && rA.f2AabbMin.y < rB.f2AabbMax.y && rB.f2AabbMin.y < rA.f2AabbMax.y;
+	return rA.f2AabbMin.x < rB.f2AabbMax.x && rB.f2AabbMin.x < rA.f2AabbMax.x && rA.f2AabbMin.y < rB.f2AabbMax.y
+	    && rB.f2AabbMin.y < rA.f2AabbMax.y;
 }
 
 // Separating Axis Theorem for two CCW convex polygons. True iff they share interior area; edge-

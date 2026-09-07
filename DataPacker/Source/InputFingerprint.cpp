@@ -345,10 +345,8 @@ std::string InputFingerprintCache::GetPersistentFile(const std::filesystem::path
 			.uiVolumeSerialNumber = metadata.at("volumeSerialNumber").get<uint32_t>(),
 		};
 		std::string fingerprint = metadata.at("fingerprint").get<std::string>();
-		if (metadata.at("magic") == kpcPersistentFingerprintMagic
-			&& metadata.at("version") == kiPersistentFingerprintVersion
-			&& IsSha256(fingerprint)
-			&& recordedSnapshot == snapshot)
+		if (metadata.at("magic") == kpcPersistentFingerprintMagic && metadata.at("version") == kiPersistentFingerprintVersion
+		 && IsSha256(fingerprint) && recordedSnapshot == snapshot)
 		{
 			mCachedFingerprints.insert_or_assign(key, CachedFingerprint {.snapshot = snapshot, .fingerprint = fingerprint});
 			mbDirty = true;
@@ -432,7 +430,7 @@ InputFingerprintCache::FileSnapshot InputFingerprintCache::Snapshot(const std::f
 	FILE_BASIC_INFO basicInfo {};
 	BY_HANDLE_FILE_INFORMATION fileInfo {};
 	if (!GetFileInformationByHandleEx(fileHandle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo))
-		|| !GetFileInformationByHandle(fileHandle.get(), &fileInfo))
+	 || !GetFileInformationByHandle(fileHandle.get(), &fileInfo))
 	{
 		throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), std::format("Failed to inspect \"{}\" for fingerprinting", rPath.string()));
 	}

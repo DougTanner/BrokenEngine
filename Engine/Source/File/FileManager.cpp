@@ -27,8 +27,8 @@ public:
 
 		DWORD uiObjectLength = 0;
 		DWORD uiResultLength = 0;
-		if (::BCryptGetProperty(mpAlgorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&uiObjectLength), sizeof(uiObjectLength), &uiResultLength, 0) < 0 ||
-			uiResultLength != sizeof(uiObjectLength))
+		if (::BCryptGetProperty(mpAlgorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&uiObjectLength), sizeof(uiObjectLength), &uiResultLength, 0) < 0
+		 || uiResultLength != sizeof(uiObjectLength))
 		{
 			return;
 		}
@@ -308,9 +308,9 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	for (;;)
 	{
 		DWORD uiBytesRead = 0;
-		if (::ReadFile(file.Get(), buffer.data(), static_cast<DWORD>(buffer.size()), &uiBytesRead, nullptr) == FALSE ||
-			uiBytesRead > buffer.size() || iByteCount > std::numeric_limits<int64_t>::max() - static_cast<int64_t>(uiBytesRead) ||
-			!hasher.Update(std::span<const std::byte>(buffer.data(), uiBytesRead)))
+		if (::ReadFile(file.Get(), buffer.data(), static_cast<DWORD>(buffer.size()), &uiBytesRead, nullptr) == FALSE
+		 || uiBytesRead > buffer.size() || iByteCount > std::numeric_limits<int64_t>::max() - static_cast<int64_t>(uiBytesRead)
+		 || !hasher.Update(std::span<const std::byte>(buffer.data(), uiBytesRead)))
 		{
 			return false;
 		}

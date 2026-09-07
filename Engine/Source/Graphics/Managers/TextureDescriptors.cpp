@@ -225,7 +225,7 @@ void TextureDescriptors::SynchronizeFullArrayBindingGenerations(const TextureBin
 		for (TextureBinding& rOtherBinding : rEntry.second)
 		{
 			if (&rOtherBinding == &rBinding || rOtherBinding.pPipeline != rBinding.pPipeline || rOtherBinding.iBinding != rBinding.iBinding
-				|| rOtherBinding.iArrayIndex >= 0 || rOtherBinding.textures != rBinding.textures)
+			 || rOtherBinding.iArrayIndex >= 0 || rOtherBinding.textures != rBinding.textures)
 			{
 				continue;
 			}
@@ -659,8 +659,7 @@ void TextureDescriptors::VerifyAllDescriptorGenerations() const
 		for (const TextureBinding& rBinding : rBindings)
 		{
 			if (rBinding.pTexture != nullptr && rBinding.pTexture->muiGeneration != 0
-				&& ((rBinding.bTextureUsesPlaceholder && rBinding.pTexture->mVkImageView != VK_NULL_HANDLE)
-					|| (!rBinding.bTextureUsesPlaceholder && (rBinding.pTexture->muiGeneration != rBinding.uiTextureGeneration || rBinding.pTexture->mVkImage == VK_NULL_HANDLE))))
+			 && ((rBinding.bTextureUsesPlaceholder && rBinding.pTexture->mVkImageView != VK_NULL_HANDLE) || (!rBinding.bTextureUsesPlaceholder && (rBinding.pTexture->muiGeneration != rBinding.uiTextureGeneration || rBinding.pTexture->mVkImage == VK_NULL_HANDLE))))
 			{
 				LOG(kGraphics, kError, "Descriptor staleness: pipeline={} binding={} crc={} texture={} snapshotGen={} currentGen={} vkImage={}", rBinding.pPipeline->mInfo.name, rBinding.iBinding, rCrc, reinterpret_cast<uintptr_t>(rBinding.pTexture), rBinding.uiTextureGeneration, rBinding.pTexture->muiGeneration, reinterpret_cast<uintptr_t>(rBinding.pTexture->mVkImage));
 				DEBUG_BREAK();
@@ -671,7 +670,7 @@ void TextureDescriptors::VerifyAllDescriptorGenerations() const
 			{
 				Texture* pTexture = rBinding.textures.at(i);
 				if (pTexture != nullptr && pTexture->muiGeneration != 0
-					&& (pTexture->muiGeneration != rBinding.uiTextureGenerations.at(i) || pTexture->mVkImage == VK_NULL_HANDLE))
+				 && (pTexture->muiGeneration != rBinding.uiTextureGenerations.at(i) || pTexture->mVkImage == VK_NULL_HANDLE))
 				{
 					LOG(kGraphics, kError, "Descriptor staleness (array): pipeline={} binding={} crc={} slot={} texture={} snapshotGen={} currentGen={} vkImage={}", rBinding.pPipeline->mInfo.name, rBinding.iBinding, rCrc, i, reinterpret_cast<uintptr_t>(pTexture), rBinding.uiTextureGenerations.at(i), pTexture->muiGeneration, reinterpret_cast<uintptr_t>(pTexture->mVkImage));
 					DEBUG_BREAK();

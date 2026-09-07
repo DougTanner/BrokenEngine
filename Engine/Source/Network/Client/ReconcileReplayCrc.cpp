@@ -200,8 +200,8 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 
 	// Cooldown: suppress detail logging when mismatch was recently logged (covers multiple
 	// Run() calls at the same or adjacent ticks within a single render frame)
-	bool bCooldownActive = (rFrames.iLastMismatchDetailLogTick >= 0 &&
-		iTargetTick - rFrames.iLastMismatchDetailLogTick < engine::CoordFrames::kiMismatchDetailLogCooldown);
+	bool bCooldownActive = (rFrames.iLastMismatchDetailLogTick >= 0
+	                     && iTargetTick - rFrames.iLastMismatchDetailLogTick < engine::CoordFrames::kiMismatchDetailLogCooldown);
 
 	CrcValidateResult validateResult = CrcValidateLoop(rWork, iTargetTick, bSameState || bCooldownActive);
 

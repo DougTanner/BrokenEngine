@@ -304,11 +304,10 @@ static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, 
 	uint64_t uiExpectedOffset = 0;
 	for (const common::ChunkLocation& rChunkLocation : rManifestChunkLocations)
 	{
-		if (rChunkLocation.uiOffset != uiExpectedOffset
-			|| rChunkLocation.uiOffset % kuiAlignmentBytes != 0
-			|| rChunkLocation.uiOffset > optionalPackFileSize.value()
-			|| rChunkLocation.uiSize < static_cast<uint64_t>(common::kiChunkDataOffset)
-			|| rChunkLocation.uiSize > optionalPackFileSize.value() - rChunkLocation.uiOffset)
+		if (rChunkLocation.uiOffset != uiExpectedOffset || rChunkLocation.uiOffset % kuiAlignmentBytes != 0
+		 || rChunkLocation.uiOffset > optionalPackFileSize.value()
+		 || rChunkLocation.uiSize < static_cast<uint64_t>(common::kiChunkDataOffset)
+		 || rChunkLocation.uiSize > optionalPackFileSize.value() - rChunkLocation.uiOffset)
 		{
 			return false;
 		}
@@ -320,10 +319,8 @@ static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, 
 			return false;
 		}
 		packFileStream.read(reinterpret_cast<char*>(&chunkHeader), sizeof(chunkHeader));
-		if (!packFileStream
-			|| packFileStream.gcount() != static_cast<std::streamsize>(sizeof(chunkHeader))
-			|| chunkHeader.iMagic != common::ChunkHeader::kiMagic
-			|| chunkHeader.crc != rChunkLocation.crc)
+		if (!packFileStream || packFileStream.gcount() != static_cast<std::streamsize>(sizeof(chunkHeader))
+		 || chunkHeader.iMagic != common::ChunkHeader::kiMagic || chunkHeader.crc != rChunkLocation.crc)
 		{
 			return false;
 		}
