@@ -77,10 +77,12 @@ requires one, and the changed-file inventory where the assigned skill documents
 a run, come from that documented run of
 `.agents/scripts/Get-SessionChangeInventory.ps1`, which supplies the script's
 mandatory `-RepositoryRoot` and `-Baseline` along with any switch the skill
-requires — `.agents/skills/repo-code-review/SKILL.md` `## Inputs` for the
-`-EmitTargets` form, and `.agents/skills/adversarial-review/SKILL.md`
-`## Inputs` for the plain changed-file inventory run — rather than from a call
-composed ad hoc or from anything retyped into the brief.
+requires — rather than from a call composed ad hoc or from anything retyped into
+the brief. Read the assigned skill's `## Inputs` before composing the brief; it
+states its exact form, and for `/repo-code-review` who performs the run:
+`.agents/skills/repo-code-review/SKILL.md` `## Inputs` for the `-EmitTargets`
+form, and `.agents/skills/adversarial-review/SKILL.md` `## Inputs` for the plain
+changed-file inventory run.
 
 Use `none` when a field has no value. Add only fields required by the invoked
 skill. Cite repository paths; do not paste root instructions, skill bodies, the
