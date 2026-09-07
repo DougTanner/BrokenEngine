@@ -33,7 +33,7 @@ Server-only. The whole simulation grid is written as one versioned file through 
 - `EagerChunk.iDataSize` is the raw on-disk extent taken from the chunk table, not `ChunkHeader::iSize`: a scene chunk's header size excludes its appended animation section. Bound eager reads against `iDataSize`, or animation data silently truncates with no crash.
 - Pack and manifest files are trust boundaries. Invalid required boot structure is fatal. Corrupt runtime `.pack` chunks and pack-backed textures halt the client and the server alike: validate and `ASSERT`; never soft-fail, skip, or substitute a placeholder.
 - Cross-pack references — a scene chunk's texture CRC list, an island header's channel CRCs — are not validated when packs open, and the lazy-chunk map is fixed at construction, so packs published from different DataPacker runs can name a chunk that stays absent for the process lifetime.
-- Load time checks each manifest location and its chunk header — alignment, extents inside the real pack file, header identity, and the declared payload and decoder sizes — before that chunk is published. A new publish path validates first: once a pointer, slice, pool slot, or map entry exists, a corrupt value already addresses memory outside the pack.
+- Load time rejects a chunk CRC repeated anywhere in the accepted manifest set, then checks each manifest location and its chunk header — alignment, extents inside the real pack file, header identity, and the declared payload and decoder sizes — before that chunk is published. A new publish path validates first: once a pointer, slice, pool slot, or map entry exists, a corrupt value already addresses memory outside the pack.
 
 ## Lazy-Pool Invariants
 

@@ -231,6 +231,7 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 
 void PackChunks::LoadPackFiles()
 {
+	std::unordered_set<common::crc_t> seenChunkCrcs;
 	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 	{
 #if defined(BT_SERVER)
@@ -273,6 +274,13 @@ void PackChunks::LoadPackFiles()
 		if (!manifestStream)
 		{
 			FailMissingRequiredAsset(manifestPath, "manifest chunk table truncated");
+		}
+		for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
+		{
+			if (!seenChunkCrcs.insert(rChunkLocation.crc).second)
+			{
+				FailMissingRequiredAsset(manifestPath, "duplicate chunk CRC");
+			}
 		}
 		if (static_cast<data::DataTypes>(i) == data::kDataTypeIslands)
 		{
@@ -320,12 +328,7 @@ void PackChunks::LoadPackFiles()
 			int64_t iOnDiskSize = rChunkLocation.uiSize - common::kiChunkDataOffset;
 			bool bCompressed = common::IsCompressed(chunkHeader.flags);
 			int64_t iDataSize = bCompressed ? chunkHeader.iUncompressedSize : iOnDiskSize;
-			auto [it, bInserted] = mLazyChunkMap.try_emplace(rChunkLocation.crc, LazyChunk {.location = rChunkLocation, .header = chunkHeader, .iDataSize = iDataSize});
-			if (!bInserted)
-			{
-				LOG(kLoading, kDebug, "Duplicate chunk CRC {} found in {}", rChunkLocation.crc, data::kpcDataTypeNames[i]);
-				DEBUG_BREAK();
-			}
+			mLazyChunkMap.try_emplace(rChunkLocation.crc, LazyChunk {.location = rChunkLocation, .header = chunkHeader, .iDataSize = iDataSize});
 
 			// Track largest compressed-chunk on-disk size for the loading-thread scratch buffer.
 			if (bCompressed && iOnDiskSize > miDecompressScratchSize)
@@ -447,12 +450,7 @@ void PackChunks::LoadPackFiles()
 				}
 				uint64_t uiDataOffset = rChunkLocation.uiOffset + common::kiChunkDataOffset;
 
-				auto [it, bInserted] = mEagerChunkMap.try_emplace(rChunkLocation.crc, EagerChunk { .pHeader = pChunkHeader, .pData = rPackBytes.data() + uiDataOffset, .iDataSize = static_cast<int64_t>(rChunkLocation.uiSize - common::kiChunkDataOffset), });
-				if (!bInserted)
-				{
-					LOG(kLoading, kDebug, "Duplicate chunk CRC {} found in {}", rChunkLocation.crc, data::kpcDataTypeNames[i]);
-					DEBUG_BREAK();
-				}
+				mEagerChunkMap.try_emplace(rChunkLocation.crc, EagerChunk { .pHeader = pChunkHeader, .pData = rPackBytes.data() + uiDataOffset, .iDataSize = static_cast<int64_t>(rChunkLocation.uiSize - common::kiChunkDataOffset), });
 
 				LOG(kLoading, kDebug, "Eager chunk {} \"{}\" size {}", rChunkLocation.crc, std::string_view(pChunkHeader->pcPath), rChunkLocation.uiSize);
 			}
