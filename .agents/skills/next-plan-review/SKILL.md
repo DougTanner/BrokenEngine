@@ -43,8 +43,6 @@ characters, which leaves room for the host's result wrapper under the
 Require the shared handoff form in
 `../../references/subagent-reporting.md`, extended with:
 
-- `Decisive checks` — provenance; sessions read; sourced timeline; pauses;
-  conformance, minimality, and process evidence.
 - `Timeline` — one row per lifecycle event named in `references/concerns.md`
   that occurred, in time order, each `<time> | <event> | <citation>`.
 - `Root cause` — up to seven rows, in time order, each
@@ -59,7 +57,11 @@ Require the shared handoff form in
   `references/report.md` routing table's column order; attempts sharing route,
   configuration, proof source, and verdict may share one row that lists every
   attempt's citation; then one aggregate row.
-- `Residuals` — missing transcript or unverifiable fact, or none; last.
+
+The shared `Decisive checks` rows carry provenance, sessions read, sourced
+timeline, pauses, and conformance, minimality, and process evidence. Each
+shared `Residuals` row names a missing transcript or unverifiable fact, using
+`none` when absent.
 
 `Changed files` and `Build required` are `none` because this retrospective
 changes no file.

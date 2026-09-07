@@ -30,10 +30,8 @@ Accept one repository skill directory or its `SKILL.md`, passed as `-Path`. The 
 ## Handoff
 
 Return the shared handoff from `.agents/references/subagent-reporting.md`
-`## Handoffs`, with these declared extension fields:
-
-- `Decisive checks` — one row per mechanical run: the command, its exit, and
-  its decisive output.
+`## Handoffs`. Each shared `Decisive checks` row names the mechanical command,
+its exit, and its decisive output.
 
 Each `Findings` row is one line on this form:
 

@@ -45,8 +45,10 @@ extended with these fields:
 - `Proposed acceptance check` — a check matching the signal: harness scenario,
   replay check, compile result, or profiling baseline.
 - `Instrumentation removed` — `yes` with the marker searched, or `none added`.
-- `Build required` — the exact targets the manager must rebuild, or none.
-- `Residuals` — unproven branch, missing environment/input, or none; last.
+
+The shared `Build required` field names the exact targets the manager must
+rebuild, or `none`. Each shared `Residuals` row names an unproven branch or
+missing environment/input; use `none` when absent.
 
 `Changed files` is `none` because a diagnosis never edits a file.
 

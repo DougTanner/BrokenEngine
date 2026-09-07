@@ -92,11 +92,11 @@ Return the shared handoff form in
 That shared form's other fields stay as it defines them; these are narrowed
 here:
 
-- `Decisive checks` — one row per build: target, configuration, status,
-  exitCode, failureKind.
-- `Evidence` — the `retainedLog.path` per build, and this dispatch's envelope
-  file as path plus selector.
-- `Residuals` — a failed or skipped required build, or none; last.
+Each shared `Decisive checks` row names the build target, configuration, status,
+exitCode, and failureKind. Shared `Evidence` carries the `retainedLog.path` for
+each build and this dispatch's envelope file as path plus selector. Each shared
+`Residuals` row names a failed or skipped required build; use `none` when
+absent.
 
 `Changed files` and `Build required` are `none` because this skill changes no
 tracked file; the envelope file is ignored `Temp/` output.

@@ -34,18 +34,15 @@ under `Documents/Plans/<area>/`, with tracked scheduler metadata.
 ## Handoff
 
 Return the shared handoff from `.agents/references/subagent-reporting.md`
-`## Handoffs`, including every proposal exactly once, with these rows:
-
-- `Findings`: none.
-- `Changed files`: one row per created Plan (path — gap and metadata); one row
-  per updated existing Plan (path — prose-only or dependency update).
-- `Decisive checks`: one row per duplicate mapping (proposal -> existing Plan
-  path); one row per Plan with its Change Workflow tier and trigger and its
-  dependencies and Coordination; one row for the plan validate result; one row
-  for the required verification/finalization route.
-- `Build required`: none.
-- `Residuals` stays last: unrecorded item, conflict, or blocker and reason, or
-  none.
+`## Handoffs`, including every proposal exactly once. The shared `Findings`
+value is `none`. Each shared `Changed files` row names a created Plan with its
+path, gap, and metadata, or an updated existing Plan with its path and whether
+the update is prose-only or a dependency update. Each shared `Decisive checks`
+row names a duplicate mapping from proposal to existing Plan path, a Plan's
+Change Workflow tier and trigger plus its dependencies and Coordination, the
+plan validate result, or the required verification/finalization route. The
+shared `Build required` value is `none`. Each shared `Residuals` row names an
+unrecorded item, conflict, or blocker and reason; use `none` when absent.
 
 ## References
 

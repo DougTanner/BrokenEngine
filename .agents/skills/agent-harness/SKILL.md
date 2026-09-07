@@ -56,7 +56,9 @@ extended with these fields:
 
 - `Criterion results` — one row per acceptance criterion, on the row form
   below.
-- `Residuals` — missing capability or environment, or none; last.
+
+Each shared `Residuals` row names a missing capability or environment; use
+`none` when absent.
 
 Each `Criterion results` row is one line on this form:
 

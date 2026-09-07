@@ -99,10 +99,10 @@ finding a stable `SA###` ID:
 <Only when clean: hypotheses traced, decisive refutations, and `PASS — audit complete; stop.`>
 ```
 
-- `Decisive checks` — the inventory, plus the trace or read and its result per
-  authorized hypothesis.
-- `Residuals` — pre-existing defect, incomplete trace, pending external
-  verdict, or none; last.
+The shared `Decisive checks` rows carry the inventory, plus the trace or read
+and its result per authorized hypothesis. Each shared `Residuals` row names a
+pre-existing defect, incomplete trace, or pending external verdict, using
+`none` when absent.
 
 `Changed files` and `Build required` are `none` because this findings-only
 audit never edits a file.

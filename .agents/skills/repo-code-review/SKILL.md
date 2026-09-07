@@ -85,8 +85,9 @@ extended with these fields:
 - `Files reviewed` — one row per path: the regions and affected paths traced.
 - `Project membership trigger` — `/update-vcxproj` with the paths and reason,
   or none.
-- `Residuals` — pre-existing defect, incomplete trace, pending external
-  verdict, size observation, or none; last.
+
+Each shared `Residuals` row names a pre-existing defect, incomplete trace,
+pending external verdict, or size observation, using `none` when absent.
 
 Each `Findings` row is one line on this form:
 

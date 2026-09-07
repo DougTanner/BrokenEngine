@@ -40,13 +40,14 @@ Return the shared handoff form in
 - `Fixes Applied` — one row per fix: file:line, Rule N, correction; or none.
 - `Renames and Required Builds` — one row per rename: old → new, propagated
   C++ references; or none.
-- `Build required` — the exact affected targets, or none.
 - `Routed Findings` — one row per routed candidate: file:line, proposed
   finding, classification or domain-review route; or none.
 - `Documentation Residuals` — one row each: identifier, file:line, and
   `/update-claude-docs` or the caller; or none.
 - `Functions/regions touched` — one row per function or region, or none.
-- `Residuals` — unresolved item, or none; last.
+
+The shared `Build required` field names the exact affected targets, or `none`.
+Each shared `Residuals` row names an unresolved item; use `none` when absent.
 
 ## References
 

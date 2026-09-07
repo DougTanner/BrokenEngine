@@ -57,12 +57,13 @@ extended with these fields:
   its owner and action.
 - `Project membership trigger` — `/update-vcxproj` with the paths and reason,
   or none.
-- `Build required` — the exact targets, configuration/platform, and
-  project-member paths; or none.
 - `Reviewer focus areas` — the contract and failure condition to try to
   disprove, or none.
-- `Residuals` — affected site not updated, incomplete search, ownership
-  conflict, unclassified hit, or none; last.
+
+Each shared `Build required` row names the exact target,
+configuration/platform, and project-member path, using `none` when absent.
+Each shared `Residuals` row names an affected site not updated, incomplete
+search, ownership conflict, or unclassified hit, using `none` when absent.
 
 Name each changed file once. `PASS` requires every trigger resolved or refuted
 and every planned search complete; requested builds remain `builder` work

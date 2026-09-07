@@ -65,7 +65,9 @@ architecture, acceptance, or verification change is meaningful.
   library integration pivot and run fresh /plan-audit`, or `run
   /external-design-interface, incorporate its design pivot, and run fresh
   /plan-audit`.
-- `Residuals` — unresolved decision, missing input, or none; last.
+
+Each shared `Residuals` row names an unresolved decision or missing input; use
+`none` when absent.
 
 Each `External claim verdicts` row is one line on this form:
 

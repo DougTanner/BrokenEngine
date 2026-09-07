@@ -35,7 +35,9 @@ extended with these fields:
 
 - `Source context` — the hotspot cluster's file:line quotes, enclosing
   loop/frame phase, and container/comparator types.
-- `Residuals` — missing source context or symbols, or none; last.
+
+Each shared `Residuals` row names missing source context or symbols; use `none`
+when absent.
 
 The full function bodies and the call-site listings do not travel inline. Each
 locator writes them to its own gitignored

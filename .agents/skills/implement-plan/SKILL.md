@@ -56,14 +56,14 @@ extended with these fields:
   scope; or `none found`.
 - `Propagation required` — `/update-affected-code` with the code scope, or
   `N/A — no code changed`.
-- `Build required` — target, configuration/platform, and selected
-  project-member `.cpp`; for headers, every consuming target and
-  configuration/platform; or none.
 - `Reviewer focus areas` — verify X holds when Y, or none.
 - `Runtime acceptance requests` — setup, action, observation, and required
   evidence per criterion; or none.
-- `Residuals` — contradiction, incomplete item, or blocker with evidence; or
-  none; last.
+
+Each shared `Build required` row names the target, configuration/platform, and
+selected project-member `.cpp`; for headers, every consuming target and
+configuration/platform. Each shared `Residuals` row names a contradiction,
+incomplete item, or blocker with evidence, using `none` when absent.
 
 Name each changed file once. Build requests must be
 executable without rediscovery: each changed `.cpp` names its exact target,

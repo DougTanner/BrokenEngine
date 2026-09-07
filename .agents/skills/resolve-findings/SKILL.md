@@ -51,11 +51,12 @@ Return the shared handoff form in `../../references/subagent-reporting.md`,
 extended with one compact item table and these fields:
 
 ```markdown
-| Item | Result | Confirmed root cause and evidence | Fixed region | Focused check |
-|---|---|---|---|---|
-| <item> | FIXED or UNRESOLVED | <path:line or log evidence> | <path:line or none> | <check and result> |
+| Item | Result | Confirmed root cause and evidence | Fixed region |
+|---|---|---|---|
+| <item> | <change made, or none with reason> | <path:line or log evidence> | <path:line or none> |
 ```
 
+Each shared `Decisive checks` row names the item, focused check, and result.
 Each cell holds its value and at most one clause; the reasoning behind it
 follows the over-cap file rule in `../../references/subagent-reporting.md`,
 `## Handoffs`.

@@ -60,8 +60,9 @@ extended with these fields:
   trace follows the over-cap file rule in
   [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
   `## Handoffs`.
-- `Residuals` — pre-existing/out-of-scope defect, missing evidence, or none;
-  last.
+
+Each shared `Residuals` row names a pre-existing/out-of-scope defect or missing
+evidence; use `none` when absent.
 
 Each `Findings` row is one line on this form:
 

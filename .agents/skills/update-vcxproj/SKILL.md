@@ -41,9 +41,11 @@ extended with the per-path membership outcome, one row per path on this form:
 and with these fields:
 
 - `Regions touched` — item groups and filter declarations, or none.
-- `Build required` — the exact target/configuration/platform, or none.
 - `Reviewer focus` — authority, affinity, or XML risk; or none.
-- `Residuals` — a FAIL, conflict, or NOTE requiring action; or none; last.
+
+Each shared `Build required` row names the exact target/configuration/platform,
+using `none` when absent. Each shared `Residuals` row names a `FAIL`, conflict,
+or `NOTE` requiring action, using `none` when absent.
 
 Use `Debug|x64` for game client/server unless approved otherwise,
 `Release|x64` for DataPacker, and the AgentTools promotion route for

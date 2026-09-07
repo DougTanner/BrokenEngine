@@ -49,8 +49,9 @@ extended with these fields:
 - `Files reviewed` — one row per path: the regions and affected paths traced.
 - `Sibling review required` — `/repo-code-review` and the shader-facing shared
   headers, or none.
-- `Residuals` — pre-existing issue, incomplete review, pending external
-  verdict, size observation, or none; last.
+
+Each shared `Residuals` row names a pre-existing issue, incomplete review,
+pending external verdict, or size observation; use `none` when absent.
 
 Each `Findings` row is one line on this form:
 

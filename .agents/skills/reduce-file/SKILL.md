@@ -93,7 +93,9 @@ implementer to decide.
 
 - `Reduction result` — the original and final `bt-token-v1` sizes, and the
   approved moves completed.
-- `Residuals` — plan contradiction, file still above threshold, or none; last.
+
+Each shared `Residuals` row names a plan contradiction or a file still above
+the threshold, using `none` when absent.
 
 Return the `/implement-plan` extension fields with it, including
 `Runtime acceptance requests` —

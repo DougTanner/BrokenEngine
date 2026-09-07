@@ -40,11 +40,11 @@ Exclude `CLAUDE.local.md` and other local overrides unless the user explicitly i
 
 Return the shared handoff form in
 [`subagent-reporting.md`](../../references/subagent-reporting.md)
-`## Handoffs` in every mode, with these rows:
-
-- `Changed files` — one row per edited `AGENTS.md` or `CLAUDE.md` path and the document section touched, or `none`.
-- `Build required: none` — this skill changes no C++ or GLSL.
-- `Residuals` — conflict, deletion candidate, or pre-existing excess, or `none`; last.
+`## Handoffs` in every mode. Each shared `Changed files` row names an edited
+`AGENTS.md` or `CLAUDE.md` path and the document section touched, using `none`
+when absent. The shared `Build required` value is `none` because this skill
+changes no C++ or GLSL. Each shared `Residuals` row names a conflict, deletion
+candidate, or pre-existing excess, using `none` when absent.
 
 Audit and audit-and-fix modes return the quality report defined in
 `references/audit-mode.md` before the handoff.
