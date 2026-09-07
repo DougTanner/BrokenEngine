@@ -284,11 +284,40 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOut)
 			}
 
 			const tinygltf::Accessor& rInputAccessor = rModel.accessors.at(static_cast<size_t>(rSampler.input));
-			size_t uiInputBytes = CheckedAnimationSize(rInputAccessor.count, sizeof(float), context);
+			const tinygltf::Accessor& rOutputAccessor = rModel.accessors.at(static_cast<size_t>(rSampler.output));
+			if (rInputAccessor.count == 0)
+			{
+				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) has no input keyframes.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler));
+			}
+			if (rInputAccessor.count > std::numeric_limits<uint32_t>::max())
+			{
+				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) input keyframe count {} exceeds the supported limit {}.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rInputAccessor.count, std::numeric_limits<uint32_t>::max()));
+			}
+			if (rInputAccessor.type != TINYGLTF_TYPE_SCALAR)
+			{
+				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) input accessor {} is not SCALAR.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rSampler.input));
+			}
 
-			channel.uiKeyframeCount = static_cast<uint32_t>(rInputAccessor.count);
+			int iRequiredOutputType = channel.uiTargetPath == common::AnimationChannel::kTargetPathRotation ? TINYGLTF_TYPE_VEC4 : TINYGLTF_TYPE_VEC3;
+			if (rOutputAccessor.type != iRequiredOutputType)
+			{
+				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) output accessor {} has an incompatible element type.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rSampler.output));
+			}
+
+			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline)
+			{
+				if (rOutputAccessor.count % 3 != 0 || rOutputAccessor.count / 3 != rInputAccessor.count)
+				{
+					throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) CUBICSPLINE output count {} is not three times its input count {}.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rOutputAccessor.count, rInputAccessor.count));
+				}
+			}
+			else if (rOutputAccessor.count != rInputAccessor.count)
+			{
+				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) output count {} does not match its input count {}.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rOutputAccessor.count, rInputAccessor.count));
+			}
 
 			int iValueStride = (channel.uiTargetPath == common::AnimationChannel::kTargetPathRotation) ? 4 : 3; // Rotation is vec4, others vec3
+			size_t uiInputBytes = CheckedAnimationSize(rInputAccessor.count, sizeof(float), context);
 			size_t uiOutputElementCount = rInputAccessor.count;
 			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline)
 			{
@@ -298,7 +327,16 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOut)
 			size_t uiOutputBytes = CheckedAnimationSize(uiOutputFloatCount, sizeof(float), context);
 
 			const float* pfTimes = AccessorFloats(rModel, rSampler.input, uiInputBytes, context + " input");
+			for (size_t i = 0; i < rInputAccessor.count; ++i)
+			{
+				if (!std::isfinite(pfTimes[i]) || (i > 0 && pfTimes[i] <= pfTimes[i - 1]))
+				{
+					throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) input times are not finite and strictly increasing.", rAnim.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler));
+				}
+			}
 			const float* pfValues = AccessorFloats(rModel, rSampler.output, uiOutputBytes, context + " output");
+
+			channel.uiKeyframeCount = static_cast<uint32_t>(rInputAccessor.count);
 
 			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline) // CUBICSPLINE
 			{
