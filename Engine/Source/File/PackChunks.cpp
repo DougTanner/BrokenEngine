@@ -453,7 +453,16 @@ void PackChunks::LoadPackFiles()
 			// If eager loading, read the entire .pack file into memory
 			rPackBytes.resize(std::filesystem::file_size(mPackFilePaths[i]));
 			std::fstream packStream(mPackFilePaths[i], std::ios::in | std::ios::binary);
-			packStream.read(reinterpret_cast<char*>(rPackBytes.data()), rPackBytes.size());
+			const std::streamsize iRequestedReadSize = static_cast<std::streamsize>(rPackBytes.size());
+			packStream.read(reinterpret_cast<char*>(rPackBytes.data()), iRequestedReadSize);
+			if (!packStream)
+			{
+				FailMissingRequiredAsset(mPackFilePaths[i], "eager pack read incomplete");
+			}
+			if (packStream.gcount() != iRequestedReadSize)
+			{
+				FailMissingRequiredAsset(mPackFilePaths[i], "eager pack read incomplete");
+			}
 			packStream.close();
 
 			// Process chunks from pack file
