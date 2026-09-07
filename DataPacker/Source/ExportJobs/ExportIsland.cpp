@@ -311,6 +311,18 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 	{
 		throw std::runtime_error(std::format("Processed mesh file \"{}\" declares negative counts (vertices {}, indices {}).", meshFile.string(), iMeshVertexCount, iMeshIndexCount));
 	}
+	if (iMeshVertexCount == 0)
+	{
+		throw std::runtime_error(std::format("Processed mesh file \"{}\" declares empty mesh data (vertices {}, indices {}).", meshFile.string(), iMeshVertexCount, iMeshIndexCount));
+	}
+	if (iMeshIndexCount == 0)
+	{
+		throw std::runtime_error(std::format("Processed mesh file \"{}\" declares empty mesh data (vertices {}, indices {}).", meshFile.string(), iMeshVertexCount, iMeshIndexCount));
+	}
+	if (iMeshIndexCount % 3 != 0)
+	{
+		throw std::runtime_error(std::format("Processed mesh file \"{}\" declares {} indices, which does not form complete triangles.", meshFile.string(), iMeshIndexCount));
+	}
 
 	size_t uiMeshVertexCount = static_cast<size_t>(iMeshVertexCount);
 	size_t uiMeshIndexCount = static_cast<size_t>(iMeshIndexCount);
@@ -335,6 +347,29 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 	if (uiIndexBytes > 0 && (!meshStream.read(reinterpret_cast<char*>(meshIndices.data()), static_cast<std::streamsize>(uiIndexBytes)) || meshStream.gcount() != static_cast<std::streamsize>(uiIndexBytes)))
 	{
 		throw std::runtime_error(std::format("Failed to read processed mesh indices from \"{}\".", meshFile.string()));
+	}
+	for (size_t uiVertex = 0; uiVertex < uiMeshVertexCount; ++uiVertex)
+	{
+		const float* pfPosition = meshPositionsXYZ.data() + uiVertex * 3;
+		if (!std::isfinite(pfPosition[0]))
+		{
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), uiVertex, pfPosition[0], pfPosition[1], pfPosition[2]));
+		}
+		if (!std::isfinite(pfPosition[1]))
+		{
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), uiVertex, pfPosition[0], pfPosition[1], pfPosition[2]));
+		}
+		if (!std::isfinite(pfPosition[2]))
+		{
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), uiVertex, pfPosition[0], pfPosition[1], pfPosition[2]));
+		}
+	}
+	for (size_t uiIndex = 0; uiIndex < uiMeshIndexCount; ++uiIndex)
+	{
+		if (meshIndices.at(uiIndex) >= uiMeshVertexCount)
+		{
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" index {} references vertex {}, but the vertex count is {}.", meshFile.string(), uiIndex, meshIndices.at(uiIndex), uiMeshVertexCount));
+		}
 	}
 
 	rOut.iMeshVertexCount = iMeshVertexCount;
