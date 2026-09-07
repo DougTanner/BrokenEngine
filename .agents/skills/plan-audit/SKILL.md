@@ -62,9 +62,14 @@ Return:
 
 ```text
 API Verification Requests: <single checkable requests or none>
-Traceability checked: <one requirement or invariant> <-> <implementation site or check>; return one single-line row per mapping, put supporting detail under `Evidence`, and follow the shared handoff overflow rule
+Traceability checked: <traced>/<total> traced
+<requirement or invariant> <-> untraced — <path-plus-selector | Findings row | Decisive checks row | Residuals row>
 Required next step: Tier 3 -> manager decision, then /external-grill-plan | Tier 2 -> manager decision
 ```
+
+Only untraced requirements or invariants follow the count line. Each cites the
+handoff row or path plus selector that holds its settling evidence and never
+restates it.
 
 Follow those extension fields with the shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only

@@ -29,7 +29,7 @@ Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, a
 
 ## Handoff
 
-Report each criterion `PASS`, `FAIL`, or `BLOCKED` with exact
+Evaluate each criterion as `PASS`, `FAIL`, or `BLOCKED` from exact
 command/query/scene/UI/screenshot/log evidence, and treat a setup limitation as
 a blocked check. Give each observed criterion failure and process-check failure
 a stable `HARNESS-F-###` ID and report it exactly once as a `Required` row in
@@ -46,7 +46,11 @@ Do not diagnose or edit a failure in this role; return reproducing commands and
 evidence to the main agent for the `/resolve-findings` decision and
 affected-check retest.
 
-Captures stay on disk. The `screenshot` result `{path, width, height}` is the evidence — cite it by path. Loading an image into context is a deliberate act for a check that genuinely needs pixels, and the report names which check and why.
+Captures stay on disk. Retain the `screenshot` result `{path, width, height}` as
+evidence; an exception row cites the `Decisive checks` row or report selector
+that records the settling observation. Loading an image into context is a
+deliberate act for a check that genuinely needs pixels, and the report names
+which check and why.
 
 If a required command, parameter, result field, query, or input primitive is missing, return that criterion `BLOCKED`. Name the missing capability and the narrowest harness extension that would expose it. The main agent decides whether the authorized change includes that extension or whether user authority/criterion revision is required. Never fake state with pixel guessing or log scraping, create an out-of-scope runtime edit, waive the gate with a follow-up plan, or silently skip the criterion.
 
@@ -54,16 +58,19 @@ Return the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
 extended with these fields:
 
-- `Criterion results` — one row per acceptance criterion, on the row form
-  below.
+- `Criterion results` — a `<passed>/<total> passed` count line followed only
+  by the `FAIL` and `BLOCKED` criteria on the row form below. A criterion
+  passes only when its existing runtime check passes.
 
 Each shared `Residuals` row names a missing capability or environment; use
 `none` when absent.
 
-Each `Criterion results` row is one line on this form:
+Each exception row cites the handoff row or path plus selector that holds its
+settling evidence and never restates it:
 
 ```text
-<criterion ID> — PASS | FAIL | BLOCKED — command/query/scene/UI and evidence selector, or HARNESS-F-### when that finding holds the evidence
+Criterion results: <passed>/<total> passed
+<criterion ID> — FAIL | BLOCKED — <path-plus-selector | Decisive checks row | Residuals row | HARNESS-F-###>
 ```
 
 Each `Findings` row is one line on this form:
@@ -79,9 +86,8 @@ Any `FAIL` or out-of-criterion process finding makes the shared `Status`
 `NEEDS_ACTION`, including a run that also has blocked criteria. Otherwise, any
 blocked prerequisite, capability, or environment makes it `BLOCKED`; when
 every criterion passes, it is `PASS`.
-Return the complete report inline. A failed or blocked in-scope criterion
-remains incomplete until the capability/environment is supplied or the user
-explicitly revises acceptance.
+A failed or blocked in-scope criterion remains incomplete until the
+capability/environment is supplied or the user explicitly revises acceptance.
 
 ## References
 

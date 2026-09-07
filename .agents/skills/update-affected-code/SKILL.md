@@ -52,9 +52,9 @@ handoff.
 Return the shared handoff form in `../../references/subagent-reporting.md`,
 extended with these fields:
 
-- `Trigger outcomes` — one outcome per trigger: `RESOLVED` with the updated
-  sites or the verified no-op, `REFUTED` with evidence, or `UNRESOLVED` with
-  its owner and action.
+- `Trigger outcomes` — a `<settled>/<total> settled` count line, where
+  `RESOLVED` and `REFUTED` are settled, followed only by `UNRESOLVED` triggers
+  on the row form below.
 - `Project membership trigger` — `/update-vcxproj` with the paths and reason,
   or none.
 - `Reviewer focus areas` — the contract and failure condition to try to
@@ -64,6 +64,14 @@ Each shared `Build required` row names the exact target,
 configuration/platform, and project-member path, using `none` when absent.
 Each shared `Residuals` row names an affected site not updated, incomplete
 search, ownership conflict, or unclassified hit, using `none` when absent.
+
+Each unresolved row cites the handoff row or path plus selector that holds its
+settling evidence and never restates it:
+
+```text
+Trigger outcomes: <settled>/<total> settled
+<trigger> — UNRESOLVED — owner <owner> — action <action> — <path-plus-selector | Decisive checks row | Residuals row>
+```
 
 Name each changed file once. `PASS` requires every trigger resolved or refuted
 and every planned search complete; requested builds remain `builder` work

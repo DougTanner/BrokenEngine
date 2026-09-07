@@ -32,20 +32,26 @@ explicit mode:
 ## Handoff
 
 Return the shared handoff form in `../../references/subagent-reporting.md`,
-extended with the per-path membership outcome, one row per path on this form:
+extended with these fields:
 
-```text
-<path> — <client|server|both|DataPacker|AgentHarness|WorktreeCli|AgentTools|non-member> — <project> — filter <path|none> — verified|fixed|NOTE <detail>|FAIL <detail>
-```
-
-and with these fields:
-
+- `Membership outcomes` — a `<settled>/<total> settled` count line, where
+  `verified` and `fixed` are settled, followed by every `NOTE` and `FAIL` path
+  on the row form below.
 - `Regions touched` — item groups and filter declarations, or none.
 - `Reviewer focus` — authority, affinity, or XML risk; or none.
 
 Each shared `Build required` row names the exact target/configuration/platform,
 using `none` when absent. Each shared `Residuals` row names a `FAIL`, conflict,
 or `NOTE` requiring action, using `none` when absent.
+
+Each exception row cites the handoff row or path plus selector that holds its
+settling evidence and never restates it. A `NOTE` may be informational; only a
+`NOTE` requiring action belongs in `Residuals`.
+
+```text
+Membership outcomes: <settled>/<total> settled
+<path> — <client|server|both|DataPacker|AgentHarness|WorktreeCli|AgentTools|non-member> — <project> — filter <path|none> — NOTE <detail>|FAIL <detail> — <path-plus-selector | Decisive checks row | Residuals row>
+```
 
 Use `Debug|x64` for game client/server unless approved otherwise,
 `Release|x64` for DataPacker, and the AgentTools promotion route for
