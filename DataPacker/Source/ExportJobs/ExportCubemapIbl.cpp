@@ -104,6 +104,11 @@ bool IsOutputCurrent(const std::filesystem::path& rOutputPath, const std::filesy
 
 void BeginOutputUpdate(const std::filesystem::path& rMetadataPath)
 {
+	if (gpFileManager->mbForbidExpensiveExport)
+	{
+		throw std::runtime_error("IBL cubemap convolution blocked by BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1");
+	}
+
 	std::ofstream stream(GetDirtyMarkerPath(rMetadataPath), std::ios::binary | std::ios::trunc);
 	stream.close();
 	VERIFY_SUCCESS(stream.good());

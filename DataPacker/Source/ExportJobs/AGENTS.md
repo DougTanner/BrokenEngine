@@ -11,7 +11,7 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
 - A job may version an expensive sub-stage independently of its chunk payload when that stage's outputs are tracked in the checkout, giving the stage its own marker and a fingerprint covering only its own inputs. Name and key that marker by the stage's own version alone, keep that version outside `Version(...)`, and bump whichever version owns the behavior that changed. Island texture encoding is the current instance.
 - Each job constructs a `common::ThreadLocal` on its worker and uses that thread's workbuffer. Keep job output and scratch isolated from other parallel exports.
 - `AllocateHeaderAndData` is normally called once per export. Scene animation data is appended afterward; its chunk size excludes that section and a header pointer captured before vector growth is invalid after reallocation.
-- `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea or texture encoding begins. Clean cached outputs remain readable under this guard.
+- `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea, IBL convolution, or texture encoding begins. Clean cached outputs remain readable under this guard.
 
 ## Matching and Routing
 
