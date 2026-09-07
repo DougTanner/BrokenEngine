@@ -86,12 +86,103 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 
 		// Load inverse bind matrices from accessor
 		const float* pfInverseBindMatrices = nullptr;
-		if (rSkin.inverseBindMatrices >= 0)
+		if (rSkin.inverseBindMatrices != -1)
 		{
-			const tinygltf::Accessor& rAccessor = rModel.accessors[rSkin.inverseBindMatrices];
-			ASSERT(rAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-			const tinygltf::BufferView& rBufferView = rModel.bufferViews[rAccessor.bufferView];
-			pfInverseBindMatrices = reinterpret_cast<const float*>(&(rModel.buffers[rBufferView.buffer].data[rAccessor.byteOffset + rBufferView.byteOffset]));
+			if (rSkin.inverseBindMatrices < 0)
+			{
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor {} is outside the model's {} accessors", rSkin.inverseBindMatrices, rModel.accessors.size()));
+			}
+			if (static_cast<size_t>(rSkin.inverseBindMatrices) >= rModel.accessors.size())
+			{
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor {} is outside the model's {} accessors", rSkin.inverseBindMatrices, rModel.accessors.size()));
+			}
+
+			const tinygltf::Accessor& rAccessor = rModel.accessors.at(rSkin.inverseBindMatrices);
+			if (rAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor must contain FLOAT MAT4 elements");
+			}
+			if (rAccessor.type != TINYGLTF_TYPE_MAT4)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor must contain FLOAT MAT4 elements");
+			}
+			if (rAccessor.count < rSkin.joints.size())
+			{
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor contains {} matrices for {} skin joints", rAccessor.count, rSkin.joints.size()));
+			}
+			if (rAccessor.sparse.isSparse)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor cannot be sparse");
+			}
+			if (rAccessor.bufferView < 0)
+			{
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor references buffer view {}, but the model declares only {} buffer views", rAccessor.bufferView, rModel.bufferViews.size()));
+			}
+			if (static_cast<size_t>(rAccessor.bufferView) >= rModel.bufferViews.size())
+			{
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor references buffer view {}, but the model declares only {} buffer views", rAccessor.bufferView, rModel.bufferViews.size()));
+			}
+
+			const tinygltf::BufferView& rBufferView = rModel.bufferViews.at(rAccessor.bufferView);
+			if (rBufferView.buffer < 0)
+			{
+				throw std::runtime_error(std::format("ExportScene inverse-bind buffer view references buffer {}, but the model declares only {} buffers", rBufferView.buffer, rModel.buffers.size()));
+			}
+			if (static_cast<size_t>(rBufferView.buffer) >= rModel.buffers.size())
+			{
+				throw std::runtime_error(std::format("ExportScene inverse-bind buffer view references buffer {}, but the model declares only {} buffers", rBufferView.buffer, rModel.buffers.size()));
+			}
+			if (rBufferView.byteStride != 0)
+			{
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor requires packed matrices, but its buffer view has byte stride {}", rBufferView.byteStride));
+			}
+
+			static constexpr size_t kuiMatrixSize = 16 * sizeof(float);
+			if (rAccessor.count > std::numeric_limits<size_t>::max() / kuiMatrixSize)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor byte span overflows");
+			}
+			size_t uiAccessorSpan = rAccessor.count * kuiMatrixSize;
+			if (rAccessor.byteOffset > rBufferView.byteLength)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor byte span exceeds its buffer view");
+			}
+			if (uiAccessorSpan > rBufferView.byteLength - rAccessor.byteOffset)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor byte span exceeds its buffer view");
+			}
+
+			const tinygltf::Buffer& rBuffer = rModel.buffers.at(rBufferView.buffer);
+			if (rBufferView.byteOffset > rBuffer.data.size())
+			{
+				throw std::runtime_error("ExportScene inverse-bind buffer view byte span exceeds its buffer");
+			}
+			if (rBufferView.byteLength > rBuffer.data.size() - rBufferView.byteOffset)
+			{
+				throw std::runtime_error("ExportScene inverse-bind buffer view byte span exceeds its buffer");
+			}
+			if (rAccessor.byteOffset > std::numeric_limits<size_t>::max() - rBufferView.byteOffset)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor data offset overflows");
+			}
+			size_t uiDataOffset = rBufferView.byteOffset + rAccessor.byteOffset;
+			if (uiDataOffset > rBuffer.data.size())
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor byte span exceeds its buffer");
+			}
+			if (uiAccessorSpan > rBuffer.data.size() - uiDataOffset)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor byte span exceeds its buffer");
+			}
+			if (uiDataOffset % alignof(float) != 0)
+			{
+				throw std::runtime_error("ExportScene inverse-bind accessor data is not float-aligned");
+			}
+
+			if (uiAccessorSpan != 0)
+			{
+				pfInverseBindMatrices = reinterpret_cast<const float*>(rBuffer.data.data() + uiDataOffset);
+			}
 		}
 
 		skeletonData.inverseBindMatrices.resize(rSkin.joints.size());
