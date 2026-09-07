@@ -848,6 +848,7 @@ int main(int argc, char* argv[])
 	{
 		bOwnsMutex = false;
 		std::printf("DataPacker is already running, waiting...\n");
+		// Windows mutex waits by the owning thread acquire recursively; every acquisition requires a matching release.
 		const DWORD uiWaitResult = WaitForSingleObject(hMutex, INFINITE);
 		if (uiWaitResult == WAIT_FAILED)
 		{
