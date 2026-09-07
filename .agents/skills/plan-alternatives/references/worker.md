@@ -6,10 +6,10 @@ dispatch recipe lives in root `AGENTS.md`.
 
 ## Steps
 
-1. Read the brief text and the evidence paths it cites. Treat only the brief's
-   `Fixed decisions` as binding; candidate-zero behavior is a benchmark, not an
-   implicit requirement. Done when the objective, scope, fixed decisions, and
-   candidate zero are each recorded separately.
+1. Read the brief text and the evidence paths it cites. Only the brief's
+   `Fixed decisions` are binding; what candidate zero happens to do is the
+   benchmark to beat, not a hidden requirement. Done when the objective, scope,
+   fixed decisions, and candidate zero are each recorded separately.
 2. Search the repository for a mechanism on the assigned axis, which is one of:
 
    - Reuse — an existing repository mechanism or pattern that already solves
@@ -21,15 +21,18 @@ dispatch recipe lives in root `AGENTS.md`.
    - Reshape — the same objective in a different place: another layer, frame
      phase, executable, or data layout.
 
-   Before proposing new state, trace the relevant existing ordering, ownership,
-   and failure guarantees. Done when the search has produced one mechanism or the
-   evidence that the axis offers none, and those guarantees have been identified.
+   Before proposing any new state, find out what the surrounding code already
+   guarantees (for example how it orders work, who owns the data, or what
+   happens on failure) so the candidate builds on that instead of rebuilding
+   it. Done when the search has produced one mechanism or the evidence that the
+   axis offers none, and those guarantees are known.
 3. Name the candidate's concrete mechanism and the 3-5 critical files it
    changes. Done when both are named, or the candidate is dropped as unnameable.
-4. State what the candidate adds, what it deletes, which invariant surfaces and
-   existing guarantees it uses, its new identity/lifecycle/reset/recovery state and
-   verification-only machinery, and when it would be the right call. Done when each
-   handoff row is stated, using `none` where the cost or guarantee is absent.
+4. Fill in the remaining `## Handoff` rows in `../SKILL.md`: what the candidate
+   adds and deletes, which invariant surfaces it touches, which existing
+   guarantees it relies on, what machinery it adds that serves only itself, and
+   when it would be the right call. Done when every row is stated, with `none`
+   where nothing applies.
 5. Return the `../SKILL.md` `## Handoff` extension fields followed by the shared
    handoff lines, or `no viable candidate on this axis` in `Candidate` with the
    reason in `Mechanism`. Done when the handoff carries every declared field.

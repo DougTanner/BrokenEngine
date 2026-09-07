@@ -58,8 +58,8 @@ Mechanism: <the concrete mechanism, or the reason no candidate exists>
 Critical files: <3-5 repository paths>
 Adds/Deletes: <what it adds; what it deletes>
 Invariant surfaces: <surfaces it touches, or none>
-Existing guarantees: <ordering, ownership, and failure guarantees it uses, or none>
-Lifecycle/verification cost: <new identity, lifecycle, reset/recovery state and verification-only machinery, or none>
+Existing guarantees: <what the code already guarantees that it relies on, such as ordering, ownership, or failure handling; or none>
+Self-serving machinery: <new state or code that exists only to make this mechanism work, not to meet the objective; or none>
 Pays off when: <the condition that makes it the right call>
 ```
 
@@ -73,29 +73,33 @@ Main scores candidate zero and every returned candidate on the same criteria,
 selects at most one candidate, and never merges candidates into a hybrid:
 
 - objective fully met;
-- cause removed versus symptom suppressed;
+- cause removed rather than symptom suppressed;
 - net new code;
 - invariant surfaces touched (a candidate that raises the tier is noted, not
   disqualified);
-- reuse of existing ordering, ownership, and failure guarantees;
-- new identity, lifecycle, reset/recovery state and verification-only machinery.
+- `Existing guarantees`: relies on what the code already guarantees instead of
+  rebuilding it;
+- `Self-serving machinery`: adds none.
 
-For each returned candidate, the verdict relative to candidate zero is two-way:
-it is `clearly better` when it fully meets the objective, wins at least two
-criteria, and loses none; otherwise it is not. Candidate zero is proportionate
-only when repository evidence shows that any identity, lifecycle, reset/recovery
-state, and verification-only machinery it adds is necessary for the fixed
-objective and explains why existing ordering, ownership, and failure guarantees
-cannot meet that need. Missing or unjustified evidence fails this condition. An
-empty axis is not evidence that candidate zero is simplest.
+A candidate is `clearly better` only when it fully meets the objective, wins at
+least two criteria, and loses none. Otherwise it is not. An empty axis says
+nothing about whether candidate zero is the simplest approach; whether the
+drafted plan itself is over-built is the `/plan-simplicity-review` question.
 
 ### User presentation
 
-If any returned candidate is clearly better, before the Plan review step main
-presents every clearly better candidate beside the drafted approach in plain
-language per root `AGENTS.md` `### User Interaction` — the same criteria, what
-it adds and deletes, which invariant surfaces it touches, and when it pays off —
-with a recommendation, then asks verbatim:
+When no candidate is clearly better, the original stands and the turn's report
+carries one line:
+
+```text
+Alternatives: original stands (<n> candidates, <axes>)
+```
+
+Otherwise, before the Plan review step, main presents every clearly better
+candidate beside the drafted approach in plain language per root `AGENTS.md`
+`### User Interaction` — the same criteria, what it adds and deletes, which
+invariant surfaces it touches, and when it pays off — with a recommendation,
+then asks verbatim:
 
 > Which approach should this change use: the drafted plan as written, or one of
 > the alternatives above?
@@ -113,18 +117,6 @@ The user picks one, and main takes it down the route that matches the change:
   through the existing `plan reject --user-authorized-rejection` route.
 - Tier 1: there is no plan file, so main adopts the chosen approach directly and
   describes it in the report.
-
-When no returned candidate is clearly better and candidate zero is proportionate,
-the original stands and the turn's report carries one line:
-
-```text
-Alternatives: original stands (<n> candidates, <axes>)
-```
-
-When no returned candidate is clearly better and candidate zero fails the
-proportionality condition, main reports an unresolved preparation issue before
-the Plan review step. It does not present candidate zero, ask the user a new
-question, add an axis, or rerun the researchers.
 
 ## References
 
