@@ -5,8 +5,9 @@
 namespace engine
 {
 
-// One placed island instance inside a cell. Emitted by GenerateIslandChain; index 0 is
-// always the dominant anchor island (consumers index islands.at(0) / islands.at(i % size)).
+// One placed island instance inside a cell, emitted by GenerateIslandChain. A cell holds
+// 0..kiMaxIslandsPerCell placements; when the list is non-empty, index 0 is the dominant anchor
+// island (consumers index islands.at(0) / islands.at(i % size)).
 struct IslandPlacement
 {
 	common::crc_t islandCrc = 0;

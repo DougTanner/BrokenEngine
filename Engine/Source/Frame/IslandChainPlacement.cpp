@@ -316,9 +316,9 @@ void GenerateIslandChain(GridCoord coord, std::vector<IslandPlacement>& rOut)
 	float fAnchorRotation = SignedJitter(kfAnchorRotationJitter, context.anchorRandom);
 	XMFLOAT2 f2AnchorLocal {};
 	bool bAnchorPlaced = PlaceAnchor(context, anchorCrc, fAnchorTargetX, fAnchorTargetY, fAnchorRotation, f2AnchorLocal);
-	// The anchor must occupy output index 0 for SpaceshipsNavigation and PlayersNavigation. PlaceAnchor
-	// fails when the island cannot fit the cell; assert success so consumers cannot silently index a
-	// different island.
+	// PlaceAnchor fails when the island cannot fit the cell. That is a generator bug, not an empty cell:
+	// steps 2-4 below grow the chain off output index 0, so assert success rather than silently building
+	// a chain around a different island.
 	ASSERT(bAnchorPlaced);
 
 	// 2. BIG-ISLAND CHAIN — 2 Large then 3 Medium, contact-linked along a hard-turning curve from the Huge
@@ -379,8 +379,6 @@ void GenerateIslandChain(GridCoord coord, std::vector<IslandPlacement>& rOut)
 		int64_t iPlaced = 0;
 		TryTouchPlace(context, crc, iTipIndex, fDir, fRotation, iPlaced);
 	}
-
-	ASSERT(!rOut.empty());
 }
 
 } // namespace engine

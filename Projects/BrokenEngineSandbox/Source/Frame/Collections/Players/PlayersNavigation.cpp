@@ -316,13 +316,18 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		// follower normally stalls one tick before finding the replacement or taking the fleet override. A promoted
 		// flagship recovers on D+2 when its flag and same-cell wanted coord become navigation-visible; mode 4 clears
 		// the stale destination without advancing the rally timer. Agent-injected players have no Fleet and receive
-		// no kUpdateFleet. Consume mode 4's three draws (island pick, footprint X, footprint Y) on each mode-5 tick:
-		// every common::Random advances once regardless of its bound, preserving stream alignment across modes 4/5.
-		common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
-		const engine::IslandPlacement& rRngPlacement = rStaticData.islands.at(static_cast<size_t>(i) % rStaticData.islands.size());
-		const engine::IslandTemplate& rRngTemplate = engine::gpIslandTerrain->mIslands.at(rRngPlacement.islandCrc);
-		common::Random(rRngTemplate.mfQuadFootprintX, rFrame.postRender.randomEngine);
-		common::Random(rRngTemplate.mfQuadFootprintY, rFrame.postRender.randomEngine);
+		// no kUpdateFleet. Consume mode 4's three draws (island pick, footprint X, footprint Y) on each
+		// mode-5 tick in a cell that has islands — mode 4 makes no draws in an island-free cell either, so
+		// the guard below keeps the two modes aligned. Every common::Random advances once regardless of its
+		// bound, preserving stream alignment across modes 4/5.
+		if (!rStaticData.islands.empty())
+		{
+			common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
+			const engine::IslandPlacement& rRngPlacement = rStaticData.islands.at(static_cast<size_t>(i) % rStaticData.islands.size());
+			const engine::IslandTemplate& rRngTemplate = engine::gpIslandTerrain->mIslands.at(rRngPlacement.islandCrc);
+			common::Random(rRngTemplate.mfQuadFootprintX, rFrame.postRender.randomEngine);
+			common::Random(rRngTemplate.mfQuadFootprintY, rFrame.postRender.randomEngine);
+		}
 
 		if (bRecompute)
 		{
@@ -339,26 +344,34 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 			// island pick is drawn unconditionally so the entry tick consumes exactly 3 randoms
 			// (pick + footprint X + footprint Y) regardless of which index selects which island —
 			// mode 5's per-tick mirror above matches this count so mode flips do not desync the
-			// shared random stream.
-			uint32_t uiRandomPick = common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
-			int64_t iPlacement = SelectIslandPlacement(rStaticData, riNavWaypointIndex, uiRandomPick);
-			if (riNavWaypointIndex < 2)
+			// shared random stream. An island-free cell skips the draws and targets the cell center.
+			if (rStaticData.islands.empty())
 			{
-				++riNavWaypointIndex;
+				rVecIslandDestination = vecFrameCenter;
+				bRecompute = true;
 			}
-			const engine::IslandPlacement& rPlacement = rStaticData.islands.at(static_cast<size_t>(iPlacement));
-			const engine::IslandTemplate& rTemplate = engine::gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			float fIslandMinX = rPlacement.f2WorldPos.x - 0.5f * rTemplate.mfQuadFootprintX;
-			float fIslandMinY = rPlacement.f2WorldPos.y - 0.5f * rTemplate.mfQuadFootprintY;
+			else
+			{
+				uint32_t uiRandomPick = common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
+				int64_t iPlacement = SelectIslandPlacement(rStaticData, riNavWaypointIndex, uiRandomPick);
+				if (riNavWaypointIndex < 2)
+				{
+					++riNavWaypointIndex;
+				}
+				const engine::IslandPlacement& rPlacement = rStaticData.islands.at(static_cast<size_t>(iPlacement));
+				const engine::IslandTemplate& rTemplate = engine::gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
+				float fIslandMinX = rPlacement.f2WorldPos.x - 0.5f * rTemplate.mfQuadFootprintX;
+				float fIslandMinY = rPlacement.f2WorldPos.y - 0.5f * rTemplate.mfQuadFootprintY;
 
-			float fX = fIslandMinX + common::Random(rTemplate.mfQuadFootprintX, rFrame.postRender.randomEngine);
-			float fY = fIslandMinY + common::Random(rTemplate.mfQuadFootprintY, rFrame.postRender.randomEngine);
-			rVecIslandDestination = XMVectorSet(fX, fY, engine::gBaseHeight.Get(), 1.0f);
+				float fX = fIslandMinX + common::Random(rTemplate.mfQuadFootprintX, rFrame.postRender.randomEngine);
+				float fY = fIslandMinY + common::Random(rTemplate.mfQuadFootprintY, rFrame.postRender.randomEngine);
+				rVecIslandDestination = XMVectorSet(fX, fY, engine::gBaseHeight.Get(), 1.0f);
 
-			// Snap to navigable area if inside an obstacle
-			rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rStaticData.navData);
-			LOG(kNavData, kVerbose, "Player {} NavSwitch: island dest generated pos={} dest={}", i, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
-			bRecompute = true; // new destination -> path immediately
+				// Snap to navigable area if inside an obstacle
+				rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rStaticData.navData);
+				LOG(kNavData, kVerbose, "Player {} NavSwitch: island dest generated pos={} dest={}", i, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
+				bRecompute = true; // new destination -> path immediately
+			}
 		}
 
 		if (bRecompute)
