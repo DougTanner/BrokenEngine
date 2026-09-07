@@ -53,6 +53,14 @@ The measurement's own state never blocks the friction lens.
 | transcript path unresolvable | nothing — no reviewer is dispatched, because there is no run evidence to review | `blocked (transcript-unavailable)` on both `Friction follow-ups:` and `Context-efficiency follow-ups:`, routed through the post-checkpoint rule below |
 | Codex main session | nothing — no lens runs | `none (codex)` on both lines |
 
+A supplied `pass` means the upstream measurement completed with no envelope
+rows. A `needs-review` envelope runs the reviewer's context-efficiency lens;
+blocked and error states skip that lens while the other lenses still run.
+Without a transcript, no review is dispatched, and a Codex session runs none of
+the checkpoint lenses. The review skill's
+[`## Handoff`](../../next-plan-checkpoint-review/SKILL.md#handoff) owns the exact
+reviewer summary output for each supplied value.
+
 The `Handoff line recorded` column is main's own record after `## Follow-up
 routing`, not reviewer output: `/next-plan-checkpoint-review` returns findings
 and its own summary block, and main writes both follow-up lines from what that
