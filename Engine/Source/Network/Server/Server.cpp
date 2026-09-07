@@ -255,6 +255,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		// arrive before the handshake completes).
 		if (contract.bRequiresHandshake && !pClient->bHandshakeComplete)
 		{
+			LOG(kNetwork, kDebug, "Server::Receive pre-handshake drop Client: {} Type: {}", iClientId, packetData[0]);
 			return;
 		}
 

@@ -33,4 +33,5 @@ This directory owns CRC fast-path, rollback/ring orchestration, replay, per-coor
 ## Other
 
 - `ClientDesyncCore` owns debug-frame correlation and repeated-desync escalation to disconnect. Real desync freezes ACK tracking and requests a debug frame only when `kbDesyncDebugFrames` is enabled; disabled builds do neither. The synthetic agent fixture enters the same engine mode regardless of the flag until cleared/reset. The game-side seam is documented in the game client-session leaf.
+- Debug-only agent fixtures that probe subscriptions must take their evidence from the normal receive, classification, drain, ACK, and reset paths. Keep synthetic send suppression scoped to the injected receive call, and bound deferred observation so a fixture cannot alter subscription policy.
 - Network fast-forward bypasses delayed delivery and flushes pending packets. Slot reuse, unsubscribe ACK, and load reset purge affected coord channels; load reset preserves the control channel ([`ClientSessionRuntime::ResetForServerLoad`](ClientSessionRuntime.cpp)). A delayed reliable rejection is delivered before ENet disconnect teardown ([`Client::Poll`](Client.cpp)).

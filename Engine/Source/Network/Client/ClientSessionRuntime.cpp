@@ -177,6 +177,12 @@ void ClientSessionRuntime::PollDiscovery()
 
 void ClientSessionRuntime::ResetForServerLoad()
 {
+	if (std::shared_ptr<ClientStaleUpdateFixtureState> pState = mpClient->mStaleUpdateFixture.lock(); pState != nullptr)
+	{
+		pState->packet.clear();
+		pState->flags.Set(ClientStaleUpdateFixtureFlags::kReset);
+		mpClient->mStaleUpdateFixture.reset();
+	}
 	ResetClock();
 	mpClient->mSmoothedJitterUs.Reset();
 	mpClient->mStateFlags.Clear(Client::ClientStateFlags::kHasLastUpdateArrival);
@@ -251,10 +257,54 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		ResetForServerLoad();
 		mrSession.OnServerLoad();
 	}
+	std::shared_ptr<ClientStaleUpdateFixtureState> pDeliveredFixture;
+	if (std::shared_ptr<ClientStaleUpdateFixtureState> pState = mpClient->mStaleUpdateFixture.lock(); pState != nullptr)
+	{
+		if (++pState->iCapturePolls > kiNetworkBufferSize)
+		{
+			pState->packet.clear();
+			pState->flags.Set(ClientStaleUpdateFixtureFlags::kBoundExpired);
+			mpClient->mStaleUpdateFixture.reset();
+		}
+		else if ((pState->flags & ClientStaleUpdateFixtureFlags::kCaptured)
+			&& pState->iCapturePolls > pState->iCapturedAtPoll + 1
+			&& pState->uiSlotIndex < mpClient->mCoordSlots.size())
+		{
+			ClientCoordSlot& rSlot = mpClient->mCoordSlots.at(pState->uiSlotIndex);
+			auto coordIt = game::gpGame->mCoordFrames.find(pState->coord);
+			if (rSlot.eState == CoordSubscriptionState::kActive && rSlot.coord == pState->coord
+				&& rSlot.ackState.uiEpoch == pState->uiEpoch && rSlot.ackState.iAckFloor >= pState->iTick
+				&& coordIt != game::gpGame->mCoordFrames.end() && coordIt->second.iConfirmedTick >= pState->iTick)
+			{
+				pState->iAckFloorBefore = rSlot.ackState.iAckFloor;
+				pState->iConfirmedBefore = coordIt->second.iConfirmedTick;
+				std::vector<uint8_t> packet = std::move(pState->packet);
+				pState->packet.clear();
+				mpClient->mStaleUpdateFixture.reset();
+				mpClient->Receive(packet);
+				pState->iAckFloorAfter = rSlot.ackState.iAckFloor;
+				pDeliveredFixture = std::move(pState);
+			}
+		}
+	}
 	mrSession.ProcessReceivedGamePackets();
 	mrSession.ApplyReceivedStaticData();
 	ApplyReceivedFullStates();
 	ApplyReceivedUpdates();
+	if (pDeliveredFixture != nullptr)
+	{
+		auto coordIt = game::gpGame->mCoordFrames.find(pDeliveredFixture->coord);
+		pDeliveredFixture->iConfirmedAfter = coordIt != game::gpGame->mCoordFrames.end() ? coordIt->second.iConfirmedTick : -1;
+		if (coordIt != game::gpGame->mCoordFrames.end() && coordIt->second.serverUpdates.contains(pDeliveredFixture->iTick))
+		{
+			pDeliveredFixture->flags.Set(ClientStaleUpdateFixtureFlags::kRetainedAfterDrain);
+		}
+		if (mpClient->mStateFlags & Client::ClientStateFlags::kConnected)
+		{
+			pDeliveredFixture->flags.Set(ClientStaleUpdateFixtureFlags::kConnectedAfterDrain);
+		}
+		pDeliveredFixture->flags.Set(ClientStaleUpdateFixtureFlags::kComplete);
+	}
 
 	SendAckAndFlush();
 }

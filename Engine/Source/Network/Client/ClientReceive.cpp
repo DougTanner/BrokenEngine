@@ -348,7 +348,7 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 
 void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool bProcessRtt)
 {
-	auto receive = [this, bProcessRtt](const NetworkMessages::CoordUpdateFields& rMessage)
+	auto receive = [this, bProcessRtt, packetData](const NetworkMessages::CoordUpdateFields& rMessage)
 	{
 		// Pipeline RTT: read echoed client timestamp (monotonic guard prevents duplicate processing during multi-frame ticks)
 		if (bProcessRtt && rMessage.iEchoedTimestampNs > 0 && rMessage.iEchoedTimestampNs > miLastEchoedTimestampNs)
@@ -411,6 +411,23 @@ void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool
 		if (actions & CoordUpdateFlags::kTrackTick)
 		{
 			TrackReceivedTick(rMessage.uiSlotIndex, rMessage.iTick);
+		}
+
+		if (bProcessRtt)
+		{
+			if (std::shared_ptr<ClientStaleUpdateFixtureState> pState = mStaleUpdateFixture.lock(); pState != nullptr
+				&& !(pState->flags & ClientStaleUpdateFixtureFlags::kCaptured))
+			{
+				// Heap: the fixture owns one exact packet copy and releases it before recursive delivery.
+				pState->packet.assign(packetData.begin(), packetData.end());
+				pState->iCapturedBytes = std::ssize(packetData);
+				pState->iCapturedAtPoll = pState->iCapturePolls;
+				pState->uiSlotIndex = rMessage.uiSlotIndex;
+				pState->uiEpoch = rMessage.uiEpoch;
+				pState->iTick = rMessage.iTick;
+				pState->coord = mCoordSlots.at(rMessage.uiSlotIndex).coord;
+				pState->flags.Set(ClientStaleUpdateFixtureFlags::kCaptured);
+			}
 		}
 	};
 
@@ -516,7 +533,16 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
-		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+		if (mpSubscribeAcceptFixtureResult != nullptr)
+		{
+			mpSubscribeAcceptFixtureResult->uiSerializedSlot = unsubscribe.uiSlotIndex;
+			mpSubscribeAcceptFixtureResult->iSerializedBytes = std::ssize(rWorkbuffer.View());
+			mpSubscribeAcceptFixtureResult->bSendSuppressed = true;
+		}
+		else
+		{
+			NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+		}
 		return;
 	}
 
@@ -568,7 +594,7 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 
 		if (RemoveCancelledSubscription(coord))
 		{
-			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Cancelled Slot: {} Coord: ({},{})", uiSlotIndex, coord.x, coord.y);
+			LOG(kNetwork, kDebug, "Client::ServerSubscribeAccept Cancelled Slot: {} Coord: ({},{})", uiSlotIndex, coord.x, coord.y);
 			SendUnsubscribe(uiSlotIndex);
 		}
 	}
@@ -598,6 +624,11 @@ void Client::ServerUnsubscribeAck(std::span<const uint8_t> packetData)
 	}
 
 	FreeSlot(uiSlotIndex);
+	if (std::shared_ptr<ClientCancelledSubscriptionFixtureState> pState = mCancelledSubscriptionFixture.lock();
+		pState != nullptr && pState->iSlot == uiSlotIndex)
+	{
+		pState->eOutcome = ClientCancelledSubscriptionFixtureOutcome::kAcked;
+	}
 }
 
 void Client::ServerLoadNotification(std::span<const uint8_t> packetData)

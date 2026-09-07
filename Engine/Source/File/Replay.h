@@ -19,6 +19,7 @@ public:
 		kManifestInvalidation,
 		kGrid,
 		kCoordinateWriter,
+		kFullFramesRecord,
 		kMetadata,
 		kInventory,
 		kFinalManifest,

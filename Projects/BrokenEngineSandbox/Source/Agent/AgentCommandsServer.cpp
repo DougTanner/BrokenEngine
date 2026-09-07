@@ -927,6 +927,11 @@ bool ExecuteAgentCommandServer(std::string_view cmd, const nlohmann::json& rPara
 		CommandEnginePacketFaultFixture(rParams, rResult);
 		return true;
 	}
+	if (cmd == "server_pre_handshake_ack_fixture")
+	{
+		CommandServerPreHandshakeAckFixture(rParams, rResult);
+		return true;
+	}
 	if (cmd == "pause")
 	{
 		CommandPause(rParams, rResult);

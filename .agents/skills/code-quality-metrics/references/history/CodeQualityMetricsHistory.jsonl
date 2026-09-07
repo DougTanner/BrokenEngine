@@ -953,3 +953,4 @@
 {"index":951,"date":"2026-09-07","captureMode":"carry-forward","verbosity":0.037213775756,"structuralErosion":0.537798607006,"supported":529,"parsed":528}
 {"index":952,"date":"2026-09-07","captureMode":"carry-forward","verbosity":0.037213775756,"structuralErosion":0.537798607006,"supported":529,"parsed":528}
 {"index":953,"date":"2026-09-07","captureMode":"cpp-change","verbosity":0.037213775756,"structuralErosion":0.538003807786,"supported":529,"parsed":528}
+{"index":954,"date":"2026-09-07","captureMode":"cpp-change","verbosity":0.037270726339,"structuralErosion":0.545951313607,"supported":529,"parsed":528}

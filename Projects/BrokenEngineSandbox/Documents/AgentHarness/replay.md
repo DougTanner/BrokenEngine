@@ -84,6 +84,10 @@ It uses a real connected client, the ordinary fleet spawn path, and a natural
    signals; do not claim that a status or query response observed either
    historical event.
 
+#### Command-only malformed fullframes route
+
+On Debug, create an active recording with the target coord present, then arm `replay_inject_persistence_failure {"stage":"fullframes_record","coord":[x,y]}` and stop recording. Require the new `Injected malformed replay fullframes` Debug line to name the selected coord and report before/after byte sizes differing by exactly one. Poll until recording stops, send `replay_play`, and require a valid manifest and adoption, the existing `Full frames file read failed, discarding` warning for the selected reader, authoritative checksum validation without CRC/desync errors, and an `End replay <tick>, looping` marker. This command mutates the saved optional diagnostic stream before manifest hashing; it leaves other coords untouched and does not require stopped-server file editing. A mutation open, read, empty-file, or atomic-rewrite failure instead deletes the selected writer's sibling set and suppresses the manifest.
+
 #### Replay manifest v3 integrity matrix
 
 This is a stopped-server AppData test, not an agent command. Produce the valid multi-coordinate fixture above and prove one loop. Stop/release the server, back up the complete `F7.replay.manifest`, `.grid`, `.meta`, and every coord sibling from `<absolute app-data root>\Broken Engine Sandbox Server`; restore the backup before each change and relaunch. The v3 manifest is fixed-width little-endian: version, initial tick, activation count and `(activationTick,x,y)` records; a `hasFullFrames` byte; inventory count and ordered `(kind,coordKey,byteCount,sha256[32])` entries; then the 32-byte generation digest. Kinds are grid/meta/header/frames/checksums/fullframes = 0..5. The SHA-256 preimage is, in order, the four little-endian length bytes `2B 00 00 00`, the 43 bytes of `broken-engine/replay-manifest-generation/v3` without a NUL, then the exact manifest semantic payload bytes from version through inventory.

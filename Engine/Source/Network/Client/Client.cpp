@@ -105,8 +105,54 @@ void Client::CancelSubscription(int64_t iSlot)
 	LOG(kNetwork, kVerbose, "Client::CancelSubscription Slot: {} Coord: ({},{}) CancelledCount: {}", iSlot, cancelledCoord.x, cancelledCoord.y, mCancelledSubscriptions.size());
 }
 
+void Client::CancelSubscriptionForAgent(int64_t iSlot)
+{
+	if (mCoordSlots.at(iSlot).eState != CoordSubscriptionState::kSubscribing)
+	{
+		throw std::runtime_error("Client::CancelSubscriptionForAgent requires a subscribing slot");
+	}
+	CancelSubscription(iSlot);
+}
+
+void Client::ArmStaleUpdateFixture(const std::shared_ptr<ClientStaleUpdateFixtureState>& pState)
+{
+	if (!mStaleUpdateFixture.expired())
+	{
+		throw std::runtime_error("client_stale_update_fixture is already active");
+	}
+	mStaleUpdateFixture = pState;
+}
+
+void Client::ArmCancelledSubscriptionFixture(const std::shared_ptr<ClientCancelledSubscriptionFixtureState>& pState)
+{
+	if (!mCancelledSubscriptionFixture.expired())
+	{
+		throw std::runtime_error("client_cancelled_subscription_fixture is already active");
+	}
+	mCancelledSubscriptionFixture = pState;
+}
+
+ClientSubscribeAcceptFixtureResult Client::ReceiveSubscribeAcceptForAgent(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord)
+{
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	NetworkMessages::ServerSubscribeAcceptMessage message {.uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch, .coord = coord};
+	NetworkMessages::Write(rWorkbuffer, message);
+
+	ClientSubscribeAcceptFixtureResult result {};
+	mpSubscribeAcceptFixtureResult = &result;
+	common::ScopedLambda clearFixture([this]() { mpSubscribeAcceptFixtureResult = nullptr; });
+	Receive(std::span(reinterpret_cast<const uint8_t*>(rWorkbuffer.View().data()), rWorkbuffer.View().size()));
+	return result;
+}
+
 void Client::ResetAllSlots()
 {
+	if (std::shared_ptr<ClientCancelledSubscriptionFixtureState> pState = mCancelledSubscriptionFixture.lock(); pState != nullptr)
+	{
+		pState->eOutcome = ClientCancelledSubscriptionFixtureOutcome::kReset;
+		mCancelledSubscriptionFixture.reset();
+	}
 	for (int64_t i = 0; i < std::ssize(mCoordSlots); ++i)
 	{
 		FreeSlot(i);

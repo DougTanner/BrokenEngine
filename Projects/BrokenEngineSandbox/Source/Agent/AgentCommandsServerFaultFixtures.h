@@ -9,6 +9,7 @@ namespace game
 // and other server handlers remain in AgentCommandsServer.cpp.
 void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult);
 void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult);
+void CommandServerPreHandshakeAckFixture(const nlohmann::json& rParams, nlohmann::json& rResult);
 
 } // namespace game
 

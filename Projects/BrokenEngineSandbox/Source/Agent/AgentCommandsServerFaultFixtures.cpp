@@ -169,6 +169,173 @@ void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::js
 	rResult["size"] = iSize;
 }
 
+void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+{
+	if constexpr (!kbDebugInput)
+	{
+		throw std::runtime_error("server_pre_handshake_ack_fixture requires kbDebugInput build");
+	}
+	else
+	{
+		if (!rParams.is_object())
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture requires exactly {}");
+		}
+		if (!rParams.empty())
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture requires exactly {}");
+		}
+
+		engine::ClientConnection* pClient = nullptr;
+		int64_t iHandshakenClientCount = 0;
+		for (engine::ClientConnection& rClient : engine::gpServer->mClients)
+		{
+			if (rClient.bHandshakeComplete)
+			{
+				pClient = &rClient;
+				++iHandshakenClientCount;
+			}
+		}
+		if (iHandshakenClientCount != 1)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture requires exactly one handshaken client");
+		}
+		if (pClient == nullptr)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture requires exactly one handshaken client");
+		}
+		if (pClient->pPeer == nullptr)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture requires exactly one handshaken client");
+		}
+		if (pClient->iTickPacketCount > engine::kiMaxClientPacketsPerTick - 1)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture requires packet-count headroom");
+		}
+		if (pClient->iTickByteCount > engine::kiMaxClientInboundBytesPerTick - engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture requires byte-count headroom");
+		}
+
+		const int64_t iClientId = pClient->iClientId;
+		ENetPeer* const pPeer = pClient->pPeer;
+		const bool bHandshakeComplete = pClient->bHandshakeComplete;
+		const int64_t iContractViolations = pClient->iContractViolations;
+		const int64_t iPacketCount = pClient->iTickPacketCount;
+		const int64_t iByteCount = pClient->iTickByteCount;
+		const uint8_t uiPacketType = static_cast<uint8_t>(engine::PacketType::kClientAckStream);
+		const uint16_t uiTypeCount = pClient->tickTypeCounts[uiPacketType];
+		const int64_t iClientTimestampNs = pClient->iClientTimestampNs;
+		const int64_t iConsecutiveZeroAdvanceAcks = pClient->iConsecutiveZeroAdvanceAcks;
+		const bool bFloorStalled = pClient->bFloorStalled;
+		const int64_t iPeakConsecutiveStallAcks = pClient->iPeakConsecutiveStallAcks;
+		std::vector<engine::AckState> ackStates;
+		ackStates.reserve(pClient->slots.size());
+		for (const engine::ClientConnection::SlotState& rSlot : pClient->slots)
+		{
+			ackStates.push_back(rSlot.ack);
+		}
+
+		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+		engine::NetworkMessages::ClientAckStreamMessage message {};
+		engine::NetworkMessages::Write(rWorkbuffer, message);
+		const std::span<const uint8_t> packetData(reinterpret_cast<const uint8_t*>(rWorkbuffer.View().data()), rWorkbuffer.View().size());
+		const int64_t iPacketSize = static_cast<int64_t>(packetData.size());
+		if (iPacketSize != engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture failed to serialize the fixed ACK layout");
+		}
+
+		{
+			pClient->bHandshakeComplete = false;
+			common::ScopedLambda restoreHandshake([iClientId]()
+			{
+				if (engine::ClientConnection* pRestoreClient = engine::gpServer->FindClient(iClientId); pRestoreClient != nullptr)
+				{
+					pRestoreClient->bHandshakeComplete = true;
+				}
+			});
+			engine::gpServer->Receive(packetData, pPeer);
+		}
+
+		pClient = engine::gpServer->FindClient(iClientId);
+		if (pClient == nullptr)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture client identity changed during receive");
+		}
+		if (pClient->pPeer != pPeer)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture client identity changed during receive");
+		}
+
+		bool bAckSlotsUnchanged = pClient->slots.size() == ackStates.size();
+		for (int64_t i = 0; bAckSlotsUnchanged && i < std::ssize(pClient->slots); ++i)
+		{
+			const engine::AckState& rBefore = ackStates.at(i);
+			const engine::AckState& rAfter = pClient->slots.at(i).ack;
+			bAckSlotsUnchanged = rAfter.iAckFloor == rBefore.iAckFloor &&
+				rAfter.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow &&
+				rAfter.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh &&
+				rAfter.uiEpoch == rBefore.uiEpoch;
+		}
+
+		const bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1 &&
+			pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;
+		const bool bHandshakeRestored = bHandshakeComplete && pClient->bHandshakeComplete;
+		const bool bTypeCountUnchanged = pClient->tickTypeCounts[uiPacketType] == uiTypeCount;
+		const bool bAckStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcks &&
+			pClient->bFloorStalled == bFloorStalled &&
+			pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcks;
+		const bool bTimestampUnchanged = pClient->iClientTimestampNs == iClientTimestampNs;
+		const bool bContractViolationsUnchanged = pClient->iContractViolations == iContractViolations;
+		if (!bAdmissionAdvanced)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
+		}
+		if (!bHandshakeRestored)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
+		}
+		if (!bTypeCountUnchanged)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
+		}
+		if (!bAckSlotsUnchanged)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
+		}
+		if (!bAckStallUnchanged)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
+		}
+		if (!bTimestampUnchanged)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
+		}
+		if (!bContractViolationsUnchanged)
+		{
+			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
+		}
+
+		rResult["clientId"] = iClientId;
+		rResult["type"] = uiPacketType;
+		rResult["size"] = iPacketSize;
+		rResult["packetCountBefore"] = iPacketCount;
+		rResult["packetCountAfter"] = pClient->iTickPacketCount;
+		rResult["byteCountBefore"] = iByteCount;
+		rResult["byteCountAfter"] = pClient->iTickByteCount;
+		rResult["handshakeRestored"] = bHandshakeRestored;
+		rResult["clientPreserved"] = true;
+		rResult["peerPreserved"] = true;
+		rResult["typeCountUnchanged"] = bTypeCountUnchanged;
+		rResult["ackSlotsUnchanged"] = bAckSlotsUnchanged;
+		rResult["ackStallUnchanged"] = bAckStallUnchanged;
+		rResult["timestampUnchanged"] = bTimestampUnchanged;
+		rResult["contractViolationsUnchanged"] = bContractViolationsUnchanged;
+	}
+}
+
 } // namespace game
 
 #endif // defined(BT_SERVER)

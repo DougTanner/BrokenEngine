@@ -379,7 +379,7 @@ bool Replay::DropRetainedReplayEndFrame(GridCoord coord)
 
 bool Replay::ArmReplayPersistenceFailure(ReplayPersistenceFailurePoint eFailurePoint, GridCoord coord)
 {
-	if (eFailurePoint == ReplayPersistenceFailurePoint::kCoordinateWriter)
+	if (eFailurePoint == ReplayPersistenceFailurePoint::kCoordinateWriter || eFailurePoint == ReplayPersistenceFailurePoint::kFullFramesRecord)
 	{
 		auto it = mReplayWriters.find(coord);
 		if (it == mReplayWriters.end() || (it->second.bTerminal && it->second.pRetainedEndFrame == nullptr))
@@ -399,7 +399,8 @@ bool Replay::ConsumeReplayPersistenceFailure(ReplayPersistenceFailurePoint eFail
 	{
 		return false;
 	}
-	if (eFailurePoint == ReplayPersistenceFailurePoint::kCoordinateWriter && mReplayPersistenceFailureCoord != coord)
+	if ((eFailurePoint == ReplayPersistenceFailurePoint::kCoordinateWriter || eFailurePoint == ReplayPersistenceFailurePoint::kFullFramesRecord) &&
+		mReplayPersistenceFailureCoord != coord)
 	{
 		return false;
 	}
@@ -843,6 +844,47 @@ bool Replay::SyncReplayTick()
 						LOG(kDefault, kError, "Injected replay writer failure for coord ({},{}); deleting replay sibling set", rCoord.x, rCoord.y);
 						rWriterState.pWriter->CleanupFiles(fileFlags, coordReplayPath);
 						bWriterSaved = false;
+					}
+					if (bWriterSaved && ConsumeReplayPersistenceFailure(ReplayPersistenceFailurePoint::kFullFramesRecord, rCoord))
+					{
+						const std::filesystem::path fullFramesPath = std::filesystem::path(coordReplayPath).concat(".fullframes");
+						std::fstream fullFramesStream = engine::gpFileManager->OpenFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, fullFramesPath);
+						fullFramesStream.seekg(0, std::ios::end);
+						const std::streamoff iBeforeBytes = fullFramesStream.tellg();
+						bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0 &&
+							iBeforeBytes <= std::numeric_limits<std::streamsize>::max();
+						std::vector<std::byte> prefix;
+						if (bFullFramesTruncated)
+						{
+							prefix.resize(static_cast<size_t>(iBeforeBytes - 1));
+							fullFramesStream.seekg(0, std::ios::beg);
+							if (!prefix.empty())
+							{
+								fullFramesStream.read(reinterpret_cast<char*>(prefix.data()), static_cast<std::streamsize>(prefix.size()));
+								bFullFramesTruncated = fullFramesStream.gcount() == static_cast<std::streamsize>(prefix.size());
+							}
+						}
+						fullFramesStream.close();
+						if (bFullFramesTruncated)
+						{
+							bFullFramesTruncated = engine::gpFileManager->WriteFileAtomically(fileFlags, fullFramesPath, [&](std::fstream& rFullFramesStream)
+							{
+								if (!prefix.empty())
+								{
+									rFullFramesStream.write(reinterpret_cast<const char*>(prefix.data()), static_cast<std::streamsize>(prefix.size()));
+								}
+							});
+						}
+						if (bFullFramesTruncated)
+						{
+							LOG(kDefault, kDebug, "Injected malformed replay fullframes for coord ({},{}); bytes {} -> {}", rCoord.x, rCoord.y, iBeforeBytes, prefix.size());
+						}
+						else
+						{
+							LOG(kDefault, kError, "Injected malformed replay fullframes failed for coord ({},{}); deleting replay sibling set", rCoord.x, rCoord.y);
+							rWriterState.pWriter->CleanupFiles(fileFlags, coordReplayPath);
+							bWriterSaved = false;
+						}
 					}
 				}
 				else

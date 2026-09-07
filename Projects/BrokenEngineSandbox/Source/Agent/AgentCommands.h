@@ -13,7 +13,7 @@ namespace game
 void ExecuteAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult);
 
 #if defined(BT_CLIENT)
-// Client-only command dispatch (full-state fixture, scene query, desync probe, and grid-cell move). ExecuteAgentCommand
+// Client-only command dispatch (network fixtures, full-state fixture, scene query, desync probe, and grid-cell move). ExecuteAgentCommand
 // falls through to this under BT_CLIENT after engine::ExecuteClientAgentCommand and before the unknown-command throw;
 // returns true if handled. Defined in the client-vcxproj-only AgentCommandsClient.cpp. Throws on bad params (trust
 // boundary), caught by AgentCommandServer::Drain().
