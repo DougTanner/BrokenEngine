@@ -120,3 +120,21 @@ threading, trust boundaries, C++, GLSL, or project membership.
 The six support locations are four files with two distinct policy statements
 in both `content-rules.md` and `audit-mode.md`. The public skill currently needs
 no direct policy removal.
+
+The `## Design` choice to replace the split guidance in `content-rules.md`
+("When a needed sentence pushes a file over its target, report the excess or
+propose splitting the file instead") with in-place trimming is corroborated by
+user direction given outside this Plan: in a later session the user stated that
+moving guidance out of an automatically loaded AGENTS.md into linked detail
+documents is an anti-pattern, and directed that an oversized AGENTS.md be
+trimmed in place instead. That direction binds the in-place-trimming half of the
+choice. It leaves one question open for the fix session: whether the replacement
+text reports the target overrun only, or also names a sanctioned alternative,
+since the user's statement rules out the split without naming a substitute.
+
+Links to separately owned automatic `AGENTS.md` documents and to
+`Documents/Architecture/`, which root `AGENTS.md` and `Documents/AGENTS.md`
+describe as external detail too large for AGENTS.md, were compared against that
+direction and are the sanctioned form rather than a conflict: the direction
+concerns moving guidance out of a loaded document, not linking to separately
+owned reference material. No change to those documents is implied.
