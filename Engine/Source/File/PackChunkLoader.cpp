@@ -270,11 +270,9 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 	bool bCompressed = common::IsCompressed(rLazyChunk.header.flags);
 
 #if defined(BT_CLIENT)
-	if ((rLazyChunk.header.flags & common::ChunkFlags::kTexture) && !mrPackChunks.RecommitChunkRange(rRequest.crc, rLazyChunk, 0, rLazyChunk.iDataSize))
+	if (rLazyChunk.header.flags & common::ChunkFlags::kTexture)
 	{
-		rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-		NotifyChunkCompletion();
-		return;
+		VERIFY_SUCCESS(mrPackChunks.RecommitChunkRange(rRequest.crc, rLazyChunk, 0, rLazyChunk.iDataSize));
 	}
 #endif // BT_CLIENT
 
