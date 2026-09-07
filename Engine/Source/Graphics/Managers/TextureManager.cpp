@@ -679,39 +679,39 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 
 			std::this_thread::yield();
 			ProcessPendingTextures(0);
+
+			// Flush pending acquire barriers since we're not in the render loop
+			if (mbHasPendingAcquireBarriers)
+			{
+				VkFenceCreateInfo vkFenceCreateInfo
+				{
+					.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+					.pNext = nullptr,
+					.flags = 0,
+				};
+				VkFence vkFence = VK_NULL_HANDLE;
+				CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &vkFence));
+
+				VkCommandBuffer vkAcquireCommandBuffer = mAcquireVkCommandBuffers.at(miAcquireFramebufferIndex);
+				VkSubmitInfo vkSubmitInfo
+				{
+					.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+					.pNext = nullptr,
+					.waitSemaphoreCount = 0,
+					.pWaitSemaphores = nullptr,
+					.pWaitDstStageMask = nullptr,
+					.commandBufferCount = 1,
+					.pCommandBuffers = &vkAcquireCommandBuffer,
+					.signalSemaphoreCount = 0,
+					.pSignalSemaphores = nullptr,
+				};
+				CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkSubmitInfo, vkFence));
+				CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX));
+
+				vkDestroyFence(gpDeviceManager->mVkDevice, vkFence, nullptr);
+				mbHasPendingAcquireBarriers = false;
+			}
 		}
-	}
-
-	// Flush pending acquire barriers since we're not in the render loop
-	if (mbHasPendingAcquireBarriers)
-	{
-		VkFenceCreateInfo vkFenceCreateInfo
-		{
-			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-			.pNext = nullptr,
-			.flags = 0,
-		};
-		VkFence vkFence = VK_NULL_HANDLE;
-		CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &vkFence));
-
-		VkCommandBuffer vkAcquireCommandBuffer = mAcquireVkCommandBuffers.at(miAcquireFramebufferIndex);
-		VkSubmitInfo vkSubmitInfo
-		{
-			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.pNext = nullptr,
-			.waitSemaphoreCount = 0,
-			.pWaitSemaphores = nullptr,
-			.pWaitDstStageMask = nullptr,
-			.commandBufferCount = 1,
-			.pCommandBuffers = &vkAcquireCommandBuffer,
-			.signalSemaphoreCount = 0,
-			.pSignalSemaphores = nullptr,
-		};
-		CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkSubmitInfo, vkFence));
-		CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX));
-
-		vkDestroyFence(gpDeviceManager->mVkDevice, vkFence, nullptr);
-		mbHasPendingAcquireBarriers = false;
 	}
 }
 

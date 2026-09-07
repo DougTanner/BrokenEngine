@@ -710,12 +710,13 @@ void CommandClientStaleUpdateFixture(const nlohmann::json& rParams, [[maybe_unus
 	}
 }
 
-void CommandClientCancelledSubscriptionFixture(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
 		throw std::runtime_error("client_cancelled_subscription_fixture requires kbDebugInput build");
 	}
+#if defined(BT_DEBUG)
 	else
 	{
 		static std::weak_ptr<int> sFixture;
@@ -881,6 +882,7 @@ void CommandClientCancelledSubscriptionFixture(const nlohmann::json& rParams, [[
 			return std::nullopt;
 		});
 	}
+#endif
 }
 
 // The packet client_packet_fault_fixture armed, empty while unarmed. It is delivered by
