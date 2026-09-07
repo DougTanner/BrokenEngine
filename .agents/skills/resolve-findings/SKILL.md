@@ -68,23 +68,22 @@ follows the over-cap file rule in `../../references/subagent-reporting.md`,
   scope; or `none found`.
 - `Propagation required` — `/update-affected-code` with the code scope, or
   `N/A — no code changed`.
-- `Build required` — target, configuration/platform, and selected
-  project-member `.cpp`; for headers, every consuming target and
-  configuration/platform; or none.
 - `External/API verification requests` — one row each: symbol/rule,
   proposition, dependent item, version/configuration, and candidate official
   source; or none.
 - `Reviewer focus areas` — the condition the independent verifier must try to
   disprove, or none.
-- `Residuals` — unresolved/out-of-scope item, its evidence, and the next
-  owner/action; or none; last.
 
-Name each changed file once. A requested build is
-`builder` work dispatched by the manager, not a passed check. The manager
-dispatches independent verification as a separate role after the fix and
-required checks complete. Use `PASS` when every
-assigned item is fixed with no fix-work residual, `NEEDS_ACTION` when manager
-action remains, and `BLOCKED` when missing required evidence prevents work.
+Name each changed file once. Each shared `Build required` row names its target,
+configuration/platform, and the selected project-member `.cpp`; a changed
+header gets one row per consuming target and configuration/platform. Each
+shared `Residuals` row names the unresolved or out-of-scope item, its
+evidence, and the next owner/action. A requested build is `builder` work
+dispatched by the manager, not a passed check. The manager dispatches
+independent verification as a separate role after the fix and required checks
+complete. Use `PASS` when every assigned item is fixed with no fix-work
+residual, `NEEDS_ACTION` when manager action remains, and `BLOCKED` when
+missing required evidence prevents work.
 
 ## References
 
