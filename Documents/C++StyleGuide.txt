@@ -2,7 +2,7 @@ Use the following rules for C++ code
 
 1. Use tabs for indentation	
 
-2. Curly braces go on the next line for functions, scopes, and lambdas. Struct or class initializers can have curly braces on the same line.
+2. Curly braces go on the next line for functions, scopes, and lambdas. A multiline struct or class initializer puts its opening brace on the next line. A complete single-line initializer can keep its braces on the declaration line.
 
 	if ()
 	{
@@ -11,6 +11,13 @@ Use the following rules for C++ code
 	auto GetContent = [](const auto& rSource) -> std::pair<bool, std::string>
 	{
 	}
+
+	Widget widget
+	{
+		.value = 1,
+	};
+
+	Widget emptyWidget {};
 
 3. Hungarian notation
 

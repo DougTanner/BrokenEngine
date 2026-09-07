@@ -34,11 +34,12 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      proceeding.
    - Done when `truncated` is false or the unavailability is reported.
 6. Read `Documents/C++StyleGuide.txt`; it is the authority every step-9
-   adjudication is decided against. Hand-read the selected ranges for the rules
-   the scanner does not cover: 3, 14, 16 (including its vector `.at()` clause),
-   21, 49, 51, 56, 61, 62, and the "always write `std::`" half of 41. Those
-   hand-read rules and the rules the scanner's `style-rule-<n>` kinds cover are
-   this review's whole style mandate; every other guide rule is outside it.
+   adjudication is decided against. Hand-read the selected ranges for every
+   Rule 2 form the narrow scanner does not emit, and for rules 3, 14, 16
+   (including its vector `.at()` clause), 21, 49, 51, 56, 61, 62, and the
+   "always write `std::`" half of 41. Those hand-read rules and the rules the
+   scanner's `style-rule-<n>` kinds cover are this review's whole style mandate;
+   every other guide rule is outside it.
    Done when the guide is in hand and those rules have been read across every
    selected range.
 7. Run the session-added candidate scanner once: `pwsh -NoProfile -File
@@ -60,7 +61,9 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - Done when the status is `pass` or the unavailability is reported.
 9. Adjudicate every `style-rule-<n>` row against rule n of the guide, reading
    the surrounding code; the rows are a starting list, not the finding set.
-   Rule 29 needs the base class, which is off the line, so look it up.
+   For Rule 2, surrounding code must reject declaration-shaped text inside a
+   block comment or raw string opened on an earlier line. Rule 29 needs the base
+   class, which is off the line, so look it up.
    - The rows carry their own rule number, so this step covers whatever kinds
      the run emits; the mandate's remaining rules are hand-read in step 6.
    - Done when every style row is accepted as a finding or rejected.
