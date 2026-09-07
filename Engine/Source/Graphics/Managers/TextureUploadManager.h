@@ -24,6 +24,9 @@ public:
 	void SignalFrame();
 	void RethrowException();
 
+	// Trust boundary for signed on-disk texture metadata used by both upload paths.
+	static void ValidateTextureDimensions(const LazyChunk& rLazyChunk);
+
 	// Pending-adoption counter: tracks chunks in an adoptable state (kDiskLoaded / kGpuUploadComplete) awaiting
 	// TextureManager::ProcessPendingTextures. Lives here (not on TextureManager) because this manager outlives the
 	// device-loss Graphics recreate that destroys TextureManager — so the upload thread never touches a freed owner
@@ -54,8 +57,6 @@ private:
 	};
 	bool DequeueNextUpload();
 	bool HandleUploadEarlyOut(LazyChunk& rLazyChunk);
-	// Trust boundary: ASSERTs the on-disk TextureHeader dims/mips are plausible and fit the chunk data.
-	static void ValidateTextureDimensions(const LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions);
 	void CreateTransferImage(LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions);
 	void RecordStagingCopies(LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions);
 	void SubmitChunkUpload(LazyChunk& rLazyChunk, VkImageMemoryBarrier& rVkImageMemoryBarrier, bool bDone);

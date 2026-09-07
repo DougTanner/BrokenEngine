@@ -12,6 +12,6 @@ Distinct transfer queues release image ownership for the matching graphics acqui
 
 ## Chunk Completion
 
-Pack dimensions and derived copy ranges are validated before image allocation. Corrupt dimensions `ASSERT` on the upload thread and travel the published fatal path (`../../File/AGENTS.md`). Other upload failures leave active ownership intact for the published fatal path.
+Pack texture headers and derived copy ranges are validated before the upload thread may hand work to foreground adoption, and again before foreground fallback allocation or copy. The validation requires positive signed dimensions and mip counts, enforces the pack ceilings and a realizable mip chain, checks the selected device's limits for that exact image format, requires square cubemaps, and requires enough resident bytes for every layer and mip. Invalid data `ASSERT`s on whichever path consumes it; upload-thread failures travel the published fatal path (`../../File/AGENTS.md`). Other upload failures leave active ownership intact for that path.
 
 The pending-adoption counter belongs to this manager because it outlives `TextureManager` during device recreation. Keep file-state rearming and adoption completion synchronized with that counter.

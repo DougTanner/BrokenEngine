@@ -545,9 +545,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 		{
 			// Fallback: upload thread didn't GPU upload (same queue family)
 
-			// Trust boundary: the fallback copy loop below sizes its memcpy off rLazyChunk.pData using the on-disk
-			// TextureHeader dims stored in rTexture.mInfo, and the same-queue-family / no-transfer-pool early-out
-			// (HandleUploadEarlyOut) reaches kDiskLoaded without the upload thread's validation, so bound here too.
+			TextureUploadManager::ValidateTextureDimensions(rLazyChunk);
 			int64_t iExpectedBytes = common::ComputeImageByteSize(rTexture.mInfo.format, rTexture.mInfo.extent.width, rTexture.mInfo.extent.height, rTexture.mInfo.mipLevels, rTexture.mInfo.arrayLayers, rTexture.mInfo.extent.depth);
 			ASSERT(iExpectedBytes > 0 && iExpectedBytes <= rLazyChunk.iDataSize);
 

@@ -127,9 +127,9 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 		throw std::runtime_error(std::format("Texture intermediate \"{}\" is {} bytes; expected more than its {}-byte header.", mInputPath.string(), iFileSize, header.iPayloadOffset));
 	}
 
-	// 16384 / 15 match TextureUploadManager::ValidateTextureDimensions (the VkPhysicalDeviceLimits::
-	// maxImageDimension2D guaranteed floor class, and log2(16384) + 1 mips), so anything published here
-	// still uploads at runtime; they also keep every zlib-path mip chain inside uLongf.
+	// 16384 / 15 match TextureUploadManager::ValidateTextureDimensions' fixed pack ceilings. Runtime also
+	// validates the actual mip chain and selected device capabilities; these bounds keep every zlib-path mip
+	// chain inside uLongf.
 	if (iWidth <= 0 || iHeight <= 0 || iMipMaps <= 0 || iWidth > 16384 || iHeight > 16384 || iMipMaps > 15)
 	{
 		throw std::runtime_error(std::format("Texture intermediate \"{}\" declares invalid dimensions {}x{} with {} mips.", mInputPath.string(), iWidth, iHeight, iMipMaps));

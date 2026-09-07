@@ -263,6 +263,7 @@ void TextureUploadManager::UploadThread()
 			}
 
 			LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(mCurrentCrc);
+			ValidateTextureDimensions(rLazyChunk);
 
 			if (HandleUploadEarlyOut(rLazyChunk))
 			{
@@ -286,10 +287,6 @@ void TextureUploadManager::UploadThread()
 				.uiBaseWidth = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth),
 				.uiBaseHeight = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight),
 			};
-
-			// Trust boundary: TextureHeader dims/mips are on-disk pack bytes that drive a VkImageCreateInfo GPU
-			// allocation and the mip-iteration copy loop, so this halts on a corrupt header before either runs.
-			ValidateTextureDimensions(rLazyChunk, dimensions);
 
 			// First chunk: create VkImage via VMA
 			if (bFirstChunk)
@@ -410,20 +407,38 @@ bool TextureUploadManager::HandleUploadEarlyOut(LazyChunk& rLazyChunk)
 	return false;
 }
 
-void TextureUploadManager::ValidateTextureDimensions(const LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions)
+void TextureUploadManager::ValidateTextureDimensions(const LazyChunk& rLazyChunk)
 {
-	// TextureHeader dims/mips have no DataFile.h structural maximum, so bound two ways: (1) a sane absolute ceiling
-	// well above any shipped asset (kiMaxTextureDimension covers the device maxImageDimension2D class; mips capped at
-	// log2(16384)+1) so a hostile value cannot drive a huge VkImage; (2) the chunk's actual data bytes — the full
-	// mip chain across all layers must fit rLazyChunk.iDataSize, so the copy loop cannot read off pData. Bounding
-	// dims/mips first keeps the ComputeImageByteSize math from overflowing on a hostile input.
-	static constexpr int64_t kiMaxTextureDimension = 16384; // VkPhysicalDeviceLimits::maxImageDimension2D guaranteed floor class
-	static constexpr int64_t kiMaxMipLevels = 15;           // log2(16384) + 1
-	ASSERT(rDimensions.uiBaseWidth != 0 && rDimensions.uiBaseHeight != 0 && rDimensions.uiMipLevels != 0
-		&& rDimensions.uiBaseWidth <= kiMaxTextureDimension && rDimensions.uiBaseHeight <= kiMaxTextureDimension
-		&& rDimensions.uiMipLevels <= kiMaxMipLevels);
+	static constexpr int64_t kiMaxTextureDimension = 16'384;
+	static constexpr int64_t kiMaxMipLevels = 15;
 
-	int64_t iExpectedBytes = common::ComputeImageByteSize(rDimensions.vkFormat, rDimensions.uiBaseWidth, rDimensions.uiBaseHeight, rDimensions.uiMipLevels, rDimensions.uiArrayLayers, 1);
+	const common::TextureHeader& rTextureHeader = rLazyChunk.header.textureHeader;
+	ASSERT(rTextureHeader.iTextureWidth > 0);
+	ASSERT(rTextureHeader.iTextureHeight > 0);
+	ASSERT(rTextureHeader.iMipLevels > 0);
+	ASSERT(rTextureHeader.iTextureWidth <= kiMaxTextureDimension);
+	ASSERT(rTextureHeader.iTextureHeight <= kiMaxTextureDimension);
+	ASSERT(rTextureHeader.iMipLevels <= kiMaxMipLevels);
+
+	uint64_t uiMaxDimension = static_cast<uint64_t>(std::max(rTextureHeader.iTextureWidth, rTextureHeader.iTextureHeight));
+	ASSERT(rTextureHeader.iMipLevels <= static_cast<int64_t>(std::bit_width(uiMaxDimension)));
+
+	bool bCubemap = rLazyChunk.header.flags & common::ChunkFlags::kCubemap;
+	VkImageCreateFlags vkImageCreateFlags = bCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : static_cast<VkImageCreateFlags>(0);
+	VkImageFormatProperties vkImageFormatProperties {};
+	VkResult eVkResult = vkGetPhysicalDeviceImageFormatProperties(gpInstanceManager->mVkPhysicalDevice, rTextureHeader.vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, vkImageCreateFlags, &vkImageFormatProperties);
+	ASSERT(eVkResult == VK_SUCCESS);
+	ASSERT(rTextureHeader.iTextureWidth <= static_cast<int64_t>(vkImageFormatProperties.maxExtent.width));
+	ASSERT(rTextureHeader.iTextureHeight <= static_cast<int64_t>(vkImageFormatProperties.maxExtent.height));
+	ASSERT(rTextureHeader.iMipLevels <= static_cast<int64_t>(vkImageFormatProperties.maxMipLevels));
+
+	if (bCubemap)
+	{
+		ASSERT(rTextureHeader.iTextureWidth == rTextureHeader.iTextureHeight);
+	}
+
+	int64_t iArrayLayers = bCubemap ? 6 : 1;
+	int64_t iExpectedBytes = common::ComputeImageByteSize(rTextureHeader.vkFormat, rTextureHeader.iTextureWidth, rTextureHeader.iTextureHeight, rTextureHeader.iMipLevels, iArrayLayers, 1);
 	ASSERT(iExpectedBytes > 0 && iExpectedBytes <= rLazyChunk.iDataSize);
 }
 
