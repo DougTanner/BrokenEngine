@@ -45,7 +45,7 @@ Preserve these invariants:
 
 ## Coordination
 
-`Documents/Plans/Engine/TextureFramebufferTeardownOrdering.md` owns the reusable `Texture::Destroy` path for render-target framebuffers. Keep this manager-owned spread ordering separate, and preserve the common Graphics synchronization before either destruction path.
+Keep the manager-owned spread ordering scoped to the lighting teardown path, and preserve the existing Graphics synchronization before destruction.
 
 ## Notes
 
