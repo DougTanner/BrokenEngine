@@ -97,9 +97,10 @@ IMPORTANT do not use auto in range-based for loops
 
 17. Use size_t for std::vector sizes and indices: for (size_t i = 0; i < vec.size(); ++i)
 
-18. Use "const" if:
+18. Use "const" for read-only reference and pointee contracts:
 	a) A pointer or reference is passed into a function and not modified: const game::MenuInput& rMenuInput
 	b) A reference in a ranged for loop is not modified: for (const Island& rIsland : mIslands)
+	Do not add top-level "const" to local value variables. Use a normal variable for runtime values, or follow rule 25 for compile-time constants.
 
 19. Use "typename" not "class" for template declarations, template parameters should be in all upper case ex: template <typename T, typename... TUV>
 

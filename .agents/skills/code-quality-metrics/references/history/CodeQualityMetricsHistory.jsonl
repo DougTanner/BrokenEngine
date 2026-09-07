@@ -947,3 +947,4 @@
 {"index":945,"date":"2026-09-07","captureMode":"cpp-change","verbosity":0.037234436302,"structuralErosion":0.537275658503,"supported":527,"parsed":526}
 {"index":946,"date":"2026-09-07","captureMode":"cpp-change","verbosity":0.037231680237,"structuralErosion":0.537275658503,"supported":529,"parsed":528}
 {"index":947,"date":"2026-09-07","captureMode":"carry-forward","verbosity":0.037231680237,"structuralErosion":0.537275658503,"supported":529,"parsed":528}
+{"index":948,"date":"2026-09-07","captureMode":"cpp-change","verbosity":0.037215152412,"structuralErosion":0.537870085953,"supported":529,"parsed":528}

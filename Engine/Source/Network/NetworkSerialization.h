@@ -22,6 +22,10 @@ inline constexpr int64_t kiMaxStatusChangeBytesPerItem = 120;
 // free of the game enum's type count).
 inline constexpr int64_t kiMaxSerializedStatusChangeBatchBytes = kiMaxStatusChangesPerCell * (kiMaxStatusChangeBytesPerItem + 3);
 
+// Maximum nested Workbuffer high-water while CompressStatusChangeBatch consumes its input: serialized bytes,
+// worst-case alignment before the sorted-index reservation, and one int64_t index per status change.
+inline constexpr int64_t kiMaxCompressStatusChangeWorkbufferBytes = kiMaxSerializedStatusChangeBatchBytes + 15 + kiMaxStatusChangesPerCell * static_cast<int64_t>(sizeof(int64_t));
+
 // Worst-case bytes CompressStatusChangeBatch can emit for a valid capped batch (4-byte uncompressed-size prefix +
 // LZ4 payload). Sizes the server's reused compression scratch so any valid batch always fits; the codec still checks
 // the LZ4 return as a belt.
