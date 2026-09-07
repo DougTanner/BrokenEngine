@@ -20,6 +20,7 @@ $PSNativeCommandUseErrorActionPreference = $false
 
 $script:RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\..'))
 $script:MeasureTokensScript = Join-Path $script:RepositoryRoot '.agents\scripts\Measure-Tokens.ps1'
+$script:MeasureCodeTokensScript = Join-Path $script:RepositoryRoot '.agents\scripts\Measure-CodeTokens.ps1'
 $script:AgentScriptCommon = Join-Path $script:RepositoryRoot '.agents\scripts\AgentScriptCommon.psm1'
 $script:MaximumOutputBytes = 8192
 $script:MaximumMessageLength = 256
@@ -35,10 +36,13 @@ $script:StubSweepExclusions = @(
 
 $script:DocumentFileNames = @('AGENTS.md', 'CLAUDE.md', 'CLAUDE.local.md')
 $script:StubBody = '@AGENTS.md'
-$script:LeafTokenTarget = 2000
-$script:HubTokenTarget = 4000
+$script:BudgetFloor = 1000
+$script:CodeTokenSlope = 35
+$script:DirectChildDocumentAllowance = 150
+$script:BudgetOverrides = [Collections.Generic.Dictionary[string, int64]]::new([StringComparer]::Ordinal)
+$script:BudgetOverrides.Add('Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md', 2003)
 # The repository-root AGENTS.md is imported into every session and keeps its
-# workflow rules front and center, so it carries a higher budget than other hubs.
+# workflow rules front and center, so it carries a fixed budget.
 $script:RootHubTokenTarget = 8000
 $script:ChainTokenTarget = 15000
 $script:ChainTokenWarning = 20000
@@ -282,20 +286,23 @@ function Get-HubCandidate
 	return ,$candidates
 }
 
-function Test-HubDocument
+function Get-DirectChildDocumentCount
 {
 	param([string] $AgentsPath)
 
-	$prefix = Get-DescendantPrefix $AgentsPath
+	$directory = Get-ParentDirectory $AgentsPath
+	$count = 0
 	foreach ($other in $script:AgentsPaths)
 	{
-		if ($other -cne $AgentsPath -and $other.StartsWith($prefix, [StringComparison]::Ordinal))
+		if ($other -ceq $AgentsPath) { continue }
+		$otherDirectory = Get-ParentDirectory $other
+		if ((Get-ParentDirectory $otherDirectory) -ceq $directory)
 		{
-			return $true
+			$count++
 		}
 	}
 
-	return $false
+	return $count
 }
 
 # Delegates the bt-token-v1 estimate to the existing Measure-Tokens.ps1 rather
@@ -329,6 +336,58 @@ function Measure-DocumentToken
 	for ($index = 0; $index -lt $RelativePath.Count; $index++)
 	{
 		$measured[$RelativePath[$index]] = [int64] $entries[$index].Tokens
+	}
+
+	return $measured
+}
+
+# Measures every chain-document directory in one child invocation and maps the
+# ordered folder results back to their documents.
+function Measure-CodeToken
+{
+	param([string[]] $RelativePath)
+
+	$measured = @{}
+	if ($RelativePath.Count -eq 0)
+	{
+		return $measured
+	}
+
+	$folders = @($RelativePath | ForEach-Object {
+		$directory = Get-ParentDirectory $_
+		if ($directory -ceq '') { $script:RepositoryRoot } else { Join-Path $script:RepositoryRoot $directory }
+	})
+	$quoted = ($folders | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
+	$command = "& '" + $script:MeasureCodeTokensScript.Replace("'", "''") + "' -Path $quoted"
+	$output = (& pwsh -NoProfile -Command $command 2>&1) -join "`n"
+	if ($LASTEXITCODE -ne 0)
+	{
+		throw "Measure-CodeTokens.ps1 exited with $LASTEXITCODE`: $output"
+	}
+
+	$parsed = $output | ConvertFrom-Json -Depth 8
+	if ($parsed.metric -cne 'bt-token-v1' -or $null -eq $parsed.folders)
+	{
+		throw 'Measure-CodeTokens.ps1 returned a malformed envelope.'
+	}
+
+	$entries = @($parsed.folders)
+	if ($entries.Count -ne $RelativePath.Count)
+	{
+		throw "Measure-CodeTokens.ps1 returned $($entries.Count) entries for $($RelativePath.Count) paths."
+	}
+
+	for ($index = 0; $index -lt $RelativePath.Count; $index++)
+	{
+		$entry = $entries[$index]
+		if ($null -eq $entry.path -or $null -eq $entry.codeFileCount -or $null -eq $entry.tokens -or
+			(Get-AgentCanonicalPath $entry.path) -cne (Get-AgentCanonicalPath $folders[$index]) -or
+			[int64] $entry.codeFileCount -lt 0 -or [int64] $entry.tokens -lt 0)
+		{
+			throw "Measure-CodeTokens.ps1 returned a malformed entry at index $index."
+		}
+
+		$measured[$RelativePath[$index]] = [int64] $entry.tokens
 	}
 
 	return $measured
@@ -386,18 +445,38 @@ try
 
 	$chainDocuments.Sort([StringComparer]::Ordinal)
 	$measured = Measure-DocumentToken ([string[]] $chainDocuments)
+	$codeMeasured = Measure-CodeToken ([string[]] $chainDocuments)
 	$sizeItems = [Collections.Generic.List[object]]::new()
 	foreach ($document in $chainDocuments)
 	{
 		$tokens = $measured[$document]
-		$isHub = Test-HubDocument $document
-		$target = if ($document -ceq 'AGENTS.md') { $script:RootHubTokenTarget } elseif ($isHub) { $script:HubTokenTarget } else { $script:LeafTokenTarget }
+		$codeTokens = $codeMeasured[$document]
+		$directChildDocumentCount = Get-DirectChildDocumentCount $document
+		if ($document -ceq 'AGENTS.md')
+		{
+			$budgetRule = 'root'
+			$budget = $script:RootHubTokenTarget
+		}
+		elseif ($script:BudgetOverrides.ContainsKey($document))
+		{
+			$budgetRule = 'override'
+			$budget = $script:BudgetOverrides[$document]
+		}
+		else
+		{
+			$budgetRule = 'formula'
+			$rawBudget = $script:BudgetFloor + $script:CodeTokenSlope * ($codeTokens / 1000.0) + $script:DirectChildDocumentAllowance * $directChildDocumentCount
+			$budget = [int64] [Math]::Round($rawBudget, 0, [MidpointRounding]::AwayFromZero)
+		}
+
 		$sizeItems.Add([ordered]@{
 			path = $document
-			kind = if ($isHub) { 'hub' } else { 'leaf' }
+			codeTokens = $codeTokens
+			directChildDocumentCount = $directChildDocumentCount
+			budget = $budget
 			tokens = $tokens
-			target = $target
-			verdict = if ($tokens -le $target) { 'ok' } else { 'over-target' }
+			budgetRule = $budgetRule
+			verdict = if ($tokens -le $budget) { 'ok' } else { 'over-target' }
 		})
 	}
 

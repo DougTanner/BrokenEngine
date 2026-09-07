@@ -25,19 +25,16 @@ the modes, the inputs, and the handoff.
    - Never reconstruct these operations inline — walking the hierarchy,
      sweeping stub pairs, or measuring sizes by hand.
    - Done when a `pass` payload is in hand or the `error` code is reported.
-   - `chains` — per changed path, the root-to-leaf governing `AGENTS.md`
+   - `chains` — per changed path, the root-to-nearest governing `AGENTS.md`
      documents in `documents`, the nearest one in `governing`, and
      `hubCandidates`, the immediate descendant documents whose duplicated
-     guidance a hub edit can make stale.
+     guidance an ancestor-document edit can make stale.
      - A directly named documentation path governs itself.
-   - `sizes` — the `bt-token-v1` size of each chain document with its `hub` or
-     `leaf` classification and target (4,000 and 2,000; the repository-root
-     `AGENTS.md` alone uses 8,000), plus each chain's `totalTokens` against the
-     15,000 target and 20,000 warning.
-     - These deterministic normalized-byte estimates are advisory, not exact
-       model tokens, and no verdict authorizes trimming: reduce only prose this
-       change affects, and report pre-existing unrelated excess without
-       trimming it.
+   - `sizes` — each chain document's `bt-token-v1` size, direct code-token and
+     child-document inputs, advisory budget, applied budget rule, and verdict,
+     plus each chain's `totalTokens` against the 15,000 target and 20,000
+     warning. [`content-rules.md`](content-rules.md) owns how to respond to an
+     over-budget verdict; the discovery script owns the calculation.
    - `stubPairs` — the repository-wide bidirectional pairing sweep, excluding
      the paths `.agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1`
      `$script:StubSweepExclusions` lists.

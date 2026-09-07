@@ -55,8 +55,10 @@ Steps and rules for the dispatched reviewer. The public
   threshold. No owner named, no finding.
 - Leave frontmatter, discovery, invocation policy, and bundled-link mechanics
   to `/validate-skill`.
-- Leave `AGENTS.md` content correctness, chain sync, and leaf/hub size targets
-  to `/update-claude-docs`.
+- Leave `AGENTS.md` content correctness, chain sync, and advisory budget
+  assessment to `/update-claude-docs`; its
+  [`content-rules.md`](../../update-claude-docs/references/content-rules.md)
+  owns the response to an over-budget verdict.
 - Leave C++ and GLSL comment content to `/comment-review` and formatting to
   `/code-style-review`.
 - Leave scope authorization and unnecessary extra work to the Review and

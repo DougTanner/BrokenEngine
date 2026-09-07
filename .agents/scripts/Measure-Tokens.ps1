@@ -17,6 +17,7 @@ $ErrorActionPreference = 'Stop'
 
 try
 {
+	Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 	$hasStartLine = $PSBoundParameters.ContainsKey('StartLine')
 	$hasEndLine = $PSBoundParameters.ContainsKey('EndLine')
 	if (($hasStartLine -or $hasEndLine) -and $Path.Count -ne 1)
@@ -29,7 +30,6 @@ try
 		throw '-StartLine must be less than or equal to -EndLine.'
 	}
 
-	$strictUtf8 = [System.Text.UTF8Encoding]::new($false, $true)
 	$normalizedUtf8 = [System.Text.UTF8Encoding]::new($false)
 	$results = foreach ($inputPath in $Path)
 	{
@@ -39,15 +39,7 @@ try
 			throw "Path is not a file: $inputPath"
 		}
 
-		$rawBytes = [System.IO.File]::ReadAllBytes($item.FullName)
-		$offset = 0
-		if ($rawBytes.Length -ge 3 -and $rawBytes[0] -eq 0xEF -and $rawBytes[1] -eq 0xBB -and $rawBytes[2] -eq 0xBF)
-		{
-			$offset = 3
-		}
-
-		$text = $strictUtf8.GetString($rawBytes, $offset, $rawBytes.Length - $offset)
-		$text = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+		$text = Get-AgentNormalizedText ([System.IO.File]::ReadAllBytes($item.FullName))
 		$selectedStartLine = $null
 		$selectedEndLine = $null
 		$lineCount = if ($text.Length -eq 0)
@@ -77,7 +69,7 @@ try
 		}
 
 		$byteCount = $normalizedUtf8.GetByteCount($text)
-		$tokenCount = [int64](($byteCount + 3) -shr 2)
+		$tokenCount = Measure-AgentTokenCount $text
 		[pscustomobject][ordered]@{
 			Metric = 'bt-token-v1'
 			Path = $item.FullName
