@@ -121,7 +121,11 @@ void XM_CALLCONV SpaceshipsPostRender::ApplyMovement(Frame& __restrict rFrame, c
 	                    : flags & kFleePlayer ? kfSpaceshipFleeAcceleration
 	                    : kfSpaceshipChaseAcceleration;
 	rVecVelocity = engine::ApplyMovement<true>(rVecVelocity, rCurrentInterpolate.pVecDirections[i], fDeltaTime, fAcceleration, kfSpaceshipDrag, kfSpaceshipMaxSpeed, kfSpaceshipVelocityToDirection);
+	ApplyPusherResponse(rFrame, rCurrentInterpolate, i, rVecVelocity);
+}
 
+void XM_CALLCONV SpaceshipsPostRender::ApplyPusherResponse(Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, XMVECTOR& rVecVelocity)
+{
 	// Apply push from nearby pushers (pass own pusher ID to ignore self-push)
 	XMVECTOR vecPush = engine::PushersInterpolate::ApplyPush(rFrame.interpolate, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.puiPushers[i]);
 
@@ -162,6 +166,11 @@ void SpaceshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFram
 	for (int64_t i = iStart; i < iEnd; ++i)
 	{
 		if (rCurrentPostRender.pFlags[i] & kExploding) [[unlikely]]
+		{
+			continue;
+		}
+
+		if (rCurrentPostRender.pfArrivalGracePeriods[i] > 0.0f)
 		{
 			continue;
 		}

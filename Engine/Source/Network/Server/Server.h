@@ -183,6 +183,7 @@ public:
 	const ClientConnection* FindClient(int64_t iClientId) const;
 	void SendCoordFullState(int64_t iClientId, int64_t iSlot, int64_t iTick, GridCoord coord, const game::Frame* pFrame);
 	void SendCoordStaticData(int64_t iClientId, int64_t iSlot, GridCoord coord, const FrameStaticData& rStaticData);
+	void AdvanceLoadGeneration();
 	void BroadcastLoadNotification();
 	// Consume-once: sends only when TimeStep recorded an applied time-scale change since the last call.
 	void BroadcastTimespeedIfChanged();
@@ -243,6 +244,7 @@ private:
 
 	ENetHost* mpHost = nullptr;
 	int64_t miNextClientId = 1;
+	uint8_t muiLoadGeneration = 0;
 
 	// Per-coord ring buffers for re-sends
 	std::unordered_map<GridCoord, std::deque<PerCoordBufferedFrame>> mPerCoordBufferedFrames;

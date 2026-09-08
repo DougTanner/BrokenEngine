@@ -3,6 +3,9 @@
 #include "Agent/AgentCommandServer.h"
 
 #include "Agent/AgentCommands.h"
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+#include "Agent/Commands/AudioStreamingFixture.h"
+#endif
 
 namespace engine
 {
@@ -14,6 +17,9 @@ static constexpr std::chrono::milliseconds kListenerRetryInterval = 50ms;
 static constexpr std::chrono::seconds kResponseFlushTimeout = 3s;
 
 AgentCommandServer::AgentCommandServer(int64_t iPort)
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+	: mpAudioStreamingFixture(std::make_unique<AudioStreamingFixture>())
+#endif
 {
 	// WSAStartup is guaranteed by NetworkManager (enet_initialize), constructed before this.
 
@@ -90,10 +96,19 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 	{
 		ListenerLoop(std::move(stopToken));
 	});
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+	AudioStreamingFixture::Attach(*mpAudioStreamingFixture);
+#endif
 }
 
 AgentCommandServer::~AgentCommandServer()
 {
+	ClearDeferredResponse();
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+	mpAudioStreamingFixture->Shutdown();
+	AudioStreamingFixture::Detach(*mpAudioStreamingFixture);
+	mpAudioStreamingFixture.reset();
+#endif
 	// Request stop, close only the listener under the lock, and wake a pending response wait. The listener owns the
 	// active connection until ServeConnection exits, then performs its one final close before the jthread joins.
 	{
@@ -106,6 +121,15 @@ AgentCommandServer::~AgentCommandServer()
 		}
 	}
 	mResponseReady.notify_all();
+}
+
+void AgentCommandServer::ClearDeferredResponse()
+{
+	mDeferredPoll = nullptr;
+	mDeferredId = nullptr;
+	mbResponseDeferred = false;
+	muiDeferredGeneration = 0;
+	miDeferredDrainCount = 0;
 }
 
 void AgentCommandServer::ListenerLoop(std::stop_token stopToken)

@@ -1,5 +1,8 @@
 #include "Network/Client/ClientSession.h"
 
+#include "Agent/Commands/ClientFullStateFixture.h"
+#include "Agent/Commands/ClientPacketFaultFixture.h"
+#include "Agent/Commands/ClientSubscriptionFixtures.h"
 #include "Fleet.h"
 #include "Game.h"
 #include "Network/GamePacketType.h"
@@ -40,6 +43,9 @@ ClientSession::ClientSession()
 
 ClientSession::~ClientSession()
 {
+	DetachClientPacketFaultFixture(*this);
+	DetachClientFullStateFixture(*this);
+	DetachClientSubscriptionFixtures(*this);
 	mpRuntime.reset();
 	if (gpClientSession == this)
 	{
@@ -251,12 +257,14 @@ void ClientSession::OnServerLoad()
 	gpGame->mCoordFrames.clear();
 
 	// Reset game-owned reconciliation and desync state.
+	ResetClientPacketFaultFixture(*this);
 	mpReconciler->Reset();
 	mpDesyncCore->Reset();
 }
 
 void ClientSession::OnRuntimeDisconnected()
 {
+	ResetClientPacketFaultFixture(*this);
 	mpReconciler->Reset();
 	for (auto& [rCoord, rFrames] : gpGame->mCoordFrames)
 	{

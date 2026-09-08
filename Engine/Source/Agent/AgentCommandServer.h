@@ -3,8 +3,12 @@
 namespace engine
 {
 
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+class AudioStreamingFixture;
+#endif
+
 // Loopback-only (127.0.0.1) TCP JSON command channel embedded in both executables. Transport only — knows no
-// commands; the listener thread reads length-framed request frames, parses them, and hands each to the main
+// dispatch semantics; the listener thread reads length-framed request frames, parses them, and hands each to the main
 // thread via Drain(), which dispatches to game::ExecuteAgentCommand. Dormant unless --agent-port is passed.
 //
 // Framing (both directions): 4-byte little-endian uint32 payload length, then UTF-8 JSON.
@@ -39,6 +43,13 @@ public:
 	// Deferred-poll liveness bound (~30 s at 60 fps): a capture lost to a device-loss Graphics recreation (mailboxes
 	// wiped) never resolves, so cap the wait and publish a failure rather than deadlock the channel forever.
 	static constexpr int64_t kiDeferredTimeoutDrains = 1800;
+
+	// Drops a deferred command while its captured runtime dependencies are still alive.
+	void ClearDeferredResponse();
+
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+	std::unique_ptr<AudioStreamingFixture> mpAudioStreamingFixture;
+#endif
 
 private:
 

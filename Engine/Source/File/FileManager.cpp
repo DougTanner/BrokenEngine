@@ -11,6 +11,23 @@ namespace engine
 
 using enum FileFlags;
 
+#if defined(BT_CLIENT)
+
+ChunkReadRequest::~ChunkReadRequest()
+{
+	Reset();
+}
+
+void ChunkReadRequest::Reset()
+{
+	if (mpPackChunks != nullptr)
+	{
+		mpPackChunks->CancelChunkRead(*this);
+	}
+}
+
+#endif // BT_CLIENT
+
 namespace
 {
 
@@ -419,6 +436,16 @@ bool FileManager::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<
 {
 	return mpPackChunks->ReadChunkData(crc, uiOffset, buffer);
 }
+
+#if defined(BT_CLIENT)
+
+ChunkReadResult FileManager::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer)
+{
+	return mpPackChunks->TryReadChunkData(rRequest, crc, uiOffset, buffer);
+}
+
+
+#endif // BT_CLIENT
 
 void FileManager::NotifyChunkCompletion()
 {

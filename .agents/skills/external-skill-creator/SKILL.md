@@ -19,8 +19,21 @@ Create or improve a skill from the user's intent, repository conventions, and ev
 
 ## Handoff
 
-Report changed package files, decisive validation evidence, token measurements, and unresolved compatibility or workflow decisions. Do not claim cross-client support unless each intended client's controls were configured and checked.
+Return the shared handoff from
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Handoffs`, extended with these fields:
+
+- `Client evidence` — one row per intended client: client and version; structural,
+  loader, observed runtime, and documentation evidence; and unverified behavior.
+- `Size measurements` — one row per changed Markdown file: path, measured
+  `bt-token-v1` count, and applicable threshold result.
+- `Unresolved decisions` — one row per compatibility or workflow choice the
+  manager must settle, or `none`.
+
+Claim support only for the clients and behavior the evidence checks. A loader
+result establishes discovery and parsing, not invocation or tool behavior.
 
 ## References
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you are the session executing this skill. The authoring steps, the repository conventions, and the writing guidance.
+- [`references/validation.md`](references/validation.md) — evidence classes and conditional client checks used in the handoff.

@@ -150,16 +150,55 @@ struct MemoryStats
 	int64_t iCount = 0;
 };
 
+class PackChunks;
+
+#if defined(BT_CLIENT)
+
+enum class ChunkReadResult : uint8_t
+{
+	kRetry,
+	kPending,
+	kReady,
+	kFailed,
+};
+
+class ChunkReadRequest
+{
+public:
+	ChunkReadRequest() = default;
+	~ChunkReadRequest();
+
+	ChunkReadRequest(const ChunkReadRequest&) = delete;
+	ChunkReadRequest& operator=(const ChunkReadRequest&) = delete;
+	ChunkReadRequest(ChunkReadRequest&&) = delete;
+	ChunkReadRequest& operator=(ChunkReadRequest&&) = delete;
+
+	void Reset();
+
+private:
+	friend class PackChunks;
+
+#if defined(BT_DEBUG)
+public:
+#endif
+	PackChunks* mpPackChunks = nullptr;
+	uint32_t uiEntryIndex = std::numeric_limits<uint32_t>::max();
+	uint64_t uiGeneration = 0;
+private:
+	common::crc_t crc = 0;
+	uint64_t uiOffset = 0;
+	uint64_t uiLength = 0;
+};
+
+#endif // BT_CLIENT
+
 constexpr bool IsEagerChunk(data::DataTypes eDataType);
 // Server-only predicate: which lazy data types the headless server actually consumes.
 // Used to skip opening (and locking) pack files the server never reads — Audio, Texture, etc.
 constexpr bool IsServerChunk(data::DataTypes eDataType);
 
 // Owned by FileManager (std::unique_ptr, forward-declared for the compile firewall): the packed-asset chunk
-// engine (eager buffers, lazy maps, loading threads, VirtualAlloc pool). Definition in PackChunks.h, included
-// only by PackChunks.cpp + FileManager.cpp.
-class PackChunks;
-
+// engine (eager buffers, lazy maps, loading threads, VirtualAlloc pool).
 class FileManager
 {
 public:
@@ -192,6 +231,10 @@ public:
 	
 	// Streaming API for reading data at specific offset within a chunk
 	bool ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
+
+#if defined(BT_CLIENT)
+	ChunkReadResult TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
+#endif // BT_CLIENT
 
 	// Notification for chunk completion (wakes WaitForChunks waiters)
 	void NotifyChunkCompletion();
@@ -245,8 +288,11 @@ private:
 	std::filesystem::path mTempDirectory;
 
 	// Packed-asset chunk engine. Owns the eager buffers, lazy maps, loading threads, and VirtualAlloc pool; the
-	// public chunk methods above forward to it. unique_ptr so PackChunks.h stays out of this header's ~20 PCH
+	// public chunk methods above forward to it. unique_ptr keeps PackChunks.h out of this header's ~20 PCH
 	// consumers (out-of-line ~FileManager in the .cpp destroys it where PackChunks is complete).
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+public:
+#endif
 	std::unique_ptr<PackChunks> mpPackChunks;
 };
 

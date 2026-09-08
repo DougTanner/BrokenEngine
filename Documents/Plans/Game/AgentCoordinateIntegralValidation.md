@@ -91,6 +91,14 @@ Preserve these invariants:
 - Server `Debug|x64` builds clean through `/compile`; the existing agent command
   scenario proves invalid requests leave ID and queue state unchanged.
 
+## Coordination
+
+`Documents/Plans/Engine/ExtractServerReplayAgentFixtures.md` moves the
+replay-transfer and status-injection fixture handlers that consume
+`CoordFromParam`. Neither Plan depends on the other: whichever lands second
+must retain one shared integral/range validation boundary before fixture lookup,
+ID allocation, or queue mutation while adapting handler placement.
+
 ## Notes
 
 The consolidated index records external proposition `CAI-EXT-014` for the

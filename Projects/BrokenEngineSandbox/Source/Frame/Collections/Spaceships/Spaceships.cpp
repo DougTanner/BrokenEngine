@@ -466,6 +466,11 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			continue;
 		}
 
+		if (rCurrentPostRender.pfArrivalGracePeriods[i] > 0.0f)
+		{
+			continue;
+		}
+
 		// Find nearest alive player for blaster targeting
 		XMVECTOR vecNearestPlayer = XMVectorZero();
 		if (!NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer))
@@ -633,19 +638,28 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 
 		float fDeltaRotation = rPreviousInterpolate.pfDeltaRotations[i];
 
-		// Find nearest alive player (shared input for RegenerateHealth + ComputeSteering)
-		XMVECTOR vecNearestPlayer = XMVectorZero();
-		bool bPlayerAlive = NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer);
-
-		RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, fDeltaTime, fHealth);
-
 		if (!(flags & kExploding)) [[likely]]
 		{
-			ComputeSteering(islandCandidates, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], bPlayerAlive, vecNearestPlayer, fDeltaTime, flags, fDeltaRotation);
-			ApplyMovement(rFrame, rCurrentInterpolate, i, flags, fDeltaTime, vecVelocity);
+			if (fArrivalGracePeriod > 0.0f)
+			{
+				ApplyPusherResponse(rFrame, rCurrentInterpolate, i, vecVelocity);
+			}
+			else
+			{
+				// Find nearest alive player (shared input for RegenerateHealth + ComputeSteering)
+				XMVECTOR vecNearestPlayer = XMVectorZero();
+				bool bPlayerAlive = NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer);
+
+				RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, fDeltaTime, fHealth);
+				ComputeSteering(islandCandidates, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], bPlayerAlive, vecNearestPlayer, fDeltaTime, flags, fDeltaRotation);
+				ApplyMovement(rFrame, rCurrentInterpolate, i, flags, fDeltaTime, vecVelocity);
+			}
 		}
 		else
 		{
+			XMVECTOR vecNearestPlayer = XMVectorZero();
+			bool bPlayerAlive = NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer);
+			RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, fDeltaTime, fHealth);
 			ApplyDeathKnockback(rPrevious.pVecDamageDirections[i], vecVelocity);
 		}
 

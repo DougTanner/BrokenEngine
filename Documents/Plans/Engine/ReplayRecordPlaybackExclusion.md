@@ -126,6 +126,14 @@ Preserve these invariants:
   active.
 - Client and server `Debug|x64` builds pass through `/compile`.
 
+## Coordination
+
+`Documents/Plans/Engine/ExtractServerReplayAgentFixtures.md` relocates fixture
+state and lifecycle hooks in the same Agent command, `GameBase`, and `Replay`
+regions. Neither Plan depends on the other: whichever lands second must retain
+this Plan's replay-owner admission and execution-boundary guards while adapting
+to the final fixture ownership boundary.
+
 ## Notes
 
 Origin: `CAI/shard-0012/003`; source selector is the shard line above and the

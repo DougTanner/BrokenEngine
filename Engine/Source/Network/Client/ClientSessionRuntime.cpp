@@ -5,6 +5,7 @@
 #if defined(BT_CLIENT)
 
 #include "Network/Client/Client.h"
+#include "Agent/Commands/ClientNetworkFixtures.h"
 #include "Network/NetworkDiscoveryScanner.h"
 
 #include "Game.h"
@@ -78,6 +79,19 @@ bool ContainsCoordinate(const GridCoord* pCoordinates, int64_t iCount, GridCoord
 	return false;
 }
 
+ClientNetworkFixtures::CoordUpdateState QueryFixtureCoordUpdateState(GridCoord coord, int64_t iTick)
+{
+	auto coordIt = game::gpGame->mCoordFrames.find(coord);
+	if (coordIt == game::gpGame->mCoordFrames.end())
+	{
+		return {};
+	}
+	ClientNetworkFixtures::CoordUpdateState state {.iConfirmedTick = coordIt->second.iConfirmedTick};
+	state.flags.Set(ClientNetworkFixtures::CoordUpdateFlags::kPresent);
+	state.flags.Set(ClientNetworkFixtures::CoordUpdateFlags::kUpdateRetained, coordIt->second.serverUpdates.contains(iTick));
+	return state;
+}
+
 } // namespace
 
 ClientSessionRuntime::ClientSessionRuntime(game::ClientSession& rSession)
@@ -136,6 +150,7 @@ void ClientSessionRuntime::Disconnect()
 {
 	// Heap: Client/ENet and discovery teardown may allocate during cleanup
 	ScopedSuppressAllocationTracking suppress;
+	ClientNetworkFixtures::Detach();
 	mpClient.reset();
 	mpDiscoveryScanner.reset();
 	ResetClock();
@@ -177,12 +192,6 @@ void ClientSessionRuntime::PollDiscovery()
 
 void ClientSessionRuntime::ResetForServerLoad()
 {
-	if (std::shared_ptr<ClientStaleUpdateFixtureState> pState = mpClient->mStaleUpdateFixture.lock(); pState != nullptr)
-	{
-		pState->packet.clear();
-		pState->flags.Set(ClientStaleUpdateFixtureFlags::kReset);
-		mpClient->mStaleUpdateFixture.reset();
-	}
 	ResetClock();
 	mpClient->mSmoothedJitterUs.Reset();
 	mpClient->mStateFlags.Clear(Client::ClientStateFlags::kHasLastUpdateArrival);
@@ -251,59 +260,19 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		}
 		return;
 	}
-
-	if (mpClient->DrainLoadNotification())
+	if (std::optional<uint8_t> uiLoadGeneration = mpClient->DrainLoadNotification(); uiLoadGeneration.has_value())
 	{
+		mpClient->muiCommittedLoadGeneration = *uiLoadGeneration;
 		ResetForServerLoad();
 		mrSession.OnServerLoad();
 	}
-	std::shared_ptr<ClientStaleUpdateFixtureState> pDeliveredFixture;
-	if (std::shared_ptr<ClientStaleUpdateFixtureState> pState = mpClient->mStaleUpdateFixture.lock(); pState != nullptr)
-	{
-		if (++pState->iCapturePolls > kiNetworkBufferSize)
-		{
-			pState->packet.clear();
-			pState->flags.Set(ClientStaleUpdateFixtureFlags::kBoundExpired);
-			mpClient->mStaleUpdateFixture.reset();
-		}
-		else if ((pState->flags & ClientStaleUpdateFixtureFlags::kCaptured) && pState->iCapturePolls > pState->iCapturedAtPoll + 1
-		      && pState->uiSlotIndex < mpClient->mCoordSlots.size())
-		{
-			ClientCoordSlot& rSlot = mpClient->mCoordSlots.at(pState->uiSlotIndex);
-			auto coordIt = game::gpGame->mCoordFrames.find(pState->coord);
-			if (rSlot.eState == CoordSubscriptionState::kActive && rSlot.coord == pState->coord && rSlot.ackState.uiEpoch == pState->uiEpoch
-			 && rSlot.ackState.iAckFloor >= pState->iTick && coordIt != game::gpGame->mCoordFrames.end()
-			 && coordIt->second.iConfirmedTick >= pState->iTick)
-			{
-				pState->iAckFloorBefore = rSlot.ackState.iAckFloor;
-				pState->iConfirmedBefore = coordIt->second.iConfirmedTick;
-				std::vector<uint8_t> packet = std::move(pState->packet);
-				pState->packet.clear();
-				mpClient->mStaleUpdateFixture.reset();
-				mpClient->Receive(packet);
-				pState->iAckFloorAfter = rSlot.ackState.iAckFloor;
-				pDeliveredFixture = std::move(pState);
-			}
-		}
-	}
+	std::shared_ptr<ClientNetworkFixtures::StaleUpdateState> pDeliveredFixture =
+		ClientNetworkFixtures::PollBeforeDrain(*mpClient, &QueryFixtureCoordUpdateState);
 	mrSession.ProcessReceivedGamePackets();
 	mrSession.ApplyReceivedStaticData();
 	ApplyReceivedFullStates();
 	ApplyReceivedUpdates();
-	if (pDeliveredFixture != nullptr)
-	{
-		auto coordIt = game::gpGame->mCoordFrames.find(pDeliveredFixture->coord);
-		pDeliveredFixture->iConfirmedAfter = coordIt != game::gpGame->mCoordFrames.end() ? coordIt->second.iConfirmedTick : -1;
-		if (coordIt != game::gpGame->mCoordFrames.end() && coordIt->second.serverUpdates.contains(pDeliveredFixture->iTick))
-		{
-			pDeliveredFixture->flags.Set(ClientStaleUpdateFixtureFlags::kRetainedAfterDrain);
-		}
-		if (mpClient->mStateFlags & Client::ClientStateFlags::kConnected)
-		{
-			pDeliveredFixture->flags.Set(ClientStaleUpdateFixtureFlags::kConnectedAfterDrain);
-		}
-		pDeliveredFixture->flags.Set(ClientStaleUpdateFixtureFlags::kComplete);
-	}
+	ClientNetworkFixtures::PollAfterDrain(*mpClient, pDeliveredFixture, &QueryFixtureCoordUpdateState);
 
 	SendAckAndFlush();
 }
@@ -541,6 +510,10 @@ void ClientSessionRuntime::SetDesiredCoords(const GridCoord* pDesiredCoords, int
 void ClientSessionRuntime::SynchronizeSubscriptions()
 {
 	if (mpClient == nullptr)
+	{
+		return;
+	}
+	if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted))
 	{
 		return;
 	}

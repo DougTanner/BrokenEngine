@@ -1,5 +1,6 @@
 #include "Pch.h"
 
+#include "Agent/Commands/ClientNetworkFixtures.h"
 #include "Network/Client/Client.h"
 
 #if defined(BT_CLIENT)
@@ -67,6 +68,18 @@ void Client::ClearSubscribingPlaceholder(GridCoord coord)
 	{
 		FreeSlot(iSlot);
 	}
+}
+
+std::optional<uint8_t> Client::DrainLoadNotification()
+{
+	if (!(mStateFlags & ClientStateFlags::kLoadNotificationReceived))
+	{
+		return std::nullopt;
+	}
+	mStateFlags.Clear(ClientStateFlags::kLoadNotificationReceived);
+	std::optional<uint8_t> uiLoadGeneration = muiPendingLoadGeneration;
+	muiPendingLoadGeneration.reset();
+	return uiLoadGeneration;
 }
 
 bool Client::IsStaleRetainedEpoch(int64_t iSlot, uint16_t uiEpoch, GridCoord coord) const
@@ -180,6 +193,11 @@ void Client::ServerCoordFullState(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerCoordFullStateMessage message {};
 	NetworkMessages::Read(packetData, message);
+	if (message.uiLoadGeneration != muiCommittedLoadGeneration)
+	{
+		LOG(kNetwork, kWarning, "Client::ServerCoordFullState Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, muiCommittedLoadGeneration);
+		return;
+	}
 
 	uint8_t uiSlotIndex = message.uiSlotIndex;
 	uint16_t uiEpoch = message.uiEpoch;
@@ -270,6 +288,11 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerCoordStaticDataMessage message {};
 	NetworkMessages::Read(packetData, message);
+	if (message.uiLoadGeneration != muiCommittedLoadGeneration)
+	{
+		LOG(kNetwork, kWarning, "Client::ServerCoordStaticData Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, muiCommittedLoadGeneration);
+		return;
+	}
 
 	uint8_t uiSlotIndex = message.uiSlotIndex;
 	uint16_t uiEpoch = message.uiEpoch;
@@ -345,6 +368,11 @@ void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool
 {
 	auto receive = [this, bProcessRtt, packetData](const NetworkMessages::CoordUpdateFields& rMessage)
 	{
+		if (rMessage.uiLoadGeneration != muiCommittedLoadGeneration)
+		{
+			LOG(kNetwork, kWarning, "Client::ServerCoordUpdateOrResend Dropped mismatched load generation Packet: {} Current: {}", rMessage.uiLoadGeneration, muiCommittedLoadGeneration);
+			return;
+		}
 		// Pipeline RTT: read echoed client timestamp (monotonic guard prevents duplicate processing during multi-frame ticks)
 		if (bProcessRtt && rMessage.iEchoedTimestampNs > 0 && rMessage.iEchoedTimestampNs > miLastEchoedTimestampNs)
 		{
@@ -410,19 +438,7 @@ void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool
 
 		if (bProcessRtt)
 		{
-			if (std::shared_ptr<ClientStaleUpdateFixtureState> pState = mStaleUpdateFixture.lock(); pState != nullptr
-			 && !(pState->flags & ClientStaleUpdateFixtureFlags::kCaptured))
-			{
-				// Heap: the fixture owns one exact packet copy and releases it before recursive delivery.
-				pState->packet.assign(packetData.begin(), packetData.end());
-				pState->iCapturedBytes = std::ssize(packetData);
-				pState->iCapturedAtPoll = pState->iCapturePolls;
-				pState->uiSlotIndex = rMessage.uiSlotIndex;
-				pState->uiEpoch = rMessage.uiEpoch;
-				pState->iTick = rMessage.iTick;
-				pState->coord = mCoordSlots.at(rMessage.uiSlotIndex).coord;
-				pState->flags.Set(ClientStaleUpdateFixtureFlags::kCaptured);
-			}
+			ClientNetworkFixtures::CaptureStaleUpdate(*this, packetData, rMessage.uiSlotIndex, rMessage.uiEpoch, rMessage.iTick);
 		}
 	};
 
@@ -470,6 +486,11 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 
 	if (bAccepted)
 	{
+		if (mStateFlags & ClientStateFlags::kConnectionAccepted)
+		{
+			return;
+		}
+		muiCommittedLoadGeneration = message.uiLoadGeneration;
 		mStateFlags.Set(ClientStateFlags::kConnectionAccepted);
 
 		if (message.bHasGuid)
@@ -506,6 +527,11 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerSubscribeAcceptMessage message {};
 	NetworkMessages::Read(packetData, message);
+	if (message.uiLoadGeneration != muiCommittedLoadGeneration)
+	{
+		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, muiCommittedLoadGeneration);
+		return;
+	}
 
 	uint8_t uiSlotIndex = message.uiSlotIndex;
 	uint16_t uiEpoch = message.uiEpoch;
@@ -528,13 +554,7 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
-		if (mpSubscribeAcceptFixtureResult != nullptr)
-		{
-			mpSubscribeAcceptFixtureResult->uiSerializedSlot = unsubscribe.uiSlotIndex;
-			mpSubscribeAcceptFixtureResult->iSerializedBytes = std::ssize(rWorkbuffer.View());
-			mpSubscribeAcceptFixtureResult->bSendSuppressed = true;
-		}
-		else
+		if (!ClientNetworkFixtures::ObserveSubscribeAcceptCleanup(*this, unsubscribe.uiSlotIndex, std::ssize(rWorkbuffer.View())))
 		{
 			NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 		}
@@ -619,17 +639,22 @@ void Client::ServerUnsubscribeAck(std::span<const uint8_t> packetData)
 	}
 
 	FreeSlot(uiSlotIndex);
-	if (std::shared_ptr<ClientCancelledSubscriptionFixtureState> pState = mCancelledSubscriptionFixture.lock();
-		pState != nullptr && pState->iSlot == uiSlotIndex)
-	{
-		pState->eOutcome = ClientCancelledSubscriptionFixtureOutcome::kAcked;
-	}
+	ClientNetworkFixtures::ObserveUnsubscribeAck(*this, uiSlotIndex);
 }
 
 void Client::ServerLoadNotification(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerLoadNotificationMessage message {};
 	NetworkMessages::Read(packetData, message);
+	if (message.uiLoadGeneration <= muiCommittedLoadGeneration)
+	{
+		return;
+	}
+
+	if (!muiPendingLoadGeneration.has_value() || message.uiLoadGeneration > *muiPendingLoadGeneration)
+	{
+		muiPendingLoadGeneration = message.uiLoadGeneration;
+	}
 
 	mReceivedGamePackets.clear();
 	mStateFlags.Set(ClientStateFlags::kLoadNotificationReceived);

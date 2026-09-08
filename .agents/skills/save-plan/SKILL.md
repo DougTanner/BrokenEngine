@@ -14,7 +14,9 @@ Persist exactly one complete client-supplied proposal.
 
 ## Inputs
 
-For Codex use the latest complete `<proposed_plan>` body; for Claude use the explicitly supplied absolute plan-file path. Do not discover or infer a source from a client-local plan store.
+Resolve the explicitly supplied complete proposal by following
+[`references/worker.md`](references/worker.md#source-selection) `## Source
+selection`.
 
 ## Handoff
 
@@ -27,5 +29,5 @@ Invoking this skill is the user's explicit approval to commit or land the saved 
 ## References
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you
-  are the session executing this skill. Worker entry: the body, review,
-  classification, and write steps, and the rules.
+  are the session executing this skill. Worker entry: source selection, body
+  review, classification and write steps, and the rules.

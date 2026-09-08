@@ -1,6 +1,10 @@
 # Repository Skill Package v2
 
-This is the authoritative schema for Claude-facing `SKILL.md` frontmatter and optional Codex `agents/openai.yaml`. Their invocation controls are independent. Both intentionally use constrained YAML subsets.
+This is the repository authoring contract for Claude-facing `SKILL.md`
+frontmatter and optional Codex `agents/openai.yaml`, not either client's full
+parser specification. The allowlist, YAML forms, lengths, package layout, and
+field relationships below are repository restrictions. Client invocation
+controls remain independent.
 
 ## Document shape
 
@@ -16,9 +20,9 @@ This is the authoritative schema for Claude-facing `SKILL.md` frontmatter and op
 
 | Key | Required | Accepted form | Constraint |
 |---|---:|---|---|
-| `name` | yes | text scalar | Equals parent directory; lowercase letters, digits, and single internal hyphens; at most 64 characters |
-| `description` | yes | text scalar or `>-` | Nonempty; at most 1,024 characters |
-| `when_to_use` | no | text scalar or `>-` | Nonempty; combined with `description` at most 1,536 characters |
+| `name` | yes | text scalar | Equals parent directory; lowercase letters, digits, and single internal hyphens; at most 64 characters (repository rule) |
+| `description` | yes | text scalar or `>-` | Nonempty; at most 1,024 characters (repository rule) |
+| `when_to_use` | no | text scalar or `>-` | Nonempty; combined with `description` at most 1,536 characters (documented Claude limit; Claude appends it to `description`) |
 | `allowed-tools` | no | flow list | String items |
 | `paths` | no | flow list | Nonempty string items |
 | `argument-hint` | no | text scalar | Nonempty |
@@ -30,9 +34,21 @@ This is the authoritative schema for Claude-facing `SKILL.md` frontmatter and op
 | `effort` | no | enum | `low`, `medium`, `high`, `xhigh`, or `max` |
 | `shell` | no | enum | `bash` or `powershell` |
 
-`arguments` and `hooks` are deliberately unsupported. Extend this schema and validator together when a repository skill first needs either field.
+`arguments`, `hooks`, `background`, `license`, `compatibility`, and `metadata`
+are documented Claude fields deliberately excluded from this repository
+subset. A client parser accepting an excluded or unknown field does not add it
+to this allowlist or prove that the client implements its behavior. Extend this
+schema and the validator together when a repository skill first needs one of
+these fields.
 
-`disallowed-tools` is banned outright, not merely unsupported. It removes tools from the *invoking* context for the remainder of the turn, so a skill written for a delegated reviewer strips the caller's own delegation, editing, and user-interview ability when invoked inline — silently, and without leaving the caller a way to ask about it. State a skill's tool bounds in its body instead. Note that omitting a tool from `allowed-tools` restricts nothing; that field only pre-approves.
+`disallowed-tools` is excluded by repository policy because Claude removes its
+listed tools from the *invoking* context for the remainder of the turn. A skill
+written for a delegated reviewer could therefore strip the caller's delegation,
+editing, and user-interview ability when invoked inline. State intended tool
+bounds in the body and use host permission configuration for enforcement.
+Claude's `allowed-tools` pre-approves its listed tools for the invoking turn;
+omitting a tool restricts nothing. Neither field is a portable permission
+boundary.
 
 ## Scalar and list forms
 
@@ -74,10 +90,14 @@ Markdown links whose relative destination begins with `references/`, `scripts/`,
 `interface`, `policy`, and `dependencies` are independently optional top-level objects in `agents/openai.yaml`; at least one must exist. Quote every string, indent with spaces, and omit comments. A present object requires:
 
 - `interface`: nonempty `display_name` and 25–64-character `short_description`; optional nonempty `icon_small`, `icon_large`, `brand_color`, and `default_prompt`. Icons resolve inside the skill, color is `#RRGGBB`, and a default prompt names `$skill-name`.
-- `policy`: exact boolean `allow_implicit_invocation`. `false` disables Codex implicit discovery but preserves explicit invocation.
+- `policy`: exact boolean `allow_implicit_invocation`. `false` disables Codex implicit invocation but preserves explicit invocation.
 - `dependencies`: nonempty `tools`; each item has quoted `type: "mcp"`, `value`, and `description`, with optional quoted `transport` and HTTPS `url`.
 
-This companion file supplies Codex UI, discovery policy, and dependency wiring. Body tool and delegation bounds remain authoritative. Never infer that Claude `disable-model-invocation: true` requires a Codex companion file.
+This companion file supplies Codex UI, invocation policy, and dependency
+wiring. Loading or listing the package does not prove its implicit-invocation
+policy or runtime behavior. Body tool and delegation bounds remain
+authoritative. Never infer that Claude `disable-model-invocation: true`
+requires a Codex companion file.
 
 ## Result contract
 

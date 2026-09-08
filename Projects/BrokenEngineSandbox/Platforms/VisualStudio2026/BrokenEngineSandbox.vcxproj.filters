@@ -7,6 +7,9 @@
     <Filter Include="Engine\Agent">
       <UniqueIdentifier>{237139c6-f52e-48af-b40c-965138daa616}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Agent\Commands">
+      <UniqueIdentifier>{f3a7c1d9-6b2e-4f80-9a5c-1d7e3b8f2c64}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Engine\Data">
       <UniqueIdentifier>{44ff7228-6a3b-47cc-8ddd-f5adb9571e29}</UniqueIdentifier>
     </Filter>
@@ -51,6 +54,9 @@
     </Filter>
     <Filter Include="Game\Agent">
       <UniqueIdentifier>{099eb226-0661-4f95-918e-551150652f03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Agent\Commands">
+      <UniqueIdentifier>{a9d4e7f2-3c6b-4a81-b5e9-0f2d6c8a1b73}</UniqueIdentifier>
     </Filter>
     <Filter Include="Game\Network">
       <UniqueIdentifier>{c5d6e7f8-a9b0-1234-5678-9abcdef01234}</UniqueIdentifier>
@@ -612,11 +618,32 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.h">
       <Filter>Engine\Agent</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\AudioStreamingFixture.h">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\ClientNetworkFixtures.h">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h">
       <Filter>Game\Agent</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Agent\AgentScene.h">
       <Filter>Game\Agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.h">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\ClientSubscriptionFixtures.h">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\ClientFullStateFixture.h">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\ClientDesyncProbe.h">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\ClientPacketFaultFixture.h">
+      <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Collection.h">
       <Filter>Engine\Frame\Collections</Filter>
@@ -1124,6 +1151,12 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.cpp">
       <Filter>Engine\Agent</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\AudioStreamingFixture.cpp">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\ClientNetworkFixtures.cpp">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Agent\AgentCommands.cpp">
       <Filter>Game\Agent</Filter>
     </ClCompile>
@@ -1132,6 +1165,21 @@
     </ClCompile>
     <ClCompile Include="..\..\Source\Agent\AgentScene.cpp">
       <Filter>Game\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.cpp">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\ClientSubscriptionFixtures.cpp">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\ClientFullStateFixture.cpp">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\ClientDesyncProbe.cpp">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\ClientPacketFaultFixture.cpp">
+      <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp">
       <Filter>Engine\Frame</Filter>

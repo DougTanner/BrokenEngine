@@ -44,6 +44,7 @@ void Server::SendCoordFullState(int64_t iClientId, int64_t iSlot, int64_t iTick,
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
 	NetworkMessages::ServerCoordFullStateMessage message {
+		.uiLoadGeneration = muiLoadGeneration,
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = rSlot.ack.uiEpoch,
 		.iTick = iTick,
@@ -77,6 +78,7 @@ void Server::SendCoordStaticData(int64_t iClientId, int64_t iSlot, GridCoord coo
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
 	NetworkMessages::ServerCoordStaticDataMessage message {
+		.uiLoadGeneration = muiLoadGeneration,
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = pClient->slots.at(iSlot).ack.uiEpoch,
 		.coord = coord,
@@ -93,6 +95,7 @@ void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char*
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
 	NetworkMessages::ServerConnectionResponseMessage message {
+		.uiLoadGeneration = muiLoadGeneration,
 		.uiAccepted = bAccepted ? 1u : 0u,
 		.guid = (pGuid != nullptr) ? *pGuid : ClientGuid {},
 		.bHasGuid = bAccepted && pGuid != nullptr,
@@ -109,6 +112,7 @@ void Server::SendSubscribeAccept(ClientConnection& rClient, int64_t iSlot, GridC
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	NetworkMessages::ServerSubscribeAcceptMessage message {
+		.uiLoadGeneration = muiLoadGeneration,
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = uiEpoch,
 		.coord = coord,
@@ -120,6 +124,7 @@ void Server::SendSubscribeAccept(ClientConnection& rClient, int64_t iSlot, GridC
 void Server::WriteBufferedFramePacket(common::Workbuffer& rWorkbuffer, PacketType eType, int64_t iSlot, uint16_t uiEpoch, const PerCoordBufferedFrame& rBuffered, int64_t iTimestampNs)
 {
 	NetworkMessages::CoordUpdateFields fields {
+		.uiLoadGeneration = muiLoadGeneration,
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = uiEpoch,
 		.iTick = rBuffered.iTick,
@@ -305,7 +310,7 @@ void Server::BroadcastLoadNotification()
 
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		NetworkMessages::ServerLoadNotificationMessage message {};
+		NetworkMessages::ServerLoadNotificationMessage message {.uiLoadGeneration = muiLoadGeneration};
 		NetworkMessages::Write(rWorkbuffer, message);
 		NetworkManager::SendPacket(rClient.pPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 	}

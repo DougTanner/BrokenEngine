@@ -87,6 +87,14 @@ changes.
 - Server `Debug|x64` builds clean through `/compile`; the documented agent
   command sequence observes no hidden writer creation.
 
+## Coordination
+
+`Documents/Plans/Engine/ExtractServerReplayAgentFixtures.md` relocates fixture
+state and lifecycle hooks in the same Agent command, `GameBase`, and `Replay`
+regions. Neither Plan depends on the other: whichever lands second must retain
+this Plan's cancellation of a pending record request across state replacement
+while adapting to the final fixture ownership boundary.
+
 ## Notes
 
 The finding has no external claim or duplicate-family hint.  Its root is the

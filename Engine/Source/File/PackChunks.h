@@ -6,10 +6,31 @@
 namespace engine
 {
 
+#if defined(BT_CLIENT)
+
+enum class AudioChunkReadState : uint8_t
+{
+	kFree,
+	kQueued,
+	kLoading,
+	kReady,
+};
+
+struct AudioChunkReadEntry
+{
+	std::atomic<uint64_t> uiOwnership {0};
+	common::crc_t crc = 0;
+	uint64_t uiOffset = 0;
+	uint64_t uiLength = 0;
+	std::array<std::byte, 16 * 1024> data {};
+};
+
+#endif // BT_CLIENT
+
 // The packed-asset chunk engine, owned by FileManager via std::unique_ptr.
 // Holds the eager pack buffers, the lazy chunk maps + atomic eState machine, the private background loader,
 // and the single-VirtualAlloc lazy memory pool. Not a *Manager: no gp* global, not
-// aggregated into Engine.h; included only by PackChunks.cpp, PackChunkLoader.cpp, and FileManager.cpp.
+// aggregated into Engine.h.
 class PackChunks
 {
 public:
@@ -31,6 +52,11 @@ public:
 
 	// Streaming API for reading data at specific offset within a chunk
 	bool ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
+
+#if defined(BT_CLIENT)
+	ChunkReadResult TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
+	void CancelChunkRead(ChunkReadRequest& rRequest);
+#endif // BT_CLIENT
 
 	// Notification for chunk completion (wakes WaitForChunks waiters)
 	void NotifyChunkCompletion();
@@ -59,6 +85,28 @@ private:
 	[[nodiscard]] bool RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, uint64_t uiOffset, uint64_t uiLength);
 	std::filesystem::path GetDataFilePath(data::DataTypes eDataType, std::string_view extension) const;
 
+#if defined(BT_CLIENT)
+#if defined(BT_DEBUG)
+public:
+#endif
+	bool HasQueuedAudioRead() const;
+	bool HasOccupiedAudioRead() const;
+	static constexpr uint32_t kiAudioReadEntryCount = 6;
+
+private:
+	static constexpr uint32_t kiInvalidAudioReadEntry = std::numeric_limits<uint32_t>::max();
+#if defined(BT_DEBUG)
+public:
+#endif
+	std::array<AudioChunkReadEntry, kiAudioReadEntryCount> mAudioReadEntries {};
+
+private:
+	bool HasActiveAudioRead() const;
+	bool TryClaimAudioRead(uint32_t& ruiIndex, uint64_t& ruiGeneration);
+	void LoadAudioRead(uint32_t uiIndex, uint64_t uiGeneration, int64_t iThreadIndex);
+	void AcknowledgeQueuedAudioReads();
+#endif // BT_CLIENT
+
 	std::filesystem::path mDataDirectory;
 
 	// Cached pack file paths (initialized once in LoadPackFiles)
@@ -73,7 +121,11 @@ private:
 
 	// Split chunk maps for eager and lazy loading
 	std::unordered_map<common::crc_t, EagerChunk> mEagerChunkMap;  // Scene, Model, Shader, Raw
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+public:
+#endif
 	std::unordered_map<common::crc_t, LazyChunk> mLazyChunkMap;  // Audio, Islands, Texture
+private:
 
 	// Eager-load completion, assigned in LoadPackFiles. mutable: the first GetEagerChunkMap() drains it
 	// (a lazy completion behind the const accessor).
@@ -106,6 +158,9 @@ private:
 	// Sub-read size for chunked disk reads (256KB balances NVMe throughput vs L3 cache pressure)
 	static constexpr int64_t kiSubReadSize = 256 * 1024;
 
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+public:
+#endif
 	PackChunkLoader mLoader;
 };
 

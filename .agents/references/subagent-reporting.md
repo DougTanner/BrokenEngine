@@ -169,6 +169,10 @@ What main does with each field:
 
 ## Whether a worker is still running, and interruption
 
+Completion or mailbox activity can return a wait early. If a healthy worker's
+wait times out without failure or no-progress evidence, wait again; the timeout
+alone does not justify status investigation, interruption, or replacement.
+
 Judge whether a worker is still running only from host status and explicit
 progress or partial handoffs.
 A running host status, elapsed time, or wait boundary does not require a

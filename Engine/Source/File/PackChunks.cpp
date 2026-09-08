@@ -6,10 +6,45 @@
 
 #if defined(BT_CLIENT)
 #include "Graphics/Managers/TextureUploadManager.h"
+#if defined(BT_DEBUG)
+#include "Agent/Commands/AudioStreamingFixture.h"
+#endif
 #endif
 
 namespace engine
 {
+
+#if defined(BT_CLIENT)
+namespace
+{
+
+constexpr uint64_t kuiAudioReadStateMask = 0x3;
+static_assert(static_cast<uint64_t>(AudioChunkReadState::kFree) == 0);
+static_assert(static_cast<uint64_t>(AudioChunkReadState::kReady) == kuiAudioReadStateMask);
+
+constexpr uint64_t PackAudioReadOwnership(AudioChunkReadState eState, uint64_t uiGeneration)
+{
+	return (uiGeneration << 2) | static_cast<uint64_t>(eState);
+}
+
+constexpr AudioChunkReadState AudioReadState(uint64_t uiOwnership)
+{
+	return static_cast<AudioChunkReadState>(uiOwnership & kuiAudioReadStateMask);
+}
+
+constexpr uint64_t AudioReadGeneration(uint64_t uiOwnership)
+{
+	return uiOwnership >> 2;
+}
+
+uint64_t NextAudioReadGeneration(uint64_t uiGeneration)
+{
+	ASSERT(uiGeneration != (std::numeric_limits<uint64_t>::max() >> 2));
+	return uiGeneration + 1;
+}
+
+} // namespace
+#endif // BT_CLIENT
 
 PackChunks::PackChunks(const std::filesystem::path& rDataDirectory)
 	: mDataDirectory(rDataDirectory)
@@ -714,6 +749,391 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 	// Chunk not found
 	return false;
 }
+
+#if defined(BT_CLIENT)
+
+ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer)
+{
+	auto clearRequest = [&rRequest]
+	{
+		rRequest.mpPackChunks = nullptr;
+		rRequest.uiEntryIndex = kiInvalidAudioReadEntry;
+		rRequest.uiGeneration = 0;
+		rRequest.crc = 0;
+		rRequest.uiOffset = 0;
+		rRequest.uiLength = 0;
+	};
+
+	if (rRequest.mpPackChunks != nullptr)
+	{
+		if (rRequest.mpPackChunks != this)
+		{
+			rRequest.Reset();
+			return ChunkReadResult::kFailed;
+		}
+		if (rRequest.uiEntryIndex >= mAudioReadEntries.size())
+		{
+			rRequest.Reset();
+			return ChunkReadResult::kFailed;
+		}
+		if (rRequest.crc != crc)
+		{
+			rRequest.Reset();
+			return ChunkReadResult::kFailed;
+		}
+		if (rRequest.uiOffset != uiOffset)
+		{
+			rRequest.Reset();
+			return ChunkReadResult::kFailed;
+		}
+		if (rRequest.uiLength != buffer.size())
+		{
+			rRequest.Reset();
+			return ChunkReadResult::kFailed;
+		}
+
+		AudioChunkReadEntry& rEntry = mAudioReadEntries[rRequest.uiEntryIndex];
+		uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
+		if (AudioReadGeneration(uiOwnership) != rRequest.uiGeneration)
+		{
+			clearRequest();
+			return ChunkReadResult::kFailed;
+		}
+
+		AudioChunkReadState eState = AudioReadState(uiOwnership);
+		if (eState != AudioChunkReadState::kReady)
+		{
+			return eState == AudioChunkReadState::kQueued || eState == AudioChunkReadState::kLoading
+				? ChunkReadResult::kPending
+				: ChunkReadResult::kFailed;
+		}
+
+		if (rEntry.crc != crc)
+		{
+			CancelChunkRead(rRequest);
+			return ChunkReadResult::kFailed;
+		}
+		if (rEntry.uiOffset != uiOffset)
+		{
+			CancelChunkRead(rRequest);
+			return ChunkReadResult::kFailed;
+		}
+		if (rEntry.uiLength != buffer.size())
+		{
+			CancelChunkRead(rRequest);
+			return ChunkReadResult::kFailed;
+		}
+
+		std::memcpy(buffer.data(), rEntry.data.data(), rEntry.uiLength);
+#if defined(BT_DEBUG)
+		AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kRefillReady, rRequest.uiEntryIndex, crc, uiOffset, rEntry.uiLength, AudioStreamingFixtureQueueState::kReady, rRequest.uiGeneration, false);
+#endif
+		const uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.uiGeneration);
+		if (!rEntry.uiOwnership.compare_exchange_strong(uiOwnership, uiFreeOwnership, std::memory_order_acq_rel))
+		{
+			clearRequest();
+			return ChunkReadResult::kFailed;
+		}
+		clearRequest();
+		return ChunkReadResult::kReady;
+	}
+
+	if (buffer.empty())
+	{
+		return ChunkReadResult::kFailed;
+	}
+	if (buffer.size() > 16 * 1024)
+	{
+		return ChunkReadResult::kFailed;
+	}
+
+	auto lazyIt = mLazyChunkMap.find(crc);
+	if (lazyIt == mLazyChunkMap.end())
+	{
+		return ChunkReadResult::kFailed;
+	}
+	LazyChunk& rLazyChunk = lazyIt->second;
+	if (!(rLazyChunk.header.flags & common::ChunkFlags::kChunkAudio))
+	{
+		return ChunkReadResult::kFailed;
+	}
+	if (uiOffset > static_cast<uint64_t>(rLazyChunk.iDataSize))
+	{
+		return ChunkReadResult::kFailed;
+	}
+	if (buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize) - uiOffset)
+	{
+		return ChunkReadResult::kFailed;
+	}
+
+	if (rLazyChunk.location.uiSize < common::kiChunkDataOffset)
+	{
+		return ChunkReadResult::kFailed;
+	}
+	const uint64_t uiPackDataSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
+	if (uiOffset > uiPackDataSize)
+	{
+		return ChunkReadResult::kFailed;
+	}
+	if (buffer.size() > uiPackDataSize - uiOffset)
+	{
+		return ChunkReadResult::kFailed;
+	}
+
+	if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
+	{
+		std::memcpy(buffer.data(), rLazyChunk.pData + uiOffset, buffer.size());
+		return ChunkReadResult::kReady;
+	}
+
+	for (uint32_t uiIndex = 0; uiIndex < mAudioReadEntries.size(); ++uiIndex)
+	{
+		AudioChunkReadEntry& rEntry = mAudioReadEntries[uiIndex];
+		uint64_t uiFreeOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
+		if (AudioReadState(uiFreeOwnership) != AudioChunkReadState::kFree)
+		{
+			continue;
+		}
+
+		uint64_t uiGeneration = NextAudioReadGeneration(AudioReadGeneration(uiFreeOwnership));
+		rEntry.crc = crc;
+		rEntry.uiOffset = uiOffset;
+		rEntry.uiLength = buffer.size();
+		rRequest.mpPackChunks = this;
+		rRequest.uiEntryIndex = uiIndex;
+		rRequest.uiGeneration = uiGeneration;
+		rRequest.crc = crc;
+		rRequest.uiOffset = uiOffset;
+		rRequest.uiLength = buffer.size();
+		const uint64_t uiQueuedOwnership = PackAudioReadOwnership(AudioChunkReadState::kQueued, uiGeneration);
+		if (!rEntry.uiOwnership.compare_exchange_strong(uiFreeOwnership, uiQueuedOwnership, std::memory_order_release, std::memory_order_acquire))
+		{
+			clearRequest();
+			continue;
+		}
+#if defined(BT_DEBUG)
+		AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kRefillQueued, uiIndex, crc, uiOffset, buffer.size(), AudioStreamingFixtureQueueState::kQueued, uiGeneration, false);
+#endif
+		mLoader.PublishWake();
+		return ChunkReadResult::kPending;
+	}
+
+#if defined(BT_DEBUG)
+	AudioStreamingFixture::CountRetry();
+#endif
+	return ChunkReadResult::kRetry;
+}
+
+void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
+{
+	if (rRequest.mpPackChunks != this)
+	{
+		return;
+	}
+	if (rRequest.uiEntryIndex >= mAudioReadEntries.size())
+	{
+		return;
+	}
+
+	AudioChunkReadEntry& rEntry = mAudioReadEntries[rRequest.uiEntryIndex];
+	const uint64_t uiRequestGeneration = rRequest.uiGeneration;
+	uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
+	while (AudioReadGeneration(uiOwnership) == uiRequestGeneration)
+	{
+		AudioChunkReadState eState = AudioReadState(uiOwnership);
+		if (eState != AudioChunkReadState::kQueued && eState != AudioChunkReadState::kReady && eState != AudioChunkReadState::kLoading)
+		{
+			break;
+		}
+		const uint64_t uiCancelledGeneration = NextAudioReadGeneration(uiRequestGeneration);
+		const AudioChunkReadState eCancelledState = eState == AudioChunkReadState::kLoading
+			? AudioChunkReadState::kLoading
+			: AudioChunkReadState::kFree;
+		const uint64_t uiCancelledOwnership = PackAudioReadOwnership(eCancelledState, uiCancelledGeneration);
+		if (rEntry.uiOwnership.compare_exchange_weak(uiOwnership, uiCancelledOwnership, std::memory_order_acq_rel))
+		{
+#if defined(BT_DEBUG)
+			AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kRefillCancelled, rRequest.uiEntryIndex, rRequest.crc, rRequest.uiOffset, rRequest.uiLength, static_cast<AudioStreamingFixtureQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+#endif
+			break;
+		}
+	}
+
+	rRequest.mpPackChunks = nullptr;
+	rRequest.uiEntryIndex = kiInvalidAudioReadEntry;
+	rRequest.uiGeneration = 0;
+	rRequest.crc = 0;
+	rRequest.uiOffset = 0;
+	rRequest.uiLength = 0;
+}
+
+bool PackChunks::HasQueuedAudioRead() const
+{
+	return std::ranges::any_of(mAudioReadEntries, [](const AudioChunkReadEntry& rEntry)
+	{
+		return AudioReadState(rEntry.uiOwnership.load(std::memory_order_acquire)) == AudioChunkReadState::kQueued;
+	});
+}
+
+bool PackChunks::HasActiveAudioRead() const
+{
+	return std::ranges::any_of(mAudioReadEntries, [](const AudioChunkReadEntry& rEntry)
+	{
+		AudioChunkReadState eState = AudioReadState(rEntry.uiOwnership.load(std::memory_order_acquire));
+		return eState == AudioChunkReadState::kQueued || eState == AudioChunkReadState::kLoading;
+	});
+}
+
+bool PackChunks::HasOccupiedAudioRead() const
+{
+	return std::ranges::any_of(mAudioReadEntries, [](const AudioChunkReadEntry& rEntry)
+	{
+		return AudioReadState(rEntry.uiOwnership.load(std::memory_order_acquire)) != AudioChunkReadState::kFree;
+	});
+}
+
+bool PackChunks::TryClaimAudioRead(uint32_t& ruiIndex, uint64_t& ruiGeneration)
+{
+	for (uint32_t uiIndex = 0; uiIndex < mAudioReadEntries.size(); ++uiIndex)
+	{
+		AudioChunkReadEntry& rEntry = mAudioReadEntries[uiIndex];
+		uint64_t uiQueuedOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
+		if (AudioReadState(uiQueuedOwnership) != AudioChunkReadState::kQueued)
+		{
+			continue;
+		}
+		const uint64_t uiGeneration = AudioReadGeneration(uiQueuedOwnership);
+		const uint64_t uiLoadingOwnership = PackAudioReadOwnership(AudioChunkReadState::kLoading, uiGeneration);
+		if (rEntry.uiOwnership.compare_exchange_strong(uiQueuedOwnership, uiLoadingOwnership, std::memory_order_acq_rel))
+		{
+			ruiIndex = uiIndex;
+			ruiGeneration = uiGeneration;
+			return true;
+		}
+	}
+	return false;
+}
+
+void PackChunks::AcknowledgeQueuedAudioReads()
+{
+	for (AudioChunkReadEntry& rEntry : mAudioReadEntries)
+	{
+		uint64_t uiQueuedOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
+		while (AudioReadState(uiQueuedOwnership) == AudioChunkReadState::kQueued)
+		{
+			const uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, NextAudioReadGeneration(AudioReadGeneration(uiQueuedOwnership)));
+			if (rEntry.uiOwnership.compare_exchange_weak(uiQueuedOwnership, uiFreeOwnership, std::memory_order_acq_rel))
+			{
+				break;
+			}
+		}
+	}
+}
+
+void PackChunks::LoadAudioRead(uint32_t uiIndex, uint64_t uiGeneration, int64_t iThreadIndex)
+{
+	AudioChunkReadEntry& rEntry = mAudioReadEntries[uiIndex];
+	const common::crc_t crc = rEntry.crc;
+	const uint64_t uiOffset = rEntry.uiOffset;
+	const uint64_t uiLength = rEntry.uiLength;
+#if defined(BT_DEBUG)
+	AudioStreamingFixturePartition ePartition = iThreadIndex == 0
+		? AudioStreamingFixturePartition::kLoader0
+		: AudioStreamingFixturePartition::kLoader1;
+	AudioStreamingFixture::Record(ePartition, AudioStreamingFixturePhase::kRefillLoading, uiIndex, crc, uiOffset, uiLength, AudioStreamingFixtureQueueState::kLoading, uiGeneration, false);
+	const bool bHeld = AudioStreamingFixture::HoldAudioRead(crc, uiOffset, uiLength, uiIndex, uiGeneration);
+#endif
+
+	const LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
+	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
+	HANDLE hFile = mLazyPackFileHandles[eDataType];
+	if (hFile == nullptr)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range pack handle is unavailable");
+	}
+	if (hFile == INVALID_HANDLE_VALUE)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range pack handle is unavailable");
+	}
+
+	uint64_t uiDataFileOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
+	if (uiDataFileOffset < rLazyChunk.location.uiOffset)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range offset overflows");
+	}
+	if (uiOffset > std::numeric_limits<uint64_t>::max() - uiDataFileOffset)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range offset overflows");
+	}
+	uint64_t uiLogicalFileOffset = uiDataFileOffset + uiOffset;
+	uint64_t uiAlignedOffset = common::RoundDown(uiLogicalFileOffset, static_cast<uint64_t>(miSectorSize));
+	uint64_t uiPrefix = uiLogicalFileOffset - uiAlignedOffset;
+	if (uiLength > std::numeric_limits<uint64_t>::max() - uiPrefix)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range size overflows");
+	}
+	uint64_t uiPhysicalSize = common::RoundUp(uiPrefix + uiLength, static_cast<uint64_t>(miSectorSize));
+	if (uiPhysicalSize > static_cast<uint64_t>(miReadBufferSize))
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range physical extent is invalid");
+	}
+	if (uiAlignedOffset > std::numeric_limits<uint64_t>::max() - uiPhysicalSize)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range physical extent is invalid");
+	}
+
+	if (uiLength > std::numeric_limits<uint64_t>::max() - uiLogicalFileOffset)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range logical extent overflows");
+	}
+	const uint64_t uiLogicalEnd = uiLogicalFileOffset + uiLength;
+	LARGE_INTEGER fileSize {};
+	if (!GetFileSizeEx(hFile, &fileSize))
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range exceeds the pack file");
+	}
+	if (fileSize.QuadPart < 0)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range exceeds the pack file");
+	}
+	if (uiLogicalEnd > static_cast<uint64_t>(fileSize.QuadPart))
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range exceeds the pack file");
+	}
+
+	OVERLAPPED overlapped {};
+	overlapped.Offset = static_cast<DWORD>(uiAlignedOffset & 0xffffffff);
+	overlapped.OffsetHigh = static_cast<DWORD>(uiAlignedOffset >> 32);
+	DWORD uiBytesRead = 0;
+	BOOL bRead = ReadFile(hFile, mpReadBuffers[iThreadIndex], static_cast<DWORD>(uiPhysicalSize), &uiBytesRead, &overlapped);
+	if (!bRead)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range read was incomplete");
+	}
+	if (uiBytesRead < uiPrefix + uiLength)
+	{
+		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range read was incomplete");
+	}
+	std::memcpy(rEntry.data.data(), mpReadBuffers[iThreadIndex] + uiPrefix, uiLength);
+
+	uint64_t uiExpectedOwnership = PackAudioReadOwnership(AudioChunkReadState::kLoading, uiGeneration);
+	const uint64_t uiReadyOwnership = PackAudioReadOwnership(AudioChunkReadState::kReady, uiGeneration);
+	const bool bCurrent = rEntry.uiOwnership.compare_exchange_strong(uiExpectedOwnership, uiReadyOwnership, std::memory_order_acq_rel);
+	if (!bCurrent)
+	{
+		ASSERT(AudioReadState(uiExpectedOwnership) == AudioChunkReadState::kLoading);
+		const uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, AudioReadGeneration(uiExpectedOwnership));
+		VERIFY_SUCCESS(rEntry.uiOwnership.compare_exchange_strong(uiExpectedOwnership, uiFreeOwnership, std::memory_order_acq_rel));
+	}
+#if defined(BT_DEBUG)
+	AudioStreamingFixture::Record(ePartition, bCurrent ? AudioStreamingFixturePhase::kRefillReady : AudioStreamingFixturePhase::kRefillCancelled, uiIndex, crc, uiOffset, uiLength, bCurrent ? AudioStreamingFixtureQueueState::kReady : AudioStreamingFixtureQueueState::kFree, uiGeneration, !bCurrent);
+	AudioStreamingFixture::CompleteAudioRead(bHeld);
+#endif
+	mLoader.NotifyChunkCompletion();
+}
+
+
+#endif // BT_CLIENT
 
 void PackChunks::DecommitChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
 {

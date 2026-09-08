@@ -465,9 +465,10 @@ struct ClientHelloMessage
 struct ServerConnectionResponseMessage
 {
 	static constexpr PacketType keType = PacketType::kServerConnectionResponse;
-	static constexpr int64_t kiMinSize = kiPacketTypeSize + sizeof(uint8_t);
+	static constexpr int64_t kiMinSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t);
 	static constexpr int64_t kiAcceptedGuidSize = kiMinSize + kiGuidSize;
 
+	uint8_t uiLoadGeneration = 0;
 	uint8_t uiAccepted = 0;
 	ClientGuid guid {};
 	bool bHasGuid = false;
@@ -477,6 +478,7 @@ struct ServerConnectionResponseMessage
 	static void Visit(TVisitor& rVisitor, ServerConnectionResponseMessage& rMessage)
 	{
 		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.uiAccepted);
 		rVisitor.ConnectionResponseTail(rMessage.uiAccepted, rMessage.guid, rMessage.bHasGuid, rMessage.rejectionMessage);
 	}
@@ -485,14 +487,16 @@ struct ServerConnectionResponseMessage
 struct ClientSubscribeMessage
 {
 	static constexpr PacketType keType = PacketType::kClientSubscribe;
-	static constexpr int64_t kiFixedSize = kiPacketTypeSize + kiGridCoordSize;
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t) + kiGridCoordSize;
 
+	uint8_t uiLoadGeneration = 0;
 	GridCoord coord {};
 
 	template <typename TVisitor>
 	static void Visit(TVisitor& rVisitor, ClientSubscribeMessage& rMessage)
 	{
 		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.coord);
 	}
 };
@@ -529,8 +533,9 @@ struct ClientResyncRequestMessage
 struct ServerSubscribeAcceptMessage
 {
 	static constexpr PacketType keType = PacketType::kServerSubscribeAccept;
-	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint16_t) + kiGridCoordSize;
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + kiGridCoordSize;
 
+	uint8_t uiLoadGeneration = 0;
 	uint8_t uiSlotIndex = 0;
 	uint16_t uiEpoch = 0;
 	GridCoord coord {};
@@ -539,6 +544,7 @@ struct ServerSubscribeAcceptMessage
 	static void Visit(TVisitor& rVisitor, ServerSubscribeAcceptMessage& rMessage)
 	{
 		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.uiSlotIndex);
 		rVisitor.Field(rMessage.uiEpoch);
 		rVisitor.Field(rMessage.coord);
@@ -563,12 +569,15 @@ struct ServerUnsubscribeAckMessage
 struct ServerLoadNotificationMessage
 {
 	static constexpr PacketType keType = PacketType::kServerLoadNotification;
-	static constexpr int64_t kiFixedSize = kiPacketTypeSize;
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t);
+
+	uint8_t uiLoadGeneration = 0;
 
 	template <typename TVisitor>
-	static void Visit(TVisitor& rVisitor, ServerLoadNotificationMessage&)
+	static void Visit(TVisitor& rVisitor, ServerLoadNotificationMessage& rMessage)
 	{
 		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiLoadGeneration);
 	}
 };
 
@@ -592,9 +601,10 @@ struct ServerTimespeedUpdateMessage
 struct ServerCoordFullStateMessage
 {
 	static constexpr PacketType keType = PacketType::kServerCoordFullState;
-	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(int64_t) + kiGridCoordSize;
+	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(int64_t) + kiGridCoordSize;
 	static constexpr int64_t kiFixedSize = kiEnvelopeSize + sizeof(int32_t) + sizeof(int32_t);
 
+	uint8_t uiLoadGeneration = 0;
 	uint8_t uiSlotIndex = 0;
 	uint16_t uiEpoch = 0;
 	int64_t iTick = 0;
@@ -606,6 +616,7 @@ struct ServerCoordFullStateMessage
 	static void Visit(TVisitor& rVisitor, ServerCoordFullStateMessage& rMessage)
 	{
 		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.uiSlotIndex);
 		rVisitor.Field(rMessage.uiEpoch);
 		rVisitor.Field(rMessage.iTick);
@@ -619,9 +630,10 @@ struct ServerCoordFullStateMessage
 struct ServerCoordStaticDataMessage
 {
 	static constexpr PacketType keType = PacketType::kServerCoordStaticData;
-	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint16_t) + kiGridCoordSize;
+	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + kiGridCoordSize;
 	static constexpr int64_t kiFixedSize = kiEnvelopeSize + sizeof(int32_t);
 
+	uint8_t uiLoadGeneration = 0;
 	uint8_t uiSlotIndex = 0;
 	uint16_t uiEpoch = 0;
 	GridCoord coord {};
@@ -631,6 +643,7 @@ struct ServerCoordStaticDataMessage
 	static void Visit(TVisitor& rVisitor, ServerCoordStaticDataMessage& rMessage)
 	{
 		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.uiSlotIndex);
 		rVisitor.Field(rMessage.uiEpoch);
 		rVisitor.Field(rMessage.coord);
@@ -641,9 +654,10 @@ struct ServerCoordStaticDataMessage
 
 struct CoordUpdateFields
 {
-	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(uint64_t);
+	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(uint64_t);
 	static constexpr int64_t kiFixedSize = kiEnvelopeSize + sizeof(int32_t);
 
+	uint8_t uiLoadGeneration = 0;
 	uint8_t uiSlotIndex = 0;
 	uint16_t uiEpoch = 0;
 	int64_t iTick = 0;
@@ -654,6 +668,7 @@ struct CoordUpdateFields
 	template <typename TVisitor>
 	static void VisitFields(TVisitor& rVisitor, CoordUpdateFields& rMessage)
 	{
+		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.uiSlotIndex);
 		rVisitor.Field(rMessage.uiEpoch);
 		rVisitor.Field(rMessage.iTick);

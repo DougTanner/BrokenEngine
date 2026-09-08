@@ -100,7 +100,15 @@ void Client::SendDebugFrameRequest(int64_t iTick, GridCoord coord)
 
 bool Client::SendSubscribe(GridCoord coord)
 {
-	if (!(mStateFlags & ClientStateFlags::kConnected) || mpServerPeer == nullptr)
+	if (!(mStateFlags & ClientStateFlags::kConnected))
+	{
+		return false;
+	}
+	if (!(mStateFlags & ClientStateFlags::kConnectionAccepted))
+	{
+		return false;
+	}
+	if (mpServerPeer == nullptr)
 	{
 		return false;
 	}
@@ -137,7 +145,7 @@ bool Client::SendSubscribe(GridCoord coord)
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	NetworkMessages::ClientSubscribeMessage message {.coord = coord};
+	NetworkMessages::ClientSubscribeMessage message {.uiLoadGeneration = muiCommittedLoadGeneration, .coord = coord};
 	NetworkMessages::Write(rWorkbuffer, message);
 	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 

@@ -356,6 +356,7 @@ void ServerSession::SubscriptionUpdates()
 
 void ServerSession::ResetClientsForLoad()
 {
+	mpRuntime->mpServer->AdvanceLoadGeneration();
 	LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad");
 	// Heap: re-link rebuilds registry entries and authorizedCoords; pending state cleared across managers
 	ScopedSuppressAllocationTracking suppress;

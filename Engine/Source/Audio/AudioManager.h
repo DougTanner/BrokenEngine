@@ -85,9 +85,13 @@ private:
 	std::unique_ptr<AudioEngine> mpAudioEngine;
 	// Declared after mpAudioEngine so both are destroyed first: they retain its raw pointer.
 	std::unique_ptr<StaticVoices> mpStaticVoices;
+#if defined(BT_DEBUG)
+public:
+#endif
 	std::unique_ptr<StreamingVoices> mpStreamingVoices;
 
 	std::atomic<bool> mbSuspended = false;
+private:
 	std::atomic<bool> mbClearVoicesRequested = false;
 	int64_t miMasteringVoiceChannels = 0;
 
@@ -103,6 +107,7 @@ private:
 	// Silent-start recovery throttle counter: gates probe frequency (kiSilentRecoveryRetryFrames) so a
 	// permanently-deviceless machine does not warn + full-reset every frame.
 	int64_t miSilentRecoveryFrameCounter = 0;
+
 };
 
 inline AudioManager* gpAudioManager = nullptr;

@@ -8,9 +8,11 @@ Client-only 3D and streaming audio through DirectXTK `AudioEngine`. `AudioManage
 - Construct one stable `AudioEngine` and attach voice subsystems to it once. Static and streaming voices retain its raw pointer, so recover a silent or lost device by resetting the existing engine rather than replacing it.
 - Treat endpoint enumeration, graph reset, and XAudio2 results as trust boundaries. A missing device leaves a usable silent engine; recovery must clear stale source voices before normal playback resumes.
 - Packed audio metadata is a trust boundary: every path that hands a wave format and byte range to XAudio2 calls `AssertValidPackedAudio` (`AudioUtility.h`) first, including any new voice-creation path.
-- `AudioManager::Update` runs post-render on the main thread and owns XAudio2 pumping and buffer submission. The streaming fill worker produces buffer data, the main thread consumes it, and XAudio2 buffer callbacks publish only atomic completion. AudioEngine reset/error notifications are delivered on the caller thread.
-- Wait for the fill worker before mutating streaming containers. Destroy faded streams after releasing the streaming mutex so source-voice teardown cannot deadlock callback completion. `Clear` is the deliberate exception: it destroys while still holding that mutex, which is safe only because the XAudio2 buffer-completion callback is a bare atomic increment that never takes the mutex. Keep that callback lock-free.
+- `AudioManager::Update` runs post-render on the main thread and owns XAudio2 pumping, streaming-range request and poll calls, and in-order buffer submission. XAudio2 buffer callbacks publish only atomic completion. AudioEngine reset/error notifications are delivered on the caller thread. File-side behavior follows the [packed-assets contract](../File/AGENTS.md#packed-assets).
+- Each streaming voice reads ahead through three fixed 16 KiB slots. Preserve its request and submit order when a later range completes first, and retry a full File result pool without advancing the slot, cursor, or destination.
+- Keep the current stream and newest fade eligible to request data, cancel older fades' pending reads before demotion, and cancel every pending streaming read before clearing or destroying its voice or resetting the audio graph.
 - Suspend stops XAudio2 processing before clearing voices. Teardown distinguishes voices already destroyed by device loss from voices still owned by the engine.
+- The [Agent audio fixture](../Agent/AGENTS.md) may inspect streaming state and attach non-owning per-voice controls only in client Debug builds; production state remains private elsewhere.
 
 ## Simulation Boundary
 

@@ -4,6 +4,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Agent/Commands/ClientNetworkFixtures.h"
+
 #include "Game.h"
 
 namespace engine
@@ -105,54 +107,9 @@ void Client::CancelSubscription(int64_t iSlot)
 	LOG(kNetwork, kVerbose, "Client::CancelSubscription Slot: {} Coord: ({},{}) CancelledCount: {}", iSlot, cancelledCoord.x, cancelledCoord.y, mCancelledSubscriptions.size());
 }
 
-void Client::CancelSubscriptionForAgent(int64_t iSlot)
-{
-	if (mCoordSlots.at(iSlot).eState != CoordSubscriptionState::kSubscribing)
-	{
-		throw std::runtime_error("Client::CancelSubscriptionForAgent requires a subscribing slot");
-	}
-	CancelSubscription(iSlot);
-}
-
-void Client::ArmStaleUpdateFixture(const std::shared_ptr<ClientStaleUpdateFixtureState>& pState)
-{
-	if (!mStaleUpdateFixture.expired())
-	{
-		throw std::runtime_error("client_stale_update_fixture is already active");
-	}
-	mStaleUpdateFixture = pState;
-}
-
-void Client::ArmCancelledSubscriptionFixture(const std::shared_ptr<ClientCancelledSubscriptionFixtureState>& pState)
-{
-	if (!mCancelledSubscriptionFixture.expired())
-	{
-		throw std::runtime_error("client_cancelled_subscription_fixture is already active");
-	}
-	mCancelledSubscriptionFixture = pState;
-}
-
-ClientSubscribeAcceptFixtureResult Client::ReceiveSubscribeAcceptForAgent(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord)
-{
-	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	NetworkMessages::ServerSubscribeAcceptMessage message {.uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch, .coord = coord};
-	NetworkMessages::Write(rWorkbuffer, message);
-
-	ClientSubscribeAcceptFixtureResult result {};
-	mpSubscribeAcceptFixtureResult = &result;
-	common::ScopedLambda clearFixture([this]() { mpSubscribeAcceptFixtureResult = nullptr; });
-	Receive(std::span(reinterpret_cast<const uint8_t*>(rWorkbuffer.View().data()), rWorkbuffer.View().size()));
-	return result;
-}
-
 void Client::ResetAllSlots()
 {
-	if (std::shared_ptr<ClientCancelledSubscriptionFixtureState> pState = mCancelledSubscriptionFixture.lock(); pState != nullptr)
-	{
-		pState->eOutcome = ClientCancelledSubscriptionFixtureOutcome::kReset;
-		mCancelledSubscriptionFixture.reset();
-	}
+	ClientNetworkFixtures::Reset(*this);
 	for (int64_t i = 0; i < std::ssize(mCoordSlots); ++i)
 	{
 		FreeSlot(i);
@@ -227,9 +184,9 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 					// Deliver that rejection before the disconnect tears down the session and its delay queue.
 					auto it = std::ranges::find_if(mDelayedPackets, [](const DelayedPacket& rPacket)
 					{
-						return rPacket.data.size() >= 2
+						return std::ssize(rPacket.data) >= NetworkMessages::ServerConnectionResponseMessage::kiMinSize
 						    && static_cast<PacketType>(rPacket.data.at(0)) == PacketType::kServerConnectionResponse
-						    && rPacket.data.at(1) == 0;
+						    && rPacket.data.at(2) == 0;
 					});
 					if (it != mDelayedPackets.end())
 					{

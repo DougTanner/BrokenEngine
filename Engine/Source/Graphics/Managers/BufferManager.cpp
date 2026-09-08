@@ -618,6 +618,7 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 	// Active tile list: VkDispatchIndirectCommand (12 bytes) + packed tile indices (4 bytes each)
 	mSmokeActiveTileBufferSize = sizeof(VkDispatchIndirectCommand) + static_cast<VkDeviceSize>(uiTotalTiles) * sizeof(uint32_t);
 	Buffer::CreateBuffer("SmokeActiveTile", mSmokeActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mSmokeActiveTileVkBuffer, mSmokeActiveTileVmaAllocation);
+	gbSmokeClear = true;
 }
 
 void BufferManager::DestroySmokeHierarchicalBuffers()

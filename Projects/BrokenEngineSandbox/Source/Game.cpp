@@ -1,6 +1,6 @@
 #include "Game.h"
 
-#include "Agent/AgentCommands.h"
+#include "Agent/Commands/ClientPacketFaultFixture.h"
 #include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Input/Input.h"
@@ -361,6 +361,10 @@ void Game::HarvestTransfers()
 
 Game::~Game()
 {
+	if (engine::gpAgentCommandServer != nullptr)
+	{
+		engine::gpAgentCommandServer->ClearDeferredResponse();
+	}
 #if defined(BT_CLIENT)
 	mpClientSession.reset();
 	engine::gpAudioManager->SetNextMusicTrackCallback(nullptr);

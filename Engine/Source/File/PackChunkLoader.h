@@ -26,7 +26,11 @@ private:
 
 	void Start();
 	void Stop();
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+public:
+#endif
 	void RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPriority ePriority);
+private:
 	void RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, LoadPriority ePriority);
 	ChunkRangeReloadState GetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength) const;
 	void ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
@@ -35,25 +39,35 @@ private:
 	void NotifyChunkCompletion();
 	void LoadingThread(int64_t iThreadIndex);
 	void LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex);
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+public:
+#endif
+	void PublishWake();
+private:
 
 	// N background loading threads, assigned inside the async eager-load task (PackChunks::mLoadingFuture), not
 	// the PackChunks ctor body. Each LoadingThread pops from the shared priority queue and reads the sync members
-	// below (mWakeCondition/mQueueMutex/mRequestQueue/mShutdown), owning a private read buffer + decompress scratch
+	// below (mWakeSequence/mQueueMutex/mRequestQueue/mShutdown), owning a private read buffer + decompress scratch
 	// (indexed by thread index). ~PackChunks first drains mLoadingFuture (ensuring these assignments have happened),
 	// then calls Stop(), which sets mShutdown + notify_all()s + join()s every thread before those members destruct.
 	// Count is deliberately small: each thread doubles the read-buffer + decompress-scratch memory footprint.
 	static constexpr int64_t kiLoadingThreadCount = 2;
 	PackChunks& mrPackChunks;
 	std::thread mLoadingThreads[kiLoadingThreadCount];
-	std::condition_variable mWakeCondition;
+	std::atomic<uint64_t> mWakeSequence {0};
 	std::condition_variable mCompletionCondition;
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+public:
+#endif
 	mutable std::mutex mQueueMutex;
+private:
 	std::priority_queue<LoadRequest> mRequestQueue;
 	std::atomic<bool> mShutdown {false};
 
 	// Jobs popped from mRequestQueue but not yet finished, guarded by mQueueMutex. Queue-empty alone cannot say the
 	// loaders are idle, because a popped job runs outside the lock; WaitForLoadersIdle needs both.
 	int64_t miActiveLoadJobs = 0;
+	bool mbPreferAudio = true;
 };
 
 } // namespace engine

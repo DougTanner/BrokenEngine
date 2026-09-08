@@ -26,7 +26,10 @@ handoff form: [`../SKILL.md`](../SKILL.md).
    `SETUP_ERROR`/2, an unrecognized result class, or a result/exit mismatch is
    `BLOCKED`.
 5. Review semantic behavior from `SKILL.md`, directly referenced resources, and a
-   present Codex companion file. Done when each of those surfaces has a verdict.
+   present Codex companion file. Classify each compatibility conclusion as
+   structural acceptance, loader acceptance, documented behavior, or observed
+   runtime behavior. Done when each surface has a verdict and every
+   compatibility claim names the evidence class that supports it.
 6. Collect inbound references by running `pwsh -NoProfile -File .agents/skills/validate-skill/scripts/Find-SkillInboundReferences.ps1 -SkillName <name>`,
    which sweeps the documented root set and returns capped `{path, line, text}`
    records with per-root hit counts; never reconstruct that sweep inline.
@@ -48,7 +51,16 @@ handoff form: [`../SKILL.md`](../SKILL.md).
   that conflicts with an inbound workflow requirement is Critical for that
   client.
 - Critical: `description` lacks meaningful trigger contexts. Codex discovery
-  sees `name` and `description`, not `when_to_use` or the body.
+  sees `name` and `description`, not `when_to_use` or the body; package listing
+  or loader acceptance does not prove implicit invocation.
+- Treat structural validation as evidence of repository-schema acceptance
+  only, and loader validation as evidence that a client parsed and listed the
+  package only. Use current authoritative documentation for documented client
+  semantics and direct host observation for claims about actual invocation or
+  tool behavior. Record unsupported compatibility claims as findings; record
+  unavailable runtime behavior as unverified when the target makes no claim
+  that depends on it. Do not require a runtime check merely because a package
+  contains client-specific metadata.
 - Recommended: remove unused Claude pre-approvals and add those needed by
   prescribed commands. Keep body tool and delegation bounds authoritative; Codex
   dependencies wire external tools and grant no execution authority.

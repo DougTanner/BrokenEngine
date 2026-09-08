@@ -42,7 +42,7 @@ public:
 	bool ServerSave(const std::filesystem::path& rFilename); // appdata-relative; caller validates the bare filename
 	bool ServerLoad(const std::filesystem::path& rFilename);
 	void ServerReset();
-	void Autosave();
+	bool Autosave();
 	void TickAutosave();
 	bool Autoload();
 

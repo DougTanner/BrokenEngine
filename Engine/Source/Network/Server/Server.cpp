@@ -57,6 +57,12 @@ Server::~Server()
 	}
 }
 
+void Server::AdvanceLoadGeneration()
+{
+	ASSERT(muiLoadGeneration < UINT8_MAX);
+	++muiLoadGeneration;
+}
+
 void Server::Flush()
 {
 	if (mpHost == nullptr)

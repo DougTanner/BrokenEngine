@@ -67,53 +67,6 @@ struct ReceivedDebugFrame
 	std::unique_ptr<game::Frame> pFrame;
 };
 
-struct ClientSubscribeAcceptFixtureResult
-{
-	uint8_t uiSerializedSlot = 0;
-	int64_t iSerializedBytes = 0;
-	bool bSendSuppressed = false;
-};
-
-enum class ClientStaleUpdateFixtureFlags : uint8_t
-{
-	kCaptured           = 1 << 0,
-	kRetainedAfterDrain = 1 << 1,
-	kConnectedAfterDrain = 1 << 2,
-	kComplete           = 1 << 3,
-	kReset              = 1 << 4,
-	kBoundExpired       = 1 << 5,
-};
-
-struct ClientStaleUpdateFixtureState
-{
-	std::vector<uint8_t> packet;
-	GridCoord coord {};
-	uint8_t uiSlotIndex = 0;
-	uint16_t uiEpoch = 0;
-	int64_t iTick = -1;
-	int64_t iCapturedBytes = 0;
-	int64_t iAckFloorBefore = -1;
-	int64_t iAckFloorAfter = -1;
-	int64_t iConfirmedBefore = -1;
-	int64_t iConfirmedAfter = -1;
-	int64_t iCapturePolls = 0;
-	int64_t iCapturedAtPoll = -1;
-	common::Flags<ClientStaleUpdateFixtureFlags> flags;
-};
-
-enum class ClientCancelledSubscriptionFixtureOutcome : uint8_t
-{
-	kPending,
-	kAcked,
-	kReset,
-};
-
-struct ClientCancelledSubscriptionFixtureState
-{
-	int64_t iSlot = -1;
-	ClientCancelledSubscriptionFixtureOutcome eOutcome = ClientCancelledSubscriptionFixtureOutcome::kPending;
-};
-
 class Client
 {
 public:
@@ -144,10 +97,7 @@ public:
 	// Wire dispatch entry point for one received packet. Public so harness fixtures can exercise the real dispatch,
 	// classification, and response paths.
 	void Receive(std::span<const uint8_t> packetData);
-	ClientSubscribeAcceptFixtureResult ReceiveSubscribeAcceptForAgent(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord);
-	void ArmStaleUpdateFixture(const std::shared_ptr<ClientStaleUpdateFixtureState>& pState);
-	void ArmCancelledSubscriptionFixture(const std::shared_ptr<ClientCancelledSubscriptionFixtureState>& pState);
-	void CancelSubscriptionForAgent(int64_t iSlot);
+	void CancelSubscription(int64_t iSlot);
 
 	enum class ClientStateFlags : uint8_t
 	{
@@ -186,13 +136,7 @@ private:
 	bool SendSubscribe(GridCoord coord);
 	void SendUnsubscribe(int64_t iSlot);
 	void Flush();
-	bool DrainLoadNotification()
-	{
-		bool bReceived = mStateFlags & ClientStateFlags::kLoadNotificationReceived;
-		mStateFlags.Clear(ClientStateFlags::kLoadNotificationReceived);
-		return bReceived;
-	}
-	void CancelSubscription(int64_t iSlot);
+	std::optional<uint8_t> DrainLoadNotification();
 	void RecoverTimedOutSubscriptions();
 	void ResetAllSlots();
 	void FreeSlot(int64_t iSlot);
@@ -270,9 +214,11 @@ private:
 	NetworkSimulationState mNetworkSimState;
 	// Coords whose kSubscribing slot was cancelled before the server responded
 	std::vector<GridCoord> mCancelledSubscriptions;
-	std::weak_ptr<ClientStaleUpdateFixtureState> mStaleUpdateFixture;
-	std::weak_ptr<ClientCancelledSubscriptionFixtureState> mCancelledSubscriptionFixture;
-	ClientSubscribeAcceptFixtureResult* mpSubscribeAcceptFixtureResult = nullptr;
+public:
+	uint8_t muiCommittedLoadGeneration = 0;
+
+private:
+	std::optional<uint8_t> muiPendingLoadGeneration;
 };
 
 inline Client* gpClient = nullptr;

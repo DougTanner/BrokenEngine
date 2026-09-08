@@ -509,7 +509,10 @@ int MainThread(HINSTANCE hinstance)
 	EnableAllocationTracking(false);
 
 #if defined(BT_SERVER)
-	pGame->mGameSaveLoad.Autosave();
+	if (!pGame->mGameSaveLoad.Autosave())
+	{
+		LOG(kDefault, kError, "Final autosave failed during shutdown");
+	}
 #endif
 
 #if defined(BT_CLIENT)

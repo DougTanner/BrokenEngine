@@ -1,10 +1,14 @@
 #include "AudioManager.h"
+#if defined(BT_DEBUG)
+#include "Agent/Commands/AudioStreamingFixture.h"
+#endif
 
 #if defined(BT_CLIENT)
 
 #include "StaticVoices.h"
 #include "StreamingVoices.h"
 
+#include "File/FileManager.h"
 #include "Profile/ProfileManager.h"
 
 namespace engine
@@ -338,6 +342,7 @@ void AudioManager::Suspend()
 	}
 
 	mbSuspended.store(true, std::memory_order_release);
+	mpStreamingVoices->CancelPendingReads();
 
 	mpAudioEngine->Suspend();
 
@@ -411,6 +416,7 @@ void AudioManager::AttemptSilentEngineRecovery()
 	}
 
 	bool bDefaultReset = false;
+	mpStreamingVoices->CancelPendingReads();
 	try
 	{
 		bDefaultReset = mpAudioEngine->Reset(nullptr, nullptr);
@@ -508,6 +514,7 @@ void AudioManager::Update(const game::Frame* pFrame)
 			// is what a hot-swap invalidates, so a failure drops the pin claim and leaves the engine silent: the else
 			// branch below then probes the new endpoint, rediscovers its channel count, and re-pins from it.
 			bool bMasteringReset = false;
+			mpStreamingVoices->CancelPendingReads();
 			try
 			{
 				bMasteringReset = mpAudioEngine->Reset(&mPinnedOutputFormat, nullptr);
@@ -548,7 +555,14 @@ void AudioManager::Update(const game::Frame* pFrame)
 
 	float fDeltaTime = common::NanosecondsToFloatSeconds<float>(mRealTime.GetDeltaNs(true));
 
+#if defined(BT_DEBUG)
+	if (!AudioStreamingFixture::SuppressTrackTransition())
+	{
+		mpStreamingVoices->CheckTrackTransition();
+	}
+#else
 	mpStreamingVoices->CheckTrackTransition();
+#endif
 	mpStreamingVoices->Update(fDeltaTime);
 
 	if (pFrame != nullptr)

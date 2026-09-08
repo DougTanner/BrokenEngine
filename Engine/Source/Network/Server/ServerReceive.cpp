@@ -350,6 +350,11 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 	{
 		return;
 	}
+	if (message.uiLoadGeneration != muiLoadGeneration)
+	{
+		LOG(kNetwork, kWarning, "Server::ClientSubscribe LoadGenerationMismatch Client: {} Received: {} Current: {}", iClientId, message.uiLoadGeneration, muiLoadGeneration);
+		return;
+	}
 
 	// Already subscribed?
 	if (pClient->FindSlotForCoord(coord) >= 0)

@@ -1,8 +1,14 @@
 # Save Plan Worker
 
-The body, review, classification, and write steps, and the rules the runner
-applies. The source input, the landing pre-approval, and the report form live in
+The source selection, body review, classification and write steps, and the rules
+the runner applies. The landing pre-approval and report form live in
 [`../SKILL.md`](../SKILL.md).
+
+## Source selection
+
+- For Codex, use the latest complete `<proposed_plan>` body.
+- For Claude, use the explicitly supplied absolute plan-file path.
+- Do not discover or infer a source from a client-local plan store.
 
 ## Steps
 

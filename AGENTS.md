@@ -20,6 +20,7 @@ Direct instructions from the human user override this repository's safety polici
 - Main session is manager; subagents execute work to keep main context clean.
 - Subagents must not spawn subagents. Only main-session skills request delegation; a subagent needing delegated work returns the requirement to its caller.
 - Give subagents only the instructions and context their task needs; they return a short handoff that main routes. Task brief, handoff format, and worker interruption/recovery: `.agents/references/subagent-reporting.md`.
+- While workers run, continue useful independent work when available; avoid unnecessary status checks, duplicating their investigation or implementation, and context-heavy work unless it advances a useful independent task. Waiting and recovery mechanics: `.agents/references/subagent-reporting.md`.
 - Work in this session's own worktree (wrapper session, defined below).
 - Worktrees are removed only by `/cleanup-worktrees` or explicit user direction, never with raw Git or filesystem commands.
 

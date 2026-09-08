@@ -3,6 +3,9 @@
 #if defined(BT_CLIENT)
 
 #include "AudioUtility.h"
+#if defined(BT_DEBUG)
+#include "Agent/Commands/AudioStreamingFixture.h"
+#endif
 #include "File/FileManager.h"
 #include "Ui/SoundSettingsWrappersBase.h"
 
@@ -23,12 +26,16 @@ StreamingVoice::StreamingVoice(AudioEngine* pAudioEngine, IXAudio2SourceVoice* p
 
 StreamingVoice::~StreamingVoice()
 {
+	CancelPendingReads();
 	DestroyXAudio2SourceVoice(mpAudioEngine, mpVoice);
+#if defined(BT_DEBUG)
+	AudioStreamingFixture::RetireVoiceControl(mpAudioStreamingControl);
+#endif
 }
 
 float StreamingVoice::GetRemainingTime() const
 {
-	int64_t iRemainingBytes = mpLazyChunk->header.iSize - miCurrentPosition;
+	int64_t iRemainingBytes = mpLazyChunk->header.iSize - miNextReadOffset;
 	if (iRemainingBytes <= 0)
 	{
 		return 0.0f;
@@ -39,60 +46,98 @@ float StreamingVoice::GetRemainingTime() const
 
 bool StreamingVoice::ShouldTransition() const
 {
-	return GetRemainingTime() <= kfCrossfadeDuration || miCurrentPosition >= mpLazyChunk->header.iSize || (mFlags & kLastBufferSubmitted);
+	return GetRemainingTime() <= kfCrossfadeDuration || miNextReadOffset >= mpLazyChunk->header.iSize || (mFlags & kLastBufferSubmitted);
 }
 
-void StreamingVoice::FillSlot(int64_t iSlot)
+void StreamingVoice::UpdateRequests(bool bAllowRequests)
 {
-	mSlotBytesRead[iSlot] = 0;
-	mbSlotLastBuffer[iSlot] = false;
-
-	int64_t iRemainingData = mpLazyChunk->header.iSize - miCurrentPosition;
-	if (iRemainingData == 0)
-	{
-		mbSlotLastBuffer[iSlot] = true;
-		mbFillDone.store(true, std::memory_order_release);
-		LOG(kAudio, kDebug, "Music streaming: No remaining data to read, position: {}/{}", miCurrentPosition, mpLazyChunk->header.iSize);
-		return;
-	}
-
-	int64_t iBytesToRead = std::min(iRemainingData, kiBufferSize);
-
-	bool bSuccess = gpFileManager->ReadChunkData(mpLazyChunk->location.crc, miCurrentPosition, std::span<std::byte>(reinterpret_cast<std::byte*>(mBuffers[iSlot]), iBytesToRead));
-	if (!bSuccess)
-	{
-		mbFillDone.store(true, std::memory_order_release);
-		LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", miCurrentPosition);
-		return;
-	}
-
-	miCurrentPosition += iBytesToRead;
-	mSlotBytesRead[iSlot] = iBytesToRead;
-
-	if (miCurrentPosition >= mpLazyChunk->header.iSize)
-	{
-		mbSlotLastBuffer[iSlot] = true;
-		LOG(kAudio, kDebug, "Music streaming last buffer: Read {} bytes at position {}/{}", iBytesToRead, miCurrentPosition, mpLazyChunk->header.iSize);
-	}
-}
-
-void StreamingVoice::FillReadyBuffers()
-{
-	if (mbFillDone.load(std::memory_order_acquire))
-	{
-		return;
-	}
 	for (int64_t iSlot = 0; iSlot < kiBufferCount; ++iSlot)
 	{
-		if (mSlotStates[iSlot].load(std::memory_order_acquire) != static_cast<uint8_t>(SlotState::kEmpty))
+		if (mSlotStates[iSlot] != SlotState::kPending)
 		{
 			continue;
 		}
-		mSlotStates[iSlot].store(static_cast<uint8_t>(SlotState::kFilling), std::memory_order_relaxed);
-		FillSlot(iSlot);
-		mSlotStates[iSlot].store(static_cast<uint8_t>(SlotState::kReady), std::memory_order_release);
-		if (mbFillDone.load(std::memory_order_acquire))
+
+		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[iSlot]), mSlotBytesRead[iSlot]);
+		ChunkReadResult eResult = gpFileManager->TryReadChunkData(mReadRequests[iSlot], mpLazyChunk->location.crc, static_cast<uint64_t>(mSlotOffsets[iSlot]), destination);
+		if (eResult == ChunkReadResult::kReady)
 		{
+			mSlotStates[iSlot] = SlotState::kReady;
+		}
+		else if (eResult == ChunkReadResult::kFailed)
+		{
+			mSlotBytesRead[iSlot] = 0;
+			mbSlotLastBuffer[iSlot] = true;
+			mbReadDone = true;
+			mSlotStates[iSlot] = SlotState::kReady;
+			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", mSlotOffsets[iSlot]);
+		}
+	}
+
+	if (!bAllowRequests)
+	{
+		return;
+	}
+#if defined(BT_DEBUG)
+	if (mpAudioStreamingControl != nullptr && mpAudioStreamingControl->uiPublicationAllowance == 0)
+	{
+		return;
+	}
+#endif
+	if (mbReadDone)
+	{
+		return;
+	}
+
+	while (mSlotStates[miNextRequest] == SlotState::kEmpty)
+	{
+		int64_t iSlot = miNextRequest;
+		int64_t iRemainingData = mpLazyChunk->header.iSize - miNextReadOffset;
+		if (iRemainingData == 0)
+		{
+			mSlotBytesRead[iSlot] = 0;
+			mSlotOffsets[iSlot] = miNextReadOffset;
+			mbSlotLastBuffer[iSlot] = true;
+			mbReadDone = true;
+			mSlotStates[iSlot] = SlotState::kReady;
+			LOG(kAudio, kDebug, "Music streaming: No remaining data to read, position: {}/{}", miNextReadOffset, mpLazyChunk->header.iSize);
+			return;
+		}
+
+		int64_t iBytesToRead = std::min(iRemainingData, kiBufferSize);
+		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[iSlot]), iBytesToRead);
+		ChunkReadResult eResult = gpFileManager->TryReadChunkData(mReadRequests[iSlot], mpLazyChunk->location.crc, static_cast<uint64_t>(miNextReadOffset), destination);
+		if (eResult == ChunkReadResult::kRetry)
+		{
+			return;
+		}
+#if defined(BT_DEBUG)
+		if (mpAudioStreamingControl != nullptr && eResult != ChunkReadResult::kFailed)
+		{
+			--mpAudioStreamingControl->uiPublicationAllowance;
+		}
+#endif
+		if (eResult == ChunkReadResult::kFailed)
+		{
+			mSlotBytesRead[iSlot] = 0;
+			mSlotOffsets[iSlot] = miNextReadOffset;
+			mbSlotLastBuffer[iSlot] = true;
+			mbReadDone = true;
+			mSlotStates[iSlot] = SlotState::kReady;
+			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", miNextReadOffset);
+			return;
+		}
+
+		mSlotBytesRead[iSlot] = iBytesToRead;
+		mSlotOffsets[iSlot] = miNextReadOffset;
+		miNextReadOffset += iBytesToRead;
+		mbSlotLastBuffer[iSlot] = miNextReadOffset >= mpLazyChunk->header.iSize;
+		mSlotStates[iSlot] = eResult == ChunkReadResult::kReady ? SlotState::kReady : SlotState::kPending;
+		miNextRequest = (miNextRequest + 1) % kiBufferCount;
+		if (mbSlotLastBuffer[iSlot])
+		{
+			mbReadDone = true;
+			LOG(kAudio, kDebug, "Music streaming last buffer: Read {} bytes at position {}/{}", iBytesToRead, miNextReadOffset, mpLazyChunk->header.iSize);
 			return;
 		}
 	}
@@ -103,14 +148,13 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 	int64_t iConsumed = miBuffersConsumed.exchange(0, std::memory_order_acquire);
 	for (int64_t i = 0; i < iConsumed; ++i)
 	{
-		mSlotStates[miNextConsume].store(static_cast<uint8_t>(SlotState::kEmpty), std::memory_order_release);
+		mSlotStates[miNextConsume] = SlotState::kEmpty;
 		miNextConsume = (miNextConsume + 1) % kiBufferCount;
 	}
 
 	while (!(mFlags & kLastBufferSubmitted))
 	{
-		uint8_t uiState = mSlotStates[miNextSubmit].load(std::memory_order_acquire);
-		if (uiState != static_cast<uint8_t>(SlotState::kReady))
+		if (mSlotStates[miNextSubmit] != SlotState::kReady)
 		{
 			break;
 		}
@@ -120,9 +164,9 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 
 		if (iBytesRead == 0)
 		{
-			// Worker hit EOF or read failure with nothing to submit; mark done and recycle the slot.
+			// EOF or read failure has nothing to submit; mark done and recycle the slot.
 			mFlags.Set(kLastBufferSubmitted);
-			mSlotStates[miNextSubmit].store(static_cast<uint8_t>(SlotState::kEmpty), std::memory_order_release);
+			mSlotStates[miNextSubmit] = SlotState::kEmpty;
 			miNextSubmit = (miNextSubmit + 1) % kiBufferCount;
 			break;
 		}
@@ -148,7 +192,7 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 			break;
 		}
 
-		mSlotStates[miNextSubmit].store(static_cast<uint8_t>(SlotState::kSubmitted), std::memory_order_release);
+		mSlotStates[miNextSubmit] = SlotState::kSubmitted;
 		miNextSubmit = (miNextSubmit + 1) % kiBufferCount;
 
 		if (!mbStarted)
@@ -161,6 +205,18 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 		{
 			mFlags.Set(kLastBufferSubmitted);
 			break;
+		}
+	}
+}
+
+void StreamingVoice::CancelPendingReads()
+{
+	for (int64_t iSlot = 0; iSlot < kiBufferCount; ++iSlot)
+	{
+		mReadRequests[iSlot].Reset();
+		if (mSlotStates[iSlot] == SlotState::kPending)
+		{
+			mSlotStates[iSlot] = SlotState::kEmpty;
 		}
 	}
 }

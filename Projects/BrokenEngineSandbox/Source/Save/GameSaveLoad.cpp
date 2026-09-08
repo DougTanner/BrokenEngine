@@ -120,10 +120,10 @@ void GameSaveLoad::ServerReset()
 	game::gpServerSession->mpRuntime->ComputeActiveSet();
 }
 
-void GameSaveLoad::Autosave()
+bool GameSaveLoad::Autosave()
 {
 	ScopedSuppressAllocationTracking suppress;
-	engine::WriteGridSave(mrGameBase, {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path("ServerAutosave.save"), game::gpGame->mClientGridCoord);
+	return engine::WriteGridSave(mrGameBase, {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path("ServerAutosave.save"), game::gpGame->mClientGridCoord);
 }
 
 void GameSaveLoad::TickAutosave()
@@ -135,9 +135,16 @@ void GameSaveLoad::TickAutosave()
 
 	if (mAutosaveTimer.GetDeltaNs(false) >= kAutosaveInterval)
 	{
-		Autosave();
+		bool bAutosaveSucceeded = Autosave();
 		mAutosaveTimer.Reset();
-		LOG(kDefault, kInfo, "Autosave fired (interval {}s)", kAutosaveInterval.count());
+		if (bAutosaveSucceeded)
+		{
+			LOG(kDefault, kInfo, "Periodic autosave succeeded (interval {}s)", kAutosaveInterval.count());
+		}
+		else
+		{
+			LOG(kDefault, kError, "Periodic autosave failed (interval {}s)", kAutosaveInterval.count());
+		}
 	}
 }
 

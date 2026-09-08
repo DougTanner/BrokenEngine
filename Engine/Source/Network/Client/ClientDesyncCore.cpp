@@ -131,32 +131,16 @@ void ClientDesyncCore::RecoverFromDesync()
 
 void ClientDesyncCore::Reset()
 {
+	if (mpfnResetObserver != nullptr)
+	{
+		mpfnResetObserver(*this);
+	}
 	if (engine::gpClient != nullptr)
 	{
 		game::gpClientSession->mpRuntime->mpClient->mStateFlags.Clear(engine::Client::ClientStateFlags::kDesyncDebugMode);
 	}
 	mDesyncDebugState = {};
-	mAgentFullStateFixtureState = {};
 	miDesyncCount = 0;
-}
-
-void ClientDesyncCore::ArmAgentFullStateFixture(int64_t iTick, GridCoord coord)
-{
-	ASSERT(!IsStalled());
-	mAgentFullStateFixtureState.bStalled = true;
-	mAgentFullStateFixtureState.iTick = iTick;
-	mAgentFullStateFixtureState.coord = coord;
-	game::gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesyncDebugMode);
-	game::gpClientSession->mpRuntime->mpClient->SendResyncRequest();
-}
-
-void ClientDesyncCore::ClearAgentFullStateFixture()
-{
-	mAgentFullStateFixtureState = {};
-	if (engine::gpClient != nullptr && mDesyncDebugState.iTick < 0)
-	{
-		game::gpClientSession->mpRuntime->mpClient->mStateFlags.Clear(engine::Client::ClientStateFlags::kDesyncDebugMode);
-	}
 }
 
 } // namespace engine

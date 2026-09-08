@@ -4,6 +4,9 @@
 
 #if defined(BT_CLIENT)
 #include "Graphics/Managers/TextureUploadManager.h"
+#if defined(BT_DEBUG)
+#include "Agent/Commands/AudioStreamingFixture.h"
+#endif
 #endif
 
 namespace engine
@@ -30,13 +33,17 @@ void PackChunkLoader::Start()
 
 void PackChunkLoader::Stop()
 {
-	// Shutdown background loading threads. notify_all (not notify_one): every waiting loading thread must wake
-	// to observe mShutdown, otherwise a thread left asleep would never reach join() below and hang teardown.
 	{
 		std::unique_lock lock(mQueueMutex);
-		mShutdown = true;
+		if (mShutdown.exchange(true, std::memory_order_release))
+		{
+			return;
+		}
+#if defined(BT_CLIENT)
+		mrPackChunks.AcknowledgeQueuedAudioReads();
+#endif // BT_CLIENT
 	}
-	mWakeCondition.notify_all();
+	PublishWake();
 	// joinable() is false only if the eager-load task threw before assigning the threads (catch in ~PackChunks).
 	for (std::thread& rLoadingThread : mLoadingThreads)
 	{
@@ -79,6 +86,12 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 
 				mRequestQueue.push({crc, ePriority, LoadRequestKind::kWholeChunk});
 				rLazyChunk.eState.store(ChunkState::kLoadRequested, std::memory_order_release);
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+				if (common::gpMultithreading->IsMainThread())
+				{
+					AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kExistingQueued, std::numeric_limits<uint32_t>::max(), crc, 0, rLazyChunk.iDataSize, AudioStreamingFixtureQueueState::kQueued, 0, false);
+				}
+#endif
 				bAddedAny = true;
 			}
 		}
@@ -86,11 +99,7 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 
 	if (bAddedAny)
 	{
-		// notify_all (not notify_one): a single call can enqueue a burst of chunks (e.g. an island subscription
-		// or WaitForChunks span). notify_one would wake just one loading thread, which would drain the whole
-		// burst serially while the others slept — defeating the parallelism. Waking all engages every thread;
-		// any woken with nothing left to pop simply returns to wait (a cheap, harmless spurious wakeup).
-		mWakeCondition.notify_all();
+		PublishWake();
 	}
 }
 
@@ -127,7 +136,7 @@ void PackChunkLoader::RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffs
 
 	if (bAdded)
 	{
-		mWakeCondition.notify_all();
+		PublishWake();
 	}
 }
 
@@ -198,9 +207,19 @@ void PackChunkLoader::WaitForLoadersIdle()
 	// Without the drain, a loader that popped a whole-texture request before the all-texture reset can store
 	// kUploading after that reset already ran. RequestChunkLoad skips any chunk at >= kDiskLoaded, so such a chunk
 	// is never requested again and its texture never recovers.
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+	AudioStreamingFixture::PrepareLoaderDrain();
+#endif
 	std::unique_lock lock(mQueueMutex);
 	LOG(kLoading, kInfo, "PackChunks loader drain begin queued={} active={}", mRequestQueue.size(), miActiveLoadJobs);
-	mCompletionCondition.wait(lock, [this] { return mRequestQueue.empty() && miActiveLoadJobs == 0; });
+	mCompletionCondition.wait(lock, [this]
+	{
+#if defined(BT_CLIENT)
+		return mRequestQueue.empty() && miActiveLoadJobs == 0 && !mrPackChunks.HasActiveAudioRead();
+#else
+		return mRequestQueue.empty() && miActiveLoadJobs == 0;
+#endif
+	});
 	LOG(kLoading, kInfo, "PackChunks loader drain end queued={} active={}", mRequestQueue.size(), miActiveLoadJobs);
 }
 
@@ -216,31 +235,79 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 	// the thread out of frame-critical CPU paths without throttling its disk I/O.
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 
-	while (!mShutdown)
+	while (true)
 	{
+		uint64_t uiSavedWakeSequence = mWakeSequence.load(std::memory_order_acquire);
 		LoadRequest loadRequest {};
+#if defined(BT_CLIENT)
+		uint32_t uiAudioIndex = 0;
+		uint64_t uiAudioGeneration = 0;
+		bool bAudioRead = false;
+#endif // BT_CLIENT
+		bool bHaveWork = false;
 
 		{
 			std::unique_lock lock(mQueueMutex);
-
-			if (!mShutdown && mRequestQueue.empty())
-			{
-				// Wait for requests
-				mWakeCondition.wait(lock, [this] { return mShutdown || !mRequestQueue.empty(); });
-			}
-
-			if (mShutdown)
+			if (mShutdown.load(std::memory_order_acquire))
 			{
 				break;
 			}
 
-			loadRequest = mRequestQueue.top();
-			mRequestQueue.pop();
-			// Counted in the same locked scope as the pop, so a request is never invisible to WaitForLoadersIdle:
-			// it is either still queued or already active.
-			++miActiveLoadJobs;
+			bool bExistingWork = !mRequestQueue.empty();
+			bool bRealtimeWork = bExistingWork && mRequestQueue.top().ePriority == LoadPriority::kRealtime;
+#if defined(BT_CLIENT)
+			bool bAudioWork = mrPackChunks.HasQueuedAudioRead();
+#else
+			bool bAudioWork = false;
+#endif
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+			if (AudioStreamingFixture::LoadersStaged())
+			{
+				bExistingWork = false;
+				bRealtimeWork = false;
+				bAudioWork = false;
+			}
+#endif
+			if (bRealtimeWork || (bExistingWork && (!bAudioWork || !mbPreferAudio)))
+			{
+				loadRequest = mRequestQueue.top();
+				mRequestQueue.pop();
+				bHaveWork = true;
+				if (bAudioWork)
+				{
+					mbPreferAudio = true;
+				}
+			}
+#if defined(BT_CLIENT)
+			else if (bAudioWork && mrPackChunks.TryClaimAudioRead(uiAudioIndex, uiAudioGeneration))
+			{
+				bAudioRead = true;
+				bHaveWork = true;
+				if (bExistingWork)
+				{
+					mbPreferAudio = false;
+				}
+			}
+#endif // BT_CLIENT
+			if (bHaveWork)
+			{
+				++miActiveLoadJobs;
+			}
 		}
 
+		if (!bHaveWork)
+		{
+			mWakeSequence.wait(uiSavedWakeSequence, std::memory_order_acquire);
+			continue;
+		}
+
+#if defined(BT_CLIENT)
+		if (bAudioRead)
+		{
+			mrPackChunks.LoadAudioRead(uiAudioIndex, uiAudioGeneration, iThreadIndex);
+		}
+		else
+#endif // BT_CLIENT
 		if (loadRequest.eKind == LoadRequestKind::kRangeReload)
 		{
 			LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
@@ -252,6 +319,14 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 			LoadChunk(loadRequest, iThreadIndex);
 		}
 
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+		if (!bAudioRead)
+		{
+			const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
+			AudioStreamingFixture::Record(iThreadIndex == 0 ? AudioStreamingFixturePartition::kLoader0 : AudioStreamingFixturePartition::kLoader1, AudioStreamingFixturePhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, loadRequest.uiOffset, loadRequest.eKind == LoadRequestKind::kWholeChunk ? static_cast<uint64_t>(rLazyChunk.iDataSize) : loadRequest.uiLength, AudioStreamingFixtureQueueState::kReady, 0, false);
+		}
+#endif
+
 		// Decremented here rather than inside LoadChunk, which already takes mQueueMutex through
 		// NotifyChunkCompletion, and only after the job published its terminal state above — so a drain that
 		// returns has seen every accepted job's result.
@@ -262,6 +337,21 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 		}
 	}
 }
+
+void PackChunkLoader::PublishWake()
+{
+	uint64_t uiWakeSequence = mWakeSequence.load(std::memory_order_relaxed);
+	while (true)
+	{
+		ASSERT(uiWakeSequence != std::numeric_limits<uint64_t>::max());
+		if (mWakeSequence.compare_exchange_weak(uiWakeSequence, uiWakeSequence + 1, std::memory_order_release, std::memory_order_relaxed))
+		{
+			break;
+		}
+	}
+	mWakeSequence.notify_all();
+}
+
 
 void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex)
 {
