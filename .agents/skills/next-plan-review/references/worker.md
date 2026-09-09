@@ -1,6 +1,7 @@
 # Next Plan Review Worker
 
-The numbered spine the invoking parent executes, and the judgment no step owns.
+The numbered spine the direct fresh `reviewer` executes, and the judgment no
+step owns.
 
 ## Steps
 
@@ -118,8 +119,7 @@ The numbered spine the invoking parent executes, and the judgment no step owns.
      worktree facts.
    - Done when the recorded client route was followed and provenance is either
      proven or reported with sanitized candidates and a named missing proof.
-7. Assemble the brief: require the child reviewer to do all of the following, and
-   state each in the brief.
+7. Perform the review requirements below.
    - Inspect every core delegation event and verify that brief contains the exact
      objective, owned scope/exclusions, fixed decisions, governing paths,
      affected artifacts, meaningful identity, acceptance checks, prohibitions,
@@ -139,17 +139,13 @@ The numbered spine the invoking parent executes, and the judgment no step owns.
    - Measure the main session's context entries per
      [`measurement.md`](measurement.md) `## Measure main-session token
      efficiency` before assessing concern 4.
-   - Done when the brief carries every requirement above.
-8. Require in that same brief the shared handoff form and the extension block in
-   [`../SKILL.md`](../SKILL.md) `## Handoff`, plus the single task brief from
-   `.agents/references/subagent-reporting.md`, commit facts, sanitized locators,
-   trust rules, and targeted event ranges.
-   - With that brief complete, delegate the proven parent and every
-     routing-inventory row to exactly one fresh `reviewer`; delegation is
-     required and has no inline fallback.
-   - Done when exactly one fresh `reviewer` is dispatched with that brief
-     carrying the Step 7 requirements and the handoff form.
-9. Confirm the returned evidence.
+   - Done when every requirement above has been completed for the proven parent
+     and every routing-inventory row.
+8. Use the shared handoff form and extension block in
+   [`../SKILL.md`](../SKILL.md) `## Handoff`, the supplied task brief, commit
+   facts, sanitized locators, trust rules, and targeted event ranges. Done when
+   the result contains every required field and stays within its size cap.
+9. Validate the assembled evidence before returning it.
    - Confirm the decisive cited ranges against Git and repository artifacts; do
      not reread whole transcripts.
    - The per-agent control-work rows and the per-route `Model-routing evidence`
@@ -167,13 +163,13 @@ The numbered spine the invoking parent executes, and the judgment no step owns.
   redacted fragment.
 - Require every row to cite its session ID and timestamp or event/line location.
   Rows concerning delegation compliance must also cite the relevant task brief.
-- In bounded friction mode, all of Steps 1-6, and the fresh `reviewer`,
-  task-brief, untrusted-transcript, and transcript-citation rules in Steps 7-9,
+- In bounded friction mode, all of Steps 1-6 and the direct-review,
+  task-brief, untrusted-transcript, and transcript-citation rules in Steps 7-9
   apply unchanged.
 - Waived in bounded friction mode and nowhere else: Step 5's routing inventory —
-  delegate the proven parent alone; every other requirement in Steps 7-9,
-  including the delegation-event inspection, the handoff extension lines, and the
+  inspect the proven parent alone; every other requirement in Steps 7-9,
+  including delegation-event inspection, the handoff extension lines, and the
   per-agent and model-routing evidence; all of [`concerns.md`](concerns.md); and
-  all of [`report.md`](report.md). The reviewer returns the standard handoff from
-  `.agents/references/subagent-reporting.md` carrying only the provenance
-  verdict, the cited root cause of the named friction, and the fix it implies.
+  all of [`report.md`](report.md). Return the standard handoff from
+  `.agents/references/subagent-reporting.md` carrying only the provenance verdict,
+  the cited root cause of the named friction, and the fix it implies.

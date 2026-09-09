@@ -54,7 +54,7 @@ Steps and rules for the dispatched reviewer. The public
 - Precision guard: every finding names the owning location or the exceeded
   threshold. No owner named, no finding.
 - Leave frontmatter, discovery, invocation policy, and bundled-link mechanics
-  to `/validate-skill`.
+  to the `/external-skill-creator` findings-only validate mode.
 - Leave `AGENTS.md` content correctness, chain sync, and advisory budget
   assessment to `/update-claude-docs`; its
   [`content-rules.md`](../../update-claude-docs/references/content-rules.md)

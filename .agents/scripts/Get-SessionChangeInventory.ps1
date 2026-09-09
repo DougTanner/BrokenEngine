@@ -38,7 +38,7 @@ $script:AcceptanceSkeletonChecks = [ordered]@{
 	codeStyleReview = '/code-style-review'
 	commentReview = '/comment-review'
 	updateVcxproj = '/update-vcxproj'
-	validateSkill = '/validate-skill'
+	validateSkill = '/external-skill-creator validate mode'
 	updateClaudeDocs = '/update-claude-docs'
 	progressiveDisclosureReview = '/progressive-disclosure-review'
 }

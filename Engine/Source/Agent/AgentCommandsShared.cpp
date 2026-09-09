@@ -2,7 +2,7 @@
 
 #include "Agent/AgentCommandsShared.h"
 
-#include "CrashReport.h"
+#include "Agent/Commands/CrashReportFixture.h"
 
 namespace engine
 {
@@ -181,27 +181,6 @@ void CommandSetLogLevel(const nlohmann::json& rParams, nlohmann::json& rResult)
 		for (int64_t i = 0; i < common::kiLogCategoryCount; ++i)
 			effective[common::kpcLogCategoryNames[i]] = LogLevelName(applyClamped(static_cast<common::LogCategory>(i)));
 		rResult["effective"] = std::move(effective);
-	}
-}
-
-// Writes a real crash report through the production handler (no exception object, so its text is the deterministic
-// "Unknown exception") and then exits. The exit is deliberate and intentionally leaves the request unanswered: the
-// harness observes transport loss plus exit code 0, so no response is built here.
-void CommandCrashReportFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
-{
-	if constexpr (!kbDebugInput)
-	{
-		throw std::runtime_error("crash_report_fixture requires kbDebugInput build");
-	}
-	else
-	{
-		if (!rParams.is_object() || !rParams.empty())
-		{
-			throw std::runtime_error("crash_report_fixture requires empty params");
-		}
-
-		HandleException();
-		ExitProcess(0);
 	}
 }
 

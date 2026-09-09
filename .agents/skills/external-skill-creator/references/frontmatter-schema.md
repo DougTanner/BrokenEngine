@@ -73,9 +73,14 @@ Every file under the skill directory must be a top-level `SKILL.md`, `LICENSE`, 
 
 Markdown links whose relative destination begins with `references/`, `scripts/`, or `assets/` must resolve beneath the skill directory. URL fragments and query strings do not participate in the filesystem check. Absolute paths, URI destinations, and links outside those bundled directories are not bundled links under this rule.
 
-## Section order and placement
+## Consumption shape, section order, and placement
 
-`SECTION001` checks section placement and order against `.agents/references/skill-skeleton.md`, which owns the section list, their relative order, and the file each belongs to. A `## ` heading outside a fenced code block that appears in a file the skeleton assigns to the other file, or after a heading the skeleton orders later, is reported at its own line. Headings the skeleton does not name are ignored, and an omitted section is valid.
+`SECTION001` checks consumption shape, section placement, and order against
+[`skill-skeleton.md`](../../../references/skill-skeleton.md) and its linked
+main-session and subagent type checklists. A `## ` heading outside a fenced code
+block that appears in a file the selected shape disallows, or after a heading
+the skeleton orders later, is reported at its own line. Headings the skeleton
+does not name are ignored, and an omitted section is valid.
 
 ## Handoff vocabulary
 
@@ -104,7 +109,7 @@ requires a Codex companion file.
 The mechanical command accepts exactly one target:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/validate-skill/scripts/Validate-Skill.ps1 -Path <skill-directory-or-SKILL.md>
+pwsh -NoProfile -File .agents/skills/external-skill-creator/scripts/Validate-Skill.ps1 -Path <skill-directory-or-SKILL.md>
 ```
 
 Repository targets must be below `.agents/skills/`. Pass `-Fixture` only for a disposable external fixture.
@@ -113,4 +118,13 @@ Repository targets must be below `.agents/skills/`. Pass `-Fixture` only for a d
 - One or more line-ordered `INVALID <path>:<line> <code>: <message>` diagnostics with exit `1`: target content is invalid.
 - `SETUP_ERROR <code>: <message>` with exit `2`: invocation, path resolution, file read, or internal validation failed.
 
-For validator changes, create disposable packages under a temporary directory; never track fixtures. Require `VALID`/0 from a valid `-Fixture` package, `INVALID`/1 after corrupting a known field, `INVALID`/1 carrying `HANDOFF001` from a fixture whose `## Handoff` fence contains a `Status:` line, `SETUP_ERROR`/2 for a nonexistent target, and `VALID`/0 from the repository self-check.
+For validator changes, create disposable packages under a temporary directory;
+never track fixtures. Require `VALID`/0 from valid main-session and subagent
+`-Fixture` packages; `INVALID`/1 from main-session section misordering and
+subagent section misplacement;
+`VALID`/0 with paired `context` and `agent` metadata in each shape;
+`INVALID`/1 with `RELATIONSHIP001` for an incomplete pair; `INVALID`/1 after
+corrupting a known field; `INVALID`/1 carrying `HANDOFF001` from a fixture whose
+`## Handoff` fence contains a `Status:` line; `INVALID`/1 for broken bundled
+links and off-contract handoff vocabulary; `SETUP_ERROR`/2 for nonexistent and
+out-of-scope targets; and `VALID`/0 from the repository self-check.

@@ -4,6 +4,7 @@
 
 #include "Save/GameSaveLoad.h"
 
+#include "Agent/Commands/ServerSimulationFixtures.h"
 #include "File/GridSave.h"
 #include "File/Replay.h"
 #include "GameBase.h"
@@ -37,27 +38,12 @@ void AdoptReplayMeta(ReplayStagedMeta&& rStagedMeta)
 
 void OnReplayStreamsInvalidated()
 {
-	game::gpServerSession->mReplayTransferFixtures.clear();
+	ResetReplayTransferFixtures(*game::gpServerSession);
 }
 
 void OnStateReplaced()
 {
 	game::gpServerSession->ResetClientsForLoad();
-}
-
-void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, ReplayTransferCaptureCounts& rCounts)
-{
-	for (const StatusChange& rTransfer : transfers)
-	{
-		switch (rTransfer.eType)
-		{
-		case StatusChangeType::kTransferPlayer: ++rCounts.iPlayerCount; break;
-		case StatusChangeType::kTransferSpaceship: ++rCounts.iSpaceshipCount; break;
-		case StatusChangeType::kTransferBlaster: ++rCounts.iBlasterCount; break;
-		case StatusChangeType::kTransferMissile: ++rCounts.iMissileCount; break;
-		default: DEBUG_BREAK(); break;
-		}
-	}
 }
 
 GameSaveLoad::GameSaveLoad(engine::GameBase& rGameBase)

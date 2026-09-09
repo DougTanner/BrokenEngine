@@ -4,9 +4,9 @@
 
 // The engine owns per-cell publication assembly and the deferred-injection drain: the broadcast snapshot of this
 // tick's status changes, the deterministic type grouping the wire format depends on, and the per-coordinate update
-// handed to ServerSessionRuntime::PublishTick. The game supplies the StatusChange payloads and the game-policy
-// queues on game::ServerSession that this machinery drains. Naming game types keeps this header out of the Engine.h
-// aggregation; its consumers include it directly.
+// handed to ServerSessionRuntime::PublishTick. The game supplies the StatusChange payloads. The game Agent fixture
+// owns its deferred injection queue and drains it at the existing pre-snapshot phase. Naming game types keeps this
+// header out of the Engine.h aggregation; its consumers include it directly.
 
 namespace engine
 {
@@ -30,7 +30,6 @@ public:
 	void ProcessUpdatePlayerRequests();
 
 	void QueueUpdatePlayerRequest(const PendingUpdatePlayerRequest& rRequest);
-	void QueueAgentStatusChange(engine::GridCoord coord, const game::StatusChange& rChange);
 	void ClearPendingRequests();
 	void ResetState();
 

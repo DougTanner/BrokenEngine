@@ -22,7 +22,7 @@ $script:MaximumMessageLength = 256
 
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
 $script:SchedulerScript = Join-Path $PSScriptRoot 'Test-PlanSchedulerState.ps1'
-$script:ValidateSkillScript = Join-Path $PSScriptRoot '../skills/validate-skill/scripts/Validate-Skill.ps1'
+$script:ValidateSkillScript = Join-Path $PSScriptRoot '../skills/external-skill-creator/scripts/Validate-Skill.ps1'
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
 $script:HeadSha = ''
@@ -253,7 +253,7 @@ function Invoke-ValidateSkillCheck([object] $Inventory) {
 	# the package name on both sides of every changed path — a rename out of a package can break the
 	# package it left — instead of from the `skill` class, which covers SKILL.md alone. Get-ChangedPath is
 	# not reusable here: it drops deletions, and a deleted bundled file is exactly a case to catch.
-	$sweepPath = '.agents/skills/validate-skill/scripts/Validate-Skill.ps1'
+	$sweepPath = '.agents/skills/external-skill-creator/scripts/Validate-Skill.ps1'
 	$names = [Collections.Generic.List[string]]::new()
 	$sweep = $false
 	foreach ($entry in $Inventory.entries) {

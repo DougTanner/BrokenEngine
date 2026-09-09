@@ -4,6 +4,7 @@
 
 #if defined(BT_SERVER)
 
+#include "Agent/Commands/ServerSimulationFixtures.h"
 #include "Game.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
@@ -86,28 +87,7 @@ void ServerBroadcaster::BuildFrameInputs()
 		// sits in mClientsWaitingForSpawn (an agent spawn landing the same tick would corrupt the spawn-assignment-by-
 		// snapshot-diff zip). Per-coord defers below: a coord the tick loop won't simulate (inactive, or no committed
 		// pCurrent frame yet).
-		if (game::gpGame->mfLastDeltaTime > 0.0f && !game::gpGame->mbReplaying && game::gpServerSession->mpClientManager->mClientsWaitingForSpawn.empty())
-		{
-			for (auto it = game::gpServerSession->mPendingAgentStatusChanges.begin(); it != game::gpServerSession->mPendingAgentStatusChanges.end();)
-			{
-				const engine::GridCoord& rCoord = it->first;
-				auto framesIt = game::gpGame->mCoordFrames.find(rCoord);
-				bool bActive = std::find(game::gpGame->mActiveCoords.begin(), game::gpGame->mActiveCoords.end(), rCoord) != game::gpGame->mActiveCoords.end();
-				if (!bActive || framesIt == game::gpGame->mCoordFrames.end() || framesIt->second.pCurrent == nullptr)
-				{
-					++it;
-					continue;
-				}
-				std::vector<game::StatusChange>& rStatusChanges = game::gpGame->mFrameInputs.try_emplace(rCoord).first->second.statusChanges;
-				rStatusChanges.insert(rStatusChanges.end(), it->second.begin(), it->second.end());
-				// Keep pending entries in status-change codec order before this tick consumes them.
-				std::stable_sort(rStatusChanges.begin(), rStatusChanges.end(), [](const game::StatusChange& rLeft, const game::StatusChange& rRight)
-				{
-					return rLeft.eType < rRight.eType;
-				});
-				it = game::gpServerSession->mPendingAgentStatusChanges.erase(it);
-			}
-		}
+		game::DrainPendingAgentStatusChanges(*game::gpServerSession);
 
 		// Save StatusChanges for broadcasting (transfers handled separately in HarvestTransfers)
 		for (const auto& [rCoord, rFrameInput] : game::gpGame->mFrameInputs)
@@ -328,13 +308,6 @@ void ServerBroadcaster::QueueUpdatePlayerRequest(const PendingUpdatePlayerReques
 	mPendingUpdatePlayerRequests.push_back(rRequest);
 }
 
-void ServerBroadcaster::QueueAgentStatusChange(engine::GridCoord coord, const game::StatusChange& rChange)
-{
-	// Runs at the agent command drain point (top of ServerUpdate) under AgentCommandServer::Drain's blanket
-	// allocation suppression — mirrors QueueUpdatePlayerRequest (no independent inner guard).
-	game::gpServerSession->mPendingAgentStatusChanges.try_emplace(coord).first->second.push_back(rChange);
-}
-
 void ServerBroadcaster::ClearPendingRequests()
 {
 	mPendingUpdatePlayerRequests.clear();
@@ -344,9 +317,7 @@ void ServerBroadcaster::ResetState()
 {
 	mBroadcastStatusChanges.clear();
 	mPendingUpdatePlayerRequests.clear();
-	// Drop any paused-deferred agent injection so a globalId minted against the pre-load game can't leak a stale
-	// StatusChange into freshly-loaded frames. Not cleared in ClearPendingRequests (runs before the agent Drain).
-	game::gpServerSession->mPendingAgentStatusChanges.clear();
+	game::ResetPendingAgentStatusChanges(*game::gpServerSession);
 }
 
 } // namespace engine

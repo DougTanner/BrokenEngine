@@ -2,7 +2,7 @@
 
 One external review covers the run for tooling friction and, on Claude, for
 context efficiency and for content that a subagent could have consumed instead.
-[worker.md](worker.md) owns when it runs; this reference owns how.
+[The `/next-plan` steps](../SKILL.md#steps) own when it runs; this reference owns how.
 
 ## Evidence and measurement
 
@@ -89,7 +89,7 @@ Review and resolve correctness review dispatch; the Verify the acceptance table
 step in root [AGENTS.md](../../../../AGENTS.md) owns how it is authored and
 verified.
 
-The post-checkpoint outcome table in [worker.md](worker.md) owns the
+The [post-checkpoint outcome table](../SKILL.md#post-checkpoint-outcomes) owns the
 authoritative claim disposition and whether a landing is followup-only.
 
 Friction first observed after this checkpoint — including friction in running

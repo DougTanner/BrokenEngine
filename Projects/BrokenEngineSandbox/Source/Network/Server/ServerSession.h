@@ -52,18 +52,7 @@ public:
 
 	engine::OwnedEntityRegistry mClientPlayers;
 
-	// Game-policy transient queues the engine transfer/broadcast machinery drains and fills. They stay here because
-	// every consumer outside that machinery is game policy: the agent fixture and injection commands, the death-scan
-	// mid-transfer skip, replay start/stop state clearing, and SubscriptionUpdates.
-	std::unordered_map<engine::GridCoord, std::vector<StatusChange>> mReplayTransferFixtures;
 	std::vector<SubscriptionUpdate> mPendingSubscriptionUpdates;
-
-	// Agent-injected StatusChanges accumulated at the command drain point; consumed in ServerBroadcaster::BuildFrameInputs
-	// before the mBroadcastStatusChanges snapshot, per-coord, only when ticking (not paused/zero-tick), not during replay
-	// playback, no clients awaiting spawn, and the coord is active + frame-ready — else held for a later tick. Cross-update
-	// accumulator: cleared only in ServerBroadcaster::ResetState(), never in ClearPendingRequests() (which runs before the
-	// agent Drain). ServerBroadcaster.cpp carries detail.
-	std::unordered_map<engine::GridCoord, std::vector<StatusChange>> mPendingAgentStatusChanges;
 
 	std::unique_ptr<ServerFleetManager> mpFleetManager;
 	std::unique_ptr<engine::ServerTransferManager> mpTransferManager;

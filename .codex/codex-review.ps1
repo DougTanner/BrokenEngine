@@ -37,7 +37,7 @@
 	the failed receipt's reason carries its last non-empty stderr line capped at 200 characters, with
 	the full stderr retained as <runId>.stderr.txt beside the run records; when the CLI printed
 	nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed or
-	malformed status is `.agents/skills/codex-review/references/worker.md`, `### Fallback`.
+	malformed status is `.agents/skills/codex-review/SKILL.md`, `### Fallback`.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Launch')]
 param(

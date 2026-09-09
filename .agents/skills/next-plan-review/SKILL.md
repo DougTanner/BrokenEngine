@@ -13,14 +13,13 @@ shell: powershell
 
 Audit one completed landing read-only, producing an evidence-based,
 priority-sorted improvement backlog; never retry the change, edit files, alter
-Plan claims, or inspect unrelated sessions. The invoking parent runs this skill and executes [`references/worker.md`](references/worker.md).
+Plan claims, or inspect unrelated sessions. One fresh `reviewer` executes the
+audit directly.
 
 ## When to use
 
-Run only in the invoking parent/manager context. Never route this skill
-through a delegated `reviewer`; this skill dispatches
-its required fresh reviewer itself, routed per the delegated-review routing
-bullet in the root [AGENTS.md](../../../AGENTS.md).
+Dispatch one fresh `reviewer` directly, routed per the delegated-review rule in
+the root [AGENTS.md](../../../AGENTS.md).
 
 ### Bounded friction mode
 
@@ -34,6 +33,9 @@ included, runs the full audit in [`references/worker.md`](references/worker.md).
 - The commit-ish argument, default `HEAD`.
 - The optional exact session ID.
 - The optional bounded-friction-mode designation with its one recorded friction.
+- The authoritative shared task-brief fields from
+  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+  including repository identity and session baseline.
 
 ## Handoff
 
@@ -68,9 +70,11 @@ changes no file.
 
 Use `NEEDS_ACTION` when the retrospective produces actionable findings, `PASS`
 only when it is clean, and `BLOCKED` when required evidence is missing.
+Main presents the retrospective, decides each returned finding, and owns every
+follow-up action.
 
 ## References
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you
-  are the session executing this skill. The steps and rules the invoking parent
-  executes.
+  are the session executing this skill. The direct review, provenance,
+  measurement, assessment, and evidence-validation steps and rules.

@@ -12,6 +12,7 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 - A fleet's position within its client's list shifts on delete, so requests and queued server work that outlive a poll carry the generated fleet identifier and re-resolve it at consumption.
 - The entities being re-attached are sorted by global ID before rebuilding client ownership so reconnect and save-load preserve creation order.
 - Normal update prepares tick inputs; replay supplies its recorded `FrameInput`.
+- The [game Agent](../../Agent/AGENTS.md#contracts) owns the session-bound fixture slot and its clearing semantics. Session teardown detaches that slot before destroying the runtime.
 
 ## Timing and Paused Availability
 
@@ -27,7 +28,7 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 - Spawn assignment diffs origin player IDs across the tick and pairs new IDs with waiting clients in request order. The client GUID written into Frame state is the persistent relink key.
 - Fleet navigation defers flagship updates through `StatusChange`s. Within `BuildFrameInputs`, waiting-client spawn construction, queued player updates, fleet timers and pending flagship updates, plus broadcast and pre-spawn snapshot capture run only on advancing updates; this work remains deferred through paused and other zero-tick updates.
 - Agent-injected `StatusChange`s remain queued until a normal, advancing, frame-ready tick can consume them. Consumed changes follow the engine-owned status-change ordering contract.
-- Transfer validation, deterministic ordering, destination materialization, the destination CRC recompute, and publication assembly are engine-owned. The game half is the transfer payloads, the ownership relink above, waiting-client spawn coordination, fleet notification, and the three transient queues `ServerSession` retains for the engine machinery to drain — replay transfer fixtures, pending subscription updates, and agent-injected `StatusChange`s — which stay here because every other consumer of them is game policy.
+- Transfer validation, deterministic ordering, destination materialization, the destination CRC recompute, and publication assembly are engine-owned. The game half is the transfer payloads, the ownership relink above, waiting-client spawn coordination, fleet notification, and pending subscription updates. Replay-transfer and injected-status fixture state follows the [game Agent contract](../../Agent/AGENTS.md#contracts), while the [engine Server contract](../../../../../Engine/Source/Network/Server/AGENTS.md#transfers-and-publication) owns its consumption ordering.
 - Replay transfer publication may include a coordinate that is publication-only at `E` and simulation-active at `E + 1`; it is still sent through the existing per-coordinate update publication and does not alter wire layout or starvation rules.
 
 ## Trust and Lifecycle Boundaries
@@ -35,7 +36,7 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 - Engine `Server` admits both engine and game packets before dispatch and owns the resulting violation accounting, including handler throws. This layer supplies game contracts, dispatches admitted packets, and catches/logs handler failures. Side-specific bounds validate navigation timing, fleet sizes, and save/replay fleet data without partially applying a request.
 - Connect-time new-client processing, including its ownership relink, begins only after the engine accepts `ClientHello` and marks the connection handshake complete. After every eligible relink attempt, notify the fleet manager even when no Players were found, because a persistent fleet can outlive all its owned Players and still needs synchronization on reconnect.
 - A client is dead only after all owned players are gone; skip death handling while a player is mid-transfer.
-- Load reset advances the engine-owned debugging-load generation before notification, slot clearing, or transient reset. It then clears client, transfer, and broadcast transient state after restored fleet state is read; resetting the two engine managers also clears the queues this session retains for them, so no second clear belongs here. Do not erase restored fleet RNG or pending navigation updates.
+- Load reset advances the engine-owned debugging-load generation before notification, slot clearing, or transient reset. It then clears client, transfer, and broadcast transient state after restored fleet state is read; resetting the two engine managers clears their corresponding game Agent fixture queues through the existing hooks, so no second clear belongs here. Do not erase restored fleet RNG or pending navigation updates.
 
 ## See Also
 

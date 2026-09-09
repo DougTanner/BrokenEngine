@@ -77,6 +77,6 @@ build/bootstrap coordination. Never embed transcript paths or home paths.
 
 ## Acceptance criteria
 - The recorded symptom no longer reproduces under the documented invocation
-- /validate-skill passes wherever the root AGENTS.md Apply the triggered
-  cleanup step triggers it; plan validate exits 0
+- /external-skill-creator validate mode passes wherever the root AGENTS.md
+  Apply the triggered cleanup step triggers it; plan validate exits 0
 ```

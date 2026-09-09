@@ -4,6 +4,7 @@
 
 #if defined(BT_SERVER)
 
+#include "Agent/Commands/ServerSimulationFixtures.h"
 #include "File/Replay.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
@@ -26,7 +27,7 @@ static engine::ClientGuid TransferDataClientGuid(const game::TransferData& rData
 // every tick as an initial-fleet-spawn bootstrap, so membership there doesn't imply anyone is
 // watching. This check is used to decide whether non-Player transfers should be dropped instead
 // of materializing ghost entities that clients can't see.
-static bool IsDestinationLive(engine::GridCoord destination)
+bool ServerTransferManager::IsDestinationLive(engine::GridCoord destination) const
 {
 	auto destinationIt = game::gpGame->mCoordFrames.find(destination);
 	if (destinationIt != game::gpGame->mCoordFrames.end() && destinationIt->second.pCurrent != nullptr
@@ -297,21 +298,7 @@ void ServerTransferManager::HarvestTransfers()
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena transfersArena = rWorkbuffer.Push();
 	CollectTransfers(transfersArena);
-	for (auto& [rCoord, rTransfers] : game::gpServerSession->mReplayTransferFixtures)
-	{
-		auto it = game::gpGame->mCoordFrames.find(rCoord);
-		if (it == game::gpGame->mCoordFrames.end() || it->second.pNext == nullptr)
-		{
-			game::gpGame->CreateFrameAtCoord(rCoord);
-			engine::CoordFrames& rFrames = game::gpGame->mCoordFrames.at(rCoord);
-			rFrames.pNext = std::make_unique<game::Frame>();
-			std::swap(rFrames.pCurrent, rFrames.pNext);
-		}
-
-		auto& rDestinationTransfers = mTransfers.try_emplace(rCoord).first->second;
-		rDestinationTransfers.insert(rDestinationTransfers.end(), std::make_move_iterator(rTransfers.begin()), std::make_move_iterator(rTransfers.end()));
-	}
-	game::gpServerSession->mReplayTransferFixtures.clear();
+	game::DrainReplayTransferFixtures(*game::gpServerSession, *this);
 
 	SortTransfersByType();
 
@@ -320,9 +307,7 @@ void ServerTransferManager::HarvestTransfers()
 	// that already contains the transferred entities.
 	for (const auto& [rCoord, rTransfers] : mTransfers)
 	{
-		const Replay::ReplayTransferCaptureResult eCaptureResult =
-			gpReplay->CaptureAcceptedTransfers(rCoord, rTransfers, *game::gpGame->mCoordFrames.at(rCoord).pNext);
-		if (eCaptureResult == Replay::ReplayTransferCaptureResult::kRecordingInvalidated) [[unlikely]]
+		if (gpReplay->CaptureAcceptedTransfers(rCoord, rTransfers, *game::gpGame->mCoordFrames.at(rCoord).pNext)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Replay transfer capture failed; recording invalidated");
 		}
@@ -377,25 +362,8 @@ void ServerTransferManager::ApplyReplayTransfers()
 void ServerTransferManager::ResetState()
 {
 	mTransfers.clear();
-	game::gpServerSession->mReplayTransferFixtures.clear();
+	game::ResetReplayTransferFixtures(*game::gpServerSession);
 	game::gpServerSession->mPendingSubscriptionUpdates.clear();
-}
-
-bool ServerTransferManager::QueueReplayTransferFixture(engine::GridCoord destination, game::StatusChange transfer)
-{
-	if constexpr (!kbDebugInput)
-	{
-		return false;
-	}
-
-	if (!game::IsTransferType(transfer.eType) || !std::holds_alternative<game::TransferData>(transfer.data)
-	 || (transfer.eType != game::StatusChangeType::kTransferPlayer && !IsDestinationLive(destination)))
-	{
-		return false;
-	}
-
-	game::gpServerSession->mReplayTransferFixtures.try_emplace(destination).first->second.push_back(std::move(transfer));
-	return true;
 }
 
 bool ServerTransferManager::HasPendingSubscriptionUpdate(int64_t iClientId) const

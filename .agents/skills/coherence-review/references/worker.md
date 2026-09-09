@@ -24,7 +24,8 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    when each such problem is either fixed and self-checked, or reported.
 5. In Tier-1 mode, run in this same context, in full, every reviewer-role check
    the Apply the triggered cleanup step of root
-   [AGENTS.md](../../../../AGENTS.md) lists — today `/validate-skill` and
+   [AGENTS.md](../../../../AGENTS.md) lists — today the
+   `/external-skill-creator` findings-only validate mode and
    `/progressive-disclosure-review`, each on the trigger that step states;
    never route one to another worker. Each passes on its own skill's pass
    condition. Done when each triggered skill has run in full and its handoff is

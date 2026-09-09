@@ -396,6 +396,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\AudioStreamingFixture.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\ClientNetworkFixtures.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportFixture.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h" />
     <ClInclude Include="..\..\Source\Agent\AgentScene.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.h" />
@@ -403,6 +404,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Agent\Commands\ClientFullStateFixture.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\ClientDesyncProbe.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\ClientPacketFaultFixture.h" />
+    <ClInclude Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.h" />
+    <ClInclude Include="..\..\Source\Agent\Commands\RegistryFixture.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\EngineCamera.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Graphics.h" />
@@ -605,6 +608,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\AudioStreamingFixture.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\ClientNetworkFixtures.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportFixture.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentCommands.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentCommandsClient.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentScene.cpp" />
@@ -613,6 +617,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Agent\Commands\ClientFullStateFixture.cpp" />
     <ClCompile Include="..\..\Source\Agent\Commands\ClientDesyncProbe.cpp" />
     <ClCompile Include="..\..\Source\Agent\Commands\ClientPacketFaultFixture.cpp" />
+    <ClCompile Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.cpp" />
+    <ClCompile Include="..\..\Source\Agent\Commands\RegistryFixture.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\EngineCamera.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Debug\DebugRender.cpp" />

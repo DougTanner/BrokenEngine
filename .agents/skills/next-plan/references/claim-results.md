@@ -49,7 +49,7 @@ carry the `retained` projection.
 
 ## Reading the queue listing
 
-`Get-NextPlanList.ps1` runs only when [worker.md](worker.md) step 2 calls for
+`Get-NextPlanList.ps1` runs only when [the `/next-plan` steps](../SKILL.md#steps) step 2 calls for
 it. It reports a bounded projection: per-state counts, then the first Plans in
 selection order (default 5) as `path`/`state` rows, with `blockedBy` on a
 blocked row and `diagnostic` on an excluded one. It never emits the whole tree,
@@ -105,10 +105,10 @@ one thing to do next, drawn from these five values:
 
 - `prepare` — this session holds the claim; continue the preparation workflow.
 - `stop-report-to-user` — the run stops here; report the result and let the user
-  decide what happens next, after the [worker.md](worker.md) step 9 checkpoint.
+  decide what happens next, after [the `/next-plan` steps](../SKILL.md#steps) step 9 checkpoint.
 - `resume-with-flag` — a `-Plan` run found an unclean worktree whose dirty paths
   are all outside `Documents/Plans`; the rerun with
-  `-ResumeRetained` is gated by the [worker.md](worker.md) resume rule.
+  `-ResumeRetained` is gated by [the `/next-plan` rules](../SKILL.md#rules).
 - `retry-later` — tell the user, and the same command can be run again later.
 - `finalize-changes` — the Plan terminal state is prepared; land the change
   through `/finalize-changes`.

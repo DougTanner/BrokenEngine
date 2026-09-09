@@ -6,7 +6,7 @@ Read this reference when a skill adds or changes client-specific metadata, promp
 
 Both clients consume the skill directory and `SKILL.md`, but their policy surfaces are independent. Write portable instructions in ordinary language, then configure every supported client explicitly. Never infer invocation behavior from an `external-` name.
 
-Repository frontmatter follows `../../validate-skill/references/frontmatter-schema.md`. The repository validator, not a client installation, owns its accepted fields and relationships.
+Repository frontmatter follows [`frontmatter-schema.md`](frontmatter-schema.md). The repository validator, not a client installation, owns its accepted fields and relationships.
 
 ## Behavior Map
 
@@ -21,7 +21,7 @@ not establish that the client enforces it.
 
 ## Claude Code
 
-Claude Code reads the repository frontmatter controls. For a genuinely user-only skill, set `disable-model-invocation: true`; this prevents automatic use and native skill-to-skill invocation. Omit it when a documented workflow must invoke the skill, and make the description state the exact automatic or chaining contexts. Set `user-invocable: false` only for a model-only skill: it hides the skill from the menu and prevents explicit `/skill-name` invocation. `when_to_use` is appended to `description` within their combined 1,536-character cap, `paths` gates activation by matching files, and `shell` selects Bash or PowerShell for commands. This skill remains Claude-manual-only.
+Claude Code reads the repository frontmatter controls. For a genuinely user-only skill, set `disable-model-invocation: true`; this prevents automatic use and native skill-to-skill invocation. Omit it when a documented workflow must invoke the skill, and make the description state the exact automatic or chaining contexts. Set `user-invocable: false` only for a model-only skill: it hides the skill from the menu and prevents explicit `/skill-name` invocation. `when_to_use` is appended to `description` within their combined 1,536-character cap, `paths` gates activation by matching files, and `shell` selects Bash or PowerShell for commands. This package permits automatic validate-mode selection while author mode remains explicitly requested.
 
 Users invoke a listed Claude skill explicitly as `/skill-name`; `.claude/skills` exposes the repository package.
 
@@ -59,7 +59,7 @@ Before claiming dual-client support, verify:
 2. Claude frontmatter matches Claude automatic, manual, and chaining behavior;
 3. `agents/openai.yaml` matches Codex implicit and explicit behavior;
 4. every referenced resource exists and is linked from `SKILL.md` when needed;
-5. the repository `validate-skill` workflow passes for frontmatter and bundled links.
+5. `/external-skill-creator` validate mode passes for frontmatter and bundled links.
 
 Use [`validation.md`](validation.md) to record those checks by evidence class.
 The current client semantics above are documented by

@@ -5,6 +5,7 @@
 #include "Network/Client/ClientSession.h"
 #endif
 #if defined(BT_SERVER)
+#include "Agent/Commands/ReplayFixtures.h"
 #include "File/Replay.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/Server/ServerTransferManager.h"
@@ -336,7 +337,7 @@ void GameBase::ServerUpdate()
 		LOG(kDefault, kWarning, "ServerUpdate FullTicks: {} (expected 1)", iFullTicks);
 	}
 	int64_t iUnusedTicks = 0;
-	if (gpReplay->mReplayTransferCaptureInfo.iPauseAfterWriterInputCount != -1 && iFullTicks > 1)
+	if (ReplayFixtures::IsWriterPauseArmed(*gpReplay) && iFullTicks > 1)
 	{
 		iUnusedTicks = iFullTicks - 1;
 		iFullTicks = 1;

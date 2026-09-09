@@ -1,10 +1,9 @@
 # Analyze Visual Studio CPU Captures Worker
 
-The analysis steps and the role and routing rules. Triggers, inputs, and the
-report the analysis returns live in [`../SKILL.md`](../SKILL.md). A dispatch
-holding a capture must read [`capture-forensics.md`](capture-forensics.md),
-which owns steps 1-4, before analyzing or reporting; the steps below continue
-its numbering at 5.
+The direct researcher's analysis steps and rules. Triggers, inputs, and the
+report live in [`../SKILL.md`](../SKILL.md). Read
+[`capture-forensics.md`](capture-forensics.md), which owns steps 1-4, before
+analyzing or reporting; the steps below continue its numbering at 5.
 
 ## Steps
 
@@ -37,29 +36,21 @@ its numbering at 5.
 
    Done when every hotspot's frame phase and PostRender/CRC exposure are
    confirmed from source.
-8. From main, dispatch one `locator` per independent top non-OS/driver cluster
-   to gather full function bodies, call sites with enclosing loop and
-   frame-phase context, and container/comparator types behind template hits.
-   Include memory helpers when their clustered share is meaningful. Done when
-   every locator's source-context extension and complete shared handoff have
-   returned, each `Evidence` citing that locator's `Temp/analyze-diagsession/`
-   file plus its `## <hotspot cluster>` selector, and main has interpreted them.
-9. Route proven optimization residuals through `/create-follow-up-plans`, which
-   owns duplicate checks, Plan shape, tracked metadata, and dependencies; no
-   Plan claim is required. Do not author Plan files directly. Done when every
-   proven residual is routed there.
-10. When a landing gate applies (defined in root `AGENTS.md`), complete
-    `/finalize-changes`; there is no step that adds a plan row after the change
-    lands. Done when that gate is either completed or shown not to apply.
-11. Return this run's profiling report in the [`../SKILL.md`](../SKILL.md)
+8. Inspect every independent top non-OS/driver cluster directly, gathering full
+   function bodies, call sites with enclosing loop and frame-phase context, and
+   container/comparator types behind template hits. Include memory helpers when
+   their clustered share is meaningful. Write each cluster's bounded evidence
+   to its `Temp/analyze-diagsession/` file and cite its `## <hotspot cluster>`
+   selector under `Evidence`. Done when every cluster has source context or an
+   exact residual and every attribution is interpreted.
+9. Return this run's profiling report in the [`../SKILL.md`](../SKILL.md)
     Handoff shape. Done when that report is returned.
 
 ## Rules
 
 - Use deterministic tools for extraction, xperf, share computation, PDB checks,
   and profile-text searches.
-- Main uses `locator` agents for source context: verbatim quotes and file:line
-  only, one agent per independent hotspot cluster.
-- Main dispatches `builder` through `/compile` only when build verification is
-  required.
-- Main interprets measurements, confirms source attribution, and reports.
+- Inspect source context directly and retain verbatim quotes and file:line
+  evidence for each independent hotspot cluster.
+- Do not ask the user, decide proposal disposition, create a follow-up Plan,
+  approve or perform landing, or involve another agent. Main owns those actions.

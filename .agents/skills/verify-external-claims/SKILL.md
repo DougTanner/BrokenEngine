@@ -13,11 +13,13 @@ allowed-tools: [Read, Grep, Glob, Agent]
 
 ## Purpose
 
-Resolve requested external facts for the caller to decide.
+One `locator` resolves requested external facts for main to decide.
 
 ## Inputs
 
-Require each request to contain:
+Dispatch one `locator` with the authoritative shared task-brief fields from
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+and require each request to contain:
 
 - a stable claim ID, API/symbol/rule, and one checkable proposition;
 - the dependent finding, item, or decision and why the verdict matters;
@@ -27,8 +29,7 @@ Require each request to contain:
 
 ## Handoff
 
-Main runs this skill and dispatches one `locator` as its evidence worker. Main
-returns the complete evidence inline, with one row per claim under each of
+The `locator` returns the complete evidence inline, with one row per claim under each of
 `Sources`, `Decisive checks`, and `Per-proposition verdicts`.
 
 Each `Sources` row is one line on this form:
@@ -53,11 +54,12 @@ Complete the report with the remaining shared handoff lines
 (`../../references/subagent-reporting.md`, `## Handoffs`); this read-only
 workflow never changes a file and never requires a build, and each unresolved
 claim with its exact missing evidence belongs in `Residuals`. Preserve exact
-citations; do not replace evidence with a summary.
+citations; do not replace evidence with a summary. Main presents the evidence
+and decides every dependent finding, item, or plan choice from the returned
+verdicts.
 
 ## References
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you
-  are the session executing this skill. Worker entry: the identifier,
-  delegation, and result-handling steps, and the rules. Main itself runs those
-  steps, dispatching the `locator`, so main reads this file to run the skill.
+  are the session executing this skill. The locator's identifier, research,
+  evidence-validation, verdict, and status steps and rules.

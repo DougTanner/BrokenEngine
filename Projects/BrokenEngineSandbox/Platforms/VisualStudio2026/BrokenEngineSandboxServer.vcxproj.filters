@@ -7,6 +7,9 @@
     <Filter Include="Engine\Agent">
       <UniqueIdentifier>{237139c6-f52e-48af-b40c-965138daa616}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Agent\Commands">
+      <UniqueIdentifier>{b7e2a9c4-6d13-4f80-9a5e-2c7d1f8b3046}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Engine\Data">
       <UniqueIdentifier>{1f2a3b4c-5d6e-7f8a-9b0c-d1e2f3a4b5c6}</UniqueIdentifier>
     </Filter>
@@ -39,6 +42,9 @@
     </Filter>
     <Filter Include="Game\Agent">
       <UniqueIdentifier>{099eb226-0661-4f95-918e-551150652f03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Agent\Commands">
+      <UniqueIdentifier>{c8f31e7a-5b24-4d96-a0e6-3f8c2b7d1945}</UniqueIdentifier>
     </Filter>
     <Filter Include="Game\Network">
       <UniqueIdentifier>{c5d6e7f8-a9b0-1234-5678-9abcdef01234}</UniqueIdentifier>
@@ -444,14 +450,29 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsShared.h">
       <Filter>Engine\Agent</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\ReplayFixtures.h">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportFixture.h">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h">
       <Filter>Game\Agent</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h">
       <Filter>Game\Agent</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\AgentCommandsServerFaultFixtures.h">
-      <Filter>Game\Agent</Filter>
+    <ClInclude Include="..\..\Source\Agent\Commands\ServerFaultFixtures.h">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\ServerSimulationFixtures.h">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.h">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\RegistryFixture.h">
+      <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Save\GameSaveLoad.h">
       <Filter>Game\Save</Filter>
@@ -752,6 +773,12 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentUiRegistryServerStubs.cpp">
       <Filter>Engine\Agent</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\ReplayFixtures.cpp">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportFixture.cpp">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Agent\AgentCommands.cpp">
       <Filter>Game\Agent</Filter>
     </ClCompile>
@@ -761,8 +788,17 @@
     <ClCompile Include="..\..\Source\Agent\AgentCommandsServerQueries.cpp">
       <Filter>Game\Agent</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\AgentCommandsServerFaultFixtures.cpp">
-      <Filter>Game\Agent</Filter>
+    <ClCompile Include="..\..\Source\Agent\Commands\ServerFaultFixtures.cpp">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\ServerSimulationFixtures.cpp">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.cpp">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\RegistryFixture.cpp">
+      <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Save\GameSaveLoad.cpp">
       <Filter>Game\Save</Filter>

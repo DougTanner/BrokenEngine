@@ -4,6 +4,7 @@
 
 #include "Network/NetworkCursor.h"
 
+#include "Agent/Commands/ServerSimulationFixtures.h"
 #include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/ServerCellStats.h"
@@ -34,6 +35,7 @@ ServerSession::ServerSession()
 
 ServerSession::~ServerSession()
 {
+	DetachServerSimulationFixtures(*this);
 	mpRuntime.reset();
 	gpServerSession = nullptr;
 }

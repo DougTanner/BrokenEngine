@@ -1,16 +1,22 @@
 # Skill Validation Evidence
 
 Use this procedure after authoring or revising a skill. The repository package
-contract lives in `../../validate-skill/references/frontmatter-schema.md`, and
+contract lives in [`frontmatter-schema.md`](frontmatter-schema.md), and
 client behavior lives in [`client-compatibility.md`](client-compatibility.md).
 
 ## Structural Validation
 
-Run the repository `/validate-skill` workflow. Its PowerShell validator and
-semantic review are the authority for repository frontmatter, companion files,
-package layout, bundled links, section placement, and handoff shape. Record its
-command result and exit code as structural evidence. Client parsing does not
-replace this check.
+In author mode, run the PowerShell validator against the
+`external-skill-creator` package and then the finished skill. Require `VALID`
+and exit `0` from both, and record both command results in the author handoff.
+These author mechanical checks do not replace independent review. Return the
+validate-mode request to the manager, which dispatches a fresh reviewer for the
+semantic and inbound-reference review and owns any finding-fix cycle.
+
+The validator and independent semantic review are the authority for repository
+frontmatter, companion files, package layout, bundled links, section placement,
+handoff shape, and semantic behavior. Client parsing does not replace these
+checks.
 
 Measure every changed Markdown file with the command owned by
 `/progressive-disclosure-review` and record its `bt-token-v1` count against that
@@ -74,7 +80,9 @@ behavior as unverified and narrow compatibility claims accordingly.
 
 Report each intended client and version separately:
 
-- structural — repository `/validate-skill` result;
+- structural — author mechanical self-and-target results, with the independent
+  repository `/external-skill-creator` validate-mode result pending until the
+  manager completes that review;
 - loader — discovery and parsing result, or unverified;
 - runtime — client behavior directly observed, with the checked case;
 - documentation — authoritative behavior used to design the controls; and

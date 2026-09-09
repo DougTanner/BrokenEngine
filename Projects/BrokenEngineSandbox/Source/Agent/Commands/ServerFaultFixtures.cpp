@@ -1,4 +1,4 @@
-#include "Agent/AgentCommandsServerFaultFixtures.h"
+#include "Agent/Commands/ServerFaultFixtures.h"
 
 #if defined(BT_SERVER)
 
@@ -123,7 +123,19 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json
 // lands in decode rather than at the exact-size admission gate.
 void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
-	if (!rParams.is_object() || rParams.size() != 1 || !rParams.contains("case") || !rParams.at("case").is_string())
+	if (!rParams.is_object())
+	{
+		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
+	}
+	if (rParams.size() != 1)
+	{
+		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
+	}
+	if (!rParams.contains("case"))
+	{
+		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
+	}
+	if (!rParams.at("case").is_string())
 	{
 		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
 	}
@@ -146,7 +158,11 @@ void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::js
 			++iHandshakenClientCount;
 		}
 	}
-	if (iHandshakenClientCount != 1 || pPeer == nullptr)
+	if (iHandshakenClientCount != 1)
+	{
+		throw std::runtime_error("engine_packet_fault_fixture requires exactly one handshaken client");
+	}
+	if (pPeer == nullptr)
 	{
 		throw std::runtime_error("engine_packet_fault_fixture requires exactly one handshaken client");
 	}

@@ -19,8 +19,23 @@ following the repository User Interaction rules.
 - The user explicitly invokes this skill because the last message assumed
   knowledge of the code, a plan file, or earlier session scrollback.
 
-## References
+## Steps
 
-- [`references/worker.md`](references/worker.md) — private: read it only if you
-  are the session executing this skill. The restatement steps and the rules
-  they follow.
+1. Identify the target: the topic named in the argument, or with no argument
+   your most recent message — especially any question or request still waiting
+   on the user. Done when that target is named.
+2. Restate it under the rules below, using headings and bullets so a longer
+   explanation stays skimmable. Done when the restatement is answerable from
+   this one message alone.
+3. If the target contained a question or decision, re-ask it after that
+   context is visible. Done when the pending question is either re-asked or
+   confirmed not to exist.
+
+## Rules
+
+- Apply root [AGENTS.md](../../../AGENTS.md) `### User Interaction` for plain
+  language, standalone context, and decision presentation. Where a technical
+  term is unavoidable, explain it in one short sentence or parenthetical the
+  first time it appears.
+- Apply root [AGENTS.md](../../../AGENTS.md) `## Directives` one-term-per-concept
+  rule.

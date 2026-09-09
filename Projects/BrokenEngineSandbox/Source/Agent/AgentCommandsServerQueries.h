@@ -6,7 +6,7 @@ namespace game
 {
 
 // Frame-read query commands (query_frame / query_players / query_collection); packet fault fixtures live in
-// AgentCommandsServerFaultFixtures.cpp, and other server agent commands (sim-control, injection, dispatcher) live in
+// Commands/ServerFaultFixtures.cpp, and other server agent commands (sim-control, injection, dispatcher) live in
 // AgentCommandsServer.cpp. rParams is the request "params" object,
 // rResult the response "result" to populate. Throw on bad params (trust boundary), caught by
 // AgentCommandServer::Drain(). nlohmann::json / engine::GridCoord arrive via the game Pch. CoordFromParam is shared

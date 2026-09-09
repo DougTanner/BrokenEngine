@@ -15,9 +15,9 @@
 Recording, playback, the manifest, and every stream lifetime rule are engine-owned (`../../../../Engine/Source/File/AGENTS.md`), the same deferral the grid file uses. This subsystem owns the game half of that contract.
 
 - Replay metadata is game-owned: written after the writer files complete, and read into an isolated staged value the engine carries without inspecting and applies only once the whole replay generation validates.
-- When the engine invalidates its replay streams, the game clears its replay-only transfer fixture and leaves the live game running.
+- When the engine invalidates its replay streams, this subsystem routes the reset to the game Agent's replay-transfer fixture queue and leaves the live game running.
 - After a successful save load, a fresh reset, or replay adoption, one game entry point relinks and resynchronizes connected clients. It is the sole caller of that relink, so all three paths share identical ordering.
-- Counting captured transfers by type is game policy, because only game code knows the `StatusChange` payload types. The engine carries the resulting per-type counts as an opaque member of its capture record.
+- Replay capture diagnostics use the game Agent's transfer-count contract (`../Agent/AGENTS.md`) and the engine Agent's replay-timed observations (`../../../../Engine/Source/Agent/AGENTS.md`).
 
 ## Affinity
 

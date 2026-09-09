@@ -1,0 +1,214 @@
+#include "Agent/Commands/CollectionLayoutCapacityFixture.h"
+
+#include "Frame/Collections/Missiles/Missiles.h"
+
+namespace game
+{
+
+namespace
+{
+
+// collection_layout_capacity_fixture verifies physical-layout capacity retention.
+
+// Deterministic per-row shared-member values. The identical formulas drive the source-stream writer and the
+// post-read verification, and they cover every MissilesPostRender::SharedMembers() column, so any column or row
+// SharedCollectionRead fails to preserve is caught. ([[maybe_unused]]: the sole callers live in the fixture's
+// kbDebugInput-only branch, discarded on non-debug builds.)
+
+// Distinct exactly-representable value per (row, column), so a column swapped with its neighbour cannot match.
+constexpr float MissileSharedRowScalar(int64_t i, int64_t iSeed, int64_t iColumn)
+{
+	return static_cast<float>(iSeed * 100000 + i * 10 + iColumn);
+}
+
+constexpr MissileFlags_t MissileSharedRowFlags(int64_t i, int64_t iSeed)
+{
+	return ((i + iSeed) & 1) ? MissileFlags_t {MissileFlags::kTransfer} : MissileFlags_t {MissileFlags::kExploding};
+}
+
+constexpr engine::alignment_t MissileSharedRowAlignment(int64_t i, int64_t iSeed)
+{
+	return engine::alignment_t {static_cast<uint32_t>(iSeed * 100 + i + 1)};
+}
+
+constexpr engine::registry_id_t MissileSharedRowTarget(int64_t i, int64_t iSeed)
+{
+	return engine::registry_id_t {engine::uuid_t {iSeed * 100000 + i + 1}};
+}
+
+XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn)
+{
+	// Directions and velocities carry W=0.0.
+	return XMVectorSet(MissileSharedRowScalar(i, iSeed, iColumn), MissileSharedRowScalar(i, iSeed, iColumn + 1), MissileSharedRowScalar(i, iSeed, iColumn + 2), 0.0f);
+}
+
+[[maybe_unused]] void FillMissileSharedRow(MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
+{
+	rMissiles.pFlags[i] = MissileSharedRowFlags(i, iSeed);
+	rMissiles.pVecVelocities[i] = MissileSharedRowVector(i, iSeed, 0);
+	rMissiles.pVecExplosionDirections[i] = MissileSharedRowVector(i, iSeed, 3);
+	rMissiles.pVecStoredDirections[i] = MissileSharedRowVector(i, iSeed, 6);
+	rMissiles.puiRegistryTargets[i] = MissileSharedRowTarget(i, iSeed);
+	rMissiles.pfTimes[i] = MissileSharedRowScalar(i, iSeed, 9);
+	rMissiles.pfDeltaRotationDelays[i] = MissileSharedRowScalar(i, iSeed, 10);
+	rMissiles.pfDeltaRotations[i] = MissileSharedRowScalar(i, iSeed, 11);
+	rMissiles.pfNextJitter[i] = MissileSharedRowScalar(i, iSeed, 12);
+	rMissiles.pfDeltaRotationMax[i] = MissileSharedRowScalar(i, iSeed, 13);
+	rMissiles.pfAccelerations[i] = MissileSharedRowScalar(i, iSeed, 14);
+	rMissiles.pfPitches[i] = MissileSharedRowScalar(i, iSeed, 15);
+	rMissiles.pfExhaustLengths[i] = MissileSharedRowScalar(i, iSeed, 16);
+	rMissiles.pAlignments[i] = MissileSharedRowAlignment(i, iSeed);
+}
+
+[[maybe_unused]] bool MissileSharedRowMatches(const MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
+{
+	return rMissiles.pFlags[i] == MissileSharedRowFlags(i, iSeed)
+	    && XMVector4Equal(rMissiles.pVecVelocities[i], MissileSharedRowVector(i, iSeed, 0))
+	    && XMVector4Equal(rMissiles.pVecExplosionDirections[i], MissileSharedRowVector(i, iSeed, 3))
+	    && XMVector4Equal(rMissiles.pVecStoredDirections[i], MissileSharedRowVector(i, iSeed, 6))
+	    && rMissiles.puiRegistryTargets[i] == MissileSharedRowTarget(i, iSeed)
+	    && rMissiles.pfTimes[i] == MissileSharedRowScalar(i, iSeed, 9)
+	    && rMissiles.pfDeltaRotationDelays[i] == MissileSharedRowScalar(i, iSeed, 10)
+	    && rMissiles.pfDeltaRotations[i] == MissileSharedRowScalar(i, iSeed, 11)
+	    && rMissiles.pfNextJitter[i] == MissileSharedRowScalar(i, iSeed, 12)
+	    && rMissiles.pfDeltaRotationMax[i] == MissileSharedRowScalar(i, iSeed, 13)
+	    && rMissiles.pfAccelerations[i] == MissileSharedRowScalar(i, iSeed, 14)
+	    && rMissiles.pfPitches[i] == MissileSharedRowScalar(i, iSeed, 15)
+	    && rMissiles.pfExhaustLengths[i] == MissileSharedRowScalar(i, iSeed, 16)
+	    && rMissiles.pAlignments[i] == MissileSharedRowAlignment(i, iSeed);
+}
+
+// Drives the real MissilesPostRender deserialization helpers through logical capacities 100 -> 70 -> 60 -> 150 on one
+// reused instance, proving the transient iPhysicalLayoutCapacity holds the true buffer stride across shrink-reuse:
+// the two shrinks reuse the 100-wide buffer and (client) zero the full physical layout including rows 70-99, while the
+// >100-row read reallocates exactly once and publishes the new capacity only after the allocation succeeds.
+
+} // namespace
+
+void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+{
+	if constexpr (!kbDebugInput)
+	{
+		throw std::runtime_error("collection_layout_capacity_fixture requires kbDebugInput build");
+	}
+	else
+	{
+#if defined(BT_CLIENT)
+		rResult["build"] = "client";
+#else
+		rResult["build"] = "server";
+#endif
+
+		// Writes one shared-wire stream (metadata + SharedMembers) at (iCapacity, iCount) through the production Write path.
+		auto BuildStream = [](int64_t iCapacity, int64_t iCount, int64_t iSeed, std::stringstream& rStream)
+		{
+			MissilesPostRender source;
+			engine::GrowCapacityWithCopy(source, iCapacity, 0, source.Members());
+			source.iCount = iCount;
+			for (int64_t i = 0; i < iCount; ++i)
+			{
+				FillMissileSharedRow(source, i, iSeed);
+			}
+			engine::CollectionWrite(rStream, source, source.SharedMembers());
+		};
+
+		MissilesPostRender destination;
+		nlohmann::json steps = nlohmann::json::array();
+
+		// Runs one production SharedCollectionRead into dest and records the capacity metadata and buffer-reuse decision.
+		auto RunRead = [&](const char* pcLabel, int64_t iCapacity, int64_t iCount, int64_t iSeed)
+		{
+			std::stringstream stream(std::ios::in | std::ios::out | std::ios::binary);
+			BuildStream(iCapacity, iCount, iSeed, stream);
+
+			const void* pBefore = destination.pData.get();
+			engine::SharedCollectionRead(stream, destination);
+
+			nlohmann::json step;
+			step["label"] = pcLabel;
+			step["logicalCapacity"] = destination.iCapacity;
+			step["physicalCapacity"] = destination.iPhysicalLayoutCapacity;
+			step["reused"] = (pBefore != nullptr && destination.pData.get() == pBefore);
+			steps.push_back(std::move(step));
+		};
+
+#if defined(BT_CLIENT)
+		// Seeds a nonzero client-only sentinel across the entire physical layout so a later read must clear the full extent.
+		auto SeedSounds = [&]()
+		{
+			for (int64_t i = 0; i < destination.iPhysicalLayoutCapacity; ++i)
+			{
+				destination.puiSounds[i] = engine::sound_t {engine::uuid_t {0x7fffffffffffffffLL}};
+			}
+		};
+		auto CountNonZeroSounds = [&]() -> int64_t
+		{
+			int64_t iNonZero = 0;
+			for (int64_t i = 0; i < destination.iPhysicalLayoutCapacity; ++i)
+			{
+				if (destination.puiSounds[i].ToUuid().Value() != 0)
+				{
+					++iNonZero;
+				}
+			}
+			return iNonZero;
+		};
+		int64_t iSoundsNonZeroTotal = 0;
+#endif
+
+		// 100 -> 70 -> 60: an initial allocation then two shrink-reuses. iPhysicalLayoutCapacity stays 100, so neither
+		// shrink reallocates, and each read must zero the full physical layout before reading the smaller live-row count.
+		RunRead("read100", 100, 100, 1);
+#if defined(BT_CLIENT)
+		SeedSounds();
+#endif
+		RunRead("read70", 70, 70, 2);
+#if defined(BT_CLIENT)
+		iSoundsNonZeroTotal += CountNonZeroSounds();
+		SeedSounds();
+#endif
+		RunRead("read60", 60, 60, 3);
+#if defined(BT_CLIENT)
+		iSoundsNonZeroTotal += CountNonZeroSounds();
+		rResult["clientSoundsNonZeroCount"] = iSoundsNonZeroTotal;
+		rResult["clientSoundsZeroed"] = (iSoundsNonZeroTotal == 0);
+#endif
+
+		// Every logical row from the final (seed 3, 60-row) stream must survive exactly.
+		int64_t iSharedMismatches = 0;
+		for (int64_t i = 0; i < destination.iCount; ++i)
+		{
+			if (!MissileSharedRowMatches(destination, i, 3))
+			{
+				++iSharedMismatches;
+			}
+		}
+		rResult["sharedRowMismatches"] = iSharedMismatches;
+		rResult["sharedRowsPreserved"] = (iSharedMismatches == 0);
+
+#if defined(BT_SERVER)
+		// The server build serializes Members() directly, so it must equal SharedMembers() (wire/CRC parity).
+		rResult["serverMembersEqualShared"] = engine::IsMemberTupleSubset(destination.Members(), destination.SharedMembers())
+		                                   && engine::IsMemberTupleSubset(destination.SharedMembers(), destination.Members());
+#endif
+
+		// A >100-row read must reallocate exactly once, growing the physical layout and publishing it only after success.
+		RunRead("read150", 150, 150, 4);
+
+		bool bReuseOk = steps[1]["reused"].get<bool>() && steps[2]["reused"].get<bool>() && !steps[3]["reused"].get<bool>()
+		             && steps[1]["physicalCapacity"].get<int64_t>() == 100 && steps[2]["physicalCapacity"].get<int64_t>() == 100
+		             && steps[3]["physicalCapacity"].get<int64_t>() == 150;
+
+		bool bPassed = (iSharedMismatches == 0) && bReuseOk;
+#if defined(BT_CLIENT)
+		bPassed = bPassed && (iSoundsNonZeroTotal == 0);
+#endif
+#if defined(BT_SERVER)
+		bPassed = bPassed && rResult["serverMembersEqualShared"].get<bool>();
+#endif
+		rResult["passed"] = bPassed;
+		rResult["steps"] = std::move(steps);
+	}
+}
+
+} // namespace game

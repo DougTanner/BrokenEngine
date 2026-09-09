@@ -29,8 +29,8 @@ boundary, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    3. `/compile` — for build, link, and static failures.
    4. A differential run: the same input through the old and new build or two
       configurations, diffing the output.
-   5. `/analyze-diagsession` — for a performance regression, measure a baseline
-      before touching anything.
+   5. For a performance regression, return the requirement for main to invoke
+      `/analyze-diagsession` and measure a baseline before diagnosis continues.
 
    Done when the command's source is chosen from this list.
 3. Tighten whatever signal you get: assert on the specific symptom, cut

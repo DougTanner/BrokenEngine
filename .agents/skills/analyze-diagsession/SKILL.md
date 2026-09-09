@@ -12,8 +12,8 @@ allowed-tools: [Read, Bash, PowerShell, Grep, Glob, Agent]
 
 ## Purpose
 
-Deliver a per-process hotspot report and evidence-backed plan proposals. Plan
-execution remains in the Change Workflow.
+One `researcher` delivers a per-process hotspot report and evidence-backed plan
+proposals. Plan execution remains in the Change Workflow.
 
 ## When to use
 
@@ -22,47 +22,47 @@ execution remains in the Change Workflow.
 
 ## Inputs
 
-Main runs this orchestration. The brief's Scope names the `.diagsession` or
-extracted ETL path and target process, and supplies the authoritative shared
-task-brief fields. Main dispatches each independent hotspot cluster to one
-`locator`; a delegated worker never delegates.
+Dispatch one `researcher` with the authoritative shared task-brief fields from
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md).
+The brief's Scope names the `.diagsession` or extracted ETL path and target
+process.
 
 ## Handoff
 
-Each locator returns the shared handoff form in
+The researcher returns the shared handoff form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
-extended with these fields:
+extended with:
 
-- `Source context` — the hotspot cluster's file:line quotes, enclosing
-  loop/frame phase, and container/comparator types.
+- `Capture` — capture, target process, and module-proven configuration.
+- `Top per-process shares` — one row per measured process hotspot.
+- `Clustered causes` — one row per clustered cause, separating measured facts
+  from source-attribution inferences and build overhead from algorithmic or
+  data-movement cost.
+- `Source context` — one row per hotspot cluster with file:line quotes,
+  enclosing loop/frame phase, and container/comparator types.
+- `Frame phase and CRC exposure` — one row per hotspot cluster.
+- `Gain ceilings` — one row per actionable cluster with its measured share and
+  expected gain ceiling.
+- `Plan proposals` — one row per evidence-backed proposal or `none`.
 
 Each shared `Residuals` row names missing source context or symbols; use `none`
 when absent.
 
-The full function bodies and the call-site listings do not travel inline. Each
-locator writes them to its own gitignored
-`Temp/analyze-diagsession/<capture>-<hotspot cluster>.md` file, whose name uses
-a filename-safe form of the cluster label, under one `## <hotspot cluster>`
-heading that keeps the label itself, and cites that path plus that `##`
-selector under `Evidence`. Main reads them there when confirming source
-attribution needs more than the `Source context` line.
+The full function bodies and call-site listings do not travel inline. The
+researcher writes them to gitignored
+`Temp/analyze-diagsession/<capture>-<hotspot cluster>.md` files, whose names use
+a filename-safe form of each cluster label, under one `## <hotspot cluster>`
+heading that keeps the label itself, and cites each path plus its `##` selector
+under `Evidence`.
 
-`Changed files` and `Build required` are `none` because this locator run edits
+`Changed files` and `Build required` are `none` because this researcher run edits
 no tracked file.
 
-Main interprets the measurements, confirms source attribution, and performs the
-existing follow-up routing. Its own result is a profiling report, not a handoff,
-and states:
-
-- capture, target process, and module-proven configuration;
-- top per-process shares and clustered causes;
-- measured facts versus source-attribution inferences;
-- build overhead versus algorithmic/data-movement cost;
-- confirmed frame phase and PostRender/CRC exposure;
-- expected gain ceiling and actionable plan proposals.
+Main presents the profiling report, decides every proposal, routes accepted
+residuals through `/create-follow-up-plans`, and owns any landing action.
 
 ## References
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you
-  are the session executing this skill. The analysis steps and the role and
-  routing rules.
+  are the session executing this skill. The researcher's extraction,
+  measurement, clustering, source-attribution, and reporting steps and rules.

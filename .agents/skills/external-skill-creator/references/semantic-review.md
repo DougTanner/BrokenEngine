@@ -1,7 +1,7 @@
-# Validate Skill Worker
+# Skill Validation Procedure
 
-Steps and rules for the dispatched reviewer. Public contract, inputs, and
-handoff form: [`../SKILL.md`](../SKILL.md).
+Steps and rules for the fresh reviewer selected by [`worker.md`](worker.md).
+Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
 
 ## Steps
 
@@ -10,10 +10,10 @@ handoff form: [`../SKILL.md`](../SKILL.md).
    repository schema; do not substitute a client-installed validator or a
    reduced prose check. Done when the whole schema has been read.
 2. Bootstrap the validation boundary by running the mechanical command against
-   this `validate-skill` directory:
+   this `external-skill-creator` directory:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/validate-skill/scripts/Validate-Skill.ps1 -Path .agents/skills/validate-skill
+   pwsh -NoProfile -File .agents/skills/external-skill-creator/scripts/Validate-Skill.ps1 -Path .agents/skills/external-skill-creator
    ```
 
    Require `VALID` and exit `0`. Report `BLOCKED` if the command cannot run,
@@ -30,7 +30,7 @@ handoff form: [`../SKILL.md`](../SKILL.md).
    structural acceptance, loader acceptance, documented behavior, or observed
    runtime behavior. Done when each surface has a verdict and every
    compatibility claim names the evidence class that supports it.
-6. Collect inbound references by running `pwsh -NoProfile -File .agents/skills/validate-skill/scripts/Find-SkillInboundReferences.ps1 -SkillName <name>`,
+6. Collect inbound references by running `pwsh -NoProfile -File .agents/skills/external-skill-creator/scripts/Find-SkillInboundReferences.ps1 -SkillName <name>`,
    which sweeps the documented root set and returns capped `{path, line, text}`
    records with per-root hit counts; never reconstruct that sweep inline.
    Complete a `truncated` result with targeted searches of the roots whose

@@ -742,12 +742,13 @@ function Read-OpenAiSidecar
 	}
 }
 
-# .agents/references/skill-skeleton.md owns the section order and the file each section
-# belongs to; .agents/references/subagent-reporting.md owns the closed status and severity
-# vocabularies. These tables only mirror those sources.
+# .agents/references/skill-skeleton.md owns consumption shapes, section order,
+# and placement; .agents/references/subagent-reporting.md owns the closed status
+# and severity vocabularies. These tables only mirror those sources.
 $skeletonSectionOrder = @('Purpose', 'When to use', 'Inputs', 'Steps', 'Handoff', 'Rules', 'References')
-$skeletonSkillSections = @('Purpose', 'When to use', 'Inputs', 'Handoff', 'References')
-$skeletonWorkerSections = @('Steps', 'Rules')
+$subagentSkillSections = @('Purpose', 'When to use', 'Inputs', 'Handoff', 'References')
+$subagentWorkerSections = @('Steps', 'Rules')
+$mainSessionSkillSections = $skeletonSectionOrder
 $handoffStatusWords = @('PASS', 'NEEDS_ACTION', 'BLOCKED')
 $handoffSeverityWords = @('Critical', 'Required', 'Recommended')
 
@@ -1188,13 +1189,15 @@ try
 		}
 	}
 
-	foreach ($finding in (Get-InstructionFindings $lines $skeletonSkillSections $true))
+	$workerFile = Join-Path $skillDirectory 'references/worker.md'
+	$hasWorker = [System.IO.File]::Exists($workerFile)
+	$skillSections = if ($hasWorker) { $subagentSkillSections } else { $mainSessionSkillSections }
+	foreach ($finding in (Get-InstructionFindings $lines $skillSections $true))
 	{
 		Add-Diagnostic $finding.Line $finding.Code $finding.Message
 	}
 
-	$workerFile = Join-Path $skillDirectory 'references/worker.md'
-	if ([System.IO.File]::Exists($workerFile))
+	if ($hasWorker)
 	{
 		$workerRelativeDisplay = [System.IO.Path]::GetRelativePath($repositoryRoot, $workerFile)
 		$workerDisplayPath = if (Test-LexicalParentEscape $workerRelativeDisplay) { $workerFile.Replace('\', '/') } else { $workerRelativeDisplay.Replace('\', '/') }
@@ -1212,7 +1215,7 @@ try
 			{
 				$workerText = $workerText.Substring(1)
 			}
-			foreach ($finding in (Get-InstructionFindings $workerText.Replace("`r`n", "`n").Split("`n") $skeletonWorkerSections $false))
+			foreach ($finding in (Get-InstructionFindings $workerText.Replace("`r`n", "`n").Split("`n") $subagentWorkerSections $false))
 			{
 				Add-Diagnostic $finding.Line $finding.Code $finding.Message $workerDisplayPath 3
 			}

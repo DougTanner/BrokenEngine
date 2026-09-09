@@ -71,24 +71,25 @@ require data mode, generation authority, Gaea outcome, and normalized paths;
 their data evidence is that same envelope reporting success with wrapper exit
 `0`. Do not accept schema/result/exit mismatches.
 
-Skill changes require a complete `/validate-skill` handoff with mechanical
-self-check, target validator exit/output, semantic review, and no unresolved
-Critical finding.
+Skill changes require a complete `/external-skill-creator` findings-only
+validate-mode handoff with mechanical self-check, target validator exit/output,
+semantic review, and no unresolved Critical finding.
 
 Instruction-doc changes require a complete `/progressive-disclosure-review`
 handoff with the baseline, the files checked, the findings, and no unresolved
 finding.
 
-A missing typed artifact — `/validate-skill`, `/progressive-disclosure-review`,
-or a build envelope — is a `BLOCKED` row, never a `PASS`.
+A missing typed artifact — `/external-skill-creator` validate mode,
+`/progressive-disclosure-review`, or a build envelope — is a `BLOCKED` row,
+never a `PASS`.
 
 A `NEEDS_ACTION` typed handoff still scores its row when every finding it raised
 is resolved — fixed in the reviewed diff or recorded refuted per the review
 reconciliation above — and a scoped spot-check re-review of exactly those
 regions returned `PASS`. Never dispatch a repeated whole-artifact review for
-that row. For `/validate-skill` the mechanical evidence is then that skill's
-documented validator runs on the reviewed tree, script runs rather than a
-review.
+that row. For `/external-skill-creator` validate mode the mechanical evidence
+is then that skill's documented validator runs on the reviewed tree, script
+runs rather than a review.
 
 ## Executable Plan check
 
