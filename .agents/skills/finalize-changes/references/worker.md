@@ -56,6 +56,10 @@ every other lease is foreign.
    - When the landing content changed after the commit was first created, pass
      approval preparation the `-CommitMessageFile` override `scripts.md`
      documents so the prepared commit's message describes what it now contains.
+   - Every `-CommitMessageFile` text this worker writes ends with the trailer
+     the brief's `Attribution trailer` field carries; this worker's own session
+     configuration never overrides it. A brief without that field returns
+     `BLOCKED` naming the missing field before the candidate commit is created.
    - Done when one prepared commit whose parent is the session's merge-base with
      primary exists.
 3. Fill the acceptance table on the resulting diff.

@@ -23,13 +23,14 @@ Produces the landing acceptance table and the landing summary main presents.
 
 ## Inputs
 
-Require the approved objective, its stage decisions, and the caller-owned
-changed paths. That set is the session's full landing set, including paths
-already committed — a deletion among them included — so a resumed invocation
-passes it unchanged rather than trimming it to what is still dirty. The
-finalizer produces the landing acceptance table itself, inside the workflow in
-`references/worker.md`, from the prepared diff final preparation and
-reconciliation produced — do not reuse an earlier table.
+Require the approved objective, its stage decisions, the caller-owned changed
+paths, and an `Attribution trailer` brief field carrying the dispatching
+session's own attribution trailer line. That path set is the session's full
+landing set, including paths already committed — a deletion among them
+included — so a resumed invocation passes it unchanged rather than trimming it
+to what is still dirty. The finalizer produces the landing acceptance table
+itself, inside the workflow in `references/worker.md`, from the prepared diff
+final preparation and reconciliation produced — do not reuse an earlier table.
 
 The brief also carries the typed review and hygiene handoffs the dispatching
 session holds for the rows that table cites, either verbatim or as a `Temp/`
