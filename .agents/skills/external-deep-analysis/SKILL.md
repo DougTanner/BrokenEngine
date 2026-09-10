@@ -63,9 +63,9 @@ remains exact-file scope.
    `current.corpusMetrics` `structuralErosion`, `verbosity`, and
    `excessDecisions` values, because the digest carries no metric values, and
    keep all six for the final summary. Done when all six values are in hand.
-7. Treat `excessDecisions` as net scope evidence: unchanged means only no net
-   decision removal, never redistribution without source-diff evidence. Done
-   when every `excessDecisions` reading is judged that way.
+7. Judge every `excessDecisions` reading by the interpretation bar in
+   `.agents/skills/code-quality-metrics/references/MetricContract.md` `## Output`.
+   Done when every `excessDecisions` reading is judged that way.
 8. Treat an operational failure as a pipeline blocker: it exits `2` with
    diagnostics on stderr and no digest on stdout. Done when the run either
    produced a digest or its failure is reported as a blocker.
