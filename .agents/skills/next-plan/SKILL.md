@@ -73,9 +73,9 @@ The `argument-hint` value selects the Plan:
    `implementer`, reading source itself only for a decision it must make that
    the Plan and the returned handoff cannot settle.
 
-   The brief bounds the card's verification evidence: each acceptance item
-   comes back as a `path:line` citation plus a verdict, not verbatim source
-   text, except an item whose purpose is proposed replacement text. A
+   The brief bounds the card's verification evidence: no verbatim source
+   text, except an acceptance item whose purpose is proposed replacement
+   text. A
    preparation handoff that returns a quantitative feasibility estimate as a
    Finding must name the check proving that the measured trial preserved the
    source document's rule or item inventory, or report the estimate as
