@@ -191,7 +191,7 @@ remains exact-file scope.
 33. Route every accepted candidate through `create-follow-up-plans`, passing
     oversized files with their required `/reduce-file <path>` instruction
     intact. Done when every accepted candidate is routed.
-34. Follow the root `AGENTS.md` Change Workflow Verify the acceptance table and
+34. Follow the `.agents/references/change-workflow.md` Verify the acceptance table and
     Verify and land steps through `finalize-changes` for acceptance and
     landing. Done when the applicable finalization outcome is known.
 

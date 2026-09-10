@@ -51,7 +51,7 @@ Each `Per-proposition verdicts` row is one line on this form:
 ```
 
 Complete the report with the remaining shared handoff lines
-(`../../references/subagent-reporting.md`, `## Handoffs`); this read-only
+(`../../references/subagent-handoff.md`, `## Handoffs`); this read-only
 workflow never changes a file and never requires a build, and each unresolved
 claim with its exact missing evidence belongs in `Residuals`. Preserve exact
 citations; do not replace evidence with a summary. Main presents the evidence

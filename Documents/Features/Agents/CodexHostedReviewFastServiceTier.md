@@ -44,7 +44,7 @@ Nothing else changes. `.codex/codex-review.ps1` already handles the Claude Code 
 
 ## Risk tier and invariants
 
-Expected Change Workflow Tier 2 — scoped tool behavior for the Codex review dispatch route. Trigger: it changes the configuration surface that governs how delegated reviews execute. No engine code, determinism/CRC, serialization, wire, or build coordination surface is touched. The role table in the root `AGENTS.md` must keep mapping `reviewer` to Sol at medium effort; this Plan changes only the service tier, never model or effort.
+Expected Change Workflow Tier 2 — scoped tool behavior for the Codex review dispatch route. Trigger: it changes the configuration surface that governs how delegated reviews execute. No engine code, determinism/CRC, serialization, wire, or build coordination surface is touched. The role table in `.agents/references/change-workflow.md` must keep mapping `reviewer` to Sol at medium effort; this Plan changes only the service tier, never model or effort.
 
 ## Acceptance criteria
 

@@ -41,8 +41,8 @@ $script:CodeTokenSlope = 35
 $script:DirectChildDocumentAllowance = 150
 $script:BudgetOverrides = [Collections.Generic.Dictionary[string, int64]]::new([StringComparer]::Ordinal)
 $script:BudgetOverrides.Add('Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md', 2003)
-# The repository-root AGENTS.md is imported into every session and keeps its
-# workflow rules front and center, so it carries a fixed budget.
+# The repository-root AGENTS.md is imported into every session and subagent, so
+# it carries a fixed budget.
 $script:RootHubTokenTarget = 8000
 $script:ChainTokenTarget = 15000
 $script:ChainTokenWarning = 20000

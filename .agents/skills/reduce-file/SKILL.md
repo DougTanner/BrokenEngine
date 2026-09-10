@@ -51,7 +51,7 @@ criteria.
 
 Every mode below except Review Observation returns one complete shared handoff
 from
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 after its domain extension. Keep the existing source-size and boundary evidence
 in the appropriate extension and keep `Residuals` last.
 

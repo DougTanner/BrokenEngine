@@ -85,8 +85,9 @@ void ServerSessionRuntime::PollTickBoundary(const NetworkTimeState& rTimeState)
 void ServerSessionRuntime::WaitForTick(TimeStep& rTimeStep)
 {
 	std::chrono::nanoseconds tickNanoseconds = rTimeStep.SimToWall(game::NetworkSessionContract::kTickDuration);
+	std::chrono::nanoseconds tickRemainderWallNanoseconds = rTimeStep.SimToWall(rTimeStep.mTickRemainderNs);
 	static constexpr std::chrono::nanoseconds kSpinMarginNanoseconds = 500'000ns;
-	std::chrono::nanoseconds remainingNanoseconds = tickNanoseconds - rTimeStep.mTickRemainderNs - rTimeStep.mRealTime.GetDeltaNs();
+	std::chrono::nanoseconds remainingNanoseconds = tickNanoseconds - tickRemainderWallNanoseconds - rTimeStep.mRealTime.GetDeltaNs();
 	std::chrono::nanoseconds sleepNanoseconds = remainingNanoseconds - kSpinMarginNanoseconds;
 	if (sleepNanoseconds > 0ns)
 	{
@@ -94,13 +95,13 @@ void ServerSessionRuntime::WaitForTick(TimeStep& rTimeStep)
 		SetWaitableTimerEx(mTimerHandle, &dueTime, 0, nullptr, nullptr, nullptr, 0);
 		WaitForSingleObject(mTimerHandle, INFINITE);
 	}
-	while (rTimeStep.mRealTime.GetDeltaNs() + rTimeStep.mTickRemainderNs < tickNanoseconds)
+	while (rTimeStep.mRealTime.GetDeltaNs() + tickRemainderWallNanoseconds < tickNanoseconds)
 	{
 		YieldProcessor();
 	}
 
 	std::chrono::nanoseconds marginNanoseconds = tickNanoseconds / 64;
-	std::chrono::nanoseconds remainderNanoseconds = rTimeStep.mRealTime.GetDeltaNs() + rTimeStep.mTickRemainderNs - tickNanoseconds;
+	std::chrono::nanoseconds remainderNanoseconds = rTimeStep.mRealTime.GetDeltaNs() + tickRemainderWallNanoseconds - tickNanoseconds;
 	static int64_t siTotalTicks = 0;
 	static int64_t siOvershootTicks = 0;
 	++siTotalTicks;

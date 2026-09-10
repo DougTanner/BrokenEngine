@@ -25,6 +25,10 @@ prescribing refactors:
 - A clone or complexity trend is needed.
 - A review advisory is needed.
 
+Per-path and per-line-range `bt-token-v1` counts come from
+`.agents/scripts/Measure-Tokens.ps1`, not from this skill; the root
+[AGENTS.md](../../../AGENTS.md) bundled-script rule owns its invocation form.
+
 ## Handoff
 
 Report the result as advisory evidence. Name the scope, coverage omissions, suppression reasons, and

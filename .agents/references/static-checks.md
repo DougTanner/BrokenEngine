@@ -1,11 +1,12 @@
 # Applicable Static Checks
 
 Implementation slices run the focused reads, searches, traces, and self-checks
-needed for their own internal coherence. After propagation, one `implementer`
-runs the full applicable static pass at the Run targeted pre-review checks step.
+needed for their own internal coherence. After propagation, an `implementer` or
+main runs the full applicable static pass at the Run targeted pre-review checks
+step; that step's row in the Change Workflow says which.
 Run every row the combined change triggers, and no row it does not.
-Compilation, PREfast, and Clang-Tidy are not implementer checks here: that
-step's `builder` bullet in root [AGENTS.md](../../AGENTS.md) and
+Compilation, PREfast, and Clang-Tidy are not part of this pass: that
+step's `builder` bullet and
 `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md:23-26` own
 them.
 

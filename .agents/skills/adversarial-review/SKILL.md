@@ -19,15 +19,16 @@ reachable failures that survive refutation. Runs as one delegated `reviewer` per
 
 ## When to use
 
-- A Tier-3 change (see root AGENTS.md, Risk tiers).
+- A Tier-3 change (see `.agents/references/risk-tiers.md`).
 - Correctness review leaves one concrete unresolved reachable hypothesis.
 - The user requests an adversarial second opinion on a supplied diff.
 
 ## Inputs
 
 Require the implementation handoff and complete changed-artifact list; plan or
-intent with declared invariants; approved Tier-3 triggers (see root AGENTS.md, Risk tiers) or the exact unresolved
-reachable hypothesis; and relevant prior findings, residuals, and focus areas.
+intent with declared invariants; approved Tier-3 triggers (see
+`.agents/references/risk-tiers.md`) or the exact unresolved reachable
+hypothesis; and relevant prior findings, residuals, and focus areas.
 
 Whenever a session baseline exists, the complete changed-artifact list is the
 `entries` rows and their `class` values from the read-only inventory: `pwsh
@@ -50,7 +51,7 @@ conversation history. Do not turn either case into an open-ended repository audi
 ## Handoff
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 extended with these fields:
 
 - `API verification requests` — one row each: symbol/rule, exact proposition,
@@ -58,7 +59,7 @@ extended with these fields:
 - `Traced clean` — one row each on the form
   `<hypothesis> — <decisive refutation> path:line`; or not applicable. A longer
   trace follows the over-cap file rule in
-  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+  [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
   `## Handoffs`.
 
 Each shared `Residuals` row names a pre-existing/out-of-scope defect or missing

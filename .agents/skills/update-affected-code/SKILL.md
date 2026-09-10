@@ -49,7 +49,7 @@ handoff.
 
 ## Handoff
 
-Return the shared handoff form in `../../references/subagent-reporting.md`,
+Return the shared handoff form in `../../references/subagent-handoff.md`,
 extended with these fields:
 
 - `Trigger outcomes` — a `<settled>/<total> settled` count line, where

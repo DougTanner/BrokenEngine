@@ -86,9 +86,10 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 19. Report any mismatch as a finding for the manager; do not manufacture
     authority artifacts or another approval gate. Done when every mismatch is
     reported.
-20. Audit the proposed execution card against the risk-tier definitions in root
-    `AGENTS.md`, classifying at the highest applicable tier. Done when that
-    comparison is made and any mismatch reported.
+20. Audit the proposed execution card against the risk-tier definitions in
+    `.agents/references/risk-tiers.md`, classifying at the highest
+    applicable tier. Done when that comparison is made and any mismatch
+    reported.
 21. Judge these card fields: every trigger named concretely, the
     out-of-scope boundary enforceable, required and conditional roles fitting
     the actual file types and risks, and each acceptance criterion carrying an

@@ -34,8 +34,8 @@ replacement; without all three it is not a finding.
    skill's `## Inputs`. Flag an input the worker could derive from a path or
    script it is given, content pasted where a path plus selector would do, and
    an `## Inputs` list that makes main gather what the worker could gather.
-4. Handoff volume: for each handoff main received, its chars against the shared
-   limits in `../../../references/subagent-reporting.md`, and any material main
+4. Handoff volume: for each handoff main received, its rows against the field
+   rules in `../../../references/subagent-handoff.md`, and any material main
    did not act on — evidence pasted inline, a restated brief, narrated
    reasoning, or bulk data meant for a later worker. Name the path plus
    selector form, and for bulk data the file, that should have carried it.
@@ -49,7 +49,7 @@ replacement; without all three it is not a finding.
 
 Not findings: content the user pasted or asked to display; a Plan body,
 execution card, or user-facing text main itself must approve or present; a
-handoff within the shared limits whose every row main acted on; and a narrow
+handoff within those field rules whose every row main acted on; and a narrow
 change having no unnecessary subagents.
 
 ## Measure control-work share
@@ -111,9 +111,11 @@ considering its role label: `planning/design`, `review/audit`,
 `implementation/propagation/documentation`, `judgment-heavy research`,
 `locate/build/mechanical`, or `unable to classify`. Map that concern to the
 appropriate workflow role, then evaluate the requested, configured, and actual
-model and effort against the commit-time root `AGENTS.md` mapping and fallback,
-not the requested role alone. When the assigned task is unable to classify, or
-the governing mapping cannot be established, do not infer compliance.
+model and effort against the mapping and fallback in `AGENTS.md`,
+`.agents/references/change-workflow.md`, and `.agents/references/risk-tiers.md`
+as they existed at that commit, not the requested role alone. When the assigned
+task is unable to classify, or the governing mapping cannot be established, do
+not infer compliance.
 
 Use only these allowed evidence chains from claim to conclusion. An ordinary
 Claude child is compliant only with its parent delegation event, recorded
@@ -130,18 +132,6 @@ model/effort mapping; actual executor/model/effort proof; fallback evidence;
 verdict; exposed tokens/active time; and citation. Aggregate affected-child
 counts and token/active-time cost only
 where exposed; otherwise report cost as unavailable.
-
-When host-owned child-session execution metadata is unavailable, an ordinary
-Claude child may instead be proved by its parent delegation event, recorded
-returned child relationship, and the `Executor` line of its returned handoff
-(`../../../references/subagent-reporting.md`), cited as self-reported. That line
-carries a model and an effort, each independently proved by it or unproved, and
-a self-reported value never substitutes for host metadata where host metadata is
-present. The row is `compliant` only when both values are proved; a row whose
-`Executor` line states a model but writes `unknown` for effort stays
-`unverified`, with its citation recording the proved model half as
-self-reported, and a missing or fully `unknown` `Executor` line leaves the row
-plainly `unverified`.
 
 Verdicts are `compliant`, `compliant fallback`, `violation`, `unverified`, or
 `not-executed`. `not-executed` is a nonfinding only when the parent event/result

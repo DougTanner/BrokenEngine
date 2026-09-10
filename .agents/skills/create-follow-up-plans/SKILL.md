@@ -33,7 +33,7 @@ under `Documents/Plans/<area>/`, with tracked scheduler metadata.
 
 ## Handoff
 
-Return the shared handoff from `.agents/references/subagent-reporting.md`
+Return the shared handoff from `.agents/references/subagent-handoff.md`
 `## Handoffs`, including every proposal exactly once. The shared `Findings`
 value is `none`. Each shared `Changed files` row names a created Plan with its
 path, gap, and metadata, or an updated existing Plan with its path and whether

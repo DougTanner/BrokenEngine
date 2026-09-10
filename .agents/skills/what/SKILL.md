@@ -33,9 +33,9 @@ following the repository User Interaction rules.
 
 ## Rules
 
-- Apply root [AGENTS.md](../../../AGENTS.md) `### User Interaction` for plain
-  language, standalone context, and decision presentation. Where a technical
-  term is unavoidable, explain it in one short sentence or parenthetical the
-  first time it appears.
+- Apply [`.agents/references/change-workflow.md`](../../references/change-workflow.md)
+  `### User Interaction` for plain language, standalone context, and decision
+  presentation. Where a technical term is unavoidable, explain it in one short
+  sentence or parenthetical the first time it appears.
 - Apply root [AGENTS.md](../../../AGENTS.md) `## Directives` one-term-per-concept
   rule.

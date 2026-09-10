@@ -39,7 +39,7 @@ requires `Fixture: true`.
 ## Handoff
 
 Return the shared handoff from
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Handoffs`.
 
 In author mode, extend it with:

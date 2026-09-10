@@ -47,7 +47,7 @@ manager updates the authoritative plan.
 
 ## Handoff
 
-Return the shared handoff form in `../../references/subagent-reporting.md`,
+Return the shared handoff form in `../../references/subagent-handoff.md`,
 extended with one compact item table and these fields:
 
 ```markdown
@@ -58,7 +58,7 @@ extended with one compact item table and these fields:
 
 Each shared `Decisive checks` row names the item, focused check, and result.
 Each cell holds its value and at most one clause; the reasoning behind it
-follows the over-cap file rule in `../../references/subagent-reporting.md`,
+follows the over-cap file rule in `../../references/subagent-handoff.md`,
 `## Handoffs`.
 
 - `PLAN DELTA REQUIRED` — `no`, or `yes` with the reason and the manager

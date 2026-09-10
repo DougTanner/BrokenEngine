@@ -22,7 +22,7 @@ handoff without the task evidence entering this session.
 
 Only when the user explicitly asks, in the current session, to run a named
 review or audit skill or a `/plan-alternatives` researcher on Codex. The Change
-Workflow never routes here: the root [AGENTS.md](../../../AGENTS.md) role table
+Workflow never routes here: the [change-workflow.md](../../references/change-workflow.md) role table
 runs its normal delegated subagents, and this package is retained so the route
 can be re-enabled later.
 
@@ -226,8 +226,8 @@ else it carries. `## Rules` `### Fallback` owns the failure-time mechanics: what
 
 ## Rules
 
-- The calling manager session decides each finding under the root
-  [AGENTS.md](../../../AGENTS.md) rule for review findings.
+- The calling manager session decides each finding under the
+  [change-workflow.md](../../references/change-workflow.md) rule for review findings.
 - Never edit code; findings-only conduct is
   [../../references/subagent-reporting.md](../../references/subagent-reporting.md).
 - An active landing gate records the final result once.

@@ -84,11 +84,11 @@ does not name are ignored, and an omitted section is valid.
 
 ## Handoff vocabulary
 
-`VOCAB001` checks handoff vocabulary. Inside any fenced code block in `SKILL.md`, a line at column zero beginning exactly `Status:` or `Findings:` followed by a space or the end of the line carries closed vocabulary. After removing `<...>` placeholders, each `|`-separated value of a `Status:` line must be one of the status words, and each value of a `Findings:` line one of the severity words, that the shared handoff form in `.agents/references/subagent-reporting.md` `## Handoffs` lists. Prose outside a fenced block, and a line starting with anything else such as `Routed Findings:` or a list marker, is not checked.
+`VOCAB001` checks handoff vocabulary. Inside any fenced code block in `SKILL.md`, a line at column zero beginning exactly `Status:` or `Findings:` followed by a space or the end of the line carries closed vocabulary. After removing `<...>` placeholders, each `|`-separated value of a `Status:` line must be one of the status words, and each value of a `Findings:` line one of the severity words, that the shared handoff form in `.agents/references/subagent-handoff.md` `## Handoffs` lists. Prose outside a fenced block, and a line starting with anything else such as `Routed Findings:` or a list marker, is not checked.
 
 ## Handoff form
 
-`HANDOFF001` checks that a `## Handoff` section does not re-render the shared handoff form. Inside a fenced code block under a `## Handoff` heading in `SKILL.md`, a line at column zero beginning `Status:`, `Findings:`, `Changed files:`, `Decisive checks:`, `Build required:`, `Evidence:`, `Executor:`, or `Residuals:` is reported at its own line. All eight names are invalid there, including a fixed-value row, which is written as prose instead. `.agents/references/subagent-reporting.md` `## Handoffs` owns the form. A `Status:` or `Findings:` line reports both `HANDOFF001` and, when its token is off-vocabulary, `VOCAB001`.
+`HANDOFF001` checks that a `## Handoff` section does not re-render the shared handoff form. Inside a fenced code block under a `## Handoff` heading in `SKILL.md`, a line at column zero beginning `Status:`, `Findings:`, `Changed files:`, `Decisive checks:`, `Build required:`, `Evidence:`, or `Residuals:` is reported at its own line. All seven names are invalid there, including a fixed-value row, which is written as prose instead. `.agents/references/subagent-handoff.md` `## Handoffs` owns the form. A `Status:` or `Findings:` line reports both `HANDOFF001` and, when its token is off-vocabulary, `VOCAB001`.
 
 ## Codex companion file
 

@@ -33,7 +33,7 @@ signal.
 ## Handoff
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 extended with these fields:
 
 - `Root cause` — one sentence, with file:line.

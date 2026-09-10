@@ -30,7 +30,7 @@ process.
 ## Handoff
 
 The researcher returns the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 extended with:
 
 - `Capture` — capture, target process, and module-proven configuration.

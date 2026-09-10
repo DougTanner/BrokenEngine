@@ -22,10 +22,9 @@ classify the work returns the evidence alone.
 
 ## When to use
 
-- The `implementer` preparation bullets of the Approve and classify and Prepare
-  and explore alternatives steps in root
-  [AGENTS.md](../../../AGENTS.md) — Tier 2 and above, or any tier where
-  classifying the work needs repository evidence.
+- The `implementer` preparation bullets of the Change Workflow Approve and
+  classify and Prepare and explore alternatives steps — Tier 2 and above, or
+  any tier where classifying the work needs repository evidence.
 - Not for a claimed executable Plan: [`../next-plan/SKILL.md`](../next-plan/SKILL.md)
   keeps its own preparation route.
 - Runs in the delegated execution context of
@@ -40,12 +39,14 @@ plus these skill-specific fields:
 - user intent, quoted where its exact wording binds;
 - the request text, or the plan document this change comes from when it is not a
   claimed executable Plan;
+- the Change Workflow step and role assignments the change triggers, as main
+  states them from the workflow;
 - session baseline.
 
 ## Handoff
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 extended with these fields:
 
 ```text
@@ -66,6 +67,8 @@ the plan or card text in the handoff.
   are the session executing this skill. The steps and rules the dispatched
   worker follows.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task-brief fields and the shared handoff form.
+  — task-brief fields.
+- [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+  — the shared handoff form.
 - [`../plan-audit/SKILL.md`](../plan-audit/SKILL.md) — the plan-file and
   execution-card contract this preparation must satisfy.

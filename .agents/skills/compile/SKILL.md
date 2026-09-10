@@ -64,7 +64,7 @@ authorization, never the resolver's JSON.
 ## Handoff
 
 Return the shared handoff form in
-[`subagent-reporting.md`](../../references/subagent-reporting.md),
+[`subagent-handoff.md`](../../references/subagent-handoff.md),
 `## Handoffs`, extended with the build reporting below.
 
 - For a delegated call, return the results after applying the execution and

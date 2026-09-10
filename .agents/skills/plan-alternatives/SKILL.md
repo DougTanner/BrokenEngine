@@ -39,7 +39,7 @@ reports that the original stands or puts a clearly better candidate to the user.
 ## Inputs
 
 Main's dispatch recipe, including every field each researcher's brief carries,
-is the root `AGENTS.md` Prepare and explore alternatives step; the brief itself
+is the Change Workflow Prepare and explore alternatives step; the brief itself
 is the shared task-brief form in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
 `## Task brief`.
@@ -96,7 +96,7 @@ Alternatives: original stands (<n> candidates, <axes>)
 ```
 
 Otherwise, before the Plan review step, main presents every clearly better
-candidate beside the drafted approach in plain language per root `AGENTS.md`
+candidate beside the drafted approach in plain language per
 `### User Interaction` — the same criteria, what it adds and deletes, which
 invariant surfaces it touches, and when it pays off — with a recommendation,
 then asks verbatim:
@@ -124,6 +124,8 @@ The user picks one, and main takes it down the route that matches the change:
   are the session executing this skill. The steps and rules the dispatched
   researcher follows.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task-brief fields and the shared handoff form.
+  — task-brief fields.
+- [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+  — the shared handoff form.
 - [`../plan-simplicity-review/SKILL.md`](../plan-simplicity-review/SKILL.md) —
   the trigger this skill shares.

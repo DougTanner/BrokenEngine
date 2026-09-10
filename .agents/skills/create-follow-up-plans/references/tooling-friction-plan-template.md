@@ -17,8 +17,9 @@ session `/next-plan-review` must reach — while the `Landing ref` line names a
 ref whose tree actually contains this Plan:
 - Client: claude | codex
 - Conversation session ID: <lowercase uuid on Claude, read from
-  CLAUDE_CODE_SESSION_ID; none on Codex, whose transcripts /next-plan-review
-  discovers by bounded commit window>
+  CLAUDE_CODE_SESSION_ID and used as /next-plan-review's override; none on
+  Codex, which has no runtime source for one, so its transcript is found by the
+  same bounded commit-window discovery both clients use>
 - Worktree/branch UUID: <lowercase uuid, the same one the Session branch and
   Worktree lines carry — selection evidence only, never production proof>
 - Session branch: <claude|codex>/<uuid>
@@ -77,6 +78,6 @@ build/bootstrap coordination. Never embed transcript paths or home paths.
 
 ## Acceptance criteria
 - The recorded symptom no longer reproduces under the documented invocation
-- /external-skill-creator validate mode passes wherever the root AGENTS.md
+- /external-skill-creator validate mode passes wherever the Change Workflow
   Apply the triggered cleanup step triggers it; plan validate exits 0
 ```

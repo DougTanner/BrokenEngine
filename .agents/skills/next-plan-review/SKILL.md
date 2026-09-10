@@ -18,8 +18,8 @@ audit directly.
 
 ## When to use
 
-Dispatch one fresh `reviewer` directly, routed per the delegated-review rule in
-the root [AGENTS.md](../../../AGENTS.md).
+Dispatch one fresh `reviewer` directly, routed per the Change Workflow
+`### Delegation roles` rule.
 
 ### Bounded friction mode
 
@@ -43,7 +43,7 @@ The handoff enters the main session's context whole, so it stays under 16,000
 characters, which leaves room for the host's result wrapper under the
 20,000-character per-result budget the `/next-plan` checkpoint measures.
 Require the shared handoff form in
-`../../references/subagent-reporting.md`, extended with:
+`../../references/subagent-handoff.md`, extended with:
 
 - `Timeline` — one row per lifecycle event named in `references/concerns.md`
   that occurred, in time order, each `<time> | <event> | <citation>`.

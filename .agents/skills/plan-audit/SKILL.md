@@ -41,7 +41,7 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
   `/codex-review`'s prompt assembly requires in the scope file before it will
   dispatch this audit.
 - Approved execution card, superseding the draft above, and session baseline
-  only when root `AGENTS.md` triggers them.
+  only when the Change Workflow Approve and classify step triggers them.
 - User intent and applicable repository instructions
 - Relevant repository paths and every cited code region
 - Accumulated constraints or known residuals
@@ -72,7 +72,7 @@ handoff row or path plus selector that holds its settling evidence and never
 restates it.
 
 Follow those extension fields with the shared handoff lines
-(`../../references/subagent-reporting.md`, `## Handoffs`); this findings-only
+(`../../references/subagent-handoff.md`, `## Handoffs`); this findings-only
 audit never changes a file and never requires a build.
 
 Use `NEEDS_ACTION` for findings or pending external verdicts and `BLOCKED` only

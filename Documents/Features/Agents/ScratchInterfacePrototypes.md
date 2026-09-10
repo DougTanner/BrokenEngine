@@ -73,7 +73,8 @@ remaining residue. No broad scratch-root cleanup or silent reuse is allowed.
 - Coordinator implementer mutation surface — the manager-supplied ignored run
   scope for lifecycle directories, the manifest, the comparison packet, the
   selected-design handoff, and exact cleanup; it does not own candidate source.
-- `AGENTS.md` — manager ownership, workflow tiering, and mutation boundaries.
+- `.agents/references/change-workflow.md` — manager ownership, workflow tiering,
+  and mutation boundaries.
 - `Documents/Features/AGENTS.md` — manual Feature lifecycle.
 - `Temp/InterfacePrototypes/<run-id>/` — ignored run, ownership, packet, and
   residue-proof surface; it is not tracked implementation source.

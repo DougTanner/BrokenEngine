@@ -6,7 +6,7 @@ Client-only (`BT_CLIENT`) ENet peer and composed `ClientSessionRuntime`. The pee
 
 ## Receive Paths
 
-Server updates use separate delta, full-state, static-data, debug-frame, and load-notification buffers. `ClientSessionRuntime` drains static data, full states, then deltas, adopting generic state while the game session applies static data and hydrates gameplay.
+Server updates use separate delta, full-state, static-data, debug-frame, and load-notification buffers. `ClientSessionRuntime` drains static data, full states, then deltas, adopting generic state while the game session applies static data and hydrates gameplay. A delta at or below its coord's confirmed tick is skipped, and buffering is keyed by tick, so a repeat of an already buffered tick keeps the first arrival.
 
 ## Subscription Receive Invariants
 

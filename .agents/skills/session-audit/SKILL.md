@@ -13,8 +13,8 @@ allowed-tools: [Read, Grep, Glob, PowerShell]
 ## Purpose
 
 Trace the named late, reconciled, or previously unseen integration hypotheses in
-a complete logical change and report findings. Root `../../../AGENTS.md` owns
-stage order; this skill owns only that local read-only action.
+a complete logical change and report findings. The Change Workflow owns stage
+order; this skill owns only that local read-only action.
 
 ## When to use
 
@@ -80,7 +80,7 @@ these inputs from conversation history.
 
 ## Handoff
 
-Return the shared handoff form in `../../references/subagent-reporting.md`,
+Return the shared handoff form in `../../references/subagent-handoff.md`,
 extended with the audit result block and these narrowed lines, giving each
 finding a stable `SA###` ID:
 
@@ -122,4 +122,6 @@ dispatching any fix.
   are the session executing this skill. The audit steps the dispatched reviewer
   runs.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task brief and shared handoff form.
+  — task brief.
+- [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+  — shared handoff form.

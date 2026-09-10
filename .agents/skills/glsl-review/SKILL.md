@@ -40,7 +40,7 @@ optional extension rows. Correctness, performance, and scope-authorization
 failures all go in the shared `Findings` field.
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 extended with these fields:
 
 - `Scope` — `PASS`, `NEEDS_ACTION`, `not applicable (Tier 1)`, or

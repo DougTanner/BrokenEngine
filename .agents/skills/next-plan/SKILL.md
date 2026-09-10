@@ -11,8 +11,8 @@ allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestio
 ## Purpose
 
 WorktreeCli alone validates metadata, selects, claims, prepares final state, and releases
-claims; `Documents/Features` is never scheduler input. The whole Change Workflow in root
-[AGENTS.md](../../../AGENTS.md) owns the cross-skill stage order, and
+claims; `Documents/Features` is never scheduler input. The whole Change Workflow in
+[change-workflow.md](../../references/change-workflow.md) owns the cross-skill stage order, and
 `/finalize-changes` the landing confirmation.
 
 ## When to use
@@ -105,8 +105,8 @@ The `argument-hint` value selects the Plan:
    input rather than the claimed Plan path, its `Decisive checks` row for that
    snapshot reports `headings.inScopePresent` and
    `headings.outOfScopePresent` both `true`.
-5. Run the Plan review step in root
-   [AGENTS.md](../../../AGENTS.md), after preparation and alternatives and
+5. Run the Plan review step in
+   [change-workflow.md](../../references/change-workflow.md), after preparation and alternatives and
    before the final claim refresh. Tier 3 retains the additional route in
    [tier3-workflow.md](references/tier3-workflow.md). Done when every required review has
    completed and accepted findings are resolved, or a missing mandatory
@@ -131,21 +131,23 @@ The `argument-hint` value selects the Plan:
    stop, a deferral, a blocker, or a refused approval comes straight here from
    wherever it stopped, while an implemented run keeps the position above.
 
-   Main never performs either review itself; it dispatches them per
+   Main never performs the review itself; it dispatches it per
    [run-checkpoint.md](references/run-checkpoint.md). Done when both follow-up lines are
    recorded per run-checkpoint.md.
 10. Only after implementation is accepted and verified, or after the user
    explicitly authorizes rejection, exit the held claim before landing-commit
-   creation: an `implementer` runs
+   creation: main runs, as its own shell call from the PowerShell tool,
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Complete-NextPlan.ps1`
    with no arguments for completion, appending `-Reject` only after explicit
    user-authorized rejection.
 
    Success removes only direct-child dependency edges, deletes the selected Plan
    in the worktree, reports the changed paths the landing commit must contain,
-   and returns `nextAction: finalize-changes`. Done when that result is in hand;
-   the claim stays held until landing succeeds, and `/finalize-changes` deletes
-   it after primary advances.
+   and returns `nextAction: finalize-changes`. That deletion is not reviewed
+   before the landing gate, per the
+   [landing acceptance table](../finalize-changes/references/landing-acceptance-table.md).
+   Done when that result is in hand; the claim stays held until landing
+   succeeds, and `/finalize-changes` deletes it after primary advances.
 11. End the run per this file's `### IMPORTANT: Session-complete marker`: print
    `SESSION COMPLETE` as the last line only
    when the `/finalize-changes` handoff carried it. Done when the final
@@ -166,7 +168,7 @@ The `argument-hint` value selects the Plan:
 ## Handoff
 
 The preparation handoff extends the shared form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 with the declared fields below. Main's brief bounds the returned handoff to
 every contradiction and unresolved decision, the other verified Plan statements
 whose result requires a card or implementation change, and one count of the
@@ -202,13 +204,13 @@ Execution card:
 Preparation and claim do not require approval. Present the complete resolved
 Plan and execution card before implementation: scope, invariants, role
 assignments, acceptance criteria, and unresolved decisions. Deliver that
-presentation per the User Interaction rules in root
-[AGENTS.md](../../../AGENTS.md) — on Codex as exactly one complete
-`<proposed_plan>` block, then ending the turn without an approval question; on
-Claude Code and every other host as rendered message text whose approval
-question is the last thing before the `Follow-up Plans created:` footer, after
-which the user's next message is the decision. Any revision is a new complete
-replacement presentation.
+presentation per the `### User Interaction` rules in
+[`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
+on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
+without an approval question; on Claude Code and every other host as rendered
+message text whose approval question is the last thing before the
+`Follow-up Plans created:` footer, after which the user's next message is the
+decision. Any revision is a new complete replacement presentation.
 
 When preparation shows the problem the Plan describes is gone, ask the user
 whether to retain the Plan or to explicitly authorize obsolete final cleanup.
@@ -233,8 +235,8 @@ deferral, unknown claim state, or work still to land — never prints that line.
   invocation the manager never selects or claims a different candidate in that
   run.
 - Never create or adopt a worktree, or inspect machine-local claims directly.
-- Which reviewer runs at which tier is the Plan review step of root
-  [AGENTS.md](../../../AGENTS.md); Tier 3 additionally follows
+- Which reviewer runs at which tier is the Plan review step of
+  [change-workflow.md](../../references/change-workflow.md); Tier 3 additionally follows
   [tier3-workflow.md](references/tier3-workflow.md). Missing a mandatory reviewer blocks.
 - An affirmative response approves only the latest unchanged presentation. A
   meaningful Plan, card, scope, invariant, acceptance, or decision change

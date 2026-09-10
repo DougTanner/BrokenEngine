@@ -6,4 +6,4 @@ effort: xhigh
 disallowedTools: Agent
 ---
 
-Follow repository instructions for the assigned mechanical-edit role. Role table: `AGENTS.md`.
+Follow repository instructions for the assigned mechanical-edit role.

@@ -30,8 +30,7 @@ output date or output hash.
 
 ## Source table and decision
 
-The source `CodeQualityMetricsHistory.jsonl` must begin with exactly 133323 bytes, 648 LF lines,
-and SHA-256 `5a39debf4be41abebd8496b9f25ee4023d109813788e95b30da8f74474fe75ed`. Legacy rows are
+The source `CodeQualityMetricsHistory.jsonl` must begin with exactly 648 LF lines. Legacy rows are
 validated for contiguous indices 0–646, lowercase SHA identities, finite metric values in [0,1],
 and `0 <= parsed <= supported`. A live suffix starts at index 647 and contains exactly
 `index,date,captureMode,verbosity,structuralErosion,supported,parsed`; dates are nondecreasing
@@ -83,7 +82,10 @@ is sorted by ordinal relative path. Ordinary `__pycache__` directories are skipp
 consumption; every other ignored/untracked/reparse/symlink extra blocks the capture. Generate takes
 the BootstrapIdentity and manifest before Snapshot and again afterward; any identity, membership,
 or source drift fails the run. Contract exposes a frozen `generator.sha256` separately from the
-optional active `capture.digest`.
+optional active `capture.digest`. For a fixed BootstrapIdentity, the one the receipt records,
+Generate's two output files are a pure function of `BaseCommit`, `TipCommit`, and `DateUtc`; a
+capture-mode Generate therefore requires a clean working tree checked out at `TipCommit` and
+otherwise fails.
 
 ## Receipt schemas
 
@@ -91,7 +93,7 @@ Contract emits `broken-engine-code-quality-history-contract/v1` with constructio
 
 `schemaVersion,mode,source,prefix,series,patch,decision,generator,capture,snapshot`.
 
-`source` contains only base/tip commit identities. `prefix` contains `bytes,lines,sha256`.
+`source` contains only base/tip commit identities. `prefix` contains `lines`.
 `series` contains `rows,liveRows,lastIndex,lastDate,historyBytesSha256`, where the final field is
 the SHA-256 of the complete immutable source JSONL bytes (including the live suffix). `patch` contains the normalized change rows,
 the count of metric-supported changes, and `cppChanged`. `decision` contains `captureMode`,
@@ -110,4 +112,4 @@ Generate emits `broken-engine-code-quality-history-update/v1` with construction 
 each contain the repository-relative path, byte count, and SHA-256. The files are named
 `CodeQualityMetricsHistory.jsonl` and `CodeQualityMetricsHistory.svg`; JSONL is the exact validated
 source bytes plus one canonical live row. SVG is UTF-8 LF without BOM, fixed at 1800x1150, has no
-timestamps or machine paths, and embeds series/generator/runtime/scb digests when capture applies.
+timestamps or machine paths, and embeds the series digest.

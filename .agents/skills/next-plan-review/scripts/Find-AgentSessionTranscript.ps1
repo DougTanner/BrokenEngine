@@ -6,7 +6,8 @@ param(
 	[ValidateRange(1, 1440)]
 	[int] $WindowMinutes = 360,
 	[string] $SessionStoreRoot,
-	[string] $ArchivedSessionStoreRoot
+	[string] $ArchivedSessionStoreRoot,
+	[string] $ClaudeSessionStoreRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -133,7 +134,8 @@ function Test-PathWithin([string] $Candidate, [string] $Root) {
 function Get-Locator([string] $Path) {
 	foreach ($store in @(
 		@{ Name = 'sessions'; Root = $SessionStoreRoot },
-		@{ Name = 'archived_sessions'; Root = $ArchivedSessionStoreRoot }
+		@{ Name = 'archived_sessions'; Root = $ArchivedSessionStoreRoot },
+		@{ Name = 'projects'; Root = $ClaudeSessionStoreRoot }
 	)) {
 		if (-not [string]::IsNullOrWhiteSpace($store.Root) -and (Test-PathWithin $Path $store.Root)) {
 			$relative = [IO.Path]::GetRelativePath($store.Root, $Path).Replace('\', '/')
@@ -141,6 +143,16 @@ function Get-Locator([string] $Path) {
 		}
 	}
 	return [IO.Path]::GetFileName($Path)
+}
+
+function Get-ClaudeProjectDirectory([string] $WorktreeRoot) {
+	# The Claude store holds one project directory per checkout, named after that checkout's absolute
+	# path with every ':', '\', '/', and '.' replaced by '-'. The encoding is one-way, so an already
+	# eligible worktree root is encoded forward instead of directory names being decoded.
+	if ([string]::IsNullOrWhiteSpace($ClaudeSessionStoreRoot) -or [string]::IsNullOrWhiteSpace($WorktreeRoot)) { return $null }
+	$encoded = $WorktreeRoot
+	foreach ($character in @(':', '\', '/', '.')) { $encoded = $encoded.Replace($character, '-') }
+	return Join-Path $ClaudeSessionStoreRoot $encoded
 }
 
 function Get-PathSafety([string] $Path) {
@@ -278,6 +290,51 @@ function Get-TranscriptSessionMeta([string] $Path) {
 	}
 }
 
+function Get-ClaudeTranscriptMetadata([string] $Path, [string] $CommitHash) {
+	# A Claude transcript carries no session_meta record, so identity, working directory, and window
+	# come from ordinary records. One file is one whole session, so it is always reported as a root
+	# with no root session id: its subagents live under a sibling directory, not in the store's sessions.
+	$stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+	$reader = [IO.StreamReader]::new($stream)
+	try {
+		$start = $null
+		$end = $null
+		$cwd = $null
+		$sessionId = $null
+		$commitHashMentions = 0
+		while (($line = $reader.ReadLine()) -ne $null) {
+			if ([string]::IsNullOrWhiteSpace($line)) { continue }
+			if ($line.Contains($CommitHash, [StringComparison]::OrdinalIgnoreCase)) { $commitHashMentions++ }
+			$record = $line | ConvertFrom-Json -Depth 64 -DateKind String
+			$eventTime = ConvertTo-UtcTimestamp (Get-StringProperty $record 'timestamp')
+			if ($null -ne $eventTime) {
+				if ($null -eq $start -or $eventTime -lt $start) { $start = $eventTime }
+				if ($null -eq $end -or $eventTime -gt $end) { $end = $eventTime }
+			}
+			if ([string]::IsNullOrWhiteSpace($cwd)) { $cwd = Get-StringProperty $record 'cwd' }
+			if ([string]::IsNullOrWhiteSpace($sessionId)) { $sessionId = Get-StringProperty $record 'sessionId' }
+		}
+		if ($null -eq $start -or $null -eq $end -or [string]::IsNullOrWhiteSpace($cwd) -or [string]::IsNullOrWhiteSpace($sessionId)) {
+			throw 'Required session metadata is missing.'
+		}
+		return [pscustomobject]@{
+			SessionId = $sessionId
+			RootSessionId = $null
+			IsRoot = $true
+			Depth = $null
+			AgentPath = $null
+			CommitHashMentions = $commitHashMentions
+			Start = $start
+			End = $end
+			Cwd = $cwd
+		}
+	}
+	finally {
+		$reader.Dispose()
+		$stream.Dispose()
+	}
+}
+
 function Add-Files(
 	[Collections.Generic.Dictionary[string, IO.FileInfo]] $Files,
 	[Collections.Generic.Dictionary[string, object]] $ReadErrors,
@@ -361,20 +418,36 @@ try {
 	$userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
 	if ([string]::IsNullOrWhiteSpace($SessionStoreRoot)) { $SessionStoreRoot = Join-Path $userProfile '.codex\sessions' }
 	if ([string]::IsNullOrWhiteSpace($ArchivedSessionStoreRoot)) { $ArchivedSessionStoreRoot = Join-Path $userProfile '.codex\archived_sessions' }
+	if ([string]::IsNullOrWhiteSpace($ClaudeSessionStoreRoot)) { $ClaudeSessionStoreRoot = Join-Path $userProfile '.claude\projects' }
 	$SessionStoreRoot = ConvertTo-LexicalCanonicalPath $SessionStoreRoot
 	$ArchivedSessionStoreRoot = ConvertTo-LexicalCanonicalPath $ArchivedSessionStoreRoot
-	if ($null -eq $SessionStoreRoot -or $null -eq $ArchivedSessionStoreRoot) { throw 'Transcript store path is invalid.' }
+	$ClaudeSessionStoreRoot = ConvertTo-LexicalCanonicalPath $ClaudeSessionStoreRoot
+	if ($null -eq $SessionStoreRoot -or $null -eq $ArchivedSessionStoreRoot -or $null -eq $ClaudeSessionStoreRoot) { throw 'Transcript store path is invalid.' }
 
 	$files = [Collections.Generic.Dictionary[string, IO.FileInfo]]::new([StringComparer]::OrdinalIgnoreCase)
+	$claudeFiles = [Collections.Generic.Dictionary[string, IO.FileInfo]]::new([StringComparer]::OrdinalIgnoreCase)
 	$readErrors = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
 	$SessionStoreRoot = Get-SafeStoreRoot 'sessions' $SessionStoreRoot $readErrors
 	$ArchivedSessionStoreRoot = Get-SafeStoreRoot 'archived_sessions' $ArchivedSessionStoreRoot $readErrors
+	$ClaudeSessionStoreRoot = Get-SafeStoreRoot 'projects' $ClaudeSessionStoreRoot $readErrors
 	$selection = if ([string]::IsNullOrWhiteSpace($SessionId)) { 'bounded-commit-window' } else { 'explicit-session-id' }
 	$windowStart = $commitTimestamp.AddMinutes(-$WindowMinutes)
 	$windowEnd = $commitTimestamp.AddMinutes($WindowMinutes)
 	if ($selection -eq 'explicit-session-id') {
 		Add-Files -Files $files -ReadErrors $readErrors -Root $SessionStoreRoot -Filter "*-$SessionId.jsonl" -Recurse
 		Add-Files -Files $files -ReadErrors $readErrors -Root $ArchivedSessionStoreRoot -Filter "*-$SessionId.jsonl" -Recurse
+		if (-not [string]::IsNullOrWhiteSpace($ClaudeSessionStoreRoot)) {
+			# A Claude session file sits at the top level of its project directory, so the override lists
+			# those directories and looks only there; `<sessionId>/subagents/` is never a discovery target.
+			try { $projectDirectories = @(Get-ChildItem -LiteralPath $ClaudeSessionStoreRoot -Directory -Force -ErrorAction Stop) }
+			catch {
+				$projectDirectories = @()
+				Add-ReadError $readErrors (Get-Locator $ClaudeSessionStoreRoot) 'transcript.read-failed' 'Transcript store contents could not be read.'
+			}
+			foreach ($projectDirectory in $projectDirectories) {
+				Add-Files -Files $claudeFiles -ReadErrors $readErrors -Root $projectDirectory.FullName -Filter "$SessionId.jsonl"
+			}
+		}
 	}
 	else {
 		for ($date = $windowStart.Date; $date -le $windowEnd.Date; $date = $date.AddDays(1)) {
@@ -390,6 +463,17 @@ try {
 		}
 		Add-Files -Files $files -ReadErrors $readErrors -Root $SessionStoreRoot -Filter '*.jsonl' -Recurse -Include $includeLastWrite
 		Add-Files -Files $files -ReadErrors $readErrors -Root $ArchivedSessionStoreRoot -Filter '*.jsonl' -Recurse -Include $includeLastWrite
+		# Claude filenames carry no date, so the write time is the only Claude prefilter, applied per
+		# eligible worktree's project directory and never below its top level. Only its lower bound is
+		# kept: a file last written before the window cannot span the commit, while a session appended
+		# to after the window still spans it, so an upper bound would discard a real candidate.
+		$includeClaudeLastWrite = {
+			param($File)
+			return $File.LastWriteTimeUtc -ge $windowStart.UtcDateTime
+		}
+		foreach ($worktreeRoot in $eligibleWorktreeRoots) {
+			Add-Files -Files $claudeFiles -ReadErrors $readErrors -Root (Get-ClaudeProjectDirectory $worktreeRoot) -Filter '*.jsonl' -Include $includeClaudeLastWrite
+		}
 	}
 
 	$records = [Collections.Generic.List[object]]::new()
@@ -400,7 +484,16 @@ try {
 			Add-ReadError $readErrors $locator 'transcript.read-failed' 'Transcript metadata could not be read.'
 			continue
 		}
-		$records.Add([pscustomobject]@{ Locator = $locator; Metadata = $metadata })
+		$records.Add([pscustomobject]@{ Client = 'codex'; Locator = $locator; Metadata = $metadata })
+	}
+	foreach ($file in @($claudeFiles.Values | Sort-Object FullName)) {
+		$locator = Get-Locator $file.FullName
+		try { $metadata = Get-ClaudeTranscriptMetadata $file.FullName $commitHash }
+		catch {
+			Add-ReadError $readErrors $locator 'transcript.read-failed' 'Transcript metadata could not be read.'
+			continue
+		}
+		$records.Add([pscustomobject]@{ Client = 'claude'; Locator = $locator; Metadata = $metadata })
 	}
 
 	# The bounded set supplies the descendant count for a needs-selection result. A single candidate
@@ -441,14 +534,16 @@ try {
 			if ($metadata.Start -gt $commitTimestamp -or $metadata.End -lt $commitTimestamp) { continue }
 		}
 		$descendants = $null
-		if ($selection -eq 'bounded-commit-window') {
+		# A Claude session's children live under a sibling directory rather than in the store's sessions,
+		# so both descendant fields stay null rather than falsely asserting that it has no children.
+		if ($selection -eq 'bounded-commit-window' -and $record.Client -ceq 'codex') {
 			$descendants = @()
 			if ($descendantsByRoot.ContainsKey($metadata.SessionId)) {
 				$descendants = @($descendantsByRoot[$metadata.SessionId] | Sort-Object sessionStartUtc, sessionId)
 			}
 		}
 		$candidates.Add([pscustomobject]@{
-			client = 'codex'
+			client = $record.Client
 			locator = $record.Locator
 			sessionId = $metadata.SessionId
 			sessionStartUtc = $metadata.Start.ToString('O')
@@ -460,7 +555,7 @@ try {
 		})
 	}
 
-	if ($selection -eq 'bounded-commit-window' -and $candidates.Count -eq 1) {
+	if ($selection -eq 'bounded-commit-window' -and $candidates.Count -eq 1 -and $candidates[0].client -ceq 'codex') {
 		$selectedCandidate = $candidates[0]
 		$selectedRootMetadata = $null
 		foreach ($record in $records) {
@@ -573,7 +668,7 @@ try {
 	if ($orderedCandidates.Count -eq 0) {
 		$result.code = 'transcript.not-found'
 		$result.message = if ($selection -eq 'explicit-session-id') {
-			'No Codex transcript matched the requested session ID; commit-time and eligible-worktree gates were not applied.'
+			'No transcript matched the requested session ID; commit-time and eligible-worktree gates were not applied.'
 		}
 		else {
 			'No transcript matched the commit time and an eligible retained worktree.'

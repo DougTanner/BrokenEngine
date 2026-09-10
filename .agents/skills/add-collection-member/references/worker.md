@@ -65,8 +65,8 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
      call that preserves the subset relation.
    - This is part of the rules that keep the simulation bit-identical across
      client and server, so if intended membership is unresolved, classify the
-     decision Tier 3 (see root AGENTS.md, Risk tiers) and stop for user
-     direction.
+     decision Tier 3 (see `.agents/references/risk-tiers.md`)
+     and stop for user direction.
 
    Done when the member's CRC membership is settled or the Tier-3 decision is
    with the user.

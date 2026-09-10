@@ -61,7 +61,9 @@ approved and implemented.
 - `.agents/skills/external-design-interface/SKILL.md` — current read-only seam
   and future opt-in boundary.
 - `.agents/skills/compile/SKILL.md` — repository-supported builder contract.
-- `AGENTS.md` — fixed-baseline, worktree, build, and landing authority.
+- `.agents/references/change-workflow.md` — build and landing authority.
+- `.agents/references/subagent-reporting.md` — fixed-baseline authority.
+- Root `AGENTS.md` — worktree authority.
 - `Documents/Features/AGENTS.md` — manual Feature lifecycle.
 - Coordinator implementer mutation surface — manager-supplied exact worktree,
   branch, run, manifest, packet, and disposal scopes; it never targets primary.

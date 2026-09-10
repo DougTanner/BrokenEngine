@@ -47,7 +47,7 @@ plus these skill-specific fields, in both implementation and audit-only modes:
 ## Handoff
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 extended with these fields:
 
 - `Self-audit resolved` — one row each: Claim -> Check -> Result, with its fix
@@ -77,4 +77,6 @@ the assigned build/runtime role and routes its concise result or later fix work.
   are the session executing this skill. The steps and rules the dispatched
   worker follows.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task-brief fields and the shared handoff form.
+  — task-brief fields.
+- [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+  — the shared handoff form.

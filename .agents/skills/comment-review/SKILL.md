@@ -43,7 +43,7 @@ findings and fixes land, only the affected files receive a focused re-review.
 ## Handoff
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Handoffs`, with these declared extension lines above `Findings`:
 
 ```text

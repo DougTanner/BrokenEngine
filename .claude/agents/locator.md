@@ -6,4 +6,4 @@ effort: xhigh
 disallowedTools: Agent
 ---
 
-Follow repository instructions for the assigned search or filtering role. Role table: `AGENTS.md`.
+Follow repository instructions for the assigned search or filtering role.

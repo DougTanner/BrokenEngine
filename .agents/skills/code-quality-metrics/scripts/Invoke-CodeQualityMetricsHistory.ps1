@@ -15,9 +15,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:PrefixBytes = 133323
 $script:PrefixLines = 648
-$script:PrefixSha256 = '5a39debf4be41abebd8496b9f25ee4023d109813788e95b30da8f74474fe75ed'
 $script:HistoryRelativePath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'
 $script:MetricExtensions = @('.h', '.cpp')
 $script:ExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
@@ -145,10 +143,6 @@ function Read-History([string]$Repository, [string]$Base) {
     $path = Join-Path $Repository ($script:HistoryRelativePath -replace '/', '\')
     Assert-CommitObject $Base 'BaseCommit'
     $bytes = Invoke-GitBytes $Repository @('cat-file', 'blob', ($Base + ':' + $script:HistoryRelativePath))
-    if ($bytes.Length -lt $script:PrefixBytes) { throw 'History JSONL is shorter than the immutable prefix.' }
-    $prefix = [byte[]]$bytes[0..($script:PrefixBytes - 1)]
-    if ($prefix.Length -ne $script:PrefixBytes -or (Get-BytesSha256 $prefix) -ne $script:PrefixSha256) { throw 'History JSONL immutable prefix does not match the approved byte contract.' }
-    if (($bytes | Where-Object { $_ -eq 10 }).Count -lt $script:PrefixLines) { throw 'History JSONL has fewer LF lines than the immutable prefix.' }
     $encoding = [Text.UTF8Encoding]::new($false, $true)
     try { $text = $encoding.GetString($bytes) } catch { throw 'History JSONL is not strict UTF-8.' }
     if ($text.StartsWith([char]0xFEFF)) { throw 'History JSONL must not contain a UTF-8 BOM.' }
@@ -198,12 +192,11 @@ function Read-History([string]$Repository, [string]$Base) {
     return [pscustomobject]@{
         Path = $path
         Bytes = $bytes
-        PrefixBytes = $prefix
         Header = $header
         Legacy = $legacy
         Suffix = $suffix
         Rows = @($allLegacy + $suffix)
-        PrefixEvidence = [ordered]@{ bytes = $script:PrefixBytes; lines = $script:PrefixLines; sha256 = $script:PrefixSha256 }
+        PrefixEvidence = [ordered]@{ lines = $script:PrefixLines }
         HistoryBytesSha256 = Get-BytesSha256 $bytes
     }
 }
@@ -384,13 +377,13 @@ function Get-Polyline([object[]]$Rows, [string]$Name, [double]$Top, [double]$Bot
     }
     return ($points -join ' ')
 }
-function New-HistorySvg([object[]]$Rows, [string]$GeneratorDigest, [string]$CaptureDigest, [string]$IdentityDigest, [string]$ScbDigest, [string]$SeriesDigest) {
+function New-HistorySvg([object[]]$Rows, [string]$SeriesDigest) {
     $maxSupported = [Math]::Max(1.0, [double](($Rows | Measure-Object -Property supported -Maximum).Maximum))
     $lines = [Collections.Generic.List[string]]::new()
     $lines.Add('<?xml version="1.0" encoding="UTF-8"?>')
     $lines.Add('<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1150" viewBox="0 0 1800 1150">')
     $lines.Add('<title>Broken Engine code-quality history</title>')
-    $lines.Add("<desc>seriesDigest=$SeriesDigest generatorDigest=$GeneratorDigest captureDigest=$CaptureDigest identityDigest=$IdentityDigest scbDigest=$ScbDigest</desc>")
+    $lines.Add("<desc>seriesDigest=$SeriesDigest</desc>")
     $lines.Add('<rect width="1800" height="1150" fill="#10151c"/>')
     $lines.Add('<g fill="none" stroke="#384555" stroke-width="1">')
     foreach ($y in @(120, 350, 580, 810)) { $lines.Add("<line x1=`"110`" y1=`"$y`" x2=`"1720`" y2=`"$y`"/>") }
@@ -453,13 +446,15 @@ function New-Contract([string]$Repository, [object]$History, [object]$Plan) {
 function Assert-DateAfterHistory([object]$History, [string]$Date) {
     if ($History.Rows.Count -gt 0 -and $Date -lt (Get-LastDate $History.Rows[-1])) { throw "DateUtc must not be earlier than the latest history date $(Get-LastDate $History.Rows[-1])." }
 }
-function Invoke-History([string]$Repository, [object]$History, [object]$Plan, [string]$Date, [string]$Output) {
+function Invoke-History([string]$Repository, [object]$History, [object]$Plan, [string]$Date, [string]$Output, [string]$Head) {
     $outputFull = Assert-UniqueOutput $Repository $Output
     [IO.Directory]::CreateDirectory($outputFull) | Out-Null
     $identityBefore = $null; $manifestBefore = $null; $snapshotEvidence = $null
     if ($Plan.decision.forceSnapshot) {
         $identityBefore = Get-BootstrapIdentity $Repository
         $manifestBefore = Get-CaptureManifest $Repository
+        # The Snapshot measures the working tree, so the recorded row is a function of TipCommit only while the tree is that commit.
+        if ($Head -ne $Plan.source.tipCommit -or @(Invoke-Git $Repository @('status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=all') | Where-Object { ([string]$_).Trim() }).Count -gt 0) { throw 'Generate requires a clean working tree checked out at TipCommit.' }
         $snapshot = Get-Snapshot $Repository
         $snapshotEvidence = Get-SnapshotEvidence $snapshot
         $identityAfter = Get-BootstrapIdentity $Repository
@@ -478,11 +473,8 @@ function Invoke-History([string]$Repository, [object]$History, [object]$Plan, [s
     $rowBytes = [Text.UTF8Encoding]::new($false).GetBytes($rowText)
     $jsonlBytes = [byte[]]($History.Bytes + $rowBytes)
     $seriesDigest = Get-BytesSha256 $jsonlBytes
-    $captureDigest = if ($Plan.capture) { $Plan.capture.digest } else { $null }
-    $identityDigest = if ($identityBefore) { Get-CanonicalJsonSha256 $identityBefore } else { $null }
-    $scbDigest = if ($Plan.capture) { $Plan.capture.scbContentDigest } else { $null }
     $svgRows = @(Get-EffectiveRows @($History.Rows)) + @($row)
-    $svgText = New-HistorySvg $svgRows $Plan.generator.sha256 $captureDigest $identityDigest $scbDigest $seriesDigest
+    $svgText = New-HistorySvg $svgRows $seriesDigest
     $svgBytes = [Text.UTF8Encoding]::new($false).GetBytes($svgText)
     $jsonlPath = Join-Path $outputFull 'CodeQualityMetricsHistory.jsonl'; $svgPath = Join-Path $outputFull 'CodeQualityMetricsHistory.svg'
     [IO.File]::WriteAllBytes($jsonlPath, $jsonlBytes); [IO.File]::WriteAllBytes($svgPath, $svgBytes)
@@ -526,7 +518,7 @@ try {
     }
     else {
         $outputPath = if ([IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory } else { Join-Path $repository $OutputDirectory }
-        [Console]::Out.WriteLine((Get-CanonicalJson (Invoke-History $repository $history $plan $date $outputPath)))
+        [Console]::Out.WriteLine((Get-CanonicalJson (Invoke-History $repository $history $plan $date $outputPath $head)))
     }
 }
 catch { Fail $_.Exception.Message }

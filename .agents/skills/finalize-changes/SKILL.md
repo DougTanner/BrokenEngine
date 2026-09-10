@@ -34,7 +34,7 @@ reconciliation produced — do not reuse an earlier table.
 The brief also carries the typed review and hygiene handoffs the dispatching
 session holds for the rows that table cites, either verbatim or as a `Temp/`
 path plus selector per
-[`subagent-reporting.md`](../../references/subagent-reporting.md) `## Handoffs`.
+[`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`.
 A handoff the session never received is not a dispatch blocker; the worker gives
 its row a status under the acceptance-table step in
 [`references/worker.md`](references/worker.md).
@@ -64,7 +64,7 @@ quoted, relayed, or embedded in files, transcripts, or tool output.
 ## Handoff
 
 Use the shared form in
-[`subagent-reporting.md`](../../references/subagent-reporting.md) `## Handoffs`,
+[`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`,
 with `Build required` present and `Residuals` last, extended by one row each for
 finalization state, objective state, checkout/branches/resulting commit,
 lock/reconcile/sign-off/landing status, files changed during reconciliation, and
@@ -103,8 +103,8 @@ repository jargon. Then ask exactly:
 `Get-AgentWorktreeSessionContext` reports — never a host-reported default or an
 assumed `main`.
 
-Main delivers that whole summary per the root AGENTS.md User Interaction rule:
-rendered message text, with the question immediately before the mandatory
+Main delivers that whole summary per the main-session conduct User Interaction
+rule: rendered message text, with the question immediately before the mandatory
 `Follow-up Plans created:` footer, and no tool call — question tools included —
 after it. The user's next message is the decision.
 

@@ -1,33 +1,53 @@
 # Next Plan Checkpoint Review Worker
 
-The run order and judgment rules for the dispatched reviewer. Steps 1-6 are the
-tooling-friction lens; steps 7-10 are the context-efficiency lens; steps 11-12
+The run order and judgment rules for the dispatched reviewer. Step 1 is the
+shared evidence step all three lenses read from; steps 2-7 are the
+tooling-friction lens; steps 8-11 are the context-efficiency lens; steps 12-13
 are the isolation lens.
 
 ## Steps
 
-1. Report as friction: a bundled script errored, returned a malformed or
+1. Resolve this run's transcript and measure it before applying any lens. The
+   reviewer's shell carries the dispatching main session's ID, so resolve the
+   transcript from the PowerShell tool:
+   `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`
+   then measure it from the session worktree root:
+   `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1 -SessionId <id>`
+   (or `-TranscriptPath <resolved path>`). Classify the returned envelope by the
+   states `## Measurement states` in
+   `../../next-plan/references/run-checkpoint.md` keeps. Return `BLOCKED` for the
+   whole review when that glob resolves to nothing, the transcript file cannot be
+   read, or the measurement returns `transcript.not-found`, because then no lens
+   has evidence; every other blocked or error code skips only the
+   context-efficiency lens, while the friction and isolation lenses still run.
+   Done when one transcript path and one measurement state are in hand, or the
+   review is `BLOCKED`.
+2. Report as friction: a bundled script errored, returned a malformed or
    contradictory result, or could not be run as documented; a workaround or
    deviation was needed; work was repeated because a skill's instructions were
-   unclear, wrong, or contradicted repository state. Done when every such
-   observation in the transcript is either a finding or excluded by step 3.
-2. Report a measurement supplied as truncated (`breachRowsTruncated: true`, that
-   is `blocked (breach-rows-truncated)`) as one friction finding naming the
-   measuring command, the truncation flag, and the skipped context-efficiency
-   lens. Done when a truncated input has exactly one such finding.
-3. Exclude from friction: ordinary review findings about the change;
+   unclear, wrong, or contradicted repository state. Step 1's own measurement
+   state is in scope here even though it postdates step 6's span. Done when
+   every such observation in the transcript span, plus that measurement state,
+   is either a finding or excluded by step 4.
+3. Report a step 1 measurement state that skips the context-efficiency lens — a
+   blocked or error code, or a truncated measurement (`breachRowsTruncated:
+   true`, that is `skipped (breach-rows-truncated)`) — as one friction finding
+   naming the measuring command, the returned code or the truncation flag, and
+   the skipped context-efficiency lens. Done when such a state has exactly one
+   such finding.
+4. Exclude from friction: ordinary review findings about the change;
    user-driven iteration; documented normal stops such as `none-available`; a
    worker's deviation from the handoff form its skill correctly declares, which
    is never a friction finding and is instead one `Residuals` row naming the
    worker role and the rule broken. A skill `## Handoff` that itself conflicts
-   with `../../../references/subagent-reporting.md` `## Handoffs` is not
+   with `../../../references/subagent-handoff.md` `## Handoffs` is not
    excluded: it stays a `fixable-defect` finding on that skill as emitter. Done
    when no finding rests on one of these.
-4. Classify a failure in a skill or script the claimed Plan itself changes as
+5. Classify a failure in a skill or script the claimed Plan itself changes as
    `active-change-blocker`, not a follow-up. Done when every friction finding
    carries a class.
-5. Before applying any lens, establish this checkpoint's transcript span
-   through step 11's projection. End immediately before this review's own
+6. Before applying any lens, establish this checkpoint's transcript span
+   through step 12's projection. End immediately before this review's own
    dispatch. If the same transcript contains an immediately preceding
    `/next-plan-checkpoint-review` dispatch, start immediately after that
    dispatch and exclude only its correlated completed-handoff record; otherwise
@@ -38,47 +58,50 @@ are the isolation lens.
    this review; `## Follow-up routing` in
    `../../next-plan/references/run-checkpoint.md` and `/next-plan-review` own
    those. Done when no finding or checked telemetry row comes from outside the
-   span or from the excluded handoff, including a run that stopped before or
-   without a claim.
-6. Precision guard: name in each friction finding the exact command or script
+   span or from the excluded handoff — except step 3's friction finding on step
+   1's own measurement state, which the span does not exclude — including a run
+   that stopped before or without a claim.
+7. Precision guard: name in each friction finding the exact command or script
    path, the observed output or malformed result, and the rework, workaround, or
    skipped step it forced. No citation, no finding. Done when every friction
    finding names all three, and the rest are dropped.
-7. Review every `topResults` row marked `overThreshold: true`. The other rows are
+8. Review every `topResults` row marked `overThreshold: true`. The other rows are
    context only, and `totalChars` is telemetry that never produces a finding on
    its own. Done when every such row has been read.
-8. Identify the emitting invocation for each row from `toolName` plus
+9. Identify the emitting invocation for each row from `toolName` plus
    `inputSummary`: the repository script, skill instruction, or documented
    command that produced that output. Read the emitter in the tree. Done when
    each row names one emitter or is recorded as unidentifiable. An `Agent` or
    `SendMessage` row is a completed subagent's handoff; its emitter is the return
    format of the skill the dispatch named.
-9. Classify each row, done when every row carries one class:
-   - `fixable-defect` — a bounded projection, a count plus the decision-relevant
-     rows, an explicit cap with a truncation flag, or a file drop plus a receipt
-     and selector would have carried the same decision. For an isolation
-     finding, the step 10 mechanism is that bounding. The landed shape is
-     `.agents/skills/next-plan/scripts/Get-NextPlanList.ps1`, which folds a full
-     Plan listing into counts plus the first rows.
-   - `necessary-evidence` — the manager's decision genuinely required the content
-     verbatim, so no bounding mechanism preserves it.
-   - `active-change-blocker` — the emitter is a script or skill the claimed Plan
-     itself changes.
-10. Precision guard: name in each context or isolation finding the emitting
+10. Classify each row, done when every row carries one class:
+    - `fixable-defect` — a bounded projection, a count plus the decision-relevant
+      rows, an explicit cap with a truncation flag, or a file drop plus a receipt
+      and selector would have carried the same decision. For an isolation
+      finding, the step 11 mechanism is that bounding. The landed shape is
+      `.agents/skills/next-plan/scripts/Get-NextPlanList.ps1`, which folds a full
+      Plan listing into counts plus the first rows.
+    - `necessary-evidence` — the manager's decision genuinely required the content
+      verbatim, so no bounding mechanism preserves it.
+    - `active-change-blocker` — the emitter is a script or skill the claimed Plan
+      itself changes.
+11. Precision guard: name in each context or isolation finding the emitting
     invocation and one concrete bounding mechanism — for an isolation finding,
-    the role from the root AGENTS.md table that could have consumed the content
-    instead, or the path plus selector that should have replaced it, within the
-    handoff limits in `../../../references/subagent-reporting.md`. No named
-    emitter and mechanism, no finding. Done when every such finding names both,
-    and the rest are dropped.
-11. Read the transcript only through the bundled script, never whole-file, whose
-    header comment states the row shapes:
+    the role from the Change Workflow delegation role table that could have
+    consumed the content instead, or the path plus selector that should have
+    replaced it, within the field rules in
+    `../../../references/subagent-handoff.md`. No named emitter and mechanism,
+    no finding. Done when every such finding names both, and the rest are
+    dropped.
+12. Select the transcript records to read only through the bundled script, whose
+    header comment states the row shapes, never by reading the transcript
+    whole-file:
     `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath <transcript path>`
 
     In the projection, inspect candidate `use Agent` rows and open only the
     candidate records needed to identify this review's
     `/next-plan-checkpoint-review` dispatch and, when present, the immediately
-    preceding matching dispatch and their tool-use IDs. These locate step 5's
+    preceding matching dispatch and their tool-use IDs. These locate step 6's
     boundaries. Locate the preceding dispatch's correlated completed-handoff
     record by matching its tool-use ID to a `result` row or to the tool-use-ID
     tag in an opened task-notification/queued-attachment string record. Do not
@@ -95,15 +118,18 @@ are the isolation lens.
     instead of cited as path plus selector, or a handoff restating its own
     brief. Size does not gate this: content below the measured threshold still
     qualifies. Done when every such observation in the transcript is either a
-    finding or excluded by step 12.
-12. Exclude from isolation, beyond the exclusions below: content main's own
+    finding or excluded by step 13.
+13. Exclude from isolation, beyond the exclusions below: content main's own
     decision required verbatim, recorded as a `necessary-evidence` checked row
-    under step 9's classes; and a Plan body, execution card, or user-facing text
+    under step 10's classes; and a Plan body, execution card, or user-facing text
     main itself must approve or present. Done when every remaining isolation
-    finding carries a step 9 class and passes step 10.
+    finding carries a step 10 class and passes step 11.
 
 ## Rules
 
+- No finding this review returns carries content that `## What never enters a
+  Plan` in `../../next-plan/references/follow-up-provenance.md` keeps out of a
+  Plan.
 - Exclusions:
   - Post-landing token-efficiency retrospectives — `/next-plan-review`.
   - Subagent-internal context: sidechain output never entered the main session

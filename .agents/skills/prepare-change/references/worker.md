@@ -6,9 +6,9 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 ## Steps
 
 1. Read the request text, or the plan document this change comes from when it is
-   not a claimed executable Plan, then `### Risk tiers` and `### Steps` in root
-   [AGENTS.md](../../../../AGENTS.md), and every repository region the request
-   names. Done when each of those has been read.
+   not a claimed executable Plan, then `### Risk tiers` in
+   [risk-tiers.md](../../../references/risk-tiers.md), and every
+   repository region the request names. Done when each of those has been read.
 2. Gather the tier evidence: for each risk-tier trigger the change could touch,
    cite the `repository-path:line` that proves it present or absent, and
    classify at the highest applicable tier. Done when every such trigger carries
@@ -25,8 +25,12 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    [`../../next-plan/SKILL.md`](../../next-plan/SKILL.md) `## Handoff` owns, with
    each acceptance check inside the tier's evidence ceiling in
    [`../../verify-acceptance/references/worker.md`](../../verify-acceptance/references/worker.md)
-   `## Tier evidence ceiling`. Done when every template field is filled under
-   that heading.
+   `## Tier evidence ceiling`. Fill the card's `Roles` field from the step and
+   role assignments the brief supplies, citing the brief as its evidence, never
+   by reading the workflow yourself. When the tier classified in step 2 differs
+   from the tier those supplied assignments assume, record the mismatch under
+   `Unresolved decisions` in the handoff and leave the roles for main to
+   reconcile. Done when every template field is filled under that heading.
 5. Confirm the drafted file's structure with one run from the worktree root:
 
    ```powershell
@@ -45,7 +49,7 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   cite the `repository-path:line` for anything a reader would otherwise take on
   trust.
 - Leave a decision the request does not settle unresolved and return it for
-  main, per `### Resolving Ambiguity` in root
+  main, per the `## Directives` trivial-choices bullet in root
   [AGENTS.md](../../../../AGENTS.md); an architectural choice is always the
   user's.
 - Scope the plan to the smallest complete change, per the minimum-sufficient

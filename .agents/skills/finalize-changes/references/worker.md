@@ -16,9 +16,9 @@ changes primary. `Show-FinalizeApprovalReview.ps1` is the one script this worker
 fills in and returns for main to run verbatim; this worker never invokes it.
 A script that cannot be run as documented is a bug: stop and report it.
 
-Under its landing lease, finalization follows the [root `AGENTS.md` Verify and
-land step's landing invariant](../../../../AGENTS.md) and the exact mechanics in
-[`scripts.md`](scripts.md).
+Under its landing lease, finalization follows the Verify and land step's rule
+that exactly one explicit user confirmation authorizes changing primary, and the
+exact mechanics in [`scripts.md`](scripts.md).
 
 Immediately after the affirmative confirmation the caller claims the landing
 lock once through
@@ -96,8 +96,8 @@ every other lease is foreign.
      handoff in [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts), is
      consumed as a usable non-conflict terminal, and proceeds directly to the
      `SmartGit launch:` line in step 6 and the existing landing summary.
-   - Apply the [root `AGENTS.md` Verify and land step's landing
-     invariant](../../../../AGENTS.md) and
+   - Apply the Verify and land step's rule that exactly one explicit user
+     confirmation authorizes changing primary, and
      [`scripts.md#landing-and-recovery`](scripts.md#landing-and-recovery) for the
      movement and lease rules.
    - A candidate/session change still returns its changed bytes through normal
@@ -149,9 +149,9 @@ every other lease is foreign.
       on it, and step 14 disposes of such a block like any other blocked landing.
     - For a claimed Plan pass `-ReleasePlanClaim` so the machine-local claim is
       deleted best-effort.
-    - Under the landing lease, landing follows the [root `AGENTS.md` Verify and
-      land step's landing invariant](../../../../AGENTS.md) and the exact
-      mechanics in [`scripts.md`](scripts.md).
+    - Under the landing lease, landing follows the Verify and land step's rule
+      that exactly one explicit user confirmation authorizes changing primary,
+      and the exact mechanics in [`scripts.md`](scripts.md).
     - Done when landing has returned its result.
 11. Read the advance and cleanup landing performed.
     - Landing advances primary by compare-and-swap with rollback, resets and
@@ -175,8 +175,8 @@ every other lease is foreign.
     - Done when the deletion is recorded as performed or as that residual.
 14. Dispose of a landing blocked by primary advancing.
     - If primary advanced before the advance succeeds, landing does its own
-      bounded rebase and retry, following the [root `AGENTS.md` Verify and land
-      step's landing invariant](../../../../AGENTS.md) and
+      bounded rebase and retry, following the Verify and land step's rule that
+      exactly one explicit user confirmation authorizes changing primary, and
       [`scripts.md`](scripts.md) for the resulting disposition.
     - Never rebase or resolve by hand.
     - Act on the blocked result's reported `disposition` and `lock` projection

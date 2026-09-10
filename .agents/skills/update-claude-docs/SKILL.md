@@ -39,7 +39,7 @@ Exclude `CLAUDE.local.md` and other local overrides unless the user explicitly i
 ## Handoff
 
 Return the shared handoff form in
-[`subagent-reporting.md`](../../references/subagent-reporting.md)
+[`subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Handoffs` in every mode. Each shared `Changed files` row names an edited
 `AGENTS.md` or `CLAUDE.md` path and the document section touched, using `none`
 when absent. The shared `Build required` value is `none` because this skill

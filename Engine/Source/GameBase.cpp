@@ -818,9 +818,10 @@ bool GameBase::HandleDeferredSwapchain()
 		else
 		{
 			// Still deferred (minimized / off-screen): this branch loops every frame with no vkQueuePresentKHR to
-			// throttle it, so pace it to the sim tick's remaining time (kTickNs minus this iteration's elapsed
-			// wall time) — the minimized loop holds ~32 Hz instead of busy-spinning a core and re-issuing a
-			// vkGetPhysicalDeviceSurfaceCapabilitiesKHR per spin. Mirrors ServerSessionRuntime::WaitForTick's high-resolution
+			// throttle it, so wait out the rest of one sim tick's wall duration, bounded between the ~1 ms floor and the
+			// unscaled tick — fast time scales cannot busy-spin a core and re-issue a
+			// vkGetPhysicalDeviceSurfaceCapabilitiesKHR per spin, and slow ones cannot stall the next iteration's message pump
+			// and agent command drain. Mirrors ServerSessionRuntime::WaitForTick's high-resolution
 			// waitable timer minus its precision spin (nothing minimized needs sub-ms accuracy).
 			if (mMinimizedThrottleTimer == nullptr)
 			{
@@ -829,10 +830,11 @@ bool GameBase::HandleDeferredSwapchain()
 
 			if (mMinimizedThrottleLast.has_value())
 			{
+				static constexpr std::chrono::nanoseconds kMinThrottleNs = 1'000'000ns;
 				std::chrono::nanoseconds elapsedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - *mMinimizedThrottleLast);
-				std::chrono::nanoseconds remainingNs = kTickNs - elapsedNs;
-				static constexpr std::chrono::nanoseconds kMinThrottleNs = 1'000'000ns; // ~1 ms floor: skip sub-ms / non-positive remainders.
-				if (remainingNs >= kMinThrottleNs)
+				std::chrono::nanoseconds budgetNs = std::clamp(mTimeStep.SimToWall(kTickNs), kMinThrottleNs, kTickNs);
+				std::chrono::nanoseconds remainingNs = budgetNs - elapsedNs;
+				if (remainingNs > 0ns)
 				{
 					LARGE_INTEGER dueTime {.QuadPart = -(remainingNs.count() / 100),}; // Negative = relative, 100ns units.
 					if (mMinimizedThrottleTimer != nullptr && SetWaitableTimerEx(mMinimizedThrottleTimer, &dueTime, 0, nullptr, nullptr, nullptr, 0) != 0)

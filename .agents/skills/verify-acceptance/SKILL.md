@@ -19,8 +19,8 @@ missing check, and a status saying whether the approved checks have all closed.
 
 ## When to use
 
-- The Change Workflow Verify the acceptance table step in root
-  [AGENTS.md](../../../AGENTS.md), for a stage completing without landing.
+- The Change Workflow Verify the acceptance table step, for a stage completing
+  without landing.
 - Not for a stage that lands in the same session: that table comes from the
   Verify and land step's landing table, which
   [`/finalize-changes`](../finalize-changes/SKILL.md) owns and builds itself
@@ -49,7 +49,7 @@ bytes are unavailable.
 ## Handoff
 
 Return the shared handoff form in
-[`subagent-reporting.md`](../../references/subagent-reporting.md) `## Handoffs`,
+[`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`,
 with one declared extension section above `Findings`:
 
 ```text

@@ -43,7 +43,7 @@ Require all of the following before starting:
 ## Handoff
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 extended with the fields below, inline. Interview questions carry their full
 wording in the `Interview questions` rows, because the manager runs the
 interview from that text and must not read a file mid-question. The decision-and-refinement rows, the

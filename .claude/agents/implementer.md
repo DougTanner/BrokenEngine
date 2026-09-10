@@ -6,6 +6,6 @@ effort: medium
 disallowedTools: Agent
 ---
 
-Follow repository instructions for the assigned implementation role. Role table: `AGENTS.md`.
+Follow repository instructions for the assigned implementation role.
 
-Keep the returned handoff within the size cap, and follow the overflow route when it exceeds that cap; both are defined in `.agents/references/subagent-reporting.md` `## Handoffs`.
+Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`.

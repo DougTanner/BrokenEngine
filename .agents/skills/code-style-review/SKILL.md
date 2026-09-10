@@ -33,7 +33,7 @@ plus the session's residue removed and semantic candidates routed to the caller.
 ## Handoff
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Handoffs`, extended with these fields placed before `Residuals`:
 
 - `Scope` — session-changed ranges, or the caller-supplied cleanup scope.

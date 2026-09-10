@@ -100,7 +100,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 ## Rules
 
 - Run inside one delegated `mechanic`; never delegate. Review C++ only. Style
-  review is not a landing gate (defined in root `AGENTS.md`).
+  review is not a landing gate (a Change Workflow definition).
 - Shader style is out of scope; do not review or route it. The only shader
   edits are the reference updates that propagate a C++ rename (steps 12-15).
 - Rule 49 forwarding findings are routed, not auto-fixed — see

@@ -102,9 +102,9 @@ worker never dispatches another worker.
     final header-style interface, key call-site examples, incorporated elements,
     affected integration sites and invariants, exclusions, and decisive
     acceptance checks. Done when that plan contains each of those.
-13. Classify that plan under the root `AGENTS.md` Change Workflow Approve and
-    classify through Plan review steps, which own the tier and the plan-review
-    gates that tier requires. Done when the plan is classified.
+13. Classify that plan under the `.agents/references/change-workflow.md` Approve
+    and classify through Plan review steps, which own the tier and the
+    plan-review gates that tier requires. Done when the plan is classified.
 14. When the plan adds a Collection, record that `/add-collection` owns its
     mechanical wiring and invokes `/add-collection-member` for every SOA column.
     Done when the plan records that ownership.
@@ -112,7 +112,7 @@ worker never dispatches another worker.
 ## Handoff
 
 Each researcher and planner returns the complete shared handoff from
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 with `Residuals` last. Add these domain fields before the shared fields:
 
 ```text
@@ -160,8 +160,9 @@ choose a public interface when multiple meaningfully different shapes remain.
   not create, edit, or remove scratch source, build output, branches, or
   worktrees, and they do not compile candidates.
 - The workflow ends at the decision and plan gate; do not begin implementation
-  from this skill. Follow root `AGENTS.md` for delegation, plan, review, and
-  landing mechanics rather than restating them here.
+  from this skill. Follow `.agents/references/change-workflow.md` for
+  delegation, plan, review, and landing mechanics rather than restating them
+  here.
 - No dispatched worker delegates further.
 - Use no more than the three available child slots and do not add a
   manager/singleton-specific fourth design.

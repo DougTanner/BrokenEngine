@@ -48,6 +48,11 @@ behavior, required check/review, and residual:
 
 `criterion | decisive check | PASS | FAIL | BLOCKED | UNVERIFIED | evidence`
 
+A `Documents/Plans/**` file deleted by `/next-plan`'s `Complete-NextPlan.ps1` is
+authorized by that script's completion result and owes no Review and resolve
+correctness row, so it is recorded in the table with no review row of its own;
+the `Executable Plan check` row below still applies to that reviewed diff.
+
 Every `PASS` cites evidence read or run here, or a mandated handoff whose fields
 prove the row. Narrative alone is `UNVERIFIED`. Duplicate checks name their
 independent signal. The change's tier sets the exploration ceiling, per

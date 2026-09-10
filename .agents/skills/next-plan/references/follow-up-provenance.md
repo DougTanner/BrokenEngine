@@ -19,13 +19,14 @@ selection section, or from `git branch --show-current` and
 ## Conversation session ID
 
 Those sources name the worktree only, so none of them yields the conversation
-session ID `/next-plan-review` needs to find a transcript. Any shell of the
+session ID that lets `/next-plan-review` skip discovery. Any shell of the
 session reads it from the `CLAUDE_CODE_SESSION_ID` environment variable, a
 dispatched worker's shell included, because a subagent shell carries the parent
 session's value; the value differs per conversation and resume, so read it when
 the friction is recorded. Codex sessions record no conversation session ID,
-because `/next-plan-review` discovers Codex transcripts by bounded commit
-window.
+because they have no runtime source for one; `/next-plan-review` discovers
+transcripts of either client by bounded commit window, and a recorded Claude ID
+is the override.
 
 ## Friction observed in a different session
 

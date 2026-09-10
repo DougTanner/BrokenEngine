@@ -110,8 +110,8 @@ transfer path.
 ## Risk tier and invariants
 
 Expect Change Workflow **Tier 3**: the change touches wire/protocol layout, serialization
-versioning, and simulation state inside the shared CRC — all Tier-2 exclusions in the root
-`AGENTS.md` risk triggers.
+versioning, and simulation state inside the shared CRC — all Tier-2 exclusions in the
+`.agents/references/change-workflow.md` risk triggers.
 
 Invariants to hold: append-only status-change enumerators; client and server apply the same
 published `FrameInput` and must produce identical PostRender bytes; the relocation must land

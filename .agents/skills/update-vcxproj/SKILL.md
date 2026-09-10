@@ -31,7 +31,7 @@ explicit mode:
 
 ## Handoff
 
-Return the shared handoff form in `../../references/subagent-reporting.md`,
+Return the shared handoff form in `../../references/subagent-handoff.md`,
 extended with these fields:
 
 - `Membership outcomes` — a `<settled>/<total> settled` count line, where

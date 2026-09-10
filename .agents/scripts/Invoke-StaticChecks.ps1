@@ -1,4 +1,4 @@
-# The static checks an implementer runs itself at the Run targeted pre-review checks
+# The static checks for the Run targeted pre-review checks
 # step, selected from the session change inventory and run in one pass: `validate-skill`
 # for each changed skill package, `plan-scheduler` for a changed Plan, and
 # `markdown-links` for every changed markdown file. The first two compose the existing bundled scripts

@@ -4,5 +4,25 @@
   },
   "env": {
     "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 1"
+          },
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 2"
+          },
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 3"
+          }
+        ]
+      }
+    ]
   }
 }

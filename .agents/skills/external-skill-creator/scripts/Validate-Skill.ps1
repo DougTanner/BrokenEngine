@@ -743,7 +743,7 @@ function Read-OpenAiSidecar
 }
 
 # .agents/references/skill-skeleton.md owns consumption shapes, section order,
-# and placement; .agents/references/subagent-reporting.md owns the closed status
+# and placement; .agents/references/subagent-handoff.md owns the closed status
 # and severity vocabularies. These tables only mirror those sources.
 $skeletonSectionOrder = @('Purpose', 'When to use', 'Inputs', 'Steps', 'Handoff', 'Rules', 'References')
 $subagentSkillSections = @('Purpose', 'When to use', 'Inputs', 'Handoff', 'References')
@@ -814,9 +814,9 @@ function Get-InstructionFindings
 		{
 			continue
 		}
-		if ($currentSection -ceq 'Handoff' -and $lineText -cmatch '^(?:Status|Findings|Changed files|Decisive checks|Build required|Evidence|Executor|Residuals):')
+		if ($currentSection -ceq 'Handoff' -and $lineText -cmatch '^(?:Status|Findings|Changed files|Decisive checks|Build required|Evidence|Residuals):')
 		{
-			$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'HANDOFF001'; Message = 'shared handoff field re-declared inside a ## Handoff fence; .agents/references/subagent-reporting.md ## Handoffs owns the form' })
+			$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'HANDOFF001'; Message = 'shared handoff field re-declared inside a ## Handoff fence; .agents/references/subagent-handoff.md ## Handoffs owns the form' })
 		}
 		if ($lineText -cmatch '^Status:(?:[ ](.*))?$')
 		{
@@ -826,7 +826,7 @@ function Get-InstructionFindings
 				{
 					continue
 				}
-				$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'VOCAB001'; Message = "status word $token is outside the closed set in .agents/references/subagent-reporting.md" })
+				$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'VOCAB001'; Message = "status word $token is outside the closed set in .agents/references/subagent-handoff.md" })
 			}
 			continue
 		}
@@ -838,7 +838,7 @@ function Get-InstructionFindings
 				{
 					continue
 				}
-				$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'VOCAB001'; Message = "severity word $token is outside the closed set in .agents/references/subagent-reporting.md" })
+				$findings.Add([pscustomobject] @{ Line = $lineNumber; Code = 'VOCAB001'; Message = "severity word $token is outside the closed set in .agents/references/subagent-handoff.md" })
 			}
 		}
 	}

@@ -76,7 +76,7 @@ optional extension rows. Correctness and scope-authorization failures both go
 in the shared `Findings` field.
 
 Return the shared handoff form in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 extended with these fields:
 
 - `Scope` — `PASS`, `NEEDS_ACTION`, `not applicable (Tier 1)`, or
@@ -108,4 +108,6 @@ the review is clean. Never return `LGTM` without decisive trace evidence.
   are the session executing this skill. Steps and rules for the dispatched
   reviewer.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task brief and shared handoff form.
+  — task brief.
+- [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+  — shared handoff form.

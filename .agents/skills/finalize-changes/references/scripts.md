@@ -49,7 +49,7 @@ pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLoc
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' -LaunchSmartGit > 'Temp/finalize-approval-review-result.json'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' > 'Temp/finalize-approval-review-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
 pwsh -NoProfile -File .agents/scripts/Repair-SessionForkPoint.ps1
@@ -103,7 +103,7 @@ The fixed terminal mapping is:
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
 | 0 | `pass` | `ok`, `primary.tree-identical` | Continue to the SmartGit review and the landing summary. |
-| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the [root `AGENTS.md` Verify and land step's landing invariant](../../../../AGENTS.md) owns primary-movement policy. The normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
+| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the Verify and land step's rule that exactly one explicit user confirmation authorizes changing primary owns primary-movement policy. The normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
 | 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 
@@ -203,7 +203,7 @@ file named by `-ApprovalReviewResultFile`.
 
 The review outcome stays non-blocking — `opened`, `unavailable`, and `failed` all
 satisfy the gate, because only an attempted launch is required, not a successful
-one. `preview` and every error status do not. A receipt that is absent,
+one. An `error` status does not satisfy it. A receipt that is absent,
 unreadable, not valid JSON, or not a `broken-engine-finalize-approval-review/v1`
 result carrying `status` and `approvedTip` blocks with `approval-review.missing`,
 one whose `approvedTip` is not the commit being landed blocks with

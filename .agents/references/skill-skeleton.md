@@ -31,19 +31,19 @@ Choose a shape by who consumes the workflow. The presence of
 5. `Handoff` (`SKILL.md`) — the skill's extension fields, fixed shared values,
    and narrowed row forms as plain lines, or as a row-form fence holding no
    shared field name; it never re-renders the shared form from
-   [`subagent-reporting.md`](subagent-reporting.md), `## Handoffs`. Applying
-   that reference's 'What main does with each field' table, mandate inline only
-   what the table gives main an action for, and no more text than that action
-   needs, however short the excess is; that reference's `## Handoffs` size caps
-   still govern the return. An extension field's own line counts when main acts
-   on it as it acts on the field it extends, text main must present or ask
-   verbatim stays inline per `## Section placement`, and everything else
-   is cited as path plus selector. A field that judges each item of a supplied
-   list carries a `<n>/<total>` count line, `<n>` named for what it counts,
-   closed by the field's own passing word (`passed`, `traced`, `settled`),
-   followed only by the items that did not pass, each citing where its settling
-   evidence lives as a path plus selector or as the handoff row that holds it,
-   never restating it.
+   [`subagent-handoff.md`](subagent-handoff.md), `## Handoffs`. Applying
+   [`subagent-reporting.md`](subagent-reporting.md)'s 'What main does with each
+   field' table, mandate inline only what the table gives main an action for,
+   and no more text than that action needs, however short the excess is;
+   `subagent-handoff.md`'s `## Handoffs` field rules still govern the return. An
+   extension field's own line counts when main acts on it as it acts on the
+   field it extends, text main must present or ask verbatim stays inline per
+   `## Section placement`, and everything else is cited as path plus selector.
+   A field that judges each item of a supplied list carries a `<n>/<total>`
+   count line, `<n>` named for what it counts, closed by the field's own
+   passing word (`passed`, `traced`, `settled`), followed only by the items
+   that did not pass, each citing where its settling evidence lives as a path
+   plus selector or as the handoff row that holds it, never restating it.
 6. `Rules` — judgment no step owns, as bullets.
 7. `References` (`SKILL.md`) — each linked file owning one topic.
 
@@ -80,7 +80,7 @@ main-session skill links every needed reference from `SKILL.md`.
 ## Shared vocabulary
 
 Status and severity words are the ones the shared handoff form in
-`subagent-reporting.md` lists. `Critical` and `Required` are defined in
+`subagent-handoff.md` lists. `Critical` and `Required` are defined in
 `.agents/skills/repo-code-review/SKILL.md`, and `Recommended` in
 `.agents/skills/external-skill-creator/SKILL.md` validation mode. Introduce no
 other status or severity term.

@@ -2,7 +2,8 @@
 
 The steps each dispatched `researcher` follows. Triggers, inputs, the handoff,
 the comparison, and the user gate live in [`../SKILL.md`](../SKILL.md); main's
-dispatch recipe lives in root `AGENTS.md`.
+dispatch recipe lives in the Change Workflow Prepare and explore alternatives
+step.
 
 ## Steps
 

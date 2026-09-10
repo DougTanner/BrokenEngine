@@ -5,11 +5,11 @@ Delegation uses a fresh, isolated context by default: Codex uses
 fork is allowed only when exact authoritative conversation text cannot be
 safely summarized, and the prompt states why.
 
-Root `AGENTS.md`'s rule that subagents never spawn subagents is enforced by
+The rule that subagents never spawn subagents is enforced by
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` and by `disallowedTools: Agent` in each
 role definition.
 
-The [root role table](../../AGENTS.md#delegation-roles) authoritatively assigns
+The Change Workflow delegation role table authoritatively assigns
 delegated work and owns every role exception. This reference owns only
 reporting-local conduct: independent findings-only work uses a fresh context,
 any root-authorized narrow edit path includes its required self-check, and tool
@@ -21,7 +21,7 @@ enforcement.
 Every delegation supplies one self-contained brief on this form:
 
 ```text
-Role: <role name from the root AGENTS.md table>
+Role: <role name from the delegation role table>
 Skill: <skill to run, or none>
 Objective: <one sentence>
 Required sections: <handoff fields or report sections the caller will read>
@@ -78,8 +78,12 @@ a run, come from that documented run of
 `.agents/scripts/Get-SessionChangeInventory.ps1`, which supplies the script's
 mandatory `-RepositoryRoot` and `-Baseline` along with any switch the skill
 requires — rather than from a call composed ad hoc or from anything retyped into
-the brief. Read the assigned skill's `## Inputs` before composing the brief; it
-states its exact form, and for `/repo-code-review` who performs the run:
+the brief. When composing a brief for a dispatched skill, read that skill by a
+section-bounded search — such as `Grep '^## (Inputs|Handoff)'` with trailing
+context — of the public sections
+[`skill-skeleton.md`](skill-skeleton.md#section-placement) names, never its
+whole `SKILL.md`. `## Inputs` states its exact form, and for
+`/repo-code-review` who performs the run:
 `.agents/skills/repo-code-review/SKILL.md` `## Inputs` for the `-EmitTargets`
 form, and `.agents/skills/adversarial-review/SKILL.md` `## Inputs` for the plain
 changed-file inventory run.
@@ -96,63 +100,8 @@ work to another worker.
 
 ## Handoffs
 
-A handoff is the short structured result a subagent returns to its manager.
-Return only decision-relevant evidence:
-
-```text
-Status: PASS | NEEDS_ACTION | BLOCKED
-Findings: <review roles and skill-declared verification failures only; one row each: ID Critical|Required|Recommended path:line — claim — evidence>
-Changed files: <one row each, path and region; or none>
-Decisive checks: <one row each, command or read and its result>
-Build required: <exact targets, or none>
-Evidence: <existing or Temp/ path plus selector, or none>
-Executor: <own model id> <own effort>, each unknown when unreadable
-Residuals: <actionable blocker or none>
-```
-
-That fenced form is the whole return — nothing precedes or follows it except the
-extension fields, row forms, and typed blocks the assigned skill's `## Handoff`
-declares — and `Status` carries exactly one of the three tokens alone on its
-line. Every row is one line. Do not quote code and do not repeat a row from
-another field. A field over 10 rows, or a whole handoff over 40 lines or 20,000
-characters, moves its full material to an existing file or log, or to a `Temp/`
-file when no existing file holds it, and cites it under `Evidence` as path plus
-selector. A selector into a Markdown file is a `##` heading in it. The handoff
-itself still carries everything main needs; the file is for the workers main
-dispatches next, cited to them as path plus selector.
-
-Both `Executor` values are what the host reports to the worker itself: the model
-identity the host states in the worker's own context, and the effort from the
-worker's own `CLAUDE_EFFORT` shell environment variable when it is set. Never
-read a session transcript for either value — in a subagent shell,
-`CLAUDE_CODE_SESSION_ID` and the matching transcript under `~/.claude/projects/`
-name the parent session, so that route mis-attributes the parent's model to the
-child. A Codex worker has no runtime source for either value — config and CLI
-pins state intent, not proof — so it writes `unknown`, and headless
-`/codex-review` runs are instead proved by their commit-time wrapper pins. Each
-of the two values is written `unknown` independently when its source is
-unreadable.
-
-A skill extends this form only by adding rows inside an existing field or by
-declaring extra fields in its own `## Handoff` section, each one line or one row
-per item, never a paragraph, and never by re-rendering the form itself.
-`Build required` stays present and `Residuals` stays last. A target that
-`/compile` builds in Release only carries `Release|x64` and no other
-configuration/platform under `Build required`. Independent review and
-verification use a context that did not produce the work. A focused
-correction/retest also uses an independent context.
-
-A worker ends its turn with the handoff as its final answer and never enters an
-open-ended wait after delivering it; continuation goes through the host's resume
-path. Any wait a worker issues mid-task carries a bounded timeout well under the
-host tool cap. Ending a turn to await one's own background child is that
-prohibited open-ended wait: a completion notification cannot resume a worker
-whose turn has ended, so capture the child's result in-turn before delivering
-the handoff.
-
-Main consumes each dispatched worker's handoff once, from the host's own
-delivery of it; it requests that worker's result again only through the
-no-progress and terminal-failure route below.
+The handoff form a worker returns and the field-authoring rules are owned by
+[`subagent-handoff.md`](subagent-handoff.md), `## Handoffs`.
 
 What main does with each field:
 
@@ -164,7 +113,6 @@ What main does with each field:
 | `Decisive checks` | Feed the acceptance table. |
 | `Build required` | Goes to a `builder`. |
 | `Evidence` | Passed on to later workers as path plus selector; main reads it only when a decision needs it, and then only at the cited selector, not the file whole. |
-| `Executor` | Proves routing. |
 | `Residuals` | Go to the message footer or to `/create-follow-up-plans`. |
 
 ## Whether a worker is still running, and interruption

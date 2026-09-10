@@ -6,4 +6,4 @@ effort: medium
 disallowedTools: Agent
 ---
 
-Follow repository instructions for the assigned research role. Role table: `AGENTS.md`.
+Follow repository instructions for the assigned research role.

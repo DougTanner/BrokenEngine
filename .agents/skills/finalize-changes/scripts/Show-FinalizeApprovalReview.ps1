@@ -7,19 +7,18 @@
 # and asks the landing confirmation in the same exchange, so the user can
 # confirm as soon as their review is done. Callers never reconstruct its SmartGit command inline.
 #
-# The landing route always passes -LaunchSmartGit, so a session landing always
-# attempts the launch and the window opens whenever SmartGit is available.
-# Without the switch it only previews the canonical command.
+# The script always attempts the launch, so the window opens whenever SmartGit
+# is available.
 # It runs Git only to expand an abbreviated supplied tip to its full commit ID,
 # and never mutates a ref or claims a lock.
 #
 # Contract: schema broken-engine-finalize-approval-review/v1. Unlike the mutating
-# scripts, every preview/launch outcome exits 0 and none report status pass — the
+# scripts, every launch outcome exits 0 and none report status pass — the
 # review outcome is non-blocking, but the attempt is not: main redirects this single-line
 # stdout to Temp/finalize-approval-review-result.json, and the resumed finalizer passes
 # that receipt path to the landing scripts, which read approvedTip and status from it and
 # refuse to change primary when it does not record an attempted launch for the
-# exact commit being landed. preview is the default;
+# exact commit being landed.
 # opened is the launch success path; unavailable/failed are non-blocking,
 # and the caller copies message and the exact manualCommand into the approval response while keeping the landing gate in
 # force. Only invalid input exits 1, with status error and a code naming the cause
@@ -33,8 +32,7 @@
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $PrimaryWorktree,
-	[Parameter(Mandatory)][string] $ApprovedTip,
-	[switch] $LaunchSmartGit
+	[Parameter(Mandatory)][string] $ApprovedTip
 )
 
 $ErrorActionPreference = 'Stop'
@@ -104,10 +102,6 @@ function Invoke-SmartGit
 	$arguments = @('--log', $script:PrimaryIdentity, "--anchor-commit=$ApprovedTip")
 	$result.arguments = $arguments
 	$result.manualCommand = ((@('&', (ConvertTo-PowerShellLiteral $standardExecutable)) + @($arguments | ForEach-Object { ConvertTo-PowerShellLiteral $_ })) -join ' ')
-	if (-not $LaunchSmartGit)
-	{
-		Complete-Review 0 'preview' 'review.preview' 'SmartGit was not launched; run manualCommand to open the candidate.'
-	}
 	$resolvedExecutable = $null
 	if (Test-Path -LiteralPath $standardExecutable -PathType Leaf)
 	{

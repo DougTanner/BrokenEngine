@@ -35,17 +35,20 @@ findings and fixes land, only the affected files receive a focused re-review.
 
 ## Inputs
 
-- Session baseline (full 40-character SHA) and the changed instruction-doc list,
-  or the diff needed to derive it.
-- The immutable snapshot of those files as changed.
+- `Baseline` — the full 40-character session baseline SHA and the absolute
+  repository toplevel, plus the committed head when the review runs against one.
+- `Scope` — any untracked paths the review must cover.
 
-If the baseline or the changed bytes are unavailable, return `BLOCKED` naming
-the missing input.
+The reviewer derives the changed instruction-doc list itself from those inputs
+and never takes a caller-supplied list or diff in its place.
+
+If the baseline is unavailable, or the change inventory cannot produce the
+changed regions, return `BLOCKED` naming the missing input.
 
 ## Handoff
 
 Return the shared handoff form in
-[`subagent-reporting.md`](../../references/subagent-reporting.md), `## Handoffs`,
+[`subagent-handoff.md`](../../references/subagent-handoff.md), `## Handoffs`,
 with these declared extension lines above `Findings`:
 
 ```text
