@@ -120,8 +120,9 @@ isolation is unchanged.
 - Replaying the recorded pre-read symptom the emitter now exposes still yields a
   finding for a read a later brief lists, and none for a read no later brief in
   the run lists
-- `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1` reports the
-  `validate-skill` and `markdown-links` rows passing for the changed package
+- The static-checks runner, invoked as `.agents/references/static-checks.md`
+  documents it, reports the `validate-skill` and `markdown-links` rows passing
+  for the changed package
 
 ## Notes
 The two neighbouring Plans both leave this script alone:

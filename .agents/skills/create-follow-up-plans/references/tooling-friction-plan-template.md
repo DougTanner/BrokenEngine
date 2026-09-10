@@ -78,6 +78,6 @@ build/bootstrap coordination. Never embed transcript paths or home paths.
 
 ## Acceptance criteria
 - The recorded symptom no longer reproduces under the documented invocation
-- /external-skill-creator validate mode passes wherever the Change Workflow
-  Apply the triggered cleanup step triggers it; plan validate exits 0
+- The static-checks runner, invoked as `.agents/references/static-checks.md`
+  documents it, reports every row the change triggers passing
 ```

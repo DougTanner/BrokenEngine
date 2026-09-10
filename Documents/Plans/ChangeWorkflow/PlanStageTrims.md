@@ -161,7 +161,8 @@ resolvable evidence locator.
   on every audited plan
 - `/plan-simplicity-review` requires no `Temp/` file for an ordinary findings
   run, and each finding still carries one resolvable evidence locator
-- `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1` reports the
-  `validate-skill` and `markdown-links` rows passing for every changed package
+- The static-checks runner, invoked as `.agents/references/static-checks.md`
+  documents it, reports the `validate-skill` and `markdown-links` rows passing
+  for every changed package
 - A mechanism whose stage-1 check failed is unchanged in the diff and named in
   the session's report

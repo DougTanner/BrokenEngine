@@ -154,7 +154,8 @@ changed a tracked file still reaches the checkpoint exactly once.
   `toolResultCount`, and running it against any transcript still returns a
   well-formed envelope whose `verdict` matches its `overThresholdCount`
 - No file under `.agents/` reads a removed member or the numeric row count
-- `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1` reports the
-  `validate-skill` and `markdown-links` rows passing for both changed packages
+- The static-checks runner, invoked as `.agents/references/static-checks.md`
+  documents it, reports the `validate-skill` and `markdown-links` rows passing
+  for both changed packages
 - A mechanism whose stage-1 check failed is unchanged in the diff and named in
   the session's report

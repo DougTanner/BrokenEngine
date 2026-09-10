@@ -199,7 +199,8 @@ rule survives relocation intact; no reference link is left dangling.
   `.agents/skills/next-plan-review/SKILL.md`
 - The headless `/codex-review` routing proof still exists and still names the
   commit-time model and effort pins
-- `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1` reports the
-  `validate-skill` and `markdown-links` rows passing for the changed package
+- The static-checks runner, invoked as `.agents/references/static-checks.md`
+  documents it, reports the `validate-skill` and `markdown-links` rows passing
+  for the changed package
 - Any mechanism whose stage-1 check failed is unchanged in the diff and named in
   the session's report
