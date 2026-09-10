@@ -29,15 +29,32 @@ Per-path and per-line-range `bt-token-v1` counts come from
 `.agents/scripts/Measure-Tokens.ps1`, not from this skill; the root
 [AGENTS.md](../../../AGENTS.md) bundled-script rule owns its invocation form.
 
+## Inputs
+
+Supply these fields on the task brief form in
+[`subagent-reporting.md`](../../references/subagent-reporting.md) `## Task brief`.
+The per-mode invocation sections of [`references/worker.md`](references/worker.md)
+own the exact parameter spellings for `Snapshot`, `Compare`, and
+`BootstrapIdentity`; [`references/HistoryContract.md`](references/HistoryContract.md)
+`## Invocation` owns them for the history modes. Do not restate a command line in
+the brief.
+
+- Mode: `Snapshot`, `Compare`, `BootstrapIdentity`, or the history modes
+  `Contract` and `Generate` (worker `### Snapshot`, `### Compare`,
+  `### Bootstrap identity`, `### History`).
+- Target path and scope kind — `Exact`, `Directory`, or `Recursive` — for
+  `Snapshot` (worker `### Snapshot`).
+- Targets file and full-SHA baseline for `Compare` (worker `### Compare`).
+- Full-SHA base commit and tip commit for `Contract` and `Generate`, plus for
+  `Generate` the UTC date in `YYYY-MM-DD` form and a new output directory
+  beneath `Temp/`.
+- The absolute repository root, which every mode takes.
+
 ## Handoff
 
 Report the result as advisory evidence. Name the scope, coverage omissions, suppression reasons, and
 comparison cohort before interpreting a delta. Do not turn a metric into a landing gate, person
-score, or automatic refactor instruction. Interpret `excessDecisions` as net scope evidence:
-unchanged means only no net decision removal, never redistribution without source-diff evidence. A
-target decrease proves simplification only when the diff shows decision removal and the corpus shows
-no attributable offset elsewhere, or a separately evidenced structural benefit independently
-justifies extraction. It is not an outlier or Phase-0 hint metric.
+score, or automatic refactor instruction.
 
 ## References
 
