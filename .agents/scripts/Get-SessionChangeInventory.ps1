@@ -33,8 +33,11 @@ $script:DualLanguageHeaders = @('shaderlayouts.h', 'shaderlayoutsbase.h', 'shade
 $script:CppClasses = @('cpp', 'dual-language-header')
 # The classes whose addition, deletion, rename, or type change can move a project item.
 $script:SourceMembershipClasses = @('cpp', 'dual-language-header', 'glsl')
+# The changed-file classes that make a landing owe its Review and resolve correctness /coherence-review row.
+$script:CoherenceReviewClasses = @('doc', 'plan', 'script', 'skill', 'vcxproj')
 # One BLOCKED acceptance row per triggered check in this set; this order is the emitted row order.
 $script:AcceptanceSkeletonChecks = [ordered]@{
+	coherenceReview = '/coherence-review'
 	codeStyleReview = '/code-style-review'
 	commentReview = '/comment-review'
 	updateVcxproj = '/update-vcxproj'
@@ -312,6 +315,7 @@ function Get-InventoryGuardSide([string] $Text) {
 function Get-RoutingTrigger([object[]] $Entries) {
 	$classes = [Collections.Generic.HashSet[string]]::new([string[]] @())
 	$membershipClasses = [Collections.Generic.HashSet[string]]::new([string[]] @())
+	$coherenceClasses = [Collections.Generic.HashSet[string]]::new([string[]] @())
 	# Instruction docs span the doc and skill classes, so this one trigger is decided from the paths.
 	$instructionDoc = $false
 	# Any changed file inside a skill package that has a head-side SKILL.md can invalidate that package,
@@ -326,6 +330,11 @@ function Get-RoutingTrigger([object[]] $Entries) {
 	foreach ($entry in $Entries) {
 		[void] $classes.Add($entry.Class)
 		if ($null -ne $entry.OldClass) { [void] $classes.Add($entry.OldClass) }
+		# A deleted Plan file never fires this trigger: /next-plan completion deletes the claimed Plan, and that deletion owes no review row.
+		if (-not ($entry.Status -ceq 'D' -and $entry.Class -ceq 'plan')) {
+			[void] $coherenceClasses.Add($entry.Class)
+			if ($null -ne $entry.OldClass) { [void] $coherenceClasses.Add($entry.OldClass) }
+		}
 		if ($entry.Status -cin @('A', 'D', 'R', 'T')) {
 			[void] $membershipClasses.Add($entry.Class)
 			if ($null -ne $entry.OldClass) { [void] $membershipClasses.Add($entry.OldClass) }
@@ -355,7 +364,9 @@ function Get-RoutingTrigger([object[]] $Entries) {
 	$cpp = $classes.Contains('cpp') -or $classes.Contains('dual-language-header')
 	$glsl = $classes.Contains('glsl') -or $classes.Contains('dual-language-header')
 	$sourceMembership = @($script:SourceMembershipClasses | Where-Object { $membershipClasses.Contains($_) }).Count -gt 0
+	$coherenceReview = @($script:CoherenceReviewClasses | Where-Object { $coherenceClasses.Contains($_) }).Count -gt 0
 	return [ordered]@{
+		coherenceReview = $coherenceReview
 		repoCodeReview = $cpp
 		glslReview = $glsl
 		codeStyleReview = $cpp
