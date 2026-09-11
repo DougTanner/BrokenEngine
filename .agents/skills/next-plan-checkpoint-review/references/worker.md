@@ -117,16 +117,13 @@ are the isolation lens.
     raw script output main only forwarded, evidence pasted inline in a handoff
     instead of cited as path plus selector, or a handoff restating its own
     brief. Size does not gate this: content below the measured threshold still
-    qualifies. Detect the first case by matching paths: in addition to the
-    boundary records opened above, open each other in-span `use Agent` record
-    and read its brief's `Governing paths` and `Scope` fields; take main's read
-    paths from the span's `use Read` rows and any shell row that reads a file,
-    opening a row whose summary the cap truncated to recover its path. A read
-    whose path, compared in repository-relative form regardless of separator, a
-    later brief lists in either field is a finding whose emitter is the skill
-    instruction main was executing when it made that read and whose step 11
-    bounding mechanism is that brief's dispatched role. Done when every such
-    observation in span is either a finding or excluded by step 13.
+    qualifies. Detect the first case from the projection's `match` rows, keeping
+    only those whose own line and `read-at` line both fall inside the step 6
+    span: each names a read path a brief lists. Such a read is a finding whose
+    emitter is the skill instruction main was executing when it made that read
+    and whose step 11 bounding mechanism is that brief's dispatched role. Done
+    when every such observation in span is either a finding or excluded by
+    step 13.
 13. Exclude from isolation, beyond the exclusions below: content main's own
     decision required verbatim, classified `necessary-evidence` under step 10
     whether or not a measured row exists; and a Plan body, execution card, or
