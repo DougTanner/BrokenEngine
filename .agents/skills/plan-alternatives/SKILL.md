@@ -4,12 +4,12 @@ description: >-
   Explore materially different ways to make a change before its plan reviews:
   dispatch blind, one-shot `researcher` workers on fixed axes, compare their
   candidates against the drafted approach, and ask the user only when a
-  candidate is clearly better. Use at the Change Workflow Prepare and explore
-  alternatives step when the change adds new code or modifies non-documentation
-  behavior (/plan-simplicity-review `## When to use` defines both), and from a
-  /next-plan claim once the Plan is verified. A new Collection, manager, or
-  subsystem API routes to /external-design-interface instead, and a saved but
-  unclaimed Plan waits for its claim.
+  candidate is clearly better. Use when the change adds new code or modifies
+  non-documentation behavior (/plan-simplicity-review `## When to use`
+  defines both), both at the Change Workflow Prepare and explore alternatives
+  step and from a /next-plan claim once the Plan is verified. A new
+  Collection, manager, or subsystem API routes to /external-design-interface
+  instead, and a saved but unclaimed Plan waits for its claim.
 allowed-tools: [Read, Grep, Glob, Agent, AskUserQuestion]
 ---
 
@@ -30,7 +30,7 @@ reports that the original stands or puts a clearly better candidate to the user.
   [`../plan-simplicity-review/SKILL.md`](../plan-simplicity-review/SKILL.md)
   `## When to use` fires — minus that skill's `/save-plan` save-time dispatch.
 - From a `/next-plan` claim, after the preparation `implementer` verifies the
-  Plan and before the Plan review reviewers.
+  Plan and before the Plan review reviewers, whenever that same trigger fires.
 - Not for a new Collection, manager, or subsystem API: `/external-design-interface`
   already produces three designs and replaces this skill for that case.
 - Not from a saved but unclaimed Plan; such a Plan gets this step when it is

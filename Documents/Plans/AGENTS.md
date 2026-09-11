@@ -10,12 +10,12 @@ An executable plan starts at byte zero with exactly one metadata line:
 
 Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn` is a unique ordinal-sorted list of normalized `Documents/Plans/**/*.md` paths. Every plan document in this tree carries the marker; a missing marker — including one preceded by a BOM, so it is not at byte zero — is a validation error naming the file. `AGENTS.md` and `CLAUDE.md` are exempt at every level of the tree and must never carry metadata.
 
-WorktreeCli is the only component that parses the scheduler and changes claims. It selects the newest eligible executable plan by `(createdUtc descending, normalized path)`. Existing valid dependencies block a child; a missing dependency is a satisfied stale edge reported as a notice. Invalid metadata and dependency cycles exclude only the affected plans from selection, so unrelated plans remain claimable. An excluded plan is one left out of selection — because its metadata is invalid, its dependencies form a cycle, or it is not present and valid at the primary tip — without affecting other plans.
+WorktreeCli is the only component that parses the scheduler and changes claims. It selects the newest eligible executable plan by `(createdUtc descending, normalized path)`. Existing valid dependencies block a child; a missing dependency is a satisfied stale edge reported as a notice. A plan is excluded from selection — left out without affecting other plans, which stay claimable — when its metadata is invalid, its dependencies form a cycle, or it is not present and valid at the primary tip.
 
 For a scheduler health check, run
-`pwsh -NoProfile -File .agents/scripts/Test-PlanSchedulerState.ps1` — it folds `plan validate` into a compact status/diagnostics result; never run a raw whole-tree `plan validate`, whose result lists every Plan and floods a session context.
+`pwsh -NoProfile -File .agents/scripts/Test-PlanSchedulerState.ps1` — it folds `plan validate` into a compact status/diagnostics result; never run a raw whole-tree `plan validate`, whose result lists every Plan and floods a session context. To validate one Plan, run `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe plan validate --lint-only --plan <normalized Plan path> --repo <absolute Git common directory> --worktree <session worktree root>`. The named Plan is valid when it appears in `plans`, which holds only that Plan; a present-but-invalid Plan still exits 0 with an empty `plans` array, an absent or untracked one exits 2 with `plan-not-found`, and `status`, `code`, and `diagnostics` describe the whole tree.
 
-`/next-plan` validates then uses `plan claim-next`. Claims are PC-local, one per session, fixed at 48 hours, and self-heal after expiry/orphaning. An orphaned claim is one whose owning session or worktree no longer exists; self-healing means such a claim is released automatically after expiry. Deferral is `plan unclaim`, which makes the plan immediately eligible again.
+`/next-plan` validates then uses `plan claim-next`. Claims are PC-local, one per session, and fixed at 48 hours; a claim whose owning session or worktree no longer exists is orphaned, and self-healing releases an expired or orphaned claim automatically. Deferral is `plan unclaim`, which makes the plan immediately eligible again.
 
 Completion uses `plan complete`; explicit rejection uses `plan reject --user-authorized-rejection`. Preparation removes direct child metadata edges and deletes the target in the Git worktree. After landing succeeds, the claim is deleted.
 
@@ -28,10 +28,10 @@ Plans live in area subdirectories, never directly at `Plans/`. The area is decid
 - `Tools/` — the C++ tools under `Tools/`: WorktreeCli, AgentHarness, ToolCommon.
 - `ChangeWorkflow/` — how agents work rather than what the product does: the root `AGENTS.md`, `.agents/`, `.claude/`, `.codex/`, skills and their scripts, the wrapper and scheduler scripts, and this file.
 
-A plan whose named files span areas goes to the area owning most of them; a tie stays in `Engine/`.
+A plan spanning areas goes to the area owning most of its named files; a tie stays in `Engine/`.
 
 An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
 
-The two scope sections are the control the finished change is measured against: the Review and resolve correctness step's review of each changed artifact type treats a changed region no `## In scope` clause covers, or one an `## Out of scope` line names, as unauthorized. A boundary written vaguely is a boundary that cannot be enforced.
+The two scope sections are the control the finished change is measured against, so write each boundary precisely enough to enforce: the Review and resolve correctness step's review of each changed artifact type treats a changed region no `## In scope` clause covers, or one an `## Out of scope` line names, as unauthorized.
 
-A document presenting options rather than a decision-complete implementation does not belong here; it belongs in `../Investigations/` (see `../Investigations/AGENTS.md`) until the decision exists. Work blocked on another change expresses that as a `dependsOn` edge, which the scheduler already honours; work blocked on a decision is not a Plan yet.
+A document presenting options rather than a decision-complete implementation belongs in `../Investigations/` (see `../Investigations/AGENTS.md`) until the decision exists. Work blocked on another change expresses that as a `dependsOn` edge; work blocked on a decision is not a Plan yet.

@@ -69,9 +69,11 @@ The `argument-hint` value selects the Plan:
    main as a card correction rather than an edit.
 
    Main writes that brief from the claimed Plan's own citations — path plus
-   line range — and leaves reading the target source to the dispatched
-   `implementer`, reading source itself only for a decision it must make that
-   the Plan and the returned handoff cannot settle.
+   line range — and leaves reading both the target source and the handoff
+   and reporting references the brief cites to the dispatched `implementer`,
+   naming those references as paths only, and reading source itself only
+   for a decision it must make that the Plan and the returned handoff cannot
+   settle.
 
    The brief bounds the card's verification evidence: no verbatim source
    text, except an acceptance item whose purpose is proposed replacement
@@ -87,9 +89,10 @@ The `argument-hint` value selects the Plan:
    the preparation `implementer` write the complete resolved Plan—its
    mechanism, corrections, the claimed Plan's `## In scope` and `## Out of
    scope` sections copied verbatim as top-level headings with their content
-   intact, and the complete execution card—cite its path plus `## Execution
-   card` selector under `Evidence` for the Plan review reviews, and, before
-   returning that handoff, run
+   intact, and the complete execution card—into one gitignored `Temp/` file
+   addressed by its path from the worktree root, cite that path plus
+   `## Execution card` selector under `Evidence` for the Plan review reviews,
+   and, before returning that handoff, run
 `pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <snapshot path>`
    and report that result's `headings.inScopePresent` and
    `headings.outOfScopePresent` values as one `Decisive checks` row.
@@ -210,7 +213,9 @@ on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
 without an approval question; on Claude Code and every other host as rendered
 message text whose approval question is the last thing before the
 `Follow-up Plans created:` footer, after which the user's next message is the
-decision. Any revision is a new complete replacement presentation.
+decision. Any revision is a new complete replacement presentation. When the
+approved presentation differs from the execution card, main updates the card
+to the approved scope before the run continues.
 
 When preparation shows the problem the Plan describes is gone, ask the user
 whether to retain the Plan or to explicitly authorize obsolete final cleanup.
@@ -236,8 +241,12 @@ deferral, unknown claim state, or work still to land — never prints that line.
   run.
 - Never create or adopt a worktree, or inspect machine-local claims directly.
 - Which reviewer runs at which tier is the Plan review step of
-  [change-workflow.md](../../references/change-workflow.md); Tier 3 additionally follows
-  [tier3-workflow.md](references/tier3-workflow.md). Missing a mandatory reviewer blocks.
+  [change-workflow.md](../../references/change-workflow.md); Tier 3
+  additionally follows [tier3-workflow.md](references/tier3-workflow.md).
+  Missing a mandatory reviewer blocks. When the preparation handoff reports an
+  empty realized change, the run goes from preparation straight to this file's
+  `### Implementation approval` route, at any tier, without reaching the Plan
+  review step.
 - An affirmative response approves only the latest unchanged presentation. A
   meaningful Plan, card, scope, invariant, acceptance, or decision change
   requires a new complete presentation.
@@ -247,6 +256,21 @@ deferral, unknown claim state, or work still to land — never prints that line.
   requires an explicit user instruction given in the current session, recorded
   in the handoff; nothing else unlocks it. Deferral never touches the worktree,
   so uncommitted implementation work stays exactly as it is.
+- When preparation or a harness run shows that a runtime acceptance criterion of
+  the claimed Plan can be settled only by reading values off rendered pixels,
+  because no harness query exposes them, the pixel-evidence prohibition in
+  `/agent-harness` `## Handoff` binds main too: never settle it from a
+  screenshot yourself. Report the gap and, on the explicit user deferral
+  instruction the bullet above requires, act in this order: file the missing
+  query as a follow-up Plan through `/create-follow-up-plans`, citing the
+  harness command documentation that exposes no such query and naming the
+  values the client already computes and the narrowest query that would expose
+  them; add that Plan's normalized path to the claimed Plan's `dependsOn`
+  through that skill's existing-Plan dependency-change case; then defer. That
+  Plan and the `dependsOn` edit are already in the worktree when the checkpoint
+  runs and are the followup-only landing gate's content under the deferred row
+  in `### Post-checkpoint outcomes`. Deferral is not waiver: the criterion
+  stays unmet and the Plan stays unimplemented in the tree.
 - Resuming retained work needs an explicit user resume instruction given in the
   current session, recorded in the handoff, and then the targeted claim with
   `-ResumeRetained` appended:

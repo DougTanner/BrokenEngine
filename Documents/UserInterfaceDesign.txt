@@ -106,7 +106,7 @@ and text line boxes may include padding or font bearings the player never sees.
 They can diagnose a layout, but only the rendered result can validate it.
 
 Files:
-  Engine/Source/Ui/Screens/AGENTS.md  "Shared Authoring Rules"  (the three-rule standard)
+  Engine/Source/Ui/Screens/AGENTS.md  "Shared Authoring Rules"  (consumer; links here, where the standard is owned)
   Engine/Source/Ui/MenuUtils.cpp:253  float MenuButtonsWidth(...)  (text-driven width precedent)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:152  float HudScreen::PanelWidth()
 
@@ -333,7 +333,7 @@ Screen-specific commitments this contract makes, each verified visually:
 Files:
   Engine/Source/Ui/MenuUtils.cpp:204  ComputeMouseOpennessTarget (fixed-extent hover zone)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:138-139  (left/right hover targets)
-  Engine/Source/Ui/Screens/AGENTS.md  (standard menu layout notes)
+  Engine/Source/Ui/Screens/AGENTS.md  (consumer; links to this document for layout)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md  (HUD layout notes)
 
 

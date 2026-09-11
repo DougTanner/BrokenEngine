@@ -71,10 +71,10 @@ undecided refutations are non-passing.
 
 For builds, require the authoritative `broken-engine-build-result/v1`: intended
 target/selection/arguments, status/exit/failure kind, complete retained log,
-decisive diagnostics, and all requested targets. Game builds additionally
-require data mode, generation authority, Gaea outcome, and normalized paths;
-their data evidence is that same envelope reporting success with wrapper exit
-`0`. Do not accept schema/result/exit mismatches.
+decisive diagnostics, and all requested targets. A game build additionally
+requires the complete `/compile` handoff for that build, the envelope file it
+cites, and any mode-divergence `Decisive checks` row it returned, reporting
+success. Do not accept schema/result/exit mismatches.
 
 Skill changes require a complete `/external-skill-creator` findings-only
 validate-mode handoff with mechanical self-check, target validator exit/output,

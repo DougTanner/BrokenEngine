@@ -60,8 +60,10 @@ File: Engine/Source/Frame/FrameBase.cpp
 ------------------
 Physics runs at a fixed 32 Hz (31.25 ms per tick). Variable frame
 rates only affect rendering interpolation, never simulation state.
-Death spiral prevention caps the accumulator at 4 ticks and limits
-processing to 12 ticks per frame.
+Death spiral prevention caps the accumulator at 4 ticks on both
+client and server. Before that clamp, a Debug-build server that
+estimates more than 12 ticks for the frame also halves a time
+multiplier above 1.
 
 File: Engine/Source/Frame/TimeStep.h
   inline constexpr int64_t kiTickRate = 32;

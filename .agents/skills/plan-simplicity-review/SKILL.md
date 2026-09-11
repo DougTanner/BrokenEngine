@@ -94,11 +94,6 @@ always the only finding in the report.
 
 Its row states what replaces the plan — nothing, or a much smaller change.
 
-For a run with findings, the Q1 occurrence/likelihood classification and its
-supporting detail, the full Q2 cost comparison, and the per-question judgment
-notes travel in a gitignored `Temp/` file, under one `## PSR-F-###` heading per
-finding, cited under `Evidence`. The handoff does not restate them.
-
 Return:
 
 ```text

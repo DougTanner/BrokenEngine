@@ -14,7 +14,8 @@ plus the session's residue removed and semantic candidates routed to the caller.
 
 ## When to use
 
-- After session C++ changes, as the Change Workflow cleanup step.
+- After session C++ changes, at the Change Workflow Run targeted pre-review
+  checks step.
 - For a requested C++ style, naming, or formatting cleanup over a scope the
   caller supplies.
 - Not for shader-only or non-C++ changes, and not for behavior or interface

@@ -52,7 +52,7 @@ that records the settling observation. Loading an image into context is a
 deliberate act for a check that genuinely needs pixels, and the report names
 which check and why.
 
-If a required command, parameter, result field, query, or input primitive is missing, return that criterion `BLOCKED`. Name the missing capability and the narrowest harness extension that would expose it. The main agent decides whether the authorized change includes that extension or whether user authority/criterion revision is required. Never fake state with pixel guessing or log scraping, create an out-of-scope runtime edit, waive the gate with a follow-up plan, or silently skip the criterion.
+If a required command, parameter, result field, query, or input primitive is missing, return that criterion `BLOCKED`. Name the missing capability and the narrowest harness extension that would expose it. The main agent decides whether the authorized change includes that extension or whether user authority/criterion revision is required; when the blocked criterion belongs to a claimed Plan and the values it needs appear only in rendered pixels, that decision follows the screenshot-only deferral rule in [`../next-plan/SKILL.md`](../next-plan/SKILL.md), which defers the Plan rather than waiving the criterion. Never fake state with pixel guessing or log scraping, create an out-of-scope runtime edit, waive the gate with a follow-up plan, or silently skip the criterion.
 
 Return the shared handoff form in
 [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),

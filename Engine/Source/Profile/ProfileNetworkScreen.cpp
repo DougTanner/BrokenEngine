@@ -296,6 +296,13 @@ void ProfileManagerBase::SetClockCorrection(int64_t iOffset, int64_t iTargetBehi
 	mSmoothedClockError.Update();
 }
 
+void ProfileManagerBase::GetClockCorrection(int64_t& riOffset, int64_t& riTargetBehind, int64_t& riError)
+{
+	riOffset = mSmoothedClockOffset.Get();
+	riTargetBehind = mSmoothedClockTarget.Get();
+	riError = mSmoothedClockError.Get();
+}
+
 void ProfileManagerBase::SetReconcileCounters(int64_t iCrcValidated, int64_t iAssumed, int64_t iCrcFastPath, int64_t iStatusChangeReplay, int64_t iKnockOnReplay)
 {
 	mCrcValidatedTicksPerSecond.Set(iCrcValidated);

@@ -21,8 +21,8 @@ main's recorded handoff line.
 
 | Measurement state | Reviewer summary line | Handoff line recorded |
 | --- | --- | --- |
-| `pass` envelope | `0` | `Context-efficiency follow-ups: <isolation-lens Plan path(s) or none>` |
-| `needs-review` envelope, untruncated | the count of rows at or over threshold | `Context-efficiency follow-ups:` Plan path(s) or none, from the reviewer's findings |
+| `pass` envelope | `pass` | `Context-efficiency follow-ups: <isolation-lens Plan path(s) or none>` |
+| `needs-review` envelope, untruncated | `needs-review` | `Context-efficiency follow-ups:` Plan path(s) or none, from the reviewer's findings |
 | blocked or error envelope | `skipped (<code>)` | `Context-efficiency follow-ups: blocked (<code>), then any isolation-lens Plan path(s)` |
 | `breachRowsTruncated: true` envelope | `skipped (breach-rows-truncated)` | `Context-efficiency follow-ups: blocked (breach-rows-truncated), then any isolation-lens Plan path(s)` |
 | transcript unresolvable, unreadable, or `transcript.not-found` | `none (BLOCKED handoff)` — the reviewer returns `BLOCKED` for the whole review and carries no summary block | `blocked (transcript-unavailable)` on both `Friction follow-ups:` and `Context-efficiency follow-ups:`, routed through the post-checkpoint rule below |

@@ -76,7 +76,7 @@ Then the summary block:
 
 ```text
 Run checkpoint: <claimed Plan path or no claim>
-Rows at or over threshold: <count | skipped (<code>) | skipped (breach-rows-truncated)>
+Context-efficiency verdict: <pass | needs-review | skipped (<code>) | skipped (breach-rows-truncated)>
 ```
 
 A `BLOCKED` handoff for the whole review carries no summary block at all: it
@@ -85,13 +85,16 @@ reason.
 
 Use the shared handoff's `Status: PASS` when no lens yields a finding under its
 precision guard. A `necessary-evidence` row does not count toward the
-`NEEDS_ACTION` decision. For the `Rows at or over threshold:` line, report a
-numeric count only after inspecting a measured envelope — `0` for a `pass`
-envelope, where no row is at or over the threshold; report `skipped (<code>)`
-naming the blocked or error code the measurement returned; and report
-`skipped (breach-rows-truncated)` for a truncated measurement. The handoff
-extends the block in `../../references/subagent-handoff.md`, keeping
-`Build required` and `Residuals` last.
+`NEEDS_ACTION` decision. For the `Context-efficiency verdict:` line, test the
+measurement state defined by `## Measurement states` in
+`../next-plan/references/run-checkpoint.md`, taking the two `skipped` forms
+first: report `skipped (<code>)` naming the blocked or error code the measurement
+returned; report `skipped (breach-rows-truncated)` for a truncated measurement;
+otherwise echo the measured envelope's `verdict` verbatim
+(`pass` | `needs-review`). The two `skipped` forms come first because a truncated
+envelope also carries `verdict: needs-review`. The handoff extends the block in
+`../../references/subagent-handoff.md`, keeping `Build required` and `Residuals`
+last.
 
 ## References
 

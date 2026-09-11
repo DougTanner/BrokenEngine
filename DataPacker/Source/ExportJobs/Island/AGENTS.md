@@ -14,6 +14,8 @@ Each accepted leaf's downsampled elevation is edge-tapered before it is written:
 
 With `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1`, a dirty route fails before launching Gaea. Clean route caches remain usable.
 
+Island discovery, route cache inspection, clean early returns, and split-only re-splits must all succeed with Gaea uninstalled. A route whose raw bake is dirty fails with Gaea uninstalled, before any of its dirty-stage work begins.
+
 ## Island Outputs
 
 Each complete leaf produces a `kIsland` chunk plus independently routed BC texture intermediates for color, normals, ambient occlusion, and the RGBA material mask. The mask channels are rock, sand, snow, and flow. Texture filenames and formats are producer/consumer contracts; update the runtime shader and upload expectations with any change.

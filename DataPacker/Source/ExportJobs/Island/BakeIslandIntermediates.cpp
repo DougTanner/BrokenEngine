@@ -2,7 +2,6 @@
 
 #include "BakeIslandIntermediatesInternal.h"
 #include "FileManager.h"
-#include "GaeaArchetype.h"
 
 namespace
 {
@@ -137,7 +136,7 @@ void RemoveNonRouteSubFolders(const std::filesystem::path& rIslandFolder, const 
 	}
 }
 
-void BakeOne(const std::filesystem::path& rGaeaExecutable, const std::filesystem::path& rIslandFolder)
+void BakeOne(const std::filesystem::path& rIslandFolder)
 {
 	std::filesystem::path islandJsonFile = rIslandFolder / "Island.json";
 
@@ -255,7 +254,6 @@ void BakeOne(const std::filesystem::path& rGaeaExecutable, const std::filesystem
 
 	IslandBakeContext context
 	{
-		.rGaeaExecutable = rGaeaExecutable,
 		.rIslandFolder = rIslandFolder,
 		.rCacheIslandFolder = cacheIslandFolder,
 		.rArchetypeFile = archetypeFile,
@@ -344,10 +342,8 @@ void BakeIslandIntermediates()
 
 	std::sort(islandFolders.begin(), islandFolders.end());
 
-	std::filesystem::path gaeaExecutable = ResolveGaeaExecutable();
-
 	for (const std::filesystem::path& rIslandFolder : islandFolders)
 	{
-		BakeOne(gaeaExecutable, rIslandFolder);
+		BakeOne(rIslandFolder);
 	}
 }

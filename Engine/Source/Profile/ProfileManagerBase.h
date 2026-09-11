@@ -379,6 +379,8 @@ public:
 	void RenderImPlotGraphs();
 
 	void SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError);
+	// Returns the same smoothed values FormatNetworkClock prints; iTargetBehind stays positive, as stored.
+	void GetClockCorrection(int64_t& riOffset, int64_t& riTargetBehind, int64_t& riError);
 	void SetReconcileCounters(int64_t iCrcValidated, int64_t iAssumed, int64_t iCrcFastPath, int64_t iStatusChangeReplay, int64_t iKnockOnReplay);
 #endif // BT_CLIENT
 

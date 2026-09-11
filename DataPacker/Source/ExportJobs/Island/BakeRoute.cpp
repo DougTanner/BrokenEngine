@@ -221,7 +221,7 @@ void RemoveOrphanedLeafFolders(const std::filesystem::path& rRouteDir, int64_t i
 // archetype, runs Gaea.Swarm once at full texturePixels into a staging directory, then verifies the
 // staged raw outputs exist. The caller publishes them and stamps the sentinel. Called only when
 // IsGaeaRawDirty.
-void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rRoute, const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rStagingDirectory, const std::filesystem::path& rPatchedArchetypeFile)
+void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rRoute, const std::filesystem::path& rGaeaExecutable, const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rStagingDirectory, const std::filesystem::path& rPatchedArchetypeFile)
 {
 	LOG(kDefault, kDebug, "Baking island route \"{}\" (Gaea export; archetype: \"{}\", seed: {}, texturePixels: {}, Route Choice: {})", rRouteDirectory.string(), rContext.rArchetypeFile.string(), rContext.iSeed, rContext.iTexturePixels, rRoute.iGaeaChoice);
 
@@ -267,7 +267,7 @@ void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rR
 	// helper. argv[0] is the executable's own path. --seed is dropped (per-node seeds were patched
 	// into the archetype). Gaea bakes the patched copy in this route's staging directory.
 	std::wstring commandLine;
-	commandLine += L"\"" + rContext.rGaeaExecutable.native() + L"\"";
+	commandLine += L"\"" + rGaeaExecutable.native() + L"\"";
 	commandLine += L" --silent";
 	commandLine += L" --Filename \"" + rPatchedArchetypeFile.native() + L"\"";
 	commandLine += L" --buildpath \"" + rStagingDirectory.native() + L"\"";
@@ -286,7 +286,7 @@ void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rR
 	{
 		throw std::runtime_error("Gaea.Swarm export blocked by BT_DATAPACKER_FORBID_GAEA_EXPORT=1");
 	}
-	common::ExecutableResult result = common::RunExecutableInNewConsole(rContext.rGaeaExecutable, commandLine);
+	common::ExecutableResult result = common::RunExecutableInNewConsole(rGaeaExecutable, commandLine);
 
 	if (result.miExitCode != 0)
 	{
@@ -604,6 +604,14 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 		return;
 	}
 
+	// Resolve Gaea only for a route whose raw bake is dirty, and ahead of the dirty-stage mutations
+	// below, so a missing executable leaves this route's version markers and staging untouched.
+	std::filesystem::path gaeaExecutable;
+	if (bGaeaDirty)
+	{
+		gaeaExecutable = ResolveGaeaExecutable();
+	}
+
 	std::filesystem::create_directories(intermediatesDirectory);
 	// Invalidate split completion before either stage mutates its inputs. A crash after a raw re-bake
 	// or midway through overwriting existing leaves must force the split to run again next launch.
@@ -621,7 +629,7 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 		std::filesystem::remove_all(stagingDirectory);
 		std::filesystem::create_directories(stagingDirectory);
 		std::filesystem::path stagingPatchedArchetypeFile = stagingDirectory / kpcPatchedArchetypeFile;
-		RunGaeaExport(rContext, rRoute, routeDirectory, stagingDirectory, stagingPatchedArchetypeFile);
+		RunGaeaExport(rContext, rRoute, gaeaExecutable, routeDirectory, stagingDirectory, stagingPatchedArchetypeFile);
 
 		std::filesystem::remove(intermediatesDirectory / kpcBakeVersionFile);
 		std::filesystem::remove(intermediatesDirectory / kpcSplitVersionFile);

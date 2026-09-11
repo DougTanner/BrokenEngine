@@ -57,7 +57,6 @@ struct RouteSubdivision
 // All members are caller-owned references; the context outlives its consumers.
 struct IslandBakeContext
 {
-	const std::filesystem::path& rGaeaExecutable;
 	const std::filesystem::path& rIslandFolder;
 	const std::filesystem::path& rCacheIslandFolder;
 	const std::filesystem::path& rArchetypeFile;

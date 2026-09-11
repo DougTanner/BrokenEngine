@@ -50,15 +50,7 @@ Require the shared handoff form in
 - `Root cause` — up to seven rows, in time order, each
   `<event> | <evidence> | <session ID> <timestamp or record>`.
 - `Assessment` — one row per assessed concern,
-  `<concern> | <verdict> | <one-sentence basis> | <citation>`, ending with the
-  alternative-explanation answer.
-- `Control-work evidence` — one row per agent/session in the
-  `references/report.md` control-work table's column order, totals only, plus
-  the citation for each total.
-- `Model-routing evidence` — one row per direct child/headless attempt in the
-  `references/report.md` routing table's column order; attempts sharing route,
-  configuration, proof source, and verdict may share one row that lists every
-  attempt's citation; then one aggregate row.
+  `<concern> | <verdict> | <one-sentence basis> | <citation>`.
 
 The shared `Decisive checks` rows carry provenance, sessions read, sourced
 timeline, pauses, and conformance, minimality, and process evidence. Each

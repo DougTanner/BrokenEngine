@@ -20,7 +20,7 @@ loops or unexplained waits.
 
 Before assessing concerns 4, 5, and 6 below, read
 [`measurement.md`](measurement.md) for the main-session token-efficiency
-measurement, the control-work classification and measurement calculus, and the
+measurement, the control-work classification, and the headless
 execution-model routing rules those three concerns apply.
 
 This audit does not code-review the implementation, infer defects or failure
@@ -58,12 +58,12 @@ Assess in this order:
    skill surface, brief assembly, handoff volume, direct main work, and
    repeats. Every finding carries the emitter, measured chars, and replacement
    that section requires.
-5. Execution-model routing: inventory and verify every direct child/headless
-   attempt using the concern-first classification, allowed evidence chains,
-   and verdict rules in `measurement.md`.
-6. Control-work share: classify and measure active agent-time using the rules in
-   `measurement.md`; distinguish required controls from removable
-   candidates before treating the burden as waste.
+5. Execution-model routing: verify every headless `/codex-review` attempt using
+   the concern-first classification, allowed evidence chain, and verdict rules
+   in `measurement.md`.
+6. Control-work classification: classify control work and label each control
+   using the rules in `measurement.md`; distinguish required controls from
+   removable candidates before treating the burden as waste.
 7. Process overhead: reconcile count, landing-phase active time, duplicate
    validations, and unchanged-input rebuild/review/verification.
 8. Isolation and landing: wrapper/claim evidence when applicable,
@@ -74,10 +74,23 @@ Assess in this order:
 
 Never label repetition from identical landed bytes alone. A repetition or
 control-removal recommendation requires proof that code, external state,
-evidence inputs, and governing contract were unchanged, plus measured cost,
-signal gained, and safety risk of removal. A control not firing once is not
-removal evidence. Prioritize from demonstrated impact and risk; no repetition,
-extra reconcile, or elapsed-time threshold is automatically P0.
+evidence inputs, and governing contract were unchanged, plus cited observed
+burden and frequency, signal gained, and safety risk of removal. A control not
+firing once is not removal evidence. Prioritize from demonstrated impact and
+risk; no repetition, extra reconcile, or elapsed-time threshold is automatically
+`Critical`. Rank proven `candidate removable` control work by cited observed
+burden and frequency, unique signal, and safety risk: higher burden and
+frequency, lower unique signal, and lower safety risk rank first, ahead of
+recommendations that add or retain control work. A demonstrated higher-risk
+`Critical` issue may outrank such a removal; otherwise do not let a required-control or new-rule
+recommendation displace proven lowest-value removable control work.
+
+Keep findings separate from recommendations, and omit empty recommendations
+rather than manufacturing work. Each minimality recommendation names the
+unnecessary mechanism, a simpler removal or consolidation alternative, and why it
+preserves governing scope and required invariants. Explain the safety tradeoff
+of weakening any tier-required control. A proposed rule weighs per-change cost
+against how often the problem fires.
 
 Carry an improvement forward only when this landing's evidence supports it
 directly, the signal is durable rather than one session's stylistic preference,

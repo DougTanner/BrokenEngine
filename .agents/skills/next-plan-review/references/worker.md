@@ -126,15 +126,8 @@ step owns.
    - Flag a Codex turn forked with the conversation context carried along unless
      it is the smallest positive fork and gives a concrete reason authoritative
      conversation text could not safely be summarized.
-   - Answer this one question as part of the same analysis:
-     `Which reasonable alternative explanation for the recorded workflow outcome is not tested by the current evidence, and what existing artifact would confirm or refute it? Return none when every material explanation is already covered.`
    - Reconstruct and assess the nine concerns defined in
-     [`concerns.md`](concerns.md), then write the report on the template in
-     [`report.md`](report.md).
-   - Those nine concerns are 1 governing-scope conformance, 2 solution
-     minimality, 3 workflow coverage, 4 token efficiency, 5 execution-model
-     routing, 6 control-work share, 7 process overhead, 8 isolation and landing,
-     9 speed.
+     [`concerns.md`](concerns.md).
    - Measure the main session's context entries per
      [`measurement.md`](measurement.md) `## Measure main-session token
      efficiency` before assessing concern 4.
@@ -147,9 +140,6 @@ step owns.
 9. Validate the assembled evidence before returning it.
    - Confirm the decisive cited ranges against Git and repository artifacts; do
      not reread whole transcripts.
-   - The per-agent control-work rows and the per-route `Model-routing evidence`
-     rows are what let the parent confirm cited ranges and commit-time
-     model/effort configuration artifacts without rereading transcripts.
    - Done when every decisive cited range is confirmed against Git or reported
      unverified.
 
@@ -168,8 +158,7 @@ step owns.
   apply unchanged.
 - Waived in bounded friction mode and nowhere else: Step 5's routing inventory —
   inspect the proven parent alone; every other requirement in Steps 7-9,
-  including delegation-event inspection, the handoff extension lines, and the
-  per-agent and model-routing evidence; all of [`concerns.md`](concerns.md); and
-  all of [`report.md`](report.md). Return the standard handoff from
+  including delegation-event inspection and the handoff extension lines; and all
+  of [`concerns.md`](concerns.md). Return the standard handoff from
   `.agents/references/subagent-handoff.md` carrying only the provenance verdict,
   the cited root cause of the named friction, and the fix it implies.

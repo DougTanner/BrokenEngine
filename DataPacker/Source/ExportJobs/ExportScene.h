@@ -39,12 +39,13 @@ protected:
 
 	virtual std::string GetInputFingerprint() const override;
 	virtual void Export() override;
+	virtual void UpdateCacheMetadata() override;
 
 private:
 
 	tinygltf::Model LoadGltfModel();
 	std::filesystem::path GetPreExportMarkerPath() const;
-	std::optional<int64_t> ReadPreExportMarkerVersion() const;
+	std::optional<std::string> GetPreExportFingerprint() const;
 	std::filesystem::path GetTextureIntermediatePath(int64_t iTextureIndex, VkFormat vkFormat) const;
 	std::filesystem::path GetTextureIntermediateStagePath(size_t uiStageIndex) const;
 

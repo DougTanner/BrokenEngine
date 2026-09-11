@@ -56,7 +56,7 @@ For Tier 1 and Tier 2, the user's request is the approval. Classify the work, ma
 
 Definitions:
 
-- Execution card — the pre-implementation record the Step 2 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits.
+- Execution card — the pre-implementation record the Step 2 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits; after approval it carries the approved scope before any dispatch cites the card.
 - Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
 - Wrapper session — session started through `.claude/claude-worktree.sh` or `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude, `-ReattachWorktree <path>` for Codex; never adopt an arbitrary worktree.
@@ -106,9 +106,10 @@ Main splits the work into disjoint slices where possible. Review-fix exceptions 
 
 #### Step 5 — Run targeted pre-review checks
 
-Order: the full applicable static pass runs after propagation; each `Build required` handoff compiles as it arrives and may run in parallel with that pass. Focused implementation self-checks remain inside the implementation slices.
+Order: the full applicable static pass and `/code-style-review` run after propagation; each `Build required` handoff compiles as it arrives and may run in parallel with the static pass, except that when the change touches C++ the pre-review build waits for `/code-style-review`. Focused implementation self-checks remain inside the implementation slices.
 
 - `implementer` runs the full applicable static pass in `.agents/references/static-checks.md` after propagation — every tier, when the change touches C++ or GLSL; main cites that reference in the brief's `Governing paths` and the `implementer` reads it there. Otherwise main runs the one documented command in that reference itself.
+- `mechanic` runs `/code-style-review` — for changed C++; a later `/resolve-findings` round that changes C++ re-runs it over the newly changed ranges before that round's `Build required` handoff compiles.
 - `builder` runs `/compile` — every `Build required` handoff, before the covered work advances.
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
@@ -133,7 +134,6 @@ Main dispatches one fresh `reviewer` per changed artifact type, plus the `mechan
 
 Order: all run in parallel, except `/progressive-disclosure-review` runs after `/update-claude-docs` so the prose that step generates is in scope.
 
-- `mechanic` runs `/code-style-review` — for changed C++.
 - `mechanic` runs `/update-vcxproj` — for changes to file membership or to which executable a whole file belongs to.
 - fresh `reviewer` runs `/external-skill-creator` in findings-only validate mode — when the session changed any file in a `.agents/skills/*/` package that has a `SKILL.md`; where the Step 6 combined pass applies it runs inside that pass instead of its own dispatch.
 - `implementer` runs `/update-claude-docs` — after C++ or GLSL changes.

@@ -472,10 +472,12 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const S
 	// Always consume random for determinism, even if fFrameChangeTimer is pre-set
 	float fRandomTimer = 15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine);
 	rCurrentPostRender.pfFrameChangeTimers[iIndex] = (rInfo.fFrameChangeTimer > 0.0f) ? rInfo.fFrameChangeTimer : fRandomTimer;
+	// Entering a frame is a fresh spawn for navigation, cross-frame transfers included: the wanted direction comes from the
+	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows flagship via proximity
 	PlayerFlags_t spawnFlags = rInfo.flags;
 	SetNavDirection(spawnFlags, (rInfo.flags & kIsFlagship) ? static_cast<int8_t>(4) : static_cast<int8_t>(-1));
-	SetNavWaypointIndex(spawnFlags, 0); // restart largest -> smallest -> random sequence in each new frame (incl. cross-frame transfers)
+	SetNavWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pfNavigationDelays[iIndex] = rInfo.fNavigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();

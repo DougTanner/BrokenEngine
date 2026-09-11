@@ -1071,6 +1071,16 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult,
 		{"sequence", rShadowSample.uiSequence},
 		{"currentUs", rShadowSample.iCurrentMicroseconds},
 	};
+	int64_t iClockOffset = 0;
+	int64_t iClockTargetBehind = 0;
+	int64_t iClockError = 0;
+	rProfileManager.GetClockCorrection(iClockOffset, iClockTargetBehind, iClockError);
+	rResult["clock"] =
+	{
+		{"offsetTicks", iClockOffset},
+		{"targetBehindTicks", iClockTargetBehind},
+		{"errorTicks", iClockError},
+	};
 }
 
 } // namespace

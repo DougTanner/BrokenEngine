@@ -47,7 +47,7 @@ public:
 	void SetTimeScale(int64_t iMultiply, int64_t iDivide);
 
 	// Death spiral prevention constants
-	static constexpr int64_t kiMaxTicksPerFrame = 12;  // Threshold for auto-reduction
+	static constexpr int64_t kiMaxTicksPerFrame = 12;  // Threshold for the server's auto-reduction
 	static constexpr int64_t kiMaxAccumulatorTicks = 4;  // Max backlog (in ticks)
 
 	// Decrease time scale (halve multiplier if > 1, else double divider if bAllowSlowMo)

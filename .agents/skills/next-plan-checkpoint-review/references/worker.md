@@ -66,8 +66,7 @@ are the isolation lens.
    skipped step it forced. No citation, no finding. Done when every friction
    finding names all three, and the rest are dropped.
 8. Review every `topResults` row marked `overThreshold: true`. The other rows are
-   context only, and `totalChars` is telemetry that never produces a finding on
-   its own. Done when every such row has been read.
+   context only. Done when every such row has been read.
 9. Identify the emitting invocation for each row from `toolName` plus
    `inputSummary`: the repository script, skill instruction, or documented
    command that produced that output. Read the emitter in the tree. Done when

@@ -87,6 +87,30 @@ const char* ValidateCachedChunkBody(std::span<const std::byte> body, common::crc
 
 }
 
+std::optional<std::string> ExportJob::ReadMarkerFile(const std::filesystem::path& rPath)
+{
+	std::ifstream stream(rPath, std::ios::binary);
+	if (!stream)
+	{
+		return std::nullopt;
+	}
+	std::string fingerprint {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
+	return !stream.bad() ? std::optional(std::move(fingerprint)) : std::nullopt;
+}
+
+// Write-then-rename: a torn marker would otherwise read back as a fingerprint mismatch at best and a
+// truncated match at worst, adopting a half-written output set as fresh.
+void ExportJob::WriteMarkerFile(const std::filesystem::path& rPath, std::string_view fingerprint)
+{
+	std::filesystem::path temporaryPath = rPath;
+	temporaryPath += ".tmp";
+	std::ofstream stream(temporaryPath, std::ios::binary | std::ios::trunc);
+	stream.write(fingerprint.data(), static_cast<std::streamsize>(fingerprint.size()));
+	stream.close();
+	VERIFY_SUCCESS(stream.good());
+	VERIFY_SUCCESS(MoveFileExW(temporaryPath.native().c_str(), rPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
+}
+
 ExportJob::ExportJob(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile, int64_t iVersion)
 : miId(siNextJobId++)
 , miVersion(iVersion)

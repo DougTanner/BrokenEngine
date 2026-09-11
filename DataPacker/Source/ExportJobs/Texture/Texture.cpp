@@ -694,12 +694,8 @@ TextureIntermediateHeader ReadTextureIntermediateHeader(const std::byte* puiData
 	return header;
 }
 
-void Texture::Save(const std::filesystem::path& rPath, VkFormat vkFormat, TextureOptions_t options)
+void WriteStagedIntermediate(const std::filesystem::path& rPath, const std::function<void(std::ostream&)>& rWriteBody)
 {
-	std::vector<std::byte> data = Export(vkFormat, options);
-
-	std::vector<std::byte> compressed = ZlibCompress(data.data(), static_cast<int64_t>(data.size()));
-
 	static std::atomic<uint64_t> suiSaveSequence {0};
 	std::filesystem::path stagingPath = rPath.parent_path();
 	// Keep the basename independent of the final path: tagged texture names must not route this stage.
@@ -709,13 +705,7 @@ void Texture::Save(const std::filesystem::path& rPath, VkFormat vkFormat, Textur
 	{
 		std::fstream fileStreamOut(stagingPath, std::ios::out | std::ios::binary | std::ios::trunc);
 		VERIFY_SUCCESS(fileStreamOut.is_open());
-		int64_t iMagic = kiTextureIntermediateMagic;
-		fileStreamOut.write(reinterpret_cast<const char*>(&iMagic), sizeof(iMagic));
-		fileStreamOut.write(reinterpret_cast<const char*>(&miWidth), sizeof(miWidth));
-		fileStreamOut.write(reinterpret_cast<const char*>(&miHeight), sizeof(miHeight));
-		int64_t iMipMaps = static_cast<int64_t>(mData.size());
-		fileStreamOut.write(reinterpret_cast<const char*>(&iMipMaps), sizeof(iMipMaps));
-		fileStreamOut.write(reinterpret_cast<const char*>(compressed.data()), static_cast<std::streamsize>(compressed.size()));
+		rWriteBody(fileStreamOut);
 		VERIFY_SUCCESS(fileStreamOut.good());
 		fileStreamOut.flush();
 		VERIFY_SUCCESS(fileStreamOut.good());
@@ -729,4 +719,22 @@ void Texture::Save(const std::filesystem::path& rPath, VkFormat vkFormat, Textur
 		std::filesystem::remove(stagingPath, errorCode);
 		throw;
 	}
+}
+
+void Texture::Save(const std::filesystem::path& rPath, VkFormat vkFormat, TextureOptions_t options)
+{
+	std::vector<std::byte> data = Export(vkFormat, options);
+
+	std::vector<std::byte> compressed = ZlibCompress(data.data(), static_cast<int64_t>(data.size()));
+
+	WriteStagedIntermediate(rPath, [&](std::ostream& rStream)
+	{
+		int64_t iMagic = kiTextureIntermediateMagic;
+		rStream.write(reinterpret_cast<const char*>(&iMagic), sizeof(iMagic));
+		rStream.write(reinterpret_cast<const char*>(&miWidth), sizeof(miWidth));
+		rStream.write(reinterpret_cast<const char*>(&miHeight), sizeof(miHeight));
+		int64_t iMipMaps = static_cast<int64_t>(mData.size());
+		rStream.write(reinterpret_cast<const char*>(&iMipMaps), sizeof(iMipMaps));
+		rStream.write(reinterpret_cast<const char*>(compressed.data()), static_cast<std::streamsize>(compressed.size()));
+	});
 }

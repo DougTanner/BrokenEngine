@@ -6,7 +6,7 @@ Texture transforms, intermediate-file I/O, block encoding, and legacy-intermedia
 
 `Texture::Save` writes a magic marker, dimensions, mip count, then the encoded payload. BCn and R16 intermediates are zlib-compressed on disk; half-float cubemap pre-pass output remains raw. Readers must use the shared parser and its returned payload offset rather than duplicating header math.
 
-Texture writers use a private, untagged staging name and atomically replace the requested destination only after the complete file is flushed and closed, so an in-progress file cannot be picked up by texture routing. Scene pre-export keeps one staged output per unique source/format pair, completes every attempt before publishing any final intermediate, and tracks unpublished attempts separately from outputs published by the current attempt so failure cleanup keeps those ownership boundaries intact.
+Intermediates written by `Texture::Save` and by both IBL cubemap pre-pass writers in `ExportJobs/ExportCubemapIbl.cpp` are published through the shared staged atomic replace helper `WriteStagedIntermediate` in `Texture.h`. A process killed between the staged write and the replace leaves that stage behind as an inert orphan nothing sweeps.
 
 Final texture chunks use LZ4 and store compressed and uncompressed sizes for `FileManager`. Raw intermediate input is decoded as needed and re-encoded for the chunk; changing the intermediate or chunk contract requires coordinated producer, exporter-version, shared-header, and runtime-reader updates.
 

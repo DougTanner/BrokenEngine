@@ -37,12 +37,18 @@ bool ExportScene::CheckDirty(const std::filesystem::path& rPackFile)
 	}
 	else
 	{
-		// Main file is clean, but a missing or stale-version pre-export marker still dirties the chunk.
-		std::optional<int64_t> optionalStoredVersion = ReadPreExportMarkerVersion();
-		if (!optionalStoredVersion.has_value() || optionalStoredVersion.value() != GetVersion())
+		// Main file is clean, but the generated .MODEL and texture intermediates are tracked in the checkout, so a
+		// deleted, reverted, or edited one leaves the chunk cache clean while the scene's published path CRCs name
+		// files that no longer exist or no longer match. The marker records exactly those outputs, so any difference
+		// - including a missing or unreadable marker - re-runs pre-export before the scene is published again.
+		std::optional<std::string> storedFingerprint = ReadMarkerFile(GetPreExportMarkerPath());
+		std::optional<std::string> currentFingerprint = GetPreExportFingerprint();
+		if (!storedFingerprint.has_value() || !currentFingerprint.has_value() || storedFingerprint.value() != currentFingerprint.value())
 		{
+			LOG(kDefault, kDebug, "Pre-export outputs stale for \"{}\", forcing pre-export", mInputPath.string());
 			mbDirty = true;
 			bDirty = true;
+			mbNeedsPreExport = true;
 		}
 	}
 
@@ -227,6 +233,39 @@ std::vector<std::string> ReadExternalUris(const std::filesystem::path& rGltfPath
 	return uris;
 }
 
+// A generated scene texture intermediate is a "<scene>.Texture<imageIndex>.<BCn>" sibling of the source glTF.
+// One definition serves both the orphan sweep and the pre-export marker's output membership, so what the sweep
+// leaves on disk and what the marker records can never disagree.
+bool IsSceneTextureIntermediate(std::string_view name, std::string_view intermediatePrefix)
+{
+	if (!name.starts_with(intermediatePrefix))
+	{
+		return false;
+	}
+
+	std::string_view indexAndSuffix(name);
+	indexAndSuffix.remove_prefix(intermediatePrefix.size());
+	size_t uiSuffixStart = indexAndSuffix.find('.');
+	if (uiSuffixStart == std::string_view::npos)
+	{
+		return false;
+	}
+	if (uiSuffixStart == 0)
+	{
+		return false;
+	}
+	for (char c : indexAndSuffix.substr(0, uiSuffixStart))
+	{
+		if (c < '0' || c > '9')
+		{
+			return false;
+		}
+	}
+
+	std::string_view suffix = indexAndSuffix.substr(uiSuffixStart);
+	return suffix == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK) || suffix == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK) || suffix == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK);
+}
+
 } // namespace
 
 std::string ExportScene::GetInputFingerprint() const
@@ -253,17 +292,73 @@ std::filesystem::path ExportScene::GetPreExportMarkerPath() const
 	return path;
 }
 
-std::optional<int64_t> ExportScene::ReadPreExportMarkerVersion() const
+// The content of every generated output pre-export owns: the .MODEL file and each scene texture intermediate on
+// disk. Entries are keyed by bare filename, the same key the orphan sweep compares, so the marker is independent
+// of where the checkout lives; nlohmann's object keys sort, so the dumped string is deterministic. Those filenames
+// are also the text MainExport builds its texture and model path CRCs from, so a matching marker proves every CRC
+// the scene chunk publishes still names a file with the contents it was published for.
+// Returns nullopt on any filesystem error so CheckDirty treats an unreadable scene directory as dirty.
+std::optional<std::string> ExportScene::GetPreExportFingerprint() const
 {
-	std::filesystem::path preExportPath = GetPreExportMarkerPath();
-	std::fstream fileStreamIn(preExportPath, std::ios::in | std::ios::binary);
-	int64_t iStoredVersion = 0;
-	fileStreamIn.read(reinterpret_cast<char*>(&iStoredVersion), sizeof(iStoredVersion));
-	if (!fileStreamIn)
+	nlohmann::json fingerprint;
+	fingerprint["version"] = GetVersion();
+
+	// A missing output records null rather than calling GetFingerprint, which throws on a missing file and would
+	// kill the run from CheckDirty. Null never equals a stored hash, so the scene stays dirty.
+	std::filesystem::path modelPath(mInputPath);
+	modelPath += ".MODEL";
+	std::error_code modelErrorCode;
+	bool bModelExists = std::filesystem::exists(modelPath, modelErrorCode);
+	if (modelErrorCode)
 	{
 		return std::nullopt;
 	}
-	return iStoredVersion;
+	fingerprint["outputs"][modelPath.filename().string()] = bModelExists ? nlohmann::json(gpFileManager->GetFingerprint(modelPath)) : nlohmann::json();
+
+	std::string intermediatePrefix = mInputPath.filename().string() + ".Texture";
+	std::error_code iterateErrorCode;
+	std::filesystem::directory_iterator iterator(mInputPath.parent_path(), iterateErrorCode);
+	if (iterateErrorCode)
+	{
+		return std::nullopt;
+	}
+	for (; iterator != std::filesystem::directory_iterator(); iterator.increment(iterateErrorCode))
+	{
+		if (iterateErrorCode)
+		{
+			return std::nullopt;
+		}
+
+		std::string name = iterator->path().filename().string();
+		if (!IsSceneTextureIntermediate(name, intermediatePrefix))
+		{
+			continue;
+		}
+
+		std::error_code entryErrorCode;
+		bool bRegularFile = iterator->is_regular_file(entryErrorCode);
+		if (entryErrorCode)
+		{
+			return std::nullopt;
+		}
+		if (!bRegularFile)
+		{
+			continue;
+		}
+
+		// An entry that vanished between the listing and here drops out of membership, which is itself a difference.
+		bool bExists = std::filesystem::exists(iterator->path(), entryErrorCode);
+		if (entryErrorCode)
+		{
+			return std::nullopt;
+		}
+		if (bExists)
+		{
+			fingerprint["outputs"][name] = gpFileManager->GetFingerprint(iterator->path());
+		}
+	}
+
+	return fingerprint.dump();
 }
 
 std::filesystem::path ExportScene::GetTextureIntermediatePath(int64_t iTextureIndex, VkFormat vkFormat) const
@@ -310,11 +405,12 @@ void ExportScene::Export()
 	// Both the pre-export and main-export paths read skin 0, so canonicalize before either runs
 	CanonicalizeSceneSkin(gltfModel);
 
-	std::optional<int64_t> optionalStoredVersion = ReadPreExportMarkerVersion();
-	bool bNeedsPreExport = mbNeedsPreExport || !optionalStoredVersion.has_value() || optionalStoredVersion.value() != GetVersion();
-
-	if (bNeedsPreExport)
+	if (mbNeedsPreExport)
 	{
+		// Model and texture writes are not transactional, and a kill (rather than a throw) mid-export never reaches
+		// CleanupOnFailure. Dropping the marker before the first output is touched keeps a half-written set from being
+		// vouched for as current by a marker that still matches - the next run would skip pre-export and ship it.
+		std::filesystem::remove(GetPreExportMarkerPath());
 		PreExport(gltfModel);
 	}
 
@@ -459,35 +555,6 @@ void ExportScene::ProcessTextures(tinygltf::Model& rGltfModel)
 	}
 
 	std::string intermediatePrefix = mInputPath.filename().string() + ".Texture";
-	auto isSceneTextureIntermediate = [&intermediatePrefix](std::string_view name)
-	{
-		if (!name.starts_with(intermediatePrefix))
-		{
-			return false;
-		}
-
-		std::string_view indexAndSuffix(name);
-		indexAndSuffix.remove_prefix(intermediatePrefix.size());
-		size_t uiSuffixStart = indexAndSuffix.find('.');
-		if (uiSuffixStart == std::string_view::npos)
-		{
-			return false;
-		}
-		if (uiSuffixStart == 0)
-		{
-			return false;
-		}
-		for (char c : indexAndSuffix.substr(0, uiSuffixStart))
-		{
-			if (c < '0' || c > '9')
-			{
-				return false;
-			}
-		}
-
-		std::string_view suffix = indexAndSuffix.substr(uiSuffixStart);
-		return suffix == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK) || suffix == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK) || suffix == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK);
-	};
 	std::vector<std::filesystem::path> orphanedIntermediates;
 	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(mInputPath.parent_path()))
 	{
@@ -496,7 +563,7 @@ void ExportScene::ProcessTextures(tinygltf::Model& rGltfModel)
 			continue;
 		}
 		std::string name = rEntry.path().filename().string();
-		if (isSceneTextureIntermediate(name) && !currentIntermediateNames.contains(name))
+		if (IsSceneTextureIntermediate(name, intermediatePrefix) && !currentIntermediateNames.contains(name))
 		{
 			orphanedIntermediates.push_back(rEntry.path());
 		}
@@ -707,15 +774,6 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 	fileStreamOut.close();
 	VERIFY_SUCCESS(fileStreamOut.good());
 	mIntermediateFiles.push_back(path);
-
-	std::filesystem::path preExportMarkerPath = GetPreExportMarkerPath();
-	std::fstream fileStreamOutMarker(preExportMarkerPath, std::ios::out | std::ios::binary);
-	int64_t iVersion = GetVersion();
-	fileStreamOutMarker.write(reinterpret_cast<const char*>(&iVersion), sizeof(iVersion));
-	fileStreamOutMarker.flush();
-	fileStreamOutMarker.close();
-	VERIFY_SUCCESS(fileStreamOutMarker.good());
-	mIntermediateFiles.push_back(preExportMarkerPath);
 }
 
 void ExportScene::MainExport(tinygltf::Model& rGltfModel)
@@ -1037,10 +1095,25 @@ void ExportScene::CleanupTextureAttemptFiles()
 	mTextureAttemptFiles.clear();
 }
 
+void ExportScene::UpdateCacheMetadata()
+{
+	// RunExport calls this only after Export() and the chunk write both succeeded, so the marker can only ever
+	// record a complete generated set. A run that reused the existing outputs rewrites the same fingerprint.
+	std::optional<std::string> fingerprint = GetPreExportFingerprint();
+	if (!fingerprint.has_value())
+	{
+		LOG(kDefault, kWarning, "Could not read generated outputs for \"{}\"; leaving no pre-export marker, so the next run re-runs pre-export", mInputPath.string());
+		return;
+	}
+	WriteMarkerFile(GetPreExportMarkerPath(), fingerprint.value());
+}
+
 void ExportScene::CleanupOnFailure()
 {
 	CleanupTextureAttemptFiles();
 	std::error_code errorCode;
+	// A partially written output set must never be adopted as fresh by a later run.
+	std::filesystem::remove(GetPreExportMarkerPath(), errorCode);
 	for (const std::filesystem::path& rPath : mPublishedTextureFiles)
 	{
 		std::filesystem::remove(rPath, errorCode);

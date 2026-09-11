@@ -750,8 +750,9 @@ bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 	}
 	bSuccess &= *exportResult;
 
-	GenerateIrradianceCubemaps();
-	GeneratePreFilteredCubemaps();
+	// Contained IBL failures, so the second pass and every later export still run.
+	bSuccess &= GenerateIrradianceCubemaps();
+	bSuccess &= GeneratePreFilteredCubemaps();
 
 	exportResult = RunAllMainExports<ExportAudio, ExportModel, ExportShader, ExportTexture, ExportRaw>(rRunSummary);
 	if (!exportResult)

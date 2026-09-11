@@ -669,6 +669,12 @@ and the handoff this run returns.
 - CPU performance investigations build and run the measured client or server
   with the `Profile` configuration/target. Debug and Release CPU timings are not
   acceptance evidence for a CPU performance investigation.
+- The on-screen profile overlay and its `P` cycling exist only where
+  `kbProfiling` is true (`Debug`, `Profile`); a `Release` client compiles both
+  out, so `key {"key":"P"}` still answers `ok:true` while nothing renders and an
+  overlay screenshot is empty. The claim default `Debug` already has
+  `kbProfiling` true, so a criterion that observes the overlay must not pass
+  `-Configuration Release` at the claim step.
 
 ### Durable caveats
 

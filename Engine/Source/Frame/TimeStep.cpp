@@ -31,7 +31,9 @@ int64_t TimeStep::TickRealtime()
 	// Accumulate time with scaling
 	mTickRemainderNs += WallToSim(realDeltaNs);
 
-	// Death spiral prevention: detect excessive updates and auto-reduce time scale
+#if defined(BT_SERVER)
+	// Death spiral prevention: detect excessive updates and auto-reduce time scale. Server only, because
+	// the server broadcasts the new ratio to every client; the client only consumes a broadcast ratio.
 	if constexpr (kbDebugInput)
 	{
 		int64_t iEstimatedTicks = mTickRemainderNs / kTickNs;
@@ -41,6 +43,7 @@ int64_t TimeStep::TickRealtime()
 			DecreaseTimeScale(false);
 		}
 	}
+#endif
 
 	// Clamp accumulator to prevent backlog cascade (e.g., after background/focus loss)
 	std::chrono::nanoseconds maxAccumulator = kTickNs * kiMaxAccumulatorTicks;

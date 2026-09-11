@@ -18,10 +18,10 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    [`scope-authorization.md`](../../../references/scope-authorization.md) over
    the same regions. Done when each pass has run against the supplied
    authorization source, or its absence is reported as that reference directs.
-4. At Tier 2+, when the dispatch allows edits, fix the meaning-preserving
-   wording and formatting problems in those regions yourself and self-check each
-   edit, and route what you cannot fix that way with the semantic findings. Done
-   when each such problem is either fixed and self-checked, or reported.
+4. When the dispatch allows edits, fix the meaning-preserving wording and
+   formatting problems in the changed regions yourself and self-check each edit,
+   and route what you cannot fix that way with the semantic findings. Done when
+   each such problem is either fixed and self-checked, or reported.
 5. In Tier-1 mode, run in this same context, in full, every reviewer-role check
    the Change Workflow Apply the triggered cleanup step lists — today the
    `/external-skill-creator` findings-only validate mode and
@@ -39,8 +39,8 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 ## Rules
 
 - The Apply the triggered cleanup mechanic and implementer checks —
-  `/code-style-review`, `/update-vcxproj`, `/update-claude-docs` — are not
-  reviewer dispatches and are unaffected by the combined mode.
+  `/update-vcxproj`, `/update-claude-docs` — are not reviewer dispatches and are
+  unaffected by the combined mode.
 - Change no repository file apart from the wording and formatting fixes step 4
   requires; every semantic problem is a finding for the manager to decide.
 - The Review and resolve correctness step's fix-round rule is unchanged: main

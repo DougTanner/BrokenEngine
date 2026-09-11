@@ -327,9 +327,11 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 			// not produce a negative sim tick.
 			if (bInitialSetup && game::gpGame->TickCounter() < iTick)
 			{
-				static constexpr int64_t kiTickTimeMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(engine::kTickNs).count();
-				static constexpr int64_t kiInitialTargetBehind = (engine::kiJitterSafetyUs + kiTickTimeMicroseconds - 1) / kiTickTimeMicroseconds;
-				const int64_t iAppliedBehind = std::min<int64_t>(kiInitialTargetBehind, iTick);
+				// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
+				// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
+				const int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimToWall(engine::kTickNs).count();
+				const int64_t iInitialTargetBehind = (engine::kiJitterSafetyUs * 1000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
+				const int64_t iAppliedBehind = std::min<int64_t>(iInitialTargetBehind, iTick);
 				game::gpGame->SetTickCounter(iTick - iAppliedBehind);
 				game::gpGame->SetCurrentTime(fFullStateTime - static_cast<float>(iAppliedBehind) * engine::kfDeltaTime);
 				game::gpGame->ResetRenderClock();
@@ -641,8 +643,10 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 		miLowerTargetBehindStreakStartTick = -1;
 	}
 	int64_t iJitterMicroseconds = mpClient->mSmoothedJitterUs.Get();
-	int64_t iTickMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(game::NetworkSessionContract::kTickDuration).count();
-	int64_t iComputedTargetBehind = (3 * iJitterMicroseconds + kiJitterSafetyUs + iTickMicroseconds - 1) / iTickMicroseconds;
+	// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
+	// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
+	int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimToWall(engine::kTickNs).count();
+	int64_t iComputedTargetBehind = ((3 * iJitterMicroseconds + kiJitterSafetyUs) * 1000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
 	if (miCurrentTargetBehind == 0)
 	{
 		miCurrentTargetBehind = iComputedTargetBehind;

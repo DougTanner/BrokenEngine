@@ -69,8 +69,8 @@ Return the shared handoff form in
 
 - For a delegated call, return the results after applying the execution and
   result discipline in [`references/worker.md`](references/worker.md). Keep
-  overall/per-project status, data mode/path, and decisive blockers visible; the
-  bullets below govern what each build carries inline.
+  overall/per-project status and decisive blockers visible; the bullets below
+  govern what each build carries inline.
 - Every build's captured `broken-engine-build-result/v1` envelope is recorded
   verbatim in this dispatch's envelope file under `Temp/AgentBuildEnvelopes/`.
   Read every reported field from the envelope, never from scraped terminal text.
@@ -82,17 +82,18 @@ Return the shared handoff form in
   in the change.
 - The exact `retainedLog.path` for each build, and `complete: false` as a
   failure.
-- For game builds, report `DataBuildMode`, the `RunDataPacker` value for every
-  build, normalized `GameDataDirectory`, and normalized
-  `GeneratedDataIncludeRoot`. Read all of these from the invocation's own stderr
-  summary lines; never reconstruct them. Report every mode-selection trigger,
-  the Local generation-authorization trigger, and whether the Gaea guard was
-  applied (or the exact explicit Gaea-regeneration authorization).
+- For game builds, report nothing about the data mode when the resolved mode
+  matches the mode the dispatch brief fixed. The effective mode, the
+  `RunDataPacker` value, and both normalized directories already reach the
+  caller as the `/p:` switches in each envelope block's `arguments`. When the
+  two differ, add one `Decisive checks` row naming the brief's mode, the
+  resolved mode as the envelope's `/p:DataBuildMode` switch, and, when your own
+  mode selection is what overrode the brief, your reason for it.
 
 That shared form's other fields stay as it defines them; these are narrowed
 here:
 
-Each shared `Decisive checks` row names the build target, configuration, status,
+Each build's `Decisive checks` row names the target, configuration, status,
 exitCode, and failureKind. Shared `Evidence` carries the `retainedLog.path` for
 each build and this dispatch's envelope file as path plus selector. Each shared
 `Residuals` row names a failed or skipped required build; use `none` when

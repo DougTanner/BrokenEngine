@@ -101,12 +101,10 @@ try {
 
 	$toolUses = @{}
 	$measured = [Collections.Generic.List[object]]::new()
-	$lineCount = 0
 	$lineNumber = 0
 	foreach ($line in [IO.File]::ReadLines($transcript)) {
 		$lineNumber++
 		if ([string]::IsNullOrWhiteSpace($line)) { continue }
-		$lineCount++
 		try { $record = $line | ConvertFrom-Json -Depth 100 }
 		catch { Complete-Measurement 1 'error' 'transcript.malformed-line' "Transcript line $lineNumber is not valid JSON." }
 		# Sidechain lines are a subagent's own context and never entered the main session.
@@ -151,8 +149,6 @@ try {
 		}
 	}
 
-	$totalChars = 0
-	foreach ($entry in $measured) { $totalChars += $entry.Chars }
 	$ranked = @($measured | Sort-Object -Property @{ Expression = 'Chars'; Descending = $true }, @{ Expression = 'ToolUseId'; Descending = $false })
 	$breaches = @($ranked | Where-Object { $_.Chars -ge $ThresholdChars })
 	$overThresholdCount = $breaches.Count
@@ -177,14 +173,9 @@ try {
 		})
 	}
 
-	# totalChars is telemetry only: the verdict turns on per-result breaches, because a total with no
-	# dominant emitter names nothing a reviewer could act on.
 	$envelope = [ordered]@{
 		schemaVersion = 'broken-engine-context-efficiency/v1'
 		sessionId = $sessionLabel
-		lineCount = $lineCount
-		toolResultCount = $measured.Count
-		totalChars = $totalChars
 		thresholds = [ordered]@{ perResultChars = $ThresholdChars }
 		verdict = $(if ($overThresholdCount -gt 0) { 'needs-review' } else { 'pass' })
 		overThresholdCount = $overThresholdCount

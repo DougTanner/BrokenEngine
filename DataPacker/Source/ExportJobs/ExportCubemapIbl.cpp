@@ -1,5 +1,6 @@
 #include "ExportCubemapIbl.h"
 
+#include "DiagnosticReporter.h"
 #include "FileManager.h"
 #include "Texture/Texture.h"
 
@@ -220,6 +221,29 @@ void ReconcileIblOutputs(const ExpectedIblOutputs& rExpectedOutputs, std::string
 	}
 }
 
+// Reports one pass's collected failures as a single aggregate record, matching the shape RunExportJobs uses
+// for an ordinary asset type, and answers whether the pass succeeded. These entries stay out of the run
+// summary's job counts, which cover export jobs only.
+bool ReportIblFailures(std::string_view passName, std::vector<diagnostic::ExportFailure>& rFailures)
+{
+	if (rFailures.empty())
+	{
+		return true;
+	}
+
+	diagnostic::Record record
+	{
+		.eSeverity = diagnostic::Severity::kError,
+		.title = "Data Packer - Export Failed",
+		.message = std::format("One or more {} cubemaps failed", passName),
+		.eButtons = diagnostic::ButtonContract::kOk,
+		.eIcon = diagnostic::ModalIcon::kNone,
+		.exportFailures = std::move(rFailures),
+	};
+	diagnostic::Report(record);
+	return false;
+}
+
 } // namespace
 
 static KtxCubemapData LoadKtxCubemapAsFloat(const std::filesystem::path& rPath)
@@ -241,89 +265,121 @@ static KtxCubemapData LoadKtxCubemapAsFloat(const std::filesystem::path& rPath)
 	return result;
 }
 
-void GenerateIrradianceCubemaps()
+bool GenerateIrradianceCubemaps()
 {
 	ExpectedIblOutputs expectedOutputs;
-	for (int64_t iInputRoot = 0; iInputRoot < static_cast<int64_t>(std::size(gpFileManager->mpInputDirectories)); ++iInputRoot)
+	std::vector<diagnostic::ExportFailure> failures;
+	bool bDiscoveryComplete = true;
+	try
 	{
-		const std::filesystem::path& rBaseDirectory = gpFileManager->mpInputDirectories[iInputRoot];
-		for (const std::filesystem::directory_entry& rDirectoryEntry : std::filesystem::recursive_directory_iterator(rBaseDirectory))
+		for (int64_t iInputRoot = 0; iInputRoot < static_cast<int64_t>(std::size(gpFileManager->mpInputDirectories)); ++iInputRoot)
 		{
-			if (rDirectoryEntry.path().extension() != ".ktx")
+			const std::filesystem::path& rBaseDirectory = gpFileManager->mpInputDirectories[iInputRoot];
+			for (const std::filesystem::directory_entry& rDirectoryEntry : std::filesystem::recursive_directory_iterator(rBaseDirectory))
 			{
-				continue;
+				if (rDirectoryEntry.path().extension() != ".ktx")
+				{
+					continue;
+				}
+
+				if (!HasCubemapTag(rDirectoryEntry.path()))
+				{
+					continue;
+				}
+
+				// Build output path: [C]<name>_Irradiance<R16G16B16A16_SFLOAT suffix>
+				std::filesystem::path outputPath = rDirectoryEntry.path().parent_path() / rDirectoryEntry.path().stem();
+				outputPath += kIrradianceOutputStem;
+				outputPath += TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
+				// Recorded before any work that can fail, so a contained per-input failure still leaves this
+				// output expected and the reconcile below cannot delete its previous complete file.
+				expectedOutputs.insert(GetExpectedOutputKey(outputPath));
+
+				try
+				{
+					std::string fingerprint = GetCubemapFingerprint("irradiance", rDirectoryEntry.path());
+					std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
+					std::filesystem::path legacyInput = rDirectoryEntry.path();
+					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, &legacyInput, 1))
+					{
+						continue;
+					}
+					BeginOutputUpdate(metadataPath);
+
+					LOG(kDefault, kDebug, "Generating irradiance cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
+
+					KtxCubemapData cubemapData = LoadKtxCubemapAsFloat(rDirectoryEntry.path());
+					uint32_t uiFaceSize = cubemapData.uiFaceSize;
+					uint32_t uiPixelsPerFace = uiFaceSize * uiFaceSize;
+					uint32_t uiTotalPixels = uiPixelsPerFace * 6;
+
+					// Create CMFT source image and populate with float data
+					cmft::Image srcImage;
+					cmft::Image dstImage;
+					cmft::imageCreate(srcImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
+					common::ScopedLambda imageCleanup([&]()
+					{
+						cmft::imageUnload(srcImage);
+						cmft::imageUnload(dstImage);
+					});
+					std::memcpy(srcImage.m_data, cubemapData.floatData.data(), uiTotalPixels * 4 * sizeof(float));
+
+					// Generate 128x128 irradiance through serial CPU double-precision spherical harmonics, without
+					// OpenCL or a thread-count input. DataPacker is not /fp:strict, so FMA contraction and the FP
+					// environment can affect output across hosts.
+					static constexpr uint32_t kuiIrradianceFaceSize = 128;
+					cmft::imageIrradianceFilterSh(dstImage, kuiIrradianceFaceSize, srcImage);
+
+					// Convert RGBA32F result back to RGBA16F
+					uint32_t uiIrradiancePixelsPerFace = kuiIrradianceFaceSize * kuiIrradianceFaceSize;
+					uint32_t uiIrradianceTotalPixels = uiIrradiancePixelsPerFace * 6;
+					std::vector<uint16_t> halfData(uiIrradianceTotalPixels * 4);
+
+					const float* pSrcFloat = static_cast<const float*>(dstImage.m_data);
+					DirectX::PackedVector::XMConvertFloatToHalfStream(halfData.data(), sizeof(uint16_t), pSrcFloat, sizeof(float), uiIrradianceTotalPixels * 4);
+
+					// Write intermediate file: [width][height][mipcount][pixel data for 6 faces]
+					int64_t iWidth = kuiIrradianceFaceSize;
+					int64_t iHeight = kuiIrradianceFaceSize;
+					int64_t iMipCount = 1;
+
+					WriteStagedIntermediate(outputPath, [&](std::ostream& rStream)
+					{
+						rStream.write(reinterpret_cast<const char*>(&iWidth), sizeof(iWidth));
+						rStream.write(reinterpret_cast<const char*>(&iHeight), sizeof(iHeight));
+						rStream.write(reinterpret_cast<const char*>(&iMipCount), sizeof(iMipCount));
+						rStream.write(reinterpret_cast<const char*>(halfData.data()), halfData.size() * sizeof(uint16_t));
+					});
+					CompleteOutputUpdate(metadataPath, fingerprint);
+				}
+				catch (const std::exception& rException)
+				{
+					failures.push_back({.assetPath = rDirectoryEntry.path(), .message = rException.what()});
+				}
 			}
+		}
+	}
+	catch (const std::exception& rException)
+	{
+		// A partial walk leaves the expected-output set incomplete, and reconciling against it would delete
+		// outputs the unvisited inputs still expect, so the sweep is skipped for this run.
+		bDiscoveryComplete = false;
+		failures.push_back({.message = std::format("Irradiance cubemap discovery failed, skipping orphaned-output removal: {}", rException.what())});
+	}
 
-			if (!HasCubemapTag(rDirectoryEntry.path()))
-			{
-				continue;
-			}
-
-			// Build output path: [C]<name>_Irradiance<R16G16B16A16_SFLOAT suffix>
-			std::filesystem::path outputPath = rDirectoryEntry.path().parent_path() / rDirectoryEntry.path().stem();
-			outputPath += kIrradianceOutputStem;
-			outputPath += TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
-			expectedOutputs.insert(GetExpectedOutputKey(outputPath));
-
-			std::string fingerprint = GetCubemapFingerprint("irradiance", rDirectoryEntry.path());
-			std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
-			std::filesystem::path legacyInput = rDirectoryEntry.path();
-			if (IsOutputCurrent(outputPath, metadataPath, fingerprint, &legacyInput, 1))
-			{
-				continue;
-			}
-			BeginOutputUpdate(metadataPath);
-
-			LOG(kDefault, kDebug, "Generating irradiance cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
-
-			KtxCubemapData cubemapData = LoadKtxCubemapAsFloat(rDirectoryEntry.path());
-			uint32_t uiFaceSize = cubemapData.uiFaceSize;
-			uint32_t uiPixelsPerFace = uiFaceSize * uiFaceSize;
-			uint32_t uiTotalPixels = uiPixelsPerFace * 6;
-
-			// Create CMFT source image and populate with float data
-			cmft::Image srcImage;
-			cmft::Image dstImage;
-			cmft::imageCreate(srcImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
-			common::ScopedLambda imageCleanup([&]()
-			{
-				cmft::imageUnload(srcImage);
-				cmft::imageUnload(dstImage);
-			});
-			std::memcpy(srcImage.m_data, cubemapData.floatData.data(), uiTotalPixels * 4 * sizeof(float));
-
-			// Generate 128x128 irradiance through serial CPU double-precision spherical harmonics, without
-			// OpenCL or a thread-count input. DataPacker is not /fp:strict, so FMA contraction and the FP
-			// environment can affect output across hosts.
-			static constexpr uint32_t kuiIrradianceFaceSize = 128;
-			cmft::imageIrradianceFilterSh(dstImage, kuiIrradianceFaceSize, srcImage);
-
-			// Convert RGBA32F result back to RGBA16F
-			uint32_t uiIrradiancePixelsPerFace = kuiIrradianceFaceSize * kuiIrradianceFaceSize;
-			uint32_t uiIrradianceTotalPixels = uiIrradiancePixelsPerFace * 6;
-			std::vector<uint16_t> halfData(uiIrradianceTotalPixels * 4);
-
-			const float* pSrcFloat = static_cast<const float*>(dstImage.m_data);
-			DirectX::PackedVector::XMConvertFloatToHalfStream(halfData.data(), sizeof(uint16_t), pSrcFloat, sizeof(float), uiIrradianceTotalPixels * 4);
-
-			// Write intermediate file: [width][height][mipcount][pixel data for 6 faces]
-			int64_t iWidth = kuiIrradianceFaceSize;
-			int64_t iHeight = kuiIrradianceFaceSize;
-			int64_t iMipCount = 1;
-
-			std::fstream fileStream(outputPath, std::ios::out | std::ios::binary);
-			fileStream.write(reinterpret_cast<const char*>(&iWidth), sizeof(iWidth));
-			fileStream.write(reinterpret_cast<const char*>(&iHeight), sizeof(iHeight));
-			fileStream.write(reinterpret_cast<const char*>(&iMipCount), sizeof(iMipCount));
-			fileStream.write(reinterpret_cast<const char*>(halfData.data()), halfData.size() * sizeof(uint16_t));
-			fileStream.flush();
-			fileStream.close();
-			VERIFY_SUCCESS(fileStream.good());
-			CompleteOutputUpdate(metadataPath, fingerprint);
+	if (bDiscoveryComplete)
+	{
+		try
+		{
+			ReconcileIblOutputs(expectedOutputs, kIrradianceOutputStem);
+		}
+		catch (const std::exception& rException)
+		{
+			failures.push_back({.message = std::format("Irradiance cubemap orphaned-output removal failed: {}", rException.what())});
 		}
 	}
 
-	ReconcileIblOutputs(expectedOutputs, kIrradianceOutputStem);
+	return ReportIblFailures("irradiance", failures);
 }
 
 static constexpr uint32_t kuiPreFilteredFaceSize = 1024;
@@ -367,171 +423,206 @@ static void WriteFilteredCubemap(cmft::Image& rDstImage, const std::filesystem::
 	int64_t iHeight = kuiPreFilteredFaceSize;
 	int64_t iMipCount = kuiPreFilteredMipCount;
 
-	std::fstream fileStream(rOutputPath, std::ios::out | std::ios::binary);
-	fileStream.write(reinterpret_cast<const char*>(&iWidth), sizeof(iWidth));
-	fileStream.write(reinterpret_cast<const char*>(&iHeight), sizeof(iHeight));
-	fileStream.write(reinterpret_cast<const char*>(&iMipCount), sizeof(iMipCount));
-	fileStream.write(reinterpret_cast<const char*>(halfData.data()), halfData.size() * sizeof(uint16_t));
-	fileStream.flush();
-	fileStream.close();
-	VERIFY_SUCCESS(fileStream.good());
+	WriteStagedIntermediate(rOutputPath, [&](std::ostream& rStream)
+	{
+		rStream.write(reinterpret_cast<const char*>(&iWidth), sizeof(iWidth));
+		rStream.write(reinterpret_cast<const char*>(&iHeight), sizeof(iHeight));
+		rStream.write(reinterpret_cast<const char*>(&iMipCount), sizeof(iMipCount));
+		rStream.write(reinterpret_cast<const char*>(halfData.data()), halfData.size() * sizeof(uint16_t));
+	});
 }
 
 // Radiance-filters every [C]-tagged .ktx cubemap that is out of date and writes the pre-filtered
-// intermediate beside the source.
-static void ProcessKtxCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext, ExpectedIblOutputs& rExpectedOutputs)
+// intermediate beside the source. Returns false when input discovery itself failed, leaving the shared
+// expected-output set incomplete.
+static bool ProcessKtxCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext, ExpectedIblOutputs& rExpectedOutputs, std::vector<diagnostic::ExportFailure>& rFailures)
 {
-	for (int64_t iInputRoot = 0; iInputRoot < static_cast<int64_t>(std::size(gpFileManager->mpInputDirectories)); ++iInputRoot)
+	try
 	{
-		const std::filesystem::path& rBaseDirectory = gpFileManager->mpInputDirectories[iInputRoot];
-		for (const std::filesystem::directory_entry& rDirectoryEntry : std::filesystem::recursive_directory_iterator(rBaseDirectory))
+		for (int64_t iInputRoot = 0; iInputRoot < static_cast<int64_t>(std::size(gpFileManager->mpInputDirectories)); ++iInputRoot)
 		{
-			if (rDirectoryEntry.path().extension() != ".ktx")
+			const std::filesystem::path& rBaseDirectory = gpFileManager->mpInputDirectories[iInputRoot];
+			for (const std::filesystem::directory_entry& rDirectoryEntry : std::filesystem::recursive_directory_iterator(rBaseDirectory))
 			{
-				continue;
+				if (rDirectoryEntry.path().extension() != ".ktx")
+				{
+					continue;
+				}
+
+				if (!HasCubemapTag(rDirectoryEntry.path()))
+				{
+					continue;
+				}
+
+				std::filesystem::path outputPath = rDirectoryEntry.path().parent_path() / rDirectoryEntry.path().stem();
+				outputPath += kPrefilteredOutputStem;
+				outputPath += TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
+				rExpectedOutputs.insert(GetExpectedOutputKey(outputPath));
+
+				try
+				{
+					std::string fingerprint = GetCubemapFingerprint("prefiltered", rDirectoryEntry.path());
+					std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
+					std::filesystem::path legacyInput = rDirectoryEntry.path();
+					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, &legacyInput, 1))
+					{
+						continue;
+					}
+					BeginOutputUpdate(metadataPath);
+
+					LOG(kDefault, kDebug, "Generating pre-filtered cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
+
+					KtxCubemapData cubemapData = LoadKtxCubemapAsFloat(rDirectoryEntry.path());
+					uint32_t uiFaceSize = cubemapData.uiFaceSize;
+					uint32_t uiPixelsPerFace = uiFaceSize * uiFaceSize;
+					uint32_t uiTotalPixels = uiPixelsPerFace * 6;
+
+					cmft::Image srcImage;
+					cmft::imageCreate(srcImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
+					cmft::Image dstImage;
+					common::ScopedLambda imageCleanup([&]()
+					{
+						cmft::imageUnload(srcImage);
+						cmft::imageUnload(dstImage);
+					});
+					std::memcpy(srcImage.m_data, cubemapData.floatData.data(), uiTotalPixels * 4 * sizeof(float));
+
+					cmft::imageRadianceFilter(dstImage, kuiPreFilteredFaceSize, cmft::LightingModel::BlinnBrdf, false, kuiPreFilteredMipCount, 14, 4, srcImage, cmft::EdgeFixup::None, uiCpuThreads, pClContext);
+
+					WriteFilteredCubemap(dstImage, outputPath);
+					CompleteOutputUpdate(metadataPath, fingerprint);
+				}
+				catch (const std::exception& rException)
+				{
+					rFailures.push_back({.assetPath = rDirectoryEntry.path(), .message = rException.what()});
+				}
 			}
-
-			if (!HasCubemapTag(rDirectoryEntry.path()))
-			{
-				continue;
-			}
-
-			std::filesystem::path outputPath = rDirectoryEntry.path().parent_path() / rDirectoryEntry.path().stem();
-			outputPath += kPrefilteredOutputStem;
-			outputPath += TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
-			rExpectedOutputs.insert(GetExpectedOutputKey(outputPath));
-
-			std::string fingerprint = GetCubemapFingerprint("prefiltered", rDirectoryEntry.path());
-			std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
-			std::filesystem::path legacyInput = rDirectoryEntry.path();
-			if (IsOutputCurrent(outputPath, metadataPath, fingerprint, &legacyInput, 1))
-			{
-				continue;
-			}
-			BeginOutputUpdate(metadataPath);
-
-			LOG(kDefault, kDebug, "Generating pre-filtered cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
-
-			KtxCubemapData cubemapData = LoadKtxCubemapAsFloat(rDirectoryEntry.path());
-			uint32_t uiFaceSize = cubemapData.uiFaceSize;
-			uint32_t uiPixelsPerFace = uiFaceSize * uiFaceSize;
-			uint32_t uiTotalPixels = uiPixelsPerFace * 6;
-
-			cmft::Image srcImage;
-			cmft::imageCreate(srcImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
-			cmft::Image dstImage;
-			common::ScopedLambda imageCleanup([&]()
-			{
-				cmft::imageUnload(srcImage);
-				cmft::imageUnload(dstImage);
-			});
-			std::memcpy(srcImage.m_data, cubemapData.floatData.data(), uiTotalPixels * 4 * sizeof(float));
-
-			cmft::imageRadianceFilter(dstImage, kuiPreFilteredFaceSize, cmft::LightingModel::BlinnBrdf, false, kuiPreFilteredMipCount, 14, 4, srcImage, cmft::EdgeFixup::None, uiCpuThreads, pClContext);
-
-			WriteFilteredCubemap(dstImage, outputPath);
-			CompleteOutputUpdate(metadataPath, fingerprint);
 		}
 	}
+	catch (const std::exception& rException)
+	{
+		rFailures.push_back({.message = std::format("Pre-filtered cubemap .ktx discovery failed, skipping orphaned-output removal: {}", rException.what())});
+		return false;
+	}
+
+	return true;
 }
 
 // Radiance-filters every [C]-tagged directory of six cube-face images (posx/negx/... .jpg or px/nx/... .png)
-// that is out of date and writes the pre-filtered intermediate beside the directory.
-static void ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext, ExpectedIblOutputs& rExpectedOutputs)
+// that is out of date and writes the pre-filtered intermediate beside the directory. Returns false when
+// input discovery itself failed, leaving the shared expected-output set incomplete.
+static bool ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext, ExpectedIblOutputs& rExpectedOutputs, std::vector<diagnostic::ExportFailure>& rFailures)
 {
-	for (int64_t iInputRoot = 0; iInputRoot < static_cast<int64_t>(std::size(gpFileManager->mpInputDirectories)); ++iInputRoot)
+	try
 	{
-		const std::filesystem::path& rBaseDirectory = gpFileManager->mpInputDirectories[iInputRoot];
-		for (const std::filesystem::directory_entry& rDirectoryEntry : std::filesystem::recursive_directory_iterator(rBaseDirectory))
+		for (int64_t iInputRoot = 0; iInputRoot < static_cast<int64_t>(std::size(gpFileManager->mpInputDirectories)); ++iInputRoot)
 		{
-			if (!rDirectoryEntry.is_directory())
+			const std::filesystem::path& rBaseDirectory = gpFileManager->mpInputDirectories[iInputRoot];
+			for (const std::filesystem::directory_entry& rDirectoryEntry : std::filesystem::recursive_directory_iterator(rBaseDirectory))
 			{
-				continue;
-			}
-
-			if (!HasCubemapTag(rDirectoryEntry.path()))
-			{
-				continue;
-			}
-
-			// Check for face files
-			bool bHasJpgFaces = std::filesystem::exists(rDirectoryEntry.path() / "posx.jpg");
-			bool bHasPngFaces = std::filesystem::exists(rDirectoryEntry.path() / "px.png");
-			if (!bHasJpgFaces && !bHasPngFaces)
-			{
-				continue;
-			}
-
-			// Output path is placed alongside the directory
-			std::filesystem::path outputPath = rDirectoryEntry.path().parent_path() / rDirectoryEntry.path().filename();
-			outputPath += kPrefilteredOutputStem;
-			outputPath += TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
-			rExpectedOutputs.insert(GetExpectedOutputKey(outputPath));
-
-			static constexpr const char* kpcJpgFaceNames[6] =
-			{
-				"posx.jpg",
-				"negx.jpg",
-				"posy.jpg",
-				"negy.jpg",
-				"posz.jpg",
-				"negz.jpg",
-			};
-			static constexpr const char* kpcPngFaceNames[6] =
-			{
-				"px.png",
-				"nx.png",
-				"py.png",
-				"ny.png",
-				"pz.png",
-				"nz.png",
-			};
-			const char* const* pFaceNames = bHasJpgFaces ? kpcJpgFaceNames : kpcPngFaceNames;
-			std::filesystem::path legacyInputs[6];
-			for (int64_t iFace = 0; iFace < 6; ++iFace)
-			{
-				legacyInputs[iFace] = rDirectoryEntry.path() / pFaceNames[iFace];
-			}
-			std::string fingerprint = GetFaceCubemapFingerprint("prefiltered", rDirectoryEntry.path(), pFaceNames);
-			std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
-			if (IsOutputCurrent(outputPath, metadataPath, fingerprint, legacyInputs, std::size(legacyInputs)))
-			{
-				continue;
-			}
-			BeginOutputUpdate(metadataPath);
-
-			LOG(kDefault, kDebug, "Generating pre-filtered cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
-
-			cmft::Image faceImages[6];
-			cmft::Image srcImage;
-			cmft::Image dstImage;
-			common::ScopedLambda imageCleanup([&]()
-			{
-				for (cmft::Image& rFaceImage : faceImages)
+				if (!rDirectoryEntry.is_directory())
 				{
-					cmft::imageUnload(rFaceImage);
+					continue;
 				}
-				cmft::imageUnload(srcImage);
-				cmft::imageUnload(dstImage);
-			});
-			for (int64_t i = 0; i < 6; ++i)
-			{
-				// stb link-resolves to the shared first-party STBI_WINDOWS_UTF8 build (cmft's vendored stb is not compiled), so imageLoadStb decodes this UTF-8 path correctly.
-				std::u8string facePath = (rDirectoryEntry.path() / pFaceNames[i]).u8string();
-				cmft::imageLoadStb(faceImages[i], reinterpret_cast<const char*>(facePath.c_str()), cmft::TextureFormat::RGBA32F);
+
+				if (!HasCubemapTag(rDirectoryEntry.path()))
+				{
+					continue;
+				}
+
+				// Check for face files
+				bool bHasJpgFaces = std::filesystem::exists(rDirectoryEntry.path() / "posx.jpg");
+				bool bHasPngFaces = std::filesystem::exists(rDirectoryEntry.path() / "px.png");
+				if (!bHasJpgFaces && !bHasPngFaces)
+				{
+					continue;
+				}
+
+				// Output path is placed alongside the directory
+				std::filesystem::path outputPath = rDirectoryEntry.path().parent_path() / rDirectoryEntry.path().filename();
+				outputPath += kPrefilteredOutputStem;
+				outputPath += TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
+				rExpectedOutputs.insert(GetExpectedOutputKey(outputPath));
+
+				try
+				{
+					static constexpr const char* kpcJpgFaceNames[6] =
+					{
+						"posx.jpg",
+						"negx.jpg",
+						"posy.jpg",
+						"negy.jpg",
+						"posz.jpg",
+						"negz.jpg",
+					};
+					static constexpr const char* kpcPngFaceNames[6] =
+					{
+						"px.png",
+						"nx.png",
+						"py.png",
+						"ny.png",
+						"pz.png",
+						"nz.png",
+					};
+					const char* const* pFaceNames = bHasJpgFaces ? kpcJpgFaceNames : kpcPngFaceNames;
+					std::filesystem::path legacyInputs[6];
+					for (int64_t iFace = 0; iFace < 6; ++iFace)
+					{
+						legacyInputs[iFace] = rDirectoryEntry.path() / pFaceNames[iFace];
+					}
+					std::string fingerprint = GetFaceCubemapFingerprint("prefiltered", rDirectoryEntry.path(), pFaceNames);
+					std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
+					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, legacyInputs, std::size(legacyInputs)))
+					{
+						continue;
+					}
+					BeginOutputUpdate(metadataPath);
+
+					LOG(kDefault, kDebug, "Generating pre-filtered cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
+
+					cmft::Image faceImages[6];
+					cmft::Image srcImage;
+					cmft::Image dstImage;
+					common::ScopedLambda imageCleanup([&]()
+					{
+						for (cmft::Image& rFaceImage : faceImages)
+						{
+							cmft::imageUnload(rFaceImage);
+						}
+						cmft::imageUnload(srcImage);
+						cmft::imageUnload(dstImage);
+					});
+					for (int64_t i = 0; i < 6; ++i)
+					{
+						// stb link-resolves to the shared first-party STBI_WINDOWS_UTF8 build (cmft's vendored stb is not compiled), so imageLoadStb decodes this UTF-8 path correctly.
+						std::u8string facePath = (rDirectoryEntry.path() / pFaceNames[i]).u8string();
+						cmft::imageLoadStb(faceImages[i], reinterpret_cast<const char*>(facePath.c_str()), cmft::TextureFormat::RGBA32F);
+					}
+
+					cmft::imageCubemapFromFaceList(srcImage, faceImages);
+
+					cmft::imageRadianceFilter(dstImage, kuiPreFilteredFaceSize, cmft::LightingModel::BlinnBrdf, false, kuiPreFilteredMipCount, 14, 4, srcImage, cmft::EdgeFixup::None, uiCpuThreads, pClContext);
+
+					WriteFilteredCubemap(dstImage, outputPath);
+					CompleteOutputUpdate(metadataPath, fingerprint);
+				}
+				catch (const std::exception& rException)
+				{
+					rFailures.push_back({.assetPath = rDirectoryEntry.path(), .message = rException.what()});
+				}
 			}
-
-			cmft::imageCubemapFromFaceList(srcImage, faceImages);
-
-			cmft::imageRadianceFilter(dstImage, kuiPreFilteredFaceSize, cmft::LightingModel::BlinnBrdf, false, kuiPreFilteredMipCount, 14, 4, srcImage, cmft::EdgeFixup::None, uiCpuThreads, pClContext);
-
-			WriteFilteredCubemap(dstImage, outputPath);
-			CompleteOutputUpdate(metadataPath, fingerprint);
 		}
 	}
+	catch (const std::exception& rException)
+	{
+		rFailures.push_back({.message = std::format("Pre-filtered cubemap face-image discovery failed, skipping orphaned-output removal: {}", rException.what())});
+		return false;
+	}
+
+	return true;
 }
 
-void GeneratePreFilteredCubemaps()
+bool GeneratePreFilteredCubemaps()
 {
 	static const uint8_t kuiCpuThreads = static_cast<uint8_t>(std::max(1u, std::thread::hardware_concurrency()));
 
@@ -539,6 +630,8 @@ void GeneratePreFilteredCubemaps()
 	// depends on kuiCpuThreads. R16G16B16A16_SFLOAT intermediates rely on a single canonical bake host
 	// for reproducibility.
 	ExpectedIblOutputs expectedOutputs;
+	std::vector<diagnostic::ExportFailure> failures;
+	bool bDiscoveryComplete = true;
 	cmft::ClContext* pClContext = nullptr;
 	const bool bClLoaded = cmft::clLoad() != 0;
 	{
@@ -556,9 +649,23 @@ void GeneratePreFilteredCubemaps()
 			pClContext = cmft::clInit(CMFT_CL_VENDOR_ANY_GPU, CMFT_CL_DEVICE_TYPE_GPU);
 		}
 
-		ProcessKtxCubemaps(kuiCpuThreads, pClContext, expectedOutputs);
-		ProcessFaceImageCubemaps(kuiCpuThreads, pClContext, expectedOutputs);
+		// Both sub-passes fill one expected-output set, so both run and either one's incomplete walk blocks
+		// the single sweep below.
+		bDiscoveryComplete &= ProcessKtxCubemaps(kuiCpuThreads, pClContext, expectedOutputs, failures);
+		bDiscoveryComplete &= ProcessFaceImageCubemaps(kuiCpuThreads, pClContext, expectedOutputs, failures);
 	}
 
-	ReconcileIblOutputs(expectedOutputs, kPrefilteredOutputStem);
+	if (bDiscoveryComplete)
+	{
+		try
+		{
+			ReconcileIblOutputs(expectedOutputs, kPrefilteredOutputStem);
+		}
+		catch (const std::exception& rException)
+		{
+			failures.push_back({.message = std::format("Pre-filtered cubemap orphaned-output removal failed: {}", rException.what())});
+		}
+	}
+
+	return ReportIblFailures("pre-filtered", failures);
 }

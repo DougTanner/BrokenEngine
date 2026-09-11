@@ -32,33 +32,6 @@ struct ExportedIsland
 	float fMaxHeightMeters = 0.0f;
 };
 
-// ExportJob's own fingerprint marker helpers are TU-local to ExportJob.cpp; the texture-stage marker
-// gets its own pair here. Plain text (no magic / version prefix): the stored bytes are the whole
-// comparison, and kiTextureVersion inside the fingerprint already invalidates every stale marker.
-std::optional<std::string> ReadTextureMarkerFile(const std::filesystem::path& rPath)
-{
-	std::ifstream stream(rPath, std::ios::binary);
-	if (!stream)
-	{
-		return std::nullopt;
-	}
-	std::string fingerprint {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
-	return !stream.bad() ? std::optional(std::move(fingerprint)) : std::nullopt;
-}
-
-// Write-then-rename: a torn marker would otherwise read back as a fingerprint mismatch at best and a
-// truncated match at worst, adopting a half-written encode as fresh.
-void WriteTextureMarkerFile(const std::filesystem::path& rPath, std::string_view fingerprint)
-{
-	std::filesystem::path temporaryPath = rPath;
-	temporaryPath += ".tmp";
-	std::ofstream stream(temporaryPath, std::ios::binary | std::ios::trunc);
-	stream.write(fingerprint.data(), static_cast<std::streamsize>(fingerprint.size()));
-	stream.close();
-	VERIFY_SUCCESS(stream.good());
-	VERIFY_SUCCESS(MoveFileExW(temporaryPath.native().c_str(), rPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
-}
-
 size_t CheckedProduct(size_t uiLeft, size_t uiRight, std::string_view what)
 {
 	if (uiRight != 0 && uiLeft > std::numeric_limits<size_t>::max() / uiRight)
@@ -624,13 +597,13 @@ bool ExportIsland::AreTexturesFresh() const
 		return false;
 	}
 
-	std::optional<std::string> markerFingerprint = ReadTextureMarkerFile(GetTextureMarkerPath());
+	std::optional<std::string> markerFingerprint = ReadMarkerFile(GetTextureMarkerPath());
 	return markerFingerprint.has_value() && markerFingerprint.value() == GetTextureFingerprint();
 }
 
 void ExportIsland::WriteTextureMarker() const
 {
-	WriteTextureMarkerFile(GetTextureMarkerPath(), GetTextureFingerprint());
+	WriteMarkerFile(GetTextureMarkerPath(), GetTextureFingerprint());
 }
 
 bool ExportIsland::CheckDirty(const std::filesystem::path& rPackFile)

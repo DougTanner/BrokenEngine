@@ -48,6 +48,12 @@ protected:
 	virtual std::string GetInputFingerprint() const;
 	virtual void UpdateCacheMetadata() {}
 
+	// Output-freshness marker sidecar, shared by the jobs whose generated outputs are tracked in the checkout.
+	// Plain text (no magic / version prefix): the stored bytes are the whole comparison, and the caller puts its
+	// own version inside the fingerprint string, so a stale marker can never compare equal.
+	static std::optional<std::string> ReadMarkerFile(const std::filesystem::path& rPath);
+	static void WriteMarkerFile(const std::filesystem::path& rPath, std::string_view fingerprint);
+
 	std::tuple<common::ChunkHeader*, std::span<std::byte>> AllocateHeaderAndData(int64_t iDataSize);
 
 	std::vector<std::byte> mHeaderAndData;

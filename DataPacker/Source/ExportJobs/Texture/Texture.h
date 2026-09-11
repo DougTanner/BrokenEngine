@@ -68,6 +68,15 @@ std::vector<std::byte> Lz4Compress(const std::byte* puiSource, int64_t iSourceSi
 // valid inputs. Shared by ExportTexture's KTX cubemap path and the IBL cubemap pre-pass (ExportCubemapIbl).
 gli::texture LoadGliFromPath(const std::filesystem::path& rPath);
 
+// Publishes an intermediate at `rPath`: opens a private, untagged sibling stage, lets `rWriteBody` emit the
+// whole file into that stream, verifies the writes, flush, and close, then replaces the final with
+// MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH); any throw removes this call's own stage.
+// The untagged stage name keeps texture routing off a partial file, and a failed write leaves the previous
+// complete final in place. The callback owns the byte layout, so the magic-prefixed Texture::Save files and
+// the magic-less half-float IBL cubemap intermediates share one placement envelope without either buffering
+// its header and payload into a single contiguous range.
+void WriteStagedIntermediate(const std::filesystem::path& rPath, const std::function<void(std::ostream&)>& rWriteBody);
+
 // Parsed header of a Texture::Save'd texture intermediate plus the offset where its payload begins.
 // Texture::Save writes [magic][width][height][mipCount][payload]; legacy files omit the magic (a
 // 3-qword header). bHadMagic distinguishes the two; the payload occupies [iPayloadOffset, buffer end).
