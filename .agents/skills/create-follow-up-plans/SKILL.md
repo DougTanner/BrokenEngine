@@ -31,6 +31,9 @@ under `Documents/Plans/<area>/`, with tracked scheduler metadata.
   `/next-plan` run sources the values per
   `.agents/skills/next-plan/references/follow-up-provenance.md`.
 
+The worker creates the Plan file with the repository-owned Plan-file writer
+script, so a brief must not name a writer.
+
 ## Handoff
 
 Return the shared handoff from `.agents/references/subagent-handoff.md`
