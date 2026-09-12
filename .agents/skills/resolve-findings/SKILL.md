@@ -86,6 +86,12 @@ complete. Use `PASS` when every assigned item is fixed with no fix-work
 residual, `NEEDS_ACTION` when manager action remains, and `BLOCKED` when
 missing required evidence prevents work.
 
+A round that resumes this worker with a newly assigned item returns this same
+handoff, narrowed to that round: the item table carries only the newly assigned
+item's row, `Changed files` only the rows this round produced, and `Decisive
+checks` only this round's rows; the extension fields keep their shapes and
+report this round's state.
+
 ## References
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you
