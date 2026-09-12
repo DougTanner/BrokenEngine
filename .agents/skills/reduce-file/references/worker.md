@@ -66,9 +66,12 @@ live in [`../SKILL.md`](../SKILL.md).
 9. For every added or removed `.cpp` or `.h`, return the project/filter
    membership change as an `/update-vcxproj` trigger; do not hand-edit project
    XML. Done when every membership change is present in the handoff.
-10. Return exact `Build required` rows for every affected target, naming
-    configuration/platform and each selected project-member `.cpp`; for changed
-    headers, name every consuming target. Return each runtime-observable
+10. Return exact `Build required` rows naming every affected target and that
+    target's configuration/platform inline; when the field would push past the
+    shared row cap, only the per-`.cpp` selected project-member path and each
+    changed header's consuming targets move with the overflow, on the shared
+    form's terms, and the rows stay executable without rediscovery wherever
+    that detail sits. Return each runtime-observable
     acceptance criterion as a runtime request naming setup, action, observation,
     and required evidence. Main schedules `/compile` and runtime verification at
     their owning stages. Done when those requests are complete, or none apply.

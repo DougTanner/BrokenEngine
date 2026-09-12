@@ -60,8 +60,10 @@ extended with these fields:
 - `Reviewer focus areas` — the contract and failure condition to try to
   disprove, or none.
 
-Each shared `Build required` row names the exact target,
-configuration/platform, and project-member path, using `none` when absent.
+Each shared `Build required` row names its distinct target and that target's
+configuration/platform inline in every case, using `none` when absent; only the
+per-file project-member paths move with an overflow, and the row stays
+executable without rediscovery wherever that detail sits.
 Each shared `Residuals` row names an affected site not updated, incomplete
 search, ownership conflict, or unclassified hit, using `none` when absent.
 
@@ -73,7 +75,10 @@ Trigger outcomes: <settled>/<total> settled
 <trigger> — UNRESOLVED — owner <owner> — action <action> — <path-plus-selector | Decisive checks row | Residuals row>
 ```
 
-Name each changed file once. `PASS` requires every trigger resolved or refuted
+Name each changed file once, and when the changed set would push a field past
+the shared row cap give the count in `Changed files` and move the per-file rows
+to the file cited under `Evidence` as path plus `##` selector, on the shared
+form's terms. `PASS` requires every trigger resolved or refuted
 and every planned search complete; requested builds remain `builder` work
 dispatched by the manager rather than passed checks.
 

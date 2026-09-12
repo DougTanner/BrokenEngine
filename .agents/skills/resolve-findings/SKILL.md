@@ -75,9 +75,15 @@ follows the over-cap file rule in `../../references/subagent-handoff.md`,
 - `Reviewer focus areas` — the condition the independent verifier must try to
   disprove, or none.
 
-Name each changed file once. Each shared `Build required` row names its target,
-configuration/platform, and the selected project-member `.cpp`; a changed
-header gets one row per consuming target and configuration/platform. Each
+Name each changed file once, and when the changed set would push a field past
+the shared row cap give the count in `Changed files` and move the per-file rows
+to the file cited under `Evidence` as path plus `##` selector, on the shared
+form's terms. Each shared `Build required` row names its distinct target and
+that target's configuration/platform inline in every case; only the per-file
+attribution — which selected project-member `.cpp` belongs to which target, and
+which targets consume a changed header — moves with the overflow. Build
+requests must be executable without rediscovery wherever the per-`.cpp` detail
+sits, inline or in that cited file. Each
 shared `Residuals` row names the unresolved or out-of-scope item, its
 evidence, and the next owner/action. A requested build is `builder` work
 dispatched by the manager, not a passed check. The manager dispatches

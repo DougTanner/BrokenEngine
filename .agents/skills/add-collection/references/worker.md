@@ -134,9 +134,12 @@ runner applies. The purpose and the triggers live in
     the blocking rule:
     [`../../../references/collection-layout-auditor.md`](../../../references/collection-layout-auditor.md).
     Done when the run reports no violation.
-18. Return an exact `Build required` request for every affected client/server
-    target, naming configuration/platform and each selected project-member
-    `.cpp`; for changed headers, name every consuming target. Main schedules
+18. Return an exact `Build required` request naming every affected
+    client/server target and that target's configuration/platform inline; when
+    the field would push past the shared row cap, only the per-`.cpp` selected
+    project-member path and each changed header's consuming targets move with
+    the overflow, on the shared form's terms, and the request stays executable
+    without rediscovery wherever that detail sits. Main schedules
     `/compile` after the C++ and project-membership stages are complete. Done
     when every affected target is present in that request.
 19. Return each runtime-observable acceptance criterion as an exact runtime
