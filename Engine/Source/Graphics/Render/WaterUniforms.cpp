@@ -57,6 +57,8 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	XMStoreFloat4A(&f4CameraPos, engine::gpCamera->mVecPosition);
 	rGlobalLayout.fWaterOriginX = f4CameraPos.x;
 	rGlobalLayout.fWaterOriginY = f4CameraPos.y;
+	gPresentationContinuity.cameraBasisCoord = engine::gpCamera->mBasisCoord;
+	gPresentationContinuity.f2WaterOrigin = {f4CameraPos.x, f4CameraPos.y};
 
 	double dSizeBaseOne = static_cast<double>(gLightingSampledNormalsOneSize.Get());
 	double dSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.Get());
@@ -157,8 +159,12 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	// fract(). Non-tenths slider values break this property and expose a seam. fWaterReducedNormalOrigin uses the same constraint with fixed
 	// per-octave multipliers.
 	double dNoiseFreq = static_cast<double>(gWaterColorNoiseFrequency.Get());
-	rGlobalLayout.fWaterReducedNoiseOriginX = static_cast<float>(std::fmod(dNoiseFreq * dCameraX, 10.0));
-	rGlobalLayout.fWaterReducedNoiseOriginY = static_cast<float>(std::fmod(dNoiseFreq * dCameraY, 10.0));
+	XMFLOAT2 f2ReducedNoiseOrigin {static_cast<float>(std::fmod(dNoiseFreq * dCameraX, 10.0)), static_cast<float>(std::fmod(dNoiseFreq * dCameraY, 10.0))};
+	rGlobalLayout.fWaterReducedNoiseOriginX = f2ReducedNoiseOrigin.x;
+	rGlobalLayout.fWaterReducedNoiseOriginY = f2ReducedNoiseOrigin.y;
+	gPresentationContinuity.f2ReducedNoiseOrigin = f2ReducedNoiseOrigin;
+	gPresentationContinuity.fNoiseFrequency = static_cast<float>(dNoiseFreq);
+	++gPresentationContinuity.iPublishedFrames;
 }
 
 // Cross-TU ordering contract: RenderFrameGlobal (GlobalUniforms.cpp) calls this exactly once per frame,

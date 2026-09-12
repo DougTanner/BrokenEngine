@@ -4,6 +4,8 @@
 
 #include "Agent/AgentCommandsClientGeneric.h"
 
+#include "Agent/Commands/PresentationContinuityProbe.h"
+
 namespace engine
 {
 
@@ -1195,6 +1197,11 @@ bool ExecuteClientAgentCommand(std::string_view cmd, const nlohmann::json& rPara
 	if (cmd == "query_profile")
 	{
 		CommandQueryProfile(rParams, rResult, rProfileManager);
+		return true;
+	}
+	if (cmd == "presentation_continuity_probe")
+	{
+		CommandPresentationContinuityProbe(rParams, rResult);
 		return true;
 	}
 	return false;

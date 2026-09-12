@@ -17,6 +17,13 @@ static void PopulatePreviousSmokeAreaSizeInv(shaders::GlobalLayout& rGlobalLayou
 	rGlobalLayout.f2PreviousSmokeAreaSizeInv.y = 1.0f / (rArea.w - rArea.y);
 }
 
+// Smoke has three publishing exits, each with its own area pair; report whichever pair this frame actually published.
+static void PublishSmokeContinuity(const XMFLOAT4& rf4CurrentArea, const XMFLOAT4& rf4PreviousArea)
+{
+	gPresentationContinuity.smoke.f4CurrentArea = rf4CurrentArea;
+	gPresentationContinuity.smoke.f4PreviousArea = rf4PreviousArea;
+}
+
 void RenderSmokeGlobal(int64_t iCommandBuffer)
 {
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
@@ -83,6 +90,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	else
 	{
 		gbSmokeClear = true;
+		++gPresentationContinuity.smoke.iHistoryResets;
 	}
 
 	if (gbSmokeClear)
@@ -93,6 +101,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 		rGlobalLayout.f4PreviousSmokeArea = f4CurrentSmokeArea;
 		PopulatePreviousSmokeAreaSizeInv(rGlobalLayout, f4CurrentSmokeArea);
 		sf4PreviousSmokeArea = f4CurrentSmokeArea;
+		PublishSmokeContinuity(f4CurrentSmokeArea, f4CurrentSmokeArea);
 
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].WriteIndirectBuffer(iCommandBuffer, 1);
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearB].WriteIndirectBuffer(iCommandBuffer, 1);
@@ -105,6 +114,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 		rGlobalLayout.f4SmokeArea = sf4PreviousSmokeArea;
 		rGlobalLayout.f4PreviousSmokeArea = sf4PreviousSmokeArea;
 		PopulatePreviousSmokeAreaSizeInv(rGlobalLayout, sf4PreviousSmokeArea);
+		PublishSmokeContinuity(sf4PreviousSmokeArea, sf4PreviousSmokeArea);
 
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].WriteIndirectBuffer(iCommandBuffer, 0);
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearB].WriteIndirectBuffer(iCommandBuffer, 0);
@@ -115,6 +125,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.f4SmokeArea = f4CurrentSmokeArea;
 	rGlobalLayout.f4PreviousSmokeArea = sf4PreviousSmokeArea;
 	PopulatePreviousSmokeAreaSizeInv(rGlobalLayout, sf4PreviousSmokeArea);
+	PublishSmokeContinuity(f4CurrentSmokeArea, sf4PreviousSmokeArea);
 	sf4PreviousSmokeArea = f4CurrentSmokeArea;
 
 	gpPipelineManager->mpPipelines[kPipelineSmokeClearA].WriteIndirectBuffer(iCommandBuffer, 0);

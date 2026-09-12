@@ -91,6 +91,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	{
 		gbLightingTemporalReset = true;
 		sbHeldVisibleArea = false;
+		++gPresentationContinuity.lighting.iHistoryResets;
 	}
 	sbLightingRefreshFrame = bScheduledRefresh || !sTemporalAreaLatch.bInitialized || !sbHeldVisibleArea
 	                      || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rVisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
@@ -107,6 +108,8 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 		rGlobalLayout.f4LightingAreaPrevious = sTemporalAreaLatch.f4PreviousArea;
 		rGlobalLayout.fLightingTemporalBlend = sTemporalAreaLatch.fBlend;
 	}
+	gPresentationContinuity.lighting.f4CurrentArea = sTemporalAreaLatch.f4CurrentArea;
+	gPresentationContinuity.lighting.f4PreviousArea = sTemporalAreaLatch.f4PreviousArea;
 
 	// Lighting-area extent reciprocal (LightingSpread.frag world->texcoord multiply).
 	const XMFLOAT4& rLightingArea = sTemporalAreaLatch.f4CurrentArea;

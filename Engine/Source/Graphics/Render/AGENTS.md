@@ -23,6 +23,7 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 - Rotate camera origins into the shader's pattern space before reduction, and preserve integral shader-side wrap multipliers. These CPU reductions are the precision owner for distant-world water sampling.
 - Retained world rectangles — shadow and lighting history areas and the held visible area — are expressed in the camera cell's frame and carry it through `RetainedAreaBasis` (`Render.h`).
 - Lighting snaps its footprint to the light-deposit grid; shadow snaps to its own world-sized texel grid. Both publish current and previous areas for temporal sampling, and recreation reseeds history from the current area for one frame.
+- Each frame that publishes also copies what it published — camera basis, water origins, and each owner's area pair and history-reset count — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
 - Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
 
 ## Area Roles

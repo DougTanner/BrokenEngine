@@ -326,8 +326,15 @@ static void PopulateShadowArea(shaders::GlobalLayout& rGlobalLayout, float fShad
 	else
 	{
 		gbShadowTemporalReset = true;
+		++gPresentationContinuity.shadow.iHistoryResets;
 	}
-	rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbShadowTemporalReset, gShadowTemporalBlend.Get(), rGlobalLayout.f4ShadowAreaPrevious);
+	// The latch publishes the previous area through a local so the probe snapshot can report the same rectangle the
+	// mapped write-only layout receives.
+	XMFLOAT4 f4PreviousArea {};
+	rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbShadowTemporalReset, gShadowTemporalBlend.Get(), f4PreviousArea);
+	rGlobalLayout.f4ShadowAreaPrevious = f4PreviousArea;
+	gPresentationContinuity.shadow.f4CurrentArea = area.f4Area;
+	gPresentationContinuity.shadow.f4PreviousArea = f4PreviousArea;
 
 	rfWorldTexelX = area.fWorldTexelX;
 	rfFullWidth = area.fFullWidth;
