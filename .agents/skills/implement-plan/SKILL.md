@@ -57,8 +57,12 @@ extended with these fields:
 - `Propagation required` — `/update-affected-code` with the code scope, or
   `N/A — no code changed`.
 - `Reviewer focus areas` — verify X holds when Y, or none.
-- `Runtime acceptance requests` — setup, action, observation, and required
-  evidence per criterion; or none.
+- `Runtime acceptance requests` — for the criteria that live in a plan file
+  this handoff already cites, one citation row giving that path plus its `##`
+  selector, then one row per such criterion whose setup, action, observation,
+  or required evidence the plan does not already state, naming the criterion
+  and giving only those parts; for each criterion with no such cited home, one
+  row giving those four parts; or none.
 
 Each shared `Build required` row names its distinct target and that target's
 configuration/platform inline in every case; when a field overflows, only the
