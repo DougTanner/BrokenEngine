@@ -67,8 +67,9 @@ void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, Play
 	// Fleet navigation: navigate toward fleet's wanted coord after countdown expires
 	if (!(fleetWantedCoord == rStaticData.coord) && uiPendingFleetWantedCoordTicks == 0)
 	{
-		int32_t iDeltaX = fleetWantedCoord.x - rStaticData.coord.x;
-		int32_t iDeltaY = fleetWantedCoord.y - rStaticData.coord.y;
+		// Two coords anywhere in the signed-int32 identity range can separate by more than int32 holds, so each converts to int64 ahead of the subtraction.
+		int64_t iDeltaX = static_cast<int64_t>(fleetWantedCoord.x) - static_cast<int64_t>(rStaticData.coord.x);
+		int64_t iDeltaY = static_cast<int64_t>(fleetWantedCoord.y) - static_cast<int64_t>(rStaticData.coord.y);
 
 		// Check if already heading in a valid direction toward wanted coord
 		bool bAlreadyValid = false;
