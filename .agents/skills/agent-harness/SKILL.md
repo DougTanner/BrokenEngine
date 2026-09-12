@@ -25,7 +25,7 @@ length-prefixed JSON.
 
 ## Inputs
 
-Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, and normalized `GameDataDirectory`.
+Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, and normalized `GameDataDirectory`. The brief may state a wall-clock budget for the run; otherwise a 20-minute default applies.
 
 ## Handoff
 
@@ -62,8 +62,8 @@ extended with these fields:
   by the `FAIL` and `BLOCKED` criteria on the row form below. A criterion
   passes only when its existing runtime check passes.
 
-Each shared `Residuals` row names a missing capability or environment; use
-`none` when absent.
+Each shared `Residuals` row names a missing capability or environment, or a
+criterion left unsettled by the run budget; use `none` when absent.
 
 Each exception row cites the handoff row or path plus selector that holds its
 settling evidence and never restates it:
@@ -84,10 +84,12 @@ harness and never edits a file.
 
 Any `FAIL` or out-of-criterion process finding makes the shared `Status`
 `NEEDS_ACTION`, including a run that also has blocked criteria. Otherwise, any
-blocked prerequisite, capability, or environment makes it `BLOCKED`; when
-every criterion passes, it is `PASS`.
+blocked prerequisite, capability, or environment, or an exhausted run budget
+or attempt cap, makes it `BLOCKED`; when every criterion passes, it is
+`PASS`.
 A failed or blocked in-scope criterion remains incomplete until the
-capability/environment is supplied or the user explicitly revises acceptance.
+capability/environment is supplied, the run is repeated, or the user
+explicitly revises acceptance.
 
 ## References
 

@@ -419,7 +419,7 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 #endif // BT_CLIENT
 
 	SpawnBlasters(rFrame);
-	SpawnMissiles(rFrame);
+	SpawnMissiles(rFrame, rStaticData);
 	SpawnDeathExplosions(rFrame);
 }
 

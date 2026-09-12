@@ -644,6 +644,19 @@ and the handoff this run returns.
 - Never infer an identity, switch data mode, fall back to Shared data, or run
   DataPacker/Gaea/texture export.
 - An owner mismatch is a hard stop. Never remove coordination state manually.
+- The run holds the one client/server slot on the machine, so it is bounded:
+  a wall-clock budget (the brief's, or the default that `../SKILL.md`
+  `## Inputs` states) measured from the moment the claim succeeds (a
+  quit-and-reclaim restarts it), and at most three attempts per criterion
+  where the process-check rules allow a retry at all. A criterion that has not
+  settled within its attempts is `BLOCKED`, with each attempt's commands and
+  observations recorded as `Decisive checks` rows. At the wall-clock budget,
+  start no further command (a helper wait already in flight runs to its own
+  deadline), mark every unsettled criterion `BLOCKED`, release through the
+  lifecycle and release steps below, and return the handoff. Never repeat a
+  scenario past its attempt cap or keep the slot to perfect a criterion; a
+  partial handoff with the slot released beats a complete one that never
+  arrives.
 - Prefer a script over the image. Most visual criteria — frame non-black, region
   matches an expected color, two captures differ, pixel count past a threshold —
   are assertions a few lines of code settle more precisely than an eye on a
