@@ -51,7 +51,7 @@ extern uint8_t gSpaceshipHitFlashControllerTypeIndex;
 // Forward declaration (defined in Spaceships.cpp)
 void SpawnSpaceshipExplosion(Frame& __restrict rFrame, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent);
 
-static void XM_CALLCONV BeginExplosion(Frame& rFrame, int64_t i, FXMVECTOR vecDamageDirection)
+static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoord, int64_t i, FXMVECTOR vecDamageDirection)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
@@ -68,7 +68,7 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, int64_t i, FXMVECTOR vecDa
 
 	// Play explosion audio
 #if defined(BT_CLIENT)
-	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, rCurrentInterpolate.pVecPositions[i], gSpaceshipDeathVolume.Get(), gSpaceshipDeathPitchMin.Get(), gSpaceshipDeathPitchRandom.Get());
+	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, emitterCoord, rCurrentInterpolate.pVecPositions[i], gSpaceshipDeathVolume.Get(), gSpaceshipDeathPitchMin.Get(), gSpaceshipDeathPitchRandom.Get());
 #endif
 
 	XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
@@ -118,7 +118,7 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 		sCollisionDamages.at(static_cast<size_t>(i)) = kfSpaceshipCollisionDamage;
 		rCollisionScratch.startTimes.at(static_cast<size_t>(i)) = 0.0f;
 		rCollisionScratch.endTimes.at(static_cast<size_t>(i)) = 1.0f;
-		engine::SegmentHit boundaryHit = engine::TracePointToFrameExit(rStaticData.vecArea, rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		engine::SegmentHit boundaryHit = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.maxTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
 
@@ -151,7 +151,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 		return;
 	}
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -173,7 +173,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 
 					// Play hit sound
 #if defined(BT_CLIENT)
-					engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.Get());
+					engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coord, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.Get());
 #endif
 
 					// Spawn hit flash effect at collision point
@@ -184,7 +184,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 					if (rCurrentPostRender.pfHealths[i] <= 0.0f)
 					{
 						XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorNegate(rResult.vecOtherVelocity));
-						BeginExplosion(rFrame, i, vecDamageDirection);
+						BeginExplosion(rFrame, rStaticData.coord, i, vecDamageDirection);
 						break;
 					}
 				}
@@ -227,7 +227,7 @@ void SpaceshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame,
 		if (rCurrentPostRender.pfHealths[i] <= 0.0f)
 		{
 			XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecClosestSource, rCurrentInterpolate.pVecPositions[i]));
-			BeginExplosion(rFrame, i, vecDamageDirection);
+			BeginExplosion(rFrame, rStaticData.coord, i, vecDamageDirection);
 		}
 	}
 }

@@ -12,7 +12,7 @@
 namespace engine
 {
 
-static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoords)
+static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
 {
 	if constexpr (!kbDebugRender)
 	{
@@ -30,12 +30,14 @@ static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoords)
 			continue;
 		}
 
+		// Every cell has the same local edges; the basis offset is what places this one on screen.
 		// vecArea packing: x=minX, y=maxY, z=maxX, w=minY
-		XMVECTOR vecArea = it->second.staticData.vecArea;
-		float fMinX = XMVectorGetX(vecArea);
-		float fMaxY = XMVectorGetY(vecArea);
-		float fMaxX = XMVectorGetZ(vecArea);
-		float fMinY = XMVectorGetW(vecArea);
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
+		XMVECTOR vecArea = LocalFrameArea();
+		float fMinX = XMVectorGetX(vecArea) + f2Offset.x;
+		float fMaxY = XMVectorGetY(vecArea) + f2Offset.y;
+		float fMaxX = XMVectorGetZ(vecArea) + f2Offset.x;
+		float fMinY = XMVectorGetW(vecArea) + f2Offset.y;
 
 		XMFLOAT3A f3MinMin = {fMinX, fMinY, fZ};
 		XMFLOAT3A f3MaxMin = {fMaxX, fMinY, fZ};
@@ -49,7 +51,7 @@ static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoords)
 	}
 }
 
-static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoords)
+static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
 {
 	if constexpr (!kbDebugRender)
 	{
@@ -67,6 +69,9 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 			continue;
 		}
 
+		// Placement positions are local to this cell; the rotate helper is the one point that converts them.
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
+
 		for (const IslandPlacement& rPlacement : it->second.staticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
@@ -77,7 +82,7 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 
 			auto rotate = [&](float fLocalX, float fLocalY)
 			{
-				return XMFLOAT3A {rPlacement.f2WorldPos.x + fLocalX * fCos - fLocalY * fSin, rPlacement.f2WorldPos.y + fLocalX * fSin + fLocalY * fCos, fZ};
+				return XMFLOAT3A {rPlacement.f2WorldPos.x + f2Offset.x + fLocalX * fCos - fLocalY * fSin, rPlacement.f2WorldPos.y + f2Offset.y + fLocalX * fSin + fLocalY * fCos, fZ};
 			};
 
 			XMFLOAT3A f3C0 = rotate(-fHalfX, -fHalfY);
@@ -93,7 +98,7 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 	}
 }
 
-static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoords)
+static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
 {
 	if constexpr (!kbDebugRender)
 	{
@@ -114,6 +119,9 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 			continue;
 		}
 
+		// Placement positions are local to this cell; the rotate helper is the one point that converts them.
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
+
 		for (const IslandPlacement& rPlacement : it->second.staticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
@@ -127,7 +135,7 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 
 			auto rotate = [&](const XMFLOAT2& rVert)
 			{
-				return XMFLOAT3A {rPlacement.f2WorldPos.x + rVert.x * fCos - rVert.y * fSin, rPlacement.f2WorldPos.y + rVert.x * fSin + rVert.y * fCos, fZ};
+				return XMFLOAT3A {rPlacement.f2WorldPos.x + f2Offset.x + rVert.x * fCos - rVert.y * fSin, rPlacement.f2WorldPos.y + f2Offset.y + rVert.x * fSin + rVert.y * fCos, fZ};
 			};
 
 			int32_t iCount = rTemplate.miValidAreaVertexCount;
@@ -141,7 +149,7 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 	}
 }
 
-static void DebugRenderNavData(const std::vector<GridCoord>& rActiveCoords)
+static void DebugRenderNavData(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
 {
 	if constexpr (!kbDebugRender)
 	{
@@ -161,6 +169,8 @@ static void DebugRenderNavData(const std::vector<GridCoord>& rActiveCoords)
 		}
 
 		const NavData& rNav = it->second.staticData.navData;
+		// Nav vertices are local to this cell; the two draw sites below are this helper's conversion point.
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
 
 		// Polygon edges
 		for (int64_t iPoly = 0; iPoly < static_cast<int64_t>(rNav.polygonOffsets.size()); ++iPoly)
@@ -171,8 +181,8 @@ static void DebugRenderNavData(const std::vector<GridCoord>& rActiveCoords)
 			for (int64_t iVert = iStart; iVert < iEnd; ++iVert)
 			{
 				int64_t iNext = (iVert + 1 < iEnd) ? iVert + 1 : iStart;
-				XMFLOAT3A f3A = {rNav.vertices[iVert].x, rNav.vertices[iVert].y, fZ};
-				XMFLOAT3A f3B = {rNav.vertices[iNext].x, rNav.vertices[iNext].y, fZ};
+				XMFLOAT3A f3A = {rNav.vertices[iVert].x + f2Offset.x, rNav.vertices[iVert].y + f2Offset.y, fZ};
+				XMFLOAT3A f3B = {rNav.vertices[iNext].x + f2Offset.x, rNav.vertices[iNext].y + f2Offset.y, fZ};
 				DebugRender::Line(f3A, f3B, kf4PolygonColor);
 			}
 		}
@@ -180,7 +190,7 @@ static void DebugRenderNavData(const std::vector<GridCoord>& rActiveCoords)
 		// Vertex markers
 		for (const XMFLOAT2& rVert : rNav.vertices)
 		{
-			DebugRender::Circle({rVert.x, rVert.y, fZ}, 0.75f, kf4VertexColor);
+			DebugRender::Circle({rVert.x + f2Offset.x, rVert.y + f2Offset.y, fZ}, 0.75f, kf4VertexColor);
 		}
 	}
 }
@@ -411,8 +421,12 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, shaders::Glo
 	double dWaveTime = static_cast<double>(rGlobalLayout.fElapsedTime);
 	XMFLOAT4A f4WaveCameraPos {};
 	XMStoreFloat4A(&f4WaveCameraPos, engine::gpCamera->mVecPosition);
-	double dWaveCameraX = static_cast<double>(f4WaveCameraPos.x);
-	double dWaveCameraY = static_cast<double>(f4WaveCameraPos.y);
+	// WaterDisplacement.comp adds dot(direction, worldPosition - waterOrigin) to this term, so the term must carry the
+	// absolute camera position for the wave phase to be continuous: reconstruct it as a double from the camera cell
+	// and the camera's local position, exactly as the reduced water origins do. CPU only — the uploaded phase is
+	// already reduced modulo 2*pi.
+	double dWaveCameraX = static_cast<double>(engine::gpCamera->mBasisCoord.x) * static_cast<double>(kfCellWidth) + static_cast<double>(f4WaveCameraPos.x);
+	double dWaveCameraY = static_cast<double>(engine::gpCamera->mBasisCoord.y) * static_cast<double>(kfCellHeight) + static_cast<double>(f4WaveCameraPos.y);
 
 	// Fade geometric wave amplitudes by camera eye height — per-stack Start/End sliders (1.0 at ≤ Start, 0.0 at ≥ End, linear between).
 	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;
@@ -563,10 +577,10 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		}
 	}
 
-	DebugRenderNavData(rActiveCoords);
-	DebugRenderFrameEdges(rActiveCoords);
-	DebugRenderIslandBoundaries(rActiveCoords);
-	DebugRenderIslandValidArea(rActiveCoords);
+	DebugRenderNavData(rActiveCoords, cameraCoord);
+	DebugRenderFrameEdges(rActiveCoords, cameraCoord);
+	DebugRenderIslandBoundaries(rActiveCoords, cameraCoord);
+	DebugRenderIslandValidArea(rActiveCoords, cameraCoord);
 
 	DebugRender::BeginRender(iCommandBuffer);
 	DebugRender::EndRender(iCommandBuffer);

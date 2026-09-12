@@ -119,6 +119,8 @@ struct FramePostRender : public engine::FramePostRenderBase
 
 // Cross-cell transfer producers push through these two calls: the split keeps the capacity-hit LOG
 // and DEBUG_BREAK between them, reading the pre-push size and capacity.
+// PrepareTransferRequest fills the per-axis delta and rewrites rRequest.data.vecPosition into the
+// destination cell's local frame; no consumer downstream converts it again.
 [[nodiscard]] bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest);
 void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rRequest);
 

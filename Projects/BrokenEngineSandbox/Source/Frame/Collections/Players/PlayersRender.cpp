@@ -72,7 +72,9 @@ struct RenderActiveGuard
 	}
 };
 
-static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict rSpaceships, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPosition, FXMVECTOR vecWantedDirection)
+// Every position here is local to the rendered cell, so each one converts into the camera cell's frame where it is
+// handed to the debug renderer; the distances and directions are computed in the local frame, which is the same.
+static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict rSpaceships, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPosition, FXMVECTOR vecWantedDirection, const engine::RenderBasis& rBasis)
 {
 	// Red line to nearest alive spaceship
 	float fClosestDistanceSq = std::numeric_limits<float>::max();
@@ -100,7 +102,7 @@ static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict 
 		// Yellow reticle at the lead-intercept point: where the player must aim so blasters land on the moving spaceship
 		XMVECTOR vecLead = common::ComputeLeadPosition(vecPosition, vecClosestPosition, rSpaceshipsPostRender.pVecVelocities[iClosestSpaceship], kfPlayerBlastersSpeed);
 		XMFLOAT3A f3Lead {};
-		XMStoreFloat3A(&f3Lead, vecLead);
+		XMStoreFloat3A(&f3Lead, engine::Rebase(rBasis, vecLead));
 		engine::DebugRender::Circle(f3Lead, kfPlayerRadius * 0.5f, {1.0f, 1.0f, 0.0f, 1.0f});
 
 		// Red line shows the player's wanted-aim direction scaled to the lead distance. The wanted
@@ -110,8 +112,8 @@ static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict 
 		XMVECTOR vecLineEnd = XMVectorAdd(vecPosition, XMVectorScale(vecWantedDirection, fDistanceToLead));
 		XMFLOAT3A f3Start {};
 		XMFLOAT3A f3End {};
-		XMStoreFloat3A(&f3Start, vecPosition);
-		XMStoreFloat3A(&f3End, vecLineEnd);
+		XMStoreFloat3A(&f3Start, engine::Rebase(rBasis, vecPosition));
+		XMStoreFloat3A(&f3End, engine::Rebase(rBasis, vecLineEnd));
 		engine::DebugRender::Line(f3Start, f3End, {1.0f, 0.0f, 0.0f, 1.0f});
 	}
 }
@@ -134,7 +136,7 @@ static std::pair<bool, XMVECTOR> FindFlagshipPosition(const PlayersInterpolate& 
 	return {false, XMVectorZero()};
 }
 
-static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rPlayers, const PlayersPostRender& __restrict rPostRender, int64_t i, int64_t iCount, FXMVECTOR vecPosition)
+static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rPlayers, const PlayersPostRender& __restrict rPostRender, int64_t i, int64_t iCount, FXMVECTOR vecPosition, const engine::RenderBasis& rBasis)
 {
 	int8_t iNavDirection = GetNavDirection(rPostRender.pFlags[i]);
 	bool bFlagshipFound = false;
@@ -153,8 +155,8 @@ static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rP
 		XMVECTOR vecWaypoint = (iNavDirection == 5) ? vecFlagshipPosition : rPostRender.pVecDebugNavWaypoints[i];
 		XMFLOAT3A f3NavStart {};
 		XMFLOAT3A f3NavEnd {};
-		XMStoreFloat3A(&f3NavStart, vecPosition);
-		XMStoreFloat3A(&f3NavEnd, XMVectorSetZ(vecWaypoint, engine::gBaseHeight.Get()));
+		XMStoreFloat3A(&f3NavStart, engine::Rebase(rBasis, vecPosition));
+		XMStoreFloat3A(&f3NavEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gBaseHeight.Get())));
 		engine::DebugRender::Line(f3NavStart, f3NavEnd, {0.0f, 1.0f, 0.0f, 1.0f});
 		engine::DebugRender::Circle(f3NavEnd, kfPlayerRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
@@ -166,14 +168,14 @@ static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rP
 		{
 			// Flagship follow: use the flagship's interpolated position
 			XMFLOAT3A f3Dest {};
-			XMStoreFloat3A(&f3Dest, XMVectorSetZ(vecFlagshipPosition, engine::gBaseHeight.Get()));
+			XMStoreFloat3A(&f3Dest, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gBaseHeight.Get())));
 			engine::DebugRender::Circle(f3Dest, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 		}
 	}
 	else if (XMVectorGetW(rPostRender.pVecIslandDestinations[i]) > 0.0f)
 	{
 		XMFLOAT3A f3Dest {};
-		XMStoreFloat3A(&f3Dest, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gBaseHeight.Get()));
+		XMStoreFloat3A(&f3Dest, engine::Rebase(rBasis, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gBaseHeight.Get())));
 		engine::DebugRender::Circle(f3Dest, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
 }
@@ -216,6 +218,7 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderPlayer);
 
 	const PlayersInterpolate& rCurrent = *rFrameInterpolate.pPlayers;
+	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 
 	int64_t iCount = (rFrameInterpolate.gameFlags & GameFlags::kMainMenu) ? 0 : rCurrent.iCount;
 
@@ -237,8 +240,12 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 			fSize *= std::pow(rCurrent.pfDestroyedTimes[i] / kfDestroyTime, kfDeathShrinkPower);
 		}
 
+		// The position is local to the rendered cell; one conversion into the camera cell's frame feeds both the
+		// model translation and the layout position.
+		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
+
 		auto matScaling = XMMatrixScaling(fSize, fSize, fSize);
-		auto matTranslation = XMMatrixTranslationFromVector(rCurrent.pVecPositions[i]);
+		auto matTranslation = XMMatrixTranslationFromVector(vecPosition);
 		auto matRotationX = XMMatrixRotationX(XM_PIDIV2);
 		auto matRotationY = XMMatrixRotationY(0.0f);
 		auto matRotationZ = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f));
@@ -247,7 +254,7 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 		auto matTransform = XMMatrixMultiply(matRotationX, XMMatrixMultiply(matRotationY, XMMatrixMultiply(matRotationZ, XMMatrixMultiply(matRotationAccelerationX, XMMatrixMultiply(matRotationAccelerationY, XMMatrixMultiply(matScaling, matTranslation))))));
 
 		shaders::ModelLayout& rPlayerLayout = pPlayerLayouts[siRendered];
-		XMStoreFloat4(&rPlayerLayout.f4Position, rCurrent.pVecPositions[i]);
+		XMStoreFloat4(&rPlayerLayout.f4Position, vecPosition);
 
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rPlayerLayout.f3x4Transform[0]), matTransform);
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rPlayerLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
@@ -311,8 +318,8 @@ void PlayersInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameIn
 	for (int64_t i = 0; i < iCount; ++i)
 	{
 		XMVECTOR vecPosition = rPlayers.pVecPositions[i];
-		RenderCombatAim(rSpaceships, rSpaceshipsPostRender, vecPosition, rPostRender.pVecWantedDirections[i]);
-		RenderNavigation(rPlayers, rPostRender, i, iCount, vecPosition);
+		RenderCombatAim(rSpaceships, rSpaceshipsPostRender, vecPosition, rPostRender.pVecWantedDirections[i], rFrameInterpolate.renderBasis);
+		RenderNavigation(rPlayers, rPostRender, i, iCount, vecPosition, rFrameInterpolate.renderBasis);
 	}
 }
 

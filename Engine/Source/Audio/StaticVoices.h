@@ -2,6 +2,7 @@
 
 #if defined(BT_CLIENT)
 
+#include "Frame/GridCoord.h"
 #include "StaticVoice.h"
 
 namespace DirectX
@@ -41,9 +42,11 @@ public:
 	void Init(AudioEngine* pAudioEngine, const int64_t* piMasteringVoiceChannels);
 
 	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, bool b3d, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
-	void XM_CALLCONV PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, FXMVECTOR vecPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
+	// vecLocalPosition is local to emitterCoord; the cull and mix convert it against mListenerCoord.
+	void XM_CALLCONV PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoord, FXMVECTOR vecLocalPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 
-	void UpdateLifecycle(const game::Frame& rFrame, float fDeltaTime);
+	// rFrame is the cell emitterCoord names, so every persistent-sound position it carries is local to it.
+	void UpdateLifecycle(const game::Frame& rFrame, GridCoord emitterCoord, float fDeltaTime);
 	void UpdateListenerPosition();
 	void UpdateVolumes();
 
@@ -66,7 +69,7 @@ private:
 
 	// UpdateLifecycle passes, run in fixed order each frame.
 	void InvalidationPass(const SoundsInterpolate& rSoundsInterpolate);
-	void PriorityPass(const SoundsInterpolate& rSoundsInterpolate, const SoundsPostRender& rSoundsPostRender);
+	void PriorityPass(const SoundsInterpolate& rSoundsInterpolate, const SoundsPostRender& rSoundsPostRender, GridCoord emitterCoord);
 	void DeactivationPass();
 	void AdvanceFadeOut(float fDeltaTime);
 	void AdvanceFadeIn(float fDeltaTime);
@@ -110,6 +113,9 @@ private:
 	// join) → Render → AudioManager::Update (Main.cpp), so no worker is alive when the audio
 	// step writes. The same sequencing is why UpdateLifecycle / UpdateVolumes / Clear may
 	// touch mVoices / mPooledVoices without taking mOneShotMutex.
+	// The cell mVecListenerPosition is local to. Every emitter position arrives local to its own cell, so the
+	// cull, priority, and mix paths offset it by the whole-cell step between that cell and this one.
+	GridCoord mListenerCoord {};
 	XMVECTOR mVecListenerPosition {};
 	X3DAUDIO_LISTENER mX3dAudioListener
 	{

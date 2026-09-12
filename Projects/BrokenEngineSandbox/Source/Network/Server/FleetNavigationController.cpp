@@ -95,7 +95,16 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			// Pick random cardinal direction and reset timer.
 			int8_t iDirection = static_cast<int8_t>(common::Random(3u, rRandom));
 			engine::GridCoord offset = NavDirectionOffset(iDirection);
-			engine::GridCoord destination {rFlagship.coord.x + offset.x, rFlagship.coord.y + offset.y};
+			engine::GridCoord destination {};
+			if (!engine::TryAddGridCoord(rFlagship.coord, offset.x, offset.y, destination)) [[unlikely]]
+			{
+				// A flagship at a numeric coordinate edge has no neighbour that way, so this move never happens
+				// rather than wrapping to the far side of the grid. wantedCoord already equals the flagship coord,
+				// so resetting the timer alone spends a full fNavigationDelay before the next draw instead of
+				// redrawing a direction every tick.
+				rFleet.fFrameChangeTimer = rFleet.fNavigationDelay;
+				continue;
+			}
 			uint8_t uiPendingTicks = static_cast<uint8_t>(engine::kiTickRate);
 			rFleet.wantedCoord = destination;
 			rFleet.uiPendingFleetWantedCoordTicks = uiPendingTicks;

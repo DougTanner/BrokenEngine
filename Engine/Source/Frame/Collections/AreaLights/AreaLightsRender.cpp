@@ -47,6 +47,7 @@ void AreaLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
 	const AreaLightsInterpolate& rCurrent = rFrameInterpolate.areaLights;
+	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	siTotalCount += rCurrent.iCount;
 
 	if (rCurrent.iCount == 0)
@@ -63,7 +64,8 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load visible positions
+		// Load visible positions. Every position below stays local to the rendered cell until it reaches the GPU
+		// layout, the frustum test, or ProjectToBaseHeight — the three conversion points of this renderer.
 		XMVECTOR vecVisiblePos0 = rCurrent.pVecVisiblePositions[0][i];
 		XMVECTOR vecVisiblePos1 = rCurrent.pVecVisiblePositions[1][i];
 		XMVECTOR vecVisiblePos2 = rCurrent.pVecVisiblePositions[2][i];
@@ -91,18 +93,20 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		XMVECTOR vecLightingPos3 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePos3, vecCenter), vecScaleFactor, vecCenter);
 
 		// Frustum culling: compute AABB of all 8 vertices and test intersection
+		// The basis offset is a translation, so rebasing the two corners is the same rectangle as rebasing all eight
+		// vertices first, at two conversions instead of eight.
 		auto [vecMin, vecMax] = common::ComputeAabb(vecVisiblePos0, vecVisiblePos1, vecVisiblePos2, vecVisiblePos3, vecLightingPos0, vecLightingPos1, vecLightingPos2, vecLightingPos3);
-		if (!common::AabbIntersectsArea(engine::gpCamera->f4RenderVisibleArea, vecMin, vecMax))
+		if (!common::AabbIntersectsArea(engine::gpCamera->f4RenderVisibleArea, Rebase(rBasis, vecMin), Rebase(rBasis, vecMax)))
 		{
 			continue;
 		}
 
 		// Populate visible light quad with actual visible positions
 		shaders::VisibleLightQuadLayout& rVisibleLayout = pVisibleLightsLayouts[siRendered];
-		XMStoreFloat4(&rVisibleLayout.pf4Vertices[0], vecVisiblePos0);
-		XMStoreFloat4(&rVisibleLayout.pf4Vertices[1], vecVisiblePos1);
-		XMStoreFloat4(&rVisibleLayout.pf4Vertices[2], vecVisiblePos2);
-		XMStoreFloat4(&rVisibleLayout.pf4Vertices[3], vecVisiblePos3);
+		XMStoreFloat4(&rVisibleLayout.pf4Vertices[0], Rebase(rBasis, vecVisiblePos0));
+		XMStoreFloat4(&rVisibleLayout.pf4Vertices[1], Rebase(rBasis, vecVisiblePos1));
+		XMStoreFloat4(&rVisibleLayout.pf4Vertices[2], Rebase(rBasis, vecVisiblePos2));
+		XMStoreFloat4(&rVisibleLayout.pf4Vertices[3], Rebase(rBasis, vecVisiblePos3));
 
 		rVisibleLayout.pf4Texcoords[0] = {rType.pf2Texcoords[0].x, rType.pf2Texcoords[0].y, 0.0f, 0.0f};
 		rVisibleLayout.pf4Texcoords[1] = {rType.pf2Texcoords[1].x, rType.pf2Texcoords[1].y, 0.0f, 0.0f};
@@ -122,10 +126,10 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		shaders::QuadLayout& rAreaLayout = pAreaLightsLayouts[siRendered];
 
 		// Project lighting positions to base height
-		XMVECTOR vecBaseLighting0 = ProjectToBaseHeight(vecLightingPos0);
-		XMVECTOR vecBaseLighting1 = ProjectToBaseHeight(vecLightingPos1);
-		XMVECTOR vecBaseLighting2 = ProjectToBaseHeight(vecLightingPos2);
-		XMVECTOR vecBaseLighting3 = ProjectToBaseHeight(vecLightingPos3);
+		XMVECTOR vecBaseLighting0 = ProjectToBaseHeight(vecLightingPos0, rBasis);
+		XMVECTOR vecBaseLighting1 = ProjectToBaseHeight(vecLightingPos1, rBasis);
+		XMVECTOR vecBaseLighting2 = ProjectToBaseHeight(vecLightingPos2, rBasis);
+		XMVECTOR vecBaseLighting3 = ProjectToBaseHeight(vecLightingPos3, rBasis);
 
 		XMFLOAT4A f4Base {};
 		XMStoreFloat4A(&f4Base, vecBaseLighting0);

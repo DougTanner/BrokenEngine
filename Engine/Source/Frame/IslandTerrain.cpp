@@ -249,17 +249,32 @@ void IslandTerrain::WaitForElevationMaps()
 namespace
 {
 
-// Grid cell containing a world position, matching GlobalElevation/GlobalNormal's cell mapping.
-GridCoord CoordFromPosition(const XMFLOAT4A& f4Position)
+// Re-home a cell-local position that has stepped outside its cell onto the neighbouring cell that contains
+// it, rewriting both the coord and the local XY. GlobalElevation's callers hand in a position local to the
+// basis coord, and GlobalNormal's taps can cross the edge. Returns false when the neighbour would leave the
+// signed-int32 identity range, so an edge cell reports sea floor instead of wrapping to the far side.
+bool ResolveLocalPosition(GridCoord& rCoord, XMFLOAT4A& rf4Local)
 {
 	static constexpr float fCellWidth = kfCellWidth;
 	static constexpr float fCellHeight = kfCellHeight;
 	static constexpr float fCellMinX = kfBaseAreaMinX;
 	static constexpr float fCellMinY = kfBaseAreaMinY;
 
-	int32_t iGridX = static_cast<int32_t>(std::floor((f4Position.x - fCellMinX) / fCellWidth));
-	int32_t iGridY = static_cast<int32_t>(std::floor((f4Position.y - fCellMinY) / fCellHeight));
-	return {iGridX, iGridY};
+	int32_t iStepX = static_cast<int32_t>(std::floor((rf4Local.x - fCellMinX) / fCellWidth));
+	int32_t iStepY = static_cast<int32_t>(std::floor((rf4Local.y - fCellMinY) / fCellHeight));
+	if (iStepX == 0 && iStepY == 0)
+	{
+		return true;
+	}
+
+	if (!TryAddGridCoord(rCoord, iStepX, iStepY, rCoord))
+	{
+		return false;
+	}
+
+	rf4Local.x -= static_cast<float>(iStepX) * fCellWidth;
+	rf4Local.y -= static_cast<float>(iStepY) * fCellHeight;
+	return true;
 }
 
 template <bool kbMultiplyUV, bool kbHoistedHeightmapMax>
@@ -387,16 +402,19 @@ float CellElevation(const IslandTerrain& rTerrain, const FrameStaticData& rStati
 
 } // anonymous namespace
 
-float XM_CALLCONV IslandTerrain::GlobalElevation(FXMVECTOR vecPosition) const
+float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition) const
 {
 	// Frame Purity Constraint (IslandTerrain.h): GlobalElevation/GlobalNormal walk mCoordFrames with
 	// libm trig and must never run from frame-tick code — the sim hot path uses FrameElevation/FrameNormal.
 	ASSERT(common::gpThreadLocal == nullptr || !common::gpThreadLocal->mbInFrameTick);
 
-	XMFLOAT4A f4Position {};
-	XMStoreFloat4A(&f4Position, vecPosition);
+	XMFLOAT4A f4Local {};
+	XMStoreFloat4A(&f4Local, vecLocalPosition);
 
-	GridCoord coord = CoordFromPosition(f4Position);
+	if (!ResolveLocalPosition(coord, f4Local))
+	{
+		return mfSeaFloorElevation;
+	}
 
 	// Look up per-cell placements. Cells outside the simulated set fall through to sea floor.
 	auto it = game::gpGame->mCoordFrames.find(coord);
@@ -405,7 +423,7 @@ float XM_CALLCONV IslandTerrain::GlobalElevation(FXMVECTOR vecPosition) const
 		return mfSeaFloorElevation;
 	}
 
-	return CellElevation(*this, it->second.staticData, f4Position);
+	return CellElevation(*this, it->second.staticData, f4Local);
 }
 
 namespace
@@ -413,13 +431,15 @@ namespace
 
 // Splat one island placement's heightmap into the per-cell elevation grid (max-blend over the rotated
 // footprint). Pure deterministic computation — the grid feeds FrameElevation, which steers CRC'd sim
-// positions, so client and server must build a bit-identical grid. fCellOrigin is the cell's south-west
-// corner in world space.
-void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, float fCellOriginX, float fCellOriginY, std::vector<float>& rOutGrid)
+// positions, so client and server must build a bit-identical grid. Every position is centered cell-local
+// meters, so grid texel 0,0 sits at the cell's south-west corner, the constant (kfBaseAreaMinX, kfBaseAreaMinY).
+void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, std::vector<float>& rOutGrid)
 {
 	static constexpr int64_t kiDim = kiElevationGridDim;
 	static constexpr float fCellWidth = kfCellWidth;
 	static constexpr float fCellHeight = kfCellHeight;
+	static constexpr float fCellOriginX = kfBaseAreaMinX;
+	static constexpr float fCellOriginY = kfBaseAreaMinY;
 	static constexpr float fGridPitchX = fCellWidth / static_cast<float>(kiDim);
 	static constexpr float fGridPitchY = fCellHeight / static_cast<float>(kiDim);
 
@@ -435,7 +455,7 @@ void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTempl
 	float fCos = rotation.fCos;
 	float fSin = rotation.fSin;
 
-	// World-AABB of the rotated quad: the 4 corners of the rotated footprint, projected onto X/Y.
+	// Cell-local AABB of the rotated quad: the 4 corners of the rotated footprint, projected onto X/Y.
 	float fAbsCos = std::abs(fCos);
 	float fAbsSin = std::abs(fSin);
 	float fAabbHalfX = fAbsCos * fHalfX + fAbsSin * fHalfY;
@@ -462,12 +482,12 @@ void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTempl
 
 	for (int64_t iGy = iMinGy; iGy <= iMaxGy; ++iGy)
 	{
-		float fWorldY = fCellOriginY + (static_cast<float>(iGy) + 0.5f) * fGridPitchY;
-		float fDy = fWorldY - rPlacement.f2WorldPos.y;
+		float fTexelY = fCellOriginY + (static_cast<float>(iGy) + 0.5f) * fGridPitchY;
+		float fDy = fTexelY - rPlacement.f2WorldPos.y;
 		for (int64_t iGx = iMinGx; iGx <= iMaxGx; ++iGx)
 		{
-			float fWorldX = fCellOriginX + (static_cast<float>(iGx) + 0.5f) * fGridPitchX;
-			float fDx = fWorldX - rPlacement.f2WorldPos.x;
+			float fTexelX = fCellOriginX + (static_cast<float>(iGx) + 0.5f) * fGridPitchX;
+			float fDx = fTexelX - rPlacement.f2WorldPos.x;
 			float fSample = 0.0f;
 			if (!SamplePlacementHeightmap<true, true>(fDx, fDy, fCos, fSin, fFootprintX, fFootprintY, fHalfX, fHalfY, rTemplate.mpHeightmapHalf, rTemplate.miHeightmapWidth, rTemplate.miHeightmapHeight, fInvFootprintX, fInvFootprintY, fHeightmapMaxU, fHeightmapMaxV, fSample))
 			{
@@ -481,35 +501,22 @@ void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTempl
 
 } // anonymous namespace
 
-void XM_CALLCONV IslandTerrain::BuildElevationGrid(GridCoord coord, const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const
+void XM_CALLCONV IslandTerrain::BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const
 {
 	static constexpr int64_t kiDim = kiElevationGridDim;
-	static constexpr float fCellWidth = kfCellWidth;
-	static constexpr float fCellHeight = kfCellHeight;
-	static constexpr float fCellMinX = kfBaseAreaMinX;
-	static constexpr float fCellMinY = kfBaseAreaMinY;
 
 	// Sea floor everywhere first; each placement then max-blends its footprint over the top
 	// (commutative max → splat order doesn't matter, matches GlobalElevation's per-point semantics).
 	rOutGrid.assign(static_cast<size_t>(kiDim * kiDim), mfSeaFloorElevation);
 
-	// World-space origin of this cell (south-west corner of grid texel 0,0)
-	float fCellOriginX = fCellMinX + static_cast<float>(coord.x) * fCellWidth;
-	float fCellOriginY = fCellMinY + static_cast<float>(coord.y) * fCellHeight;
-
 	for (const IslandPlacement& rPlacement : rPlacements)
 	{
-		BlendPlacementIntoGrid(rPlacement, mIslands.at(rPlacement.islandCrc), fCellOriginX, fCellOriginY, rOutGrid);
+		BlendPlacementIntoGrid(rPlacement, mIslands.at(rPlacement.islandCrc), rOutGrid);
 	}
 }
 
 FrameElevationSampler XM_CALLCONV IslandTerrain::MakeFrameElevationSampler(const FrameStaticData& rStaticData) const
 {
-	static constexpr float fCellWidth = kfCellWidth;
-	static constexpr float fCellHeight = kfCellHeight;
-	static constexpr float fCellMinX = kfBaseAreaMinX;
-	static constexpr float fCellMinY = kfBaseAreaMinY;
-
 	FrameElevationSampler sampler;
 	sampler.fSeaFloor = mfSeaFloorElevation;
 	if (rStaticData.elevationGrid.empty())
@@ -519,19 +526,17 @@ FrameElevationSampler XM_CALLCONV IslandTerrain::MakeFrameElevationSampler(const
 	}
 
 	sampler.pGrid = &rStaticData.elevationGrid;
-	sampler.fCellOriginX = fCellMinX + static_cast<float>(rStaticData.coord.x) * fCellWidth;
-	sampler.fCellOriginY = fCellMinY + static_cast<float>(rStaticData.coord.y) * fCellHeight;
 	return sampler;
 }
 
-float XM_CALLCONV IslandTerrain::FrameElevation(const FrameStaticData& rStaticData, FXMVECTOR vecPosition) const
+float XM_CALLCONV IslandTerrain::FrameElevation(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const
 {
 	// Single-source-of-truth for the sim/CRC elevation lookup: FrameElevation and every batched
 	// FrameElevationSampler::Sample share one arithmetic path so they can never drift out of bit-exactness.
-	return MakeFrameElevationSampler(rStaticData).Sample(vecPosition);
+	return MakeFrameElevationSampler(rStaticData).Sample(vecLocalPosition);
 }
 
-float XM_CALLCONV FrameElevationSampler::Sample(FXMVECTOR vecPosition) const
+float XM_CALLCONV FrameElevationSampler::Sample(FXMVECTOR vecLocalPosition) const
 {
 	if (pGrid == nullptr)
 	{
@@ -541,16 +546,18 @@ float XM_CALLCONV FrameElevationSampler::Sample(FXMVECTOR vecPosition) const
 	static constexpr int64_t kiDim = kiElevationGridDim;
 	static constexpr float fCellWidth = kfCellWidth;
 	static constexpr float fCellHeight = kfCellHeight;
+	static constexpr float fCellOriginX = kfBaseAreaMinX;
+	static constexpr float fCellOriginY = kfBaseAreaMinY;
 	static constexpr float fGridPitchX = fCellWidth / static_cast<float>(kiDim);
 	static constexpr float fGridPitchY = fCellHeight / static_cast<float>(kiDim);
 
 	XMFLOAT4A f4Position {};
-	XMStoreFloat4A(&f4Position, vecPosition);
+	XMStoreFloat4A(&f4Position, vecLocalPosition);
 
-	float fLocalX = f4Position.x - fCellOriginX;
-	float fLocalY = f4Position.y - fCellOriginY;
-	int64_t iGx = static_cast<int64_t>(std::floor(fLocalX / fGridPitchX));
-	int64_t iGy = static_cast<int64_t>(std::floor(fLocalY / fGridPitchY));
+	float fGridX = f4Position.x - fCellOriginX;
+	float fGridY = f4Position.y - fCellOriginY;
+	int64_t iGx = static_cast<int64_t>(std::floor(fGridX / fGridPitchX));
+	int64_t iGy = static_cast<int64_t>(std::floor(fGridY / fGridPitchY));
 	if (iGx < 0 || iGx >= kiDim || iGy < 0 || iGy >= kiDim)
 	{
 		return fSeaFloor;
@@ -559,19 +566,19 @@ float XM_CALLCONV FrameElevationSampler::Sample(FXMVECTOR vecPosition) const
 	return (*pGrid)[static_cast<size_t>(iGy * kiDim + iGx)];
 }
 
-XMVECTOR XM_CALLCONV IslandTerrain::FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecPosition) const
+XMVECTOR XM_CALLCONV IslandTerrain::FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const
 {
 	// 4-tap finite-difference over FrameElevation. Same baseline as GlobalNormal so contour-following
 	// AI behaves identically — only the elevation source changes.
 	float fDistance = 2.0f;
 
-	return NormalFromElevation(vecPosition, fDistance, [&](FXMVECTOR vecTap)
+	return NormalFromElevation(vecLocalPosition, fDistance, [&](FXMVECTOR vecTap)
 	{
 		return FrameElevation(rStaticData, vecTap);
 	});
 }
 
-XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(FXMVECTOR vecPosition) const
+XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(GridCoord coord, FXMVECTOR vecLocalPosition) const
 {
 	// Frame Purity Constraint (see GlobalElevation): must never run from frame-tick code. GlobalNormal
 	// resolves cells itself (batching the 4 taps' lookups below) rather than routing each tap through
@@ -596,18 +603,22 @@ XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(FXMVECTOR vecPosition) const
 	{
 		XMFLOAT4A f4Tap {};
 		XMStoreFloat4A(&f4Tap, vecTap);
-		GridCoord coord = CoordFromPosition(f4Tap);
-		if (!bHaveCachedCoord || coord != cachedCoord)
+		GridCoord tapCoord = coord;
+		if (!ResolveLocalPosition(tapCoord, f4Tap))
 		{
-			auto it = game::gpGame->mCoordFrames.find(coord);
+			return mfSeaFloorElevation;
+		}
+		if (!bHaveCachedCoord || tapCoord != cachedCoord)
+		{
+			auto it = game::gpGame->mCoordFrames.find(tapCoord);
 			pCachedStaticData = it == game::gpGame->mCoordFrames.end() ? nullptr : &it->second.staticData;
-			cachedCoord = coord;
+			cachedCoord = tapCoord;
 			bHaveCachedCoord = true;
 		}
 		return pCachedStaticData == nullptr ? mfSeaFloorElevation : CellElevation(*this, *pCachedStaticData, f4Tap);
 	};
 
-	return NormalFromElevation(vecPosition, fDistance, SampleElevation);
+	return NormalFromElevation(vecLocalPosition, fDistance, SampleElevation);
 }
 
 SegmentHit XM_CALLCONV TracePointAgainstTerrain(const FrameStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime)
@@ -615,6 +626,8 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const FrameStaticData& rStaticDa
 	static constexpr int64_t kiGridDimension = kiElevationGridDim;
 	static constexpr float kfGridPitchX = kfCellWidth / static_cast<float>(kiGridDimension);
 	static constexpr float kfGridPitchY = kfCellHeight / static_cast<float>(kiGridDimension);
+	static constexpr float kfCellOriginX = kfBaseAreaMinX;
+	static constexpr float kfCellOriginY = kfBaseAreaMinY;
 
 	FrameElevationSampler sampler = gpIslandTerrain->MakeFrameElevationSampler(rStaticData);
 	XMFLOAT4A f4Start {};
@@ -625,8 +638,8 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const FrameStaticData& rStaticDa
 	float fDeltaX = f4End.x - f4Start.x;
 	float fDeltaY = f4End.y - f4Start.y;
 	float fDeltaZ = f4End.z - f4Start.z;
-	int64_t iGridX = static_cast<int64_t>(std::floor((f4Start.x - sampler.fCellOriginX) / kfGridPitchX));
-	int64_t iGridY = static_cast<int64_t>(std::floor((f4Start.y - sampler.fCellOriginY) / kfGridPitchY));
+	int64_t iGridX = static_cast<int64_t>(std::floor((f4Start.x - kfCellOriginX) / kfGridPitchX));
+	int64_t iGridY = static_cast<int64_t>(std::floor((f4Start.y - kfCellOriginY) / kfGridPitchY));
 	int64_t iStepX = fDeltaX > 0.0f ? 1 : fDeltaX < 0.0f ? -1 : 0;
 	int64_t iStepY = fDeltaY > 0.0f ? 1 : fDeltaY < 0.0f ? -1 : 0;
 	int64_t iNextBoundaryX = iGridX + (iStepX > 0 ? 1 : 0);
@@ -655,12 +668,12 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const FrameStaticData& rStaticDa
 		float fDistanceY = std::numeric_limits<float>::max();
 		if (iStepX != 0)
 		{
-			float fBoundaryX = sampler.fCellOriginX + static_cast<float>(iNextBoundaryX) * kfGridPitchX;
+			float fBoundaryX = kfCellOriginX + static_cast<float>(iNextBoundaryX) * kfGridPitchX;
 			fDistanceX = std::abs(fBoundaryX - f4Start.x);
 		}
 		if (iStepY != 0)
 		{
-			float fBoundaryY = sampler.fCellOriginY + static_cast<float>(iNextBoundaryY) * kfGridPitchY;
+			float fBoundaryY = kfCellOriginY + static_cast<float>(iNextBoundaryY) * kfGridPitchY;
 			fDistanceY = std::abs(fBoundaryY - f4Start.y);
 		}
 

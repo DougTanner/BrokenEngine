@@ -117,21 +117,19 @@ struct IslandTemplate
 #endif
 };
 
-// Precomputed per-cell elevation sampler. Hoists FrameElevation's per-cell constants (grid pointer,
-// cell origin, sea floor) so a batch of samples that all fall in one cell pays the origin compute and
-// the empty check once, then samples by position. Sample() is bit-identical to FrameElevation per
-// sample (same float ops in the same order) — this is the CRC/determinism sim path (/fp:strict), so a
-// caller batching many samples (e.g. game::ComputeTerrainAvoidance) gets results identical to calling
-// FrameElevation directly. FrameElevation is itself implemented on top of this, so the arithmetic has
-// one home. pGrid is null when the cell has no elevation grid (Sample returns fSeaFloor).
+// Precomputed per-cell elevation sampler. Hoists FrameElevation's per-cell state (grid pointer, sea floor)
+// so a batch of samples that all fall in one cell pays the empty check once, then samples by cell-local
+// position. Sample() is bit-identical to FrameElevation per sample (same float ops in the same order) —
+// this is the CRC/determinism sim path (/fp:strict), so a caller batching many samples (e.g.
+// game::ComputeTerrainAvoidance) gets results identical to calling FrameElevation directly. FrameElevation
+// is itself implemented on top of this, so the arithmetic has one home. pGrid is null when the cell has no
+// elevation grid (Sample returns fSeaFloor).
 struct FrameElevationSampler
 {
 	const std::vector<float>* pGrid = nullptr;
-	float fCellOriginX = 0.0f;
-	float fCellOriginY = 0.0f;
 	float fSeaFloor = 0.0f;
 
-	[[nodiscard]] float XM_CALLCONV Sample(FXMVECTOR vecPosition) const;
+	[[nodiscard]] float XM_CALLCONV Sample(FXMVECTOR vecLocalPosition) const;
 };
 
 class IslandTerrain
@@ -148,12 +146,13 @@ public:
 #endif
 
 	// Sim path (Frame-tick callers). Cell-local O(1) nearest-texel lookup into the cell's
-	// precomputed FrameStaticData::elevationGrid. Out-of-cell positions return mfSeaFloorElevation.
-	// Honors the Frame Purity Constraint: the caller hands its own static data in, so this never
-	// touches gpGame->mCoordFrames and never reads a neighbor cell. Builds happen at the top of
-	// RunFrameTick (see FrameBase.cpp), before any sim phase that would query.
-	[[nodiscard]] float XM_CALLCONV FrameElevation(const FrameStaticData& rStaticData, FXMVECTOR vecPosition) const;
-	[[nodiscard]] XMVECTOR XM_CALLCONV FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecPosition) const;
+	// precomputed FrameStaticData::elevationGrid, taking the position in that cell's own centered local
+	// meters. Out-of-cell positions return mfSeaFloorElevation. Honors the Frame Purity Constraint: the
+	// caller hands its own static data in, so this never touches gpGame->mCoordFrames and never reads a
+	// neighbor cell. Builds happen at the top of RunFrameTick (see FrameBase.cpp), before any sim phase
+	// that would query.
+	[[nodiscard]] float XM_CALLCONV FrameElevation(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
+	[[nodiscard]] XMVECTOR XM_CALLCONV FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
 
 	// Build a FrameElevationSampler for one cell so a caller can batch many FrameElevation-equivalent
 	// samples without redoing the per-cell origin compute / empty check each call. Same sim/CRC path as
@@ -164,14 +163,17 @@ public:
 	// float grid (max-blend across overlapping footprints, matching the per-point semantics of
 	// GlobalElevation). Allocates rOutGrid.assign(kDim*kDim, mfSeaFloorElevation) and then
 	// stamps each island. Called once per cell at the top of RunFrameTick when the grid is empty.
-	void XM_CALLCONV BuildElevationGrid(GridCoord coord, const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
+	// Takes no coord: placements are centered cell-local, so every cell's grid covers the same
+	// [-450,+450] extent.
+	void XM_CALLCONV BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
 
-	// Render path (engine client — ProjectToBaseHeight). Position-based iteration over
-	// mCoordFrames' immutable islands list. Never touches the per-cell grid, so it never races
-	// the tick-time build. MUST NOT be called from Frame-tick code; use FrameElevation/FrameNormal
+	// Render path (engine client — ProjectToBaseHeight). Takes the cell the position is local to plus that
+	// local position, and iterates mCoordFrames' immutable islands list; a position (or a GlobalNormal tap)
+	// past the cell edge resolves onto the neighbouring cell. Never touches the per-cell grid, so it never
+	// races the tick-time build. MUST NOT be called from Frame-tick code; use FrameElevation/FrameNormal
 	// from a Frame-tick context.
-	[[nodiscard]] float XM_CALLCONV GlobalElevation(FXMVECTOR vecPosition) const;
-	[[nodiscard]] XMVECTOR XM_CALLCONV GlobalNormal(FXMVECTOR vecPosition) const;
+	[[nodiscard]] float XM_CALLCONV GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition) const;
+	[[nodiscard]] XMVECTOR XM_CALLCONV GlobalNormal(GridCoord coord, FXMVECTOR vecLocalPosition) const;
 
 #if defined(BT_CLIENT)
 	// Client-only: assign or retrieve the bindless texture-array slot for an island template.

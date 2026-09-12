@@ -43,6 +43,7 @@ void HexShieldsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
 	const HexShieldsInterpolate& rCurrent = rFrameInterpolate.hexShields;
+	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	siTotalCount += rCurrent.iCount;
 
 	if (rCurrent.iCount == 0)
@@ -55,13 +56,14 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load position and type
-		XMVECTOR vecPosition = rCurrent.pVecPositions[i];
+		// Load position and type. The position is local to the rendered cell; storing it converts it once into the
+		// camera cell's frame, and every use below reads the converted value.
+		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
 		const HexShieldsType& rType = GetType(rCurrent.puiTypeIndices[i]);
 
 		// Visibility culling
 		XMFLOAT4A f4Position {};
-		XMStoreFloat4A(&f4Position, vecPosition);
+		XMStoreFloat4A(&f4Position, Rebase(rBasis, vecLocalPosition));
 		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->f4RenderVisibleArea, f4Position, kfAdjust, kfAdjust, kfAdjust, kfAdjust))
 		{
 			continue;

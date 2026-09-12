@@ -71,7 +71,7 @@ IXAudio2SourceVoice* StaticVoices::PlayOneShotLocked(common::crc_t uiAudioCrc, b
 	return pIXAudio2SourceVoice;
 }
 
-void XM_CALLCONV StaticVoices::PlayOneShot3d([[maybe_unused]] const game::Frame& rFrame, common::crc_t uiAudioCrc, FXMVECTOR vecPosition, float fVolume, float fPitch, float fPitchRange)
+void XM_CALLCONV StaticVoices::PlayOneShot3d([[maybe_unused]] const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoord, FXMVECTOR vecLocalPosition, float fVolume, float fPitch, float fPitchRange)
 {
 	ASSERT(rFrame.interpolate.frameFlags & FrameFlags::kPostRender);
 
@@ -93,6 +93,10 @@ void XM_CALLCONV StaticVoices::PlayOneShot3d([[maybe_unused]] const game::Frame&
 	{
 		return;
 	}
+
+	// The emitter position arrives local to its own cell: this is the one point that moves it into the listener's
+	// cell, and the mix below reuses that converted value.
+	XMVECTOR vecPosition = Rebase(MakeRenderBasis(emitterCoord, mListenerCoord), vecLocalPosition);
 
 	// Hard-cull inaudible one-shots before grabbing a voice slot. Uses the same curve
 	// as the persistent priority pass so behaviour is consistent across both paths.
@@ -182,7 +186,7 @@ void StaticVoices::ClearPool()
 	mPooledVoices.clear();
 }
 
-void StaticVoices::UpdateLifecycle(const game::Frame& rFrame, float fDeltaTime)
+void StaticVoices::UpdateLifecycle(const game::Frame& rFrame, GridCoord emitterCoord, float fDeltaTime)
 {
 	ASSERT(rFrame.interpolate.frameFlags & FrameFlags::kPostRender);
 
@@ -207,7 +211,7 @@ void StaticVoices::UpdateLifecycle(const game::Frame& rFrame, float fDeltaTime)
 	{
 		InvalidationPass(rSoundsInterpolate);
 	}
-	PriorityPass(rSoundsInterpolate, rSoundsPostRender);
+	PriorityPass(rSoundsInterpolate, rSoundsPostRender, emitterCoord);
 	DeactivationPass();
 	AdvanceFadeOut(fDeltaTime);
 	AdvanceFadeIn(fDeltaTime);
@@ -277,8 +281,13 @@ void StaticVoices::InvalidationPass(const SoundsInterpolate& rSoundsInterpolate)
 	}
 }
 
-void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, const SoundsPostRender& rSoundsPostRender)
+void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, const SoundsPostRender& rSoundsPostRender, GridCoord emitterCoord)
 {
+	// Every position in rSoundsInterpolate is local to emitterCoord. This pass is where a persistent sound's position
+	// enters the mix, so it converts once here and stores the listener-frame value on the voice; UpdateListenerPosition
+	// keeps those stored values current when the listener itself changes cell.
+	RenderBasis emitterBasis = MakeRenderBasis(emitterCoord, mListenerCoord);
+
 	// Rank candidates by attenuated volume so the closest / loudest sounds win the
 	// kiMaxStaticVoices slots. Out-of-range candidates (below the hysteresis floor) are
 	// skipped entirely; matching active voices get deactivated in DeactivationPass.
@@ -304,7 +313,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 		sound_t id = rSoundsPostRender.puiIds[i];
 		int64_t iIndex = rSoundsInterpolate.IdToIndex(id);
 		float fSoundVolume = rSoundsInterpolate.pfVolumes[iIndex];
-		float fDistance = common::Distance(rSoundsInterpolate.pVecPositions[iIndex], mVecListenerPosition);
+		float fDistance = common::Distance(Rebase(emitterBasis, rSoundsInterpolate.pVecPositions[iIndex]), mVecListenerPosition);
 		float fAttenuated = ComputeAttenuatedVolume(fDistance, fSoundVolume);
 		if (fAttenuated < kfDeactivateFloor)
 		{
@@ -328,7 +337,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 		int64_t iIndex = rSoundsInterpolate.IdToIndex(id);
 		float fSoundVolume = rSoundsInterpolate.pfVolumes[iIndex];
 		float fPitch = rSoundsInterpolate.pfPitches[iIndex];
-		XMVECTOR vecPosition = rSoundsInterpolate.pVecPositions[iIndex];
+		XMVECTOR vecPosition = Rebase(emitterBasis, rSoundsInterpolate.pVecPositions[iIndex]);
 		XMVECTOR vecVelocity = rSoundsInterpolate.pVecVelocities[iIndex];
 
 		StaticVoice* pExistingVoice = nullptr;
@@ -540,6 +549,20 @@ void StaticVoices::AdvanceFadeIn(float fDeltaTime)
 
 void StaticVoices::UpdateListenerPosition()
 {
+	// The listener is the camera, so its cell is the camera cell and every stored voice position is expressed in it.
+	// When that cell changes, move the stored positions with it: a voice that is not re-synced this frame (out of
+	// range, fading out) would otherwise mix a whole cell away from where it sounds.
+	if (engine::gpCamera->mBasisCoord != mListenerCoord)
+	{
+		RenderBasis previousBasis = MakeRenderBasis(mListenerCoord, engine::gpCamera->mBasisCoord);
+		XMVECTOR vecShift = XMVectorSet(previousBasis.f2Offset.x, previousBasis.f2Offset.y, 0.0f, 0.0f);
+		for (StaticVoice& rVoice : mVoices)
+		{
+			rVoice.mVecPosition = XMVectorAdd(rVoice.mVecPosition, vecShift);
+		}
+		mListenerCoord = engine::gpCamera->mBasisCoord;
+	}
+
 	// mVecListenerPosition is the camera eye in full XYZ, so altitude contributes to manual fade distance.
 	// mX3dAudioListener.Position is the camera look-at on the gBaseHeight plane for pan/Doppler; its XY-only vector to
 	// ground emitters keeps screen-left audible on the left rather than collapsed toward center by altitude. Listener

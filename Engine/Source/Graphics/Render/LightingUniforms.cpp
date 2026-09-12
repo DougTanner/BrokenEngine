@@ -78,6 +78,20 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	static LightingTemporalAreaLatch sTemporalAreaLatch {};
 	static XMFLOAT4 sf4HeldVisibleArea {};
 	static bool sbHeldVisibleArea = false;
+	// Every rectangle retained across frames here is in the camera cell's frame; follow a camera cell change before
+	// the refresh test compares them with this frame's areas, and let a multi-cell jump take the existing reset.
+	static RetainedAreaBasis sRetainedAreaBasis {};
+	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoord))
+	{
+		ShiftArea(sTemporalAreaLatch.f4CurrentArea, *of2Shift);
+		ShiftArea(sTemporalAreaLatch.f4PreviousArea, *of2Shift);
+		ShiftArea(sf4HeldVisibleArea, *of2Shift);
+	}
+	else
+	{
+		gbLightingTemporalReset = true;
+		sbHeldVisibleArea = false;
+	}
 	sbLightingRefreshFrame = bScheduledRefresh || !sTemporalAreaLatch.bInitialized || !sbHeldVisibleArea
 	                      || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rVisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
 	if (sbLightingRefreshFrame)

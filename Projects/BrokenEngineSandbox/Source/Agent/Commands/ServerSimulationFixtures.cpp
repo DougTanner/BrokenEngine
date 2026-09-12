@@ -331,7 +331,8 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			throw std::runtime_error("'source' frame is not ready");
 		}
 
-		XMVECTOR vecPosition = XMVectorSet(static_cast<float>(destination.x) * engine::kfCellWidth, static_cast<float>(destination.y) * engine::kfCellHeight, engine::gBaseHeight.Get(), 1.0f);
+		// Transfer payloads are destination-local, so the default arrival point is the destination cell's center.
+		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 1.0f);
 		if (eType == StatusChangeType::kTransferBlaster)
 		{
 			auto destinationIt = gpGame->mCoordFrames.find(destination);
@@ -345,10 +346,10 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			{
 				// Heap: Build the one-time derived terrain grid before this command samples it.
 				ScopedSuppressAllocationTracking suppress;
-				engine::gpIslandTerrain->BuildElevationGrid(rDestinationStaticData.coord, rDestinationStaticData.islands, rDestinationStaticData.elevationGrid);
+				engine::gpIslandTerrain->BuildElevationGrid(rDestinationStaticData.islands, rDestinationStaticData.elevationGrid);
 			}
 			XMFLOAT4A f4Area {};
-			XMStoreFloat4A(&f4Area, rDestinationStaticData.vecArea);
+			XMStoreFloat4A(&f4Area, engine::LocalFrameArea());
 			// Blasters are destroyed by point-terrain contact, so place this debug fixture in a terrain-clear
 			// cell and verify the first fixed-tick movement remains clear too.
 			constexpr int64_t kiTerrainGridDim = 20;

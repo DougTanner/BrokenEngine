@@ -30,7 +30,7 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 128 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
+const int64_t Frame::kiVersion = 129 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
 
 // FrameInterpolate
 FrameInterpolate::FrameInterpolate()
@@ -282,7 +282,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 	// Reject positions outside the cell, inside terrain (with full body clearance), or within visible range of any alive player
 	auto IsSpawnPositionValid = [&](FXMVECTOR vecPosition) -> bool
 	{
-		if (!common::InsideArea(vecPosition, rStaticData.vecArea))
+		if (!common::InsideArea(vecPosition, engine::LocalFrameArea()))
 		{
 			return false;
 		}
@@ -305,9 +305,9 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 		return true;
 	};
 
-	// Cell-area extents and grid pitch (vecArea layout: x=minX, y=maxY, z=maxX, w=minY — see common::InsideArea)
+	// Cell-area extents and grid pitch (area layout: x=minX, y=maxY, z=maxX, w=minY — see common::InsideArea)
 	XMFLOAT4A f4Area;
-	XMStoreFloat4A(&f4Area, rStaticData.vecArea);
+	XMStoreFloat4A(&f4Area, engine::LocalFrameArea());
 	float fAreaMinX = f4Area.x;
 	float fAreaMinY = f4Area.w;
 	float fPitchX = (f4Area.z - f4Area.x) / static_cast<float>(kiGridDim);
@@ -778,6 +778,12 @@ void FramePostRender::ServerRead(std::istream& rStream)
 bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest)
 {
 	engine::ComputeTransferDelta(rBounds, rRequest.data.vecPosition, rRequest.iDeltaX, rRequest.iDeltaY);
+
+	// The payload leaves here already expressed in the destination cell's local frame: one cell width per
+	// transferred axis. Every downstream consumer — network transfer, SpawnTransfer, replay reconcile —
+	// forwards the position unchanged, so this is the single conversion point.
+	rRequest.data.vecPosition = XMVectorSubtract(rRequest.data.vecPosition,
+		XMVectorSet(static_cast<float>(rRequest.iDeltaX) * engine::kfCellWidth, static_cast<float>(rRequest.iDeltaY) * engine::kfCellHeight, 0.0f, 0.0f));
 
 	// Heap realloc warning: capacity exceeded during a shared per-tick burst. Producers are
 	// unbounded, so investigate entities re-flagging kTransfer across iterations or an

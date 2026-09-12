@@ -16,15 +16,6 @@
 namespace game
 {
 
-namespace
-{
-
-// Keeps agent-supplied cells far from the int32 extremes that server adjacency deltas and the client 3x3
-// neighbour ring compute from them.
-constexpr int32_t kiAgentGridCoordLimit = 1'000'000;
-
-} // namespace
-
 int32_t ClientGridCoordValue(const nlohmann::json& rValue, std::string_view command)
 {
 	if (!rValue.is_number_integer())
@@ -32,20 +23,23 @@ int32_t ClientGridCoordValue(const nlohmann::json& rValue, std::string_view comm
 		throw std::runtime_error(std::format("{} 'coord' must be an array of 2 integers", command));
 	}
 
+	// Every signed-int32 coordinate identifies a usable cell, so the only rejected integers are the ones a
+	// GridCoord cannot hold. The 3x3 neighbour ring and server adjacency deltas use checked addition
+	// (engine::TryAddGridCoord), which omits the neighbours a numeric-edge cell cannot represent.
 	if (rValue.is_number_unsigned())
 	{
 		uint64_t uiValue = rValue.get<uint64_t>();
-		if (uiValue > static_cast<uint64_t>(kiAgentGridCoordLimit))
+		if (uiValue > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
 		{
-			throw std::runtime_error(std::format("{} 'coord' values must be within +/-1000000", command));
+			throw std::runtime_error(std::format("{} 'coord' values must fit in a signed 32-bit integer", command));
 		}
 		return static_cast<int32_t>(uiValue);
 	}
 
 	int64_t iValue = rValue.get<int64_t>();
-	if (iValue < -static_cast<int64_t>(kiAgentGridCoordLimit) || iValue > static_cast<int64_t>(kiAgentGridCoordLimit))
+	if (iValue < static_cast<int64_t>(std::numeric_limits<int32_t>::min()) || iValue > static_cast<int64_t>(std::numeric_limits<int32_t>::max()))
 	{
-		throw std::runtime_error(std::format("{} 'coord' values must be within +/-1000000", command));
+		throw std::runtime_error(std::format("{} 'coord' values must fit in a signed 32-bit integer", command));
 	}
 	return static_cast<int32_t>(iValue);
 }

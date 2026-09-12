@@ -115,19 +115,31 @@ inline SegmentHit XM_CALLCONV TracePointToFrameExit(FXMVECTOR vecArea, FXMVECTOR
 	};
 }
 
-// Compute world-space frame bounds for a given grid coordinate
-inline XMVECTOR XM_CALLCONV ComputeFrameArea(FXMVECTOR vecBaseArea, GridCoord coord)
+// The one frame area, identical in every cell: geometry is centered cell-local, so the grid coordinate is
+// identity only and never scales an edge. Lanes follow the convention ComputeFrameBounds reads.
+inline XMVECTOR XM_CALLCONV LocalFrameArea()
 {
-	float fWidth = XMVectorGetZ(vecBaseArea) - XMVectorGetX(vecBaseArea);
-	float fHeight = XMVectorGetY(vecBaseArea) - XMVectorGetW(vecBaseArea);
-	XMVECTOR vecOffset = XMVectorSet(static_cast<float>(coord.x) * fWidth, static_cast<float>(coord.y) * fHeight, static_cast<float>(coord.x) * fWidth, static_cast<float>(coord.y) * fHeight);
-	return XMVectorAdd(vecBaseArea, vecOffset);
+	return XMVectorSet(kfBaseAreaMinX, kfBaseAreaMaxY, kfBaseAreaMaxX, kfBaseAreaMinY);
 }
 
-// The one canonical frame area for a coord: every producer and every read site must agree on this value
-inline XMVECTOR XM_CALLCONV ComputeCanonicalFrameArea(GridCoord coord)
+// Neighbour and transfer-destination coordinate arithmetic. Returns false and leaves rOutCoord untouched when
+// the sum leaves the signed-int32 identity range, so a cell at a numeric edge omits that neighbour instead of
+// wrapping to the opposite end of the grid.
+[[nodiscard]] inline bool TryAddGridCoord(GridCoord coord, int32_t iDeltaX, int32_t iDeltaY, GridCoord& rOutCoord)
 {
-	return ComputeFrameArea(XMVectorSet(kfBaseAreaMinX, kfBaseAreaMaxY, kfBaseAreaMaxX, kfBaseAreaMinY), coord);
+	int64_t iSumX = static_cast<int64_t>(coord.x) + static_cast<int64_t>(iDeltaX);
+	int64_t iSumY = static_cast<int64_t>(coord.y) + static_cast<int64_t>(iDeltaY);
+	if (iSumX < std::numeric_limits<int32_t>::min() || iSumX > std::numeric_limits<int32_t>::max())
+	{
+		return false;
+	}
+	if (iSumY < std::numeric_limits<int32_t>::min() || iSumY > std::numeric_limits<int32_t>::max())
+	{
+		return false;
+	}
+
+	rOutCoord = {static_cast<int32_t>(iSumX), static_cast<int32_t>(iSumY)};
+	return true;
 }
 
 inline constexpr size_t kuiInitialTransferCapacity = 32;

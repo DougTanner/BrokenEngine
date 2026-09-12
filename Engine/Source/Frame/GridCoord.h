@@ -54,6 +54,26 @@ inline constexpr float kfBaseAreaMaxY = kfCellHeight / 2.0f;
 inline constexpr float kfBaseAreaMaxX = kfCellWidth / 2.0f;
 inline constexpr float kfBaseAreaMinY = -kfCellHeight / 2.0f;
 
+#if defined(BT_CLIENT)
+// Client-only presentation basis: the cell a value's positions are local to, plus the offset from the camera
+// cell's origin to that cell's origin. coord answers cross-cell queries such as GlobalElevation, which need
+// the cell identity rather than the offset. Both cells come from the small active set around the camera, so the
+// offset is a small integer multiple of the 900-unit cell size and is therefore exact in float. Exactness rests
+// on that multiple alone; a camera-coord fallback can put an active cell more than one cell away per axis.
+struct RenderBasis
+{
+	GridCoord coord {};
+	XMFLOAT2 f2Offset {};
+};
+
+// Move a position that is local to rBasis.coord into the camera cell's frame. Height is untouched: the offset
+// is planar.
+inline XMVECTOR XM_CALLCONV Rebase(const RenderBasis& rBasis, FXMVECTOR vecLocalPosition)
+{
+	return XMVectorAdd(vecLocalPosition, XMVectorSet(rBasis.f2Offset.x, rBasis.f2Offset.y, 0.0f, 0.0f));
+}
+#endif
+
 // Pre-mix coord.ToKey() into a 32-bit seed where both x and y bits influence the result.
 // Required because ToKey() packs x into bits 32-63: a naive `static_cast<uint32_t>(key)` would
 // drop x entirely. The 64-bit multiply spreads every input bit through the upper half of the

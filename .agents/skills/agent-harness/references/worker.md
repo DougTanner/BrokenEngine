@@ -17,11 +17,10 @@ and the handoff this run returns.
 2. Read the focused references only when applicable. Done when every reference
    this scenario makes applicable has been read:
 
-   - Read the command reference (`command-reference.md`) for the five
-     engine-shared command schemas (`ping`, `quit`, `get_logs`,
-     `set_log_level`, `crash_report_fixture`) and the `params`/`result`
-     placement convention; the request/response envelope itself is defined in
-     the Invoke commands steps below. The selected project's
+   - Read the command reference (`command-reference.md#shared-commands`) for
+     the engine-shared command schemas and the `params`/`result` placement
+     convention; the request/response envelope itself is defined in the Invoke
+     commands steps below. The selected project's
      `Projects/<Project>/Documents/AgentHarness.md` hub routes every game
      command schema, launch recipe, verification scenario, and game caveat to a
      focused reference.

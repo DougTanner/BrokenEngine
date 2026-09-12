@@ -40,6 +40,7 @@ void SmokeTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
 	const SmokeTrailsInterpolate& rCurrent = rFrameInterpolate.smokeTrails;
+	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	siTotalCount += rCurrent.iCount;
 
 	if (rCurrent.iCount == 0)
@@ -55,16 +56,17 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 	// Build GPU quads
 	for (const auto& [id, iIndex] : rCurrent.idToIndexMap)
 	{
-		XMVECTOR vecPosition = rCurrent.pVecPositions[iIndex];
+		// Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
+		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[iIndex];
 		const SmokeTrailsType& rType = SmokeTrailsInterpolate::GetType(rCurrent.puiTypeIndices[iIndex]);
 		float fIntensity = rCurrent.pfIntensities[iIndex];
 		float fWidth = rType.fWidth;
 		float fStartTime = rCurrent.pfStartTimes[iIndex];
-		XMVECTOR vecSmoothedPosition = rCurrent.pVecSmoothedPositions[iIndex];
+		XMVECTOR vecLocalSmoothedPosition = rCurrent.pVecSmoothedPositions[iIndex];
 
 		// Visibility culling
 		XMFLOAT4A f4Position {};
-		if (!IsPointVisible(vecPosition, f4Position))
+		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
 		{
 			continue;
 		}
@@ -76,8 +78,8 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		fJitterTwo = fJitterTwo * fJitterTwo;
 
 		// Project current and smoothed positions to base height
-		XMVECTOR vecBasePosition = ProjectToBaseHeight(vecPosition);
-		XMVECTOR vecBaseSmoothedPosition = ProjectToBaseHeight(vecSmoothedPosition);
+		XMVECTOR vecBasePosition = ProjectToBaseHeight(vecLocalPosition, rBasis);
+		XMVECTOR vecBaseSmoothedPosition = ProjectToBaseHeight(vecLocalSmoothedPosition, rBasis);
 
 		// Calculate direction from smoothed to current
 		XMVECTOR vecToSmoothed = XMVectorSubtract(vecBasePosition, vecBaseSmoothedPosition);

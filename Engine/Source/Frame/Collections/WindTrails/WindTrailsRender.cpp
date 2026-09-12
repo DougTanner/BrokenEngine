@@ -55,6 +55,9 @@ void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
 	const WindTrailsInterpolate& rCurrent = rFrameInterpolate.windTrails;
+	// sPreviousPositions caches a trail's position in its own cell's frame, which is the frame this render reads it
+	// back in, so the cache needs no conversion of its own.
+	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 
 	if (!gWindEnabled.Get<bool>())
 	{
@@ -83,25 +86,25 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		// Build GPU quads
 		for (const auto& [id, iIndex] : rCurrent.idToIndexMap)
 		{
-			XMVECTOR vecPosition = rCurrent.pVecPositions[iIndex];
+			XMVECTOR vecLocalPosition = rCurrent.pVecPositions[iIndex];
 			float fIntensity = rCurrent.pfIntensities[iIndex];
 			float fWidth = rCurrent.pfWidths[iIndex];
 
 			// Visibility culling
 			XMFLOAT4A f4Position {};
-			if (!IsPointVisible(vecPosition, f4Position))
+			if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
 			{
 				continue;
 			}
 
 			// Look up or initialize previous position
 			auto it = sPreviousPositions.find(id);
-			XMVECTOR vecPreviousPosition = (it != sPreviousPositions.end()) ? it->second : vecPosition;
+			XMVECTOR vecLocalPreviousPosition = (it != sPreviousPositions.end()) ? it->second : vecLocalPosition;
 			float fLengthMultiplier = rCurrent.pfLengthMultipliers[iIndex];
 
 			// Project to base height
-			XMVECTOR vecBasePosition = ProjectToBaseHeight(vecPosition);
-			XMVECTOR vecBasePreviousPosition = ProjectToBaseHeight(vecPreviousPosition);
+			XMVECTOR vecBasePosition = ProjectToBaseHeight(vecLocalPosition, rBasis);
+			XMVECTOR vecBasePreviousPosition = ProjectToBaseHeight(vecLocalPreviousPosition, rBasis);
 
 			// Calculate direction from previous to current, scaled by length multiplier
 			XMVECTOR vecDirection = XMVectorSubtract(vecBasePosition, vecBasePreviousPosition);

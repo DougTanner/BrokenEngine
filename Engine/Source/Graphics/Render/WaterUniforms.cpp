@@ -116,8 +116,11 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	double dScrollSinThree = std::sin(dScrollGammaThree);
 	sdReducedTimeThreeX = std::fmod(sdReducedTimeThreeX + dDeltaThree * (dScrollCosThree - dScrollSinThree), 10.0);
 	sdReducedTimeThreeY = std::fmod(sdReducedTimeThreeY + dDeltaThree * (dScrollCosThree + dScrollSinThree), 10.0);
-	double dCameraX = static_cast<double>(f4CameraPos.x);
-	double dCameraY = static_cast<double>(f4CameraPos.y);
+	// Phase must follow the camera across a cell change, so the reductions below run on the absolute camera position,
+	// reconstructed as a double from the camera cell and the camera's local position. This is client-only CPU work:
+	// fWaterOriginX/Y above stays in the rebased frame the shaders add it back to.
+	double dCameraX = static_cast<double>(engine::gpCamera->mBasisCoord.x) * static_cast<double>(kfCellWidth) + static_cast<double>(f4CameraPos.x);
+	double dCameraY = static_cast<double>(engine::gpCamera->mBasisCoord.y) * static_cast<double>(kfCellHeight) + static_cast<double>(f4CameraPos.y);
 
 	// Rotate cameraXY by R(-theta) before fmod on the CPU: rotation is already encoded when shader fract() absorbs the integral sizeMult*10
 	// wrap. Rotating an already-reduced origin gives nonintegral wrap shifts except at multiples of pi/2, causing normal-pattern jumps at each

@@ -7,7 +7,6 @@ namespace engine
 
 void FrameStaticData::Write(std::ostream& rStream, bool bIncludeNavData) const
 {
-	common::Write(rStream, vecArea);
 	common::Write(rStream, static_cast<int32_t>(islands.size()));
 	for (const IslandPlacement& rPlacement : islands)
 	{
@@ -23,7 +22,6 @@ void FrameStaticData::Write(std::ostream& rStream, bool bIncludeNavData) const
 
 void FrameStaticData::Read(std::istream& rStream, bool bIncludeNavData)
 {
-	common::Read(rStream, vecArea);
 	int32_t iCount = 0;
 	common::Read(rStream, iCount);
 	// Trust boundary (save / network full-state): enforce the generated per-cell contract and bound the count

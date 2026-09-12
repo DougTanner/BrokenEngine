@@ -335,7 +335,7 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{
@@ -502,7 +502,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	rCurrentPostRender.puiRegistryTargets[i] = {};
 
 #if defined(BT_CLIENT)
-	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, rCurrentInterpolate.pVecPositions[i], gExplosionVolume.Get());
+	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, rStaticData.coord, rCurrentInterpolate.pVecPositions[i], gExplosionVolume.Get());
 #endif
 
 	rCurrentPostRender.pFlags[i].Set(kExploding);

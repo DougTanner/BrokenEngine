@@ -12,7 +12,7 @@ struct NavContour
 	std::vector<int32_t> polygonOffsets;
 };
 
-inline constexpr int64_t kiNavDataVersion = 14;
+inline constexpr int64_t kiNavDataVersion = 15;
 
 // Broad-phase edge grid dimensions (tunable). Mirrors the fixed-zone grid in Collision.h; finer here
 // because obstacle edges are denser than collision objects. Only affects derived (non-serialized) data.

@@ -83,6 +83,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderSpaceships);
 
 	const SpaceshipsInterpolate& rCurrent = *rFrameInterpolate.pSpaceships;
+	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	gpProfileManager->SetCount(game::kCpuCounterSpaceships, rCurrent.iCount);
 
 	if (rCurrent.iCount == 0)
@@ -120,8 +121,9 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 			continue;
 		}
 
+		// Positions are local to the rendered cell; the visible area is in the camera cell's frame.
 		XMFLOAT4A f4Position {};
-		XMStoreFloat4A(&f4Position, rCurrent.pVecPositions[i]);
+		XMStoreFloat4A(&f4Position, engine::Rebase(rBasis, rCurrent.pVecPositions[i]));
 		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->f4RenderVisibleArea, f4Position))
 		{
 			continue;
@@ -167,13 +169,15 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 				fSize *= std::pow(rCurrent.pfDestroyedTimes[i] / kfSpaceshipDestroyTime, 0.75f);
 			}
 
+			// One conversion into the camera cell's frame feeds both the layout position and the translation.
+			XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 			XMFLOAT4A f4Position {};
-			XMStoreFloat4A(&f4Position, rCurrent.pVecPositions[i]);
+			XMStoreFloat4A(&f4Position, vecPosition);
 
 			XMMATRIX matScaling = XMMatrixScaling(fSize, fSize, fSize);
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
-			XMMATRIX matTranslation = XMMatrixTranslationFromVector(rCurrent.pVecPositions[i]);
+			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
 			XMMATRIX matTransform = matScaling * sMatPreRotate * matRoll * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];

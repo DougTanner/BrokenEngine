@@ -746,6 +746,10 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 				float fCoordDeltaTime = (rSub.iSnapshotCount >= kiRenderBehindTicks + 1) ? fDeltaTime : 0.0f;
 				game::FrameInterpolate::AllocateAndCopy(mRenderInterpolates.try_emplace(rCoord).first->second, rFrame.interpolate);
 				game::FrameInterpolate::Update(mRenderInterpolates.at(rCoord), rFrame, fCoordDeltaTime);
+				// Label the copy with the cell its positions are local to and that cell's offset from the camera cell
+				// this same render entry point just resolved. Every renderer converts with this value at its one
+				// position-to-GPU point; the position columns are never rewritten.
+				mRenderInterpolates.at(rCoord).renderBasis = MakeRenderBasis(rCoord, cameraCoord);
 			};
 			if (bHaveRenderableCamera)
 			{
@@ -928,7 +932,6 @@ void GameBase::CreateFrameAtCoord(GridCoord coord)
 
 	// Populate static data for this coord
 	FrameStaticData& rStaticData = rFrames.staticData;
-	rStaticData.vecArea = ComputeCanonicalFrameArea(coord);
 	rStaticData.coord = coord;
 	GenerateIslandChain(coord, rStaticData.islands);
 	// navData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.

@@ -161,7 +161,7 @@ XMVECTOR Game::GetClientPlayerPosition() const
 			}
 		}
 	}
-	XMVECTOR vecArea = rFrames.staticData.vecArea;
+	XMVECTOR vecArea = engine::LocalFrameArea();
 	return XMVectorSet((XMVectorGetX(vecArea) + XMVectorGetZ(vecArea)) * 0.5f, (XMVectorGetY(vecArea) + XMVectorGetW(vecArea)) * 0.5f, 0.0f, 1.0f);
 }
 #endif // BT_CLIENT
@@ -202,7 +202,11 @@ void Game::ComputeActiveSet()
 		{
 			// Camera-zoom-dependent VisibleArea: f4LargeVisibleArea packs (minX, maxY, maxX, minY).
 			const XMFLOAT4& f4Visible = engine::gpCamera->f4LargeVisibleArea;
-			XMVECTOR vecArea = mCoordFrames.at(mClientGridCoord).staticData.vecArea;
+			// The visible area is in the camera basis cell's frame, which is not always the client cell: it lags a
+			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
+			// neighbour rectangle therefore offsets the one local area every cell has by that neighbour's own offset
+			// from the camera basis, so both sides of the test are always in the same frame.
+			XMVECTOR vecArea = engine::LocalFrameArea();
 			float fCellMinX = XMVectorGetX(vecArea);
 			float fCellMaxY = XMVectorGetY(vecArea);
 			float fCellMaxX = XMVectorGetZ(vecArea);
@@ -231,16 +235,21 @@ void Game::ComputeActiveSet()
 					{
 						continue;
 					}
-					float fOffsetX = static_cast<float>(i) * engine::kfCellWidth;
-					float fOffsetY = static_cast<float>(j) * engine::kfCellHeight;
-					float fNeighborMinX = fCellMinX + fOffsetX;
-					float fNeighborMaxX = fCellMaxX + fOffsetX;
-					float fNeighborMinY = fCellMinY + fOffsetY;
-					float fNeighborMaxY = fCellMaxY + fOffsetY;
+					// A cell at the numeric edge of the grid has no neighbour in that direction; skip it rather than
+					// wrap to the opposite end.
+					engine::GridCoord neighbor {};
+					if (!engine::TryAddGridCoord(mClientGridCoord, i, j, neighbor))
+					{
+						continue;
+					}
+					XMFLOAT2 f2Offset = engine::MakeRenderBasis(neighbor, engine::gpCamera->mBasisCoord).f2Offset;
+					float fNeighborMinX = fCellMinX + f2Offset.x;
+					float fNeighborMaxX = fCellMaxX + f2Offset.x;
+					float fNeighborMinY = fCellMinY + f2Offset.y;
+					float fNeighborMaxY = fCellMaxY + f2Offset.y;
 					if (f4Visible.x < fNeighborMaxX && f4Visible.z > fNeighborMinX && f4Visible.w < fNeighborMaxY
 					 && f4Visible.y > fNeighborMinY)
 					{
-						engine::GridCoord neighbor {.x = mClientGridCoord.x + i, .y = mClientGridCoord.y + j};
 						mVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
 						ensureNeighbor(neighbor);
 					}
@@ -439,7 +448,6 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 
 	// Populate static data for origin coord (used as the main-menu cell)
 	engine::FrameStaticData& rStaticData = rFrames.staticData;
-	rStaticData.vecArea = XMVectorSet(engine::kfBaseAreaMinX, engine::kfBaseAreaMaxY, engine::kfBaseAreaMaxX, engine::kfBaseAreaMinY);
 	rStaticData.coord = engine::kOriginCoord;
 	// Debug builds turn the main-menu cell into a single centered island browser ('E' cycles it);
 	// release builds keep the procedural island chain. Gameplay cells always use the chain.

@@ -33,7 +33,9 @@ void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t& riBeg
 	riEnd = std::min<int64_t>(iTotal, riBegin + std::max<int64_t>(iLimit, 0));
 }
 
-// Minimum+cheap field set per collection: index, pos/dir, health, alignment, id — wherever the member exists.
+// Minimum+cheap field set per collection: index, local/dir, health, alignment, id — wherever the member exists.
+// Every row of one of these reports belongs to the cell the request named, so the position is the local
+// component alone; the caller's own 'coord' parameter identifies the cell.
 nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
 	const PlayersInterpolate& rInterp = *rFrame.interpolate.pPlayers;
@@ -49,7 +51,7 @@ nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64_t iLim
 			{"index", i},
 			{"uuid", rPost.puiIds[i].ToUuid().Value()},
 			{"globalId", rPost.pGlobalPlayerIds[i].iValue},
-			{"pos", Vec3ToJson(rInterp.pVecPositions[i])},
+			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
 			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
 			{"armor", rPost.pfArmors[i]},
 			{"shield", rPost.pfShields[i]},
@@ -73,7 +75,7 @@ nlohmann::json ExtractSpaceships(const Frame& rFrame, int64_t iOffset, int64_t i
 		items.push_back(
 		{
 			{"index", i},
-			{"pos", Vec3ToJson(rInterp.pVecPositions[i])},
+			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
 			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
 			{"health", rPost.pfHealths[i]},
 			{"deltaRotation", rInterp.pfDeltaRotations[i]},
@@ -97,7 +99,7 @@ nlohmann::json ExtractMissiles(const Frame& rFrame, int64_t iOffset, int64_t iLi
 		items.push_back(
 		{
 			{"index", i},
-			{"pos", Vec3ToJson(rInterp.pVecPositions[i])},
+			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
 			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
 			{"deltaRotation", rPost.pfDeltaRotations[i]},
 			{"deltaRotationDelay", rPost.pfDeltaRotationDelays[i]},
@@ -121,7 +123,7 @@ nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int64_t iLi
 		items.push_back(
 		{
 			{"index", i},
-			{"pos", Vec3ToJson(rInterp.pVecPositions[i])},
+			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
 			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
 			{"alignment", rPost.pAlignments[i].Value()},
 		});

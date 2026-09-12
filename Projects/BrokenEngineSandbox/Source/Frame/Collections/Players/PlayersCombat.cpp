@@ -175,14 +175,14 @@ void PlayersPostRender::RegenerateShield(float fDeltaTime, float fShieldCooldown
 
 // Player collision phases apply entity damage.
 
-static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[maybe_unused]] PlayersInterpolate& rPlayerInterpolate, PlayersPostRender& rPlayer, int64_t i, float fDamage, [[maybe_unused]] FXMVECTOR vecDamagePosition, [[maybe_unused]] float fHexShieldIntensity = 1.0f)
+static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoord, [[maybe_unused]] PlayersInterpolate& rPlayerInterpolate, PlayersPostRender& rPlayer, int64_t i, float fDamage, [[maybe_unused]] FXMVECTOR vecDamagePosition, [[maybe_unused]] float fHexShieldIntensity = 1.0f)
 {
 	// Shield absorbs damage first
 	if (rPlayer.pfShields[i] > 0.0f)
 	{
 		// Play shield hit sound with pitch based on remaining shield
 #if defined(BT_CLIENT)
-		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor465540__steaq__scifishieldhitwavwavCrc, vecDamagePosition, gShieldHitVolumeBase.Get() + gShieldHitVolumeScale.Get() * (1.0f - rPlayer.pfShields[i] / kfPlayerShield));
+		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor465540__steaq__scifishieldhitwavwavCrc, emitterCoord, vecDamagePosition, gShieldHitVolumeBase.Get() + gShieldHitVolumeScale.Get() * (1.0f - rPlayer.pfShields[i] / kfPlayerShield));
 #endif
 
 		// Update hex shield direction intensity
@@ -229,7 +229,7 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 #if defined(BT_CLIENT)
 		if (fDamage > kfArmorHitSoundDamageThreshold)
 		{
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor330629__stormwaveaudio__scififorcefieldimpact15wavCrc, vecDamagePosition, gArmorHitVolumeBase.Get() + gArmorHitVolumeScale.Get() * (1.0f - rPlayer.pfArmors[i] / kfPlayerArmor));
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor330629__stormwaveaudio__scififorcefieldimpact15wavCrc, emitterCoord, vecDamagePosition, gArmorHitVolumeBase.Get() + gArmorHitVolumeScale.Get() * (1.0f - rPlayer.pfArmors[i] / kfPlayerArmor));
 		}
 #endif
 
@@ -245,7 +245,7 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -262,11 +262,11 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 			{
 				if (rResult.uiOtherCategory == CollisionCategory::kSpaceship)
 				{
-					ApplyDamage(rFrame, rCurrentInterpolate, rCurrentPostRender, i, kfSpaceshipCollisionDamage, rResult.vecContactPoint);
+					ApplyDamage(rFrame, rStaticData.coord, rCurrentInterpolate, rCurrentPostRender, i, kfSpaceshipCollisionDamage, rResult.vecContactPoint);
 				}
 				else if (rResult.uiOtherCategory == CollisionCategory::kBlaster)
 				{
-					ApplyDamage(rFrame, rCurrentInterpolate, rCurrentPostRender, i, rResult.fDamageReceived, rResult.vecContactPoint);
+					ApplyDamage(rFrame, rStaticData.coord, rCurrentInterpolate, rCurrentPostRender, i, rResult.fDamageReceived, rResult.vecContactPoint);
 
 					// Spawn impact VFX at contact point
 #if defined(BT_CLIENT)
@@ -294,7 +294,7 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 
 // PlayersPostRender::Spawn creates weapons and death effects.
 
-void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame)
+void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoord)
 {
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
@@ -363,7 +363,7 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame)
 			});
 
 #if defined(BT_CLIENT)
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, vecFinalPosition, gPlayerBlasterVolume.Get(), gPlayerBlasterPitchMin.Get(), gPlayerBlasterPitchRandom.Get());
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, emitterCoord, vecFinalPosition, gPlayerBlasterVolume.Get(), gPlayerBlasterPitchMin.Get(), gPlayerBlasterPitchRandom.Get());
 #endif
 
 			rCurrentPostRender.pfNextBlasterFireTimes[i] += kfBlasterFireInterval;
@@ -371,13 +371,13 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame)
 	}
 }
 
-void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData)
+void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoord)
 {
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 	float fDeltaTime = rFrame.interpolate.fDeltaTime;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	// Built once for the whole spawn loop, after Update, Transfer, and Destroy have settled this tick's spaceship
 	// rows and every current missile handle. Missiles spawned below may grow their collection, which the context
@@ -439,7 +439,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 		// pointers, and the wrapper pushes on that same workbuffer.
 		if (engine::IsOutOfBounds(bounds, vecMissilePosition)) [[unlikely]]
 		{
-			LOG(kDefault, kDebug, "SpawnMissiles: muzzle outside cell Tick: {} Coord: ({},{}) Index: {} Position: ({:.1f},{:.1f})", rFrame.interpolate.iTick, rStaticData.coord.x, rStaticData.coord.y, i, XMVectorGetX(vecMissilePosition), XMVectorGetY(vecMissilePosition));
+			LOG(kDefault, kDebug, "SpawnMissiles: muzzle outside cell Tick: {} Coord: ({},{}) Index: {} Position: ({:.1f},{:.1f})", rFrame.interpolate.iTick, emitterCoord.x, emitterCoord.y, i, XMVectorGetX(vecMissilePosition), XMVectorGetY(vecMissilePosition));
 			continue;
 		}
 
@@ -472,7 +472,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 		});
 
 #if defined(BT_CLIENT)
-		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissile182794__qubodup__rocketlaunch_start_2wavCrc, vecMissilePosition, gMissileLaunchVolume.Get(), gMissilePitchMin.Get(), gMissilePitchRandom.Get());
+		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissile182794__qubodup__rocketlaunch_start_2wavCrc, emitterCoord, vecMissilePosition, gMissileLaunchVolume.Get(), gMissilePitchMin.Get(), gMissilePitchRandom.Get());
 #endif
 	}
 }

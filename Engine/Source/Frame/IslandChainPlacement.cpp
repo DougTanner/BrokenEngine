@@ -59,11 +59,10 @@ enum class Role
 	kSmall,
 };
 
-// Per-cell generation state threaded through the placement helpers.
+// Per-cell generation state threaded through the placement helpers. Every position below is cell-local
+// meters, so the cell center is the origin and no coordinate-derived term appears in the geometry.
 struct CellContext
 {
-	float fCenterWorldX = 0.0f;
-	float fCenterWorldY = 0.0f;
 	float fHalfW = 0.0f;
 	float fHalfH = 0.0f;
 
@@ -168,9 +167,9 @@ const XMFLOAT2* LocalHull(const IslandTemplate& rTemplate, XMFLOAT2 (&rRectStora
 	return pLocalHull;
 }
 
-// Commit a candidate world hull as a new placement: copy its verts into pointer-stable storage, push the
+// Commit a candidate hull as a new placement: copy its verts into pointer-stable storage, push the
 // matching view and the IslandPlacement, and return the new placed index.
-int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT2 f2World, float fRotation, const common::ConvexHull2D& rCandidate)
+int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT2 f2Local, float fRotation, const common::ConvexHull2D& rCandidate)
 {
 	// placedHullViews hold raw vertex pointers into placedHullStorage, reserved to kiMaxIslandsPerCell.
 	// Placement must not exceed that reserve; the stable-view contract protects SAT overlap tests,
@@ -180,7 +179,7 @@ int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT2 f2Wor
 	common::ConvexHull2D view = rCandidate;
 	view.pVertices = rContext.placedHullStorage.back().data();
 	rContext.placedHullViews.push_back(view);
-	rContext.pOut->push_back({.islandCrc = crc, .f2WorldPos = f2World, .fRotation = fRotation});
+	rContext.pOut->push_back({.islandCrc = crc, .f2WorldPos = f2Local, .fRotation = fRotation});
 	return static_cast<int64_t>(rContext.placedHullViews.size()) - 1;
 }
 
@@ -208,11 +207,11 @@ bool PlaceAnchor(CellContext& rContext, common::crc_t crc, float fTargetLocalX, 
 
 	float fLocalX = std::clamp(fTargetLocalX, -fLimitX, fLimitX);
 	float fLocalY = std::clamp(fTargetLocalY, -fLimitY, fLimitY);
-	XMFLOAT2 f2World {rContext.fCenterWorldX + fLocalX, rContext.fCenterWorldY + fLocalY};
+	XMFLOAT2 f2Local {fLocalX, fLocalY};
 
 	rContext.scratch.resize(static_cast<size_t>(iLocalCount));
-	common::ConvexHull2D candidate = common::BuildWorldHull(pLocalHull, iLocalCount, f2World, rotation.fCos, rotation.fSin, rContext.scratch.data());
-	CommitPlacement(rContext, crc, f2World, fRotation, candidate);
+	common::ConvexHull2D candidate = common::BuildWorldHull(pLocalHull, iLocalCount, f2Local, rotation.fCos, rotation.fSin, rContext.scratch.data());
+	CommitPlacement(rContext, crc, f2Local, fRotation, candidate);
 	rAcceptedLocalOut = {fLocalX, fLocalY};
 	return true;
 }
@@ -256,16 +255,16 @@ bool TryTouchPlace(CellContext& rContext, common::crc_t crc, int64_t iHost, floa
 	// edge — the two hulls just clear each other along fDir (separating axis), leaving the small gap.
 	XMFLOAT2 f2Host = rContext.pOut->at(static_cast<size_t>(iHost)).f2WorldPos;
 	float fS = fHostMax + kfTouchGapMeters - fCandMin - (f2Host.x * fDirX + f2Host.y * fDirY);
-	XMFLOAT2 f2World {f2Host.x + fS * fDirX, f2Host.y + fS * fDirY};
+	XMFLOAT2 f2Local {f2Host.x + fS * fDirX, f2Host.y + fS * fDirY};
 
 	rContext.scratch.resize(static_cast<size_t>(iLocalCount));
-	common::ConvexHull2D candidate = common::BuildWorldHull(pLocalHull, iLocalCount, f2World, fCos, fSin, rContext.scratch.data());
+	common::ConvexHull2D candidate = common::BuildWorldHull(pLocalHull, iLocalCount, f2Local, fCos, fSin, rContext.scratch.data());
 
 	// Keep the whole cluster inside the cell (the touch pose is not clamped — that would break contact).
 	float fLimitX = rContext.fHalfW - kfCellEdgeMarginMeters;
 	float fLimitY = rContext.fHalfH - kfCellEdgeMarginMeters;
-	if (candidate.f2AabbMin.x < rContext.fCenterWorldX - fLimitX || candidate.f2AabbMax.x > rContext.fCenterWorldX + fLimitX
-	 || candidate.f2AabbMin.y < rContext.fCenterWorldY - fLimitY || candidate.f2AabbMax.y > rContext.fCenterWorldY + fLimitY)
+	if (candidate.f2AabbMin.x < -fLimitX || candidate.f2AabbMax.x > fLimitX
+	 || candidate.f2AabbMin.y < -fLimitY || candidate.f2AabbMax.y > fLimitY)
 	{
 		return false;
 	}
@@ -278,7 +277,7 @@ bool TryTouchPlace(CellContext& rContext, common::crc_t crc, int64_t iHost, floa
 		}
 	}
 
-	rPlacedIndexOut = CommitPlacement(rContext, crc, f2World, fRotation, candidate);
+	rPlacedIndexOut = CommitPlacement(rContext, crc, f2Local, fRotation, candidate);
 	return true;
 }
 
@@ -290,12 +289,10 @@ void GenerateIslandChain(GridCoord coord, std::vector<IslandPlacement>& rOut)
 
 	const float fCellW = kfCellWidth;
 	const float fCellH = kfCellHeight;
-	const float fCellOriginX = kfBaseAreaMinX + static_cast<float>(coord.x) * fCellW;
-	const float fCellMaxY = kfBaseAreaMaxY + static_cast<float>(coord.y) * fCellH;
 
+	// The coordinate seeds the RNG streams and nothing else: every cell generates the same centered local
+	// geometry, so no coordinate-scaled term can collapse an edge at a large coordinate.
 	CellContext context;
-	context.fCenterWorldX = fCellOriginX + 0.5f * fCellW;
-	context.fCenterWorldY = fCellMaxY - 0.5f * fCellH;
 	context.fHalfW = 0.5f * fCellW;
 	context.fHalfH = 0.5f * fCellH;
 	context.crcRandom = common::RandomEngine(SeedFromGridCoord(coord, kCrcPickSeedMultiplier));

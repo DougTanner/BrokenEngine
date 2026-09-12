@@ -74,6 +74,7 @@ void MissilesInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, c
 void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)
 {
 	const MissilesInterpolate& rCurrent = *rFrameInterpolate.pMissiles;
+	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	gpProfileManager->SetCount(game::kCpuCounterMissiles, rCurrent.iCount);
 
 	if (rCurrent.iCount == 0)
@@ -91,8 +92,11 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
+		// The position is local to the rendered cell; converting it once here feeds the cull, the layout position,
+		// and the model translation, all of which are in the camera cell's frame.
+		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 		XMFLOAT4A f4Position {};
-		XMStoreFloat4A(&f4Position, rCurrent.pVecPositions[i]);
+		XMStoreFloat4A(&f4Position, vecPosition);
 		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->f4RenderVisibleArea, f4Position))
 		{
 			continue;
@@ -112,7 +116,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 
 		XMMATRIX matScaling = XMMatrixScaling(kfMissileWidth * fScale, fScale, fScale);
 		XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
-		XMMATRIX matTranslation = XMMatrixTranslationFromVector(rCurrent.pVecPositions[i]);
+		XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
 		XMMATRIX matTransform = sMatPreMove * matScaling * sMatPreRotate * matYaw * matTranslation;
 
 		shaders::ModelLayout& rModelLayout = pLayouts[siRendered++];

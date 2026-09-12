@@ -19,8 +19,9 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 
 ## Precision and History
 
-- Water phase and camera-relative UV origins are computed in `double`, reduced with `std::fmod`, then cast to float. Integrate reduced phase from per-frame size, speed, and delta time so tunable changes do not jump.
+- Water phase and camera-relative UV origins are computed in `double`, reduced with `std::fmod`, then cast to float. Integrate reduced phase from per-frame size, speed, and delta time so tunable changes do not jump. The reduction consumes the absolute camera position, rebuilt as a `double` from the camera cell and the camera's local position, so the pattern stays continuous when the camera changes cell.
 - Rotate camera origins into the shader's pattern space before reduction, and preserve integral shader-side wrap multipliers. These CPU reductions are the precision owner for distant-world water sampling.
+- Retained world rectangles — shadow and lighting history areas and the held visible area — are expressed in the camera cell's frame and carry it through `RetainedAreaBasis` (`Render.h`).
 - Lighting snaps its footprint to the light-deposit grid; shadow snaps to its own world-sized texel grid. Both publish current and previous areas for temporal sampling, and recreation reseeds history from the current area for one frame.
 - Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
 

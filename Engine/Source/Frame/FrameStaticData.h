@@ -28,7 +28,6 @@ struct IslandRenderQuery
 
 struct FrameStaticData
 {
-	XMVECTOR vecArea {};
 	GridCoord coord {};
 	std::vector<IslandPlacement> islands;
 	// Derived from islands + per-template NavContour. Built lazily on the per-coord

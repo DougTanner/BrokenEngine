@@ -14,17 +14,8 @@ namespace game
 namespace
 {
 
-// Local JSON helpers (deliberately not shared with the server TU's CoordFromParam/Vec3ToJson — KISS, no new header).
-nlohmann::json CoordToJson(engine::GridCoord coord)
-{
-	return nlohmann::json::array({coord.x, coord.y});
-}
-
-nlohmann::json Vec3ToJson(XMVECTOR vec)
-{
-	return nlohmann::json::array({XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec)});
-}
-
+// Coordinates and positions use the shared agent formatting (engine::AgentCoordJson / AgentLocalPositionJson);
+// this local helper covers the remaining plain XY pairs, which are screen pixels and template footprints.
 nlohmann::json Vec2ToJson(float fX, float fY)
 {
 	return nlohmann::json::array({fX, fY});
@@ -179,9 +170,12 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 
 	// Camera / UI / game state — always present (graceful empty state: no subscribed coords still returns these).
 	XMFLOAT4 f4VisibleArea = engine::gpCamera->f4RenderVisibleArea;
+	// basisCoord is the cell the camera's own values are local to, so eye and visibleArea read against it, and a
+	// unit row's local position only compares with them once it is rebased from its own cell onto this one.
 	rResult["camera"] =
 	{
-		{"eye", Vec3ToJson(engine::gpCamera->mVecEyePosition)},
+		{"basisCoord", engine::AgentCoordJson(engine::gpCamera->mBasisCoord)},
+		{"eye", engine::AgentLocalPositionJson(engine::gpCamera->mVecEyePosition)},
 		{"visibleArea", nlohmann::json::array({f4VisibleArea.x, f4VisibleArea.y, f4VisibleArea.z, f4VisibleArea.w})},
 		{"lod", engine::gpCamera->miVisibleAreaLod},
 	};
@@ -189,7 +183,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 	rResult["tweaksVisible"] = gpGame->mbShowImGui;
 	rResult["gameFlags"] = engine::GameFlagNames(gpGame->mGameFlags);
 	rResult["tick"] = gpGame->TickCounter();
-	rResult["clientGridCoord"] = CoordToJson(gpGame->mClientGridCoord);
+	rResult["clientGridCoord"] = engine::AgentCoordJson(gpGame->mClientGridCoord);
 	rResult["fleets"] = BuildFleets();
 
 	nlohmann::json subscribedCoords = nlohmann::json::array();
@@ -204,7 +198,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 
 	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
 	{
-		subscribedCoords.push_back(CoordToJson(rCoord));
+		subscribedCoords.push_back(engine::AgentCoordJson(rCoord));
 
 		// Island placements come from staticData, available regardless of whether a snapshot has arrived.
 		const engine::FrameStaticData& rStaticData = rFrames.staticData;
@@ -213,8 +207,9 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		{
 			const engine::IslandPlacement& rPlacement = rStaticData.islands.at(iIsland);
 			nlohmann::json islandJson;
-			islandJson["coord"] = CoordToJson(rCoord);
-			islandJson["center"] = Vec2ToJson(rPlacement.f2WorldPos.x, rPlacement.f2WorldPos.y);
+			islandJson["coord"] = engine::AgentCoordJson(rCoord);
+			// The placement center, in the owning cell's local meters like every other position here.
+			islandJson["local"] = Vec2ToJson(rPlacement.f2WorldPos.x, rPlacement.f2WorldPos.y);
 			islandJson["rotation"] = rPlacement.fRotation;
 			if (bHasFootprint)
 			{
@@ -230,6 +225,11 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 			continue;
 		}
 		const Frame& rFrame = gpGame->RenderFrame(rCoord);
+
+		// Unit positions are local to this cell, while the visible area and the screen projection are in the
+		// camera cell's frame, so every row rebases once before the cull and the projection and reports the
+		// unrebased local value.
+		const engine::RenderBasis basis = engine::MakeRenderBasis(rCoord, engine::gpCamera->mBasisCoord);
 
 		iPlayerTotal += rFrame.postRender.pPlayers->iCount;
 		iSpaceshipTotal += rFrame.postRender.pSpaceships->iCount;
@@ -247,8 +247,9 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 			const PlayersPostRender& rPlayersPost = *rFrame.postRender.pPlayers;
 			for (int64_t i = 0; i < rPlayersPost.iCount; ++i)
 			{
-				XMVECTOR vecPosition = rPlayersInterp.pVecPositions[i];
-				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+				XMVECTOR vecLocalPosition = rPlayersInterp.pVecPositions[i];
+				XMVECTOR vecRenderPosition = engine::Rebase(basis, vecLocalPosition);
+				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecRenderPosition))
 				{
 					continue;
 				}
@@ -257,12 +258,13 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 					bTruncated = true;
 					break;
 				}
-				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
+				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecRenderPosition);
 				units.push_back(
 				{
 					{"type", "player"},
 					{"globalId", rPlayersPost.pGlobalPlayerIds[i].iValue},
-					{"world", Vec3ToJson(vecPosition)},
+					{"coord", engine::AgentCoordJson(rCoord)},
+					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
 					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
 					{"armor", rPlayersPost.pfArmors[i]},
 					{"shield", rPlayersPost.pfShields[i]},
@@ -279,8 +281,9 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 			const SpaceshipsPostRender& rShipsPost = *rFrame.postRender.pSpaceships;
 			for (int64_t i = 0; i < rShipsPost.iCount; ++i)
 			{
-				XMVECTOR vecPosition = rShipsInterp.pVecPositions[i];
-				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+				XMVECTOR vecLocalPosition = rShipsInterp.pVecPositions[i];
+				XMVECTOR vecRenderPosition = engine::Rebase(basis, vecLocalPosition);
+				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecRenderPosition))
 				{
 					continue;
 				}
@@ -289,11 +292,12 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 					bTruncated = true;
 					break;
 				}
-				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
+				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecRenderPosition);
 				units.push_back(
 				{
 					{"type", "spaceship"},
-					{"world", Vec3ToJson(vecPosition)},
+					{"coord", engine::AgentCoordJson(rCoord)},
+					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
 					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
 					{"health", rShipsPost.pfHealths[i]},
 					{"alignment", rShipsPost.pAlignments[i].Value()},
@@ -310,8 +314,9 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 			const BlastersPostRender& rBlastersPost = *rFrame.postRender.pBlasters;
 			for (int64_t i = 0; i < rBlastersPost.iCount; ++i)
 			{
-				XMVECTOR vecPosition = rBlastersInterp.pVecPositions[i];
-				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecPosition))
+				XMVECTOR vecLocalPosition = rBlastersInterp.pVecPositions[i];
+				XMVECTOR vecRenderPosition = engine::Rebase(basis, vecLocalPosition);
+				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecRenderPosition))
 				{
 					continue;
 				}
@@ -320,11 +325,12 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 					bTruncated = true;
 					break;
 				}
-				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecPosition);
+				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecRenderPosition);
 				units.push_back(
 				{
 					{"type", "blaster"},
-					{"world", Vec3ToJson(vecPosition)},
+					{"coord", engine::AgentCoordJson(rCoord)},
+					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
 					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
 					{"alignment", rBlastersPost.pAlignments[i].Value()},
 					{"windTrailIntensity", rBlastersInterp.pfWindTrailIntensities[i]},

@@ -44,6 +44,7 @@ void WindRadialsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 void WindRadialsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
 	const WindRadialsInterpolate& rCurrent = rFrameInterpolate.windRadials;
+	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 
 	if (!gWindEnabled.Get<bool>() || rCurrent.iCount == 0)
 	{
@@ -55,20 +56,20 @@ void WindRadialsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
-		XMVECTOR vecPosition = rCurrent.pVecPositions[i];
+		// Load. Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
+		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
 		float fIntensity = rCurrent.pfIntensities[i];
 		float fSize = rCurrent.pfSizes[i];
 
 		// Visibility culling
 		XMFLOAT4A f4Position {};
-		if (!IsPointVisible(vecPosition, f4Position))
+		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
 		{
 			continue;
 		}
 
 		// Project to base height
-		XMVECTOR vecBasePosition = ProjectToBaseHeight(vecPosition);
+		XMVECTOR vecBasePosition = ProjectToBaseHeight(vecLocalPosition, rBasis);
 		XMStoreFloat4A(&f4Position, vecBasePosition);
 
 		// Build AxisAlignedQuadLayout

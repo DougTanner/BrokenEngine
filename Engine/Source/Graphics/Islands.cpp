@@ -227,10 +227,12 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	f4MeshVisibleArea.z = f4EyePosition.x + (f4MeshVisibleArea.z - f4EyePosition.x) * fSeaFloorScale;
 	f4MeshVisibleArea.w = f4EyePosition.y + (f4MeshVisibleArea.w - f4EyePosition.y) * fSeaFloorScale;
 
-	auto IsMeshVisible = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate)
+	// Placement positions are local to the cell that owns them, so every pass below resolves that cell's offset from
+	// the camera cell once and hands it to the visibility test and the emission that consume the position.
+	auto IsMeshVisible = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, XMFLOAT2 f2Offset)
 	{
 		float fRadius = 0.5f * std::hypot(rTemplate.mfQuadFootprintX, rTemplate.mfQuadFootprintY);
-		XMFLOAT4 f4Position {rPlacement.f2WorldPos.x, rPlacement.f2WorldPos.y, 0.0f, 1.0f};
+		XMFLOAT4 f4Position {rPlacement.f2WorldPos.x + f2Offset.x, rPlacement.f2WorldPos.y + f2Offset.y, 0.0f, 1.0f};
 		return engine::gpCamera->InVisibleArea(f4MeshVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius);
 	};
 
@@ -245,6 +247,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 		}
 
 		const FrameStaticData& rStaticData = it->second.staticData;
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, engine::gpCamera->mBasisCoord).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
 			IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
@@ -254,7 +257,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 			rTemplate.muiLastUsedRenderFrame = gpGraphics->muiFrameCounter;
 			std::ignore = gpIslandTerrain->AcquireTextureSlot(rPlacement.islandCrc);
 			++puiPerTemplateTotalCount[iTemplate];
-			if (IsMeshVisible(rPlacement, rTemplate))
+			if (IsMeshVisible(rPlacement, rTemplate, f2Offset))
 			{
 				++puiPerTemplateMeshVisibleCount[iTemplate];
 			}
@@ -282,7 +285,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 		uiCurrentWrittenOffset += puiPerTemplateTotalCount[iTemplate];
 	}
 
-	auto EmitPlacement = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, uint32_t uiTextureSlot)
+	auto EmitPlacement = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, uint32_t uiTextureSlot, XMFLOAT2 f2Offset)
 	{
 		int64_t iTemplate = rTemplate.miTemplateArrayIndex;
 		ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
@@ -298,8 +301,8 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 
 		shaders::AxisAlignedQuadLayout& rQuad = pSsbo[uiStorageBufferIndex];
 
-		rQuad.f4VertexRect.x = rPlacement.f2WorldPos.x - 0.5f * rTemplate.mfQuadFootprintX;
-		rQuad.f4VertexRect.y = rPlacement.f2WorldPos.y + 0.5f * rTemplate.mfQuadFootprintY;
+		rQuad.f4VertexRect.x = rPlacement.f2WorldPos.x + f2Offset.x - 0.5f * rTemplate.mfQuadFootprintX;
+		rQuad.f4VertexRect.y = rPlacement.f2WorldPos.y + f2Offset.y + 0.5f * rTemplate.mfQuadFootprintY;
 		rQuad.f4VertexRect.z = rTemplate.mfQuadFootprintX;
 		rQuad.f4VertexRect.w = -rTemplate.mfQuadFootprintY;
 
@@ -326,12 +329,13 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 		}
 
 		const FrameStaticData& rStaticData = it->second.staticData;
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, engine::gpCamera->mBasisCoord).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			if (IsMeshVisible(rPlacement, rTemplate))
+			if (IsMeshVisible(rPlacement, rTemplate, f2Offset))
 			{
-				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.miTextureSlot));
+				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.miTextureSlot), f2Offset);
 			}
 		}
 	}
@@ -349,12 +353,13 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 		}
 
 		const FrameStaticData& rStaticData = it->second.staticData;
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, engine::gpCamera->mBasisCoord).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			if (!IsMeshVisible(rPlacement, rTemplate))
+			if (!IsMeshVisible(rPlacement, rTemplate, f2Offset))
 			{
-				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.miTextureSlot));
+				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.miTextureSlot), f2Offset);
 			}
 		}
 	}

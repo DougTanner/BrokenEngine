@@ -103,10 +103,12 @@ bool IsPointVisible(XMVECTOR vecPosition, XMFLOAT4A& rOutPosition)
 	return rOutPosition.x >= engine::gpCamera->f4RenderVisibleArea.x && rOutPosition.x <= engine::gpCamera->f4RenderVisibleArea.z && rOutPosition.y <= engine::gpCamera->f4RenderVisibleArea.y && rOutPosition.y >= engine::gpCamera->f4RenderVisibleArea.w;
 }
 
-XMVECTOR ProjectToBaseHeight(XMVECTOR vecPosition)
+XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis)
 {
-	float fElevation = gpIslandTerrain->GlobalElevation(vecPosition);
-	return common::ToBaseHeight(vecPosition, engine::gpCamera->mVecEyePosition, std::max(fElevation, gBaseHeight.Get()));
+	// The elevation query is answered in the emitter's own cell, from the coordinate the basis carries; the
+	// projection toward the eye is the conversion point, so the rebase happens exactly once here.
+	float fElevation = gpIslandTerrain->GlobalElevation(rBasis.coord, vecLocalPosition);
+	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gBaseHeight.Get()));
 }
 
 void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& f4Position, float fArea, const XMFLOAT4A& f4Params, uint32_t uiColor)

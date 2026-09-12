@@ -2,6 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Frame/GridCoord.h"
+
 namespace game
 {
 
@@ -48,7 +50,8 @@ public:
 	void Update(const game::Frame* pFrame);
 
 	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, bool b3d, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
-	void XM_CALLCONV PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, FXMVECTOR vecPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
+	// vecLocalPosition is local to emitterCoord; the mix converts it against the listener's own cell.
+	void XM_CALLCONV PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoord, FXMVECTOR vecLocalPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 
 	void PlayMusic(common::crc_t uiAudioCrc);
 	void SetNextMusicTrackCallback(std::function<common::crc_t()> callback);

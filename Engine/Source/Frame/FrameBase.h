@@ -68,6 +68,12 @@ struct FrameInterpolateBase
 	// Client-only: phase markers (kInterpolate/kPostRender) and the replay marker (kRecalculated).
 	// Excluded from CRC, serialization, and LogDifferences — server never reads or sets them.
 	FrameFlags_t frameFlags {FrameFlags::kPostRender};
+
+	// Client-only: the cell this copy's positions are local to, plus that cell's offset from the camera cell
+	// the render dispatch resolved when it stamped this copy. Every renderer converts with it at its single
+	// position-to-GPU point; the position columns themselves are never rewritten. Excluded from CRC,
+	// serialization, and LogDifferences — the server never reads or sets it.
+	RenderBasis renderBasis {};
 #endif
 	int64_t iTick = 0;
 	float fCurrentTime = 0.0f;

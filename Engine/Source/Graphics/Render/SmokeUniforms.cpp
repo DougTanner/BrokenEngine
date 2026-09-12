@@ -72,6 +72,19 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 		sbPreviousAreaInitialized = true;
 	}
 
+	// The retained area — which wind also consumes through f4PreviousSmokeArea — is in the camera cell's frame, so
+	// follow a camera cell change before it is published beside this frame's area. A one-cell step keeps the smoke
+	// and wind textures usable; a larger step leaves no overlap, so it takes the existing clear below.
+	static RetainedAreaBasis sRetainedAreaBasis {};
+	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoord))
+	{
+		ShiftArea(sf4PreviousSmokeArea, *of2Shift);
+	}
+	else
+	{
+		gbSmokeClear = true;
+	}
+
 	if (gbSmokeClear)
 	{
 		gbSmokeClear = false;

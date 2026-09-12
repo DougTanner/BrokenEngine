@@ -69,7 +69,16 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 				DEBUG_BREAK();
 			}
 
-			engine::GridCoord destination {rCoord.x + rRequest.iDeltaX, rCoord.y + rRequest.iDeltaY};
+			// Checked before anything is queued, published, or created: a cell at a numeric coordinate edge
+			// has no outward neighbour, so the transfer fails here rather than wrapping to the far side of
+			// the grid. The source already released the entity, which is the correct outcome for a
+			// destination that cannot exist.
+			engine::GridCoord destination {};
+			if (!engine::TryAddGridCoord(rCoord, rRequest.iDeltaX, rRequest.iDeltaY, destination)) [[unlikely]]
+			{
+				LOG(kDefault, kError, "Transfer destination leaves the coordinate range Tick: {} Source: ({},{}) Delta: ({},{}) Type: {} Position: {}", rNextFrame.interpolate.iTick, rCoord.x, rCoord.y, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), game::StatusChangeTypeName(rRequest.eType), common::WbV2(rRequest.data.vecPosition, 1));
+				continue;
+			}
 
 			// Drop non-Player transfers (spaceships, blasters, missiles) whose destination is not
 			// live. kTransferPlayer is always allowed — the player's arrival IS the subscription.

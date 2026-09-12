@@ -5,7 +5,8 @@ namespace game
 
 // Dispatches a single agent command by name. rParams is the request "params" object, rResult the response
 // "result" object to populate. Tries the engine shared commands first (engine::ExecuteSharedAgentCommand —
-// ping/quit/get_logs/set_log_level/crash_report_fixture), then falls through to the side-specific BT_CLIENT/BT_SERVER handlers.
+// ping/quit/get_logs/set_log_level/crash_report_fixture/cell_coordinate_probe), then falls through to the
+// side-specific BT_CLIENT/BT_SERVER handlers.
 // Throws (std::runtime_error / nlohmann type/parse errors) on any failure — unknown command, missing/mistyped
 // params, unknown category or level, invalid regex — which the engine AgentCommandServer::Drain() catches and
 // formats into the failure envelope. Engine calling game:: is the sanctioned direction. nlohmann::json arrives
@@ -13,6 +14,8 @@ namespace game
 void ExecuteAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult);
 
 #if defined(BT_CLIENT)
+// One agent-supplied grid coordinate value, named by command in the failure message. Accepts the full
+// signed-int32 identity domain and throws for an integer outside it or a non-integer.
 int32_t ClientGridCoordValue(const nlohmann::json& rValue, std::string_view command);
 
 // Client-only command dispatch (network fixtures, full-state fixture, scene query, desync probe, and grid-cell move). ExecuteAgentCommand

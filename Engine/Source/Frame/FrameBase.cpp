@@ -231,7 +231,7 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	ForEachPostRenderUpdate(PostRenderBaseTypes{}, rFrame, rPreviousFrame, rStaticData);
 
 	// Setup pusher zones for spatial acceleration
-	PushersInterpolate::SetupZones(rFrame, rStaticData.vecArea);
+	PushersInterpolate::SetupZones(rFrame, LocalFrameArea());
 }
 
 void FramePostRenderBase::PreCollision([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
@@ -318,7 +318,7 @@ void RunFrameTick(const ActiveFrameRef& rRef, int64_t iTickCounter, float fCurre
 	if (rStaticData.elevationGrid.empty() && !rStaticData.islands.empty())
 	{
 		ScopedSuppressAllocationTracking suppress;
-		gpIslandTerrain->BuildElevationGrid(rStaticData.coord, rStaticData.islands, rStaticData.elevationGrid);
+		gpIslandTerrain->BuildElevationGrid(rStaticData.islands, rStaticData.elevationGrid);
 	}
 
 #if defined(BT_CLIENT)
@@ -346,7 +346,7 @@ void RunFrameTick(const ActiveFrameRef& rRef, int64_t iTickCounter, float fCurre
 
 	// Phase 3: Collision
 	game::FramePostRender::PreCollision(rNext, rCurrent, rStaticData);
-	Collision::Collide(rNext.postRender.alignments, rStaticData.vecArea);
+	Collision::Collide(rNext.postRender.alignments, LocalFrameArea());
 	game::FramePostRender::PostCollision(rNext, rCurrent, rStaticData);
 	game::FramePostRender::AreaDamage(rNext, rCurrent, rStaticData);
 

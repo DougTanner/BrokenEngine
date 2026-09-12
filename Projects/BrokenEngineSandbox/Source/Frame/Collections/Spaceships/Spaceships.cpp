@@ -371,7 +371,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{
@@ -513,7 +513,7 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			});
 
 #if defined(BT_CLIENT)
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, vecPosition, gEnemyBlasterVolume.Get(), gEnemyBlasterPitchMin.Get(), gEnemyBlasterPitchRandom.Get());
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coord, vecPosition, gEnemyBlasterVolume.Get(), gEnemyBlasterPitchMin.Get(), gEnemyBlasterPitchRandom.Get());
 #endif
 		}
 	}

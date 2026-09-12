@@ -289,17 +289,14 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 				fSpawnOffsetY = rSpawnData.fSpawnOffsetY;
 			}
 
-			// Compute frame center from world-space vecArea for spawn offset
-			float fCenterX = (XMVectorGetX(rStaticData.vecArea) + XMVectorGetZ(rStaticData.vecArea)) * 0.5f;
-			float fCenterY = (XMVectorGetW(rStaticData.vecArea) + XMVectorGetY(rStaticData.vecArea)) * 0.5f;
-
-			XMVECTOR vecSpawnPosition = XMVectorSet(fCenterX + fSpawnOffsetX, fCenterY + fSpawnOffsetY, engine::gBaseHeight.Get(), 1.0f);
+			// The cell's local frame is centered on the origin, so the spawn offset is the local position.
+			XMVECTOR vecSpawnPosition = XMVectorSet(fSpawnOffsetX, fSpawnOffsetY, engine::gBaseHeight.Get(), 1.0f);
 
 			// The offsets arrive over the wire, so refuse rather than clamp: a point outside this cell's bounds
 			// belongs to a neighbouring cell, which owns anything standing there. The single bounds test also
 			// rejects NaN and +/-inf, because under /fp:strict every NaN comparison is false and an infinity
 			// fails a strict bound, so junk offsets never reach Spawn's ValidateVector asserts below.
-			if (engine::IsOutOfBounds(engine::ComputeFrameBounds(rStaticData.vecArea), vecSpawnPosition)) [[unlikely]]
+			if (engine::IsOutOfBounds(engine::ComputeFrameBounds(engine::LocalFrameArea()), vecSpawnPosition)) [[unlikely]]
 			{
 				LOG(kNetwork, kWarning, "ProcessSpawnStatusChanges: spawn offset ({},{}) is outside cell ({},{}) - no player created", common::Wb(fSpawnOffsetX, 1), common::Wb(fSpawnOffsetY, 1), rStaticData.coord.x, rStaticData.coord.y);
 				continue;
@@ -418,8 +415,8 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	}
 #endif // BT_CLIENT
 
-	SpawnBlasters(rFrame);
-	SpawnMissiles(rFrame, rStaticData);
+	SpawnBlasters(rFrame, rStaticData.coord);
+	SpawnMissiles(rFrame, rStaticData.coord);
 	SpawnDeathExplosions(rFrame);
 }
 
@@ -702,7 +699,7 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
 		rCollisionScratch.startTimes.at(static_cast<size_t>(i)) = 0.0f;
 		rCollisionScratch.endTimes.at(static_cast<size_t>(i)) = 1.0f;
-		engine::SegmentHit boundaryHit = engine::TracePointToFrameExit(rStaticData.vecArea, rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		engine::SegmentHit boundaryHit = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.maxTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
 
@@ -739,11 +736,10 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		return;
 	}
 
-	// Frame area and center
-	XMVECTOR vecArea = rStaticData.vecArea;
+	// Frame center: every cell's local frame is centered on the origin.
 	// W=1.0 keeps this a proper position — every downstream (frameCenter - vecPosition) and cardinal offset add stays W-clean,
 	// so normalize fallbacks don't leak W into the AI direction and on into velocity.
-	XMVECTOR vecFrameCenter = XMVectorSet((XMVectorGetX(vecArea) + XMVectorGetZ(vecArea)) * 0.5f, (XMVectorGetW(vecArea) + XMVectorGetY(vecArea)) * 0.5f, engine::gBaseHeight.Get(), 1.0f);
+	XMVECTOR vecFrameCenter = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 1.0f);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{

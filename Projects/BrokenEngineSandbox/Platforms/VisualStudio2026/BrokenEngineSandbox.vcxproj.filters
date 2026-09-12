@@ -627,6 +627,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportFixture.h">
       <Filter>Engine\Agent\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CellCoordinateProbe.h">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h">
       <Filter>Game\Agent</Filter>
     </ClInclude>
@@ -1167,6 +1170,9 @@
       <Filter>Engine\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportFixture.cpp">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\CellCoordinateProbe.cpp">
       <Filter>Engine\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Agent\AgentCommands.cpp">

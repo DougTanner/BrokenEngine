@@ -230,7 +230,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	// Reverse iteration for swap-and-pop safety with RemoveIndexableElement
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)

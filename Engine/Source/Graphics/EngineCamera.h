@@ -2,10 +2,29 @@
 
 #if defined(BT_CLIENT)
 
+#include "Frame/GridCoord.h"
+
 namespace engine
 {
 
 struct FrameInterpolateBase;
+
+// The presentation basis for a cell whose positions are shown against cameraCoord's cell. The offset is a whole
+// number of cell widths, so it is exact in float, and it is the only value a grid coordinate contributes to
+// presentation. Collection render bodies read the one stamped on their interpolate copy; every other conversion
+// point builds its own here. Nothing publishes one render-wide for a renderer to find.
+inline RenderBasis MakeRenderBasis(GridCoord coord, GridCoord cameraCoord)
+{
+	return RenderBasis
+	{
+		.coord = coord,
+		.f2Offset =
+		{
+			static_cast<float>(static_cast<int64_t>(coord.x) - static_cast<int64_t>(cameraCoord.x)) * kfCellWidth,
+			static_cast<float>(static_cast<int64_t>(coord.y) - static_cast<int64_t>(cameraCoord.y)) * kfCellHeight,
+		},
+	};
+}
 
 // Minimum eye height (LOD pivot floor). Single source for both the engine LOD-bucket math in
 // Camera::CalculateMatricesAndVisibleArea and the zoom-clamp floor in Camera::UpdateEyeHeight.
@@ -92,6 +111,11 @@ public:
 	XMVECTOR mVecEyePosition {};
 	XMVECTOR mVecToEyeNormal {};
 
+	// The cell every cached camera position, and every basis built for this render, is local to. Update follows the
+	// rendered camera coord: on a one-cell step it shifts the cached positions so the flight stays continuous, on a
+	// larger step it restarts tracking.
+	GridCoord mBasisCoord {};
+
 	float mfShake = 0.0f;
 	int64_t miFrame = 0;
 
@@ -169,6 +193,8 @@ protected:
 
 private:
 
+	void DiscardTrackingCaches();
+	void ShiftToRenderedCell(GridCoord cameraCoord);
 	XMVECTOR ResolveTarget(const CameraTarget& rCameraTarget);
 	void UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime);
 	void UpdateEyeHeight();

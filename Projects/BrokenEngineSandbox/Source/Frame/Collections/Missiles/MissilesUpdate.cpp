@@ -330,7 +330,7 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		rCollisionScratch.startTimes.at(uiIndex) = 0.0f;
 		rCollisionScratch.endTimes.at(uiIndex) = 1.0f;
 		rCollisionScratch.terrainHits.at(uiIndex) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.boundaryHits.at(uiIndex) = engine::TracePointToFrameExit(rStaticData.vecArea, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.boundaryHits.at(uiIndex) = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		float fMaxTime = std::numeric_limits<float>::max();
 		if (rCollisionScratch.terrainHits.at(uiIndex).bHit)
 		{

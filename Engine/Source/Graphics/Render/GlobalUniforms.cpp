@@ -316,6 +316,17 @@ static void PopulateShadowArea(shaders::GlobalLayout& rGlobalLayout, float fShad
 	// Latch the previous world area. A recreate makes the previous area current and forces pure-current temporal
 	// output; otherwise ShadowTemporal.comp rejects reprojected samples that land outside the previous footprint.
 	static TemporalAreaLatch sTemporalAreaLatch {};
+	// The retained rectangle is in the camera cell's frame; follow a camera cell change before it is compared with
+	// this frame's area, and let a multi-cell jump take the existing reset.
+	static RetainedAreaBasis sRetainedAreaBasis {};
+	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoord))
+	{
+		ShiftArea(sTemporalAreaLatch.f4PreviousArea, *of2Shift);
+	}
+	else
+	{
+		gbShadowTemporalReset = true;
+	}
 	rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbShadowTemporalReset, gShadowTemporalBlend.Get(), rGlobalLayout.f4ShadowAreaPrevious);
 
 	rfWorldTexelX = area.fWorldTexelX;

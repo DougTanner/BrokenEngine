@@ -170,7 +170,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(rStaticData.vecArea);
+	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{

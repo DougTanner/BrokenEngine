@@ -12,8 +12,8 @@ namespace
 
 // Detect crossing polygon edges (the yellow debug lines). Two non-adjacent polygon edges that properly
 // intersect indicate a self-intersecting contour. Cross-placement overlap is no longer a defect on its
-// own: the visibility build and the runtime query both evaluate every polygon in the cell in world
-// space, so an edge that clears one island is still tested against the rest. Pure diagnostic:
+// own: the visibility build and the runtime query both evaluate every polygon in the cell in the shared
+// cell-local frame, so an edge that clears one island is still tested against the rest. Pure diagnostic:
 // O(edges^2) double loop, compiled out by default. Flip kbDebugNavCrossingCheck to true locally when
 // investigating a suspected contour defect.
 void DebugCheckCrossingEdges([[maybe_unused]] const NavData& rNavData)
@@ -205,7 +205,7 @@ void BuildNavAdjacency(NavData& rNavData)
 	}
 }
 
-// Whole-cell visibility graph in world space: edge (i, j) exists iff the runtime's own blocked test says
+// Whole-cell visibility graph in cell-local meters: edge (i, j) exists iff the runtime's own blocked test says
 // the segment is clear of every polygon in the cell, so the build and the query can never disagree.
 // Determinism: emission is fixed (i, j) index order over deterministic input, and SegmentBlockedByObstacle
 // is an order-independent boolean OR. Precondition: BuildNavAcceleration has already run over a non-empty
@@ -226,9 +226,9 @@ void BuildCellVisibilityGraph(NavData& rNavData)
 		auto [iStart, iEnd] = PolygonRange(rNavData.polygonOffsets, iPoly, iVertexCount);
 		int32_t iCount = iEnd - iStart;
 
-		// Convexity sign from the measured world-space winding, never assumed. BuildCellNavData below maps
+		// Convexity sign from the measured cell-frame winding, never assumed. BuildCellNavData below maps
 		// fLocalY = (0.5f - fV) * fFootprintY, mirroring Y, and the rotation preserves orientation — so
-		// these merged world-space polygons wind clockwise, the reverse of the UV-space template contour
+		// these merged cell-frame polygons wind clockwise, the reverse of the UV-space template contour
 		// NavBuild.cpp asserts CCW. A CCW assumption here would select exactly the reflex vertices and
 		// discard the path-critical convex ones. Under 3 vertices has no interior: IsPolygonCcw is
 		// undefined there and the cross product below is zero, so such a polygon offers no candidates.
@@ -313,8 +313,9 @@ void BuildCellNavData(NavData& rNavData, const std::vector<IslandPlacement>& rPl
 	rNavData.visEdgeA.clear();
 	rNavData.visEdgeB.clear();
 
-	// Walk per-cell placements; each placement's template contour (UV-space) is rotated and
-	// world-positioned around the placement's center. Topology offsets are rebased per island.
+	// Walk per-cell placements; each placement's template contour (UV-space) is rotated and offset by the
+	// placement's cell-local center, so the whole graph lands in centered cell-local meters and no grid
+	// coordinate enters it. Topology offsets are rebased per island.
 	for (const IslandPlacement& rPlacement : rPlacements)
 	{
 		const auto islandIt = gpIslandTerrain->mIslands.find(rPlacement.islandCrc);

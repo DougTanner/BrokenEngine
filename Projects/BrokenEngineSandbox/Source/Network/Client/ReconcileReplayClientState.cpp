@@ -95,7 +95,13 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 							clientState.clientGlobalPlayerId);
 						DEBUG_BREAK();
 					}
-					engine::GridCoord destination {rWork.coord.x + rRequest.iDeltaX, rWork.coord.y + rRequest.iDeltaY};
+					// Checked exactly like the server's transfer destination, so a cell at a numeric coordinate edge
+					// follows the server in having no outward neighbour instead of wrapping to the far side.
+					engine::GridCoord destination {};
+					if (!engine::TryAddGridCoord(rWork.coord, rRequest.iDeltaX, rRequest.iDeltaY, destination)) [[unlikely]]
+					{
+						continue;
+					}
 					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferPlayer GlobalPlayerId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalPlayerId, rWork.coord.x, rWork.coord.y, destination.x, destination.y);
 					clientState.fPreviousClientArmor = rRequest.data.fHealth;
 

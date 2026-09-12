@@ -40,6 +40,7 @@ void BillboardsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
 	const BillboardsInterpolate& rCurrent = rFrameInterpolate.billboards;
+	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	siTotalCount += rCurrent.iCount;
 
 	if (rCurrent.iCount == 0)
@@ -57,12 +58,12 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		BillboardFlags_t flags = rCurrent.pFlags[i];
 		float fRotation = rCurrent.pfRotations[i];
 		float fExtra = rCurrent.pfExtra[i];
-		XMVECTOR vecPosition = rCurrent.pVecPositions[i];
+		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
 
 		const BillboardsInterpolate::Type& rType = BillboardsInterpolate::sTypes.at(uiTypeIndex);
 
-		// Project world position to clip space
-		XMVECTOR vecProjection = XMVector4Transform(vecPosition, XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatPerspective));
+		// Convert into the camera cell's frame, then project to clip space — the view matrix is built in that frame.
+		XMVECTOR vecProjection = XMVector4Transform(Rebase(rBasis, vecLocalPosition), XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatPerspective));
 
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecProjection);

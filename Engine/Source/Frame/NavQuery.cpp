@@ -649,7 +649,7 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 	int32_t iVertexCount = static_cast<int32_t>(rNavData.vertices.size());
 	int32_t iTotalNodes = iVertexCount + 2;
 
-	// Workbuffer allocation for A* scratch memory only (vertices already world-space in NavData)
+	// Workbuffer allocation for A* scratch memory only (vertices already in NavData's cell-local frame)
 	AStarMemoryLayout aStarMemoryLayout = ComputeAStarMemoryLayout(iTotalNodes, iVertexCount);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;

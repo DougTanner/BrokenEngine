@@ -2,6 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Frame/GridCoord.h"
+
 namespace engine
 {
 
@@ -31,9 +33,14 @@ inline constexpr uint32_t TileCount(uint32_t uiCount)
 	return (uiCount + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize;
 }
 
-// Shared rendering helpers for collections
+// Shared rendering helpers for collections. Each renderer rebases its cell-local positions once, at its single
+// position-to-GPU point, so only ProjectToBaseHeight takes a basis: it reaches the cross-cell GlobalElevation
+// query, which needs the cell identity as well as the offset.
+// vecPosition is already in the camera cell's frame.
 bool IsPointVisible(XMVECTOR vecPosition, XMFLOAT4A& rOutPosition);
-XMVECTOR ProjectToBaseHeight(XMVECTOR vecPosition);
+// vecLocalPosition is local to rBasis.coord; the returned position is in the camera cell's frame.
+XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis);
+// f4Position is ProjectToBaseHeight's output, so it is already in the camera cell's frame.
 void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& f4Position, float fArea, const XMFLOAT4A& f4Params, uint32_t uiColor);
 float MinLightingDepositSize();
 

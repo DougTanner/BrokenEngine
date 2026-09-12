@@ -2,6 +2,7 @@
 
 #include "Agent/AgentCommandsShared.h"
 
+#include "Agent/Commands/CellCoordinateProbe.h"
 #include "Agent/Commands/CrashReportFixture.h"
 
 namespace engine
@@ -186,6 +187,16 @@ void CommandSetLogLevel(const nlohmann::json& rParams, nlohmann::json& rResult)
 
 } // namespace
 
+nlohmann::json AgentCoordJson(GridCoord coord)
+{
+	return nlohmann::json::array({coord.x, coord.y});
+}
+
+nlohmann::json AgentLocalPositionJson(FXMVECTOR vecLocalPosition)
+{
+	return nlohmann::json::array({XMVectorGetX(vecLocalPosition), XMVectorGetY(vecLocalPosition), XMVectorGetZ(vecLocalPosition)});
+}
+
 bool ExecuteSharedAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult, int64_t iGameTick)
 {
 	if (cmd == "ping")
@@ -207,6 +218,10 @@ bool ExecuteSharedAgentCommand(std::string_view cmd, const nlohmann::json& rPara
 	else if (cmd == "crash_report_fixture")
 	{
 		CommandCrashReportFixture(rParams, rResult);
+	}
+	else if (cmd == "cell_coordinate_probe")
+	{
+		CommandCellCoordinateProbe(rParams, rResult);
 	}
 	else
 	{

@@ -46,6 +46,7 @@ void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
 	const PointLightsInterpolate& rCurrent = rFrameInterpolate.pointLights;
+	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	siTotalCount += rCurrent.iCount;
 
 	if (rCurrent.iCount == 0)
@@ -65,8 +66,8 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
-		XMVECTOR vecPosition = rCurrent.pVecPositions[i];
+		// Load. Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
+		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
 		const PointLightsType& rType = PointLightsInterpolate::GetType(rCurrent.puiTypeIndices[i]);
 		float fRotation = rCurrent.pfRotations[i];
 		float fLightingArea = std::max(rCurrent.pfLightingAreas[i], fMinLightingArea);
@@ -74,7 +75,7 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 		// Visibility culling
 		XMFLOAT4A f4Position {};
-		if (!IsPointVisible(vecPosition, f4Position))
+		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
 		{
 			continue;
 		}
@@ -83,7 +84,7 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		XMFLOAT4A f4VisiblePosition = f4Position;
 
 		// Project to base height for lighting
-		XMStoreFloat4A(&f4Position, ProjectToBaseHeight(vecPosition));
+		XMStoreFloat4A(&f4Position, ProjectToBaseHeight(vecLocalPosition, rBasis));
 
 		// Build AxisAlignedQuadLayout for lighting pass (uses base height projected position)
 		int64_t iTextureIndex = gpTextureManager->mTextureDescriptors.CrcToIndex(rType.crc);

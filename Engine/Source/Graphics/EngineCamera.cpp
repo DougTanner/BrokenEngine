@@ -80,6 +80,51 @@ Camera::~Camera()
 	}
 }
 
+void Camera::DiscardTrackingCaches()
+{
+	mVecLastKnownPlayerPosition = {};
+	mVecLastKnownPlayerVelocity = {};
+	mfLastKnownPlayerTime = 0.0f;
+	mVecJumpStartPosition = {};
+	mVecPreviousTargetPosition = {};
+	mfJumpStartTime = 0.0f;
+	mbJumping = false;
+}
+
+void Camera::ShiftToRenderedCell(GridCoord cameraCoord)
+{
+	if (cameraCoord == mBasisCoord)
+	{
+		return;
+	}
+
+	int64_t iStepX = static_cast<int64_t>(cameraCoord.x) - static_cast<int64_t>(mBasisCoord.x);
+	int64_t iStepY = static_cast<int64_t>(cameraCoord.y) - static_cast<int64_t>(mBasisCoord.y);
+	// Z and W stay zero: the step is planar, and the cached values it moves are homogeneous points.
+	RenderBasis previousBasis = MakeRenderBasis(mBasisCoord, cameraCoord);
+	XMVECTOR vecShift = XMVectorSet(previousBasis.f2Offset.x, previousBasis.f2Offset.y, 0.0f, 0.0f);
+	mBasisCoord = cameraCoord;
+
+	if (iStepX < -1 || iStepX > 1 || iStepY < -1 || iStepY > 1)
+	{
+		// Farther than the subscribed ring: nothing the camera cached describes a place inside the new cell, so drop
+		// the tracking state and re-enter the cell at its center. The sun angle and the zoom state are not positional
+		// and keep running.
+		mVecPosition = XMVectorSetY(XMVectorSetX(mVecPosition, 0.0f), 0.0f);
+		DiscardTrackingCaches();
+		return;
+	}
+
+	// One-cell step: move the whole cached set by the same exact whole-cell delta. Both flight endpoints shift
+	// together, so the smoothstep parameter and the elapsed jump clock are untouched and the flight stays monotonic
+	// across the boundary.
+	mVecPosition = XMVectorAdd(mVecPosition, vecShift);
+	mVecEyePosition = XMVectorAdd(mVecEyePosition, vecShift);
+	mVecJumpStartPosition = XMVectorAdd(mVecJumpStartPosition, vecShift);
+	mVecPreviousTargetPosition = XMVectorAdd(mVecPreviousTargetPosition, vecShift);
+	mVecLastKnownPlayerPosition = XMVectorAdd(mVecLastKnownPlayerPosition, vecShift);
+}
+
 void Camera::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime)
 {
 	// fDeltaTime is the sim-scaled render delta the engine just measured: wall delta multiplied by the active time
@@ -87,6 +132,10 @@ void Camera::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaT
 	// keeps the camera in sync with the interpolated player across vsync misses; otherwise different deltas would
 	// produce visible relative stutter at high zoom.
 	mfTime += fDeltaTime;
+
+	// Before any position is read or written this frame: the camera lives in its own cell's local frame, so a change
+	// of rendered cell must move every cached position into the new frame first.
+	ShiftToRenderedCell(rFrameInterpolate.renderBasis.coord);
 
 	// Decay camera shake using sim-scaled render time
 	mfShake = std::max(mfShake - fDeltaTime * 2.0f, 0.0f);
@@ -287,13 +336,7 @@ void Camera::UpdateEyeHeight()
 void Camera::ResetForSession()
 {
 	ResetSunAngle();
-	mVecLastKnownPlayerPosition = {};
-	mVecLastKnownPlayerVelocity = {};
-	mfLastKnownPlayerTime = 0.0f;
-	mVecJumpStartPosition = {};
-	mVecPreviousTargetPosition = {};
-	mfJumpStartTime = 0.0f;
-	mbJumping = false;
+	DiscardTrackingCaches();
 	// Reinitialize both references directly to the new session's live zoom on the next camera update; do not carry
 	// contraction across sessions.
 	mfShadowTexelEyeHeight = 0.0f;

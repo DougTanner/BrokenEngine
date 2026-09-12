@@ -52,6 +52,36 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroo
 	};
 }
 
+// Retained world rectangles (shadow and lighting history, and the held visible area) are expressed in the camera
+// cell's frame, so they follow the camera when it changes cell. The whole-cell step keeps GPU history usable for the
+// one-cell case the 3x3 subscription allows; a larger step leaves no overlap, so the owner resets instead.
+struct RetainedAreaBasis
+{
+	GridCoord coord {};
+
+	[[nodiscard]] std::optional<XMFLOAT2> Advance(GridCoord cameraCoord)
+	{
+		int64_t iStepX = static_cast<int64_t>(cameraCoord.x) - static_cast<int64_t>(coord.x);
+		int64_t iStepY = static_cast<int64_t>(cameraCoord.y) - static_cast<int64_t>(coord.y);
+		XMFLOAT2 f2Offset = MakeRenderBasis(coord, cameraCoord).f2Offset;
+		coord = cameraCoord;
+		if (iStepX < -1 || iStepX > 1 || iStepY < -1 || iStepY > 1)
+		{
+			return std::nullopt;
+		}
+
+		return f2Offset;
+	}
+};
+
+inline void ShiftArea(XMFLOAT4& rf4Area, XMFLOAT2 f2Offset)
+{
+	rf4Area.x += f2Offset.x;
+	rf4Area.z += f2Offset.x;
+	rf4Area.y += f2Offset.y;
+	rf4Area.w += f2Offset.y;
+}
+
 struct TemporalAreaLatch
 {
 	bool bInitialized = false;

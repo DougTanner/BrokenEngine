@@ -9,6 +9,7 @@
 #include "StreamingVoices.h"
 
 #include "File/FileManager.h"
+#include "Game.h"
 #include "Profile/ProfileManager.h"
 
 namespace engine
@@ -381,13 +382,13 @@ void AudioManager::PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioC
 	mpStaticVoices->PlayOneShot(rFrame, uiAudioCrc, b3d, fVolume, fPitch, fPitchRange);
 }
 
-void XM_CALLCONV AudioManager::PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, FXMVECTOR vecPosition, float fVolume, float fPitch, float fPitchRange)
+void XM_CALLCONV AudioManager::PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoord, FXMVECTOR vecLocalPosition, float fVolume, float fPitch, float fPitchRange)
 {
 	if (mbSuspended.load(std::memory_order_acquire))
 	{
 		return;
 	}
-	mpStaticVoices->PlayOneShot3d(rFrame, uiAudioCrc, vecPosition, fVolume, fPitch, fPitchRange);
+	mpStaticVoices->PlayOneShot3d(rFrame, uiAudioCrc, emitterCoord, vecLocalPosition, fVolume, fPitch, fPitchRange);
 }
 
 void AudioManager::FinishDeviceReset()
@@ -570,7 +571,9 @@ void AudioManager::Update(const game::Frame* pFrame)
 		// Listener position must update first — UpdateLifecycle's priority/cull pass
 		// reads mVecListenerPosition and mfEffectiveFadeEnd computed here.
 		mpStaticVoices->UpdateListenerPosition();
-		mpStaticVoices->UpdateLifecycle(*pFrame, fDeltaTime);
+		// pFrame is the client cell's render frame (Main.cpp), so every persistent-sound position it carries is
+		// local to that cell.
+		mpStaticVoices->UpdateLifecycle(*pFrame, game::gpGame->mClientGridCoord, fDeltaTime);
 	}
 
 	mpStaticVoices->UpdateVolumes();

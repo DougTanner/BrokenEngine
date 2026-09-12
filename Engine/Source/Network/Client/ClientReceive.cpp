@@ -346,9 +346,6 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 		NetworkMessages::ThrowCorruptStream("Client::ServerCoordStaticData");
 	}
 
-	// The serialized area is derived data, not trusted: the coord this payload was matched to defines it.
-	received.staticData.vecArea = ComputeCanonicalFrameArea(coord);
-
 	// Trust boundary: the Hello pack-integrity gate already proved both peers hold the same island manifest,
 	// so a placement naming an unloaded island template is corrupt server data, not a stale payload.
 	for (const IslandPlacement& rPlacement : received.staticData.islands)
