@@ -1072,3 +1072,4 @@
 {"index":1070,"date":"2026-09-11","captureMode":"cpp-change","verbosity":0.037573316992,"structuralErosion":0.567426001467,"supported":553,"parsed":552}
 {"index":1071,"date":"2026-09-12","captureMode":"cpp-change","verbosity":0.037570685761,"structuralErosion":0.56734590398,"supported":553,"parsed":552}
 {"index":1072,"date":"2026-09-12","captureMode":"cpp-change","verbosity":0.037463121694,"structuralErosion":0.566140634784,"supported":555,"parsed":554}
+{"index":1073,"date":"2026-09-12","captureMode":"carry-forward","verbosity":0.037463121694,"structuralErosion":0.566140634784,"supported":555,"parsed":554}
