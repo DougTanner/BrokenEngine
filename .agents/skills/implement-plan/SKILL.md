@@ -60,16 +60,22 @@ extended with these fields:
 - `Runtime acceptance requests` — setup, action, observation, and required
   evidence per criterion; or none.
 
-Each shared `Build required` row names the target, configuration/platform, and
-selected project-member `.cpp`; for headers, every consuming target and
-configuration/platform. Each shared `Residuals` row names a contradiction,
-incomplete item, or blocker with evidence, using `none` when absent.
+Each shared `Build required` row names its distinct target and that target's
+configuration/platform inline in every case; when a field overflows, only the
+per-file attribution — which selected project-member `.cpp` belongs to which
+target, and which targets consume a changed header — moves with the overflow
+below. Each shared `Residuals` row names a contradiction, incomplete item, or
+blocker with evidence, using `none` when absent.
 
-Name each changed file once. Build requests must be
-executable without rediscovery: each changed `.cpp` names its exact target,
-configuration/platform, and selected project-member path; each changed header
-names every consuming target and configuration/platform. The manager dispatches
-the assigned build/runtime role and routes its concise result or later fix work.
+Name each changed file once, and when the changed set would push a field past
+the shared row cap give the count in `Changed files` and move the per-file rows
+to the file cited under `Evidence` as path plus `##` selector, on the shared
+form's terms. Build requests must be executable without rediscovery wherever the
+per-`.cpp` detail sits, inline or in that cited file: it names the exact target,
+configuration/platform, and selected project-member path, and each changed
+header names every consuming target and configuration/platform. The manager
+dispatches the assigned build/runtime role and routes its concise result or
+later fix work.
 
 ## References
 

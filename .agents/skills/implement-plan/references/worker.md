@@ -44,9 +44,9 @@ Skip this phase in audit-only mode.
    an affected-site note naming the symbol/pattern and search scope for each
    signature, identity, semantics, layout, client/server guard, missed-caller,
    or mirrored-code concern.
-   - Done when the handoff carries those rows and `Propagation required` names
-     `/update-affected-code` whenever code changed, even when the note is
-     `none found`.
+   - Done when the handoff or the file it cites carries those rows and
+     `Propagation required` names `/update-affected-code` whenever code
+     changed, even when the note is `none found`.
 8. For ignored or non-worktree state, follow its owner contract. Done when the
    exact path, persistence mechanism, expected persistence, and result are
    reported.
