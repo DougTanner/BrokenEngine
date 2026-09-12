@@ -117,6 +117,18 @@ What main does with each field:
 
 ## Whether a worker is still running, and interruption
 
+On Claude, main waits for a background worker by ending the turn or doing
+independent work and letting the host's task notification deliver the handoff;
+it never fetches that worker's result with a blocking host call such as
+`TaskOutput`, because the notification carries the same handoff text and the
+fetch would take it twice, against
+[`subagent-handoff.md`](subagent-handoff.md), `## Handoffs`. For a Codex main
+session waiting for its own background worker, no mechanism is documented in
+this repository or in the client documentation in the tree, so do not assume
+one. The timeout, no-progress, and interruption rules below are the exception
+route; a wait in them is a bounded host wait call where the client provides
+one.
+
 Completion or mailbox activity can return a wait early. If a healthy worker's
 wait times out without failure or no-progress evidence, wait again; the timeout
 alone does not justify status investigation, interruption, or replacement.
