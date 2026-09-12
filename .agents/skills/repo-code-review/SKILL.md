@@ -55,10 +55,13 @@ read-only run to a file:
 `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
 -RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character SHA>
 -EmitTargets`, adding `-IncludeUntracked <comma-separated paths>` for
-authorized untracked additions and `-Head <commit>` for a committed head. On `status` `pass` (exit 0) stdout carries
-only the targets bytes; `blocked` (exit 2) or `error` (exit 1) leaves stdout
-empty and reports the envelope on stderr, which counts as a missing targets file
-below. Never rebuild the targets file or restate the class decision inline.
+authorized untracked additions and `-Head <commit>` for a committed head. The
+run reports its own `status` rather than a field of the saved file: on
+`pass` (exit 0) stdout carries only the targets bytes, while `blocked` (exit 2)
+or `error` (exit 1) leaves stdout empty and reports the envelope on stderr,
+which counts as a missing targets file below. The saved file itself holds only
+`schemaVersion` and `paths`, so a check of that file confirms those two keys.
+Never rebuild the targets file or restate the class decision inline.
 
 Return `BLOCKED` when the session baseline, diff boundary, targets file, intent,
 or invariants are missing or moving. Do not reconstruct them from a mutable merge
