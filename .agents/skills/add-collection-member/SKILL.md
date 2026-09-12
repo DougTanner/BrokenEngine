@@ -33,11 +33,12 @@ save/replay version and compatibility decision.
 
 This specialist returns no envelope of its own; its results fold into the
 enclosing [`/implement-plan`](../implement-plan/SKILL.md) handoff. Name every
-consuming client/server target under `Build required`, one runtime-observable
-criterion per `Runtime acceptance requests` row, the tuple-position,
-carry-forward, initialization, transfer, hydration, and identity invariants
-under `Reviewer focus areas`, and a stale exemplar or unresolved
-CRC/version/compatibility decision under `Residuals`.
+consuming client/server target under `Build required`, the runtime
+acceptance criteria in the `Runtime acceptance requests` form
+[`/implement-plan`](../implement-plan/SKILL.md) `## Handoff` declares, the
+tuple-position, carry-forward, initialization, transfer, hydration, and
+identity invariants under `Reviewer focus areas`, and a stale exemplar or
+unresolved CRC/version/compatibility decision under `Residuals`.
 
 ## References
 
