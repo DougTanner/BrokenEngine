@@ -172,21 +172,24 @@ The `argument-hint` value selects the Plan:
 
 The preparation handoff extends the shared form in
 [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
-with the declared fields below. Main's brief bounds the returned handoff to
-every contradiction and unresolved decision, the other verified Plan statements
-whose result requires a card or implementation change, and one count of the
-unaffected statements; it never asks for a per-statement enumeration of
-unaffected results.
+with the declared fields below. Main's brief bounds the returned handoff's
+verification content to the `Verification` rows; it never asks for a
+per-statement enumeration of unaffected results.
 
 - `Claim` — the Plan path, or none; with the resolved state when claimed.
 - `Classification` — `Tier 1`, `Tier 2`, or `Tier 3`, and the trigger.
-- `Execution card` — the file path plus its `##` selector.
+- `Verification` — one row per contradiction, unresolved decision, and verified
+  Plan statement whose result requires a card or implementation change, on the
+  form `<kind> — <Plan citation> — <result and the change it requires>`, then one
+  final row `Unaffected statements: <count>`; a quantitative feasibility
+  estimate is not repeated here, and step 4 governs one returned as a `Findings`
+  row.
 
 ### Execution card presentation/template
 
-`Execution card` names the file and `##` selector containing the following
-required content. Main reads that content and presents it with the resolved
-Plan; the card itself is not repeated inline in the handoff.
+The card, cited under `Evidence`, carries the following required content. Main
+reads that content and presents it with the resolved Plan; the card itself is
+not repeated inline in the handoff.
 
 ```text
 Execution card:
