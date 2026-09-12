@@ -514,7 +514,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, float fCurrentTime)
 	PopulateSunAndLighting(rGlobalLayout, fSunAngle, fDayPercent, fNoonPercent, vecSunMoonNormal, vecAmbientColor);
 	PopulateShadowParameters(rGlobalLayout, fSunAngle, fDayPercent, fNoonPercent, vecSunMoonNormal, vecAmbientColor);
 	PopulateTerrainParameters(rGlobalLayout, fDayPercent, fNoonPercent);
-	PopulateWaterParameters(rGlobalLayout, fSunAngle, fDayPercent);
+	PopulateWaterParameters(rGlobalLayout, fSunAngle, fDayPercent, fCurrentTime);
 
 	// Debug
 	rGlobalLayout.fDebugTextureIndex = gDebugTextureIndex.Get();

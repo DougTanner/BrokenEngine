@@ -12,42 +12,36 @@ namespace engine
 // Water depth-LUT sunset fade: piecewise over the sun angle, then intensity/power shaping.
 static void PopulateWaterSunsetFade(shaders::GlobalLayout& rGlobalLayout, float fSunAngle)
 {
+	float fSunsetFade = 1.0f;
 	if (fSunAngle >= XM_PIDIV16 && fSunAngle < XM_PIDIV2)
 	{
-		rGlobalLayout.fWaterDepthLutSunsetFade = 1.0f - (fSunAngle - XM_PIDIV16) / (XM_PIDIV2 - XM_PIDIV16);
+		fSunsetFade = 1.0f - (fSunAngle - XM_PIDIV16) / (XM_PIDIV2 - XM_PIDIV16);
 	}
 	else if (fSunAngle >= XM_PIDIV2 && fSunAngle < XM_PI - XM_PIDIV16)
 	{
-		rGlobalLayout.fWaterDepthLutSunsetFade = (fSunAngle - XM_PIDIV2) / (XM_PI - XM_PIDIV16 - XM_PIDIV2);
+		fSunsetFade = (fSunAngle - XM_PIDIV2) / (XM_PI - XM_PIDIV16 - XM_PIDIV2);
 	}
-	else
-	{
-		rGlobalLayout.fWaterDepthLutSunsetFade = 1.0f;
-	}
-	rGlobalLayout.fWaterDepthLutSunsetFade = gWaterDepthLutSunsetFadeIntensity.Get() * std::pow(rGlobalLayout.fWaterDepthLutSunsetFade, gWaterDepthLutSunsetFadePower.Get());
+	rGlobalLayout.fWaterDepthLutSunsetFade = gWaterDepthLutSunsetFadeIntensity.Get() * std::pow(fSunsetFade, gWaterDepthLutSunsetFadePower.Get());
 }
 
 // Water directional term: piecewise over the sun angle, squared.
 static void PopulateWaterDirectional(shaders::GlobalLayout& rGlobalLayout, float fSunAngle)
 {
+	float fDirectional = 1.0f;
 	if (fSunAngle >= 0.0f && fSunAngle < XM_PIDIV2)
 	{
-		rGlobalLayout.fWaterDirectional = 1.0f - (fSunAngle) / XM_PIDIV2;
+		fDirectional = 1.0f - (fSunAngle) / XM_PIDIV2;
 	}
 	else if (fSunAngle >= XM_PIDIV2 && fSunAngle < XM_PI)
 	{
-		rGlobalLayout.fWaterDirectional = (fSunAngle - XM_PIDIV2) / XM_PIDIV2;
+		fDirectional = (fSunAngle - XM_PIDIV2) / XM_PIDIV2;
 	}
-	else
-	{
-		rGlobalLayout.fWaterDirectional = 1.0f;
-	}
-	rGlobalLayout.fWaterDirectional = std::pow(rGlobalLayout.fWaterDirectional, 2.0f);
+	rGlobalLayout.fWaterDirectional = std::pow(fDirectional, 2.0f);
 }
 
 // Camera-relative UV reduction — owns the per-frame reduced-time accumulator latches, so it must be
 // called exactly once per frame (preserved by the single PopulateWaterParameters call site).
-static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
+static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, float fCurrentTime)
 {
 	// Water precision: camera-relative UV reduction (double precision on CPU)
 	// Normal map mod uses 10.0 (not 1.0) because the shader multiplies reducedOrigin by non-integer
@@ -87,8 +81,8 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	static double sdReducedTimeThreeX = 0.0;
 	static double sdReducedTimeThreeY = 0.0;
 	static float sfPrevElapsedTime = 0.0f;
-	float fDeltaTime = std::max(0.0f, rGlobalLayout.fElapsedTime - sfPrevElapsedTime);
-	sfPrevElapsedTime = rGlobalLayout.fElapsedTime;
+	float fDeltaTime = std::max(0.0f, fCurrentTime - sfPrevElapsedTime);
+	sfPrevElapsedTime = fCurrentTime;
 	double dDeltaTime = static_cast<double>(fDeltaTime);
 	double dDeltaOne = dSizeBaseOne * dSpeedOne * dDeltaTime;
 	double dCosOne = static_cast<double>(std::cos(fRotationOne));
@@ -167,10 +161,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout)
 	++gPresentationContinuity.iPublishedFrames;
 }
 
-// Cross-TU ordering contract: RenderFrameGlobal (GlobalUniforms.cpp) calls this exactly once per frame,
-// after publishing rGlobalLayout.fElapsedTime — PopulateWaterReducedUv reads that field to derive its
-// per-frame delta for the reduced-time accumulators.
-void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent)
+void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent, float fCurrentTime)
 {
 	// Water global
 	rGlobalLayout.fWaterEarlyOut = gWaterEarlyOut.Get();
@@ -219,7 +210,7 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 	rGlobalLayout.iWaterLowCount = static_cast<int>(std::min(gWaterLowCount.Get<int64_t>(), static_cast<int64_t>(gWaterLowMax.Get())));
 	rGlobalLayout.iWaterMediumCount = static_cast<int>(gWaterMediumCount.Get<int64_t>());
 
-	PopulateWaterReducedUv(rGlobalLayout);
+	PopulateWaterReducedUv(rGlobalLayout, fCurrentTime);
 }
 
 } // namespace engine

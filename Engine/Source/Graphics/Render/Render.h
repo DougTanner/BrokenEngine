@@ -160,7 +160,7 @@ inline int64_t giWindTextureIndex = 0; // 0 = write TextureOne, 1 = write Textur
 void RenderWindGlobal(int64_t iCommandBuffer);
 
 // Water
-void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent);
+void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent, float fCurrentTime);
 
 } // namespace engine
 

@@ -39,7 +39,9 @@ skill-specific inputs:
 - the repository root, primary checkout, and baseline the caller explicitly
   supplied, or none;
 - whether the session's approved plan or acceptance table includes an
-  agent-harness scenario; a delegator requesting the build states this trigger;
+  agent-harness scenario; a delegator requesting the build states this trigger,
+  counting any acceptance criterion or check settled by running `/agent-harness`
+  as such a scenario;
 - for a BrokenEngineSandbox build, the resolved data mode, carried with the
   Local generation authorization a user-approved plan or acceptance
   criterion grants, the deletion-only reference-search evidence, or the stated
