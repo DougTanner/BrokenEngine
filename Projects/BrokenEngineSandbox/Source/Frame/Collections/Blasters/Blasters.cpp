@@ -116,8 +116,13 @@ void BlastersInterpolate::ClientInitAll(Frame& rFrame)
 }
 #endif // BT_CLIENT
 
-void BlastersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const SpawnInfo& rInfo)
+bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
+	if (!common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()))
+	{
+		return false;
+	}
+
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
@@ -145,6 +150,8 @@ void BlastersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const 
 #if defined(BT_CLIENT)
 	BlastersInterpolate::ClientInit(rFrame, iIndex);
 #endif
+
+	return true;
 }
 
 static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] BlastersInterpolate& rCurrentInterpolate, [[maybe_unused]] int64_t i)

@@ -23,8 +23,13 @@ void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, s
 
 #endif // BT_CLIENT
 
-void ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentTime, const SpawnInfo& rInfo)
+bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentTime, const SpawnInfo& rInfo)
 {
+	if (!common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()))
+	{
+		return false;
+	}
+
 	ExplosionsInterpolate& rInterpolate = rFrame.interpolate.explosions;
 	ExplosionsPostRender& rPostRender = rFrame.postRender.explosions;
 
@@ -234,6 +239,8 @@ void ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 		}
 #endif // BT_CLIENT
 	}
+
+	return true;
 }
 
 } // namespace engine

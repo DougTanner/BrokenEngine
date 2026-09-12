@@ -9,5 +9,5 @@ Blasters move at constant velocity and own client-side light and wind-trail effe
 - Each blaster uses either an area light or a camera-aligned point light. Sync and teardown must preserve that exclusive ownership.
 - Cross-cell transfer resets client-only wind-trail tuning to canonical client defaults; trail identity is not carried, so the source trail is removed and the destination client creates a new trail.
 - Terrain impacts use the resolved elevation-grid position before spawning their client effects.
-- Weapon code creates new projectiles. Keep one-shot muzzle audio at the firing site so transfers do not replay it.
+- Weapon code creates new projectiles. Keep one-shot muzzle audio at the firing site so transfers do not replay it; where the muzzle can land outside the cell and be refused (`../../../../../../Engine/Source/Frame/AGENTS.md`), gate that audio on what `Spawn` reports, so a refused shot is silent.
 - Blaster-owned terrain effect types register through `BlastersInterpolate::Register()`, which forwards to a helper defined in the update file where the cached type indices live. Add new blaster-owned effect types through that one entry point so registration stays ordered and happens once.

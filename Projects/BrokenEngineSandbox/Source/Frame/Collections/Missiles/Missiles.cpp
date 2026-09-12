@@ -398,8 +398,13 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		});
 }
 
-void MissilesPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const SpawnInfo& rInfo)
+bool MissilesPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
+	if (!common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()))
+	{
+		return false;
+	}
+
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
@@ -452,6 +457,8 @@ void MissilesPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const 
 #if defined(BT_CLIENT)
 	MissilesInterpolate::ClientInit(rFrame, iIndex);
 #endif // BT_CLIENT
+
+	return true;
 }
 
 void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, float fDeltaTime)

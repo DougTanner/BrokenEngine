@@ -552,8 +552,13 @@ void SpaceshipsInterpolate::ClientInitAll(Frame& rFrame)
 }
 #endif // BT_CLIENT
 
-void SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
+bool SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
+	if (!common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()))
+	{
+		return false;
+	}
+
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
@@ -599,6 +604,8 @@ void SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInf
 
 	// Sync owned objects after Add()
 	SyncSpaceship(rFrame.interpolate, rCurrentInterpolate.puiPushers[iIndex], rInfo.vecPosition);
+
+	return true;
 }
 
 void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)

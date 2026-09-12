@@ -292,13 +292,10 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			// The cell's local frame is centered on the origin, so the spawn offset is the local position.
 			XMVECTOR vecSpawnPosition = XMVectorSet(fSpawnOffsetX, fSpawnOffsetY, engine::gBaseHeight.Get(), 1.0f);
 
-			// The offsets arrive over the wire, so refuse rather than clamp: a point outside this cell's bounds
-			// belongs to a neighbouring cell, which owns anything standing there. The single bounds test also
-			// rejects NaN and +/-inf, because under /fp:strict every NaN comparison is false and an infinity
-			// fails a strict bound, so junk offsets never reach Spawn's ValidateVector asserts below.
-			if (engine::IsOutOfBounds(engine::ComputeFrameBounds(engine::LocalFrameArea()), vecSpawnPosition)) [[unlikely]]
+			// These offsets arrive from outside the simulation (network or harness), so refuse one outside this
+			// cell here.
+			if (!common::InsideArea(vecSpawnPosition, engine::LocalFrameArea()))
 			{
-				LOG(kNetwork, kWarning, "ProcessSpawnStatusChanges: spawn offset ({},{}) is outside cell ({},{}) - no player created", common::Wb(fSpawnOffsetX, 1), common::Wb(fSpawnOffsetY, 1), rStaticData.coord.x, rStaticData.coord.y);
 				continue;
 			}
 
@@ -420,8 +417,11 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	SpawnDeathExplosions(rFrame);
 }
 
-void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const SpawnInfo& rInfo)
+bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
+	// A human-controlled unit outside its own cell is a bug, not gameplay.
+	ASSERT(common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()));
+
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
@@ -486,6 +486,8 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, const S
 #if defined(BT_CLIENT)
 	rCurrentPostRender.pVecDebugNavWaypoints[iIndex] = XMVectorZero();
 #endif // BT_CLIENT
+
+	return true;
 }
 
 // PlayersInterpolate::Update synchronizes per-player state.

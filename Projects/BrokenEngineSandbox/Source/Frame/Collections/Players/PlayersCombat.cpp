@@ -351,7 +351,7 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 			// position, and successive blasters fired at different sub-tick times stay evenly spaced.
 			XMVECTOR vecFinalPosition = XMVectorAdd(vecSpawnPosition, XMVectorScale(vecBlasterVelocity, fInterFrameTime));
 
-			BlastersPostRender::Spawn(rFrame,
+			[[maybe_unused]] bool bSpawned = BlastersPostRender::Spawn(rFrame,
 			{
 				.vecPosition = vecFinalPosition,
 				.vecVelocity = vecBlasterVelocity,
@@ -363,7 +363,10 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 			});
 
 #if defined(BT_CLIENT)
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, emitterCoord, vecFinalPosition, gPlayerBlasterVolume.Get(), gPlayerBlasterPitchMin.Get(), gPlayerBlasterPitchRandom.Get());
+			if (bSpawned)
+			{
+				engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, emitterCoord, vecFinalPosition, gPlayerBlasterVolume.Get(), gPlayerBlasterPitchMin.Get(), gPlayerBlasterPitchRandom.Get());
+			}
 #endif
 
 			rCurrentPostRender.pfNextBlasterFireTimes[i] += kfBlasterFireInterval;
@@ -376,8 +379,6 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 	float fDeltaTime = rFrame.interpolate.fDeltaTime;
-
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	// Built once for the whole spawn loop, after Update, Transfer, and Destroy have settled this tick's spaceship
 	// rows and every current missile handle. Missiles spawned below may grow their collection, which the context
@@ -433,13 +434,9 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 		XMVECTOR vecMissilePosition = XMVectorAdd(vecSpawnPosition, XMVectorScale(vecJitteredDirection, kfMissileSpawnPreMove));
 		XMVECTOR vecMissileVelocity = XMVectorScale(vecJitteredDirection, kfMissileInitialVelocity);
 
-		// Refuse here rather than after acquisition: a muzzle point outside this cell belongs to the neighbour,
-		// and a row appended this late gets no transfer to repair its ownership before the next collision phase.
-		// The position logs as plain lanes, not common::WbV2 like sibling sites: the window above holds workbuffer
-		// pointers, and the wrapper pushes on that same workbuffer.
-		if (engine::IsOutOfBounds(bounds, vecMissilePosition)) [[unlikely]]
+		// Refuse before acquisition: a subscription taken for a row that is never appended is never released.
+		if (!common::InsideArea(vecMissilePosition, engine::LocalFrameArea()))
 		{
-			LOG(kDefault, kDebug, "SpawnMissiles: muzzle outside cell Tick: {} Coord: ({},{}) Index: {} Position: ({:.1f},{:.1f})", rFrame.interpolate.iTick, emitterCoord.x, emitterCoord.y, i, XMVectorGetX(vecMissilePosition), XMVectorGetY(vecMissilePosition));
 			continue;
 		}
 

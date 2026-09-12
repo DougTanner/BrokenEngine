@@ -352,7 +352,7 @@ public:
 		bool bTransfer = false;
 	};
 
-	static void Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);
+	static bool Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);
 };
 
 } // namespace game

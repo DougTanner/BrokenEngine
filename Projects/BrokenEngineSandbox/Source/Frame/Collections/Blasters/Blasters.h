@@ -127,7 +127,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 		float fWindTrailLengthMultiplier = 1.0f;
 	};
 
-	static void Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);
+	static bool Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);
 };
 
 } // namespace game

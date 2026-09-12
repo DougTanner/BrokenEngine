@@ -301,7 +301,7 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		float fTimePercent = 1.0f;
 	};
 
-	static void Spawn(game::Frame& __restrict rFrame, float fCurrentTime, const SpawnInfo& rInfo);
+	static bool Spawn(game::Frame& __restrict rFrame, float fCurrentTime, const SpawnInfo& rInfo);
 };
 
 extern template struct Collection<ExplosionsInterpolate>;
