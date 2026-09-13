@@ -720,13 +720,117 @@ void CommandSpawnPlayers(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
 }
 
+// Seeds one synthetic Player arrival near the requested edge and lets the unchanged transfer pipeline carry it
+// back out: SpawnTransfer's post-arrival lock skips navigation and acceleration, so the arrival coasts at the
+// velocity chosen here until PostCollision sees it leave the cell.
+void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json& rResult)
+{
+	if constexpr (!kbDebugInput)
+	{
+		throw std::runtime_error("inject_outward_transfer requires kbDebugInput build");
+	}
+	else
+	{
+		if (gpGame->mbReplaying)
+		{
+			throw std::runtime_error("cannot inject during replay playback");
+		}
+		if (ClientsWaitingForSpawn())
+		{
+			throw std::runtime_error("cannot inject while clients are waiting for spawn");
+		}
+		if (!rParams.is_object())
+		{
+			throw std::runtime_error("inject_outward_transfer requires exactly {\"coord\":[x,y],\"delta\":[dx,dy]}");
+		}
+		if (rParams.size() != 2)
+		{
+			throw std::runtime_error("inject_outward_transfer requires exactly {\"coord\":[x,y],\"delta\":[dx,dy]}");
+		}
+
+		const engine::GridCoord coord = CoordFromParam(rParams);
+		if (!rParams.contains("delta"))
+		{
+			throw std::runtime_error("inject_outward_transfer requires exactly {\"coord\":[x,y],\"delta\":[dx,dy]}");
+		}
+		const nlohmann::json& rDelta = rParams.at("delta");
+		if (!rDelta.is_array())
+		{
+			throw std::runtime_error("'delta' must be a [dx,dy] array");
+		}
+		if (rDelta.size() != 2)
+		{
+			throw std::runtime_error("'delta' must be a [dx,dy] array");
+		}
+		if (!rDelta.at(0).is_number_integer())
+		{
+			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
+		}
+		if (!rDelta.at(1).is_number_integer())
+		{
+			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
+		}
+		const int64_t iDeltaX = rDelta.at(0).get<int64_t>();
+		const int64_t iDeltaY = rDelta.at(1).get<int64_t>();
+		if (std::abs(iDeltaX) > 1)
+		{
+			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
+		}
+		if (std::abs(iDeltaY) > 1)
+		{
+			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
+		}
+		if (iDeltaX == 0 && iDeltaY == 0)
+		{
+			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
+		}
+
+		XMFLOAT4A f4Area {};
+		XMStoreFloat4A(&f4Area, engine::LocalFrameArea());
+		// 16 ticks of coast: half of SpawnTransfer's one-second transfer lock, long enough for the harness to
+		// observe the seeded cell while it is active and still finished inside the lock. The extra half step
+		// keeps the crossing off an exact multiple of the step, so the departing position overshoots the edge
+		// instead of landing on it, and the cell-width subtraction PrepareTransferRequest applies leaves the
+		// destination-local position strictly inside the destination cell.
+		constexpr float kfCoastMargin = (16.0f - 0.5f) * kfPlayerMaxSpeed * engine::kfDeltaTime;
+		// Midpoint of the requested edge: the half-extent pulled inward on each non-zero axis, the cell centre
+		// on a zero-delta one.
+		float fPositionX = (iDeltaX > 0) ? f4Area.z - kfCoastMargin : (iDeltaX < 0) ? f4Area.x + kfCoastMargin : (f4Area.x + f4Area.z) * 0.5f;
+		float fPositionY = (iDeltaY > 0) ? f4Area.y - kfCoastMargin : (iDeltaY < 0) ? f4Area.w + kfCoastMargin : (f4Area.y + f4Area.w) * 0.5f;
+		XMVECTOR vecVelocity = XMVectorSet(static_cast<float>(iDeltaX) * kfPlayerMaxSpeed, static_cast<float>(iDeltaY) * kfPlayerMaxSpeed, 0.0f, 0.0f);
+
+		int64_t iGlobalId = gpGame->GenerateGlobalId();
+		TransferData data
+		{
+			.vecPosition = XMVectorSet(fPositionX, fPositionY, engine::gBaseHeight.Get(), 1.0f),
+			.vecDirection = XMVector3Normalize(vecVelocity),
+			.vecVelocity = vecVelocity,
+			.alignment = gpGame->PlayerAlignment(),
+			// A zero-armor arrival is flagged exploding on its first tick instead of transferring.
+			.fHealth = 1.0f,
+			.fShield = 1.0f,
+			.globalPlayerId = engine::global_id_t {iGlobalId},
+			// Seeded cell: no fleet override fights the coast once the transfer lock expires.
+			.fleetWantedCoord = coord,
+		};
+		StatusChange transfer {.eType = StatusChangeType::kTransferPlayer, .data = std::move(data)};
+		if (!QueueReplayTransferFixture(*gpServerSession, coord, std::move(transfer)))
+		{
+			throw std::runtime_error("inject_outward_transfer could not queue the arrival");
+		}
+
+		rResult["globalId"] = iGlobalId;
+		rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
+	}
+}
+
 } // namespace
 
 bool ExecuteServerSimulationFixtureCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (cmd != "replay_record" && cmd != "replay_play" && cmd != "replay_transfer_capture"
 	 && cmd != "replay_drop_retained_end_frame" && cmd != "replay_inject_persistence_failure"
-	 && cmd != "replay_transfer_fixture" && cmd != "inject_status_changes" && cmd != "spawn_players")
+	 && cmd != "replay_transfer_fixture" && cmd != "inject_status_changes" && cmd != "spawn_players" && cmd != "inject_outward_transfer")
 	{
 		return false;
 	}
@@ -769,6 +873,11 @@ bool ExecuteServerSimulationFixtureCommand(std::string_view cmd, const nlohmann:
 	if (cmd == "spawn_players")
 	{
 		CommandSpawnPlayers(rParams, rResult);
+		return true;
+	}
+	if (cmd == "inject_outward_transfer")
+	{
+		CommandInjectOutwardTransfer(rParams, rResult);
 		return true;
 	}
 	return false;
