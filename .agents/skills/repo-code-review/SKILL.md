@@ -15,7 +15,8 @@ allowed-tools: [Read, Grep, Glob, Bash, PowerShell]
 
 Findings on reachable correctness defects and Broken Engine contract violations
 in session-changed C++, each with the smallest correction, and never a fix.
-Delegation form: `../../references/subagent-reporting.md`.
+Delegation form: `../../references/subagent-reporting.md`
+`## Delegated execution context`.
 
 ## When to use
 
@@ -47,21 +48,27 @@ Require a self-contained brief containing:
   the change may affect, and any prior findings relevant to a focused re-review;
 - checkout path and applicable repository instructions.
 
-The targets file is the authoritative supplied input. A
-`/codex-review` prompt supplies it as the `Targets file: <path>` entry in its
-evidence section (the receipt's `targetsPath`, written next to the prompt file),
-and inlines the same bytes there as a copy of that file. Otherwise the dispatching manager saves one
-read-only run to a file:
+The targets file is the authoritative supplied input. A `/codex-review` prompt
+supplies it as the `Targets file: <path>` entry in its evidence section (the
+receipt's `targetsPath`, written next to the prompt file), and inlines the same
+bytes there as a copy of that file. Otherwise the dispatching manager saves one
+read-only run to a file by piping that script call's own stdout inside the
+same single PowerShell-tool call, which the root `AGENTS.md` bundled-scripts
+rule permits as using that call's own output:
 `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
 -RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character SHA>
--EmitTargets`, adding `-IncludeUntracked <comma-separated paths>` for
-authorized untracked additions and `-Head <commit>` for a committed head. The
-run reports its own `status` rather than a field of the saved file: on
-`pass` (exit 0) stdout carries only the targets bytes, while `blocked` (exit 2)
-or `error` (exit 1) leaves stdout empty and reports the envelope on stderr,
-which counts as a missing targets file below. The saved file itself holds only
-`schemaVersion` and `paths`, so a check of that file confirms those two keys.
-Never rebuild the targets file or restate the class decision inline.
+-EmitTargets | Set-Content -LiteralPath Temp/code-review-targets.json
+-NoNewline`, adding `-IncludeUntracked <comma-separated paths>` for authorized
+untracked additions and `-Head <commit>` for a committed head. That gitignored
+`Temp/` path is the save-path convention, and the manager supplies the path, not
+the targets bytes, to the review worker. The run reports its own `status` rather
+than a field of the saved file: on `pass` (exit 0) stdout carries only the
+targets bytes, while `blocked` (exit 2) or `error` (exit 1) sends no targets
+bytes to the file, so any file at that path is absent or holds a previous run's
+stale bytes while the envelope goes to stderr, and such a run counts as a
+missing targets file below. The saved file itself holds only `schemaVersion`
+and `paths`, so a check of that file confirms those two keys. Never rebuild the
+targets file or restate the class decision inline.
 
 Return `BLOCKED` when the session baseline, diff boundary, targets file, intent,
 or invariants are missing or moving. Do not reconstruct them from a mutable merge
@@ -111,6 +118,6 @@ the review is clean. Never return `LGTM` without decisive trace evidence.
   are the session executing this skill. Steps and rules for the dispatched
   reviewer.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task brief.
+  `## Task brief` — task brief.
 - [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
   — shared handoff form.

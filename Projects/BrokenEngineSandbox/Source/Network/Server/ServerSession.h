@@ -54,6 +54,8 @@ public:
 
 	std::vector<SubscriptionUpdate> mPendingSubscriptionUpdates;
 
+	int64_t miHarvestedTransferTotal = 0; // transfers applied since the current game state began; agent status reporting only, never CRC, wire, or save state
+
 	std::unique_ptr<ServerFleetManager> mpFleetManager;
 	std::unique_ptr<engine::ServerTransferManager> mpTransferManager;
 	std::unique_ptr<engine::ServerBroadcaster> mpBroadcaster;

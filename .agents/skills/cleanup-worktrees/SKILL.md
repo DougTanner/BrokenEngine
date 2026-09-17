@@ -68,6 +68,6 @@ Return the script's complete report, including:
 - Do not recreate failed commands with broader Git or filesystem operations.
 - The script deliberately refuses saved-ref deletion and global pruning, and
   never touches a folder Git has not registered as a worktree. It deliberately
-  force-removes eligible worktrees and force-deletes their `claude/`/`codex/`
+  force-removes eligible worktrees and force-deletes their `claude/`/`codex/`/`opencode/`
   branches with `git branch -D`; a worktree on any other branch is removed but
   its branch is left.

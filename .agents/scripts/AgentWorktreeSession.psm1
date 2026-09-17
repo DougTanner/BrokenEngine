@@ -59,7 +59,7 @@ function Get-AgentWorktreePrimaryIdentity([string] $RepositoryRoot) {
 
 # Session identity is entirely Git-derived: the branch names the session, the Git common directory
 # names the primary checkout, and the baseline is the attribution point the session diverged from.
-# A checkout not on a claude/ or codex/ session branch has no session sidecar, so it resolves with
+# A checkout not on a claude/, codex/, or opencode/ session branch has no session sidecar, so it resolves with
 # SessionId $null instead of failing.
 # A session worktree's primary branch is the one its wrapper recorded in the session sidecar, not the
 # branch the primary checkout currently has checked out.
@@ -69,7 +69,7 @@ function Get-AgentWorktreeSessionContext {
 	try { $top = Get-AgentCanonicalPath (Get-AgentWorktreeGitValue $Worktree @('rev-parse', '--show-toplevel') 'repository top-level') }
 	catch { throw "'$Worktree' is not inside a Git worktree: $($_.Exception.Message)" }
 	$branch = Get-AgentWorktreeGitValue $top @('branch', '--show-current') 'current branch'
-	$sessionId = if ($branch -cmatch '^(?:claude|codex)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$') { $Matches[1] } else { $null }
+	$sessionId = if ($branch -cmatch '^(?:claude|codex|opencode)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$') { $Matches[1] } else { $null }
 	$common = Get-AgentCanonicalPath (Get-AgentWorktreeGitValue $top @('rev-parse', '--path-format=absolute', '--git-common-dir') 'Git common directory')
 	$primaryRoot = Get-AgentCanonicalPath (Split-Path -Parent $common)
 	$primaryBranch = if ($null -ne $sessionId) {
@@ -78,11 +78,11 @@ function Get-AgentWorktreeSessionContext {
 		# lands onto its recorded parent, not whatever the primary checkout has checked out right now.
 		$sidecarPath = Join-Path $top 'Temp\session-sidecar.json'
 		if (-not (Test-Path -LiteralPath $sidecarPath -PathType Leaf)) {
-			throw "Session sidecar '$sidecarPath' is missing. Start or reattach this worktree through '.claude/claude-worktree.sh' or '.codex/codex-worktree.ps1', which write it."
+			throw "Session sidecar '$sidecarPath' is missing. Start or reattach this worktree through '.claude/claude-worktree.sh', '.codex/codex-worktree.ps1', or '.opencode/opencode-worktree.ps1', which write it."
 		}
 		$sidecar = $null
 		try { $sidecar = [IO.File]::ReadAllText($sidecarPath) | ConvertFrom-Json -Depth 4 -ErrorAction Stop }
-		catch { throw "Session sidecar '$sidecarPath' is invalid: $($_.Exception.Message). Recreate it by reattaching through '.claude/claude-worktree.sh' or '.codex/codex-worktree.ps1'." }
+		catch { throw "Session sidecar '$sidecarPath' is invalid: $($_.Exception.Message). Recreate it by reattaching through '.claude/claude-worktree.sh', '.codex/codex-worktree.ps1', or '.opencode/opencode-worktree.ps1'." }
 		# Every post-parse failure funnels into one diagnostic: reject a null or non-object parse result
 		# before touching properties, and compare property names case-sensitively so a wrong-case field
 		# never passes. The name check runs before any property access, so StrictMode cannot throw a raw
@@ -95,7 +95,7 @@ function Get-AgentWorktreeSessionContext {
 				$sidecar.targetBranch -is [string] -and -not [string]::IsNullOrWhiteSpace($sidecar.targetBranch)
 		}
 		if (-not $valid) {
-			throw "Session sidecar '$sidecarPath' is invalid: it must contain one JSON object with exactly schemaVersion 'broken-engine-session-sidecar/v1' and a non-empty string targetBranch. Recreate it by reattaching through '.claude/claude-worktree.sh' or '.codex/codex-worktree.ps1'."
+			throw "Session sidecar '$sidecarPath' is invalid: it must contain one JSON object with exactly schemaVersion 'broken-engine-session-sidecar/v1' and a non-empty string targetBranch. Recreate it by reattaching through '.claude/claude-worktree.sh', '.codex/codex-worktree.ps1', or '.opencode/opencode-worktree.ps1'."
 		}
 		$sidecar.targetBranch
 	}

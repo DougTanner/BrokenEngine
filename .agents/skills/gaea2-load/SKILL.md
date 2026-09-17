@@ -45,7 +45,7 @@ Convert a Gaea 2 `.terrain` JSON into:
 4. Act on the envelope's `versionDrift` object, which carries `state` and a `notice` (the probe's own output). Done when its `state` has been handled.
 
    - `unchanged` — proceed silently.
-   - `changed` — surface the `notice` to the user in your final report as a one- or two-line note ("Gaea moved 2.3.0.0 → 2.4.0.0; SatMap.Library gained 'Volcanic'"), and suggest they check that `../gaea2-shared/references/node-conventions.md`'s per-type constraints aren't stale.
+   - `changed` — surface the `notice` to the user in your final report as a one- or two-line note ("Gaea moved 2.3.0.0 → 2.4.0.0; SatMap.Library gained 'Volcanic'"), and suggest they check that the per-type constraints in `../gaea2-shared/references/node-conventions.md` `## Per-type enum constraints` aren't stale.
    - `baseline-cached` — no PC-local baseline existed yet; it was cached silently, proceed.
    - `undetected` — no Gaea install or shared cache was reachable. Note it in the report but continue; drift detection is an information probe, not a gate.
 

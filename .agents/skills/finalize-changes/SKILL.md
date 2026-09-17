@@ -4,7 +4,7 @@ description: >-
   Squash, rebase, summarize, and land a verified session change onto the
   primary branch under the global landing lock, then delete the machine-local
   Plan claim. Use when landing a session's verified work onto primary.
-allowed-tools: [Read, Bash, PowerShell]
+allowed-tools: [Read, Bash, PowerShell, Agent, SendMessage]
 ---
 
 # Finalize Changes

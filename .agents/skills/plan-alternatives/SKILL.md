@@ -3,8 +3,8 @@ name: plan-alternatives
 description: >-
   Explore materially different ways to make a change before its plan reviews:
   dispatch blind, one-shot `researcher` workers on fixed axes, compare their
-  candidates against the drafted approach, and ask the user only when a
-  candidate is clearly better. Use when the change adds new code or modifies
+  candidates against the drafted approach, and ask the user when a candidate
+  is worth presenting. Use when the change adds new code or modifies
   non-documentation behavior (/plan-simplicity-review `## When to use`
   defines both), both at the Change Workflow Prepare and explore alternatives
   step and from a /next-plan claim once the Plan is verified. A new
@@ -20,7 +20,8 @@ allowed-tools: [Read, Grep, Glob, Agent, AskUserQuestion]
 Answer one question before the Plan review step: is there a materially
 different way to do this? Main dispatches one to three blind `researcher` workers
 on fixed axes, compares their candidates against the drafted approach, and
-reports that the original stands or puts a clearly better candidate to the user.
+reports that the original stands or puts the candidates worth presenting to the
+user, who picks at most one.
 
 ## When to use
 
@@ -70,10 +71,12 @@ to show its sourcing cites the existing repository path plus selector under
 ### Comparison
 
 Main scores candidate zero and every returned candidate on the same criteria,
-selects at most one candidate, and never merges candidates into a hybrid:
+and never merges candidates into a hybrid; the user picks at most one:
 
 - objective fully met;
 - cause removed rather than symptom suppressed;
+- shape, read from `Mechanism` and `Adds/Deletes`: fixing a fact where it is
+  created is simpler than carrying a transient key to reconcile it later;
 - net new code;
 - invariant surfaces touched (a candidate that raises the tier is noted, not
   disqualified);
@@ -81,22 +84,28 @@ selects at most one candidate, and never merges candidates into a hybrid:
   rebuilding it;
 - `Self-serving machinery`: adds none.
 
-A candidate is `clearly better` only when it fully meets the objective, wins at
-least two criteria, and loses none. Otherwise it is not. An empty axis says
-nothing about whether candidate zero is the simplest approach; whether the
-drafted plan itself is over-built is the `/plan-simplicity-review` question.
+The scores inform a judgement; they are not a tally. A candidate is
+`worth presenting` when it fully meets the objective and, weighing the
+criteria above, a user could reasonably prefer it — most often because it wins
+on cause removal or shape. A loss on net new code or invariant surfaces is a
+cost to state beside it, never a reason to withhold it; a loss on cause
+removal or shape is weighed like any other. A candidate that fails the
+objective, rebuilds an existing guarantee, or adds self-serving machinery is
+not worth presenting. An empty axis says nothing about whether candidate zero
+is the simplest approach; whether the drafted plan itself is over-built is the
+`/plan-simplicity-review` question.
 
 ### User presentation
 
-When no candidate is clearly better, the original stands and the turn's report
+When no candidate is worth presenting, the original stands and the turn's report
 carries one line:
 
 ```text
 Alternatives: original stands (<n> candidates, <axes>)
 ```
 
-Otherwise, before the Plan review step, main presents every clearly better
-candidate beside the drafted approach in plain language per
+Otherwise, before the Plan review step, main presents every candidate worth
+presenting beside the drafted approach in plain language per
 `### User Interaction` — the same criteria, what it adds and deletes, which
 invariant surfaces it touches, and when it pays off — with a recommendation,
 then asks verbatim:
@@ -124,7 +133,7 @@ The user picks one, and main takes it down the route that matches the change:
   are the session executing this skill. The steps and rules the dispatched
   researcher follows.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task-brief fields.
+  `## Task brief` — task-brief fields.
 - [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
   — the shared handoff form.
 - [`../plan-simplicity-review/SKILL.md`](../plan-simplicity-review/SKILL.md) —

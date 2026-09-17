@@ -23,7 +23,8 @@ proposals. Plan execution remains in the Change Workflow.
 ## Inputs
 
 Dispatch one `researcher` with the authoritative shared task-brief fields from
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md).
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Task brief`.
 The brief's Scope names the `.diagsession` or extracted ETL path and target
 process.
 

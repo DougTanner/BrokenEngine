@@ -4,16 +4,16 @@ Read this reference when a skill adds or changes client-specific metadata, promp
 
 ## Shared Package
 
-Both clients consume the skill directory and `SKILL.md`, but their policy surfaces are independent. Write portable instructions in ordinary language, then configure every supported client explicitly. Never infer invocation behavior from an `external-` name.
+Claude Code, Codex, and OpenCode consume the skill directory and `SKILL.md`, but their policy surfaces are independent. Write portable instructions in ordinary language, then configure every supported client explicitly. Never infer invocation behavior from an `external-` name.
 
 Repository frontmatter follows [`frontmatter-schema.md`](frontmatter-schema.md). The repository validator, not a client installation, owns its accepted fields and relationships.
 
 ## Behavior Map
 
-| Concern | Claude Code owner below | Codex owner below |
-| --- | --- | --- |
-| Invocation and activation | Frontmatter controls in `## Claude Code` | Companion policy in `## Codex` |
-| Tool and prompt behavior | Claude-only controls and syntax in `## Claude Code` | Native host mechanisms in `## Codex` |
+| Concern | Claude Code owner below | Codex owner below | OpenCode owner below |
+| --- | --- | --- | --- |
+| Invocation and activation | Frontmatter controls in `## Claude Code` | Companion policy in `## Codex` | Agent and command configuration in `## OpenCode` |
+| Tool and prompt behavior | Claude-only controls and syntax in `## Claude Code` | Native host mechanisms in `## Codex` | Agent permissions and portable body instructions in `## OpenCode` |
 
 Repository schema acceptance, client loader acceptance, documented behavior, and
 observed runtime behavior are separate evidence. A loader accepting a field does
@@ -51,20 +51,43 @@ policy:
 
 Codex does not interpret Claude substitutions, shell injection, `AskUserQuestion`, `Agent`, or the Claude extended-thinking keyword as portable skill behavior. Express the intended outcome in the shared workflow and use Codex-native interaction, collaboration, shell, and permission mechanisms at execution time.
 
+## OpenCode
+
+OpenCode discovers repository skills from `.agents/skills`, but reads only its
+documented portable metadata subset. It does not enforce this repository's
+Claude `allowed-tools` field; `disable-model-invocation` is enforced on
+OpenCode by the `.opencode/opencode.json` `permission.skill` map, where each
+user-only skill has a hand-added `"<skill-name>": "ask"` entry that prompts the
+user before the skill loads. Keep tool and delegation bounds in the
+shared body, and enforce worker delegation denial in the OpenCode agent
+permission configuration.
+
+Users invoke an OpenCode command as `/command-name`. A command that exposes a
+user-only workflow must state the user's intent explicitly in its template and
+pass `$ARGUMENTS`; `/next-plan` is such an adapter. OpenCode's tool named `bash`
+uses the repository-configured `pwsh` shell, so shared instructions continue to
+use the canonical PowerShell command form rather than assuming Bash syntax.
+
 ## Cross-Client Check
 
-Before claiming dual-client support, verify:
+Before claiming support across the three clients, verify:
 
 1. shared instructions do not require one client's syntax;
 2. Claude frontmatter matches Claude automatic, manual, and chaining behavior;
 3. `agents/openai.yaml` matches Codex implicit and explicit behavior;
-4. every referenced resource exists and is linked from `SKILL.md` when needed;
-5. `/external-skill-creator` validate mode passes for frontmatter and bundled links.
+4. OpenCode agent/command configuration and the `.opencode/opencode.json` `permission.skill` map supply any invocation and permission behavior its skill loader ignores;
+5. every referenced resource exists and is linked from `SKILL.md` when needed;
+6. `/external-skill-creator` validate mode passes for frontmatter and bundled links.
 
 Use [`validation.md`](validation.md) to record those checks by evidence class.
 The current client semantics above are documented by
 [Anthropic's skills reference](https://code.claude.com/docs/en/skills), while
 Codex companion policy and loader mechanics are documented by
 [OpenAI's skill guide](https://learn.chatgpt.com/docs/build-skills) and
-[App Server guide](https://learn.chatgpt.com/docs/app-server). Record the
+[App Server guide](https://learn.chatgpt.com/docs/app-server). OpenCode skill,
+agent, command, and shell behavior is documented by its
+[skills](https://opencode.ai/docs/skills/),
+[agents](https://opencode.ai/docs/agents/),
+[commands](https://opencode.ai/docs/commands/), and
+[configuration](https://opencode.ai/docs/config/) references. Record the
 installed client versions and observation dates when runtime behavior matters.

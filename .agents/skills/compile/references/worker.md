@@ -302,7 +302,10 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   driver; a default-output WorktreeCli build therefore fails with a structural
   LNK1104. They produce `Temp\AgentToolsCandidate\WorktreeCli.exe` and
   `Temp\AgentToolsCandidate\AgentHarness.exe` under the repository root for
-  AgentTools promotion.
+  AgentTools promotion. The authoritative executables that promotion maintains
+  are `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe` and
+  `Tools\AgentHarness\Platforms\VisualStudio2026\Output\AgentHarness.exe` under
+  the resolved repository root.
 - A WorktreeCli default-output `LNK1104` is structural because the running
   driver holds the shared primary Output; use the AgentTools targets in step 7.
   Other `LNK1104`, `LNK1168`, or EXE `LNK2019` failures can mean a live target

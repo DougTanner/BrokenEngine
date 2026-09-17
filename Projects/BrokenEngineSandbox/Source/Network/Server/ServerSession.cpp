@@ -393,6 +393,7 @@ void ServerSession::ResetClientsForLoad()
 	// Clear all pending state across managers
 	mpClientManager->ResetState();
 	mpTransferManager->ResetState();
+	miHarvestedTransferTotal = 0;
 	mpBroadcaster->ResetState();
 	// Fleet manager: only drop pending request queues. mFleets / mGuidToClientId
 	// were just authoritatively restored by ReadFleetData + per-client OnResetForLoad above;

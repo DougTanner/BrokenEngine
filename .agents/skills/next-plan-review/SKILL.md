@@ -31,10 +31,13 @@ included, runs the full audit in [`references/worker.md`](references/worker.md).
 ## Inputs
 
 - The commit-ish argument, default `HEAD`.
+- The optional source client whose session produced the landing or recorded
+  friction; recorded provenance supplies it when available.
 - The optional exact session ID.
 - The optional bounded-friction-mode designation with its one recorded friction.
 - The authoritative shared task-brief fields from
-  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md),
+  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+  `## Task brief`,
   including repository identity and session baseline.
 
 ## Handoff
@@ -59,6 +62,11 @@ shared `Residuals` row names a missing transcript or unverifiable fact, using
 
 `Changed files` and `Build required` are `none` because this retrospective
 changes no file.
+
+When the source client is OpenCode, return `BLOCKED` before transcript discovery,
+with `Transcript provenance: unsupported (opencode)` as a `Decisive checks` row
+and the unsupported transcript source as the sole residual. This is not a
+review verdict; set `Timeline`, `Root cause`, and `Assessment` to `none`.
 
 Use `NEEDS_ACTION` when the retrospective produces actionable findings, `PASS`
 only when it is clean, and `BLOCKED` when required evidence is missing.

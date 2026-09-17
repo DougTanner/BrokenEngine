@@ -1,8 +1,9 @@
 # Require the project executables, provision the checkout, resolve AgentHarness, mint an owner
 # token, and claim the harness lock.
 # A foreign owner is waited out, not stolen from: provisioning runs once and only the claim attempt
-# repeats until the wait budget expires, and nothing touches the holder's processes, heartbeat, or
-# claim. An expired wait reports the holder record the last claim attempt itself printed.
+# repeats until the wait budget expires or the holder's own heartbeat reaches the staleness point,
+# and nothing touches the holder's processes, heartbeat, or claim. An ended wait reports the holder
+# record the last claim attempt itself printed.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -26,6 +27,8 @@ Set-StrictMode -Version Latest
 $MaximumMessageLength = 256
 $MaximumOutputCharacters = 2048
 $PollMilliseconds = 5000
+# Mirrors the five-minute staleness rule that agent-harness worker.md step 11 owns.
+$StaleHeartbeatSeconds = 300
 
 $result = [ordered]@{
 	schemaVersion = 'broken-engine-harness-claim/v1'
@@ -84,6 +87,19 @@ function ConvertFrom-LockOutput([string] $Text) {
 function Get-LockField($Record, [string] $Name) {
 	if ($null -eq $Record -or -not ($Record.PSObject.Properties.Name -ccontains $Name)) { return $null }
 	return $Record.$Name
+}
+
+# ConvertFrom-Json turns an ISO-8601 timestamp into [datetime], so both forms are normalized here.
+function ConvertTo-LockUtc($Value) {
+	if ($Value -is [datetime]) { return ([datetime]$Value).ToUniversalTime() }
+	if ($Value -is [string]) {
+		try {
+			return [datetime]::Parse($Value, [cultureinfo]::InvariantCulture,
+				[Globalization.DateTimeStyles]::AdjustToUniversal -bor [Globalization.DateTimeStyles]::AssumeUniversal)
+		}
+		catch { return $null }
+	}
+	return $null
 }
 
 # The expected pack version comes from this worktree's own DataFile.h — the source the executables were
@@ -323,6 +339,8 @@ try {
 
 	# Only the claim attempt repeats: provisioning, the harness path, and the owner token above stay
 	# valid for the whole wait, and the same owner token reclaims after each foreign-owner refusal.
+	# The wait ends at whichever comes first, the budget or the refused holder's heartbeat reaching
+	# $StaleHeartbeatSeconds old, so a holder the worker may take over is not waited out.
 	$stopwatch = [Diagnostics.Stopwatch]::StartNew()
 	$deadlineMilliseconds = $WaitSeconds * 1000
 	$attempts = 0
@@ -341,27 +359,22 @@ try {
 		if ($claim.ExitCode -ne 2) {
 			Complete-HarnessClaim 1 'error' 'claim.failed' "AgentHarness lock claim failed with exit $($claim.ExitCode): $($claim.Stderr)"
 		}
-		# Sleeping a full interval past the deadline would wait longer than the promised budget.
+		# Sleeping a full interval past the nearer deadline would overshoot the promised budget
+		# or the holder's staleness point.
 		$remainingMilliseconds = $deadlineMilliseconds - [int]$stopwatch.ElapsedMilliseconds
+		$heartbeatUtc = ConvertTo-LockUtc (Get-LockField $record 'heartbeatAt')
+		if ($null -ne $heartbeatUtc) {
+			$remainingMilliseconds = [Math]::Min([double]$remainingMilliseconds,
+				($heartbeatUtc.AddSeconds($StaleHeartbeatSeconds) - [datetime]::UtcNow).TotalMilliseconds)
+		}
 		if ($remainingMilliseconds -le 0) { break }
 		Start-Sleep -Milliseconds ([Math]::Min($PollMilliseconds, $remainingMilliseconds))
 	}
 
-	# The wait expired with the lock still held, so the last attempt's record describes the holder.
+	# The wait ended with the lock still held, so the last attempt's record describes the holder.
 	# lock claim prints the held record itself, so the holder needs no second lock status call.
 	$claimedAt = Get-LockField $record 'claimedAt'
-	# ConvertFrom-Json turns an ISO-8601 timestamp into [datetime], so both forms are normalized here.
-	$claimedUtc = $null
-	if ($claimedAt -is [datetime]) {
-		$claimedUtc = ([datetime]$claimedAt).ToUniversalTime()
-	}
-	elseif ($claimedAt -is [string]) {
-		try {
-			$claimedUtc = [datetime]::Parse($claimedAt, [cultureinfo]::InvariantCulture,
-				[Globalization.DateTimeStyles]::AdjustToUniversal -bor [Globalization.DateTimeStyles]::AssumeUniversal)
-		}
-		catch { $claimedUtc = $null }
-	}
+	$claimedUtc = ConvertTo-LockUtc $claimedAt
 	$holdSeconds = $null
 	$claimedAtText = [string]$claimedAt
 	if ($null -ne $claimedUtc) {
@@ -378,7 +391,7 @@ try {
 		record = $record
 	}
 	Complete-HarnessClaim 2 'blocked' 'claim.foreign-owner' ("Harness lock '$Key' is still held by owner $(Get-LockField $record 'owner') " +
-		"since $claimedAtText ($holdSeconds seconds) after waiting $WaitSeconds seconds over $attempts attempt(s).")
+		"since $claimedAtText ($holdSeconds seconds) after waiting $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 3)) seconds over $attempts attempt(s).")
 }
 catch {
 	Complete-HarnessClaim 1 'error' 'internal.error' $_.Exception.Message

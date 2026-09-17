@@ -20,10 +20,7 @@ delegated `builder`; separate-role requirements return to the manager.
 - PREfast verification runs only when an approved plan explicitly requires it;
   never infer PREfast authorization from a routine compile, rebuild, or
   link-error check.
-- Not for AgentTools bootstrap or promotion. The authoritative executables are
-  `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe` and
-  `Tools\AgentHarness\Platforms\VisualStudio2026\Output\AgentHarness.exe` under
-  the resolved repository root.
+- Not for AgentTools bootstrap or promotion.
 - When the changed set contains a non-Markdown path under `Tools/WorktreeCli/`,
   `Tools/AgentHarness/`, or `Tools/ToolCommon/`, the rebuilt tools are promoted
   through `/finalize-changes`, which owns that promotion and bootstrap policy —
@@ -42,26 +39,17 @@ skill-specific inputs:
   agent-harness scenario; a delegator requesting the build states this trigger,
   counting any acceptance criterion or check settled by running `/agent-harness`
   as such a scenario;
-- for a BrokenEngineSandbox build, the resolved data mode, carried with the
-  Local generation authorization a user-approved plan or acceptance
-  criterion grants, the deletion-only reference-search evidence, or the stated
-  basis for Shared, plus any Gaea authorization the same plan or criterion
-  grants — [references/runtime-data-mode.md](references/runtime-data-mode.md)
-  owns which authorizations are valid;
+- for a BrokenEngineSandbox build, the Local generation authorization a
+  user-approved plan or acceptance criterion grants, the deletion-only
+  reference-search evidence, or the stated basis for Shared, plus any Gaea
+  authorization the same plan or criterion grants, and any Local mode the user
+  forced; the worker resolves and selects the mode itself —
+  [references/runtime-data-mode.md](references/runtime-data-mode.md)
+  `## Mode selection` and `## Local generation` own which authorizations are
+  valid;
 - whether an approved plan explicitly requires PREfast verification —
-  [references/prefast-mode.md](references/prefast-mode.md).
-
-For a BrokenEngineSandbox build, resolve that data mode before writing the
-brief, with one read-only run of the resolver from the worktree root —
-`pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1`,
-adding `-RepositoryRoot`, `-PrimaryCheckout`, or `-Baseline` only for an input
-the caller explicitly supplied. Its `dataBuildMode` is the path-rule answer;
-[references/runtime-data-mode.md](references/runtime-data-mode.md) owns the
-remaining judgment triggers, which can still select Local when the script
-reports Shared. A Local mode needs that reference's Local generation
-authorization present in the brief before the build may generate. The worker
-re-resolves the same context itself, so the brief carries the mode and its
-authorization, never the resolver's JSON.
+  [references/prefast-mode.md](references/prefast-mode.md)
+  `## Authorization and when to use`.
 
 ## Handoff
 
@@ -74,13 +62,10 @@ the execution and result discipline in
 - `Decisive checks` — one row per build: target, configuration, `status`,
   `exitCode`, `failureKind`, and, for a failing build with a `severity: error`
   diagnostic, the first one's `code` and `file`.
-- `Decisive checks` — for a game build, one row only when the resolved data
-  mode differs from the mode the dispatch brief fixed, naming the brief's mode,
-  the resolved mode as the envelope's `/p:DataBuildMode` switch, and, when your
-  own mode selection overrode the brief, your reason for it. Report nothing
-  about the data mode when the two match; the effective mode, the
-  `RunDataPacker` value, and both normalized directories already reach the
-  caller as the `/p:` switches in each envelope block's `arguments`.
+- `Decisive checks` — for a game build, one row naming the resolved data mode as
+  the envelope's `/p:DataBuildMode` switch, plus your reason whenever your own
+  judgment overrode the `dataBuildMode` that `Resolve-CompileContext.ps1`
+  reported.
 - `Evidence` — one row per build carrying its `retainedLog.path`, plus one row
   for this dispatch's envelope file as path plus `##` selector.
 - `Residuals` — one row per failed or skipped required build, counting

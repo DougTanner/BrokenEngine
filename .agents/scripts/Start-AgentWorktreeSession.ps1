@@ -1,15 +1,16 @@
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet('claude', 'codex')][string] $Client,
+	[Parameter(Mandatory)][ValidateSet('claude', 'codex', 'opencode')][string] $Client,
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[string] $ClientExecutable,
 	[string[]] $ClientArguments = @(),
 	[string] $ReattachWorktree,
+	[switch] $PrepareOnly,
 	[int] $WaitSeconds = 500
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Client -cne 'claude' -and $Client -cne 'codex') { throw "Client must be lowercase 'claude' or 'codex'." }
+if ($Client -cne 'claude' -and $Client -cne 'codex' -and $Client -cne 'opencode') { throw "Client must be lowercase 'claude', 'codex', or 'opencode'." }
 
 # Claude carries client arguments out of band because -File treats a leading dash as a
 # PowerShell parameter. Do not clear the transport variable until reattach validation succeeds:
@@ -33,6 +34,19 @@ function Assert-AgentWorktreeSkillsLink([string] $Worktree) {
 	if ($null -eq $skillsItem -or -not $skillsItem.PSIsContainer -or -not ($skillsItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
 		$null -eq (Get-ChildItem -LiteralPath $skillsLink -ErrorAction SilentlyContinue | Select-Object -First 1)) {
 		throw "'.claude\skills' in worktree '$Worktree' did not check out as a working directory link, so agent skills are unavailable. Enable Windows Developer Mode (Settings -> System -> For developers -> Developer Mode -> On), open a new terminal, then restore the link: git -C '$Worktree' config core.symlinks true; git -C '$Worktree' checkout -- .claude/skills"
+	}
+}
+
+function Assert-AgentWorktreeOpenCodeSkills([string] $Worktree) {
+	$skillsRoot = Join-Path $Worktree '.agents\skills'
+	$skillsItem = Get-Item -LiteralPath $skillsRoot -Force -ErrorAction SilentlyContinue
+	$skillFile = if ($null -ne $skillsItem -and $skillsItem.PSIsContainer) {
+		Get-ChildItem -LiteralPath $skillsRoot -Directory -ErrorAction SilentlyContinue |
+			Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md') -PathType Leaf } |
+			Select-Object -First 1
+	}
+	if ($null -eq $skillsItem -or -not $skillsItem.PSIsContainer -or $null -eq $skillFile) {
+		throw "'.agents\skills' in worktree '$Worktree' does not contain an available skill package, so OpenCode skills are unavailable."
 	}
 }
 
@@ -82,7 +96,7 @@ try {
 		$repositoryName = Split-Path -Leaf $root
 		$uuid = [guid]::NewGuid().ToString()
 		$branch = "$Client/$uuid"
-		$clientHome = if ($Client -ceq 'claude') { '.claude' } else { '.codex' }
+		$clientHome = ".$Client"
 		$worktreeRoot = Join-Path $HOME "$clientHome\worktrees\$repositoryName"
 		$worktree = Join-Path $worktreeRoot $uuid
 		if (Test-Path -LiteralPath $worktree) { throw "Generated worktree path already exists: '$worktree'." }
@@ -156,9 +170,10 @@ try {
 	}
 	& (Join-Path $root '.agents\scripts\Bootstrap-AgentTools.ps1') -RepositoryRoot $root -WaitSeconds $WaitSeconds
 	& (Join-Path $root '.agents\scripts\Provision-WorktreeThirdParty.ps1') -RepositoryRoot $identity.Worktree -WaitSeconds $WaitSeconds
-	Assert-AgentWorktreeSkillsLink $identity.Worktree
+	if ($Client -ceq 'opencode') { Assert-AgentWorktreeOpenCodeSkills $identity.Worktree }
+	else { Assert-AgentWorktreeSkillsLink $identity.Worktree }
 	if ($clearClaudeArgumentTransport) { $env:BROKEN_ENGINE_CLIENT_ARGUMENTS = $null }
-	if ([string]::IsNullOrWhiteSpace($ClientExecutable)) {
+	if (-not $PrepareOnly -and [string]::IsNullOrWhiteSpace($ClientExecutable)) {
 		$ClientExecutable = (Get-Command $Client -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 	}
 	# Skip the DataPacker build while a rebase is in progress: a tree with conflict markers cannot build,
@@ -173,7 +188,8 @@ try {
 		$banner = "FIRST TASK: this worktree has a rebase in progress - resolve your rebase first. Fix the conflicted files, run 'git rebase --continue', then run $buildCommand to build the deferred DataPacker.`n" + $banner
 	}
 	Write-Host $banner
-	$exitCode = Invoke-WorktreeCliTrackedProcess -Executable $ClientExecutable -ArgumentList $ClientArguments -WorkingDirectory $identity.Worktree
+	if ($PrepareOnly) { $exitCode = 0 }
+	else { $exitCode = Invoke-WorktreeCliTrackedProcess -Executable $ClientExecutable -ArgumentList $ClientArguments -WorkingDirectory $identity.Worktree }
 }
 catch {
 	[Console]::Error.WriteLine($_.Exception.Message)

@@ -12,7 +12,7 @@ This file, `.agents/references/change-workflow.md`, carries the Change Workflow,
 
 ### Delegation roles
 
-This table is the authoritative spawned-agent routing policy; role definitions and the Codex TOMLs enforce it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named.
+This table is the authoritative spawned-agent routing policy; role definitions and the Codex TOMLs enforce it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md` and `.opencode/agent/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named.
 
 | `subagent_type` | Model | Effort | Work |
 | --- | --- | --- | --- |
@@ -30,6 +30,7 @@ This table is the authoritative spawned-agent routing policy; role definitions a
 - Every independent findings-only review or audit the table above assigns to `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including `/next-plan-review`, which runs directly in one fresh reviewer. `/comment-review` remains the `mechanic` exception; same-context `/implement-plan` and `/update-claude-docs` audits remain with their implementer; and `/coherence-review` may make only the narrow caller-authorized meaning-preserving wording and formatting fixes its worker contract allows, followed by that contract's self-check. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
 
 ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-5.6-sol medium); Sonnet -> Luna (gpt-5.6-luna max).
+OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no effort mapping.
 
 ## Main-session conduct
 
@@ -59,7 +60,7 @@ Definitions:
 - Execution card — the pre-implementation record the Step 2 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits; after approval it carries the approved scope before any dispatch cites the card.
 - Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
-- Wrapper session — session started through `.claude/claude-worktree.sh` or `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude, `-ReattachWorktree <path>` for Codex; never adopt an arbitrary worktree.
+- Wrapper session — session started through `.claude/claude-worktree.sh`, `.codex/codex-worktree.ps1`, or `.opencode/opencode-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude and `-ReattachWorktree <path>` for Codex and OpenCode; never adopt an arbitrary worktree.
 - Primary — the shared main checkout and its main branch that finished session work lands into.
 - Tracked artifact — any file Git tracks in this repository: code, shaders, scripts, skills, plans, and documentation.
 - Step and stage — a step is one of the nine numbered Change Workflow steps below; outside this file a step is cited by its heading name (`the Plan review step`), never by its number, so renumbering here changes nothing elsewhere; a stage is one approved unit of session work that can complete or land independently.
@@ -82,7 +83,7 @@ From user intent and any such preparation, main locks in the objective, the appr
 Order: `/prepare-change` first at Tier 2+, because the alternative investigations need the drafted plan's objective and scope; at Tier 1 there is no plan file, so main briefs from the request. Then `/plan-alternatives` when its trigger fires. A chosen alternative returns to `/prepare-change` for a redraft before Step 3; the skill owns the claimed-Plan and Tier-1 routes.
 
 - `implementer` runs `/prepare-change` to prepare the plan — Tier 2+.
-- main dispatches one `researcher` per axis for `/plan-alternatives`, concurrently and blind — every tier, on `/plan-simplicity-review`'s trigger (that skill's `## When to use`): Tier 1 axis 1 (Reuse), Tier 2 axes 1-2 (adds Remove the need), Tier 3 axes 1-3 (adds Reshape). Each brief is the shared task-brief form with `Skill: /plan-alternatives`, the objective, the plan's `## In scope`/`## Out of scope` quoted in full as text (main's intended change at Tier 1), evidence paths, the tier, fixed user decisions, one line naming the drafted mechanism as candidate zero, and the assigned axis — never the plan's rationale, and never the plan file's path, in any field and in any form, positive or negative. Main compares the handoffs per that skill's `## Handoff` and asks the user only when a candidate is clearly better.
+- main dispatches one `researcher` per axis for `/plan-alternatives`, concurrently and blind — every tier, on `/plan-simplicity-review`'s trigger (that skill's `## When to use`): Tier 1 axis 1 (Reuse), Tier 2 axes 1-2 (adds Remove the need), Tier 3 axes 1-3 (adds Reshape). Each brief is the shared task-brief form with `Skill: /plan-alternatives`, the objective, the plan's `## In scope`/`## Out of scope` quoted in full as text (main's intended change at Tier 1), evidence paths, the tier, fixed user decisions, one line naming the drafted mechanism as candidate zero, and the assigned axis — never the plan's rationale, and never the plan file's path, in any field and in any form, positive or negative. Main compares the handoffs per that skill's `## Handoff` and asks the user when a candidate is worth presenting.
 
 #### Step 3 — Plan review
 

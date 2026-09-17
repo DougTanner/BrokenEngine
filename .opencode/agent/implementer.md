@@ -1,0 +1,11 @@
+---
+description: Writing code and documentation; affected-site propagation; review-fix rounds; plan authoring; driving runtime/harness verification.
+mode: subagent
+model: opencode/union-alpha
+permission:
+  task: deny
+---
+
+Follow repository instructions for the assigned implementation role.
+
+Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`.

@@ -3,7 +3,7 @@ name: next-plan
 description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the resolved Plan and execution card for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
 disable-model-invocation: true
 argument-hint: "[Documents/Plans/... | partial pattern]"
-allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestion]
+allowed-tools: [Read, Write, Grep, Glob, Agent, SendMessage, Edit, PowerShell, AskUserQuestion]
 ---
 
 # Next Plan
@@ -57,7 +57,8 @@ The `argument-hint` value selects the Plan:
    Done when the result reports `nextAction: prepare`.
 4. Dispatch one preparation `implementer` to verify every Plan statement against
    current code, on the single task brief in
-   [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md).
+   [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+   `## Task brief`.
 
    That brief carries `Skill: none` — `/prepare-change` excludes a claimed
    executable Plan — and a `Return:` naming the shared handoff form plus the
@@ -88,9 +89,11 @@ The `argument-hint` value selects the Plan:
    Plan—its mechanism, corrections, the claimed Plan's `## In scope` and
    `## Out of scope` sections copied verbatim as top-level headings with their
    content intact, and the complete execution card—into one gitignored `Temp/`
-   file addressed by its path from the worktree root, cite that path plus
-   `## Execution card` selector under `Evidence` for the Plan review reviews
-   and the approval presentation, and, before returning that handoff, run
+   file addressed by its path from the worktree root, with each section main
+   presents per this file's `### Implementation approval` under its own `##`
+   heading, cite that path under `Evidence` with one `##` selector per such
+   section for the Plan review reviews and the approval presentation, and,
+   before returning that handoff, run
 `pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <snapshot path>`
    and report that result's `headings.inScopePresent` and
    `headings.outOfScopePresent` values as one `Decisive checks` row.
@@ -100,10 +103,11 @@ The `argument-hint` value selects the Plan:
    fires.
 
    Done when the execution card carries every field of the card template in
-   this file's `### Execution card presentation/template`, the
-   preparation handoff cites it as one file path plus `##` selector, and its
-   `Decisive checks` row for that `Temp/` snapshot reports
-   `headings.inScopePresent` and `headings.outOfScopePresent` both `true`.
+   this file's `### Execution card presentation/template`, the preparation
+   handoff cites that snapshot as one file path plus the `##` selectors this
+   step requires, and its `Decisive checks` row for that `Temp/` snapshot
+   reports `headings.inScopePresent` and `headings.outOfScopePresent` both
+   `true`.
 5. Run the Plan review step in
    [change-workflow.md](../../references/change-workflow.md), after preparation and alternatives and
    before the final claim refresh. Tier 3 retains the additional route in
@@ -131,8 +135,8 @@ The `argument-hint` value selects the Plan:
    wherever it stopped, while an implemented run keeps the position above.
 
    Main never performs the review itself; it dispatches it per
-   [run-checkpoint.md](references/run-checkpoint.md). Done when both follow-up lines are
-   recorded per run-checkpoint.md.
+   [run-checkpoint.md](references/run-checkpoint.md) `## Dispatch`. Done when both
+   follow-up lines are recorded per run-checkpoint.md.
 10. Only after implementation is accepted and verified, or after the user
    explicitly authorizes rejection, exit the held claim before landing-commit
    creation: main runs, as its own shell call from the PowerShell tool,
@@ -144,7 +148,8 @@ The `argument-hint` value selects the Plan:
    in the worktree, reports the changed paths the landing commit must contain,
    and returns `nextAction: finalize-changes`. That deletion is not reviewed
    before the landing gate, per the
-   [landing acceptance table](../finalize-changes/references/landing-acceptance-table.md).
+   [landing acceptance table](../finalize-changes/references/landing-acceptance-table.md)
+   `## Acceptance table`.
    Done when that result is in hand; the claim stays held until landing
    succeeds, and `/finalize-changes` deletes it after primary advances.
 11. End the run per this file's `### IMPORTANT: Session-complete marker`: print
@@ -209,8 +214,8 @@ assignments, acceptance criteria, and unresolved decisions. Deliver that
 presentation per the `### User Interaction` rules in
 [`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
 on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
-without an approval question; on Claude Code and every other host as rendered
-message text whose approval question is the last thing before the
+without an approval question; on Claude Code, OpenCode, and every other host as
+rendered message text whose approval question is the last thing before the
 `Follow-up Plans created:` footer, after which the user's next message is the
 decision. Any revision is a new complete replacement presentation. When the
 approved presentation differs from the execution card, main updates the card
@@ -282,7 +287,10 @@ deferral, unknown claim state, or work still to land — never prints that line.
   before its own dispatch, excluding only the previous checkpoint's correlated
   completed handoff; `/next-plan-review` covers the rest after landing. Codex
   runs no live checkpoint lens and leaves all three concerns to
-  `/next-plan-review`.
+  `/next-plan-review`. OpenCode runs no live checkpoint lens and records the
+  explicit unsupported state that [run-checkpoint.md](references/run-checkpoint.md)
+  `## Measurement states` defines; its landed retrospective is also unsupported
+  until an OpenCode transcript source is implemented.
 - [claim-results.md](references/claim-results.md) owns how each claim, listing, and
   claim-exit result is read, including the `sync` and `nextAction` fields, the
   listing's snapshot limits and tier-constrained reading procedure, and the

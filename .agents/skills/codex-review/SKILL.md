@@ -51,7 +51,7 @@ assigned skills' vocabulary. Codex callers never invoke this skill.
 
 Steps 1-8 assemble reviewer and auditor prompts only. For an explicitly
 requested `/plan-alternatives` researcher dispatch, write the complete per-axis
-shared task brief required by `../../plan-alternatives/SKILL.md` directly to a
+shared task brief required by `../plan-alternatives/SKILL.md` directly to a
 new repo-relative file under `Temp/`; do not run the review prompt builder or
 add its reviewer guardrails. The brief must instruct the researcher to return
 the normal axis handoff and then append a standalone final `PASS` line for the
@@ -78,7 +78,7 @@ dispatch wrapper. Use that file as `<promptPath>`, then continue at step 9 with
    Done when that check's verbatim result and identity binding are in
    `-ScopeFile`, or no such check applies.
 3. Include the assigned skill's own required evidence in that same file before
-   dispatching: `plan-audit`'s draft execution card (`../../plan-audit/SKILL.md`).
+   dispatching: `plan-audit`'s draft execution card (`../plan-audit/SKILL.md`).
    The script blocks the dispatch when that card is absent or leaves a field
    unfilled.
 
@@ -229,7 +229,8 @@ else it carries. `## Rules` `### Fallback` owns the failure-time mechanics: what
 - The calling manager session decides each finding under the
   [change-workflow.md](../../references/change-workflow.md) rule for review findings.
 - Never edit code; findings-only conduct is
-  [../../references/subagent-reporting.md](../../references/subagent-reporting.md).
+  [../../references/subagent-reporting.md](../../references/subagent-reporting.md)
+  `## Delegated execution context`.
 - An active landing gate records the final result once.
 
 ### Fallback

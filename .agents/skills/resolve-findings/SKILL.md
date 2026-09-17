@@ -25,7 +25,8 @@ inside one delegated `implementer` that does not delegate.
 ## Inputs
 
 Require a self-contained assignment carrying the authoritative task-brief fields
-(`../../references/subagent-reporting.md`) plus these skill-specific fields:
+(`../../references/subagent-reporting.md` `## Task brief`) plus these
+skill-specific fields:
 
 - accepted finding or failure evidence and its prescribed check;
 - classification: intent `conformance` or `plan_delta`, and scope

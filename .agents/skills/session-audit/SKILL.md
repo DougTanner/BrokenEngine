@@ -19,7 +19,7 @@ order; this skill owns only that local read-only action.
 ## When to use
 
 Run only on an explicit user request. Delegation and reviewer conduct follow
-`../../references/subagent-reporting.md`.
+`../../references/subagent-reporting.md` `## Delegated execution context`.
 Audit only hypotheses that earlier domain reviews could not have covered; do not
 repeat their artifact-level correctness, style, documentation, shader, or
 validation passes.
@@ -122,6 +122,6 @@ dispatching any fix.
   are the session executing this skill. The audit steps the dispatched reviewer
   runs.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task brief.
+  `## Task brief` — task brief.
 - [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
   — shared handoff form.

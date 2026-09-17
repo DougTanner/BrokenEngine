@@ -1,13 +1,17 @@
 # Delegated Reporting
 
+## Delegated execution context
+
 Delegation uses a fresh, isolated context by default: Codex uses
-`fork_turns: "none"`; Claude receives a fresh prompt. A positive Codex turn
+`fork_turns: "none"`; Claude receives a fresh prompt; OpenCode calls `task`
+with the table's `subagent_type` and omits `task_id`. A positive Codex turn
 fork is allowed only when exact authoritative conversation text cannot be
 safely summarized, and the prompt states why.
 
 The rule that subagents never spawn subagents is enforced by
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` and by `disallowedTools: Agent` in each
-role definition.
+Claude role definition, by the Codex role instructions, and by OpenCode's
+worker `permission.task: deny` configuration.
 
 The Change Workflow delegation role table authoritatively assigns
 delegated work and owns every role exception. This reference owns only

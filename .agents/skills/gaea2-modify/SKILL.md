@@ -54,7 +54,7 @@ moving, or rewiring nodes, or changing node properties.
 
    - Check that property values still parse as their original type — don't put a string where a float was, and see the type rules under "Edit a property".
    - For any newly-added node, surface the port-catalogue limitation to the user (the saver will use a default In/Out pair until passthrough is updated) so they can decide whether to copy a port block from a sibling example.
-   - For any newly-added node, check the enum values against "Per-type enum constraints" in `../gaea2-shared/references/node-conventions.md`; an invalid one silently deactivates the node and the validator won't see it.
+   - For any newly-added node, check the enum values against `## Per-type enum constraints` in `../gaea2-shared/references/node-conventions.md`; an invalid one silently deactivates the node and the validator won't see it.
 
 ### Edit operations
 
@@ -72,7 +72,7 @@ Edit the `position:` line: `position: 27225.0, 26250.0`. Two floats, comma-separ
 Edit the `name: ...` line under the node's heading. If no `name:` line exists (the loader omits it when name == type), add one.
 
 #### Add a node
-1. Pick a free integer ID in the range 100-998: scan all `### n<ID>:` headings and pick `max(IDs) + 1`. Never use an ID below 100 — Gaea 2 silently deactivates it (details under "Id must be ≥ 100" in `../gaea2-shared/references/node-conventions.md`).
+1. Pick a free integer ID in the range 100-998: scan all `### n<ID>:` headings and pick `max(IDs) + 1`. Never use an ID below 100 — Gaea 2 silently deactivates it (details under `## Id must be ≥ 100` in `../gaea2-shared/references/node-conventions.md`).
 2. Append a new node section at the bottom of `## Nodes`:
    ```
    ### n<NEW_ID>: <Type>
@@ -82,7 +82,7 @@ Edit the `name: ...` line under the node's heading. If no `name:` line exists (t
    ```
 3. Add `n<NEW_ID>["<Type>"]` to the Mermaid block (between `flowchart TD` and the edges).
 4. The save step needs port info for new nodes, which lives only in `.passthrough.json`. Present the `### New node port-catalogue message` below to the user. Offer to find a node of the same type in the shipping examples (`C:/Program Files/QuadSpinner/Gaea 2/Examples/`) and quote its port block. (`.agents/skills/gaea2-shared/examples/` is intentionally empty — see its README.)
-5. Check the per-type requirements in `../gaea2-shared/references/node-conventions.md`. Several node types need specific fields (e.g. `Version: 2`) or valid enum values, otherwise Gaea silently loads them as deactivated. The validator in step 3 catches the field-level ones; whether an enum value is legal it cannot judge — you must.
+5. Check the per-type requirements in `../gaea2-shared/references/node-conventions.md` `` ## Types that require `Version: 2` `` and `## Per-type enum constraints`. Several node types need specific fields (e.g. `Version: 2`) or valid enum values, otherwise Gaea silently loads them as deactivated. The validator in step 3 catches the field-level ones; whether an enum value is legal it cannot judge — you must.
 
 #### Remove a node
 1. Delete the entire `### n<ID>: ...` section (heading + its property lines).

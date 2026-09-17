@@ -365,6 +365,11 @@ void Game::HarvestTransfers()
 {
 #if defined(BT_SERVER)
 	gpServerSession->mpTransferManager->HarvestTransfers();
+	// mTransfers still holds the batch just applied; the broadcaster clears it later this tick.
+	for (const auto& [rCoord, rTransfers] : gpServerSession->mpTransferManager->mTransfers)
+	{
+		gpServerSession->miHarvestedTransferTotal += std::ssize(rTransfers);
+	}
 #endif
 }
 

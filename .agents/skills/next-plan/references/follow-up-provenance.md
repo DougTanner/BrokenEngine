@@ -8,7 +8,7 @@ provenance block's field shapes, and the routing rules stay in
 
 ## Where each field comes from
 
-The block names the client (the session-branch `claude`/`codex` prefix), the
+The block names the client (the session-branch `claude`/`codex`/`opencode` prefix), the
 worktree/branch UUID, the session branch, a profile-relative worktree locator
 with the user-profile prefix stripped, and, on Claude, the conversation session
 ID. Take the client, worktree/branch UUID, session branch, and worktree locator
@@ -25,8 +25,10 @@ dispatched worker's shell included, because a subagent shell carries the parent
 session's value; the value differs per conversation and resume, so read it when
 the friction is recorded. Codex sessions record no conversation session ID,
 because they have no runtime source for one; `/next-plan-review` discovers
-transcripts of either client by bounded commit window, and a recorded Claude ID
-is the override.
+Codex transcripts by bounded commit window, and a recorded Claude ID is the
+Claude override. OpenCode also records no conversation session ID; its
+transcript discovery is unsupported, so never invent an ID or imply that the
+worktree UUID can substitute for one.
 
 ## Friction observed in a different session
 
@@ -41,4 +43,6 @@ session's own landing ref is stated.
 
 Never record a transcript file path or transcript text; reference the session by
 client, worktree/branch UUID, on Claude the conversation session ID, and, for an
-earlier observing session, its landed commit or branch only.
+earlier observing session, its landed commit or branch only. An OpenCode block
+uses `none` for the conversation session ID and retains the client and Git
+identity even though retrospective transcript review is unsupported.

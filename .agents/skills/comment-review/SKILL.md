@@ -29,8 +29,9 @@ each with the shortest present-tense replacement keeping every preserved fact.
 
 Run in the delegated execution context of
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-as one `mechanic`. Dispatch is once per review round; after the manager accepts
-findings and fixes land, only the affected files receive a focused re-review.
+`## Delegated execution context` as one `mechanic`. Dispatch is once per review
+round; after the manager accepts findings and fixes land, only the affected
+files receive a focused re-review.
 
 ## Inputs
 

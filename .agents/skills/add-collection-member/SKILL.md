@@ -24,10 +24,10 @@ site — tuple, version, CRC, persistence, creation, transfer, hydration, identi
 
 The enclosing implementer's brief supplies the task-brief fields in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-and its ownership snapshot. This checklist also consumes the target collection
-and member, the intended ownership and shared/client reachability, the known
-producers, consumers, lifecycle and integration sites, and the approved
-save/replay version and compatibility decision.
+`## Task brief` and its ownership snapshot. This checklist also consumes the
+target collection and member, the intended ownership and shared/client
+reachability, the known producers, consumers, lifecycle and integration sites,
+and the approved save/replay version and compatibility decision.
 
 ## Handoff
 

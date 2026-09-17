@@ -15,21 +15,22 @@ Session provenance (machine-local; not reproducible after cleanup). The Client
 through Worktree fields name the session that observed the friction — the
 session `/next-plan-review` must reach — while the `Landing ref` line names a
 ref whose tree actually contains this Plan:
-- Client: claude | codex
+- Client: claude | codex | opencode
 - Conversation session ID: <lowercase uuid on Claude, read from
   CLAUDE_CODE_SESSION_ID and used as /next-plan-review's override; none on
-  Codex, which has no runtime source for one, so its transcript is found by the
-  same bounded commit-window discovery both clients use>
+  Codex or OpenCode; Codex uses bounded commit-window discovery, while OpenCode
+  transcript review is unsupported and the worktree UUID is never substituted>
 - Worktree/branch UUID: <lowercase uuid, the same one the Session branch and
   Worktree lines carry — selection evidence only, never production proof>
-- Session branch: <claude|codex>/<uuid>
+- Session branch: <claude|codex|opencode>/<uuid>
 - Worktree: <profile-relative locator, e.g. .claude\worktrees\<repo>\<uuid> —
   never an absolute path, so no home prefix enters the public repo>
 - Observed in an earlier session: <omit this line entirely when the session
   recording this Plan is the session that observed the friction. Otherwise
   state that the fields above are the observing session's, and give that
   session's landed commit or branch — required on Codex, whose transcript
-  discovery needs the commit window around it.>
+  discovery needs the commit window around it, and retained as Git provenance
+  on OpenCode even though transcript review is unsupported.>
 - Landing ref: <a ref whose tree contains this Plan; never assume the session
   branch above contains it. When the observing session records and lands the
   Plan itself: the session branch above, whose tip is that session's final
@@ -46,7 +47,8 @@ ref whose tree actually contains this Plan:
 - Run the review before /cleanup-worktrees removes the worktree recorded above:
   Codex transcript discovery requires the producing worktree to remain
   registered, and Claude review requires the exact conversation session ID
-  above.
+  above. OpenCode transcript review remains unsupported regardless of worktree
+  retention.
 
 ## Design
 First root-cause the friction from the current tree and this Plan's `## Context`.
@@ -55,7 +57,10 @@ Only when the transcript is genuinely needed, in a new session run
 on the `Observed in an earlier session` line when that line is present, otherwise
 the landing ref — supplying the recorded client and, on Claude, the recorded
 conversation session ID; a Codex review supplies the client and that review ref
-only. Then make the smallest fix inside the `## In scope` boundary below. If
+only. For an OpenCode observing session, `/next-plan-review` returns
+`unsupported (opencode)` before transcript discovery, so root-cause only from
+the recorded symptom and Git evidence. Then make the smallest fix inside the
+`## In scope` boundary below. If
 root-causing shows the fix lies outside that boundary, surface it for
 re-planning instead of expanding scope.
 

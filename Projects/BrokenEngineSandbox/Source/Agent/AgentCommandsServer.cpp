@@ -107,6 +107,9 @@ void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::jso
 
 	rResult["nextGlobalId"] = gpGame->NextGlobalId();
 	rResult["pendingFlagshipUpdateCount"] = std::ssize(gpServerSession->mpFleetManager->mNavigation.mPendingFlagshipUpdates);
+	rResult["harvestedTransferTotal"] = gpServerSession->miHarvestedTransferTotal;
+	rResult["pendingTransferFixtureCount"] = CountReplayTransferFixtures(*gpServerSession);
+	rResult["pendingAgentStatusChangeCount"] = CountPendingAgentStatusChanges(*gpServerSession);
 }
 
 void CommandPause(const nlohmann::json& rParams, nlohmann::json& rResult)

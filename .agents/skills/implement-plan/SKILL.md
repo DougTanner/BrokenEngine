@@ -27,12 +27,15 @@ context, and returns a handoff of changed files, triggers, and residuals.
 
 The main session reads this skill, then dispatches exactly one `implementer`
 with a self-contained brief and no inherited conversation context — fresh on
-Claude, `fork_turns: "none"` on Codex, per the authoritative default in
-[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md).
+Claude, `fork_turns: "none"` on Codex, or an OpenCode `task` with
+`subagent_type: implementer` and no `task_id`, per the authoritative default in
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Delegated execution context`.
 That worker performs both implementation and its same-context assumption audit.
 
 Supply the authoritative task-brief fields
-([`../../references/subagent-reporting.md`](../../references/subagent-reporting.md))
+([`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Task brief`)
 plus these skill-specific fields, in both implementation and audit-only modes:
 
 - mode: `implementation` or `audit-only`;
@@ -87,6 +90,6 @@ later fix work.
   are the session executing this skill. The steps and rules the dispatched
   worker follows.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task-brief fields.
+  `## Task brief` — task-brief fields.
 - [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
   — the shared handoff form.

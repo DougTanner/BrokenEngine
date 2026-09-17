@@ -51,6 +51,8 @@ bool AreAdjacent(engine::GridCoord source, engine::GridCoord destination)
 	return (iDeltaX != 0 || iDeltaY != 0) && std::abs(iDeltaX) <= 1 && std::abs(iDeltaY) <= 1;
 }
 
+bool ClientsWaitingForSpawn();
+
 void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
 	// SaveLoadReplay/SyncReplayTick are compiled out under !kbDebugInput, so the flag would never be consumed.
@@ -255,6 +257,10 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 		if (gpGame->mbReplaying)
 		{
 			throw std::runtime_error("cannot queue replay transfer fixture during replay playback");
+		}
+		if (ClientsWaitingForSpawn())
+		{
+			throw std::runtime_error("cannot inject while clients are waiting for spawn");
 		}
 		const bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused)
 		                        && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !engine::gpReplay->IsRecording();
@@ -970,6 +976,11 @@ void DrainReplayTransferFixtures(ServerSession& rSession, engine::ServerTransfer
 	{
 		return;
 	}
+	// Held, not dropped: returning ahead of the clear leaves the queue whole for the first harvest after the list empties.
+	if (!rSession.mpClientManager->mClientsWaitingForSpawn.empty())
+	{
+		return;
+	}
 
 	for (auto& [rCoord, rTransfers] : sFixture.replayTransferFixtures)
 	{
@@ -1002,6 +1013,36 @@ void ResetReplayTransferFixtures(ServerSession& rSession)
 	{
 		sFixture.replayTransferFixtures.clear();
 	}
+}
+
+int64_t CountPendingAgentStatusChanges(ServerSession& rSession)
+{
+	if (sFixture.pSession != &rSession)
+	{
+		return 0;
+	}
+
+	int64_t iCount = 0;
+	for (const auto& [rCoord, rChanges] : sFixture.pendingAgentStatusChanges)
+	{
+		iCount += std::ssize(rChanges);
+	}
+	return iCount;
+}
+
+int64_t CountReplayTransferFixtures(ServerSession& rSession)
+{
+	if (sFixture.pSession != &rSession)
+	{
+		return 0;
+	}
+
+	int64_t iCount = 0;
+	for (const auto& [rCoord, rTransfers] : sFixture.replayTransferFixtures)
+	{
+		iCount += std::ssize(rTransfers);
+	}
+	return iCount;
 }
 
 void DetachServerSimulationFixtures(ServerSession& rSession)

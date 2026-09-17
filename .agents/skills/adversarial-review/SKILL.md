@@ -15,7 +15,8 @@ allowed-tools: [Read, Grep, Glob, PowerShell]
 
 Attempt to disprove a change across every changed artifact type and report the
 reachable failures that survive refutation. Runs as one delegated `reviewer` per
-[`subagent-reporting.md`](../../references/subagent-reporting.md).
+[`subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Delegated execution context`.
 
 ## When to use
 

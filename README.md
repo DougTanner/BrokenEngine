@@ -26,6 +26,8 @@ Setting up a new machine? [Documents/FreshMachineSetup.md](Documents/FreshMachin
 
 - Gaea 2 (QuadSpinner), required to bake island terrain. DataPacker runs `Gaea.Swarm.exe` from the `GAEA2_PATH` environment variable when it is set and points at an existing path, and otherwise from the default install location `C:\Program Files\QuadSpinner\Gaea 2\Gaea.Swarm.exe`.
 
+- Node.js with npm, required only to install OpenCode.
+
 - x64 CPython 3.12 or newer, required by every skill that needs host Python. `code-quality-metrics` uses the first `python` Application resolved through normal PATH precedence, then verifies that it is a supported CPython installation; the `gaea2-*` and `analyze-diagsession` skills locate an interpreter through `.agents/scripts/Detect-Python.ps1`, which also probes well-known install directories. The `py` launcher is not used as a fallback.
 
 ## Git
@@ -86,7 +88,7 @@ Setting up a new machine? [Documents/FreshMachineSetup.md](Documents/FreshMachin
 
 The suggested launch commands below bypass permission prompts and other safeguards. Use them only in a repository and environment where that level of access is intentional.
 
-Use separate Windows Terminal profiles for the two clients: run Claude Code from Git Bash, and run Codex CLI from PowerShell 7. The repository wrappers and command examples use the native syntax of those shells; `pwsh` must also be available to Git Bash for shared PowerShell helpers.
+Use separate Windows Terminal profiles for the three clients: run Claude Code from Git Bash, and run Codex CLI and OpenCode from PowerShell 7. The repository wrappers and command examples use the native syntax of those shells; `pwsh` must also be available to Git Bash for shared PowerShell helpers.
 
 ### Claude Code
 
@@ -135,7 +137,7 @@ The wrapper already supplies the dangerous permission bypass; no additional sett
 	```powershell
 	.\.codex\codex-worktree.ps1
 	```
-- The wrapper creates branch `codex/<uuid>`, stores the worktree under `~/.codex/worktrees/<repository>/<uuid>`, validates the same links and report directory, and launches Codex with `--dangerously-bypass-approvals-and-sandbox`. Both wrappers rebuild the shared primary binaries under a bootstrap mutex before launch, track the client with kill-on-host-close lifetime, propagate its exit code, and preserve partial artifacts on provisioning failure.
+- The wrapper creates branch `codex/<uuid>`, stores the worktree under `~/.codex/worktrees/<repository>/<uuid>`, validates the same links and report directory, and launches Codex with `--dangerously-bypass-approvals-and-sandbox`. Every wrapper rebuilds the shared primary binaries under a bootstrap mutex before launch, tracks the client with kill-on-host-close lifetime, propagates its exit code, and preserves partial artifacts on provisioning failure.
 - The Codex headless route (`.codex/codex-review.ps1`, driven by the `/codex-review` skill) is retained but dormant. An explicit request can select its Sol or Opus role configuration for a review, audit, or researcher assignment; normal workflow delegation does not use it. Headless Codex runs bill the ChatGPT subscription, not metered API credits.
 
 #### Optional Current Maintainer Configuration
@@ -198,6 +200,20 @@ url = "https://developers.openai.com/mcp"
 ```
 
 Keep the runtime-generated `node_repl` command and environment values intact; edit its existing `[mcp_servers.node_repl]` block to add `enabled = false`. Restart Codex and open a new thread after capability changes, then verify the active state with `codex plugin list` and `codex mcp list`. The profile disables Visualize, Google Calendar, Slack, Browser, Documents, PDF, Spreadsheets, Presentations, Template Creator, Sites, and OpenAI Templates, plus `js_repl`, `node_repl`, and `sites-design-picker`; it retains `openaiDeveloperDocs`.
+
+### OpenCode
+
+- Install the `opencode-ai` npm package (1.18.31 observed) from PowerShell:
+	```powershell
+	npm install -g opencode-ai
+	```
+- Close and reopen the terminal, then verify the installation with `opencode --version`.
+- From a PowerShell 7 tab inside Windows Terminal, opened at the primary checkout root, launch the repository wrapper:
+	```powershell
+	pwsh -NoProfile -File .opencode/opencode-worktree.ps1
+	```
+- The wrapper creates branch `opencode/<uuid>` and stores the worktree under `~/.opencode/worktrees/<repository>/<uuid>`. `-ReattachWorktree <path>` reopens an existing session worktree, and `-PrepareOnly` prepares the worktree without launching the agent.
+- OpenCode needs no bypass flag: its default permissions allow tool use without prompts, except the user-only skills that `.opencode/opencode.json` gates behind a confirmation.
 
 ## Compile
 

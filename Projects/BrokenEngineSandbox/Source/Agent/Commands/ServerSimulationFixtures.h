@@ -31,6 +31,8 @@ void DrainPendingAgentStatusChanges(ServerSession& rSession);
 void DrainReplayTransferFixtures(ServerSession& rSession, engine::ServerTransferManager& rTransferManager);
 void ResetPendingAgentStatusChanges(ServerSession& rSession);
 void ResetReplayTransferFixtures(ServerSession& rSession);
+int64_t CountPendingAgentStatusChanges(ServerSession& rSession);
+int64_t CountReplayTransferFixtures(ServerSession& rSession);
 void DetachServerSimulationFixtures(ServerSession& rSession);
 void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, ReplayTransferCaptureCounts& rCounts);
 

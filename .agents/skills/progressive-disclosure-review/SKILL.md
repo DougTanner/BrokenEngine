@@ -29,7 +29,8 @@ directive is the sole statement of the layering; this skill only enforces it.
   parent `AGENTS.md`, or exceeds the skill size thresholds.
 
 Run in the delegated execution context of
-[`subagent-reporting.md`](../../references/subagent-reporting.md); inline review
+[`subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Delegated execution context`; inline review
 is prohibited. Dispatch is once per review round; after the manager accepts
 findings and fixes land, only the affected files receive a focused re-review.
 

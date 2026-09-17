@@ -18,7 +18,7 @@ function Test-NextPlanStateBlocker($ErrorRecord) {
 function Get-NextPlanContext {
 	try {
 		$session = Get-AgentWorktreeSessionContext -Worktree (Get-Location).Path
-		if ([string]::IsNullOrWhiteSpace($session.SessionId)) { throw (New-NextPlanStateBlocker 'The current checkout is not an agent session worktree (no claude/<uuid> or codex/<uuid> branch).') }
+		if ([string]::IsNullOrWhiteSpace($session.SessionId)) { throw (New-NextPlanStateBlocker 'The current checkout is not an agent session worktree (no claude/<uuid>, codex/<uuid>, or opencode/<uuid> branch).') }
 
 		$worktree = Get-FinalizeGitIdentity $session.Worktree 'Session worktree'
 		$current = Get-FinalizeExistingWindowsIdentity (Get-Location).Path 'Current directory'

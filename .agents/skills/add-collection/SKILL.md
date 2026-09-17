@@ -29,9 +29,10 @@ affinity.
 
 The enclosing implementer's brief supplies the task-brief fields in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-and its ownership snapshot. This checklist also consumes the exact collection
-variant, the collection name and ownership, all known frame/phase/integration
-sites, and the approved save/replay version and compatibility decision.
+`## Task brief` and its ownership snapshot. This checklist also consumes the
+exact collection variant, the collection name and ownership, all known
+frame/phase/integration sites, and the approved save/replay version and
+compatibility decision.
 
 ## Handoff
 

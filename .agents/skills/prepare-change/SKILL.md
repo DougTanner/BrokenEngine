@@ -28,12 +28,14 @@ classify the work returns the evidence alone.
 - Not for a claimed executable Plan: [`../next-plan/SKILL.md`](../next-plan/SKILL.md)
   keeps its own preparation route.
 - Runs in the delegated execution context of
-  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md).
+  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+  `## Delegated execution context`.
 
 ## Inputs
 
 Supply the authoritative task-brief fields
-([`../../references/subagent-reporting.md`](../../references/subagent-reporting.md))
+([`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Task brief`)
 plus these skill-specific fields:
 
 - user intent, quoted where its exact wording binds;
@@ -67,7 +69,7 @@ the plan or card text in the handoff.
   are the session executing this skill. The steps and rules the dispatched
   worker follows.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — task-brief fields.
+  `## Task brief` — task-brief fields.
 - [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
   — the shared handoff form.
 - [`../plan-audit/SKILL.md`](../plan-audit/SKILL.md) — the plan-file and

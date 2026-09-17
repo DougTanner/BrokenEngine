@@ -31,7 +31,8 @@ missing check, and a status saying whether the approved checks have all closed.
   reviewer and runs this skill's mapping as its acceptance component.
 
 Run in the delegated execution context of
-[`subagent-reporting.md`](../../references/subagent-reporting.md), in a context
+[`subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Delegated execution context`, in a context
 that did not produce the work.
 
 ## Inputs

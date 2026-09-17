@@ -22,7 +22,8 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
 - Every Tier-2 and Tier-3 change, before implementation; Tier-1 mechanical work
   skips it.
 - Runs in the delegated execution context of
-  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md);
+  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+  `## Delegated execution context`;
   if the mandatory reviewer is unavailable, the manager reports a blocker.
 - The audit is findings-only work and never creates an approval gate; a
   `/next-plan` invocation additionally follows the authoritative

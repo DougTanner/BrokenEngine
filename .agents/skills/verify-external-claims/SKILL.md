@@ -19,7 +19,7 @@ One `locator` resolves requested external facts for main to decide.
 
 Dispatch one `locator` with the authoritative shared task-brief fields from
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-and require each request to contain:
+`## Task brief` and require each request to contain:
 
 - a stable claim ID, API/symbol/rule, and one checkable proposition;
 - the dependent finding, item, or decision and why the verdict matters;

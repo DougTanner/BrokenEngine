@@ -71,12 +71,12 @@ and the handoff this run returns.
      the owner token, and claims the lock, printing one compact
      `broken-engine-harness-claim/v1` JSON object.
    - When another session holds the lock, it provisions once and then retries
-     only the claim until it succeeds or its 500-second wait budget expires, so
-     the invocation above is itself the wait — never hand-write a poll loop,
-     invent a sleep window, or pass a wait budget of your own; give the call the
-     maximum available host command timeout so that budget is not preempted, or
-     run it through a host background-execution parameter and read its result in
-     the same turn.
+     only the claim until it succeeds, the holder becomes stale under step 11,
+     or its 500-second wait budget expires, so the invocation above is itself
+     the wait — never hand-write a poll loop, invent a sleep window, or pass
+     a wait budget of your own; give the call the maximum available host
+     command timeout so that budget is not preempted, or run it through a
+     host background-execution parameter and read its result in the same turn.
    - Pass the latest `/compile` result's normalized `GameDataDirectory` verbatim
      as `-GameDataDirectory` — the same packed data the launch below selects
      with `--data-directory`.
@@ -88,7 +88,7 @@ and the handoff this run returns.
 
 7. Read the claim result and act on its exit code. Done when the claim is held
    with its values retained, or the reported block or failure is reported and
-   the attempt ends.
+   the attempt ends or, for a stale holder, routes to the takeover steps.
 
    - Exit `0` (`status` `pass`) supplies the `owner` token, the resolved
      `agentHarness` path, and the `claim` record; retain those values outside
@@ -99,10 +99,13 @@ and the handoff this run returns.
      `gameDataDirectory`, canonicalized once the pack-version check resolves it,
      and carries a `packVersion` field that is `null` except on the
      `claim.pack-version-mismatch` block below.
-   - Exit `2` (`status` `blocked`) carries one of three codes, and any of them
-     ends the attempt here: the script never launches the game, so the Launch
-     and ping-wait steps below are not performed and their absence is not a
-     further failure to diagnose.
+   - Exit `2` (`status` `blocked`) carries one of three codes. A stale-holder
+     `claim.foreign-owner` continues into the takeover steps, while
+     `claim.executable-missing`, `claim.pack-version-mismatch`, and a
+     fresh-holder `claim.foreign-owner` end the attempt here, and for those
+     three the script never launches the game, so the Launch and ping-wait
+     steps below are not performed and their absence is not a further failure
+     to diagnose.
    - `claim.executable-missing` means a required project executable is absent
      for the requested configuration: no provisioning ran and no lock was taken,
      so route `/compile` for the named executables and re-enter; when only the
@@ -117,13 +120,18 @@ and the handoff this run returns.
      - The payload's `packVersion` carries `expected`, `found`,
        `mismatchedManifests`, and `manifestCount`, so rebuild or re-export to
        pair them rather than relaunching.
-   - `claim.foreign-owner` means the wait expired and another session still
-     holds the lock: the payload's `currentOwner` carries the last attempt's
-     `claimedAt` and the derived `holdSeconds` — heartbeat never advances
-     `claimedAt` — so reorder non-harness work or escalate rather than
-     re-running the wait blind.
+   - `claim.foreign-owner` means another session still holds the lock, reported
+     once the holder becomes stale or the budget expires, whichever comes
+     first: the payload's `currentOwner` carries the last attempt's
+     `claimedAt`, the derived `holdSeconds`, and `heartbeatAt` — heartbeat never
+     advances `claimedAt` — so judge staleness from `heartbeatAt` per step 11
+     and route a stale holder to the takeover steps, reordering non-harness work
+     or escalating only when the holder is fresh rather than re-running the wait
+     blind; the takeover steps take the old owner token from
+     `currentOwner.owner` and the harness path from `agentHarness`.
    - The script never steals and never touches a foreign owner's processes,
-     heartbeat, or claim, whether it acquires the lock or waits the budget out.
+     heartbeat, or claim, whether it acquires the lock, blocks once the holder
+     is stale, or waits the budget out.
    - Exit `1` is a failure naming its step (`claim.repository-missing`,
      `claim.provisioner-missing`, `claim.launch-doc-unreadable`,
      `claim.pack-version-underivable`, `claim.game-data-unreadable`,

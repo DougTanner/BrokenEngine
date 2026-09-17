@@ -1,6 +1,14 @@
 # Explicit Microsoft PREfast verification mode
 
-Use this mode only when an approved plan explicitly requires Microsoft PREfast verification. Retain every ordinary game-build protection the skill states: the rules for taking and releasing the short-lived operation lock, immutable prebuilt WorktreeCli, worktree provisioning and lifecycle validation, WorktreeCli target serialization, synchronous foreground execution, and data-mode selection with the authoritative data properties from [runtime-data-mode.md](runtime-data-mode.md). `-Prefast` changes only the analysis switches and, on a full build, forces a rebuild, so those protections all still apply. Do not invoke MSBuild or `/analyze` outside WorktreeCli.
+## Authorization and when to use
+
+Use this mode only when an approved plan explicitly requires Microsoft PREfast verification. Outside this explicitly authorized mode, omit `-Prefast` so the build keeps `EnableClangTidyCodeAnalysis=false` and `RunCodeAnalysis=false`.
+
+## Retained protections
+
+Retain every ordinary game-build protection the skill states: the rules for taking and releasing the short-lived operation lock, immutable prebuilt WorktreeCli, worktree provisioning and lifecycle validation, WorktreeCli target serialization, synchronous foreground execution, and data-mode selection with the authoritative data properties from [runtime-data-mode.md](runtime-data-mode.md). `-Prefast` changes only the analysis switches and, on a full build, forces a rebuild, so those protections all still apply. Do not invoke MSBuild or `/analyze` outside WorktreeCli.
+
+## Invocation and coverage
 
 `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns the Microsoft code analysis explanation in its "Microsoft code analysis" bullet: the two Release paths selected by `RunCodeAnalysis`, the `EnablePREfast` gate, the rule set, `CodeAnalysisTreatWarningsAsErrors`, and the `CodeAnalysisNeverReportRuleErrors` prohibition. The facts this mode adds on top of it:
 
@@ -18,6 +26,6 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 
 `EnableMicrosoftCodeAnalysis=true`, which `-Prefast` passes, is an extra safety measure here: the toolchain forces analysis off only on an explicit `false`, and the Release configurations set it nowhere, so passing it changes nothing today. Keep it so an upstream default change cannot silently disable the mode.
 
-A policy failure surfaces as a nonzero MSBuild exit after the link step, with the executable already produced — analysis runs through `AfterBuildLinkTargets`. Existing binaries after a failed run are expected, not a partial success. A failing run also does not write `*.lastcodeanalysissucceeded`, so the failure correctly re-reports on the next build until it is fixed. The matched diagnostics reach the caller through the envelope file and retained log the `## Handoff` rows cite, never inline.
+## Results
 
-Outside this explicitly authorized mode, omit `-Prefast` so the build keeps `EnableClangTidyCodeAnalysis=false` and `RunCodeAnalysis=false`; never infer PREfast authorization from a routine compile, rebuild, or link-error check.
+A policy failure surfaces as a nonzero MSBuild exit after the link step, with the executable already produced — analysis runs through `AfterBuildLinkTargets`. Existing binaries after a failed run are expected, not a partial success. A failing run also does not write `*.lastcodeanalysissucceeded`, so the failure correctly re-reports on the next build until it is fixed. The matched diagnostics reach the caller through the envelope file and retained log the `## Handoff` rows cite, never inline.

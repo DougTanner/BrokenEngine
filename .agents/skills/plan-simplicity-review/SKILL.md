@@ -35,7 +35,8 @@ recovery path, or configuration surface absent at the session baseline —
 including an addition inside an existing file. Non-documentation behavior means
 C++, shaders, scripts, or the skill behavior the Trigger section below defines.
 
-Dispatch it once per `../../references/subagent-reporting.md`, in parallel with
+Dispatch it once per `../../references/subagent-reporting.md`
+`## Delegated execution context`, in parallel with
 `/plan-audit` on the same plan snapshot where `/plan-audit` runs (Tier 2+) and
 standalone where it does not (Tier 1, and the save-time dispatch from
 `/save-plan`).
@@ -112,6 +113,6 @@ missing.
 - [`references/worker.md`](references/worker.md) — private: read it only if you
   are the session executing this skill. The reviewer's steps and judgment rules.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  — delegated execution context.
+  `## Delegated execution context` — delegated execution context.
 - [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
   — the shared handoff form.

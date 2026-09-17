@@ -23,8 +23,8 @@ envelope are the evidence; this judges them.
 
 - Dispatched from the `/next-plan` run checkpoint, and only from there.
 - Run in the delegated execution context of
-  `../../references/subagent-reporting.md`, dispatched as the `reviewer` subagent;
-  inline review is prohibited.
+  `../../references/subagent-reporting.md` `## Delegated execution context`,
+  dispatched as the `reviewer` subagent; inline review is prohibited.
 
 ## Inputs
 
