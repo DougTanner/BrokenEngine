@@ -15,29 +15,27 @@ these classes enforce; they add no rule it does not state.
 
 ## Examples
 
-- boilerplate — `Common/WindowsUtils.h:35-43`: `Parameters:`, `Returns:`, and
-  `Thread-safety:` fields restate the declaration below them.
-  `Engine/Source/Frame/Collections/CollectionMemory.h:6-15`: a `// ====` banner
-  around a heading. A template field is boilerplate when its content is generic
+- boilerplate — `// Returns: true on success` above a `bool` function restates
+  the declaration below it, and `// =====================` is a banner
+  separator. A template field is boilerplate when its content is generic
   ("thread-safe", "uses local resources") or restates what the signature shows;
-  one carrying a real threading or lifetime contract is preserved by rewriting it
-  as a plain present-tense sentence, never deleted.
-- history — `Engine/Source/Frame/IslandTerrain.cpp:337`: "results are identical
-  to the previous per-point form" describes the replaced code.
-- speculative — `Engine/Source/Graphics/Render/MainUniforms.cpp:458-474`:
-  eleven of its lines describe what an unreachable early return would do if the
-  invariant it guards ever broke. The first two lines state the never-empty
-  invariant itself, so they are preserved; only the hypothetical-path lines go.
-- navigation — `Common/Log/Log.h:214`: "remaining out-of-window case
-  (Log/AGENTS.md)". Delete a comment whose sole content is the pointer;
-  otherwise keep the technical statement and remove only the pointer.
-- false — no repository instance was located: the test is to read the adjacent
+  one carrying a real threading or lifetime contract is preserved by rewriting
+  it as a plain present-tense sentence, never deleted.
+- history — `// Previously scaled by 100; now stored in meters.` describes the
+  change that produced the current code.
+- speculative — `// The bucket list is never empty here. If it were, the
+  loop below would return without writing.` The first sentence states the
+  invariant, so it is preserved; only the hypothetical-path sentence goes.
+- navigation — `// See AGENTS.md for the threading rules.` Delete a comment
+  whose sole content is the pointer; otherwise keep the technical statement and
+  remove only the pointer.
+- false — no fixed example applies: the test is to read the adjacent
   code and accept the class only when that code contradicts the stated fact,
   rather than to match a pattern. When the claim is about runtime correctness,
   the replacement slot is `route: /repo-code-review`, because either the comment
   or the code is wrong and only that review decides which.
-- dense — `Engine/Source/File/PackChunks.cpp:859-879`: a 21-line thread-safety
-  precondition whose constraint is real, so it is shortened, never deleted.
+- dense — a nine-line block spelling out a thread-safety precondition one
+  sentence carries: the constraint is real, so it is shortened, never deleted.
 
 ## Preserve list
 

@@ -65,8 +65,9 @@ model, and says what happens when Jev is wrong.
   real risk, and the reason a threshold has to be set to flag generously.
 - Weak spot: `false` ("every statement is true of the adjacent code as it
   stands", `comment-classes.md:13`). Deciding it needs real understanding of the
-  code, and `comment-classes.md:34-38` records that no repository instance was
-  ever located. That class should stay with the reviewer whatever else happens.
+  code, and `comment-classes.md:32-36` records that no fixed example applies
+  and the class is decided by reading the adjacent code. That class should stay
+  with the reviewer whatever else happens.
 
 ### 2. Judgment-only style rules for `/code-style-review`
 
