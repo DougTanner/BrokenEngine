@@ -22,16 +22,14 @@ public:
 
 	void QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid = {}, int64_t iMemberIndex = -1);
 	void NewClients();
-	void FinalizeNewClients();
+	void SpawnWaitingClients();
 	void Disconnects();
 	void DetectPlayerDeaths();
-	void RefreshPreSpawnSnapshot();
 	void ResetState();
 
 	std::vector<ClientSpawnInfo> mClientsWaitingForSpawn;
 	std::unordered_set<int64_t> mDeadClientIds;
 	std::unordered_set<int64_t> mProcessedClientIds;
-	std::vector<player_t> mPreSpawnPlayerIds;
 
 private:
 

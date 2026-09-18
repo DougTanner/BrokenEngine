@@ -266,6 +266,8 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 		if (rStatusChange.eType == StatusChangeType::kSpawnPlayer || rStatusChange.eType == StatusChangeType::kRespawnPlayer)
 		{
 			engine::global_id_t globalPlayerId {};
+			// Empty unless the spawn request carries an owning client: agent-injected and respawn rows are born unowned.
+			engine::ClientGuid spawnClientGuid {};
 			PlayerFlags_t spawnFlags {PlayerFlags::kBlasterSpawnLeft};
 			engine::GridCoord spawnFleetWantedCoord {};
 			uint8_t uiSpawnPendingFleetTicks = 0;
@@ -279,6 +281,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			{
 				const SpawnPlayerData& rSpawnData = std::get<SpawnPlayerData>(rStatusChange.data);
 				globalPlayerId.iValue = rSpawnData.iGlobalId;
+				spawnClientGuid = rSpawnData.clientGuid;
 				if (rSpawnData.bIsFlagship)
 				{
 					spawnFlags.Set(kIsFlagship);
@@ -308,6 +311,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 				.flags = spawnFlags,
 				.fArrivalGracePeriod = kfArrivalGracePeriod,
 				.globalPlayerId = globalPlayerId,
+				.clientGuid = spawnClientGuid,
 				.fleetWantedCoord = spawnFleetWantedCoord,
 				.uiPendingFleetWantedCoordTicks = uiSpawnPendingFleetTicks,
 			});
@@ -478,7 +482,7 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pfNavigationDelays[iIndex] = rInfo.fNavigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
-	rCurrentPostRender.pClientGuids[iIndex] = {};
+	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
 	rCurrentPostRender.pGlobalPlayerIds[iIndex] = rInfo.globalPlayerId;
 	rCurrentPostRender.pFleetWantedCoords[iIndex] = rInfo.fleetWantedCoord;
 	rCurrentPostRender.puiPendingFleetWantedCoordTicks[iIndex] = rInfo.uiPendingFleetWantedCoordTicks;

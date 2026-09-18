@@ -345,6 +345,7 @@ public:
 		float fFrameChangeTimer = 0.0f;
 		float fNavigationDelay = 60.0f;
 		engine::global_id_t globalPlayerId {};
+		engine::ClientGuid clientGuid {};
 		engine::GridCoord fleetWantedCoord {};
 		uint8_t uiPendingFleetWantedCoordTicks = 0;
 		uint8_t uiPendingWeaponModeTicks = 0;

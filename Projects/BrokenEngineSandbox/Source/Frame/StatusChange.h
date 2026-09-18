@@ -1,5 +1,8 @@
 #pragma once
 
+// Direct include, not the Engine.h aggregation: the game PCH pulls this header in ahead of Engine.h.
+#include "Network/NetworkProtocol.h" // ClientGuid
+
 namespace game
 {
 
@@ -60,6 +63,8 @@ struct SpawnPlayerData
 	// Spawn point in meters from the target cell's center.
 	float fSpawnOffsetX = 45.0f;
 	float fSpawnOffsetY = -12.0f;
+	// Owning client GUID, so a requested player row is born owned (not serialized over network, like the transfer payload's GUID).
+	engine::ClientGuid clientGuid {};
 	bool operator==(const SpawnPlayerData&) const = default;
 };
 

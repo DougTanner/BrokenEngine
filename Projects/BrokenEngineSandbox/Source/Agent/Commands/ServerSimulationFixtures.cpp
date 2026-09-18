@@ -9,7 +9,6 @@
 #include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Game.h"
-#include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/Server/ServerTransferManager.h"
 #include "Profile/ProfileManager.h"
@@ -50,8 +49,6 @@ bool AreAdjacent(engine::GridCoord source, engine::GridCoord destination)
 	const int64_t iDeltaY = static_cast<int64_t>(destination.y) - source.y;
 	return (iDeltaX != 0 || iDeltaY != 0) && std::abs(iDeltaX) <= 1 && std::abs(iDeltaY) <= 1;
 }
-
-bool ClientsWaitingForSpawn();
 
 void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
@@ -257,10 +254,6 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 		if (gpGame->mbReplaying)
 		{
 			throw std::runtime_error("cannot queue replay transfer fixture during replay playback");
-		}
-		if (ClientsWaitingForSpawn())
-		{
-			throw std::runtime_error("cannot inject while clients are waiting for spawn");
 		}
 		const bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused)
 		                        && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !engine::gpReplay->IsRecording();
@@ -510,13 +503,6 @@ std::pair<engine::GridCoord, StatusChange> BuildInjectedChange(const nlohmann::j
 	return {coord, change};
 }
 
-// True while a client sits in mClientsWaitingForSpawn: the spawn-assignment-by-snapshot-diff invariant would
-// mis-assign an agent SpawnPlayer landing the same tick to the waiting client — reject injection outright.
-bool ClientsWaitingForSpawn()
-{
-	return !gpServerSession->mpClientManager->mClientsWaitingForSpawn.empty();
-}
-
 void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!rParams.is_object())
@@ -574,10 +560,6 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 	if (gpGame->mbReplaying)
 	{
 		throw std::runtime_error("cannot inject during replay playback");
-	}
-	if (ClientsWaitingForSpawn())
-	{
-		throw std::runtime_error("cannot inject while clients are waiting for spawn");
 	}
 	if (bArmNavQuery)
 	{
@@ -686,10 +668,6 @@ void CommandSpawnPlayers(const nlohmann::json& rParams, nlohmann::json& rResult)
 	{
 		throw std::runtime_error("cannot inject during replay playback");
 	}
-	if (ClientsWaitingForSpawn())
-	{
-		throw std::runtime_error("cannot inject while clients are waiting for spawn");
-	}
 	engine::GridCoord coord = CoordFromParam(rParams);
 	if (!IsCoordActive(coord))
 	{
@@ -740,10 +718,6 @@ void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json&
 		if (gpGame->mbReplaying)
 		{
 			throw std::runtime_error("cannot inject during replay playback");
-		}
-		if (ClientsWaitingForSpawn())
-		{
-			throw std::runtime_error("cannot inject while clients are waiting for spawn");
 		}
 		if (!rParams.is_object())
 		{
@@ -935,10 +909,6 @@ void DrainPendingAgentStatusChanges(ServerSession& rSession)
 	{
 		return;
 	}
-	if (!rSession.mpClientManager->mClientsWaitingForSpawn.empty())
-	{
-		return;
-	}
 
 	for (auto it = sFixture.pendingAgentStatusChanges.begin(); it != sFixture.pendingAgentStatusChanges.end();)
 	{
@@ -973,11 +943,6 @@ void DrainPendingAgentStatusChanges(ServerSession& rSession)
 void DrainReplayTransferFixtures(ServerSession& rSession, engine::ServerTransferManager& rTransferManager)
 {
 	if (sFixture.pSession != &rSession)
-	{
-		return;
-	}
-	// Held, not dropped: returning ahead of the clear leaves the queue whole for the first harvest after the list empties.
-	if (!rSession.mpClientManager->mClientsWaitingForSpawn.empty())
 	{
 		return;
 	}

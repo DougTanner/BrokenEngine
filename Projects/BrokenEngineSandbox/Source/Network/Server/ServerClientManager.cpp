@@ -21,7 +21,8 @@ void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::C
 	mProcessedClientIds.erase(iClientId);
 
 	// Dedup only the queue push on the full spawn identity so a client spamming spawn-into/respawn queues at most one spawn
-	// per (fleet guid, member). Skip duplicates without reordering — preserves the order-sensitive spawn-assignment invariant.
+	// per (fleet guid, member). Skip duplicates without reordering — request order is the order spawn status changes enter
+	// the frame input, and therefore the simulation and the CRC.
 	bool bAlreadyQueued = std::ranges::any_of(mClientsWaitingForSpawn, [&](const ClientSpawnInfo& rInfo)
 	{
 		return rInfo.iClientId == iClientId && rInfo.fleetGuid == rFleetGuid && rInfo.iMemberIndex == iMemberIndex;
@@ -108,66 +109,42 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 	}
 }
 
-void ServerClientManager::FinalizeNewClients()
+void ServerClientManager::SpawnWaitingClients()
 {
-	if (mClientsWaitingForSpawn.empty())
-	{
-		return;
-	}
-
-	// Heap: vector operations
+	// Heap: vector push_back for status changes and owned-entity records
 	ScopedSuppressAllocationTracking suppress;
 
-	// Find newly spawned player IDs (present now but not in pre-spawn snapshot)
-	const PlayersPostRender& rPlayers = *gpGame->CurrentFrame(engine::kOriginCoord).postRender.pPlayers;
-	std::vector<player_t> newPlayerIds;
-	newPlayerIds.reserve(static_cast<size_t>(rPlayers.iCount));
-	for (int64_t i = 0; i < rPlayers.iCount; ++i)
+	for (const ClientSpawnInfo& rClientSpawnInformation : mClientsWaitingForSpawn)
 	{
-		if (!std::ranges::contains(mPreSpawnPlayerIds, rPlayers.puiIds[i]))
+		engine::global_id_t globalPlayerId {gpGame->GenerateGlobalId()};
+
+		bool bIsFlagship = false;
+		engine::GridCoord spawnFleetWantedCoord {};
+		uint8_t uiSpawnPendingFleetTicks = 0;
+		if (!rClientSpawnInformation.fleetGuid.IsEmpty())
 		{
-			newPlayerIds.push_back(rPlayers.puiIds[i]);
+			ServerFleetManager::FleetLookupResult result = gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.iMemberIndex);
+			bIsFlagship = result.flags & ServerFleetManager::FleetLookupFlags::kIsFlagship;
+			spawnFleetWantedCoord = result.fleetWantedCoord;
+			uiSpawnPendingFleetTicks = result.uiPendingFleetWantedCoordTicks;
 		}
+
+		// The requesting client's GUID rides the status change, so the row this tick creates is born owned.
+		StatusChange spawnChange {.eType = StatusChangeType::kSpawnPlayer, .data = SpawnPlayerData{.iGlobalId = globalPlayerId.iValue, .bIsFlagship = bIsFlagship, .fleetWantedCoord = spawnFleetWantedCoord, .uiPendingFleetWantedCoordTicks = uiSpawnPendingFleetTicks, .clientGuid = rClientSpawnInformation.clientGuid}};
+		gpGame->mFrameInputs.try_emplace(engine::kOriginCoord).first->second.statusChanges.push_back(spawnChange);
+		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients::kSpawnPlayer Client: {} GlobalId: {} Coord: ({},{}) Flagship: {}", rClientSpawnInformation.iClientId, globalPlayerId.iValue, engine::kOriginCoord.x, engine::kOriginCoord.y, bIsFlagship);
+
+		// Assignment is keyed on the id just minted, so it completes here rather than waiting for the row to exist.
+		// Client handles subscriptions — no full state sent here.
+		gpServerSession->SendAssignPlayer(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoord);
+		gpServerSession->SendPlayerState(rClientSpawnInformation.iClientId, PlayerStateWireType::kSpawned, globalPlayerId.iValue, engine::kOriginCoord);
+		gpServerSession->mClientPlayers.Add(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoord);
+
+		// Associate with fleet if this spawn was fleet-triggered
+		gpServerSession->mpFleetManager->OnPlayerSpawned(rClientSpawnInformation.iClientId, rClientSpawnInformation.clientGuid, rClientSpawnInformation, globalPlayerId);
 	}
 
-	LOG(kNetwork, kVerbose, "ServerClientManager::FinalizeNewClients Waiting: {} PlayerCount: {} PreSpawn: {} NewIds: {}", mClientsWaitingForSpawn.size(), rPlayers.iCount, mPreSpawnPlayerIds.size(), newPlayerIds.size());
-	// Assign new players to waiting clients (in order)
-	// Client handles subscriptions — no full state sent here
-	size_t uiAssignCount = std::min(mClientsWaitingForSpawn.size(), newPlayerIds.size());
-	for (size_t i = 0; i < uiAssignCount; ++i)
-	{
-		int64_t iClientId = mClientsWaitingForSpawn.at(i).iClientId;
-		player_t playerId = newPlayerIds.at(i);
-
-		// Find the player's index and read its global ID
-		engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
-		PlayersPostRender& rPlayersPostRender = *gpGame->CurrentFrame(engine::kOriginCoord).postRender.pPlayers;
-		const PlayersInterpolate& rPlayersInterpolate = *gpGame->CurrentFrame(engine::kOriginCoord).interpolate.pPlayers;
-		if (rPlayersInterpolate.idToIndexMap.contains(playerId))
-		{
-			int64_t iPlayerIndex = rPlayersInterpolate.idToIndexMap.at(playerId);
-			engine::global_id_t globalPlayerId = rPlayersPostRender.pGlobalPlayerIds[iPlayerIndex];
-
-			gpServerSession->SendAssignPlayer(iClientId, globalPlayerId, engine::kOriginCoord);
-			gpServerSession->SendPlayerState(iClientId, PlayerStateWireType::kSpawned, globalPlayerId.iValue, engine::kOriginCoord);
-
-			// Write client GUID into the player entity for save/load re-linking
-			if (pClient != nullptr)
-			{
-				rPlayersPostRender.pClientGuids[iPlayerIndex] = pClient->clientGuid;
-				gpServerSession->mClientPlayers.Add(pClient->iClientId, globalPlayerId, engine::kOriginCoord);
-
-				// Associate with fleet if this spawn was fleet-triggered
-				const ClientSpawnInfo& rSpawnInfo = mClientsWaitingForSpawn.at(i);
-				gpServerSession->mpFleetManager->OnPlayerSpawned(iClientId, pClient->clientGuid, rSpawnInfo, globalPlayerId);
-			}
-		}
-	}
-
-	mClientsWaitingForSpawn.erase(mClientsWaitingForSpawn.begin(), mClientsWaitingForSpawn.begin() + static_cast<int64_t>(uiAssignCount));
-
-	// Refresh snapshot for subsequent ticks
-	RefreshPreSpawnSnapshot();
+	mClientsWaitingForSpawn.clear();
 }
 
 void ServerClientManager::Disconnects()
@@ -261,23 +238,11 @@ void ServerClientManager::DetectPlayerDeaths()
 	}
 }
 
-void ServerClientManager::RefreshPreSpawnSnapshot()
-{
-	mPreSpawnPlayerIds.clear();
-	const PlayersPostRender& rPlayers = *gpGame->CurrentFrame(engine::kOriginCoord).postRender.pPlayers;
-	mPreSpawnPlayerIds.reserve(static_cast<size_t>(rPlayers.iCount));
-	for (int64_t i = 0; i < rPlayers.iCount; ++i)
-	{
-		mPreSpawnPlayerIds.push_back(rPlayers.puiIds[i]);
-	}
-}
-
 void ServerClientManager::ResetState()
 {
 	mClientsWaitingForSpawn.clear();
 	mDeadClientIds.clear();
 	mProcessedClientIds.clear();
-	mPreSpawnPlayerIds.clear();
 }
 
 #endif // BT_SERVER

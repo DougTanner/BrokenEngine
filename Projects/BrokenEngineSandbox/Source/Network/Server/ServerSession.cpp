@@ -49,7 +49,7 @@ void ServerSession::PrepareTick()
 	}
 
 	// Recompute active set each tick so new client subscriptions
-	// (set by FinalizeNewClients on the previous frame) are picked up immediately
+	// (requested by the client after the previous frame's assignment) are picked up immediately
 	// Heap: ComputeActiveSet/EnsureNextFrames may grow mActiveCoords and CoordFrames maps
 	ScopedSuppressAllocationTracking suppress;
 
@@ -247,7 +247,8 @@ void ServerSession::AfterNetworkPoll()
 	mpClientManager->NewClients();
 	// Ordering contract: Create runs first so requests naming a fleet created in the same poll can
 	// resolve its guid. SpawnInto before Respawn also matters: both append to the client manager's
-	// spawn queue, and spawn assignment pairs new player IDs with waiting clients in request order.
+	// spawn queue, and that order is the order spawn status changes enter the frame input, and
+	// therefore the simulation and the CRC.
 	mpFleetManager->ProcessCreateFleetRequests();
 	mpFleetManager->ProcessDeleteFleetRequests();
 	mpFleetManager->ProcessSpawnIntoFleetRequests();
@@ -256,10 +257,6 @@ void ServerSession::AfterNetworkPoll()
 
 void ServerSession::FinalizeTickClients()
 {
-	if (!gpGame->mbReplaying)
-	{
-		mpClientManager->FinalizeNewClients();
-	}
 	mpClientManager->DetectPlayerDeaths();
 	mpFleetManager->DetectDisconnectedPlayerDeaths();
 
