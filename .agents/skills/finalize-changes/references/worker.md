@@ -39,6 +39,14 @@ every other lease is foreign.
 
 ## Steps
 
+A preparation dispatch runs steps 1-8; a landing dispatch runs steps 9-15 from
+the continuation capsule `SKILL.md` `### Landing confirmation` lists and skips
+1-8. A blocked result that needs recovery is returned as a handoff for the
+recovery dispatch: main dispatches a fresh preparation worker whose
+continuation capsule carries that blocked disposition as its unresolved-issue
+item and, for `primary.path-overlap`,
+`Temp/finalize-primary-movement-result.json` as path plus selector.
+
 1. Run final preparation first when a claimed Plan finished.
    - Run `plan complete`, or `plan reject --user-authorized-rejection` after
      explicit user-authorized rejection.
@@ -137,13 +145,13 @@ every other lease is foreign.
    - Main runs the launch line, then presents the summary immediately before the
      authoritative confirmation question. That summary is a terminal return: the
      worker ends its turn with it as its final answer.
-   - This worker's steps 1-8 change nothing on primary, so a brief that says to
-     stop before any primary change still ends with this summary, per
+   - The preparation dispatch changes nothing on primary, so a brief that says
+     to stop before any primary change still ends with this summary, per
      `SKILL.md` `## Inputs`.
    - Done when that single handoff has been returned.
 9. Claim the landing lock.
-   - Only that affirmative response permits the same worker to claim the landing
-     lock and invoke landing with that owner token, in the order
+   - Only that affirmative response permits the landing worker to claim the
+     landing lock and invoke landing with that owner token, in the order
      `## Bundled scripts` states.
    - Done when that claim has returned the owner token landing carries.
 10. Invoke landing with that owner token.
@@ -186,9 +194,9 @@ every other lease is foreign.
     - Act on the blocked result's reported `disposition` and `lock` projection
       exactly as `scripts.md` specifies, never a memorized list of codes.
     - A `terminal` result stops this caller; one reporting a changed reviewed
-      contract or reachable source patch returns to `SKILL.md`
-      `### Landing confirmation` for focused re-review and a refreshed
-      confirmation.
+      contract or reachable source patch is returned as a handoff for the
+      recovery dispatch, for focused re-review and a refreshed confirmation per
+      `SKILL.md` `### Landing confirmation`.
     - Done when the reported disposition has been acted on.
 15. Retain the session branch and worktree; only `/cleanup-worktrees` or explicit
     user direction removes them. Done when this worker has removed neither.
@@ -210,15 +218,17 @@ every other lease is foreign.
   restored the approved session commit, and released its normal postconfirmation
   landing lease. The original landing arguments, candidate, baseline, expected
   tips, verification evidence, SmartGit receipt, summary, and confirmation are
-  invalid. Only after abort, restoration, and lease release are proven, restart
-  preconfirmation reconciliation: re-resolve the current session and primary
-  tips, and a fresh candidate baseline; perform the ordinary linear rebase and
-  hunk resolution under the `Recovery` section, recreate and prepare a new
-  candidate, rerun the affected reviews and the acceptance table, produce a fresh
-  summary and launch line — main reopens SmartGit from that line — and obtain
-  fresh user confirmation. If any abort, restoration, or release is unproven, retain
-  the existing blocker and lease state and stop; do not begin recovery or
-  expose a user wait. No primary change is attempted until the fresh review and
+  invalid. Only after abort, restoration, and lease release are proven, return
+  that result as a handoff for the recovery dispatch; that worker restarts
+  preconfirmation reconciliation: it re-resolves the current session and
+  primary tips, and a fresh candidate
+  baseline; performs the ordinary linear rebase and hunk resolution under the
+  `Recovery` section, recreates and prepares a new candidate, reruns the
+  affected reviews and the acceptance table, and produces a fresh summary and
+  launch line — main reopens SmartGit from that line — for fresh user
+  confirmation. If any abort, restoration, or release is unproven, retain the
+  existing blocker and lease state and stop; do not begin recovery or expose a
+  user wait. No primary change is attempted until the fresh review and
   confirmation complete. Never reuse the original approved landing arguments.
 - Preconfirmation reconciliation conflict: resolve under the approved
   invariants, then re-review the affected regions and re-ask the confirmation.
@@ -237,9 +247,10 @@ every other lease is foreign.
   primary checkout, then continues ordinary recovery; initial non-recovery sanity
   remains strict. Then delete the claim.
 - The movement check blocked with `primary.path-overlap` (foreign primary
-  movement touched a session-owned path): stop and report the result to the
-  manager. When the manager authorizes recovery, this same finalizer performs
-  the single ordinary linear rebase and the re-invocation of approval
+  movement touched a session-owned path): stop and return the result as a
+  handoff for the recovery dispatch. When the manager authorizes recovery, that
+  worker performs the single ordinary linear rebase and the re-invocation of
+  approval
   preparation with the re-resolved tips and any verified-candidate pair stated
   in [`scripts.md`](scripts.md)'s `Invoke-FinalizeApprovalPreparation.ps1`
   entry, inspecting any place that rebase merged cleanly but changed the code's

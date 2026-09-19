@@ -83,9 +83,9 @@ Assess core-delegation compliance with concrete evidence: manager-only core
 activity; one manager with a single level of workers below it; one scoped
 worker per concern; prohibited duplicate search, restatement, or consensus
 work; artifact-path-plus-selector evidence forwarding rather than raw
-forwarding; and capsule/resume recovery rather than repetition of completed
-work. Mandatory fresh review, independent verification, and required disjoint
-fan-out are legitimate independent work,
+forwarding; and continuation-capsule recovery rather than repetition of
+completed work. Mandatory fresh review, independent verification, and required
+disjoint fan-out are legitimate independent work,
 not duplicate effort. A compliance finding cites the delegation record,
 session ID and timestamp or event/line location, artifact selector, or concrete
 repeated operation.

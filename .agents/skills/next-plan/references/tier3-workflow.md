@@ -3,7 +3,7 @@
 This route inherits the global Change Workflow from the
 [change-workflow.md](../../../references/change-workflow.md) Verify and land
 step and the Implementation approval section of [`/next-plan`](../SKILL.md);
-Tier 3 risk does not add another approval or resume gate. This reference owns
+Tier 3 risk does not add another approval gate. This reference owns
 only the additional Tier-3 preparation, review, and implementation actions
 below.
 
@@ -34,15 +34,16 @@ worker performs every repository read and search `/external-grill-plan` requires
 and returns an immutable decision brief in the shape that skill's `## Handoff`
 defines; it never interviews, chooses, or delegates.
 Main routes external-claim requests to a `locator` through
-`/verify-external-claims`, resumes the same worker with the exact verdicts and
-with each answer that unlocks dependent repository-backed work, and receives the
-next brief. Main alone interviews the user and decides, recording the exact
-questions, answers, decisions, and refinements; it performs no repository read or
-search work, and the idempotent claim invocation `/next-plan` assigns to main is
-the one scheduler command it still runs. The final handoff preserves that record
-and the worker updates the card. A decision-complete plan yields a PASS audit
-and a no-question brief; do not manufacture findings or interview questions to
-justify the review.
+`/verify-external-claims`, then dispatches a fresh preparation `implementer`
+per round whose continuation capsule carries that skill's
+[`## Inputs`](../../external-grill-plan/SKILL.md#inputs) for the round, and
+receives the next brief. Main alone interviews the user and decides, recording
+the exact questions, answers, decisions, and refinements; it performs no
+repository read or search work, and the idempotent claim invocation `/next-plan`
+assigns to main is the one scheduler command it still runs. The final handoff
+preserves that record and the worker updates the card. A decision-complete plan
+yields a PASS audit and a no-question brief; do not manufacture findings or
+interview questions to justify the review.
 
 ## Implementation and stop rule
 

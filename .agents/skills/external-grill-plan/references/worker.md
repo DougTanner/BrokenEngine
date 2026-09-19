@@ -29,9 +29,9 @@ inputs, the interview question format, and the handoff form live in
 8. Return the current frontier — every decision whose prerequisites are already
    settled — as the round's `Interview questions`. Done when the whole frontier
    is in that handoff.
-9. On resume with the round's answers, record each selected choice and the exact
-   plan refinement it implies. Done when every answer carries a recorded choice
-   and refinement.
+9. Record each selected choice and the exact plan refinement the round's
+   answers imply. Done when every answer carries a recorded choice and
+   refinement.
 10. Recompute the frontier and return the next round. Done when no decision with
     settled prerequisites remains unreturned.
 11. Run the closing checks in `### Closing Checks`. Done when each of them is

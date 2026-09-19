@@ -4,7 +4,7 @@ description: >-
   Squash, rebase, summarize, and land a verified session change onto the
   primary branch under the global landing lock, then delete the machine-local
   Plan claim. Use when landing a session's verified work onto primary.
-allowed-tools: [Read, Bash, PowerShell, Agent, SendMessage]
+allowed-tools: [Read, Bash, PowerShell, Agent]
 ---
 
 # Finalize Changes
@@ -17,9 +17,10 @@ Produces the landing acceptance table and the landing summary main presents.
 
 ## When to use
 
-- Landing a session's verified work onto primary: main dispatches one
-  `implementer` and resumes that worker after main obtains the authoritative
-  confirmation in `### Landing confirmation`.
+- Landing a session's verified work onto primary, in two dispatches: one
+  `implementer` prepares and ends with the summary handoff; after main obtains
+  the authoritative confirmation in `### Landing confirmation`, a fresh
+  `implementer` lands from the continuation capsule that section lists.
 
 ## Inputs
 
@@ -27,8 +28,8 @@ Require the approved objective, its stage decisions, the caller-owned changed
 paths, and an `Attribution trailer` brief field carrying the dispatching
 session's own attribution trailer line. That path set is the session's full
 landing set, including paths already committed — a deletion among them
-included — so a resumed invocation passes it unchanged rather than trimming it
-to what is still dirty. The finalizer produces the landing acceptance table
+included — so a re-preparation dispatch passes it unchanged rather than trimming
+it to what is still dirty. The finalizer produces the landing acceptance table
 itself, inside the workflow in `references/worker.md`, from the prepared diff
 final preparation and reconciliation produced — do not reuse an earlier table.
 
@@ -111,10 +112,27 @@ after it. The user's next message is the decision.
 
 Only a current explicit affirmative response to the latest unchanged summary
 authorizes primary change. Plan or implementation approval, a request to finish
-or land, or reconciliation consent is not a substitute. Main resumes the same finalizer after
-confirmation. A decline or non-answer leaves primary unchanged. `/save-plan` is
-the sole standing exception, and only when the change contains exactly the
-saved Plan file.
+or land, or reconciliation consent is not a substitute. After confirmation main
+dispatches a fresh landing `implementer` whose brief carries the ordinary fields
+plus the continuation capsule below
+([`subagent-handoff.md`](../../references/subagent-handoff.md)
+`## Continuation capsule`):
+
+- `Temp/finalize-approval-preparation-result.json` and
+  `Temp/finalize-primary-movement-result.json`, each as path plus selector —
+  they hold the candidate commit, tree, parent, and expected tips, which are
+  never retyped;
+- whether a claimed Plan reached final preparation, so the landing invocation
+  passes `-ReleasePlanClaim`;
+- one confirmation row: the exact question asked and the user's affirmative
+  reply.
+
+Branches, the session label, and the receipt path are re-resolved by the
+landing worker or fixed; the path set and the `Attribution trailer` stay
+ordinary brief fields; the owner token never crosses the dispatch boundary —
+the landing worker claims the lock itself. A decline or non-answer leaves
+primary unchanged. `/save-plan` is the sole standing exception, and only when
+the change contains exactly the saved Plan file.
 
 Confirmation binds the reviewed diff, not commit hashes. A clean identical
 rebase onto an advanced primary lands without re-asking, and needs no re-review
@@ -122,7 +140,8 @@ or rebuild. An actual rebase conflict
 requiring manual resolution, a change to the session bytes, or a meaningful
 semantic change re-runs review of the affected regions and requires a refreshed
 summary, a fresh `SmartGit launch:` line for the new commit that main runs the
-same way, and a fresh confirmation; `references/worker.md` defines the recovery
+same way, and a fresh confirmation, through a fresh preparation dispatch and
+then a fresh landing dispatch; `references/worker.md` defines the recovery
 transition after `rebase.conflicted`.
 
 ## References

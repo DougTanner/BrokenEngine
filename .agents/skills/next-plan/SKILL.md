@@ -3,7 +3,7 @@ name: next-plan
 description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the execution card's summary, alternatives, and unresolved decisions for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
 disable-model-invocation: true
 argument-hint: "[Documents/Plans/... | partial pattern]"
-allowed-tools: [Read, Write, Grep, Glob, Agent, SendMessage, Edit, PowerShell, AskUserQuestion]
+allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestion]
 ---
 
 # Next Plan

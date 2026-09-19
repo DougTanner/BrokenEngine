@@ -30,6 +30,7 @@ A client/server game engine using data-oriented design, with data pre-packer (of
 - Do not add unit tests
 - Bundled scripts: run a repository script exactly as its skill documents it — never wrap, reimplement, or work around one; a script that cannot be run as documented is a bug to report. Canonical invocation form: `pwsh -NoProfile -File <repo-relative script path> [arguments]`, run from the session worktree root; never an absolute path or `-ExecutionPolicy Bypass`. Never change the working directory (no `cd`, no `Set-Location`); address scratch files by path from the worktree root. One script per shell call with nothing chained before or after it; using that call's own output (assigning it, piping to `ConvertFrom-Json`, or reading `$LASTEXITCODE` after it) is allowed from the PowerShell tool only. Import a `.psm1` with `Import-Module ./<repo-relative path>` (leading `./` required) and call its functions in the same shell call. When a parameter takes an array, use `pwsh -NoProfile -Command "& '<repo-relative path>' -Param 'a','b'"` instead of `-File`.
 - Trivial choices (naming, small implementation details, equivalent approaches): pick the simplest and proceed; a worker returns any other decision to main.
+- A finished subagent is never resumed or messaged again; every next step is a fresh dispatch carrying a continuation capsule, defined in `.agents/references/subagent-handoff.md` `## Continuation capsule`.
 
 ### Diagnosis Discipline
 

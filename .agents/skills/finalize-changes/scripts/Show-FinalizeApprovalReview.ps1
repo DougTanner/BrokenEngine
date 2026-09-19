@@ -15,7 +15,7 @@
 # Contract: schema broken-engine-finalize-approval-review/v1. Unlike the mutating
 # scripts, every launch outcome exits 0 and none report status pass — the
 # review outcome is non-blocking, but the attempt is not: main redirects this single-line
-# stdout to Temp/finalize-approval-review-result.json, and the resumed finalizer passes
+# stdout to Temp/finalize-approval-review-result.json, and the landing finalizer passes
 # that receipt path to the landing scripts, which read approvedTip and status from it and
 # refuse to change primary when it does not record an attempted launch for the
 # exact commit being landed.

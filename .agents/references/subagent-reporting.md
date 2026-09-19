@@ -141,31 +141,28 @@ one. The timeout, no-progress, and interruption rules below are the exception
 route; a wait in them is a bounded host wait call where the client provides
 one.
 
-Completion or mailbox activity can return a wait early. If a healthy worker's
-wait times out without failure or no-progress evidence, wait again; the timeout
-alone does not justify status investigation, interruption, or replacement.
+Completion can return a wait early. If a healthy worker's wait times out
+without failure or no-progress evidence, wait again; the timeout alone does not
+justify status investigation, interruption, or replacement.
 
 Judge whether a worker is still running only from host status and explicit
 progress or partial handoffs.
 A running host status, elapsed time, or wait boundary does not require a
 progress ping or repeated manager status command. Forward progress is a newly
 reported distinct action, narrowed search, new evidence, or synthesis; a loop
-is explicit repetition without narrowing or new evidence. A worker messages its
-manager mid-task only to ask a blocking question or hand off a partial result,
-never to narrate status; manager-to-user narration is unaffected.
+is explicit repetition without narrowing or new evidence. A worker with a
+blocking question or a partial result ends its turn with a `BLOCKED` or partial
+handoff instead of messaging its manager, and never narrates status;
+manager-to-user narration is unaffected.
 
-Documented no-progress means no recorded worker tool call or message within a
-no-activity window the manager states in advance, measured from the worker's
-last recorded action; elapsed turn time alone does not establish it. When
-terminal failure or documented no-progress/loop evidence exists:
+Documented no-progress means no recorded worker tool call within a no-activity
+window the manager states in advance, measured from the worker's last recorded
+action; elapsed turn time alone does not establish it. When terminal failure or
+documented no-progress/loop evidence exists:
 
 1. inspect host status and available partial evidence;
-2. request the handoff immediately;
-3. allow a fixed response window; and
-4. interrupt or replace only if the failure or no-progress evidence persists.
-
-Prefer resuming the same worker. Otherwise supply a recovery capsule containing
-objective/scope, meaningful identity, completed evidence, unresolved issue, next
-action, and the skill to resume with (for example `/implement-plan`,
-`/resolve-findings`, or `/update-affected-code`) so completed exploration is not
-repeated.
+2. interrupt the worker with the host's stop; and
+3. dispatch a fresh worker of the same role whose continuation capsule
+   ([`subagent-handoff.md`](subagent-handoff.md) `## Continuation capsule`) is
+   built from the partial evidence available, so completed exploration is not
+   repeated.

@@ -40,14 +40,31 @@ verification use a context that did not produce the work. A focused
 correction/retest also uses an independent context.
 
 A worker ends its turn with the handoff as its final answer and never enters an
-open-ended wait after delivering it; continuation goes through the host's resume
-path. Any wait a worker issues mid-task carries a bounded timeout well under the
-host tool cap. Ending a turn to await one's own background child is that
-prohibited open-ended wait: a completion notification cannot resume a worker
-whose turn has ended, so capture the child's result in-turn before delivering
-the handoff.
+open-ended wait after delivering it; whatever comes next is a fresh dispatch
+carrying a continuation capsule (`## Continuation capsule` below). Any wait a
+worker issues mid-task carries a bounded timeout well under the host tool cap.
+Ending a turn to await one's own background child is that prohibited open-ended
+wait: a completion notification cannot resume a worker whose turn has ended, so
+capture the child's result in-turn before delivering the handoff.
 
 Main consumes each dispatched worker's handoff once, from the host's own
-delivery of it; it requests that worker's result again only through the
-no-progress and terminal-failure route in
-[`subagent-reporting.md`](subagent-reporting.md).
+delivery of it; the no-progress and terminal-failure route in
+[`subagent-reporting.md`](subagent-reporting.md) interrupts that worker and
+replaces it.
+
+## Continuation capsule
+
+The next step after a pause — user confirmation, external verdicts, interview
+answers, an accepted finding, recovery — is a fresh worker of the same role with
+the ordinary task brief plus a `Continuation capsule:` field carrying only what
+that step consumes:
+
+- objective and scope;
+- the identity of the prior worker's artifacts — commit hashes, paths, receipt
+  files, tokens — as path plus selector where a file holds them;
+- the decision or answers that unblocked the step;
+- the unresolved issue;
+- the next action; and
+- the skill to run.
+
+Never the prior worker's transcript or reasoning.

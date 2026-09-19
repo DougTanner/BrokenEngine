@@ -119,9 +119,9 @@ reconstructs the assessment from Git output.
   hands every argument over as one literal string, so several owned paths can
   only travel as one comma-separated `-OwnedPaths` token. `-OwnedPaths` carries
   the session's full caller-owned landing set, never a hand-trimmed subset: an
-  entry already committed as a deletion is a satisfied no-op, so a resumed
-  invocation passes the same set unchanged. A path found in neither the baseline
-  tree nor the expected-tip tree nor the worktree still blocks with
+  entry already committed as a deletion is a satisfied no-op, so a
+  re-preparation dispatch passes the same set unchanged. A path found in neither
+  the baseline tree nor the expected-tip tree nor the worktree still blocks with
   `input.path-not-single-entry`.
 - `Invoke-FinalizeCandidateCommit.ps1` never advances primary. Its result is
   `broken-engine-finalize-candidate/v5`, carrying only the candidate.
