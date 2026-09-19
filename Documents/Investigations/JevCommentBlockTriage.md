@@ -88,19 +88,21 @@ change confirms the first.
 
 ## Decisions a Plan needs
 
-1. Whether the caller is a new script under
-   `.agents/skills/comment-review/scripts/` or an extension of
-   `Find-CommentBlocks.ps1`. The scanner is documented as writing nothing and
-   being safe under a read-only sandbox; a network call breaks that property, so
-   a separate script is the likely answer.
+1. Whether the reading-order script is a new script beside
+   `Find-CommentBlocks.ps1` or an extension of it. The scanner is documented
+   as writing nothing and being safe under a read-only sandbox; calling
+   `.agents/scripts/Invoke-Jev.ps1` (the shared caller
+   `JevDecisionModelWorkflowUses.md` decided) breaks that property, so a
+   separate script is the likely answer.
 2. How much surrounding code goes into the state: the fixed 3-before/15-after
    window of the pilot, or the enclosing function found by brace matching.
 3. The threshold, as a number written in the skill's references, and what the
-   worker does when the key is absent or the call fails: the existing scanner's
-   precedent is to report the list unavailable rather than hunt by hand, and the
-   opposite fall-through — read every block in scanner order — is the behaviour
-   the workflow has today.
+   worker does when `Invoke-Jev.ps1` returns `blocked`: report the list
+   unavailable, which is the existing scanner's precedent, or fall through and
+   read every block in scanner order, which is the behaviour the workflow has
+   today.
 4. Whether the class hint is shown at all, and if so that `false` is shown as
    "check against code" rather than as a proposed class.
-5. The shared decisions in `JevDecisionModelWorkflowUses.md`: key handling,
-   script location, and the no-gate rule.
+5. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

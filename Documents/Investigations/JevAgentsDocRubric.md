@@ -59,7 +59,7 @@ full model graded C or below is in Jev's bottom third. The wiring runs Jev
 first and still hands the full model every document the audit covers, ordered
 by Jev's ranking with Jev's per-criterion scores beside each, so the
 lowest-graded ones are read first. Skipping the top-ranked documents waits for
-a second measurement on a later audit, per shared decision 5 in
+a second measurement on a later audit, per shared decision 4 in
 `JevDecisionModelWorkflowUses.md`.
 
 ## Decisions a Plan needs
@@ -72,4 +72,6 @@ a second measurement on a later audit, per shared decision 5 in
 3. Whether the state is the document alone or the document plus its parent
    `AGENTS.md`, since duplicated parent rules are a listed defect that only
    the pair reveals.
-4. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+4. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

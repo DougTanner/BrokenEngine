@@ -89,4 +89,6 @@ when a follow-up Plan is authored; it never blocks creation or merges anything.
 2. The shortlist rule for the sweep, if any: same area only, shared title
    words, or shared paths in `## Critical files`.
 3. The threshold and whether the residual names the level or only the score.
-4. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+4. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

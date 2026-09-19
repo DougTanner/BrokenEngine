@@ -71,4 +71,6 @@ changes the tier itself.
    `risk-tiers.md` so the question and the rule cannot drift apart.
 3. Hunk context: the hunk alone, or the enclosing function.
 4. The threshold, and that a flag is a residual for a human, never a tier.
-5. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+5. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

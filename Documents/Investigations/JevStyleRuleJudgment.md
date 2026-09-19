@@ -83,4 +83,6 @@ name the question passes is a missed violation.
 2. Whether the scanner output joins `Find-SessionCandidates.ps1`'s
    `style-rule-<n>` kinds so the worker's existing loop consumes it.
 3. The per-rule threshold, written in the skill's references.
-4. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+4. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

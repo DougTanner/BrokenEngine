@@ -70,4 +70,6 @@ decision become a question, and the answer may still be no.
    separately.
 3. Whether the check runs at all for Tier-1 changes, which have no plan file
    (main briefs from the request), and if so what the state is.
-4. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+4. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

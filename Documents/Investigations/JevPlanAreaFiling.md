@@ -84,11 +84,14 @@ disagreement as a residual for the user.
    authoring time, or as one pass in `Test-PlanSchedulerState.ps1`'s health
    check over the whole tree. The health check already walks every Plan and is
    run by `/next-plan`, so it is the smaller change, but it would make the
-   scheduler health check a network call.
+   scheduler health check depend on `.agents/scripts/Invoke-Jev.ps1` and so
+   report the area pass as not run whenever that caller is `blocked`.
 2. Whether to compute the path majority in code first and ask Jev only when the
    count is a tie or the sections name no files, which is the shape the
    TypeSafe docs recommend (filter in code, judge the remainder).
 3. Whether the tree question is included at all, given its tiny corpus.
 4. The confidence gate as a number in the skill's references, and that a
    disagreement is reported, never applied.
-5. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+5. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

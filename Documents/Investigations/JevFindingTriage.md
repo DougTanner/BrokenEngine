@@ -79,4 +79,6 @@ dispatches a fix on its own.
    receiving it.
 3. Whether `severity_matches` is included, since it second-guesses a reviewer
    that already read the code.
-4. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+4. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

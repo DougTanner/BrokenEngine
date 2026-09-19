@@ -5,11 +5,33 @@ place in this repository's skills and Change Workflow? This is the overview of
 a series: it owns what Jev is, the places it must never decide, the decisions
 every candidate shares, and the table of candidates. Each candidate is its own
 Investigation, written so it can be tested on its own and promoted to a Plan
-when its test passes. Nothing in the series is implemented: no tracked script
-calls Jev, no workflow skill uses it, and no script under `.agents/scripts/`
-makes a network call of any kind today. The pilots below ran from untracked
-scratch scripts against the live API; each candidate document states its method
-precisely enough to rerun.
+when its test passes. Two tracked scripts exist and no workflow skill uses
+either yet: `.agents/scripts/Invoke-Jev.ps1` is the one caller every Jev use
+goes through, and `.agents/scripts/Test-CitationSupport.ps1` is the first
+check built on it (`JevEvidenceCitationCheck.md`). The other pilots ran from
+untracked scratch scripts against the live API; each candidate document states
+its method precisely enough to rerun.
+
+## The caller
+
+`Invoke-Jev.ps1` takes `-RequestPath <json>` holding one `{state, questions}`
+object or an array of them, posts each to the endpoint in parallel (eight at a
+time, retrying only rate-limit and overload responses), and returns one result
+document: `status`, `code`, `message`, `requestCount`, `failedCount`,
+`inputTokens`, and `responses[]` in request order, each with the answers under
+the question ids the request used. Without `-OutputPath` the document is the
+whole of stdout, for an agent to read; with it the document is written to that
+file and stdout carries one summary line, for a script to consume later. The
+key is read from `TYPESAFE_API_KEY` and never printed. When the key is absent
+the result is `blocked`/`jev.key-missing` with exit code 2; when every request
+fails it is `blocked`/`jev.unavailable`; when some fail it is
+`error`/`jev.partial` with the answered responses kept and each failed one
+carrying its error. A consumer treats `blocked` as "the check did not run" and
+does whatever it did before Jev existed, so a clone without a key loses only
+the check. Answers are stable but not bit-identical between runs: over 625
+identical citation questions two sweeps agreed on 605 verdicts, the
+disagreements all near the 0.5 probability boundary, so a consumer orders by
+probability rather than treating a verdict as exact.
 
 ## What Jev is
 
@@ -63,7 +85,7 @@ the list a full model then reads", never "Jev decides".
 | `JevCommentBlockTriage.md` | `/comment-review`'s six classes | `choice` + `ok` per block; `ok` probability orders reading | run: at `ok` < 0.5, 35/40 changed blocks flagged, 13/40 untouched flagged | hand-labelled 100 blocks from a second commit |
 | `JevPlanAreaFiling.md` | `Documents/Plans/AGENTS.md` areas; the Plans/Features/Investigations test | `choice` over areas | run: 56/58 agree; both misses are the borderline cases and the lowest confidences | full tree plus Investigations and Features at a 0.6 gate |
 | `JevDuplicatePlanDetection.md` | `/create-follow-up-plans` duplicate rule | `score` with levels = actions (distinct, related, same fix) | run: the three merged Plans are the top three of 50 pairs; no distinct pair reached 1.0 | a second historical merge; a code-side shortlist |
-| `JevEvidenceCitationCheck.md` | finding evidence rows, acceptance rows, Plan citations | `choice` supports / contradicts / says_nothing | run: 27/30 real citations `supports`, 5/30 shifted regions | human read of the three flagged real citations; Plans predating a refactor |
+| `JevEvidenceCitationCheck.md` | finding evidence rows, acceptance rows, Plan citations | `choice` supports / contradicts / says_nothing | run twice, tracked script: 440/625 real citations `supports`, 36/585 shifted regions; blind read of 66: passes right 20/22, flags right only 15/44 | reading order only; enclosing-function context, then a human blind read |
 | `JevStyleRuleJudgment.md` | `/code-style-review` hand-read rules 49, 56, 62 | one `noul` per rule per candidate | not run: scanner needed first | 60 hand-labelled candidates per rule |
 | `JevSimplicityReviewTrigger.md` | `/plan-simplicity-review` dispatch trigger | two `noul`s, low threshold | not run | record beside main's decision for 30 plans |
 | `JevRiskTierSurfaceFlags.md` | `risk-tiers.md` Tier-3 surfaces | one `noul` per surface per hunk, max-gated, escalate-only | not run: no tier corpus | record the tier per landed change, then 40 changes |
@@ -97,10 +119,11 @@ already applies to diffs.
 Promote in the order the pilots justify, not the order of expected saving:
 
 1. `JevEvidenceCitationCheck.md` and `JevDuplicatePlanDetection.md` first.
-   Both run offline over the Plan tree, cost nothing on the critical path,
-   report residuals rather than deciding anything, and their pilots separated
-   the labelled cases cleanly. Each has one concrete next test that a human can
-   finish in an hour.
+   Both run offline over the Plan tree, cost nothing on the critical path, and
+   report residuals rather than deciding anything. The citation check's full
+   sweep showed its flags are a reading order and not a verdict, which is the
+   shape every candidate is held to anyway; the duplicate check still has one
+   concrete next test a human can finish in an hour.
 2. `JevPlanAreaFiling.md` next, as a check inside the same tree sweep once
    the first two exist, since its wiring is nearly the same script.
 3. `JevCommentBlockTriage.md` as the first in-round use, wired as a reading
@@ -112,25 +135,19 @@ Promote in the order the pilots justify, not the order of expected saving:
 
 ## Decisions every Plan in the series shares
 
-1. Access route: a PowerShell 7 script using `Invoke-RestMethod` against the
-   HTTPS endpoint, or a vendor SDK. PowerShell 7 is the repository default
-   (root `AGENTS.md` `## Environment`) and no SDK is vendored, so the raw call
-   is the smaller change — but it would be the first tracked script to touch
-   the network at all, which is itself a decision, and one shared caller script
-   is the obvious place for it.
-2. Where that caller lives: bundled under the first owning skill, or shared in
-   `.agents/scripts/` because several skills would call it; either way it is
-   invoked exactly as the bundled-scripts rule in root `AGENTS.md` states.
-3. The key: the `TYPESAFE_API_KEY` user-level environment variable the vendor
-   SDKs also read, never tracked and never printed. What a caller does when it
-   is absent or a call fails: refuse and report the list unavailable, which is
-   the precedent `Find-CommentBlocks.ps1` sets, or fall through to the
-   behaviour the workflow has today. A reading-order use can fall through; a
-   sweep that reports residuals should say it did not run.
-4. Threshold policy: every threshold is a number written in the owning skill's
+1. Decided — access route and location: `.agents/scripts/Invoke-Jev.ps1`
+   (`## The caller` above), a PowerShell 7 `Invoke-RestMethod` call with no
+   vendored SDK, shared because several skills would call it, invoked exactly
+   as the bundled-scripts rule in root `AGENTS.md` states. A check script
+   calls it in-process and never makes its own HTTP call.
+2. Decided — the key and failure: `TYPESAFE_API_KEY`, never tracked and never
+   printed; a missing key or unreachable service is `blocked`, and every
+   consumer then behaves as the workflow does without Jev. A reading-order use
+   falls through silently; a sweep that reports residuals says it did not run.
+3. Threshold policy: every threshold is a number written in the owning skill's
    references, chosen from the candidate's measurement, and every use errs
    toward an extra read rather than a miss.
-5. No gate: no candidate hides an item from a reviewer, lowers a tier, skips a
+4. No gate: no candidate hides an item from a reviewer, lowers a tier, skips a
    review, or dispatches a fix on its own until a second measurement on a
    later change confirms the first — and the vendor's warning about
    thresholds not composing applies the moment one does.

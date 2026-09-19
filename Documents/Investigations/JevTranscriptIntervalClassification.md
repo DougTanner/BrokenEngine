@@ -71,4 +71,6 @@ still reads every interval it cites.
    warning and results that run to thousands of lines.
 3. Whether the checkpoint review's oversized-result class is included, since
    it needs the bounding-mechanism fact the worker looks up.
-4. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+4. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

@@ -63,4 +63,6 @@ requests. The measurement alone decides whether wiring is worth doing.
 2. Whether `## When to use` sections are short enough to fit the second
    request for every skill, or need a summary field.
 3. What "suggestion the session reads" means mechanically on each host.
-4. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+4. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.

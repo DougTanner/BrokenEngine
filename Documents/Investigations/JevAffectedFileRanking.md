@@ -67,4 +67,6 @@ to search order with a residual line, matching the behaviour today.
 2. The state for a hit: the hit line, the enclosing function, or a fixed
    window; the docs' warning about unrelated context argues for the function.
 3. Whether the probability is shown in the handoff's verified-absence rows.
-4. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+4. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself
+   is `.agents/scripts/Invoke-Jev.ps1` (that document's `## The caller`), so
+   the Plan writes a request file and reads the result, never an HTTP call.
