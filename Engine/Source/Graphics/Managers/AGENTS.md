@@ -59,7 +59,7 @@ All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/
 
 ### TextureManager
 
-Loaded textures, global texture descriptors, cached generated textures, and renderer targets. Lazy textures begin on a white placeholder and enter the bounded per-frame adoption path after a load request. Non-indirect pipelines request at creation, indirect pipelines defer until their first positive instance write, and priority textures request at boot.
+Loaded textures, global texture descriptors, cached generated textures, and renderer targets. Lazy textures begin on a white placeholder and enter the bounded per-frame adoption path after a load request. Non-indirect pipelines request at creation, indirect pipelines defer until their first positive instance write, priority textures request at boot, and `InitializeBootTextures` replays every registered lighting-texture CRC so a device recreation does not strand them on the placeholder.
 
 - Swapchain recreation selectively rebuilds screen-dependent targets and descriptor sets while preserving loaded textures.
 - Explicit repeat/clamp samplers cover authored/generated deposit lookup and visible-light textures. Unflagged combined samplers, explicit offscreen linear variants, and dedicated smoke/wind variants all omit anisotropy; internal render-target reads remain non-anisotropic. Format-specific elevation, model-material, and water-normal variants remain separate.
@@ -78,6 +78,7 @@ A dedicated upload thread with a fixed staging budget, persisting large-texture 
 - `WaitIdle` is a teardown drain handshake: the upload thread acknowledges only from a no-submit-in-flight point, and every exit path publishes exit state so a waiter cannot deadlock. Frame permits remain binary and must be drained before release. Fatal upload failures are published for the main thread and survive transfer-resource recreation; device loss remains a separate recovery path.
 - Pack texture headers and derived copy ranges are validated before the upload thread may hand work to foreground adoption, and again before foreground fallback allocation or copy: positive signed dimensions and mip counts, the pack ceilings and a realizable mip chain, the selected device's limits for that exact image format, square cubemaps, and enough resident bytes for every layer and mip. Upload-thread failures travel the published fatal path. Other upload failures leave active ownership intact for that path.
 - The pending-adoption counter belongs to this manager because it outlives `TextureManager` during device recreation. Keep file-state rearming and adoption completion synchronized with that counter.
+- The registered lighting-texture CRC set belongs to this manager for the same reason: startup registration happens once, so a set owned by `TextureManager` would come back empty from every device recreation. Unlike the counter, it is main-thread-only and unsynchronized — written by startup registration, read by adoption and reblur — so the upload thread must never touch it.
 
 ### PipelineManager
 

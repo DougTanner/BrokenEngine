@@ -415,9 +415,25 @@ void Graphics::Create()
 	{
 		mpIslands = std::make_unique<Islands>();
 	}
+	bool bInitializeBootTextures = false;
 	if (mpTextureManager == nullptr)
 	{
 		mpTextureManager = std::make_unique<TextureManager>();
+		bInitializeBootTextures = true;
+	}
+	else if (bSwapchainRecreated)
+	{
+		gpTextureManager->CreateScreenDependentResources();
+	}
+	if (mpPipelineManager == nullptr)
+	{
+		mpPipelineManager = std::make_unique<PipelineManager>();
+	}
+	// After the pipeline manager, so the lighting blur pipelines exist before any adoption the boot waits drive can
+	// reach TextureManager::BlurLightingTexture. The texture manager is still constructed first, which the pipeline
+	// manager's constructor requires.
+	if (bInitializeBootTextures)
+	{
 		try
 		{
 			mpTextureManager->InitializeBootTextures();
@@ -432,14 +448,6 @@ void Graphics::Create()
 			}
 			throw;
 		}
-	}
-	else if (bSwapchainRecreated)
-	{
-		gpTextureManager->CreateScreenDependentResources();
-	}
-	if (mpPipelineManager == nullptr)
-	{
-		mpPipelineManager = std::make_unique<PipelineManager>();
 	}
 	if (mpParticleManager == nullptr)
 	{

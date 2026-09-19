@@ -252,6 +252,17 @@ void TextureManager::InitializeBootTextures()
 
 	// Request priority textures
 	gpFileManager->RequestChunkLoad(kpPriorityTextures.pCrcs, LoadPriority::kRealtime);
+
+	// Replay every registered lighting-texture request: registration runs once at startup, after the first Graphics
+	// construction, so without this a full recreate would strand these textures on the white placeholder forever (the
+	// set is still empty on that first boot, making this a no-op). One batched call rather than a per-CRC
+	// RequestTextureChunkLoad loop: that helper requests at kNormal, and the batch locks and wakes the loader once.
+	common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
+	for (common::crc_t crc : gpTextureUploadManager->mLightingTextureCrcs)
+	{
+		common::gpThreadLocal->mWorkbuffer.PushBack<common::crc_t>(crc);
+	}
+	gpFileManager->RequestChunkLoad(common::gpThreadLocal->mWorkbuffer.Span<common::crc_t>(), LoadPriority::kRealtime);
 }
 
 TextureManager::~TextureManager()
@@ -563,7 +574,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
 			gpTextureUploadManager->NotifyChunkAdopted(); // adoptable -> kReady: disarm the pending-adoption counter
 
-			if (mLightingTextureCrcs.contains(rCrc))
+			if (gpTextureUploadManager->mLightingTextureCrcs.contains(rCrc))
 			{
 				BlurLightingTexture(rCrc);
 			}
@@ -598,7 +609,7 @@ void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bo
 	// Adopt the GPU-uploaded image (sets mVkImage and creates VkImageView)
 	rTexture.AdoptTransferredImage(rLazyChunk.vkImage, rLazyChunk.vmaAllocation);
 
-	bool bIsLightingTexture = mLightingTextureCrcs.contains(crc);
+	bool bIsLightingTexture = gpTextureUploadManager->mLightingTextureCrcs.contains(crc);
 
 	// Lighting textures handle their own acquire barrier inside BlurLightingTexture's OneShotCommandBuffer
 	if (bNeedAcquireBarrier && !bIsLightingTexture)
@@ -726,17 +737,12 @@ void TextureManager::WaitForTextures(std::span<Texture* const> textures)
 
 void RegisterLightingTextureCrc(common::crc_t crc)
 {
-	gpTextureManager->RegisterLightingTextureCrc(crc);
-}
-
-void TextureManager::RegisterLightingTextureCrc(common::crc_t crc)
-{
 	// Heap: unordered_set insert during startup registration
 	ScopedSuppressAllocationTracking suppress;
-	mLightingTextureCrcs.insert(crc);
+	gpTextureUploadManager->mLightingTextureCrcs.insert(crc);
 	// A 17th lighting texture would overflow the reserved blur slots (TextureDescriptors.cpp's generic index ASSERT fires
 	// later and elsewhere); fail at the cause, naming the constant
-	ASSERT(static_cast<int64_t>(mLightingTextureCrcs.size()) <= kiLightingBlurSlots);
+	ASSERT(static_cast<int64_t>(gpTextureUploadManager->mLightingTextureCrcs.size()) <= kiLightingBlurSlots);
 }
 
 void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBarrier)
@@ -838,7 +844,7 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 
 void TextureManager::ReblurAllLightingTextures()
 {
-	for (common::crc_t crc : mLightingTextureCrcs)
+	for (common::crc_t crc : gpTextureUploadManager->mLightingTextureCrcs)
 	{
 		LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(crc);
 		if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kReady)

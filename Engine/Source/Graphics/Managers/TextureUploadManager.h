@@ -37,6 +37,14 @@ public:
 	void NotifyChunkAdopted() noexcept { miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); }
 	bool HasPendingAdoptions() const noexcept { return miPendingAdoptions.load(std::memory_order_relaxed) != 0; }
 
+	// Registered pre-blur lighting-texture CRCs. Lives here for the same reason as the counter above: this manager
+	// outlives every Graphics recreation, while TextureManager — which registration would otherwise write and which
+	// never re-registers, because registration runs once at startup — is destroyed and rebuilt empty by one.
+	// Unlike the counter, this is main-thread-only and unsynchronized, not an atomic: it is written only by startup
+	// registration (RegisterLightingTextureCrc) and read only from main-thread adoption and reblur, so the upload
+	// thread must never touch it.
+	std::unordered_set<common::crc_t> mLightingTextureCrcs;
+
 	std::binary_semaphore mFrameSignal {0};
 
 private:
