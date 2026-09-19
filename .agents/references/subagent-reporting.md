@@ -41,6 +41,14 @@ Return: <the shared handoff plus the named skill's declared extension fields, or
 
 `Required sections` names which skill-specific report sections the caller will
 read; the worker skips the rest. The shared handoff is always returned in full.
+In addition to that full shared handoff, a brief that has the worker run
+another skill one or more times as acceptance evidence names the run skill's
+field its acceptance criterion turns on and adds one `Decisive checks` row per
+run — the expected observation met or not, that run's `Status`, and that named
+field's row — plus one row on the resulting tree state, and has the worker
+write each full run handoff to one gitignored `Temp/` file under a
+`## Run <n>` heading, cited under `Evidence` as path plus selector;
+`git status --porcelain` output never travels inline.
 
 The session baseline is the attribution and delegation fork point for the
 session's work. It begins as the commit reported by
