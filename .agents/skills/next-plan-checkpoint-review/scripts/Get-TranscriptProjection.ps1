@@ -1,12 +1,18 @@
-# Prints one row per tool call, per tool result, per main-assistant text element, per string-content record, and per
-# matched read/brief pair of a Claude Code JSONL transcript, given as an absolute path, for the checkpoint isolation
-# lens: a record with several of those yields several rows, and a record with none yields none. The rows are:
+# Prints one row per tool call, per tool result, per main-assistant text element, per string-content record, per matched
+# read/brief pair, and per unmet brief requirement of a Claude Code JSONL transcript, given as an absolute path, for the
+# checkpoint isolation lens: a record with several of those yields several rows, and a record with none yields none.
+# The rows are:
 # `<line> use <tool> <input summary capped at 160 chars>`
 # `<line> match <read path> read-at <read line>` — a delegation record's brief lists a path an earlier `Read` record or
 #   allowlisted read-only shell command opened; `<line>` is the delegation record's line and `<read line>` the reading
 #   record's line. A delegation record is a `tool_use` whose string input field starts with a `Role:` line and carries a
 #   `Governing paths:` line; that line's value and a `Scope:` line's value are the brief paths, compared case- and
 #   separator-insensitively against the read path.
+# `<line> brief-missing <input field> <field label>` — a delegation-shaped input field fails a brief requirement: its
+#   first non-blank line is not a `Role:` line, or it carries no `Governing paths:` line. A field is delegation-shaped
+#   when at least two `.agents/references/subagent-reporting.md` `## Task brief` field labels each start a line of it.
+#   One row per unmet requirement; such a field yields no `match` rows. Any string input field qualifies, including one
+#   carrying quoted or embedded brief text, such as a `Write`/`Edit` payload; open the record to dismiss such a row.
 # `<line> result <tool_use_id> len <chars>`
 # `<line> result <tool_use_id> len <chars> error` — only when `is_error` is true.
 # `<line> assistant-text len <chars> <text>` — original text length; whitespace collapsed and payload capped at 160 chars.
@@ -62,18 +68,30 @@ foreach ($line in [IO.File]::ReadLines($TranscriptPath)) {
 			# Brief paths come from the unescaped field value, never the serialized JSON above, so a token is delimited by
 			# real whitespace, a real backtick, or the `,`/`;` a brief separates listed paths with, and loses the
 			# sentence punctuation a brief may end it with; prose in those fields yields no token.
+			$briefLabels = @('Role:', 'Skill:', 'Objective:', 'Required sections:', 'Scope:', 'Exclusions:', 'Fixed decisions:', 'Governing paths:', 'Baseline:', 'Acceptance:', 'Prohibitions:', 'Return:')
+			$briefMissing = [Collections.Generic.List[string]]::new()
 			$briefKeys = foreach ($field in $element.input.PSObject.Properties) {
 				if ($field.Value -isnot [string]) { continue }
 				$fieldLines = $field.Value -split '\r?\n'
 				$firstText = $fieldLines | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1
-				if ($firstText -notlike 'Role:*') { continue }
+				$hasRole = $firstText -like 'Role:*'
 				$pathLines = $fieldLines | Where-Object { $_ -like 'Governing paths:*' -or $_ -like 'Scope:*' }
-				if (-not ($pathLines | Where-Object { $_ -like 'Governing paths:*' })) { continue }
+				$hasGoverningPaths = [bool] ($pathLines | Where-Object { $_ -like 'Governing paths:*' })
+				if (-not ($hasRole -and $hasGoverningPaths)) {
+					# Two distinct brief labels separate a malformed brief from prose that merely carries one such line.
+					$labelHits = @($briefLabels | Where-Object { $label = $_; @($fieldLines | Where-Object { $_ -like "$label*" }).Count -gt 0 })
+					if ($labelHits.Count -ge 2) {
+						if (-not $hasRole) { $briefMissing.Add(('{0} brief-missing {1} Role:' -f $n, $field.Name)) }
+						if (-not $hasGoverningPaths) { $briefMissing.Add(('{0} brief-missing {1} Governing paths:' -f $n, $field.Name)) }
+					}
+					continue
+				}
 				foreach ($token in (($pathLines -join ' ') -split '[\s`,;]+')) {
 					$token = $token.TrimEnd('.', ')', '"', "'")
 					if ($token -match '[/\\]') { ($token -replace '\\', '/').ToLowerInvariant() }
 				}
 			}
+			foreach ($row in $briefMissing) { $row }
 			foreach ($read in $reads) {
 				foreach ($briefKey in $briefKeys) {
 					if ($read.Key -eq $briefKey -or $read.Key.EndsWith('/' + $briefKey)) {
