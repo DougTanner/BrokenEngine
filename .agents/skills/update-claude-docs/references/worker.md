@@ -22,8 +22,8 @@ the modes, the inputs, and the handoff.
      usable.
    - A list that exceeds the output cap reports a nonzero `omittedCount`; rerun
      with fewer changed paths when something you need is omitted.
-   - Never reconstruct these operations inline — walking the hierarchy,
-     sweeping stub pairs, or measuring sizes by hand.
+   - Never reconstruct these operations inline — walking the hierarchy or
+     measuring sizes by hand.
    - Done when a `pass` payload is in hand or the `error` code is reported.
    - `chains` — per changed path, the root-to-nearest governing `AGENTS.md`
      documents in `documents`, the nearest one in `governing`, and
@@ -35,15 +35,6 @@ the modes, the inputs, and the handoff.
      plus each chain's `totalTokens` against the 15,000 target and 20,000
      warning. [`content-rules.md`](content-rules.md) owns how to respond to an
      over-budget verdict; the discovery script owns the calculation.
-   - `stubPairs` — the repository-wide bidirectional pairing sweep, excluding
-     the paths `.agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1`
-     `$script:StubSweepExclusions` lists.
-     - `stub.missing` is a directory `AGENTS.md` with no sibling `CLAUDE.md`,
-       `stub.orphan` a `CLAUDE.md` with no same-directory `AGENTS.md`,
-       `stub.malformed` a stub whose bytes are not exactly `@AGENTS.md` plus
-       one line ending.
-     - Fix a reported defect inside the authorized scope in the same edit;
-       report one outside that scope as a residual.
 3. Read every governing document and relevant parent or sibling rule before
    deciding whether to edit. Compare the current code and changed regions
    against present-tense documentation. Done when every `chains` document has
@@ -54,19 +45,17 @@ the modes, the inputs, and the handoff.
    handoff here without editing.
 5. Update only affected sections, applying
    [`content-rules.md`](content-rules.md) to every sentence you write or remove.
-   - Create a directory `AGENTS.md` only for a distinct subsystem, and create
-     its sibling `CLAUDE.md` stub in the same edit. Never create directory
-     memory for a single-file utility.
+   - Create a directory `AGENTS.md` only for a distinct subsystem. Never create
+     directory memory for a single-file utility.
    - In audit-and-fix mode, apply only the improvements the request already
      authorized, show the affected diffs, and add no further approval pause.
    - Done when every affected section is either edited or deliberately left
      alone.
-6. Re-read edited files, verify links, rerun the script to confirm stub bytes,
-   and inspect the session-baseline diff limited to the authorized paths; in
-   audit-and-fix mode also recheck scores, links, sizes, and stub integrity.
+6. Re-read edited files, verify links, and inspect the session-baseline diff
+   limited to the authorized paths; in audit-and-fix mode also recheck scores,
+   links, and sizes.
    - If a directory is no longer a distinct subsystem, report its `AGENTS.md`
-     and stub as a proposed deletion rather than deleting them without
-     authority.
+     as a proposed deletion rather than deleting it without authority.
    - Done when each check has run and its result is in the handoff.
 
 ## Rules

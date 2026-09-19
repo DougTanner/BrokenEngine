@@ -130,7 +130,7 @@ function Get-ContextTrigger([string] $Path) {
 	# named Raw whatever its extension.
 	$segments = $Path.Split('/')
 	$leaf = $segments[$segments.Length - 1]
-	if ($leaf.Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase) -or $leaf.Equals('CLAUDE.md', [StringComparison]::OrdinalIgnoreCase)) {
+	if ($leaf.Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase)) {
 		$rawDirectories = @($segments | Select-Object -SkipLast 1 | Where-Object { $_.Equals('Raw', [StringComparison]::OrdinalIgnoreCase) })
 		if ($rawDirectories.Count -eq 0) { return $null }
 	}

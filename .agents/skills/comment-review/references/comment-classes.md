@@ -9,7 +9,7 @@ these classes enforce; they add no rule it does not state.
 | boilerplate | never restates the signature or a house pattern in template fields, never uses banner separators, never merely explains a language feature or house pattern the declaration already shows | "Uses X to …" counts as a template field | Required |
 | history | never describes the previous implementation, the change that produced the code, or a comparison against replaced code | trigger words: "now", "no longer", "previously", "instead of" | Required |
 | speculative | never describes a hypothetical or future code path, and never argues that the code is correct | a rebuttal of a review is such an argument | Required |
-| navigation | never carries an `AGENTS.md` or `CLAUDE.md` navigation pointer as its content | — | Required |
+| navigation | never carries an `AGENTS.md` navigation pointer as its content | — | Required |
 | false | every statement is true of the adjacent code as it stands | — | Required |
 | dense | says it in the fewest sentences that carry it | a block over 8 lines, or a fact the block or its function already states elsewhere | Recommended |
 

@@ -332,7 +332,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 	// This function's locals must fit the 16 KiB stack budget the analysis build allows, so the 258 origins
 	// live in the workbuffer; its frames start 16-byte aligned, so XMVECTOR storage is safe there.
 
-A comment also never restates the signature or a house pattern in template fields (Parameters, Returns, Thread-safety), never uses banner separators, never merely explains a language feature or house pattern the declaration already shows, never carries an AGENTS.md or CLAUDE.md navigation pointer as its content, never describes a hypothetical or future code path, and never argues that the code is correct:
+A comment also never restates the signature or a house pattern in template fields (Parameters, Returns, Thread-safety), never uses banner separators, never merely explains a language feature or house pattern the declaration already shows, never carries an AGENTS.md navigation pointer as its content, never describes a hypothetical or future code path, and never argues that the code is correct:
 
 	Bad (template fields restating the declaration):
 	// Executes an external process with captured stdin/stdout/stderr and returns the output and exit code

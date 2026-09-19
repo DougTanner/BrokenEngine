@@ -138,7 +138,7 @@ Order: all run in parallel, except `/progressive-disclosure-review` runs after `
 - `mechanic` runs `/update-vcxproj` — for changes to file membership or to which executable a whole file belongs to.
 - fresh `reviewer` runs `/external-skill-creator` in findings-only validate mode — when the session changed any file in a `.agents/skills/*/` package that has a `SKILL.md`; where the Step 6 combined pass applies it runs inside that pass instead of its own dispatch.
 - `implementer` runs `/update-claude-docs` — after C++ or GLSL changes.
-- fresh `reviewer` runs `/progressive-disclosure-review` — when the session changed any `AGENTS.md`, `CLAUDE.md`, `.agents/skills/**/*.md`, or `.agents/references/**/*.md` file; where the Step 6 combined pass applies it runs inside that pass like the `/external-skill-creator` validate mode.
+- fresh `reviewer` runs `/progressive-disclosure-review` — when the session changed any `AGENTS.md`, `.agents/skills/**/*.md`, or `.agents/references/**/*.md` file; where the Step 6 combined pass applies it runs inside that pass like the `/external-skill-creator` validate mode.
 
 #### Step 8 — Verify the acceptance table
 

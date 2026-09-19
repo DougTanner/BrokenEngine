@@ -30,7 +30,7 @@ $script:KindPatterns = @(
 	@{ Kind = 'template-field'; Pattern = '^\s*//\s*(Parameters|Returns|Thread-safety):' }
 	@{ Kind = 'history'; Pattern = '\b(previous(ly)?|no longer|used to|was |instead of|replaced|now )\b' }
 	@{ Kind = 'speculative'; Pattern = '\b(would need|if .* ever|future|hypothetical|TODO)\b' }
-	@{ Kind = 'navigation'; Pattern = '(AGENTS|CLAUDE)\.md' }
+	@{ Kind = 'navigation'; Pattern = 'AGENTS\.md' }
 )
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 

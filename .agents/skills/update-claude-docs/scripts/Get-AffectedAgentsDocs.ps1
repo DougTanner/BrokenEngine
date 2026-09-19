@@ -1,7 +1,7 @@
 # Mechanical discovery for the /update-claude-docs sync workflow: the governing
-# AGENTS.md chain of each caller-supplied changed path, the bt-token-v1 size of
-# every document in those chains, and the repository-wide AGENTS.md/CLAUDE.md
-# stub-pairing sweep. Reports only; every edit decision stays with the agent.
+# AGENTS.md chain of each caller-supplied changed path and the bt-token-v1 size
+# of every document in those chains. Reports only; every edit decision stays
+# with the agent.
 [CmdletBinding()]
 param(
 	# Remaining arguments bind here so `-File <script> -ChangedPath a b c` works:
@@ -25,17 +25,7 @@ $script:AgentScriptCommon = Join-Path $script:RepositoryRoot '.agents\scripts\Ag
 $script:MaximumOutputBytes = 8192
 $script:MaximumMessageLength = 256
 
-# Repository-relative globs kept out of the stub-pairing sweep.
-$script:StubSweepExclusions = @(
-	'ThirdParty/*',
-	'Documents/Plans/*',
-	'Documents/Features/*',
-	'CLAUDE.local.md',
-	'*/CLAUDE.local.md'
-)
-
-$script:DocumentFileNames = @('AGENTS.md', 'CLAUDE.md', 'CLAUDE.local.md')
-$script:StubBody = '@AGENTS.md'
+$script:DocumentFileNames = @('AGENTS.md')
 $script:BudgetFloor = 1000
 $script:CodeTokenSlope = 35
 $script:DirectChildDocumentAllowance = 150
@@ -54,7 +44,6 @@ $result = [ordered]@{
 	message = 'Affected AGENTS.md discovery did not run.'
 	chains = [ordered]@{ items = @(); totalCount = 0; omittedCount = 0 }
 	sizes = [ordered]@{ items = @(); totalCount = 0; omittedCount = 0 }
-	stubPairs = [ordered]@{ items = @(); totalCount = 0; omittedCount = 0 }
 }
 
 function Complete-AffectedAgentsDocs
@@ -67,9 +56,7 @@ function Complete-AffectedAgentsDocs
 		[object[]] $ChainItems = @(),
 		[int] $ChainTotalCount = 0,
 		[object[]] $SizeItems = @(),
-		[int] $SizeTotalCount = 0,
-		[object[]] $StubItems = @(),
-		[int] $StubTotalCount = 0
+		[int] $SizeTotalCount = 0
 	)
 
 	if ($Message.Length -gt $script:MaximumMessageLength)
@@ -79,7 +66,6 @@ function Complete-AffectedAgentsDocs
 
 	$chains = [Collections.Generic.List[object]]::new($ChainItems)
 	$sizes = [Collections.Generic.List[object]]::new($SizeItems)
-	$stubs = [Collections.Generic.List[object]]::new($StubItems)
 	while ($true)
 	{
 		$result.status = $Status
@@ -87,14 +73,12 @@ function Complete-AffectedAgentsDocs
 		$result.message = $Message
 		$result.chains = [ordered]@{ items = @($chains); totalCount = $ChainTotalCount; omittedCount = $ChainTotalCount - $chains.Count }
 		$result.sizes = [ordered]@{ items = @($sizes); totalCount = $SizeTotalCount; omittedCount = $SizeTotalCount - $sizes.Count }
-		$result.stubPairs = [ordered]@{ items = @($stubs); totalCount = $StubTotalCount; omittedCount = $StubTotalCount - $stubs.Count }
 		$json = $result | ConvertTo-Json -Depth 8 -Compress
 		if ([Text.Encoding]::UTF8.GetByteCount($json) -le $script:MaximumOutputBytes)
 		{
 			break
 		}
 
-		if ($stubs.Count -gt 0) { $stubs.RemoveAt($stubs.Count - 1); continue }
 		if ($sizes.Count -gt 0) { $sizes.RemoveAt($sizes.Count - 1); continue }
 		if ($chains.Count -gt 0) { $chains.RemoveAt($chains.Count - 1); continue }
 		if ($Message.Length -gt 0) { $Message = ''; continue }
@@ -197,9 +181,9 @@ function Get-DescendantPrefix
 	return "$directory/"
 }
 
-# Enumerates every AGENTS.md and CLAUDE.md on disk, including untracked ones, so
-# a document added by the current change is discovered. Reparse points are
-# skipped because .claude/skills links back into .agents/skills.
+# Enumerates every AGENTS.md on disk, including untracked ones, so a document
+# added by the current change is discovered. Reparse points are skipped because
+# .claude/skills links back into .agents/skills.
 function Get-DocumentPath
 {
 	$documents = [Collections.Generic.List[string]]::new()
@@ -226,21 +210,6 @@ function Get-DocumentPath
 
 	$documents.Sort([StringComparer]::Ordinal)
 	return ,$documents
-}
-
-function Test-StubSweepExcluded
-{
-	param([string] $RelativePath)
-
-	foreach ($exclusion in $script:StubSweepExclusions)
-	{
-		if ($RelativePath -like $exclusion)
-		{
-			return $true
-		}
-	}
-
-	return $false
 }
 
 function Get-GoverningChain
@@ -489,39 +458,7 @@ try
 		$item.verdict = if ($total -gt $script:ChainTokenWarning) { 'warning' } elseif ($total -ge $script:ChainTokenTarget) { 'over-target' } else { 'ok' }
 	}
 
-	$stubItems = [Collections.Generic.List[object]]::new()
-	foreach ($document in $documentPaths)
-	{
-		if (Test-StubSweepExcluded $document) { continue }
-
-		$directory = Get-ParentDirectory $document
-		if ($document -ceq (Get-DirectoryAgentsDocument $directory))
-		{
-			$stub = if ($directory -ceq '') { 'CLAUDE.md' } else { "$directory/CLAUDE.md" }
-			if (-not $script:DocumentSet.Contains($stub))
-			{
-				$stubItems.Add([ordered]@{ path = $document; code = 'stub.missing'; detail = "No sibling CLAUDE.md at '$stub'." })
-			}
-
-			continue
-		}
-
-		$owner = Get-DirectoryAgentsDocument $directory
-		if (-not $script:DocumentSet.Contains($owner))
-		{
-			$stubItems.Add([ordered]@{ path = $document; code = 'stub.orphan'; detail = "No same-directory AGENTS.md at '$owner'." })
-			continue
-		}
-
-		$bytes = [IO.File]::ReadAllBytes((Join-Path $script:RepositoryRoot $document))
-		$text = [Text.Encoding]::UTF8.GetString($bytes)
-		if ($text -cne "$script:StubBody`n" -and $text -cne "$script:StubBody`r`n")
-		{
-			$stubItems.Add([ordered]@{ path = $document; code = 'stub.malformed'; detail = "Stub must be '$script:StubBody' plus one line ending; file is $($bytes.Length) bytes." })
-		}
-	}
-
-	Complete-AffectedAgentsDocs 0 'pass' 'ok' 'Affected AGENTS.md discovery completed.' @($chainItems) $chainItems.Count @($sizeItems) $sizeItems.Count @($stubItems) $stubItems.Count
+	Complete-AffectedAgentsDocs 0 'pass' 'ok' 'Affected AGENTS.md discovery completed.' @($chainItems) $chainItems.Count @($sizeItems) $sizeItems.Count
 }
 catch
 {

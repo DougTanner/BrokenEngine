@@ -159,7 +159,7 @@ namespace toolcli
 		bool IsDirectoryGuidance(const std::wstring& rPath)
 		{
 			const std::wstring filename = std::filesystem::path(rPath).filename().wstring();
-			return filename == L"AGENTS.md" || filename == L"CLAUDE.md";
+			return filename == L"AGENTS.md";
 		}
 
 		// Guidance metadata is inert in both directions: never executable, and never another Plan's dependency child, so

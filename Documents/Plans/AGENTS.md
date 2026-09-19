@@ -8,7 +8,7 @@ An executable plan starts at byte zero with exactly one metadata line:
 
 `<!-- broken-engine-plan/v1 {"createdUtc":"2026-07-22T18:24:31.042Z","dependsOn":["Documents/Plans/Area/Prerequisite.md"]} -->`
 
-Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn` is a unique ordinal-sorted list of normalized `Documents/Plans/**/*.md` paths. Every plan document in this tree carries the marker; a missing marker — including one preceded by a BOM, so it is not at byte zero — is a validation error naming the file. `AGENTS.md` and `CLAUDE.md` are exempt at every level of the tree and must never carry metadata.
+Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn` is a unique ordinal-sorted list of normalized `Documents/Plans/**/*.md` paths. Every plan document in this tree carries the marker; a missing marker — including one preceded by a BOM, so it is not at byte zero — is a validation error naming the file. `AGENTS.md` is exempt at every level of the tree and must never carry metadata.
 
 WorktreeCli is the only component that parses the scheduler and changes claims. It selects the newest eligible executable plan by `(createdUtc descending, normalized path)`. Existing valid dependencies block a child; a missing dependency is a satisfied stale edge reported as a notice. A plan is excluded from selection — left out without affecting other plans, which stay claimable — when its metadata is invalid, its dependencies form a cycle, or it is not present and valid at the primary tip.
 

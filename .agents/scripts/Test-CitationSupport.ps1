@@ -105,7 +105,7 @@ function Get-Window([string[]] $Lines, [int] $Start, [int] $End) {
 
 $markdownFiles = @(foreach ($entry in $Path) {
 	$full = if ([IO.Path]::IsPathRooted($entry)) { $entry } else { Join-Path $RepositoryRoot $entry }
-	if (Test-Path -LiteralPath $full -PathType Container) { Get-ChildItem -LiteralPath $full -Recurse -Filter '*.md' -File | Where-Object { $_.Name -notin @('AGENTS.md', 'CLAUDE.md') } | ForEach-Object { $_.FullName } }
+	if (Test-Path -LiteralPath $full -PathType Container) { Get-ChildItem -LiteralPath $full -Recurse -Filter '*.md' -File | Where-Object { $_.Name -ne 'AGENTS.md' } | ForEach-Object { $_.FullName } }
 	elseif (Test-Path -LiteralPath $full -PathType Leaf) { $full }
 })
 if ($markdownFiles.Count -eq 0) { Complete-CitationSupport 1 'error' 'path.empty' 'No markdown files found under the given paths.' }

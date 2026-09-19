@@ -230,7 +230,7 @@ function Get-PathClass([string] $Path, [string] $Mode, [bool] $IsBinary) {
 	if ($underShaders -and $extension -ceq '.h') { return 'glsl' }
 	if ($extension -cin @('.cpp', '.h', '.inl')) { return 'cpp' }
 	if ($leaf -ceq 'SKILL.md' -and $components.Count -eq 4 -and $components[0] -ceq '.agents' -and $components[1] -ceq 'skills') { return 'skill' }
-	if ($extension -ceq '.md' -and $components.Count -gt 2 -and $components[0] -ceq 'Documents' -and $components[1] -ceq 'Plans' -and $leaf -cne 'AGENTS.md' -and $leaf -cne 'CLAUDE.md') { return 'plan' }
+	if ($extension -ceq '.md' -and $components.Count -gt 2 -and $components[0] -ceq 'Documents' -and $components[1] -ceq 'Plans' -and $leaf -cne 'AGENTS.md') { return 'plan' }
 	if ($extension -cin @('.ps1', '.psm1', '.py', '.sh')) { return 'script' }
 	if ($extension -ceq '.vcxproj' -or $leaf.ToLowerInvariant().EndsWith('.vcxproj.filters')) { return 'vcxproj' }
 	if ($extension -cin @('.md', '.txt')) { return 'doc' }
@@ -265,7 +265,7 @@ function Get-InventoryEntry([hashtable] $Row, [hashtable] $BinaryPaths, [bool] $
 
 function Test-InstructionDocPath([string] $Path) {
 	$leaf = $Path.Substring($Path.LastIndexOf('/') + 1)
-	if ($leaf -ceq 'AGENTS.md' -or $leaf -ceq 'CLAUDE.md') { return $true }
+	if ($leaf -ceq 'AGENTS.md') { return $true }
 	if (-not $leaf.ToLowerInvariant().EndsWith('.md')) { return $false }
 	return $Path.StartsWith('.agents/skills/') -or $Path.StartsWith('.agents/references/')
 }
@@ -582,7 +582,7 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 	}
 	# The rows this landing owes, each left BLOCKED for the finalizer to fill with evidence. The
 	# Executable Plan row is decided from the reviewed paths rather than from planTouched, whose
-	# `plan` class deliberately excludes the Plans tree's own AGENTS.md and CLAUDE.md.
+	# `plan` class deliberately excludes the Plans tree's own AGENTS.md.
 	$skeleton = [Collections.Generic.List[object]]::new()
 	foreach ($name in $script:AcceptanceSkeletonChecks.Keys) {
 		if ($reviewedTriggers[$name]) { $skeleton.Add([ordered]@{ check = $script:AcceptanceSkeletonChecks[$name]; status = 'BLOCKED' }) }

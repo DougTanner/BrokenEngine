@@ -1,8 +1,8 @@
 ---
 name: update-claude-docs
 description: >-
-  Synchronize AGENTS.md documentation and sibling CLAUDE.md import stubs after
-  every C++ or GLSL change, and for an explicit request to update AGENTS.md.
+  Synchronize AGENTS.md documentation after every C++ or GLSL change, and for
+  an explicit request to update AGENTS.md.
   Also use for an explicit AGENTS.md audit or audit-and-fix request; audits
   report only unless improvement edits were already authorized.
 allowed-tools: [Read, Edit, Write, Grep, Glob, Bash, PowerShell]
@@ -12,10 +12,9 @@ allowed-tools: [Read, Edit, Write, Grep, Glob, Bash, PowerShell]
 
 ## Purpose
 
-Keeps AGENTS.md guidance and its sibling `CLAUDE.md` import stubs matching the
-current code, or grades a requested AGENTS.md scope. Runs inside one delegated
-`implementer`; never delegate, and return any separate-role requirement to the
-manager.
+Keeps AGENTS.md guidance matching the current code, or grades a requested
+AGENTS.md scope. Runs inside one delegated `implementer`; never delegate, and
+return any separate-role requirement to the manager.
 
 ## When to use
 
@@ -41,10 +40,10 @@ Exclude `CLAUDE.local.md` and other local overrides unless the user explicitly i
 Return the shared handoff form in
 [`subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Handoffs` in every mode. Each shared `Changed files` row names an edited
-`AGENTS.md` or `CLAUDE.md` path and the document section touched, using `none`
-when absent. The shared `Build required` value is `none` because this skill
-changes no C++ or GLSL. Each shared `Residuals` row names a conflict, deletion
-candidate, or pre-existing excess, using `none` when absent.
+`AGENTS.md` path and the document section touched, using `none` when absent.
+The shared `Build required` value is `none` because this skill changes no C++
+or GLSL. Each shared `Residuals` row names a conflict, deletion candidate, or
+pre-existing excess, using `none` when absent.
 
 Audit and audit-and-fix modes return the quality report defined in
 `references/audit-mode.md` before the handoff.

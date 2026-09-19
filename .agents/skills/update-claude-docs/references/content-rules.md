@@ -31,7 +31,3 @@
 A source exemplar may replace procedural prose only when it points to one stable file and symbol, labels the concern and the applicability variant, and leaves the governing invariant and reason in AGENTS.md. A concern may cite at most three exemplars. The source demonstrates implementation shape; documentation remains authoritative for ownership and constraints.
 
 Do not establish one-off code introduced by the current change as authoritative until an existing repository pattern supports it. During every affected documentation sync, verify that each cited path and symbol still demonstrates its label; retarget a stale symbol in the same edit. Keep distinct applicability variants distinct rather than presenting one exemplar as a universal policy.
-
-## Stub Contract
-
-Directory memory lives in `AGENTS.md`. Its sibling `CLAUDE.md` is only the one-line `@AGENTS.md` import. Put all guidance in AGENTS.md. Enforce the pairing bidirectionally, excluding `CLAUDE.local.md` unless explicitly authorized.
