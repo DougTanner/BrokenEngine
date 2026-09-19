@@ -6,9 +6,9 @@ for? Part of the series in `JevDecisionModelWorkflowUses.md`. Piloted once
 against the live API over the 41 hand-labelled code blocks in
 `.agents/skills/code-style-review/references/style-rule-judgment/cases.json`,
 which `.agents/scripts/Test-StyleRuleJudgment.ps1 -CasesPath` re-measures
-with the questions `## The instructions` records; the Plan that wires the
-result into the worker is
-`Documents/Plans/ChangeWorkflow/JevStyleRuleReadingOrder.md`. The result is that one
+with the questions `## The instructions` records; the Plan that wired the
+result into the worker landed, and `/code-style-review` gates its hand read
+on the script's session mode. The result is that one
 request per changed function, carrying one `noul` per rule, orders the
 hand-read pass for seven of the ten rules at one threshold, rule 3 needs a
 higher one, rule 61 goes to a scanner instead, and rule 56 needs a
@@ -16,12 +16,14 @@ scanner-extracted name list as its state.
 
 ## The decision today
 
-`.agents/skills/code-style-review/references/worker.md:36-42` names the rules
-the worker hand-reads across every changed range because the scanner emits no
-candidates for them: 3, 14, 16 (including its vector `.at()` clause), 21, 49,
-51, 56, 61, 62, and the "always write `std::`" half of 41. Every one of those
-is a yes/no over a function-sized span, and the worker reads whole ranges to
-answer them. The scanner's own kinds (2, 15, 19, 27, 28, 29, 32, 41's `using
+`.agents/skills/code-style-review/references/worker.md:59-71` (step 7)
+hand-reads rules 3 and 56 across every changed range because the scanner
+emits no candidates for them, and routes the gated rules — 14, 16 (including
+its vector `.at()` clause), 21, 49, 51, 62, and the "always write `std::`"
+half of 41 — through the judgment script in step 6 (`worker.md:36-58`). Every
+one of those is a yes/no over a function-sized span, and before the gate the
+worker read whole ranges to answer them. The scanner's own kinds (2, 15, 19,
+27, 28, 29, 32, 41's `using
 namespace`, 50, 52, 57, 58) are deterministic and stay out of this document.
 
 One more judgment of the same shape lives outside the style guide: the log
@@ -146,12 +148,12 @@ for the user.
 ## What still needs a full model
 
 Every fix, and the meaning-preservation decision the auto-fix requires
-(`references/worker.md:70-73`). Jev replaces the reading of unchanged ranges,
+(`references/worker.md:107-110`). Jev replaces the reading of unchanged ranges,
 not the judgment on a flagged block: the worker still reads a flagged
 function against the guide before it fixes or routes anything, so the shape
 is "Jev shortens the list the worker reads" as `JevDecisionModelWorkflowUses.md`
 requires. A whole-file question is still no substitute: the handoff row needs
-file, line, rule number, and correction (`SKILL.md:41`), and the function
+file, line, rule number, and correction (`SKILL.md:44`), and the function
 enumeration supplies the first two.
 
 ## What would make this a Plan
@@ -161,10 +163,11 @@ flagged with under 30% of compliant blocks flagged) for rules 14, 16, 21, 41,
 49, 51, and 62 at threshold 0.5. Rule 56 in the list form at 0.7 fell one name
 short of it, 8 of 9 planted names, with `CalcVelocity` at 0.59 the miss. The
 remaining measurement is rule 3's threshold and the rule 56 exception list,
-both of which need real session changes rather than hand-written blocks, so
-the second measurement is a rerun of the script's session mode over the last
-ten landed C++ commits with the flagged blocks hand-labelled, before either
-rule's flag is allowed to shorten the read.
+both of which need real session changes rather than hand-written blocks. The
+seven rules gate the read since the Plan landed; the second measurement — the
+next test — is a rerun of the script's session mode over the last ten landed
+C++ commits with the flagged blocks hand-labelled for rules 3 and 56, before
+either of those two rules' flags is allowed to shorten the read.
 
 ## Decisions a Plan needs
 
@@ -191,12 +194,10 @@ rule's flag is allowed to shorten the read.
    carried in the check script as data, with the exception lists above; the
    thresholds are 0.5 for the seven rules, 0.7 for rule 56 names, and 0.9 for
    rule 3, written in the skill's references.
-5. Decided — reading-order only at first, per the series' no-gate rule: the
-   worker hand-reads flagged blocks first and still reads the rest, and
-   records in its handoff whether it agreed on each flagged block, until the
-   standalone second measurement above confirms the pilot for rules 3 and
-   56. After that the worker reads only flagged blocks for the confirmed
-   rules.
+5. Superseded by user direction at landing — the worker reads only flagged
+   blocks for the seven rules that met the bar, halts on any unusable result,
+   and falls back to the hand read only on the user's "skip jev"; rules 3 and
+   56 stay hand-read until the second measurement above.
 6. Open, for the user: whether `Diff` (`vecDiff` 0.61) and `ack` (0.85 in
    the pilot's list run) join the rule 56 exception list in
    `Documents/C++StyleGuide.txt:264`; the codebase uses both, and neither

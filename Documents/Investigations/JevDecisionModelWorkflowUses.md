@@ -5,9 +5,10 @@ place in this repository's skills and Change Workflow? This is the overview of
 a series: it owns what Jev is, the places it must never decide, the decisions
 every candidate shares, and the table of candidates. Each candidate is its own
 Investigation, written so it can be tested on its own and promoted to a Plan
-when its test passes. Three tracked scripts exist and no workflow skill uses
-any yet: `.agents/scripts/Invoke-Jev.ps1` is the one caller every Jev use
-goes through, `.agents/scripts/Test-CitationSupport.ps1` is the first
+when its test passes. Three tracked scripts exist and `/code-style-review`
+uses the style-rule judgment as a gate: `.agents/scripts/Invoke-Jev.ps1` is
+the one caller every Jev use goes through,
+`.agents/scripts/Test-CitationSupport.ps1` is the first
 check built on it (`JevEvidenceCitationCheck.md`), and
 `.agents/scripts/Test-StyleRuleJudgment.ps1` is the second, with its labelled
 corpus (`JevStyleRuleJudgment.md`). The other pilots ran from
@@ -92,7 +93,8 @@ the list a full model then reads", never "Jev decides".
 | `JevPlanAreaFiling.md` | `Documents/Plans/AGENTS.md` areas; the Plans/Features/Investigations test | `choice` over areas | run twice: 56/58 and 57/58 agree, every flag a false flag; a path count reproduces all 58; the tree question turns on user intent the document does not carry | none: not promoted |
 | `JevDuplicatePlanDetection.md` | `/create-follow-up-plans` duplicate rule | `score` with levels = actions (distinct, related, same fix) | run: the three merged Plans are the top three of 50 pairs; no distinct pair reached 1.0 | a second historical merge; a code-side shortlist |
 | `JevEvidenceCitationCheck.md` | finding evidence rows, acceptance rows, Plan citations | `choice` supports / contradicts / says_nothing | run twice, tracked script: 440/625 real citations `supports`, 36/585 shifted regions; blind read of 66: passes right 20/22, flags right only 15/44 | reading order only; enclosing-function context, then a human blind read |
-| `JevStyleRuleJudgment.md` | `/code-style-review` hand-read rules 3, 14, 16, 21, 41, 49, 51, 56, 61, 62 | one request per changed function with one `noul` per rule; rule 56 as one `noul` per name over the function's name list | run twice over 41 blocks: seven rules meet the success bar at 0.5 (no miss, at most one clean block flagged each), rule 56 needs the name-list form, rule 61 goes to a scanner, rule 3 needs 0.9 | rule 3 and rule 56 recorded beside the worker's verdict on real session changes |
+| `JevStyleRuleJudgment.md` | `/code-style-review` hand-read rules 3, 14, 16, 21, 41, 49, 51, 56, 61, 62 | one request per changed function with one `noul` per rule; rule 56 as one `noul` per name over the function's name list | run twice over 41 blocks: seven rules meet the success bar at 0.5 (no miss, at most one clean block flagged each), rule 56 needs the name-list form, rule 61 goes to a scanner, rule 3 needs 0.9 | session mode over the last ten landed C++ commits, flagged blocks hand-labelled for rules 3 and 56 |
+| `JevSessionResidueJudgment.md` | `/code-style-review` step 17: whether a scanner `log`, `printf`, `debug-break`, `assert-false`, `fixme`, or `hack` hit is temporary | one `noul` per hit; probability orders the read; same request as the style rules or its own is open | not run: a removed line never lands, so positives must be planted and recorded | scanner hits over the last ten landed C++ commits as negatives, 20+ planted temporary lines as positives, then recorded step 17 removals |
 | `JevSimplicityReviewTrigger.md` | `/plan-simplicity-review` dispatch trigger | two `noul`s, low threshold | not run | record beside main's decision for 30 plans |
 | `JevRiskTierSurfaceFlags.md` | `risk-tiers.md` Tier-3 surfaces | one `noul` per surface per hunk, max-gated, escalate-only | not run: no tier corpus | record the tier per landed change, then 40 changes |
 | `JevFindingTriage.md` | `/resolve-findings` intent and scope; the YAGNI warning; severity rule | four questions per finding in one request | not run: findings are not stored | record `(finding, labels, decision)` for 50 findings |
@@ -134,10 +136,9 @@ Promote in the order the pilots justify, not the order of expected saving:
    order only, after its second-commit measurement. `JevPlanAreaFiling.md` is
    not promoted: its second pilot showed the filing rule is a path count a
    script reproduces exactly, so it falls under `## Not suitable`.
-3. `JevStyleRuleJudgment.md` next: its pilot met its own success bar for
-   seven of ten hand-read rules over hand-labelled blocks; its Plan is decided
-   apart from one style-guide question for the user, and rules 3 and 56 stay
-   reading-order only until a second measurement on real session changes.
+3. `JevStyleRuleJudgment.md` landed: by user direction it gates the hand read
+   for the seven rules that met the bar, and rules 3 and 56 stay hand-read
+   until the real-change measurement.
 4. Every remaining candidate waits for a corpus that does not exist yet, and
    `JevSimplicityReviewTrigger.md` and `JevFindingTriage.md` are the cheapest
    ways to start collecting one, because they record Jev's answer beside a
@@ -153,11 +154,15 @@ Promote in the order the pilots justify, not the order of expected saving:
 2. Decided — the key and failure: `TYPESAFE_API_KEY`, never tracked and never
    printed; a missing key or unreachable service is `blocked`, and every
    consumer then behaves as the workflow does without Jev. A reading-order use
-   falls through silently; a sweep that reports residuals says it did not run.
+   falls through silently; a sweep that reports residuals says it did not run;
+   `JevStyleRuleJudgment.md` is the user-directed exception, whose consumer
+   halts instead of falling through.
 3. Threshold policy: every threshold is a number written in the owning skill's
    references, chosen from the candidate's measurement, and every use errs
    toward an extra read rather than a miss.
 4. No gate: no candidate hides an item from a reviewer, lowers a tier, skips a
    review, or dispatches a fix on its own until a second measurement on a
    later change confirms the first — and the vendor's warning about
-   thresholds not composing applies the moment one does.
+   thresholds not composing applies the moment one does;
+   `JevStyleRuleJudgment.md` is the user-directed exception, gating before a
+   second measurement.

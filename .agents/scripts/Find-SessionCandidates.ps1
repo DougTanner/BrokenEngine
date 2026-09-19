@@ -29,10 +29,11 @@ $script:MaximumOutputBytes = 131072
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
 $script:CppClasses = @('cpp', 'dual-language-header')
 # One entry per candidate kind: the residue kinds .agents/skills/code-style-review/references/worker.md
-# step 16 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 9
+# step 17 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 10
 # adjudicates. The order is the order a line is attributed: a line reports the first kind that matches
-# it. An entry's Except clears a match that is one of the rule's permitted forms. That worker's step 6
-# hand-read list is the complement of the style-rule-<n> kinds here, so update it with this table.
+# it. An entry's Except clears a match that is one of the rule's permitted forms. The style-rule-61 kind
+# is not in this table: it needs the next line too, so Test-Rule61Line decides it before the table. That
+# worker's step 7 hand-read list is the complement of the style-rule-<n> kinds, so update it with them.
 $script:CandidatePatterns = @(
 	@{ Kind = 'log'; Pattern = '\bLOG\s*\(' }
 	@{ Kind = 'printf'; Pattern = '\bprintf\s*\(' }
@@ -80,35 +81,8 @@ function Complete-SessionCandidates([int] $ExitCode, [string] $Status, [string] 
 	exit $ExitCode
 }
 
-function Invoke-CandidateProcess([string] $FileName, [string[]] $Arguments, [string] $WorkingDirectory) {
-	$start = [Diagnostics.ProcessStartInfo]::new()
-	$start.FileName = $FileName
-	$start.WorkingDirectory = $WorkingDirectory
-	$start.UseShellExecute = $false
-	$start.CreateNoWindow = $true
-	$start.RedirectStandardOutput = $true
-	$start.RedirectStandardError = $true
-	$start.StandardOutputEncoding = $script:Utf8
-	$start.StandardErrorEncoding = $script:Utf8
-	$start.Environment['GIT_OPTIONAL_LOCKS'] = '0'
-	foreach ($argument in $Arguments) { [void] $start.ArgumentList.Add($argument) }
-	$process = [Diagnostics.Process]::new()
-	$process.StartInfo = $start
-	if (-not $process.Start()) { throw "Could not start $FileName with: $($Arguments -join ' ')" }
-	$stdoutTask = $process.StandardOutput.ReadToEndAsync()
-	$stderrTask = $process.StandardError.ReadToEndAsync()
-	$process.WaitForExit()
-	$run = [pscustomobject] @{
-		ExitCode = $process.ExitCode
-		Stdout = $stdoutTask.GetAwaiter().GetResult()
-		Stderr = $stderrTask.GetAwaiter().GetResult()
-	}
-	$process.Dispose()
-	return $run
-}
-
 function Invoke-CandidateGit([string[]] $Arguments) {
-	$run = Invoke-CandidateProcess 'git' (@('-C', $script:Root, '--no-pager') + $Arguments) $script:Root
+	$run = Invoke-AgentProcess 'git' (@('-C', $script:Root, '--no-pager') + $Arguments) $script:Root
 	if ($run.ExitCode -ne 0) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
 	return $run.Stdout
 }
@@ -140,7 +114,7 @@ function Get-InventoryDocument() {
 	}
 	$shell = [Environment]::ProcessPath
 	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
-	$run = Invoke-CandidateProcess $shell $arguments $script:Root
+	$run = Invoke-AgentProcess $shell $arguments $script:Root
 	$document = $null
 	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) { $document = $run.Stdout | ConvertFrom-Json }
 	if ($run.ExitCode -ne 0 -or $null -eq $document -or $document.status -cne 'pass') {
@@ -170,6 +144,38 @@ function Get-AddedLine([object] $Inventory) {
 	return $added
 }
 
+function Test-Rule61Line([string] $Path, [int] $Line, [string] $Text) {
+	# An `if` (an `else if` counts as its `if`) or `else` line breaks rule 61 when a statement follows the
+	# condition on the same line, or when the next non-blank head-side line is neither `{` nor a `&&`/`||`
+	# continuation of the condition. A trailing `{` is a brace, not a statement.
+	if ($Text -cnotmatch '^\s*(?:else\s+)?if\b|^\s*else\b') { return $false }
+	$code = $Text -replace '//.*$', ''
+	$rest = ''
+	if ($code -cmatch '^\s*(?:else\s+)?if\b') {
+		$depth = 0
+		for ($index = $code.IndexOf('('); $index -ge 0 -and $index -lt $code.Length; $index++) {
+			if ($code[$index] -eq '(') { $depth++ }
+			elseif ($code[$index] -eq ')') {
+				$depth--
+				if ($depth -eq 0) { $rest = $code.Substring($index + 1); break }
+			}
+		}
+	}
+	else {
+		$rest = $code -replace '^\s*else\b', ''
+	}
+	$rest = $rest.Trim()
+	if ($rest.StartsWith('{')) { return $false }
+	if ($rest.Length -gt 0) { return $true }
+	$lines = Get-NewSideLine $Path
+	for ($number = $Line + 1; $number -le $lines.Count; $number++) {
+		$next = $lines[$number - 1].Trim()
+		if ($next.Length -eq 0) { continue }
+		return -not ($next.StartsWith('{') -or $next.StartsWith('&&') -or $next.StartsWith('||'))
+	}
+	return $false
+}
+
 function Test-CandidatePattern([string] $Text) {
 	foreach ($pattern in $script:CandidatePatterns) {
 		if ($Text -cnotmatch $pattern.Pattern) { continue }
@@ -195,7 +201,7 @@ try {
 
 	$hits = [Collections.Generic.List[object]]::new()
 	foreach ($line in (Get-AddedLine $inventory)) {
-		$kind = Test-CandidatePattern $line.Text
+		$kind = if (Test-Rule61Line $line.Path $line.Line $line.Text) { 'style-rule-61' } else { Test-CandidatePattern $line.Text }
 		if ($null -eq $kind) { continue }
 		$text = $line.Text.Trim()
 		if ($text.Length -gt $script:MaximumTextLength) { $text = $text.Substring(0, $script:MaximumTextLength) }
@@ -212,6 +218,7 @@ try {
 	# Counts always describe the complete scan, never the truncated emission.
 	$counts = [ordered]@{ total = $sorted.Count }
 	foreach ($pattern in $script:CandidatePatterns) { $counts[$pattern.Kind] = @($sorted | Where-Object { $_.kind -ceq $pattern.Kind }).Count }
+	$counts['style-rule-61'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-61' }).Count
 	$result.counts = $counts
 	$emitted = [Collections.Generic.List[object]]::new()
 	foreach ($hit in ($sorted | Select-Object -First $script:MaximumHits)) { $emitted.Add($hit) }

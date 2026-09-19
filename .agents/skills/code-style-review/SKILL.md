@@ -30,6 +30,9 @@ plus the session's residue removed and semantic candidates routed to the caller.
 - `Baseline` — the full 40-character session baseline SHA and the absolute
   repository toplevel, required for a session-changed scope, plus any untracked
   paths the review must cover.
+- `Jev` — `skip`, supplied only after the user says "skip jev"; the worker then
+  hand-reads the gated rules itself and never runs the judgment script. Absent
+  otherwise.
 
 ## Handoff
 
@@ -46,6 +49,16 @@ Return the shared handoff form in
 - `Documentation Residuals` — one row each: identifier, file:line, and
   `/update-claude-docs` or the caller; or none.
 - `Functions/regions touched` — one row per function or region, or none.
+- `Judgment` — one row per flagged gated-rule entry: `path:line`, the rule, its
+  probability, and `confirmed` or `false flag` from adjudication; `none` when
+  the script returned zero flagged entries; `skipped (user)` when the fallback
+  ran on `Jev: skip`; `not applicable (cleanup scope)` for a caller-supplied
+  scope; `not run — <code>: <message>` with `Status: BLOCKED`.
+
+A `BLOCKED` handoff from the judgment step halts the workflow: main tells the
+user the code and message, and any re-dispatch is user-directed — with the
+`Jev` input (`## Inputs`) when the user directs it, without it when the user
+reports the cause fixed (key set, service back).
 
 The shared `Build required` field names the exact affected targets, or `none`.
 Each shared `Residuals` row names an unresolved item; use `none` when absent.

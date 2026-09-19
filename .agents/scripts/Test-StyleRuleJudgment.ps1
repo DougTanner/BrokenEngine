@@ -6,13 +6,21 @@
 # broken" (Documents/Investigations/JevStyleRuleJudgment.md). Rule 61 is deliberately absent: the Allman
 # brace on its own line reads as "no brace" to the model, and a two-line scanner decides it exactly.
 #
-# -CasesPath measures the questions against a labelled corpus: each case carries `id`, `code` (an array of
-# lines), and `expected` (the `rule<n>` keys that should fire), and the result adds per-rule hit counts.
-# Without a key or a reachable service the result is `blocked` and no block was judged, which is the
-# behaviour the review has without Jev.
+# Two modes. -CasesPath measures the questions against a labelled corpus: each case carries `id`, `code` (an
+# array of lines), and `expected` (the `rule<n>` keys that should fire), and the result adds per-rule hit
+# counts. -RepositoryRoot with -Baseline (optional -Head and -IncludeUntracked, as Find-SessionCandidates.ps1
+# takes them) is the session mode: it finds every changed C++ function or class body between baseline and
+# head from Get-SessionChangeInventory.ps1's regions, judges each, and reports `path`, `line`, `endLine`,
+# and `flagged` per block in path then line order. The session mode is the review worker's gate: any result
+# other than `ok` (a missing key, an unreachable service, a partial answer, an unusable inventory) halts the
+# review, so the worker never reads less than it claims.
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][string] $CasesPath,
+	[string] $CasesPath,
+	[string] $RepositoryRoot,
+	[string] $Baseline,
+	[string] $Head,
+	[switch] $IncludeUntracked,
 	[string] $OutputPath,
 	[double] $BlockThreshold = 0.5,
 	[double] $Rule3Threshold = 0.9,
@@ -21,8 +29,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
+$script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
+$script:CppClasses = @('cpp', 'dual-language-header')
+$script:Root = $null
+$script:HeadSha = ''
+$script:HeadSideLines = @{}
 
 # One question per block-level rule. Each instruction names the construct the rule forbids and the correct
 # forms the model must not flag; the criteria restate both so the boundary is explicit.
@@ -114,9 +128,138 @@ function Get-BlockIdentifiers([string] $Code) {
 	return @($names | Where-Object { $_.Length -ge 2 -and $script:NameKeywords -cnotcontains $_ -and $_ -cnotmatch '^(?:vk|Vk|VK_|XM|k[A-Z])' -and $_ -cnotmatch '^[A-Z_0-9]+$' })
 }
 
-if (-not (Test-Path -LiteralPath $CasesPath -PathType Leaf)) { Complete-StyleRuleJudgment 1 'error' 'cases.missing' "Cases file not found: '$CasesPath'." }
-$cases = @(Get-Content -LiteralPath $CasesPath -Raw | ConvertFrom-Json -Depth 8)
-if ($cases.Count -eq 0) { Complete-StyleRuleJudgment 1 'error' 'cases.empty' 'Cases file holds no cases.' }
+function Get-HeadSideLine([string] $Path) {
+	# The wrapping comma keeps a one-line file an array of one line rather than a bare string.
+	if ($script:HeadSideLines.ContainsKey($Path)) { return , $script:HeadSideLines[$Path] }
+	$text = if ([string]::IsNullOrEmpty($script:HeadSha)) {
+		[IO.File]::ReadAllText((Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)), $script:Utf8)
+	}
+	else {
+		$run = Invoke-AgentProcess 'git' @('-C', $script:Root, '--no-pager', 'show', "$($script:HeadSha):$Path") $script:Root
+		if ($run.ExitCode -ne 0) { throw "git show $($script:HeadSha):$Path failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
+		$run.Stdout
+	}
+	$script:HeadSideLines[$Path] = @($text -split "`r`n|`n|`r")
+	return , $script:HeadSideLines[$Path]
+}
+
+function Get-InventoryDocument() {
+	$arguments = @('-NoProfile', '-File', $script:InventoryScript, '-RepositoryRoot', $script:Root, '-Baseline', $Baseline, '-Regions')
+	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) }
+	if ($IncludeUntracked) {
+		$run = Invoke-AgentProcess 'git' @('-C', $script:Root, '--no-pager', 'ls-files', '--others', '--exclude-standard', '-z') $script:Root
+		if ($run.ExitCode -ne 0) { throw "git ls-files failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
+		$untracked = @($run.Stdout -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
+		if ($untracked.Count -gt 0) { $arguments += @('-IncludeUntracked', ($untracked -join ',')) }
+	}
+	$shell = [Environment]::ProcessPath
+	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
+	$run = Invoke-AgentProcess $shell $arguments $script:Root
+	$document = $null
+	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) { $document = $run.Stdout | ConvertFrom-Json }
+	if ($run.ExitCode -ne 0 -or $null -eq $document -or $document.status -cne 'pass') {
+		if ($null -ne $document) { Complete-StyleRuleJudgment 2 'blocked' $document.code "The session change inventory did not pass, so no block was judged: $($document.message)" }
+		Complete-StyleRuleJudgment 2 'blocked' 'judgment.inventory-unavailable' "The session change inventory produced no result, so no block was judged: $($run.Stderr.Trim())"
+	}
+	if ($document.truncated) { Complete-StyleRuleJudgment 2 'blocked' 'judgment.inventory-truncated' 'The session change inventory truncated its regions, so a changed block could go unjudged.' }
+	return $document
+}
+
+function Test-BlockOpener([string[]] $Lines, [int] $Number) {
+	# A column-0 `{` opens a function or class body unless the nearest non-blank line above it is a namespace.
+	if ($Lines[$Number - 1] -cnotmatch '^\{\s*$') { return $false }
+	for ($above = $Number - 1; $above -ge 1; $above--) {
+		if ([string]::IsNullOrWhiteSpace($Lines[$above - 1])) { continue }
+		return $Lines[$above - 1] -cnotmatch '^\s*namespace\b'
+	}
+	return $true
+}
+
+function Get-SessionBlock([object] $Inventory) {
+	# Allman-shape enumeration, no brace parser: a region's block is the column-0 `{` its start line looks
+	# down to (through non-blank lines only, before any column-0 closer) or, failing that, walks up to, from
+	# the non-blank line before that `{` (the declaration) through the first column-0 `}` or `};` after it.
+	# A region reaching no such `{` is at namespace scope and is its own block, and the lines a look-down
+	# skipped before the declaration are one too, so no changed line goes unjudged. A region running past a
+	# block's closer continues from the next line under the same rule until every region line is in a block.
+	$cppPaths = [Collections.Generic.HashSet[string]]::new([string[]] @())
+	foreach ($entry in $Inventory.entries) {
+		if ($script:CppClasses -ccontains $entry.class) { [void] $cppPaths.Add($entry.path) }
+	}
+	$blocks = [Collections.Generic.List[object]]::new()
+	$seen = [Collections.Generic.HashSet[string]]::new()
+	if ($null -eq $Inventory.regions) { return $blocks }
+	$add = {
+		param([string] $Path, [int] $Line, [int] $EndLine, [string[]] $Lines)
+		if (-not $seen.Add("$Path`n$Line")) { return }
+		$blocks.Add([ordered]@{ path = $Path; line = $Line; endLine = $EndLine; text = (($Lines[($Line - 1)..($EndLine - 1)]) -join "`n") })
+	}
+	foreach ($region in $Inventory.regions) {
+		if (-not $cppPaths.Contains($region.path) -or $null -eq $region.startLine) { continue }
+		$lines = Get-HeadSideLine $region.path
+		$start = [Math]::Max(1, [int] $region.startLine)
+		$end = [Math]::Min($lines.Count, [int] $region.endLine)
+		while ($start -le $end) {
+			# Blank lines at the region's start or after a closer are skipped so a separator does not look down into the next body.
+			while ($start -le $end -and [string]::IsNullOrWhiteSpace($lines[$start - 1])) { $start++ }
+			if ($start -gt $end) { break }
+			$opener = 0
+			for ($number = $start; $number -le $lines.Count; $number++) {
+				if ($number -gt $start -and [string]::IsNullOrWhiteSpace($lines[$number - 1])) { break }
+				if ($lines[$number - 1] -cmatch '^\};?\s*$') { break }
+				if (Test-BlockOpener $lines $number) { $opener = $number; break }
+			}
+			if ($opener -eq 0) {
+				for ($number = $start - 1; $number -ge 1; $number--) {
+					if ($lines[$number - 1] -cmatch '^\};?\s*$') { break }
+					if (Test-BlockOpener $lines $number) { $opener = $number; break }
+				}
+			}
+			if ($opener -eq 0) { & $add $region.path $start $end $lines; break }
+			$declaration = $opener
+			for ($number = $opener - 1; $number -ge 1; $number--) {
+				if (-not [string]::IsNullOrWhiteSpace($lines[$number - 1])) { $declaration = $number; break }
+			}
+			$closer = $lines.Count
+			for ($number = $opener + 1; $number -le $lines.Count; $number++) {
+				if ($lines[$number - 1] -cmatch '^\};?\s*$') { $closer = $number; break }
+			}
+			& $add $region.path $declaration $closer $lines
+			if ($declaration -gt $start) { & $add $region.path $start ($declaration - 1) $lines }
+			$start = $closer + 1
+		}
+	}
+	$blocks.Sort([Comparison[object]] {
+		param($left, $right)
+		$compare = [string]::CompareOrdinal($left.path, $right.path)
+		if ($compare -ne 0) { return $compare }
+		return $left.line - $right.line
+	})
+	return $blocks
+}
+
+$sessionMode = -not [string]::IsNullOrWhiteSpace($RepositoryRoot) -and -not [string]::IsNullOrWhiteSpace($Baseline)
+if ($sessionMode -eq (-not [string]::IsNullOrWhiteSpace($CasesPath))) { Complete-StyleRuleJudgment 1 'error' 'input.mode' 'Supply exactly one of -CasesPath or -RepositoryRoot with -Baseline.' }
+if ($sessionMode) {
+	try {
+		$script:Root = Get-AgentCanonicalPath $RepositoryRoot
+		$inventory = Get-InventoryDocument
+		$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
+		# @() keeps zero blocks an empty array and one block a one-row array: a returned list unrolls to its rows.
+		$sessionBlocks = @(Get-SessionBlock $inventory)
+	}
+	catch {
+		Complete-StyleRuleJudgment 1 'error' 'internal.error' $_.Exception.Message
+	}
+	if ($sessionBlocks.Count -eq 0) { Complete-StyleRuleJudgment 0 'ok' 'judgment.no-blocks' 'The session changed no C++ block, so Jev was not asked.' }
+	$codes = @($sessionBlocks | ForEach-Object { $_.text })
+}
+else {
+	if (-not (Test-Path -LiteralPath $CasesPath -PathType Leaf)) { Complete-StyleRuleJudgment 1 'error' 'cases.missing' "Cases file not found: '$CasesPath'." }
+	$cases = @(Get-Content -LiteralPath $CasesPath -Raw | ConvertFrom-Json -Depth 8)
+	if ($cases.Count -eq 0) { Complete-StyleRuleJudgment 1 'error' 'cases.empty' 'Cases file holds no cases.' }
+	$codes = @($cases | ForEach-Object { $_.code -join "`n" })
+}
 
 # Named apart from the table it copies: variable names are case-insensitive, so `$blockQuestions` would be
 # the table itself.
@@ -129,8 +272,7 @@ foreach ($key in $script:BlockQuestions.Keys) {
 # Two requests per block, block questions then name questions, so response 2i and 2i+1 belong to block i.
 $requests = [Collections.Generic.List[object]]::new()
 $nameLists = [Collections.Generic.List[object]]::new()
-foreach ($case in $cases) {
-	$code = ($case.code -join "`n")
+foreach ($code in $codes) {
 	$requests.Add([ordered]@{ state = [ordered]@{ code = $code }; questions = $blockQuestionSet })
 	$names = Get-BlockIdentifiers $code
 	$nameLists.Add($names)
@@ -158,45 +300,66 @@ finally {
 if ($jev.status -eq 'blocked') { Complete-StyleRuleJudgment 2 'blocked' $jev.code "Jev did not run, so no block was judged: $($jev.message)" }
 $result.inputTokens = [int64]$jev.inputTokens
 
-$perRule = [ordered]@{}
-foreach ($key in @($script:BlockQuestions.Keys) + @('rule56')) { $perRule[$key] = [ordered]@{ hit = 0; missed = 0; falseFlag = 0; clean = 0 } }
-$blocks = @()
-for ($i = 0; $i -lt $cases.Count; $i++) {
-	$case = $cases[$i]
-	$blockResponse = $jev.responses[2 * $i]
-	$nameResponse = $jev.responses[2 * $i + 1]
-	if ($null -ne $blockResponse.error -or $null -ne $nameResponse.error) {
-		$blocks += [ordered]@{ id = $case.id; error = "$($blockResponse.error) $($nameResponse.error)".Trim() }
-		continue
-	}
+function Get-BlockJudgment([object] $BlockResponse, [object] $NameResponse, [string[]] $NameList) {
 	$probabilities = [ordered]@{}
 	$flagged = @()
 	foreach ($key in $script:BlockQuestions.Keys) {
-		$p = [Math]::Round([double]$blockResponse.answers.$key.noul, 3)
+		$p = [Math]::Round([double]$BlockResponse.answers.$key.noul, 3)
 		$probabilities[$key] = $p
 		$threshold = if ($key -eq 'rule3') { $Rule3Threshold } else { $BlockThreshold }
 		if ($p -ge $threshold) { $flagged += [ordered]@{ rule = $key; probability = $p } }
 	}
 	$names = @()
-	foreach ($name in $nameLists[$i]) { $names += [ordered]@{ name = $name; probability = [Math]::Round([double]$nameResponse.answers.$name.noul, 3) } }
+	foreach ($name in $NameList) { $names += [ordered]@{ name = $name; probability = [Math]::Round([double]$NameResponse.answers.$name.noul, 3) } }
 	$names = @($names | Sort-Object -Property { $_['probability'] } -Descending)
 	$flaggedNames = @($names | Where-Object { $_['probability'] -ge $NameThreshold })
 	if ($flaggedNames.Count -gt 0) { $flagged += [ordered]@{ rule = 'rule56'; probability = $flaggedNames[0].probability; names = @($flaggedNames | ForEach-Object { $_['name'] }) } }
 	$flagged = @($flagged | Sort-Object -Property { $_['probability'] } -Descending)
-	$expected = @($case.expected)
-	$got = @($flagged | ForEach-Object { $_['rule'] })
-	foreach ($key in $perRule.Keys) {
-		$wanted = $expected -contains $key
-		$fired = $got -contains $key
-		if ($wanted -and $fired) { $perRule[$key].hit++ } elseif ($wanted) { $perRule[$key].missed++ } elseif ($fired) { $perRule[$key].falseFlag++ } else { $perRule[$key].clean++ }
+	return [ordered]@{ flagged = $flagged; probabilities = $probabilities; names = $names }
+}
+
+$blocks = @()
+if ($sessionMode) {
+	for ($i = 0; $i -lt $sessionBlocks.Count; $i++) {
+		$block = $sessionBlocks[$i]
+		$blockResponse = $jev.responses[2 * $i]
+		$nameResponse = $jev.responses[2 * $i + 1]
+		if ($null -ne $blockResponse.error -or $null -ne $nameResponse.error) {
+			$blocks += [ordered]@{ path = $block.path; line = $block.line; endLine = $block.endLine; error = "$($blockResponse.error) $($nameResponse.error)".Trim() }
+			continue
+		}
+		$judgment = Get-BlockJudgment $blockResponse $nameResponse $nameLists[$i]
+		$blocks += [ordered]@{ path = $block.path; line = $block.line; endLine = $block.endLine; flagged = $judgment.flagged }
 	}
-	# A label for a rule this script does not ask (rule 61, the scanner's) is not a miss.
-	$missed = @($expected | Where-Object { $perRule.Contains($_) -and $got -notcontains $_ })
-	$falseFlags = @($got | Where-Object { $expected -notcontains $_ })
-	$blocks += [ordered]@{ id = $case.id; expected = $expected; missed = $missed; falseFlags = $falseFlags; flagged = $flagged; probabilities = $probabilities; names = $names }
+}
+else {
+	$perRule = [ordered]@{}
+	foreach ($key in @($script:BlockQuestions.Keys) + @('rule56')) { $perRule[$key] = [ordered]@{ hit = 0; missed = 0; falseFlag = 0; clean = 0 } }
+	for ($i = 0; $i -lt $cases.Count; $i++) {
+		$case = $cases[$i]
+		$blockResponse = $jev.responses[2 * $i]
+		$nameResponse = $jev.responses[2 * $i + 1]
+		if ($null -ne $blockResponse.error -or $null -ne $nameResponse.error) {
+			$blocks += [ordered]@{ id = $case.id; error = "$($blockResponse.error) $($nameResponse.error)".Trim() }
+			continue
+		}
+		$judgment = Get-BlockJudgment $blockResponse $nameResponse $nameLists[$i]
+		$flagged = $judgment.flagged
+		$expected = @($case.expected)
+		$got = @($flagged | ForEach-Object { $_['rule'] })
+		foreach ($key in $perRule.Keys) {
+			$wanted = $expected -contains $key
+			$fired = $got -contains $key
+			if ($wanted -and $fired) { $perRule[$key].hit++ } elseif ($wanted) { $perRule[$key].missed++ } elseif ($fired) { $perRule[$key].falseFlag++ } else { $perRule[$key].clean++ }
+		}
+		# A label for a rule this script does not ask (rule 61, the scanner's) is not a miss.
+		$missed = @($expected | Where-Object { $perRule.Contains($_) -and $got -notcontains $_ })
+		$falseFlags = @($got | Where-Object { $expected -notcontains $_ })
+		$blocks += [ordered]@{ id = $case.id; expected = $expected; missed = $missed; falseFlags = $falseFlags; flagged = $flagged; probabilities = $judgment.probabilities; names = $judgment.names }
+	}
+	$result.measurement = $perRule
 }
 $result.blocks = $blocks
-$result.measurement = $perRule
 if ($jevExit -ne 0) { Complete-StyleRuleJudgment 1 'error' 'jev.partial' 'Some requests failed; their blocks carry an error instead of probabilities.' }
 $flaggedBlocks = @($blocks | Where-Object { $_.Contains('flagged') -and $_['flagged'].Count -gt 0 }).Count
 Complete-StyleRuleJudgment 0 'ok' 'blocks.judged' "$($blocks.Count) blocks judged; $flaggedBlocks flagged for a hand read."
