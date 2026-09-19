@@ -18,9 +18,9 @@ Design-time documents live in three sibling directories:
 | Directory | Scope |
 |-----------|-------|
 | `Plans/` (`Plans/AGENTS.md`) | Refactors and bugfixes. Debt reduction — cleaning, decomposing, renaming, deleting dead code, fixing races/NaNs/precision, defensive shader clamps. Changes *how* the engine is built or how correctly it runs, not what it does. |
-| `Features/` (`Features/AGENTS.md`) | Brand-new additions. Manually executed; never scheduler-tracked. |
-| `Investigations/` (`Investigations/AGENTS.md`) | Non-executable reference material — findings records, overviews, option-presenting investigations. Never a scheduler input. |
+| `Features/` (`Features/AGENTS.md`) | Ideas saved for another day, decided or not. Manually executed; never scheduler-tracked. |
+| `Investigations/` (`Investigations/AGENTS.md`) | Work wanted soon that is not yet complete or confirmed enough to be a Plan, plus findings records and overviews. Never a scheduler input. |
 
 Decision-complete means every choice needed to implement is already made: no open options, no TBDs.
 
-Deciding test: *is this decision-complete work?* No → `Investigations/`. Yes, and it gives the engine a capability it didn't have before → `Features/`; otherwise → `Plans/`. Every plan document under `Plans/` carries a byte-zero, Git-tracked metadata marker; a marker-less one is a validation error, not a manual document. WorktreeCli selects executable Plans deterministically by immutable creation time and normalized path. Each tree uses area subfolders; `Plans/AGENTS.md` defines the Plans areas.
+Deciding test: *is this wanted soon?* No → `Features/`. Yes, and decision-complete → `Plans/`; otherwise → `Investigations/`. Every plan document under `Plans/` carries a byte-zero, Git-tracked metadata marker; a marker-less one is a validation error, not a manual document. WorktreeCli selects executable Plans deterministically by immutable creation time and normalized path. Each tree uses area subfolders; `Plans/AGENTS.md` defines the Plans areas.

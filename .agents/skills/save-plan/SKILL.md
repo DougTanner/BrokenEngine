@@ -1,6 +1,6 @@
 ---
 name: save-plan
-description: Save an explicitly supplied complete plan-mode proposal into the correct Broken Engine planning tree. Documents/Plans receives Git-backed metadata; Documents/Features remains manual.
+description: Save an explicitly supplied complete plan-mode proposal into the correct Broken Engine planning tree. Documents/Plans receives Git-backed metadata; Documents/Investigations and Documents/Features remain manual.
 argument-hint: [PascalCase.md]
 allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell, Bash]
 disable-model-invocation: true
@@ -93,9 +93,9 @@ Resolve the explicitly supplied complete proposal as follows:
 
    Done when a meaning-changing revision has explicit user approval, or no such
    revision was made.
-9. Classify into `Documents/Plans/` for executable engine debt or
-   `Documents/Features/` for manual capability planning. Done when the tree is
-   chosen.
+9. Classify into `Documents/Plans/`, `Documents/Investigations/`, or
+   `Documents/Features/` by the deciding test in `Documents/AGENTS.md`
+   `## Planning Trees`. Done when the tree is chosen.
 10. Select an existing area and a concise PascalCase filename matching
     `^[A-Z][A-Za-z0-9]*\.md$`. Done when the area and filename are chosen.
 11. Search live Plans for duplicate root cause and implementation boundary

@@ -65,7 +65,11 @@ the list a full model then reads", never "Jev decides".
   (`Documents/Plans/AGENTS.md`), file classes come from the change inventory,
   and executable membership is deterministic validation
   (`.agents/skills/update-vcxproj/SKILL.md`). A model answer would be strictly
-  worse than the answer the repository already has.
+  worse than the answer the repository already has. `JevPlanAreaFiling.md` is
+  the measured case: its rule read like a judgment but is a count over named
+  paths, and a script reproduced every filing, while Jev got 56 or 57 of 58. So
+  before a pilot, write the rule's deterministic part as code and measure how
+  much is left for the model; a candidate whose remainder is empty stops here.
 - Anything that must be the evidence of record. The root `AGENTS.md` Diagnosis
   Discipline directive requires a root cause confirmed from close code
   inspection or evidence, and every finding must carry its evidence
@@ -83,7 +87,7 @@ the list a full model then reads", never "Jev decides".
 | document | where the choice is fixed today | primitive | pilot | next test |
 |---|---|---|---|---|
 | `JevCommentBlockTriage.md` | `/comment-review`'s six classes | `choice` + `ok` per block; `ok` probability orders reading | run: at `ok` < 0.5, 35/40 changed blocks flagged, 13/40 untouched flagged | hand-labelled 100 blocks from a second commit |
-| `JevPlanAreaFiling.md` | `Documents/Plans/AGENTS.md` areas; the Plans/Features/Investigations test | `choice` over areas | run: 56/58 agree; both misses are the borderline cases and the lowest confidences | full tree plus Investigations and Features at a 0.6 gate |
+| `JevPlanAreaFiling.md` | `Documents/Plans/AGENTS.md` areas; the Plans/Features/Investigations test | `choice` over areas | run twice: 56/58 and 57/58 agree, every flag a false flag; a path count reproduces all 58; the tree question turns on user intent the document does not carry | none: not promoted |
 | `JevDuplicatePlanDetection.md` | `/create-follow-up-plans` duplicate rule | `score` with levels = actions (distinct, related, same fix) | run: the three merged Plans are the top three of 50 pairs; no distinct pair reached 1.0 | a second historical merge; a code-side shortlist |
 | `JevEvidenceCitationCheck.md` | finding evidence rows, acceptance rows, Plan citations | `choice` supports / contradicts / says_nothing | run twice, tracked script: 440/625 real citations `supports`, 36/585 shifted regions; blind read of 66: passes right 20/22, flags right only 15/44 | reading order only; enclosing-function context, then a human blind read |
 | `JevStyleRuleJudgment.md` | `/code-style-review` hand-read rules 49, 56, 62 | one `noul` per rule per candidate | not run: scanner needed first | 60 hand-labelled candidates per rule |
@@ -124,11 +128,11 @@ Promote in the order the pilots justify, not the order of expected saving:
    sweep showed its flags are a reading order and not a verdict, which is the
    shape every candidate is held to anyway; the duplicate check still has one
    concrete next test a human can finish in an hour.
-2. `JevPlanAreaFiling.md` next, as a check inside the same tree sweep once
-   the first two exist, since its wiring is nearly the same script.
-3. `JevCommentBlockTriage.md` as the first in-round use, wired as a reading
-   order only, after its second-commit measurement.
-4. Every remaining candidate waits for a corpus that does not exist yet, and
+2. `JevCommentBlockTriage.md` as the first in-round use, wired as a reading
+   order only, after its second-commit measurement. `JevPlanAreaFiling.md` is
+   not promoted: its second pilot showed the filing rule is a path count a
+   script reproduces exactly, so it falls under `## Not suitable`.
+3. Every remaining candidate waits for a corpus that does not exist yet, and
    `JevSimplicityReviewTrigger.md` and `JevFindingTriage.md` are the cheapest
    ways to start collecting one, because they record Jev's answer beside a
    decision the workflow already makes.
