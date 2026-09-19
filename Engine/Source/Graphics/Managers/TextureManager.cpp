@@ -846,8 +846,9 @@ void TextureManager::ReblurAllLightingTextures()
 {
 	for (common::crc_t crc : gpTextureUploadManager->mLightingTextureCrcs)
 	{
-		LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(crc);
-		if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kReady)
+		// A registered CRC can be a cross-pack reference with no chunk in this pack set; IsChunkReady reports it
+		//   not ready, so it stays unblurred like the request path leaves it
+		if (gpFileManager->IsChunkReady(crc))
 		{
 			BlurLightingTexture(crc);
 		}
