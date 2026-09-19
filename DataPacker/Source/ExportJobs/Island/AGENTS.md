@@ -18,7 +18,7 @@ Island discovery, route cache inspection, clean early returns, and split-only re
 
 ## Island Outputs
 
-Each complete leaf produces a `kIsland` chunk plus independently routed BC texture intermediates for color, normals, ambient occlusion, and the RGBA material mask. The mask channels are rock, sand, snow, and flow. Texture filenames and formats are producer/consumer contracts; update the runtime shader and upload expectations with any change.
+Each complete leaf produces a `kIsland` chunk plus independently routed BC texture intermediates for color, normals, ambient occlusion, and the RGBA material mask. The mask channels are rock, sand, snow, and flow. Flow is packed and fingerprinted like the others; `Documents/Features/Graphics/IslandFlowMaskUsage.md` owns why it is kept. Texture filenames and formats are producer/consumer contracts; update the runtime shader and upload expectations with any change.
 
 Masking occurs before mip generation. Underwater texels use format-specific flat values so constant regions survive through mipmaps and compression, while shoreline above `common::kfUnderwaterMaskThresholdMeters` remains available to rendering and placement. That one shared constant is the whole cut line: DataPacker bakes both the texture mask and the valid-area hull from it, and the engine publishes the same value to the shaders and to the debug hull draw. Never introduce a second local threshold — nothing would catch baked textures drifting out of step with the shader.
 

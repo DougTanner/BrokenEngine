@@ -46,9 +46,10 @@ step.
   brief and the repository rather than asking main for more.
 - Each researcher works blind, from its own brief alone, and never sees another
   researcher's candidate.
-- A file under `Documents/Plans/` is never an evidence path. Leave one unread
-  whether the brief names it or a search surfaces it, and work from the scope
-  the brief states.
+- `Documents/Plans/`, `Documents/Features/`, `Documents/Investigations/`, and
+  `Temp/` are outside a researcher's search and are never evidence paths. Leave
+  such a file unread whether the brief names it or a search surfaces it, and
+  work from the scope the brief states.
 - Keep every candidate on the assigned axis; leave a strong idea belonging to
   another axis out.
 - Drop a candidate that cannot name its mechanism or its files, and report the

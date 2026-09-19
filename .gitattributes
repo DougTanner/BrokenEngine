@@ -23,4 +23,3 @@
 *.BC5_UNORM_BLOCK     binary
 *.BC7_UNORM_BLOCK     binary
 *.R16G16B16A16_SFLOAT binary
-*.GLTF_MODEL          binary

@@ -138,7 +138,9 @@ sequenceDiagram
     participant Server
 
     Main->>Main: ClientReconciler::Run() detects CRC mismatch
-    Main->>Main: Deep-copy client Frame
+    opt kbDesyncDebugFrames enabled on client and server
+        Main->>Main: Deep-copy client Frame
+    end
     Main->>Net: SendDesyncReport()
     Net->>Server: Desync report
 

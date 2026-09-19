@@ -38,7 +38,6 @@ IslandTerrain::IslandTerrain()
 		rTemplate.mfWorldFootprintXMeters = rLazyChunk.header.islandHeader.fWorldFootprintXMeters;
 		rTemplate.mfWorldFootprintYMeters = rLazyChunk.header.islandHeader.fWorldFootprintYMeters;
 		rTemplate.mfWorldElevationMeters = rLazyChunk.header.islandHeader.fWorldElevationMeters;
-		rTemplate.mfMaxHeightMeters = rLazyChunk.header.islandHeader.fMaxHeightMeters;
 		ASSERT(rTemplate.mfWorldFootprintXMeters > 0.0f);
 		ASSERT(rTemplate.mfWorldFootprintYMeters > 0.0f);
 		rTemplate.mfQuadFootprintX = rTemplate.mfWorldFootprintXMeters;

@@ -22,7 +22,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 - Player/enemy alignments are copied into each new `FramePostRender`; frame code reads the snapshot, not `gpGame`.
 - The game-owned persisted client settings — `TweaksSettings.bin` and `ClientState.bin` — are versioned POD written through the engine versioned-file helpers. `ClientState.bin` loads once at startup into an in-memory mirror that focus and zoom changes refresh; orderly client shutdown writes that mirror once, while abnormal exits do not guarantee current-session changes are saved and may leave the previous orderly-exit snapshot on disk. Bump the owning version on layout change. Game, sound, and graphics settings persistence is engine-owned (`../../../Engine/Source/Ui/AGENTS.md`).
 - Save/replay compatibility is gated by `Frame::kiVersion`; `Version.h::kiGameVersion` is informational.
-- `Pch.h` owns compile-time switches. `kbDesyncDebugFrames` is a manual, disabled-by-default diagnostic switch that must match between client and server; it controls full-frame buffering/serving and client debug-frame stalling without changing the wire contract.
+- `Pch.h` owns compile-time switches. `kbDesyncDebugFrames` is a manual, disabled-by-default diagnostic switch that must match between client and server; it controls full-frame buffering/serving, client desync frame cloning, and client debug-frame stalling without changing the wire contract.
 - The game PCH force-includes shared aggregation/layout headers. Consumer TUs do not repeat those includes; DataPacker has a separate PCH.
 
 ## Subsystems

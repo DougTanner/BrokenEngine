@@ -38,12 +38,16 @@ skill-specific inputs:
 - whether the session's approved plan or acceptance table includes an
   agent-harness scenario; a delegator requesting the build states this trigger,
   counting any acceptance criterion or check settled by running `/agent-harness`
-  as such a scenario;
+  as such a scenario. An included agent-harness scenario adds the client and
+  the server to the targets, so name both;
 - for a BrokenEngineSandbox build, the Local generation authorization a
   user-approved plan or acceptance criterion grants, the deletion-only
-  reference-search evidence, or the stated basis for Shared, plus any Gaea
-  authorization the same plan or criterion grants, and any Local mode the user
-  forced; the worker resolves and selects the mode itself —
+  reference-search evidence — a basis only when every trigger-matching
+  changed path is a whole-file deletion of a source asset (baseline diff
+  status `D`), never an in-file modification — or the stated basis for
+  Shared, plus any Gaea authorization the same plan or criterion grants, and
+  any Local mode the user forced; the worker resolves and selects the mode
+  itself —
   [references/runtime-data-mode.md](references/runtime-data-mode.md)
   `## Mode selection` and `## Local generation` own which authorizations are
   valid;

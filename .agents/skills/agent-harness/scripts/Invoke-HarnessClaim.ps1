@@ -1,9 +1,10 @@
 # Require the project executables, provision the checkout, resolve AgentHarness, mint an owner
 # token, and claim the harness lock.
 # A foreign owner is waited out, not stolen from: provisioning runs once and only the claim attempt
-# repeats until the wait budget expires or the holder's own heartbeat reaches the staleness point,
-# and nothing touches the holder's processes, heartbeat, or claim. An ended wait reports the holder
-# record the last claim attempt itself printed.
+# repeats, until the lock is acquired or the holder's own heartbeat reaches the staleness point, and
+# nothing touches the holder's processes, heartbeat, or claim. A holder that keeps refreshing its
+# heartbeat is waited on for as long as it holds the lock. An ended wait reports the holder record
+# the last claim attempt itself printed.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -15,10 +16,7 @@ param(
 	[string] $Configuration = 'Debug',
 	# The caller declares that this session's scenario launches only the server, which narrows the
 	# existence check below to the server executable. It is never inferred from the command document.
-	[switch] $ServerOnly,
-	# Agents use the default; a short budget exists only so a test or scenario can reach the
-	# expired-wait outcome without waiting out the standard budget.
-	[ValidateRange(1, 500)][int] $WaitSeconds = 500
+	[switch] $ServerOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -339,10 +337,10 @@ try {
 
 	# Only the claim attempt repeats: provisioning, the harness path, and the owner token above stay
 	# valid for the whole wait, and the same owner token reclaims after each foreign-owner refusal.
-	# The wait ends at whichever comes first, the budget or the refused holder's heartbeat reaching
-	# $StaleHeartbeatSeconds old, so a holder the worker may take over is not waited out.
+	# The wait ends only when the lock is acquired or the refused holder's heartbeat reaches
+	# $StaleHeartbeatSeconds old, so a holder that keeps its heartbeat fresh is waited on instead of
+	# being given up on, and a holder the worker may take over is not waited past.
 	$stopwatch = [Diagnostics.Stopwatch]::StartNew()
-	$deadlineMilliseconds = $WaitSeconds * 1000
 	$attempts = 0
 	while ($true) {
 		$attempts++
@@ -359,14 +357,10 @@ try {
 		if ($claim.ExitCode -ne 2) {
 			Complete-HarnessClaim 1 'error' 'claim.failed' "AgentHarness lock claim failed with exit $($claim.ExitCode): $($claim.Stderr)"
 		}
-		# Sleeping a full interval past the nearer deadline would overshoot the promised budget
-		# or the holder's staleness point.
-		$remainingMilliseconds = $deadlineMilliseconds - [int]$stopwatch.ElapsedMilliseconds
+		# Sleeping a full interval past the holder's staleness point would overshoot the moment the
+		# takeover steps become available.
 		$heartbeatUtc = ConvertTo-LockUtc (Get-LockField $record 'heartbeatAt')
-		if ($null -ne $heartbeatUtc) {
-			$remainingMilliseconds = [Math]::Min([double]$remainingMilliseconds,
-				($heartbeatUtc.AddSeconds($StaleHeartbeatSeconds) - [datetime]::UtcNow).TotalMilliseconds)
-		}
+		$remainingMilliseconds = ($heartbeatUtc.AddSeconds($StaleHeartbeatSeconds) - [datetime]::UtcNow).TotalMilliseconds
 		if ($remainingMilliseconds -le 0) { break }
 		Start-Sleep -Milliseconds ([Math]::Min($PollMilliseconds, $remainingMilliseconds))
 	}
@@ -390,8 +384,9 @@ try {
 		holdSeconds = $holdSeconds
 		record = $record
 	}
-	Complete-HarnessClaim 2 'blocked' 'claim.foreign-owner' ("Harness lock '$Key' is still held by owner $(Get-LockField $record 'owner') " +
-		"since $claimedAtText ($holdSeconds seconds) after waiting $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 3)) seconds over $attempts attempt(s).")
+	Complete-HarnessClaim 2 'blocked' 'claim.foreign-owner' ("Harness lock '$Key' is held by owner $(Get-LockField $record 'owner') " +
+		"since $claimedAtText ($holdSeconds seconds) and has gone stale after waiting " +
+		"$([Math]::Round($stopwatch.Elapsed.TotalSeconds, 3)) seconds over $attempts attempt(s).")
 }
 catch {
 	Complete-HarnessClaim 1 'error' 'internal.error' $_.Exception.Message

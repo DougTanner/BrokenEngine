@@ -13,7 +13,7 @@ try {
  $status=Get-NextPlanClaimStatus $context
  $claimArguments=$status.Arguments;$claimStatus=$status.Status
  if($status.ExitCode -ne 0){$exit=if($status.ExitCode -eq 2){2}else{1};Complete-Workflow $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'completion.claim-status-failed' 'WorktreeCli could not report the Plan claim.' 'stop-report-to-user'}
- if([string]$claimStatus.code -ceq 'none'){Complete-Workflow 0 'pass' 'no-claim' 'No Plan claim is present.' 'stop-report-to-user'}
+ if([string]$claimStatus.code -ceq 'none'){Complete-Workflow 0 'pass' 'no-claim' 'No Plan claim is present.' 'checkpoint-followup-gate'}
  $operation=if($Reject){'reject'}else{'complete'}
  $expectedDisposition=if($Reject){'rejected'}else{'completed'}
  $arguments=@('plan',$operation)+$claimArguments

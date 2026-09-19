@@ -2,8 +2,6 @@
 
 #include "Texture.h"
 
-#include "Ui/GraphicsSettingsWrappersBase.h"
-
 namespace engine
 {
 
@@ -185,7 +183,7 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(void*, i
 		.mipLevels = mInfo.mipLevels,
 		.arrayLayers = mInfo.arrayLayers,
 		.samples = mInfo.samples,
-		.tiling = mInfo.textureFlags & kHostVisible ? VK_IMAGE_TILING_LINEAR : VK_IMAGE_TILING_OPTIMAL,
+		.tiling = VK_IMAGE_TILING_OPTIMAL,
 		.usage = mInfo.usage,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount = 0,
@@ -196,11 +194,7 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(void*, i
 	VmaAllocationCreateInfo vmaAllocationCreateInfo {};
 	vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-	if (mInfo.textureFlags & kHostVisible)
-	{
-		vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	}
-	else if (mInfo.textureFlags & kRenderPass)
+	if (mInfo.textureFlags & kRenderPass)
 	{
 		// Use dedicated allocations only for large render targets (VMA recommends for resources >32MB or frequently resized)
 		static constexpr VkDeviceSize kLargeSizeThreshold = 32 * 1024 * 1024;
@@ -295,31 +289,6 @@ void Texture::UploadImageData(const std::function<void(void*, int64_t, int64_t)>
 
 void Texture::CreateRenderTarget()
 {
-	if (mInfo.textureFlags & kDepth)
-	{
-		VkImageAspectFlags vkImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
-		if (gpInstanceManager->mDepthVkFormat == VK_FORMAT_D16_UNORM_S8_UINT || gpInstanceManager->mDepthVkFormat == VK_FORMAT_D24_UNORM_S8_UINT || gpInstanceManager->mDepthVkFormat == VK_FORMAT_D32_SFLOAT_S8_UINT)
-		{
-			vkImageAspectFlags |= VK_IMAGE_ASPECT_STENCIL_BIT;
-		}
-		mpDepthTexture = std::make_unique<Texture>();
-		mpDepthTexture->Create(TextureInfo
-		{
-			.textureFlags = {},
-			.name = "Depth",
-			.flags = 0,
-			.format = gpInstanceManager->mDepthVkFormat,
-			.extent = VkExtent3D {.width = mInfo.extent.width, .height = mInfo.extent.height, .depth = 1},
-			.mipLevels = 1,
-			.arrayLayers = 1,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.aspectMask = vkImageAspectFlags,
-			.eTextureLayout = kUndefined,
-		});
-	}
-
 	VkAttachmentDescription pVkAttachmentDescriptions[]
 	{
 		VkAttachmentDescription
@@ -334,32 +303,11 @@ void Texture::CreateRenderTarget()
 			.initialLayout = mInfo.renderPassInitialVkImageLayout,
 			.finalLayout = mInfo.renderPassFinalVkImageLayout,
 		},
-		// The optional, unused kDepth path reuses a per-texture depth image with UNDEFINED initial layout and CLEAR load. This pass has only an
-		// outgoing dependency; incoming depth synchronization is implicit. Reusing depth requires an explicit EXTERNAL-to-0 dependency with
-		// EARLY/LATE_FRAGMENT_TESTS and DEPTH_STENCIL_ATTACHMENT_WRITE scopes, as in SwapchainManager::CreateRenderPass, to prevent depth
-		// write-after-write.
-		VkAttachmentDescription
-		{
-			.flags = 0,
-			.format = gpInstanceManager->mDepthVkFormat,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-		},
 	};
 	VkAttachmentReference vkAttachmentReference
 	{
 		.attachment = 0,
 		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	};
-	VkAttachmentReference depthVkAttachmentReference
-	{
-		.attachment = 1,
-		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 	};
 	VkSubpassDescription vkSubpassDescription
 	{
@@ -370,7 +318,7 @@ void Texture::CreateRenderTarget()
 		.colorAttachmentCount = 1,
 		.pColorAttachments = &vkAttachmentReference,
 		.pResolveAttachments = nullptr,
-		.pDepthStencilAttachment = mInfo.textureFlags & kDepth ? &depthVkAttachmentReference : nullptr,
+		.pDepthStencilAttachment = nullptr,
 		.preserveAttachmentCount = 0,
 		.pPreserveAttachments = nullptr,
 	};
@@ -390,7 +338,7 @@ void Texture::CreateRenderTarget()
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.attachmentCount = mInfo.textureFlags & kDepth ? 2u : 1u,
+		.attachmentCount = 1,
 		.pAttachments = pVkAttachmentDescriptions,
 		.subpassCount = 1,
 		.pSubpasses = &vkSubpassDescription,
@@ -399,14 +347,14 @@ void Texture::CreateRenderTarget()
 	};
 	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkRenderPassCreateInfo, nullptr, &mVkRenderPass));
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mVkRenderPass, mInfo.name.data());
-	VkImageView pVkImageViews[] {mVkImageView, mInfo.textureFlags & kDepth ? mpDepthTexture->mVkImageView : nullptr};
+	VkImageView pVkImageViews[] {mVkImageView};
 	VkFramebufferCreateInfo vkFramebufferCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
 		.renderPass = mVkRenderPass,
-		.attachmentCount = mInfo.textureFlags & kDepth ? 2u : 1u,
+		.attachmentCount = 1,
 		.pAttachments = pVkImageViews,
 		.width = mInfo.extent.width,
 		.height = mInfo.extent.height,
@@ -432,8 +380,6 @@ void Texture::Destroy() noexcept
 
 	if (mVkRenderPass != VK_NULL_HANDLE)
 	{
-		mpDepthTexture.reset();
-
 		vkDestroyFramebuffer(gpDeviceManager->mVkDevice, mVkFramebuffer, nullptr);
 		mVkFramebuffer = VK_NULL_HANDLE;
 		vkDestroyRenderPass(gpDeviceManager->mVkDevice, mVkRenderPass, nullptr);
@@ -494,14 +440,6 @@ void Texture::RecordCopyImageFrom(VkCommandBuffer vkCommandBuffer, const Texture
 void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer)
 {
 	RenderPassFlags_t renderPassFlags;
-	if (mInfo.textureFlags & TextureFlags::kDepth)
-	{
-		renderPassFlags.Set(RenderPassFlags::kDepth);
-	}
-	if (mInfo.textureFlags & TextureFlags::kMultisampling && gMultisampling.Get<bool>())
-	{
-		renderPassFlags.Set(RenderPassFlags::kMultisampling);
-	}
 	if (mInfo.renderPassVkAttachmentLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)
 	{
 		renderPassFlags.Set(RenderPassFlags::kClear);

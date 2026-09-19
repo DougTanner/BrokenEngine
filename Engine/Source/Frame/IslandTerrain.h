@@ -52,10 +52,6 @@ struct IslandTemplate
 	float mfWorldFootprintYMeters = 0.0f;
 	float mfWorldElevationMeters = 0.0f;
 
-	// Actual peak of the shipped heightmap in engine-meters above beach (vs mfWorldElevationMeters,
-	// the configured elevation range). Manifest metadata, populated in IslandTerrain ctor.
-	float mfMaxHeightMeters = 0.0f;
-
 	// Anisotropic quad footprint in engine units (islands use 1 m = 1 engine unit), so a
 	// direct copy of mfWorldFootprint{X,Y}Meters; set in ctor.
 	float mfQuadFootprintX = 0.0f;

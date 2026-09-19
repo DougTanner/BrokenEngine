@@ -291,9 +291,6 @@ struct IslandHeader
 	float fWorldFootprintXMeters = 0.0f;
 	float fWorldFootprintYMeters = 0.0f;
 	float fWorldElevationMeters = 0.0f;
-	// Actual peak of the downsampled shipped heightmap (engine-meters above beach). Differs from
-	// fWorldElevationMeters, which is the configured elevation *range* from Island.json.
-	float fMaxHeightMeters = 0.0f;
 	// Chunk data payload follows the heightmap R16 halfs:
 	// [float2 positions[iMeshVertexCount]][uint32 indices[iMeshIndexCount]][float2 valid-area hull verts[iValidAreaVertexCount]].
 	// Mesh Z is omitted — Terrain.vert re-derives world Z from the composite elevation sampler. The
@@ -304,7 +301,7 @@ struct IslandHeader
 	int32_t iMeshIndexCount = 0;
 	int32_t iValidAreaVertexCount = 0;
 };
-static_assert(sizeof(IslandHeader) == 72, "IslandHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportIsland::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
+static_assert(sizeof(IslandHeader) == 64, "IslandHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportIsland::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
 
 struct ModelHeader
 {
@@ -364,8 +361,8 @@ struct TextureHeader
 	// Per-mip Toksvig slope variance mean((1 - |avgN|) / |avgN|), baked by ExportTexture for BC5
 	// normal maps on the regular export path (zeros for every other format/path). Entries past the
 	// real mip chain are padded with the last real value at write time, so readers index by any
-	// clamped LOD without a count. Sized so TextureHeader matches the largest ChunkHeader union
-	// member (IslandHeader, 72 bytes) — real BC5 chains max out at 9 mips (1024^2).
+	// clamped LOD without a count. Sized so TextureHeader is the largest ChunkHeader union member at
+	// 72 bytes, which fixes the union footprint — real BC5 chains max out at 9 mips (1024^2).
 	static constexpr int64_t kiMipVarianceCount = 10;
 
 	int64_t iTextureWidth = 0;
@@ -430,7 +427,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size reorders also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 51 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 52 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

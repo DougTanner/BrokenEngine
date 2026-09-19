@@ -24,7 +24,6 @@ struct DataTypeEntry
 
 struct DataPackerRunSummary
 {
-	int64_t miCleanJobs = 0;
 	int64_t miExportedJobs = 0;
 	int64_t miFailedJobs = 0;
 };
@@ -478,10 +477,6 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 			{
 				++rRunSummary.miExportedJobs;
 			}
-			else
-			{
-				++rRunSummary.miCleanJobs;
-			}
 		}
 		catch (const std::exception& rException)
 		{
@@ -627,7 +622,6 @@ std::expected<bool, FileManager::EnsureLocalResult> RunExportJobs(DataPackerRunS
 
 	if (!bDirty)
 	{
-		rRunSummary.miCleanJobs += static_cast<int64_t>(exportJobs.size());
 		return true;
 	}
 
@@ -776,8 +770,6 @@ bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 		return false;
 	}
 
-	LOG(kDefault, kDebug, "");
-
 	return bSuccess;
 }
 
@@ -813,8 +805,22 @@ static bool RunCommand(int argc, char* argv[])
 	DataPackerRunSummary runSummary;
 	const auto logSummary = [&runSummary, startTime](bool bSuccess)
 	{
-		const double fElapsedSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
-		LOG(kDefault, kInfo, "Data Packer summary: {} jobs clean, {} exported, {} failed; {}s; result={}", runSummary.miCleanJobs, runSummary.miExportedJobs, runSummary.miFailedJobs, fElapsedSeconds, bSuccess ? "success" : "failed");
+		// MainThread's ThreadLocal is gone here; without one the log prefix is "#: ".
+		common::ThreadLocal threadLocal(1024, std::nullopt, false);
+		{
+			// Clean jobs are the expected case, so only exports and failures get a line inside the block.
+			ScopedLogIndent scopedLogIndent;
+			if (runSummary.miExportedJobs > 0)
+			{
+				LOG(kDefault, kInfo, "Exported: {}", runSummary.miExportedJobs);
+			}
+			if (runSummary.miFailedJobs > 0)
+			{
+				LOG(kDefault, kInfo, "Failed: {}", runSummary.miFailedJobs);
+			}
+		}
+		const int64_t iElapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - startTime).count();
+		LOG(kDefault, kInfo, "Time: {}s ({})", iElapsedSeconds, bSuccess ? "Success" : "Failed");
 	};
 
 	try

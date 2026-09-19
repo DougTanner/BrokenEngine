@@ -23,7 +23,7 @@ public:
 	// Governs the chunk payload only (heightmap R16 quantize, mesh XY, indices, valid-area hull) — the
 	// BC texture encode is versioned separately by kiTextureVersion below, so a payload bump re-packs
 	// chunks without rewriting the tracked island textures.
-	static constexpr int64_t kiVersion = Version(29);
+	static constexpr int64_t kiVersion = Version(30);
 
 	ExportIsland(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
 	: ExportJob(rChunkFlags, rFile, kiVersion)

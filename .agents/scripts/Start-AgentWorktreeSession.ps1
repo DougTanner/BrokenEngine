@@ -168,7 +168,9 @@ try {
 		}
 		catch { Write-Warning "Seeding the worktree shader caches failed, so the first launch rebuilds them: $($_.Exception.Message)" }
 	}
+	# Each step below is separated by a blank line so its output reads as its own block in the transcript.
 	& (Join-Path $root '.agents\scripts\Bootstrap-AgentTools.ps1') -RepositoryRoot $root -WaitSeconds $WaitSeconds
+	Write-Host ''
 	& (Join-Path $root '.agents\scripts\Provision-WorktreeThirdParty.ps1') -RepositoryRoot $identity.Worktree -WaitSeconds $WaitSeconds
 	if ($Client -ceq 'opencode') { Assert-AgentWorktreeOpenCodeSkills $identity.Worktree }
 	else { Assert-AgentWorktreeSkillsLink $identity.Worktree }
@@ -180,8 +182,10 @@ try {
 	# and a wrapper exit here would block the very session that must resolve the conflict from launching.
 	# The session runs the build itself after `git rebase --continue`. Provisioning above is conflict-insensitive.
 	if (-not $rebaseInProgress) {
+		Write-Host ''
 		& (Join-Path $root '.agents\scripts\Build-WorktreeDataPacker.ps1') -Worktree $identity.Worktree -WorktreeCliExecutable $worktreeCli -PrimaryCheckout $root
 	}
+	Write-Host ''
 	$banner = "$(if ($worktreeCreated) { 'Created' } else { 'Reattached' }) worktree $($identity.Worktree) on branch $($identity.Branch) at baseline $($identity.Baseline)."
 	if ($rebaseInProgress) {
 		$buildCommand = "'.agents\scripts\Build-WorktreeDataPacker.ps1' -Worktree '$($identity.Worktree)' -WorktreeCliExecutable '$worktreeCli' -PrimaryCheckout '$root'"

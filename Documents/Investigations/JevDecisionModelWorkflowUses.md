@@ -1,191 +1,46 @@
 # Using the Jev decision model in this repository's workflow
 
 Open question: where, if anywhere, would a cheap classify-only model earn its
-place in this repository's skills and Change Workflow? This document lists the
-places the workflow already makes a fixed-choice decision, says for each what
-Jev would be asked and what would still need a full model, compares the
-strongest candidates, recommends one first experiment, and lists the decisions a
-Plan would have to make. Nothing here is implemented: no script calls Jev, no
-skill mentions it, and no script under `.agents/scripts/` makes a network call
-of any kind today.
+place in this repository's skills and Change Workflow? This is the overview of
+a series: it owns what Jev is, the places it must never decide, the decisions
+every candidate shares, and the table of candidates. Each candidate is its own
+Investigation, written so it can be tested on its own and promoted to a Plan
+when its test passes. Nothing in the series is implemented: no tracked script
+calls Jev, no workflow skill uses it, and no script under `.agents/scripts/`
+makes a network call of any kind today. The pilots below ran from untracked
+scratch scripts against the live API; each candidate document states its method
+precisely enough to rerun.
 
 ## What Jev is
 
 Jev, from TypeSafe AI, is a model that cannot write text. It takes a state (a
 string, a JSON object, or an array of texts — no images) plus a set of named
-questions and answers all of them in one pass. A question is a `choice` (one of
-up to 255 named options, each with a description), a `score` (2 to 10 ordered
-levels), or a boolean (a 0 to 1 probability); choice and score answers also carry
-a confidence value. It runs in 70 to 500 ms, costs $0.042 per million input
-tokens with output free, accepts 64k tokens per request and 32k for the state
-plus the longest question, and allows 1,200 requests per minute. On the vendor's
-own workflow evaluations it agreed with the reference answer about 68% of the
-time — the same as Claude Sonnet 5, below Claude Opus 5 at 73% — for a few
-hundredths of the cost, and the vendor's own advice is to keep any real decision
-on a full model until Jev has been checked against your own labelled examples.
+questions and answers all of them in one pass. A question is a `choice`, a
+`score`, or a `noul`, defined in `/external-typesafe-ai`
+(`.agents/skills/external-typesafe-ai/SKILL.md`), which every candidate below
+names by those terms. The current model is `jev-1.13.0`, reached as
+`jev-latest` at
+`POST https://api.typesafe.ai/v1/systemone` with a bearer key. It accepts 64k
+tokens per request and 32k for the state plus the longest question, costs
+$0.042 per million input tokens with output free, and allows 1,200 requests per
+minute. Two vendor warnings shape every candidate: accuracy falls as the state
+grows with material unrelated to the decision, so code filters first and sends
+only the fields a question needs; and calibrated single answers do not stay
+calibrated once thresholds are applied and answers combined, so a threshold is
+chosen from measurement on this repository's data, never in advance. English is
+its primary language.
 
-Two consequences shape everything below. Jev can only choose among options
-someone else wrote down, so it is useless wherever the workflow needs prose: a
-replacement comment, a fix, a finding's evidence sentence. And at roughly two
-answers in three it cannot be the last word on anything that blocks a change;
-the honest shape is "Jev shortens the list a full model then reads", never "Jev
-decides".
-
-## Where the workflow already makes fixed-choice decisions
-
-Each candidate names the skill, quotes the text that fixes the choice, states
-the question Jev would answer, names what enumerates the candidates and supplies
-the file and line (always a script, never Jev), says what still needs a full
-model, and says what happens when Jev is wrong.
-
-### 1. Classifying comment blocks for `/comment-review`
-
-- Where it is fixed: `.agents/skills/comment-review/references/comment-classes.md:9-14`
-  is a six-row table — `boilerplate`, `history`, `speculative`, `navigation`,
-  `false`, `dense` — each with the rule 64 clause it enforces and a fixed
-  severity. Every finding row must carry exactly one of those six
-  (`.agents/skills/comment-review/SKILL.md:59`). The worker's step 3 is
-  literally "classify every scanned block by reading the surrounding code"
-  (`.agents/skills/comment-review/references/worker.md:37-44`).
-- Question: one `choice` per block over seven options — the six classes plus
-  "ok, no finding". The enumeration already exists:
-  `.agents/skills/comment-review/scripts/Find-CommentBlocks.ps1` walks the
-  scoped files and emits one row per run of consecutive `//` lines with `path`,
-  `startLine`, `lineCount`, `kinds`, and `firstLine`
-  (`Find-CommentBlocks.ps1:105-111`), so locations never come from Jev. One gap:
-  it emits only the block's first line, not the block text or the code beneath
-  it, so whatever calls Jev must assemble the state from the file.
-- Still needs a full model: the replacement text, "the shortest present-tense
-  replacement keeping every preserved fact"
-  (`.agents/skills/comment-review/SKILL.md:18-20`) — writing, not choosing. The
-  gain is that the reviewer reads the flagged blocks rather than all of them.
-- If Jev is wrong: a false positive costs the reviewer one block read and is
-  caught, because the reviewer must still confirm the class against the code
-  before writing a replacement. A false negative silently drops a finding — the
-  real risk, and the reason a threshold has to be set to flag generously.
-- Weak spot: `false` ("every statement is true of the adjacent code as it
-  stands", `comment-classes.md:13`). Deciding it needs real understanding of the
-  code, and `comment-classes.md:32-36` records that no fixed example applies
-  and the class is decided by reading the adjacent code. That class should stay
-  with the reviewer whatever else happens.
-
-### 2. Judgment-only style rules for `/code-style-review`
-
-- Where it is fixed: the worker hand-reads a named rule list because the
-  scanner does not emit candidates for it — "rules 3, 14, 16 …, 21, 49, 51, 56,
-  61, 62" (`.agents/skills/code-style-review/references/worker.md:36-44`). Of
-  those, the ones that are pure judgment on a short piece of text are rule 49,
-  no accessor or one-line pass-through functions
-  (`Documents/C++StyleGuide.txt:201`); rule 56, complete words in names, no
-  abbreviations (`:264`); and rule 62, one `if` per guard condition instead of
-  a packed `A || B || C` (`:299`).
-- Question: one boolean per candidate ("does this violate rule N as quoted?").
-- Enumeration: does not exist yet for these three. `Find-SessionCandidates.ps1`
-  emits a `style-rule-<n>` kind per rule it covers
-  (`.agents/scripts/Find-SessionCandidates.ps1:44-55`), and 49, 56, and 62 are
-  not among them — that is exactly why the worker hand-reads them. So this
-  candidate costs a new scanner (declarations, identifiers, guard conditions)
-  before a Jev call has anything to answer about. Rule 57 (`Impl`/`Internal`
-  suffixes, `Documents/C++StyleGuide.txt:266`) is the opposite case: the scanner
-  already emits `style-rule-57` (`Find-SessionCandidates.ps1:54`) and the rule
-  has no exceptions worth judging, so Jev would add nothing there.
-- Still needs a full model: the fix, and whether it is meaning-preserving — the
-  worker may only auto-fix when "the resulting C++ meaning is demonstrably
-  unchanged" (`.agents/skills/code-style-review/references/worker.md:70-73`).
-- If Jev is wrong: same shape as candidate 1, but a missed rule-49 or rule-56
-  violation lands in the code, and the enumeration gap makes this the more
-  expensive experiment for the same kind of payoff. A whole-file "does this file
-  follow the style guide" boolean is no substitute: the handoff needs file,
-  line, rule number, and correction
-  (`.agents/skills/code-style-review/SKILL.md:41`).
-
-### 3. The `/plan-simplicity-review` dispatch trigger
-
-- Where it is fixed: the Change Workflow says to dispatch the review "when the
-  plan adds new code or changes non-documentation behavior … when unsure
-  whether a plan triggers it, dispatch it"
-  (`.agents/references/change-workflow.md:93`). The skill defines both terms:
-  new code is "a new tracked file, function, class, system, script, guard or
-  recovery path, or configuration surface absent at the session baseline"
-  (`.agents/skills/plan-simplicity-review/SKILL.md:33-36`), and a skill edit is
-  behavior when it changes frontmatter, invocation, routing, a bundled script, a
-  workflow step, a contract, a trigger, or a threshold — documentation when it
-  only rewords (`:48-55`).
-- Question: one boolean over the plan text, with a deliberately low threshold so
-  the "when unsure, dispatch" default survives. No enumeration is needed; a plan
-  file sits well inside the 32k-token state limit. The review itself is
-  unchanged.
-- Still needs a full model: the review itself. Jev would decide only whether to
-  dispatch `/plan-simplicity-review`; the dispatch still runs the reviewer
-  subagent, which reads the plan and writes the findings.
-- If Jev is wrong: a false positive costs one extra reviewer dispatch, which is
-  what the current rule already chooses on purpose; a false negative skips a
-  review the workflow requires. So the saving is capped at the dispatches main
-  would have made under uncertainty, while the error runs only in the expensive
-  direction. Useful mainly as a low-stakes place to measure agreement.
-
-### 4. Risk tier classification
-
-- Where it is fixed: three tiers with written boundaries, "classify the whole
-  change at the highest applicable tier before implementing"
-  (`.agents/references/risk-tiers.md:5-9`), locked in by main at the Approve and
-  classify step (`.agents/references/change-workflow.md:75-79`), and a reviewer
-  "may escalate the tier when the changed bytes expose a higher-risk surface"
-  (`risk-tiers.md:11`).
-- Question: one three-way `choice` over the diff plus the tier text. The changed
-  files and regions come from `.agents/scripts/Get-SessionChangeInventory.ps1`,
-  which every review's scope already derives from
-  (`.agents/skills/code-style-review/references/worker.md:14-27`).
-- Still needs a full model: the classification itself, because the tier decides
-  which reviews run.
-- If Jev is wrong: downgrading a tier skips required reviews, the worst failure
-  in this list. The only safe wiring is a second opinion allowed to agree or
-  escalate and never to downgrade, matching the escalation sentence already in
-  `risk-tiers.md:11`. Even then a whole diff is often larger than one state, so
-  the question would be asked per file and combined — and the vendor's warning
-  that calibrated single answers do not stay calibrated once thresholds are
-  applied lands directly on that combining step.
-
-### 5. Triage of accepted review findings
-
-- Where it is fixed twice. Main decides each finding and is told to "be
-  especially careful with findings that add guards, options, or machinery for
-  cases nobody has observed (YAGNI and over-engineering)"
-  (`.agents/references/change-workflow.md:30`). Then every fix dispatch must
-  carry "intent `conformance` or `plan_delta`, and scope `non_structural` or
-  `structural`" (`.agents/skills/resolve-findings/SKILL.md:32`), and the fixer
-  accepts only `conformance + non_structural` (`:41-47`).
-- Question: per finding, one boolean for "this adds a guard or machinery for a
-  case nobody has observed", plus the two two-way choices the fix dispatch
-  needs. A `score` for how reachable the described failure is would add a
-  ranking, but nothing in the workflow consumes such a number today. No
-  enumeration is needed: each finding is already one line with an ID, path,
-  claim, and evidence (`.agents/references/subagent-handoff.md:15`), and its
-  severity is already assigned by its reviewer
-  (`.agents/skills/repo-code-review/SKILL.md:82-86`). Accepting or rejecting the
-  finding stays with main, which is where the judgment lives.
-- If Jev is wrong: a wrong intent or scope label sends a fix to a worker that
-  must refuse it, which the fixer already handles by returning
-  `PLAN DELTA REQUIRED: yes` without editing
-  (`.agents/skills/resolve-findings/SKILL.md:41-43`). That self-correcting
-  refusal makes this the safest of the five, but the volume is low — a handful
-  of findings per round — so the saving is correspondingly small.
-
-### Weaker possibilities, listed once
-
-`/progressive-disclosure-review` findings carry a three-way class,
-`duplication | misplacement | size`
-(`.agents/skills/progressive-disclosure-review/SKILL.md:64`), but `size` is a
-measurement and `duplication` needs the other location that already states the
-fact — a search Jev cannot do; it could only confirm a pair a script proposed.
-`/coherence-review` and `/verify-acceptance` produce verdicts whose content is
-the reasoning, not the label.
+Two consequences follow. Jev can only choose among options someone else wrote
+down, so it is useless wherever the workflow needs prose: a replacement
+comment, a fix, a finding's evidence sentence. And it cannot be the last word
+on anything that blocks a change; the honest shape is "Jev shortens or orders
+the list a full model then reads", never "Jev decides".
 
 ## Not suitable
 
 - Anything a script already decides: Plan selection is "the newest eligible
   executable plan by `(createdUtc descending, normalized path)`"
-  (`Documents/Plans/AGENTS.md:13`), file classes come from the change inventory,
+  (`Documents/Plans/AGENTS.md`), file classes come from the change inventory,
   and executable membership is deterministic validation
   (`.agents/skills/update-vcxproj/SKILL.md`). A model answer would be strictly
   worse than the answer the repository already has.
@@ -193,99 +48,89 @@ the reasoning, not the label.
   Discipline directive requires a root cause confirmed from close code
   inspection or evidence, and every finding must carry its evidence
   (`.agents/references/subagent-handoff.md:15`). A probability is not evidence.
-- Anything needing an image: Jev takes none, so every screenshot check in
-  `/agent-harness` is out.
+- Anything needing an image: every screenshot check in `/agent-harness` is out.
 - Anything gating a landing. Exactly one user confirmation authorizes changing
-  primary (`.agents/references/change-workflow.md:152-156`); nothing at 68%
-  agreement belongs on that path.
+  primary (`.agents/references/change-workflow.md`, Verify and land step);
+  nothing on that path.
+- Verdicts whose content is the reasoning, not the label: `/coherence-review`
+  and `/verify-acceptance` produce those, so Jev can check their citations
+  (`JevEvidenceCitationCheck.md`) but not replace them.
 
-## Comparing the top three
+## Candidates
 
-Judged on the same four criteria: whether labelled examples already exist to
-validate against, the cost of a wrong answer, how much has to be built, and
-what a correct answer actually saves.
+| document | where the choice is fixed today | primitive | pilot | next test |
+|---|---|---|---|---|
+| `JevCommentBlockTriage.md` | `/comment-review`'s six classes | `choice` + `ok` per block; `ok` probability orders reading | run: at `ok` < 0.5, 35/40 changed blocks flagged, 13/40 untouched flagged | hand-labelled 100 blocks from a second commit |
+| `JevPlanAreaFiling.md` | `Documents/Plans/AGENTS.md` areas; the Plans/Features/Investigations test | `choice` over areas | run: 56/58 agree; both misses are the borderline cases and the lowest confidences | full tree plus Investigations and Features at a 0.6 gate |
+| `JevDuplicatePlanDetection.md` | `/create-follow-up-plans` duplicate rule | `score` with levels = actions (distinct, related, same fix) | run: the three merged Plans are the top three of 50 pairs; no distinct pair reached 1.0 | a second historical merge; a code-side shortlist |
+| `JevEvidenceCitationCheck.md` | finding evidence rows, acceptance rows, Plan citations | `choice` supports / contradicts / says_nothing | run: 27/30 real citations `supports`, 5/30 shifted regions | human read of the three flagged real citations; Plans predating a refactor |
+| `JevStyleRuleJudgment.md` | `/code-style-review` hand-read rules 49, 56, 62 | one `noul` per rule per candidate | not run: scanner needed first | 60 hand-labelled candidates per rule |
+| `JevSimplicityReviewTrigger.md` | `/plan-simplicity-review` dispatch trigger | two `noul`s, low threshold | not run | record beside main's decision for 30 plans |
+| `JevRiskTierSurfaceFlags.md` | `risk-tiers.md` Tier-3 surfaces | one `noul` per surface per hunk, max-gated, escalate-only | not run: no tier corpus | record the tier per landed change, then 40 changes |
+| `JevFindingTriage.md` | `/resolve-findings` intent and scope; the YAGNI warning; severity rule | four questions per finding in one request | not run: findings are not stored | record `(finding, labels, decision)` for 50 findings |
+| `JevAffectedFileRanking.md` | `/update-affected-code` and `/prepare-change` search order | one `noul` per (change, hit) as sort key | not run | 20 Plan-completing commits: changed files versus search hits |
+| `JevSkillRouting.md` | skill `description` matching | wide `choice` plus gating `noul`s, then a top-three re-read | not run: transcripts are local-only | 100 labelled past requests |
+| `JevAgentsDocRubric.md` | `/update-claude-docs` six-criterion audit rubric | six `score`s per document, weighted in code | not run | past audit reports, or one full-model audit as labels |
+| `JevTranscriptIntervalClassification.md` | `/next-plan-review` control-work classes; checkpoint review's result classes | three `choice`s per transcript interval | not run: needs an interval extractor | 300 intervals from three reviewed sessions |
 
-| | 1 comment classes | 2 style rules 49/56/62 | 3 simplicity trigger |
-|---|---|---|---|
-| Labels available now | yes — commit `65255669` is a comment cleanup across 123 files, 615 insertions and 1275 deletions; every block it changed is a positive example with its class implied by the edit, and the blocks it left alone in those files are negatives | no — would have to be hand-labelled | thin — one boolean per past plan, and few plans record why the trigger fired |
-| Cost of a wrong answer | false positive: one extra block read; false negative: a missed finding in a findings-only review that never gates a landing | same shape, but a missed rule-49 or rule-56 violation lands in the code | false negative skips a required review |
-| What must be built | a caller for the existing scanner plus block-text extraction, since `Find-CommentBlocks.ps1:105-111` emits only `firstLine` | a whole new candidate scanner for three rules that have none, then the caller | a caller only |
-| What it saves | the reviewer reads the flagged blocks instead of every block in scope; the scanner already emits up to 400 blocks per run (`Find-CommentBlocks.ps1:14`) | the hand-read pass over three rules across the changed ranges | occasional reviewer dispatches main would have made anyway |
+Smaller fixed choices the sweep of the workflow found, not worth their own
+document yet: whether a `/compile` change set may affect generated bytes and so
+needs Local mode (`.agents/skills/compile/references/runtime-data-mode.md:18`),
+a `noul` over the changed path list; whether a headless `/codex-review` result
+is a review of its scope or drafting notes (`codex-review/SKILL.md:185-188`),
+a `noul` over the result; and the `worth presenting` verdict on a
+`/plan-alternatives` candidate, which is reasoning main should keep. The
+handoff `Status`, per-criterion `PASS | FAIL | BLOCKED`, and every
+acceptance-table cell are evidence of record and stay out.
 
-Cost is not a differentiator: at $0.042 per million input tokens, a few hundred
-comment blocks with their surrounding code is a fraction of a cent, and at 1,200
-requests per minute a whole scope finishes in well under a minute.
+Patterns from the TypeSafe docs that the series does not yet use, kept here so
+a later candidate starts from them: feature discovery (Jev answers as columns
+for a fitted predictor of, say, review escalation, which needs the corpora the
+candidates above would create); hierarchical classification with beam search
+(for a nested taxonomy larger than any this workflow has); structure recovery
+without regeneration (classifying blocks of a plan rather than rewriting
+them); and guardrail batteries over agent output, which `JevRiskTierSurfaceFlags.md`
+already applies to diffs.
 
 ## Recommendation
 
-Run candidate 1 first, as a measurement and not as a gate.
+Promote in the order the pilots justify, not the order of expected saving:
 
-The reason is the first row of the table: this repository already contains a
-labelled corpus for it. Commit `65255669` ("Clarify codebase comments and record
-pack reset race") is a comment cleanup across 123 files. The six worked examples
-in `.agents/skills/comment-review/references/comment-classes.md:18-40` were
-written against the state before it — `Common/WindowsUtils.h:35-43` no longer
-holds the `Parameters:`/`Returns:`/`Thread-safety:` fields the example
-describes, `Engine/Source/Frame/IslandTerrain.cpp:337` is now ordinary code,
-`Common/Log/Log.h:214` is now the `LOG` macro definition, with an unrelated
-comment above it at 212-213 — and `git log -S`
-confirms `65255669` removed the first two. That makes the commit's diff a
-ready-made answer key: the removed blocks with the class each one broke, and the
-untouched blocks in the same files as the "ok" cases.
+1. `JevEvidenceCitationCheck.md` and `JevDuplicatePlanDetection.md` first.
+   Both run offline over the Plan tree, cost nothing on the critical path,
+   report residuals rather than deciding anything, and their pilots separated
+   the labelled cases cleanly. Each has one concrete next test that a human can
+   finish in an hour.
+2. `JevPlanAreaFiling.md` next, as a check inside the same tree sweep once
+   the first two exist, since its wiring is nearly the same script.
+3. `JevCommentBlockTriage.md` as the first in-round use, wired as a reading
+   order only, after its second-commit measurement.
+4. Every remaining candidate waits for a corpus that does not exist yet, and
+   `JevSimplicityReviewTrigger.md` and `JevFindingTriage.md` are the cheapest
+   ways to start collecting one, because they record Jev's answer beside a
+   decision the workflow already makes.
 
-How to validate before it influences anything: take the blocks that commit
-changed and the ones it left alone in the same files, hand-assign each a class
-from the six in `comment-classes.md:9-14` or "ok", ask Jev the same question for
-each, and record the chosen option, its probability, and its confidence. Report
-two numbers separately, because they cost different amounts: how often Jev
-flagged a block the sweep changed (the misses are the expensive error), and how
-often it named the same class. Pick the flag threshold from that measurement
-rather than in advance, erring toward extra reads. Only then wire it as a
-reading order — flagged blocks first, every other block still read — and never
-as a filter that hides blocks until a second measurement on a later change
-confirms the first.
-
-Do not start with candidate 2: it needs a scanner built before a single question
-can be asked, and its answer key would have to be hand-made. Candidate 3 is
-cheap to wire but can only err in the expensive direction. Candidates 4 and 5
-should wait for a measured agreement number from candidate 1 — candidate 4
-because a wrong tier skips required reviews, candidate 5 because the volume is
-too low to pay for the integration on its own.
-
-## Decisions a Plan needs
+## Decisions every Plan in the series shares
 
 1. Access route: a PowerShell 7 script using `Invoke-RestMethod` against the
-   HTTPS endpoint, or one of the vendor SDKs. PowerShell 7 is the repository
-   default (root `AGENTS.md` `## Environment`) and no vendor SDK is vendored,
-   so the raw call is the smaller change — but it would be the first repository
-   script to touch the network at all, which is itself a decision.
-2. Where the script lives: bundled under the owning skill like
-   `.agents/skills/comment-review/scripts/Find-CommentBlocks.ps1`, or shared in
-   `.agents/scripts/`; either way it is invoked exactly as the bundled-scripts
-   rule in root `AGENTS.md` states. Separate from the existing scanner, most
-   likely, since that one is documented as writing nothing and being safe under
-   a read-only sandbox (`Find-CommentBlocks.ps1:1-5`) and a network call breaks
-   that property.
-3. How the block text and its surrounding code reach the state, given that the
-   scanner emits only `startLine`, `lineCount`, and `firstLine` today, and how
-   much surrounding code is enough to judge `dense` and `false`.
-4. The key: a user-level environment variable, never tracked, and what the
-   script does when it is absent — refuse, or fall through to the current
-   all-blocks-read behavior. Same question for a failed call or a hit rate
-   limit; the existing scanner sets the opposite precedent to a fall-through —
-   a `blocked` or `error` status "means the block list is unavailable — report
-   that rather than hunting comment blocks by hand"
-   (`.agents/skills/comment-review/references/worker.md:27-30`).
-5. Threshold policy and what a low confidence means. The candidate proposal is
-   "flag on low probability, and treat low confidence as a flag", so uncertainty
-   always costs a read and never a miss; a Plan must state the numbers and where
-   they are written down.
-6. Whether any measurement is ever allowed to become a gate, and what evidence
-   would authorize that — the vendor's warning about calibrated single answers
-   not composing into a calibrated workflow applies the moment a threshold hides
-   anything from a reviewer.
-7. Nothing: the stale examples in `comment-classes.md:18-40` are corrected
-   separately, by
-   `Documents/Plans/ChangeWorkflow/CommentClassStaleExamples.md`, which now owns
-   that defect. It is independent of anything Jev-related, so no Jev Plan need
-   wait on it or repeat it.
+   HTTPS endpoint, or a vendor SDK. PowerShell 7 is the repository default
+   (root `AGENTS.md` `## Environment`) and no SDK is vendored, so the raw call
+   is the smaller change — but it would be the first tracked script to touch
+   the network at all, which is itself a decision, and one shared caller script
+   is the obvious place for it.
+2. Where that caller lives: bundled under the first owning skill, or shared in
+   `.agents/scripts/` because several skills would call it; either way it is
+   invoked exactly as the bundled-scripts rule in root `AGENTS.md` states.
+3. The key: the `TYPESAFE_API_KEY` user-level environment variable the vendor
+   SDKs also read, never tracked and never printed. What a caller does when it
+   is absent or a call fails: refuse and report the list unavailable, which is
+   the precedent `Find-CommentBlocks.ps1` sets, or fall through to the
+   behaviour the workflow has today. A reading-order use can fall through; a
+   sweep that reports residuals should say it did not run.
+4. Threshold policy: every threshold is a number written in the owning skill's
+   references, chosen from the candidate's measurement, and every use errs
+   toward an extra read rather than a miss.
+5. No gate: no candidate hides an item from a reviewer, lowers a tier, skips a
+   review, or dispatches a fix on its own until a second measurement on a
+   later change confirms the first — and the vendor's warning about
+   thresholds not composing applies the moment one does.

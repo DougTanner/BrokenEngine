@@ -31,7 +31,9 @@ user, who picks at most one.
   [`../plan-simplicity-review/SKILL.md`](../plan-simplicity-review/SKILL.md)
   `## When to use` fires — minus that skill's `/save-plan` save-time dispatch.
 - From a `/next-plan` claim, after the preparation `implementer` verifies the
-  Plan and before the Plan review reviewers, whenever that same trigger fires.
+  Plan and before the Plan review reviewers, whenever that same trigger fires;
+  its user presentation is then carried into that skill's approval
+  presentation.
 - Not for a new Collection, manager, or subsystem API: `/external-design-interface`
   already produces three designs and replaces this skill for that case.
 - Not from a saved but unclaimed Plan; such a Plan gets this step when it is
@@ -104,11 +106,12 @@ carries one line:
 Alternatives: original stands (<n> candidates, <axes>)
 ```
 
-Otherwise, before the Plan review step, main presents every candidate worth
-presenting beside the drafted approach in plain language per
-`### User Interaction` — the same criteria, what it adds and deletes, which
-invariant surfaces it touches, and when it pays off — with a recommendation,
-then asks verbatim:
+Otherwise, before the Plan review step — or, in a `/next-plan` run, as the
+`### Plan alternatives` section of that skill's `### Implementation approval`
+presentation — main presents every candidate worth presenting beside the
+drafted approach in plain language per `### User Interaction` — the same
+criteria, what it adds and deletes, which invariant surfaces it touches, and
+when it pays off — with a recommendation, then asks verbatim:
 
 > Which approach should this change use: the drafted plan as written, or one of
 > the alternatives above?

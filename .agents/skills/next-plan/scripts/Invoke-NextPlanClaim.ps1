@@ -118,7 +118,7 @@ try {
  if($response.ExitCode -eq 2 -and [string]$claim.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claim.requestedPlan;heldPlan=[string]$claim.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'}
  if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.' 'stop-report-to-user'}
  $code=[string]$claim.code
- if($code -ceq 'none'){$message=if($targeted){Get-TargetedNoneMessage $context $Plan}else{'No eligible Plan is available.'};Complete-Claim 0 'pass' 'none-available' $message 'stop-report-to-user'}
+ if($code -ceq 'none'){$message=if($targeted){Get-TargetedNoneMessage $context $Plan}else{'No eligible Plan is available.'};Complete-Claim 0 'pass' 'none-available' $message 'checkpoint-followup-gate'}
  if($code -cne 'claimed' -and $code -cne 'existing'){throw "plan claim-next returned an unknown result code '$code'."}
  $result.claim=[ordered]@{claimed=$true;plan=[string]$claim.plan;state=$code}
  if($code -ceq 'existing'){Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}

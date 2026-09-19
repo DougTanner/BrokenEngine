@@ -1,6 +1,6 @@
 ---
 name: next-plan
-description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the resolved Plan and execution card for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
+description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the execution card's summary, alternatives, and unresolved decisions for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
 disable-model-invocation: true
 argument-hint: "[Documents/Plans/... | partial pattern]"
 allowed-tools: [Read, Write, Grep, Glob, Agent, SendMessage, Edit, PowerShell, AskUserQuestion]
@@ -89,18 +89,23 @@ The `argument-hint` value selects the Plan:
    Plan—its mechanism, corrections, the claimed Plan's `## In scope` and
    `## Out of scope` sections copied verbatim as top-level headings with their
    content intact, and the complete execution card—into one gitignored `Temp/`
-   file addressed by its path from the worktree root, with each section main
-   presents per this file's `### Implementation approval` under its own `##`
-   heading, cite that path under `Evidence` with one `##` selector per such
-   section for the Plan review reviews and the approval presentation, and,
+   file addressed by its path from the worktree root, each under its own `##`
+   heading, with a `## Unresolved decisions` section (`none` when every
+   decision is resolved), cite that path under `Evidence` with one `##`
+   selector per section for the Plan review reviews and the approval
+   presentation, and,
    before returning that handoff, run
 `pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <snapshot path>`
    and report that result's `headings.inScopePresent` and
-   `headings.outOfScopePresent` values as one `Decisive checks` row.
+   `headings.outOfScopePresent` values as one `Decisive checks` row. Of that
+   result, only those two booleans gate this step's Done condition; every other
+   record it carries, including a `citations.items` entry with `pathExists` or
+   `lineExists` false, is an advisory lead, never a defect to clear and rerun.
 
-   After that preparation handoff, and before the Plan review reviewers and the
-   step 7 approval presentation, main runs `/plan-alternatives` when its trigger
-   fires.
+   After that preparation handoff, and before the Plan review reviewers, main
+   runs `/plan-alternatives` when its trigger fires; a candidate worth
+   presenting is carried into the step 7 approval presentation's
+   `### Plan alternatives` section.
 
    Done when the execution card carries every field of the card template in
    this file's `### Execution card presentation/template`, the preparation
@@ -189,8 +194,9 @@ per-statement enumeration of unaffected results.
 ### Execution card presentation/template
 
 The card, cited under `Evidence`, carries the following required content. Main
-reads that content and presents it with the resolved Plan; the card itself is
-not repeated inline in the handoff.
+reads that content and presents its first two sections per
+`### Implementation approval`; the card itself is not repeated inline in the
+handoff.
 
 ```text
 Execution card:
@@ -208,18 +214,29 @@ Execution card:
 
 ### Implementation approval
 
-Preparation and claim do not require approval. Present the complete resolved
-Plan and execution card before implementation: scope, invariants, role
-assignments, acceptance criteria, and unresolved decisions. Deliver that
-presentation per the `### User Interaction` rules in
+Preparation and claim do not require approval. Before implementation, present
+only the execution card's `### What does this plan do?` and
+`### Why this is good for the codebase` sections, plus a `### Plan alternatives`
+section when `/plan-alternatives` returned a candidate worth presenting,
+carrying that skill's comparison and question so it is clear that choosing one
+replaces the drafted plan, plus a `### User decisions needed` section when any
+decision is unresolved, listing each one with its options, trade-offs, and a
+recommendation; the rest of the resolved Plan and card stays in the snapshot
+for the reviews and is not presented. Deliver that presentation per the
+`### User Interaction` rules in
 [`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
 on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
 without an approval question; on Claude Code, OpenCode, and every other host as
 rendered message text whose approval question is the last thing before the
 `Follow-up Plans created:` footer, after which the user's next message is the
-decision. Any revision is a new complete replacement presentation. When the
-approved presentation differs from the execution card, main updates the card
-to the approved scope before the run continues.
+decision. An approval that leaves any listed alternative or decision unanswered
+does not authorize implementation: main halts, asks again for only the
+unanswered items with the same options and recommendation, and waits for the
+answer. A chosen alternative is a decision change: the run returns to
+preparation and Plan review and re-presents. Any revision is a new complete
+replacement presentation. When the approved presentation differs from the
+execution card, main updates the card to the approved scope before the run
+continues.
 
 When preparation shows the problem the Plan describes is gone, ask the user
 whether to retain the Plan or to explicitly authorize obsolete final cleanup.

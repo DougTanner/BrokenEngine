@@ -25,13 +25,20 @@ enum class PersistenceFailurePoint : uint8_t
 	kTransferCapture,
 };
 
-struct TransferCaptureSnapshot
+struct TransferCaptureEvent
 {
 	int64_t iRecordingEventTick = -1;
 	int64_t iPlaybackEventTick = -1;
+	game::ReplayTransferCaptureCounts transferCounts;
+};
+
+constexpr int64_t kiReservedEvents = 16;
+
+struct TransferCaptureSnapshot
+{
 	int64_t iFirstWriterInputTick = -1;
 	int64_t iWriterInputCount = 0;
-	game::ReplayTransferCaptureCounts transferCounts;
+	std::vector<TransferCaptureEvent> events;
 };
 
 void Attach(Replay& rReplay);

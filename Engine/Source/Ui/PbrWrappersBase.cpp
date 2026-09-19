@@ -14,7 +14,7 @@ Wrapper gPbrBrdfSpecular(20.0f, 0.0f, 30.0f);
 Wrapper gPbrBrdfSpecularPower(0.30f, 0.1f, 1.0f);
 // Pbr - Tone Mapping
 Wrapper gPbrExposure(0.9f, 0.0f, 2.0f);
-Wrapper gPbrGamma(0.9f, 0.0f, 2.0f);
+Wrapper gPbrGamma(0.9f, shaders::kfEpsilon, 2.0f); // Nonzero min load-bearing: LightingUniforms.cpp uploads 1.0f / gPbrGamma.Get() as the HdrResolve.frag pow exponent.
 // Pbr - Color Grading
 Wrapper gColorGradingSaturation(1.05f, 0.0f, 2.0f);
 Wrapper gColorGradingContrast(1.1f, 0.5f, 2.0f);

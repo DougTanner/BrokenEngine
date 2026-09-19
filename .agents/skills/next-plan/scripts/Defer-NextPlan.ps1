@@ -13,7 +13,7 @@ try {
 	$status=Get-NextPlanClaimStatus $context
 	$claimArguments=$status.Arguments;$claimStatus=$status.Status
 	if($status.ExitCode -ne 0){Complete-Deferral $(if($status.ExitCode -eq 2){2}else{1}) $(if($status.ExitCode -eq 2){'blocked'}else{'error'}) 'defer.claim-status-failed' 'WorktreeCli could not report the Plan claim.' 'stop-report-to-user'}
-	if([string]$claimStatus.code -ceq 'none'){Complete-Deferral 0 'pass' 'no-claim' 'No Plan claim is present.' 'stop-report-to-user'}
+	if([string]$claimStatus.code -ceq 'none'){Complete-Deferral 0 'pass' 'no-claim' 'No Plan claim is present.' 'checkpoint-followup-gate'}
 	# Read the retained work before releasing, so a failure to read it stops with the claim still held.
 	$tree=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
 	if($tree.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree, so retained work could not be reported; the Plan claim is unchanged. $($tree.Stderr.Trim())")}
@@ -22,6 +22,6 @@ try {
 	$release=ConvertFrom-NextPlanProcessJson $response 'plan unclaim'
 	if($response.ExitCode -ne 0 -or [string]$release.code -notin @('released','already-absent')){Complete-Deferral $(if($response.ExitCode -eq 2){2}else{1}) $(if($response.ExitCode -eq 2){'blocked'}else{'error'}) 'defer.unclaim-failed' 'WorktreeCli did not release the Plan claim.' 'stop-report-to-user'}
 	$result.claim=[ordered]@{released=$true};$result.retained=[ordered]@{count=$retained.Count;truncated=($retained.Count -gt 10);paths=@($retained|Select-Object -First 10)}
-	# The release check above admits only 'released' and 'already-absent', and both are a stop the user is told about.
-	Complete-Deferral 0 'pass' ([string]$release.code) 'Plan claim deferred.' 'stop-report-to-user'
+	# The release check above admits only 'released' and 'already-absent', and both take the deferral row's checkpoint route.
+	Complete-Deferral 0 'pass' ([string]$release.code) 'Plan claim deferred.' 'checkpoint-followup-gate'
 } catch {if(Get-Command Test-NextPlanStateBlocker -ErrorAction SilentlyContinue){if(Test-NextPlanStateBlocker $_){Complete-Deferral 2 'blocked' 'defer.context-conflict' $_.Exception.Message 'stop-report-to-user'}};Complete-Deferral 1 'error' 'defer.failed' $_.Exception.Message 'stop-report-to-user'}

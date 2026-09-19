@@ -281,12 +281,15 @@ void RenderLightingMain(int64_t iCommandBuffer)
 		rMainLayout.fWaterNormalWRelSqThree = 0.0f;
 	}
 	rMainLayout.fWaterNormalWeightSumInv = 1.0f / std::max(3.0f * fWaterNormalWeightTotal, shaders::kfEpsilon);
-	// Water.frag height darkening keeps the bottom and uploads only the range reciprocal; leave it unguarded because top == bottom yields +inf
-	// absorbed by the surrounding clamp.
+	// Water.frag height darkening keeps the bottom and uploads only the range reciprocal; the two tunables are independent and their ranges overlap, so
+	// floor the range magnitude at kfEpsilon to keep the reciprocal finite, keeping the sign so a top below the bottom still reads as an inverted range.
 	float fWaterHeightDarkenTop = gWaterHeightDarkenTop.Get();
 	float fWaterHeightDarkenBottom = gWaterHeightDarkenBottom.Get();
 	rMainLayout.fWaterHeightDarkenBottom = fWaterHeightDarkenBottom;
-	rMainLayout.fWaterHeightDarkenRangeInv = 1.0f / (fWaterHeightDarkenTop - fWaterHeightDarkenBottom);
+	float fWaterHeightDarkenRange = fWaterHeightDarkenTop - fWaterHeightDarkenBottom;
+	float fRangeMagnitude = std::max(std::abs(fWaterHeightDarkenRange), shaders::kfEpsilon);
+	fWaterHeightDarkenRange = fWaterHeightDarkenRange < 0.0f ? -fRangeMagnitude : fRangeMagnitude;
+	rMainLayout.fWaterHeightDarkenRangeInv = 1.0f / fWaterHeightDarkenRange;
 	rMainLayout.fWaterHeightDarkenTarget = gWaterHeightDarkenTarget.Get();
 	rMainLayout.fWaterHeightDarkenSource = gWaterHeightDarkenSource.Get();
 	rMainLayout.fWaterHeightDarkenLighting = gWaterHeightDarkenLighting.Get();

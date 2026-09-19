@@ -29,7 +29,6 @@ struct ExportedIsland
 	float fWorldFootprintXMeters = 0.0f;
 	float fWorldFootprintYMeters = 0.0f;
 	float fWorldElevationMeters = 0.0f;
-	float fMaxHeightMeters = 0.0f;
 };
 
 size_t CheckedProduct(size_t uiLeft, size_t uiRight, std::string_view what)
@@ -425,11 +424,6 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	rOut.iHeightmapWidth = static_cast<int32_t>(iElevationWidth);
 	rOut.iHeightmapHeight = static_cast<int32_t>(iElevationHeight);
 
-	// fMaxHeightMeters is the peak of finite, nonempty downsampled engine-meter heights above beach,
-	// before R16 quantization, so it can differ from sampled height by half-float rounding. Runtime copies
-	// this metadata into the island template but does not query it.
-	rOut.fMaxHeightMeters = *std::ranges::max_element(rOut.cpuHeightmapData);
-
 	// Convex hull of the valid (above-threshold) region — same heightmap + threshold as the texture
 	// masking. Packed into the chunk payload after the mesh (see Export()); debug render draws it.
 	BuildValidAreaHull(rOut);
@@ -701,7 +695,6 @@ void ExportIsland::Export()
 	pHeader->islandHeader.fWorldFootprintXMeters = exported.fWorldFootprintXMeters;
 	pHeader->islandHeader.fWorldFootprintYMeters = exported.fWorldFootprintYMeters;
 	pHeader->islandHeader.fWorldElevationMeters = exported.fWorldElevationMeters;
-	pHeader->islandHeader.fMaxHeightMeters = exported.fMaxHeightMeters;
 	pHeader->islandHeader.iMeshVertexCount = exported.iMeshVertexCount;
 	pHeader->islandHeader.iMeshIndexCount = exported.iMeshIndexCount;
 	pHeader->islandHeader.iValidAreaVertexCount = exported.iValidAreaVertexCount;

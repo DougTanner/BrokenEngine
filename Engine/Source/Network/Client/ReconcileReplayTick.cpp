@@ -13,16 +13,6 @@
 namespace engine
 {
 
-static std::unique_ptr<game::Frame> CloneFrameViaSerialization(const game::Frame& rFrame)
-{
-	std::ostringstream outputStream(std::ios::binary);
-	outputStream << rFrame;
-	std::istringstream inputStream(outputStream.str(), std::ios::binary);
-	std::unique_ptr<game::Frame> pClone = std::make_unique<game::Frame>();
-	inputStream >> *pClone;
-	return pClone;
-}
-
 void ReconcileRollbackCoord(CoordWork& rWork, int64_t iRollbackOffset)
 {
 	engine::CoordFrames& rFrames = *rWork.pFrames;
@@ -212,7 +202,11 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 		rScratch.iDesyncTick = iTick;
 		rScratch.desyncExpectedCrc = rUpdate.sharedCrc;
 		rScratch.desyncActualCrc = clientCrc;
-		rScratch.pDesyncClientFrame = CloneFrameViaSerialization(rCurrentFrame);
+		if constexpr (kbDesyncDebugFrames)
+		{
+			rScratch.pDesyncClientFrame = std::make_unique<game::Frame>();
+			TransferViaStream(rCurrentFrame, *rScratch.pDesyncClientFrame);
+		}
 		return false;
 	}
 

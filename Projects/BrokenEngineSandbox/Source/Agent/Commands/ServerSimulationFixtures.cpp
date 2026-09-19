@@ -121,14 +121,22 @@ void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& rParams
 	else
 	{
 		const engine::ReplayFixtures::TransferCaptureSnapshot captureInfo = engine::ReplayFixtures::CaptureSnapshot(*engine::gpReplay);
-		rResult["recordingEventTick"] = captureInfo.iRecordingEventTick;
-		rResult["playbackEventTick"] = captureInfo.iPlaybackEventTick;
 		rResult["firstWriterInputTick"] = captureInfo.iFirstWriterInputTick;
 		rResult["writerInputCount"] = captureInfo.iWriterInputCount;
-		rResult["playerCount"] = captureInfo.transferCounts.iPlayerCount;
-		rResult["spaceshipCount"] = captureInfo.transferCounts.iSpaceshipCount;
-		rResult["blasterCount"] = captureInfo.transferCounts.iBlasterCount;
-		rResult["missileCount"] = captureInfo.transferCounts.iMissileCount;
+
+		nlohmann::json events = nlohmann::json::array();
+		for (const engine::ReplayFixtures::TransferCaptureEvent& rEvent : captureInfo.events)
+		{
+			nlohmann::json eventJson;
+			eventJson["recordingEventTick"] = rEvent.iRecordingEventTick;
+			eventJson["playbackEventTick"] = rEvent.iPlaybackEventTick;
+			eventJson["playerCount"] = rEvent.transferCounts.iPlayerCount;
+			eventJson["spaceshipCount"] = rEvent.transferCounts.iSpaceshipCount;
+			eventJson["blasterCount"] = rEvent.transferCounts.iBlasterCount;
+			eventJson["missileCount"] = rEvent.transferCounts.iMissileCount;
+			events.push_back(std::move(eventJson));
+		}
+		rResult["events"] = std::move(events);
 	}
 }
 

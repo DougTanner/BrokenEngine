@@ -37,7 +37,7 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 ### User Interaction
 
 - IMPORTANT: Every question or decision request aimed at the user must be answerable from the current message without hidden reasoning or remembered scrollback. Provide the FULL context needed to understand as rendered message text the user is guaranteed to see — text emitted before a question-tool call may never be displayed, so present first and ask only after the context is visible — and explain what the answer changes or blocks. When relevant, give options, trade-offs, and a recommendation. The user has NOT read the source code or plan file.
-- AVOID jargon, the user is NOT a domain expert, use plain language (dumb it down).
+- AVOID jargon: the user is NOT a domain expert. Use everyday words and short sentences. Define an unavoidable technical term in one clause the first time it appears.
 - Explain fully when asked; use headings and bullet points so a longer explanation stays skimmable.
 - Reporting work: state what was built and what was verified separately, and name every required check still open; "done" means those checks have closed. A defect is stated with its evidence and effect, never as a verdict or count alone.
 - Comparing options: use the same criteria, evidence, detail, and tone for each; recommend one, but never sell the favorite by its benefit and the alternative by its risk.

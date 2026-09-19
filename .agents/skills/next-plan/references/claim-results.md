@@ -89,7 +89,8 @@ only projects those paths. The existing claim remains unchanged.
 `Complete-NextPlan.ps1` reports the changed paths the landing commit must
 contain as `changes.items[].path`, counted by `changes.totalCount`, with
 `changes.truncated` flagging more paths than the listed items, and returns
-`nextAction: finalize-changes` only on the `ok` result; every other completion
+`nextAction: finalize-changes` only on the `ok` result and
+`checkpoint-followup-gate` on the `no-claim` result; every other completion
 result returns `stop-report-to-user`.
 
 `Defer-NextPlan.ps1` reports the uncommitted work it leaves in place as
@@ -101,11 +102,15 @@ pass result.
 ## `nextAction`
 
 Every claim, deferral, and completion result carries a `nextAction` naming the
-one thing to do next, drawn from these five values:
+one thing to do next, drawn from these six values:
 
 - `prepare` — this session holds the claim; continue the preparation workflow.
 - `stop-report-to-user` — the run stops here; report the result and let the user
   decide what happens next, after [the `/next-plan` steps](../SKILL.md#steps) step 9 checkpoint.
+- `checkpoint-followup-gate` — the claim was released by a deferral, or no claim
+  was held; run [the `/next-plan` steps](../SKILL.md#steps) step 9 checkpoint
+  once, then follow the row for a released or absent claim in
+  [post-checkpoint outcomes](../SKILL.md#post-checkpoint-outcomes).
 - `resume-with-flag` — a `-Plan` run found an unclean worktree whose dirty paths
   are all outside `Documents/Plans`; the rerun with
   `-ResumeRetained` is gated by [the `/next-plan` rules](../SKILL.md#rules).

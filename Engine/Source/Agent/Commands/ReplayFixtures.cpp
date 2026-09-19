@@ -80,6 +80,9 @@ void RecordingStarted(Replay& rReplay)
 	if (Binding* pBinding = FindBinding(rReplay); pBinding != nullptr)
 	{
 		pBinding->capture = {};
+		// Heap: one reserve per recording start, inside Replay::SyncReplayTick's tracking suppression, so the
+		//   per-tick capture path below pushes without reallocating for a recording of the expected size
+		pBinding->capture.events.reserve(static_cast<size_t>(kiReservedEvents));
 	}
 }
 
@@ -114,7 +117,10 @@ void PlaybackAdopted(Replay& rReplay, const TransferCaptureSnapshot& rRecordingS
 	if (sBinding.pReplay == &rReplay)
 	{
 		sBinding = {.pReplay = &rReplay, .capture = rRecordingSnapshot};
-		sBinding.capture.iPlaybackEventTick = -1;
+		for (TransferCaptureEvent& rEvent : sBinding.capture.events)
+		{
+			rEvent.iPlaybackEventTick = -1;
+		}
 	}
 }
 
@@ -278,20 +284,36 @@ void ObserveAcceptedTransfers(Replay& rReplay, int64_t iEventTick, std::span<con
 	{
 		return;
 	}
-	if (pBinding->capture.iRecordingEventTick != iEventTick)
+	std::vector<TransferCaptureEvent>& rEvents = pBinding->capture.events;
+	// Event ticks arrive monotonically, so only the last entry can still be accumulating
+	if (rEvents.empty() || rEvents.back().iRecordingEventTick != iEventTick)
 	{
-		pBinding->capture.iRecordingEventTick = iEventTick;
-		pBinding->capture.iPlaybackEventTick = -1;
-		pBinding->capture.transferCounts = {};
+		if (rEvents.size() == rEvents.capacity()) [[unlikely]]
+		{
+			LOG(kDefault, kError, "Replay transfer capture list under-sized Tick: {} Size: {} Capacity: {}", iEventTick, static_cast<int64_t>(rEvents.size()), static_cast<int64_t>(rEvents.capacity()));
+			DEBUG_BREAK();
+		}
+		// Heap: a push past the reserve is the under-sizing flagged above and still runs so no event is lost;
+		//   ServerTransferManager::HarvestTransfers' tracking suppression encloses this whole capture path
+		rEvents.push_back({.iRecordingEventTick = iEventTick});
 	}
-	game::CountCapturedReplayTransfers(sortedTransfers, pBinding->capture.transferCounts);
+	game::CountCapturedReplayTransfers(sortedTransfers, rEvents.back().transferCounts);
 }
 
 void ObservePlaybackEvent(Replay& rReplay, int64_t iEventTick)
 {
-	if (Binding* pBinding = FindBinding(rReplay); pBinding != nullptr)
+	Binding* pBinding = FindBinding(rReplay);
+	if (pBinding == nullptr)
 	{
-		pBinding->capture.iPlaybackEventTick = iEventTick;
+		return;
+	}
+	for (TransferCaptureEvent& rEvent : pBinding->capture.events)
+	{
+		if (rEvent.iRecordingEventTick == iEventTick)
+		{
+			rEvent.iPlaybackEventTick = iEventTick;
+			return;
+		}
 	}
 }
 

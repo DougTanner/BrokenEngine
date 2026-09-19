@@ -10,10 +10,7 @@ inline constexpr float kfMaxDepth = 1.0f;
 
 enum class TextureFlags : uint64_t
 {
-	kMultisampling = 0x01,
-	kRenderPass    = 0x02,
-	kDepth         = 0x04,
-	kHostVisible   = 0x08,
+	kRenderPass = 0x02,
 };
 using TextureFlags_t = common::Flags<TextureFlags>;
 
@@ -94,7 +91,6 @@ public:
 		, mVkImage(std::exchange(rOther.mVkImage, VK_NULL_HANDLE))
 		, mVkImageView(std::exchange(rOther.mVkImageView, VK_NULL_HANDLE))
 		, muiGeneration(rOther.muiGeneration)
-		, mpDepthTexture(std::move(rOther.mpDepthTexture))
 		, mVkRenderPass(std::exchange(rOther.mVkRenderPass, VK_NULL_HANDLE))
 		, mVkFramebuffer(std::exchange(rOther.mVkFramebuffer, VK_NULL_HANDLE))
 	{}
@@ -133,7 +129,6 @@ public:
 	uint64_t muiGeneration = 0;
 
 	// Render target
-	std::unique_ptr<Texture> mpDepthTexture;
 	VkRenderPass mVkRenderPass = VK_NULL_HANDLE;
 	VkFramebuffer mVkFramebuffer = VK_NULL_HANDLE;
 };

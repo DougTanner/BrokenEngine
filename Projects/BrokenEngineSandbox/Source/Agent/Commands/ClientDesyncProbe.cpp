@@ -154,11 +154,8 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 			throw std::runtime_error("desync_probe cannot trigger recovery while desync debug mode is already stalled");
 		}
 
-		std::ostringstream outputStream(std::ios::binary);
-		outputStream << *pCurrentFrame;
-		std::istringstream inputStream(outputStream.str(), std::ios::binary);
 		std::unique_ptr<Frame> pSnapshot = std::make_unique<Frame>();
-		inputStream >> *pSnapshot;
+		engine::TransferViaStream(*pCurrentFrame, *pSnapshot);
 
 		engine::ReconcileDesyncInfo desyncInfo
 		{

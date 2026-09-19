@@ -233,14 +233,6 @@ struct VisibleLightQuadLayout
 	uint32_t uiTextureIndex INIT;
 };
 
-struct ObjectLayout
-{
-	vec4 f4Position INIT;
-	uint32_t uiColor INIT;
-	vec4 f3x4Transform[3] INIT;
-	vec4 f3x4TransformNormal[3] INIT;
-};
-
 struct PbrMaterialLayout
 {
 	// First 9 fields must exactly match MaterialShaderData (from f4BaseColorFactor onward)
@@ -273,16 +265,6 @@ struct ModelLayout
 	vec4 f4ColorAdd INIT;
 	uint32_t uiMeshDataBase INIT;     // Base index into meshData[] for this object
 	uint32_t uiMaterialCount INIT;    // Number of materials (slots in meshData)
-};
-
-struct ModelCustomLayout
-{
-	vec4 f4Position INIT;
-	vec4 f3x4Transform[3] INIT;
-	vec4 f3x4TransformNormal[3] INIT;
-	vec4 f3x4TransformCustom[3] INIT;
-	vec4 f3x4TransformCustomNormal[3] INIT;
-	vec4 f4ColorAdd INIT;
 };
 
 CONSTEXPR int32_t kiHexShieldDirections = 4 * 4;

@@ -319,8 +319,8 @@ bool ProcessBakedRegion(const IslandBakeContext& rContext, const BakeOutput& rBa
 	CropRect crop = ComputeCropRect(bbox, rContext.iTexturePixels);
 	LOG(kDefault, kDebug, "Cropping island chunk \"{}\": bbox ({}..{},{}..{}) -> ({}+{},{}+{}) [aligned to {}]", rSourceLeafDirectory.string(), bbox.iMinX, bbox.iMaxX, bbox.iMinY, bbox.iMaxY, crop.iX, crop.iWidth, crop.iY, crop.iHeight, kiCropAlignment);
 
-	// Crop + box-filter downsample elevation, then reject very low / underwater leaves: the
-	// downsampled peak is the exact shipped data ExportIsland reports as fMaxHeightMeters. Below the
+	// Crop + box-filter downsample elevation, then reject very low / underwater leaves: the peak is
+	// measured on the downsampled elevation this leaf would ship, not the full bake. Below the
 	// threshold, delete any prior committed leaf (intermediates AND BC outputs) and write nothing, so
 	// no BakedDimensions.json is created -- ExportIsland::Handles never claims it, producing no kIsland
 	// chunk and no orphan texture chunks. AreLeavesDirty treats the now-absent leaf folder as

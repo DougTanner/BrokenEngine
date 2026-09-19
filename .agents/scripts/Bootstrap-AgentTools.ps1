@@ -52,6 +52,7 @@ try {
 			throw "Primary AgentTools executables are missing and uncommitted Tools/ThirdParty changes block a rebuild. Commit or stash those changes, then retry."
 		}
 		& $capabilityScript -WorktreeCliExecutable $worktreeCli -AgentHarnessExecutable $agentHarness | Out-Null
+		Write-Host ''
 		Write-Host "Skipped AgentTools bootstrap builds (dirty primary); using existing binaries at '$worktreeCli' and '$agentHarness'."
 		return
 	}
@@ -81,6 +82,8 @@ try {
 
 	$commonBuildArguments = @('/p:Platform=x64', '/p:EnableClangTidyCodeAnalysis=false', '/p:RunCodeAnalysis=false', '/verbosity:minimal')
 	function Invoke-BootstrapBuild([string] $Solution, [string] $Configuration) {
+		# Blank line so each build's MSBuild output reads as its own block in the session start transcript.
+		Write-Host ''
 		$exitCode = Invoke-WorktreeCliTrackedProcess -Executable $msBuild -ArgumentList (@($Solution, "/p:Configuration=$Configuration") + $commonBuildArguments) -WorkingDirectory $root
 		if ($exitCode -ne 0) { throw "AgentTools bootstrap build failed for '$Solution' with exit code $exitCode. If another live worktree session is holding these executables, wrap up active worktree sessions and retry." }
 	}
@@ -197,6 +200,7 @@ try {
 				$refreshedDataDirectory = $gameDataDirectory
 			}
 		}
+		Write-Host ''
 		Write-Host "Built primary AgentTools and ThirdParty at '$worktreeCliOutput', '$agentHarnessOutput', and '$thirdPartyOutput'."
 		if ($null -ne $refreshedDataDirectory) { Write-Host "Refreshed primary data at '$refreshedDataDirectory'." }
 	}

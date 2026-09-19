@@ -34,8 +34,11 @@ following the repository User Interaction rules.
 ## Rules
 
 - Apply [`.agents/references/change-workflow.md`](../../references/change-workflow.md)
-  `### User Interaction` for plain language, standalone context, and decision
-  presentation. Where a technical term is unavoidable, explain it in one short
-  sentence or parenthetical the first time it appears.
+  `### User Interaction` for plain language, term definitions, standalone
+  context, and decision presentation.
 - Apply root [AGENTS.md](../../../AGENTS.md) `## Directives` one-term-per-concept
   rule.
+- Keep every fact, decision, number, file path, and question from the original;
+  simplify the wording around them, never the content.
+- Drop repetition, hedging, and secondary detail. Open with the restatement
+  itself, never a preamble such as "Here is a simpler version".

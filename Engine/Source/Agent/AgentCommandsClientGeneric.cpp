@@ -5,6 +5,7 @@
 #include "Agent/AgentCommandsClientGeneric.h"
 
 #include "Agent/Commands/PresentationContinuityProbe.h"
+#include "Ui/WrapperBase.h"
 
 namespace engine
 {
@@ -939,6 +940,31 @@ void CommandSetSlider(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::
 	BeginScriptAndDefer(script, nullptr, false, true, script.bHasWindow, script.pcWindow);
 }
 
+// get_wrapper {key}: read a Tweaks-registered wrapper by its slider map key; set_slider is the write path.
+void CommandGetWrapper(const nlohmann::json& rParams, nlohmann::json& rResult)
+{
+	if (!rParams.contains("key") || !rParams.at("key").is_string())
+	{
+		throw std::runtime_error("get_wrapper requires string 'key'");
+	}
+
+	const std::string key = rParams.at("key").get<std::string>();
+	const std::unordered_map<std::string_view, Wrapper*>& rSliderMap = TweaksSliderMap::Get();
+	auto it = rSliderMap.find(key);
+	if (it == rSliderMap.end())
+	{
+		throw std::runtime_error("get_wrapper: no Tweaks slider key '" + key + "'");
+	}
+
+	char pcText[32] {};
+	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->Get());
+	rResult["value"] = pcText;
+	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->GetMin());
+	rResult["min"] = pcText;
+	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->GetMax());
+	rResult["max"] = pcText;
+}
+
 // key {key, holdFrames?=1}: hold then release a named VK through the RawInput overlay, driving KeyboardPressed edges.
 void CommandKey(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
@@ -1182,6 +1208,11 @@ bool ExecuteClientAgentCommand(std::string_view cmd, const nlohmann::json& rPara
 	if (cmd == "set_slider")
 	{
 		CommandSetSlider(rParams, rResult);
+		return true;
+	}
+	if (cmd == "get_wrapper")
+	{
+		CommandGetWrapper(rParams, rResult);
 		return true;
 	}
 	if (cmd == "key")
