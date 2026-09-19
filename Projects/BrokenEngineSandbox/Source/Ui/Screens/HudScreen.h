@@ -2,6 +2,7 @@
 
 #if defined(BT_CLIENT)
 #include "Ui/MenuUtils.h"
+#include "Ui/NetworkUiControl.h"
 #endif
 
 namespace game

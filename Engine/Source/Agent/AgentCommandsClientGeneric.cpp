@@ -5,6 +5,7 @@
 #include "Agent/AgentCommandsClientGeneric.h"
 
 #include "Agent/Commands/PresentationContinuityProbe.h"
+#include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 #include "Ui/WrapperBase.h"
 
 namespace engine

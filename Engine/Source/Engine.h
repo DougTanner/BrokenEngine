@@ -28,11 +28,6 @@
 
 #if defined(BT_CLIENT)
 
-// Ui (client-only)
-#include "Ui/Screens/TweaksScreen/TweaksScreenBase.h"
-#include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
-#include "Ui/NetworkUiControl.h"
-
 // Graphics objects
 #include "Graphics/Objects/Buffer.h"
 #include "Graphics/Objects/CommandBuffers.h"

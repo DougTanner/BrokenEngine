@@ -1,5 +1,6 @@
 #include "TweaksScreen.h"
 #include "Ui/HexShieldWrappersBase.h"
+#include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 
 #if defined(BT_CLIENT)
 

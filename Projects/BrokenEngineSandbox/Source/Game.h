@@ -11,6 +11,7 @@
 #endif
 #if defined(BT_CLIENT)
 #include "Network/Client/ClientSession.h"
+#include "Ui/NetworkUiControl.h"
 #endif
 
 namespace game

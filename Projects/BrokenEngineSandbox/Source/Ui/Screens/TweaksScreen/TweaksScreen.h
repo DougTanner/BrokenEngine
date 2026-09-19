@@ -2,6 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Ui/Screens/TweaksScreen/TweaksScreenBase.h"
+
 namespace game
 {
 

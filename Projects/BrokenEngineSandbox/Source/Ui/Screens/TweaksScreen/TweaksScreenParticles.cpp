@@ -1,6 +1,7 @@
 #include "TweaksScreen.h"
 
 #include "Ui/ParticleWrappers.h"
+#include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 
 #if defined(BT_CLIENT)
 

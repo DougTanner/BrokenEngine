@@ -5,6 +5,8 @@
 namespace engine
 {
 
+class Wrapper;
+
 class TweaksSliderMap
 {
 public:
