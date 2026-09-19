@@ -9,8 +9,11 @@ step.
 
 1. Read the brief text and the evidence paths it cites. Only the brief's
    `Fixed decisions` are binding; what candidate zero happens to do is the
-   benchmark to beat, not a hidden requirement. Done when the objective, scope,
-   fixed decisions, and candidate zero are each recorded separately.
+   benchmark to beat, not a hidden requirement. A plan's own declarations,
+   including its scope boundaries, bind only as
+   [`../../../references/authority-order.md`](../../../references/authority-order.md)
+   provides. Done when the objective, fixed decisions, and candidate zero are
+   each recorded separately.
 2. Search the repository for a mechanism on the assigned axis, which is one of:
 
    - Reuse — an existing repository mechanism or pattern that already solves
@@ -49,7 +52,7 @@ step.
 - `Documents/Plans/`, `Documents/Features/`, `Documents/Investigations/`, and
   `Temp/` are outside a researcher's search and are never evidence paths. Leave
   such a file unread whether the brief names it or a search surfaces it, and
-  work from the scope the brief states.
+  work from the objective the brief states.
 - Keep every candidate on the assigned axis; leave a strong idea belonging to
   another axis out.
 - Drop a candidate that cannot name its mechanism or its files, and report the
