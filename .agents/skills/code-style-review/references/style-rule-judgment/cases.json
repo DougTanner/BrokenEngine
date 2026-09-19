@@ -1,0 +1,774 @@
+[
+  {
+    "id": "clean-function",
+    "expected": [],
+    "code": [
+      "void UpdateProjectiles(Frame& rFrame, std::span<const Projectile> projectiles)",
+      "{",
+      "\tint64_t iActiveCount = 0;",
+      "\tfor (const Projectile& rProjectile : projectiles)",
+      "\t{",
+      "\t\tif (rProjectile.bActive)",
+      "\t\t{",
+      "\t\t\t++iActiveCount;",
+      "\t\t}",
+      "\t}",
+      "\trFrame.iProjectileCount = iActiveCount;",
+      "}"
+    ]
+  },
+  {
+    "id": "clean-class-invariant",
+    "expected": [],
+    "code": [
+      "class RingBuffer",
+      "{",
+      "public:",
+      "\tvoid Push(int64_t iValue)",
+      "\t{",
+      "\t\tmValues.at(muiWrite) = iValue;",
+      "\t\tmuiWrite = (muiWrite + 1) % kuiCapacity;",
+      "\t\tmuiCount = std::min(muiCount + 1, kuiCapacity);",
+      "\t}",
+      "",
+      "private:",
+      "\tstatic constexpr uint64_t kuiCapacity = 64;",
+      "\tstd::array<int64_t, kuiCapacity> mValues {};",
+      "\tuint64_t muiWrite = 0;",
+      "\tuint64_t muiCount = 0;",
+      "};"
+    ]
+  },
+  {
+    "id": "clean-loop-counters",
+    "expected": [],
+    "code": [
+      "for (size_t i = 0; i < mIslands.size(); ++i)",
+      "{",
+      "\tfor (size_t j = 0; j < mIslands.at(i).quads.size(); ++j)",
+      "\t{",
+      "\t\tauto it = mQuadMap.find(mIslands.at(i).quads.at(j).crc);",
+      "\t\tif (it != mQuadMap.end())",
+      "\t\t{",
+      "\t\t\tit->second.bVisible = true;",
+      "\t\t}",
+      "\t}",
+      "}"
+    ]
+  },
+  {
+    "id": "clean-two-guards-different-bodies",
+    "expected": [],
+    "code": [
+      "void Fire(Frame& rFrame, Unit* pUnit)",
+      "{",
+      "\tif (pUnit == nullptr)",
+      "\t{",
+      "\t\treturn;",
+      "\t}",
+      "",
+      "\tif (!rFrame.bSimulating)",
+      "\t{",
+      "\t\tLOG(\"Fire skipped outside simulation\");",
+      "\t\treturn;",
+      "\t}",
+      "",
+      "\tpUnit->iAmmo -= 1;",
+      "}"
+    ]
+  },
+  {
+    "id": "clean-or-in-bool-assignment",
+    "expected": [],
+    "code": [
+      "bool bNeedsRebuild = mbDirty || muiTextureCount != rOther.muiTextureCount || mbForceRebuild;",
+      "if (bNeedsRebuild)",
+      "{",
+      "\tRebuildDescriptorSets();",
+      "}"
+    ]
+  },
+  {
+    "id": "clean-and-guard",
+    "expected": [],
+    "code": [
+      "if (pTarget != nullptr && pTarget->bAlive)",
+      "{",
+      "\tApplyDamage(*pTarget, iDamage);",
+      "}"
+    ]
+  },
+  {
+    "id": "clean-num-inside-word",
+    "expected": [],
+    "code": [
+      "int64_t iNumerator = iDividend * kiScale;",
+      "int64_t iSerialNumber = rHeader.iSerialNumber;",
+      "float fEnumerated = static_cast<float>(iNumerator) / static_cast<float>(iDenominator);"
+    ]
+  },
+  {
+    "id": "clean-map-in-comment-and-string",
+    "expected": [],
+    "code": [
+      "// Legacy code used mTextureMap[crc] here; the .at() below throws instead of inserting.",
+      "const Texture& rTexture = mTextureMap.at(crc);",
+      "LOG(\"lookup map[key] for {}\", rTexture.name);"
+    ]
+  },
+  {
+    "id": "clean-repo-acronyms",
+    "expected": [],
+    "code": [
+      "void BindTexture(VkCommandBuffer vkCommandBuffer, common::crc_t crc, uint32_t uiSlot)",
+      "{",
+      "\tconst Texture& rTexture = mTextureMap.at(crc);",
+      "\tvkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipelineLayout, uiSlot, 1, &rTexture.vkDescriptorSet, 0, nullptr);",
+      "}"
+    ]
+  },
+  {
+    "id": "clean-long-single-line-call",
+    "expected": [],
+    "code": [
+      "engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissileCrc, vecMissilePosition, gMissileLaunchVolume.Get(), gMissilePitchMin.Get(), gMissilePitchRandom.Get());"
+    ]
+  },
+  {
+    "id": "clean-split-past-140",
+    "expected": [],
+    "code": [
+      "if (uiSlotIndex < std::ssize(pClient->slots) && (pClient->slots.at(uiSlotIndex).subscription.flags & SubscriptionFlags::kActive)",
+      " && pClient->slots.at(uiSlotIndex).ack.uiEpoch == uiEpoch)",
+      "{",
+      "\tpClient->slots.at(uiSlotIndex).ack.bAcknowledged = true;",
+      "}"
+    ]
+  },
+  {
+    "id": "clean-codec-adapter",
+    "expected": [],
+    "code": [
+      "void Serialize(Writer& rWriter) const",
+      "{",
+      "\trWriter.Write(mHeader);",
+      "\trWriter.Write(mPayload);",
+      "\trWriter.Write(common::Crc(mPayload));",
+      "}"
+    ]
+  },
+  {
+    "id": "v49-getter",
+    "expected": [
+      "rule49"
+    ],
+    "code": [
+      "class Squad",
+      "{",
+      "public:",
+      "\tint64_t GetUnitCount() const",
+      "\t{",
+      "\t\treturn miUnitCount;",
+      "\t}",
+      "",
+      "private:",
+      "\tint64_t miUnitCount = 0;",
+      "};"
+    ]
+  },
+  {
+    "id": "v49-is-accessor-composed",
+    "expected": [
+      "rule49"
+    ],
+    "code": [
+      "bool IsEmpty() const",
+      "{",
+      "\treturn mItems.empty() && miPending == 0;",
+      "}"
+    ]
+  },
+  {
+    "id": "v49-pass-through",
+    "expected": [
+      "rule49"
+    ],
+    "code": [
+      "void Graphics::ResizeSwapchain(uint32_t uiWidth, uint32_t uiHeight)",
+      "{",
+      "\tmSwapchain.Resize(uiWidth, uiHeight);",
+      "}"
+    ]
+  },
+  {
+    "id": "v49-setter-spread",
+    "expected": [
+      "rule49"
+    ],
+    "code": [
+      "void SetVolume(float fVolume)",
+      "{",
+      "\tmfVolume",
+      "\t\t= fVolume;",
+      "}"
+    ]
+  },
+  {
+    "id": "v56-abbreviations",
+    "expected": [
+      "rule56"
+    ],
+    "code": [
+      "void Reconcile(ReconcileContext& ctx, VkCommandBuffer cmdBuf)",
+      "{",
+      "\tfor (auto bufIt = ctx.buffers.begin(); bufIt != ctx.buffers.end(); ++bufIt)",
+      "\t{",
+      "\t\tbufIt->Flush(cmdBuf);",
+      "\t}",
+      "}"
+    ]
+  },
+  {
+    "id": "v56-single-abbreviation",
+    "expected": [
+      "rule56"
+    ],
+    "code": [
+      "int64_t iMsgCount = 0;",
+      "for (const Message& rMessage : rQueue.messages)",
+      "{",
+      "\tif (rMessage.bPending)",
+      "\t{",
+      "\t\t++iMsgCount;",
+      "\t}",
+      "}"
+    ]
+  },
+  {
+    "id": "v56-function-name",
+    "expected": [
+      "rule56",
+      "rule49"
+    ],
+    "code": [
+      "void CalcVelocity(Unit& rUnit, float fDeltaSeconds)",
+      "{",
+      "\trUnit.vecVelocity = XMVectorScale(rUnit.vecAcceleration, fDeltaSeconds);",
+      "}"
+    ]
+  },
+  {
+    "id": "v62-packed-guards",
+    "expected": [
+      "rule62"
+    ],
+    "code": [
+      "void Fire(Frame& rFrame, Unit* pTarget, int64_t iProjectileCount)",
+      "{",
+      "\tif (pTarget == nullptr || !rFrame.bSimulating || iProjectileCount == 0)",
+      "\t{",
+      "\t\treturn;",
+      "\t}",
+      "",
+      "\tSpawnProjectiles(rFrame, *pTarget, iProjectileCount);",
+      "}"
+    ]
+  },
+  {
+    "id": "v62-two-packed-guards-continue",
+    "expected": [
+      "rule62"
+    ],
+    "code": [
+      "for (Unit& rUnit : rFrame.units)",
+      "{",
+      "\tif (!rUnit.bAlive || rUnit.iOwner != iPlayer)",
+      "\t{",
+      "\t\tcontinue;",
+      "\t}",
+      "\trUnit.bSelected = true;",
+      "}"
+    ]
+  },
+  {
+    "id": "v14-num",
+    "expected": [
+      "rule14"
+    ],
+    "code": [
+      "inline constexpr uint32_t kuiNumThreads = 3;",
+      "int64_t iNumUnits = std::ssize(rFrame.units);"
+    ]
+  },
+  {
+    "id": "v16-map-bracket",
+    "expected": [
+      "rule16"
+    ],
+    "code": [
+      "Texture& rTexture = mTextureMap[crc];",
+      "rTexture.bResident = true;"
+    ]
+  },
+  {
+    "id": "v16-vector-bracket",
+    "expected": [
+      "rule16"
+    ],
+    "code": [
+      "for (size_t i = 0; i < mIslands.size(); ++i)",
+      "{",
+      "\tmIslands[i].bVisible = false;",
+      "}"
+    ]
+  },
+  {
+    "id": "v3-missing-prefixes",
+    "expected": [
+      "rule3"
+    ],
+    "code": [
+      "void Tick(Frame& frame)",
+      "{",
+      "\tint64_t count = 0;",
+      "\tbool done = false;",
+      "\tfloat volume = 1.0f;",
+      "\tUnit* unit = nullptr;",
+      "}"
+    ]
+  },
+  {
+    "id": "v3-wrong-prefix",
+    "expected": [
+      "rule3"
+    ],
+    "code": [
+      "bool iEnabled = true;",
+      "float bVolume = 0.5f;"
+    ]
+  },
+  {
+    "id": "v51-wrapped-arguments",
+    "expected": [
+      "rule51"
+    ],
+    "code": [
+      "engine::gpAudioManager->PlayOneShot3d(rFrame,",
+      "\tdata::kAudioMissileCrc,",
+      "\tvecMissilePosition, gMissileLaunchVolume.Get(), gMissilePitchMin.Get(), gMissilePitchRandom.Get());"
+    ]
+  },
+  {
+    "id": "v51-wrapped-short-condition",
+    "expected": [
+      "rule51"
+    ],
+    "code": [
+      "if (rSlot.eState == CoordSubscriptionState::kWaitingFullState",
+      "\t|| rSlot.eState == CoordSubscriptionState::kSubscribing)",
+      "{",
+      "\trSlot.iRetryCount += 1;",
+      "}"
+    ]
+  },
+  {
+    "id": "v61-no-braces",
+    "expected": [
+      "rule61"
+    ],
+    "code": [
+      "if (pLine[0] != '\\0')",
+      "\t++iCount;",
+      "else",
+      "\tbreak;"
+    ]
+  },
+  {
+    "id": "v21-pointer-size-pair",
+    "expected": [
+      "rule21"
+    ],
+    "code": [
+      "void Receive(const uint8_t* pPacketData, size_t uiPacketSize);"
+    ]
+  },
+  {
+    "id": "v41-missing-std",
+    "expected": [
+      "rule41"
+    ],
+    "code": [
+      "vector<string> names;",
+      "names.reserve(iCount);",
+      "unordered_map<crc_t, Texture> textures;"
+    ]
+  },
+  {
+    "id": "mixed-49-56",
+    "expected": [
+      "rule49",
+      "rule56"
+    ],
+    "code": [
+      "class Ctx",
+      "{",
+      "public:",
+      "\tint64_t GetCnt() const",
+      "\t{",
+      "\t\treturn miCnt;",
+      "\t}",
+      "",
+      "private:",
+      "\tint64_t miCnt = 0;",
+      "};"
+    ]
+  },
+  {
+    "id": "mixed-62-61-16",
+    "expected": [
+      "rule62",
+      "rule61",
+      "rule16"
+    ],
+    "code": [
+      "if (pUnit == nullptr || iIndex < 0 || iIndex >= std::ssize(mSlots))",
+      "\treturn;",
+      "mSlots[iIndex].pUnit = pUnit;"
+    ]
+  },
+  {
+    "id": "real-tickrealtime",
+    "expected": [],
+    "code": [
+      "int64_t TimeStep::TickRealtime()",
+      "{",
+      "\tstd::chrono::nanoseconds realDeltaNs = mRealTime.GetDeltaNs(true);",
+      "",
+      "\tif constexpr (kbProfilingFrameSpike)",
+      "\t{",
+      "\t\t// Track delta for performance monitoring",
+      "\t\tfloat fDelta = common::NanosecondsToFloatSeconds<float>(realDeltaNs);",
+      "\t\tif (mAverageDelta.miCount > 200 && fDelta > 1.9f * mAverageDelta.Average())",
+      "\t\t{",
+      "\t\t\tLOG(kDefault, kWarning, \"\\n\\n\\n  deltaNs spike {} > {}\", common::Wb(fDelta, 4), common::Wb(mAverageDelta.Average(), 4));",
+      "\t\t\tstatic bool sbOnce = false;",
+      "\t\t\tif (!sbOnce)",
+      "\t\t\t{",
+      "\t\t\t\tsbOnce = true;",
+      "\t\t\t\tgpProfileManager->LogTimers();",
+      "\t\t\t}",
+      "\t\t}",
+      "\t\tLOG(kDefault, kVerbose, \"\\n\\n\");",
+      "",
+      "\t\tmAverageDelta = fDelta;",
+      "\t}",
+      "",
+      "\t// Accumulate time with scaling",
+      "\tmTickRemainderNs += WallToSim(realDeltaNs);",
+      "",
+      "#if defined(BT_SERVER)",
+      "\t// Death spiral prevention: detect excessive updates and auto-reduce time scale. Server only, because",
+      "\t// the server broadcasts the new ratio to every client; the client only consumes a broadcast ratio.",
+      "\tif constexpr (kbDebugInput)",
+      "\t{",
+      "\t\tint64_t iEstimatedTicks = mTickRemainderNs / kTickNs;",
+      "\t\tif (iEstimatedTicks > kiMaxTicksPerFrame && miTimeMultiply > 1) [[unlikely]]",
+      "\t\t{",
+      "\t\t\tLOG(kDefault, kWarning, \"Death spiral detected: {} ticks at {}x speed\", iEstimatedTicks, miTimeMultiply);",
+      "\t\t\tDecreaseTimeScale(false);",
+      "\t\t}",
+      "\t}",
+      "#endif",
+      "",
+      "\t// Clamp accumulator to prevent backlog cascade (e.g., after background/focus loss)",
+      "\tstd::chrono::nanoseconds maxAccumulator = kTickNs * kiMaxAccumulatorTicks;",
+      "\tif (mTickRemainderNs > maxAccumulator)",
+      "\t{",
+      "\t\tLOG(kDefault, kVerbose, \"TimeStep::TickRealtime Accumulator clamped\");",
+      "\t\tmTickRemainderNs = maxAccumulator;",
+      "\t}",
+      "",
+      "\t// Calculate number of ticks needed",
+      "\tint64_t iTicks = mTickRemainderNs / kTickNs;",
+      "\tmTickRemainderNs %= kTickNs;",
+      "",
+      "\treturn iTicks;",
+      "}"
+    ]
+  },
+  {
+    "id": "real-clearaccumulator",
+    "expected": [
+      "rule49"
+    ],
+    "code": [
+      "void TimeStep::ClearAccumulator()",
+      "{",
+      "\tmTickRemainderNs = 0ns;",
+      "}",
+      "",
+      "void TimeStep::AbsorbUnusedTicks(int64_t iTicks)",
+      "{",
+      "\tmTickRemainderNs += iTicks * kTickNs;",
+      "}"
+    ]
+  },
+  {
+    "id": "real-settimescale",
+    "expected": [],
+    "code": [
+      "void TimeStep::SetTimeScale(int64_t iMultiply, int64_t iDivide)",
+      "{",
+      "\tmiTimeMultiply = iMultiply;",
+      "\tmiTimeDivide = iDivide;",
+      "\tmbTimeScaleChanged = true;",
+      "}"
+    ]
+  },
+  {
+    "id": "real-areadamage-get",
+    "expected": [],
+    "code": [
+      "float AreaDamage::Get(FXMVECTOR vecPosition, uint16_t uiCategoryMask, XMVECTOR& rvecClosestSource)",
+      "{",
+      "\tfloat fTotalDamage = 0.0f;",
+      "\tfloat fClosestDistance = std::numeric_limits<float>::max();",
+      "\trvecClosestSource = vecPosition;",
+      "",
+      "\tfor (int64_t i = 0; i < siAreaDamageSourceCount; ++i)",
+      "\t{",
+      "\t\tconst AreaDamageSource& rSource = sAreaDamageSources.at(static_cast<size_t>(i));",
+      "\t\t// Filter by category",
+      "\t\tif ((rSource.uiCategory & uiCategoryMask) == 0)",
+      "\t\t{",
+      "\t\t\tcontinue;",
+      "\t\t}",
+      "",
+      "\t\t// Calculate distance",
+      "\t\tXMVECTOR vecDiff = XMVectorSubtract(vecPosition, rSource.vecPosition);",
+      "\t\tfloat fDistance = XMVectorGetX(XMVector3Length(vecDiff));",
+      "",
+      "\t\t// Skip if outside radius",
+      "\t\tif (fDistance >= rSource.fRadius)",
+      "\t\t{",
+      "\t\t\tcontinue;",
+      "\t\t}",
+      "",
+      "\t\t// Track closest source",
+      "\t\tif (fDistance < fClosestDistance)",
+      "\t\t{",
+      "\t\t\tfClosestDistance = fDistance;",
+      "\t\t\trvecClosestSource = rSource.vecPosition;",
+      "\t\t}",
+      "",
+      "\t\t// Linear falloff: full damage at center, zero at edge",
+      "\t\tfloat fFalloff = 1.0f - (fDistance / rSource.fRadius);",
+      "\t\tfTotalDamage += rSource.fDamage * fFalloff;",
+      "\t}",
+      "",
+      "\treturn fTotalDamage;",
+      "}"
+    ]
+  },
+  {
+    "id": "real-areadamage-add",
+    "expected": [],
+    "code": [
+      "void AreaDamage::Add(const AreaDamageSource& rSource)",
+      "{",
+      "\tint64_t iIndex = siAreaDamageSourceCount;",
+      "\tif (sAreaDamageSources.empty())",
+      "\t{",
+      "\t\t// Heap: one-time per-thread pre-allocation (thread_local vectors start empty to avoid allocating during mi_process_init)",
+      "\t\tScopedSuppressAllocationTracking suppress;",
+      "\t\tsAreaDamageSources.resize(kiAreaDamageSourcePreallocate);",
+      "\t}",
+      "",
+      "\tif (siAreaDamageSourceCount >= static_cast<int64_t>(sAreaDamageSources.size()))",
+      "\t{",
+      "\t\tLOG(kDefault, kWarning, \"AreaDamage: sAreaDamageSources overflow (count: {}, capacity: {}). Increase kiAreaDamageSourcePreallocate in AreaDamage.h\", siAreaDamageSourceCount, sAreaDamageSources.size());",
+      "\t\tDEBUG_BREAK();",
+      "\t\t// Heap: rare growth when area-damage source count exceeds pre-allocation",
+      "\t\tScopedSuppressAllocationTracking suppress;",
+      "\t\tsAreaDamageSources.resize(siAreaDamageSourceCount * 2);",
+      "\t}",
+      "\tsAreaDamageSources.at(static_cast<size_t>(iIndex)) = rSource;",
+      "\t++siAreaDamageSourceCount;",
+      "}"
+    ]
+  },
+  {
+    "id": "real-explosions-spawn-head",
+    "expected": [],
+    "code": [
+      "bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentTime, const SpawnInfo& rInfo)",
+      "{",
+      "\tif (!common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()))",
+      "\t{",
+      "\t\treturn false;",
+      "\t}",
+      "",
+      "\tExplosionsInterpolate& rInterpolate = rFrame.interpolate.explosions;",
+      "\tExplosionsPostRender& rPostRender = rFrame.postRender.explosions;",
+      "",
+      "\tcommon::ValidateVector<true >(rInfo.vecPosition);",
+      "\tcommon::ValidateVector<false>(rInfo.vecDirection);",
+      "",
+      "\tconst ExplosionType& rType = ExplosionsInterpolate::sTypes.at(rInfo.uiTypeIndex);",
+      "",
+      "\tGrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());",
+      "\tint64_t iSpawnIndex = AddElement(rInterpolate, rPostRender);",
+      "",
+      "\t// Initialize explosion data",
+      "\trInterpolate.puiTypeIndices[iSpawnIndex] = rInfo.uiTypeIndex;",
+      "\trInterpolate.pFlags[iSpawnIndex] = rInfo.flags;",
+      "\trInterpolate.pfStartTimes[iSpawnIndex] = fCurrentTime;",
+      "\trInterpolate.pVecPositions[iSpawnIndex] = rInfo.vecPosition;",
+      "\trInterpolate.pVecDirections[iSpawnIndex] = rInfo.vecDirection;",
+      "",
+      "\trInterpolate.pfTimePercents[iSpawnIndex] = rInfo.fTimePercent;",
+      "",
+      "\trInterpolate.piTrailCounts[iSpawnIndex] = static_cast<int32_t>(std::min(rInfo.uiTrailCount, static_cast<uint32_t>(kiMaxExplosionTrails)));",
+      "",
+      "\t// Initialize trail arrays to invalid",
+      "\tfor (int64_t j = 0; j < kiMaxExplosionTrails; ++j)",
+      "\t{",
+      "\t\trInterpolate.pfTrailTimes[j][iSpawnIndex] = 0.0f;",
+      "#if defined(BT_CLIENT)",
+      "\t\trInterpolate.pTrails[j][iSpawnIndex] = smoke_trails_t {};",
+      "\t\trInterpolate.pfTrailIntensities[j][iSpawnIndex] = 0.0f;",
+      "\t\trInterpolate.pVecTrailStartPositions[j][iSpawnIndex] = XMVectorZero();",
+      "\t\trInterpolate.pVecTrailEndPositions[j][iSpawnIndex] = XMVectorZero();",
+      "#endif",
+      "\t}",
+      "",
+      "\t// Consume random unconditionally to keep random engine in sync across client/server",
+      "\t[[maybe_unused]] float fPrimaryRotation = common::Random<XM_2PI>(rFrame.postRender.randomEngine);",
+      "",
+      "\t// Fire-and-forget effects: Primary light",
+      "#if defined(BT_CLIENT)",
+      "\tif (rType.uiPrimaryLightControllerTypeIndex != kuiInvalidControllerType)",
+      "\t{",
+      "\t\tPointLightsPostRender::AddControlled(rFrame, fCurrentTime, rType.uiPrimaryLightControllerTypeIndex, rInfo.vecPosition, fPrimaryRotation);",
+      "\t}",
+      "#endif",
+      "",
+      "\t// Fire-and-forget effects: Primary puff",
+      "#if defined(BT_CLIENT)",
+      "\tif (rType.uiPrimaryPuffControllerTypeIndex != kuiInvalidControllerType)",
+      "\t{",
+      "\t\tPuffsPostRender::AddControlled(rFrame, fCurrentTime, rType.uiPrimaryPuffControllerTypeIndex, rInfo.vecPosition);",
+      "\t}",
+      "#endif"
+    ]
+  },
+  {
+    "id": "buried-14-in-tickrealtime",
+    "expected": [
+      "rule14"
+    ],
+    "code": [
+      "int64_t TimeStep::TickRealtime()",
+      "{",
+      "\tstd::chrono::nanoseconds realDeltaNs = mRealTime.GetDeltaNs(true);",
+      "",
+      "\tif constexpr (kbProfilingFrameSpike)",
+      "\t{",
+      "\t\t// Track delta for performance monitoring",
+      "\t\tfloat fDelta = common::NanosecondsToFloatSeconds<float>(realDeltaNs);",
+      "\t\tif (mAverageDelta.miCount > 200 && fDelta > 1.9f * mAverageDelta.Average())",
+      "\t\t{",
+      "\t\t\tLOG(kDefault, kWarning, \"\\n\\n\\n  deltaNs spike {} > {}\", common::Wb(fDelta, 4), common::Wb(mAverageDelta.Average(), 4));",
+      "\t\t\tstatic bool sbOnce = false;",
+      "\t\t\tif (!sbOnce)",
+      "\t\t\t{",
+      "\t\t\t\tsbOnce = true;",
+      "\t\t\t\tgpProfileManager->LogTimers();",
+      "\t\t\t}",
+      "\t\t}",
+      "\t\tLOG(kDefault, kVerbose, \"\\n\\n\");",
+      "",
+      "\t\tmAverageDelta = fDelta;",
+      "\t}",
+      "",
+      "\t// Accumulate time with scaling",
+      "\tmTickRemainderNs += WallToSim(realDeltaNs);",
+      "",
+      "#if defined(BT_SERVER)",
+      "\t// Death spiral prevention: detect excessive updates and auto-reduce time scale. Server only, because",
+      "\t// the server broadcasts the new ratio to every client; the client only consumes a broadcast ratio.",
+      "\tif constexpr (kbDebugInput)",
+      "\t{",
+      "\t\tint64_t iEstimatedTicks = mTickRemainderNs / kTickNs;",
+      "\t\tif (iEstimatedTicks > kiMaxTicksPerFrame && miTimeMultiply > 1) [[unlikely]]",
+      "\t\t{",
+      "\t\t\tLOG(kDefault, kWarning, \"Death spiral detected: {} ticks at {}x speed\", iEstimatedTicks, miTimeMultiply);",
+      "\t\t\tDecreaseTimeScale(false);",
+      "\t\t}",
+      "\t}",
+      "#endif",
+      "",
+      "\t// Clamp accumulator to prevent backlog cascade (e.g., after background/focus loss)",
+      "\tstd::chrono::nanoseconds maxAccumulator = kTickNs * kiMaxAccumulatorTicks;",
+      "\tif (mTickRemainderNs > maxAccumulator)",
+      "\t{",
+      "\t\tLOG(kDefault, kVerbose, \"TimeStep::TickRealtime Accumulator clamped\");",
+      "\t\tmTickRemainderNs = maxAccumulator;",
+      "\t}",
+      "",
+      "\t// Calculate number of ticks needed",
+      "\tint64_t iNumTicks = mTickRemainderNs / kTickNs;",
+      "\tmTickRemainderNs %= kTickNs;",
+      "",
+      "\treturn iNumTicks;",
+      "}"
+    ]
+  },
+  {
+    "id": "buried-56-in-areadamage-get",
+    "expected": [
+      "rule56"
+    ],
+    "code": [
+      "float AreaDamage::Get(FXMVECTOR vecPosition, uint16_t uiCategoryMask, XMVECTOR& rvecClosestSource)",
+      "{",
+      "\tfloat fTotalDamage = 0.0f;",
+      "\tfloat fClosestDistance = std::numeric_limits<float>::max();",
+      "\trvecClosestSource = vecPosition;",
+      "",
+      "\tfor (int64_t i = 0; i < siAreaDamageSourceCount; ++i)",
+      "\t{",
+      "\t\tconst AreaDamageSource& rSource = sAreaDamageSources.at(static_cast<size_t>(i));",
+      "\t\t// Filter by category",
+      "\t\tif ((rSource.uiCategory & uiCategoryMask) == 0)",
+      "\t\t{",
+      "\t\t\tcontinue;",
+      "\t\t}",
+      "",
+      "\t\t// Calculate distance",
+      "\t\tXMVECTOR vecDiff = XMVectorSubtract(vecPosition, rSource.vecPosition);",
+      "\t\tfloat fDist = XMVectorGetX(XMVector3Length(vecDiff));",
+      "",
+      "\t\t// Skip if outside radius",
+      "\t\tif (fDist >= rSource.fRadius)",
+      "\t\t{",
+      "\t\t\tcontinue;",
+      "\t\t}",
+      "",
+      "\t\t// Track closest source",
+      "\t\tif (fDist < fClosestDistance)",
+      "\t\t{",
+      "\t\t\tfClosestDistance = fDist;",
+      "\t\t\trvecClosestSource = rSource.vecPosition;",
+      "\t\t}",
+      "",
+      "\t\t// Linear falloff: full damage at center, zero at edge",
+      "\t\tfloat fFalloff = 1.0f - (fDist / rSource.fRadius);",
+      "\t\tfTotalDamage += rSource.fDamage * fFalloff;",
+      "\t}",
+      "",
+      "\treturn fTotalDamage;",
+      "}"
+    ]
+  }
+]
