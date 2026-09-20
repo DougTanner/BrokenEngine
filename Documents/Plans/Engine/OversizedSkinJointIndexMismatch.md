@@ -124,10 +124,10 @@ workbuffer makes `Workbuffer::Grow` (`Common/Workbuffer.cpp:78-95`) fire: it
 `DEBUG_BREAK()`s, logs `kError` while a frame is open, resizes to twice the need,
 and continues, and the per-thread buffer stays grown for every later call on that
 thread. That is the intended, accepted behavior here — one break and one
-allocation per thread per oversized model. It is safe because
+in-place growth per thread per oversized model. It is safe because
 `Documents/Plans/Engine/WorkbufferGrowthHandleSafety.md`, this Plan's dependency,
-makes `ScopedWorkbufferAllocation` handles resolve through current backing
-storage, names this exact nested pair in its `## In scope`, and rewrites the
+moves the workbuffer onto backing storage that grows in place without changing
+its address, names this exact nested pair in its `## Context`, and rewrites the
 `Common/AGENTS.md` `## Allocation-Free Scratch` growth sentence accordingly. That
 is why this Plan leaves both reservations and `EvaluateWorldMatrices`' signature
 alone.
