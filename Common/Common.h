@@ -6,6 +6,7 @@
 #include "Crc.h"
 #include "FileUtils.h"
 #include "Serialization.h"
+#include "StableVector.h"
 #include "StringUtils.h"
 #include "TextureFormat.h"
 

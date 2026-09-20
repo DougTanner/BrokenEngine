@@ -40,16 +40,17 @@ struct CollisionPairContext
 
 struct CollisionEventScratch
 {
-	std::vector<CollisionCandidate> candidates;
-	std::vector<PendingCollisionResult> pendingResults;
+	// Reserved counts live here rather than at the growth sites because the owner is default-constructed
+	common::StableVector<CollisionCandidate> candidates {64 * kiCollisionCandidatePreallocate};
+	common::StableVector<PendingCollisionResult> pendingResults {64 * kiCollisionResultPreallocate};
 	int64_t iCandidateCount = 0;
 	int64_t iPendingResultCount = 0;
 };
 
 static CollisionEventScratch& GetCollisionEventScratch()
 {
-	// Function-local TLS defers construction until first use; default construction is allocation-free
-	// (empty vectors), so it is safe even before allocator startup completes. Growth sites suppress tracking.
+	// Function-local TLS defers construction until first use; construction only records the reserved
+	// counts and makes no OS call, so it is safe even before allocator startup completes.
 	static thread_local CollisionEventScratch sScratch;
 	return sScratch;
 }
@@ -66,8 +67,9 @@ struct ZoneRange
 // Per-zone storage for a layer pair
 struct ZonePair
 {
-	std::vector<int64_t> indicesA;  // Object indices from layer A
-	std::vector<int64_t> indicesB;  // Object indices from layer B
+	// Reserved counts live here rather than at the growth sites because the owner is default-constructed
+	common::StableVector<int64_t> indicesA {4 * kiCollisionZonePreallocate};  // Object indices from layer A
+	common::StableVector<int64_t> indicesB {4 * kiCollisionZonePreallocate};  // Object indices from layer B
 	int64_t iCountA = 0;
 	int64_t iCountB = 0;
 };
@@ -85,8 +87,8 @@ struct LayerPairZones
 		{
 			for (ZonePair& rZonePair : rRow)
 			{
-				rZonePair.indicesA.resize(kiCollisionZonePreallocate);
-				rZonePair.indicesB.resize(kiCollisionZonePreallocate);
+				rZonePair.indicesA.Resize(kiCollisionZonePreallocate);
+				rZonePair.indicesB.Resize(kiCollisionZonePreallocate);
 			}
 		}
 	}
@@ -104,14 +106,19 @@ thread_local float Collision::sfZoneHeight = 0.0f;
 thread_local std::vector<CollisionLayer> Collision::sLayers;
 thread_local int64_t Collision::siLayerCount = 0;
 
-thread_local std::vector<LayerPairZones> Collision::sLayerPairZones;
+// StableVector construction only records the reserved count, so these reserve no address space and make
+// no OS call until their first Resize; growth then commits more of that reservation without moving.
+thread_local common::StableVector<LayerPairZones> Collision::sLayerPairZones {64 * kiCollisionLayerPairPreallocate};
 thread_local int64_t Collision::siLayerPairCount = 0;
 
-thread_local std::vector<CollisionResult> Collision::sResultEntries;
-thread_local std::vector<CollisionResultSpan> Collision::sResultSpans;
+// These three are first sized from live data rather than from a pre-allocate constant, so each reserves
+// a fixed live-data ceiling instead of a multiple of one.
+static constexpr int64_t kiCollisionLiveDataReserveBytes = 64 * 1024 * 1024;
+thread_local common::StableVector<CollisionResult> Collision::sResultEntries {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResult))};
+thread_local common::StableVector<CollisionResultSpan> Collision::sResultSpans {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResultSpan))};
 thread_local int64_t Collision::siResultSpanCount = 0;
 thread_local int64_t Collision::sLayerBaseOffsets[kiCollisionLayerPreallocate] {};
-thread_local std::vector<uint32_t> Collision::sTestedBGeneration;
+thread_local common::StableVector<uint32_t> Collision::sTestedBGeneration {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(uint32_t))};
 thread_local uint32_t Collision::suiTestedBCurrentGeneration = 0;
 
 using enum CollisionFlags;
@@ -186,20 +193,18 @@ void Collision::InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex
 		for (int32_t x = rRange.iStartX; x <= rRange.iEndX; ++x)
 		{
 			ZonePair& rZonePair = rPairZones.zones[y][x];
-			std::vector<int64_t>& rIndices = bIsLayerA ? rZonePair.indicesA : rZonePair.indicesB;
+			common::StableVector<int64_t>& rIndices = bIsLayerA ? rZonePair.indicesA : rZonePair.indicesB;
 			int64_t& riCount = bIsLayerA ? rZonePair.iCountA : rZonePair.iCountB;
-			if (riCount >= static_cast<int64_t>(rIndices.size()))
+			if (riCount >= rIndices.Size())
 			{
 				// sLayers lookups feed only this rare overflow LOG, so fetch them here, not every zone iteration
 				const CollisionLayer& rLayerA = sLayers.at(rPairZones.uiLayerA);
 				const CollisionLayer& rLayerB = sLayers.at(rPairZones.uiLayerB);
-				LOG(kDefault, kWarning, "Collision: ZonePair.indices{} overflow (count: {}, capacity: {}) pair A={}(cat={},total={}) B={}(cat={},total={}) zone=({},{}). Increase kiCollisionZonePreallocate in Collision.h", bIsLayerA ? 'A' : 'B', riCount, rIndices.size(), rPairZones.uiLayerA, rLayerA.uiCategory, rLayerA.iCount, rPairZones.uiLayerB, rLayerB.uiCategory, rLayerB.iCount, x, y);
+				LOG(kDefault, kWarning, "Collision: ZonePair.indices{} overflow (count: {}, capacity: {}) pair A={}(cat={},total={}) B={}(cat={},total={}) zone=({},{}). Increase kiCollisionZonePreallocate in Collision.h", bIsLayerA ? 'A' : 'B', riCount, rIndices.Size(), rPairZones.uiLayerA, rLayerA.uiCategory, rLayerA.iCount, rPairZones.uiLayerB, rLayerB.uiCategory, rLayerB.iCount, x, y);
 				DEBUG_BREAK();
-				// Heap: rare growth when zone occupancy exceeds pre-allocation
-				ScopedSuppressAllocationTracking suppress;
-				rIndices.resize(riCount * 2);
+				rIndices.Resize(riCount * 2);
 			}
-			rIndices.at(static_cast<size_t>(riCount)) = iIndex;
+			rIndices[riCount] = iIndex;
 			++riCount;
 		}
 	}
@@ -278,11 +283,9 @@ static bool XM_CALLCONV SweptSphereTest(FXMVECTOR vecStartA, FXMVECTOR vecEndA, 
 
 void Collision::SetupZones(FXMVECTOR vecArea)
 {
-	if (sLayerPairZones.empty())
+	if (sLayerPairZones.Size() == 0)
 	{
-		// Heap: one-time per-thread pre-allocation (thread_local vectors start empty to avoid allocating during mi_process_init)
-		ScopedSuppressAllocationTracking suppress;
-		sLayerPairZones.resize(kiCollisionLayerPairPreallocate);
+		sLayerPairZones.Resize(kiCollisionLayerPairPreallocate);
 	}
 
 	// Compute zone dimensions from vecArea (x=minX, y=maxY, z=maxX, w=minY)
@@ -296,7 +299,7 @@ void Collision::SetupZones(FXMVECTOR vecArea)
 	// Reset zone counts instead of clearing
 	for (int64_t i = 0; i < siLayerPairCount; ++i)
 	{
-		LayerPairZones& rPairZones = sLayerPairZones.at(static_cast<size_t>(i));
+		LayerPairZones& rPairZones = sLayerPairZones[i];
 		for (ZonePair (&rRow)[kiCollisionZonesX] : rPairZones.zones)
 		{
 			for (ZonePair& rZonePair : rRow)
@@ -332,15 +335,13 @@ void Collision::SetupZones(FXMVECTOR vecArea)
 			}
 
 			// Reuse existing entry or grow if needed
-			if (uiPairIndex >= sLayerPairZones.size())
+			if (static_cast<int64_t>(uiPairIndex) >= sLayerPairZones.Size())
 			{
-				LOG(kDefault, kWarning, "Collision: sLayerPairZones overflow (index: {}, capacity: {}). Increase kiCollisionLayerPairPreallocate in Collision.h", uiPairIndex, sLayerPairZones.size());
+				LOG(kDefault, kWarning, "Collision: sLayerPairZones overflow (index: {}, capacity: {}). Increase kiCollisionLayerPairPreallocate in Collision.h", uiPairIndex, sLayerPairZones.Size());
 				DEBUG_BREAK();
-				// Heap: rare growth when layer-pair count exceeds pre-allocation (each new LayerPairZones pre-allocates its zone index vectors)
-				ScopedSuppressAllocationTracking suppress;
-				sLayerPairZones.resize(static_cast<int64_t>(uiPairIndex) * 2);
+				sLayerPairZones.Resize(static_cast<int64_t>(uiPairIndex) * 2);
 			}
-			LayerPairZones& rPairZones = sLayerPairZones.at(uiPairIndex);
+			LayerPairZones& rPairZones = sLayerPairZones[static_cast<int64_t>(uiPairIndex)];
 			rPairZones.uiLayerA = static_cast<size_t>(iLayerA);
 			rPairZones.uiLayerB = static_cast<size_t>(iLayerB);
 
@@ -367,31 +368,27 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 	SetupZones(vecArea);
 
 	// Collect every candidate before mutating collision flags so traversal order cannot select winners.
-	if (rScratch.candidates.empty())
+	if (rScratch.candidates.Size() == 0)
 	{
-		// Heap: one-time per-thread pre-allocation; retained for later ticks.
-		ScopedSuppressAllocationTracking suppress;
-		rScratch.candidates.resize(kiCollisionCandidatePreallocate);
+		rScratch.candidates.Resize(kiCollisionCandidatePreallocate);
 	}
 	rScratch.iCandidateCount = 0;
-	if (rScratch.pendingResults.empty())
+	if (rScratch.pendingResults.Size() == 0)
 	{
-		// Heap: one-time per-thread pre-allocation; retained for later ticks.
-		ScopedSuppressAllocationTracking suppress;
-		rScratch.pendingResults.resize(kiCollisionResultPreallocate);
+		rScratch.pendingResults.Resize(kiCollisionResultPreallocate);
 	}
 	rScratch.iPendingResultCount = 0;
 
 	// Process all layer pair zones
 	for (int64_t i = 0; i < siLayerPairCount; ++i)
 	{
-		CollideLayerPair(rAlignments, sLayerPairZones.at(static_cast<size_t>(i)));
+		CollideLayerPair(rAlignments, sLayerPairZones[i]);
 	}
 
 	// One global sort, not per layer pair. The trailing layer/object keys are load-bearing: for the fixed
 	// layer-registration order client and server share, they make the equal-time order total and reproducible.
 	// Sorting by fTimeOfImpact alone leaves equal-time candidates in an arbitrary order and desyncs client and server.
-	std::sort(rScratch.candidates.begin(), rScratch.candidates.begin() + rScratch.iCandidateCount, [](const CollisionCandidate& rLeftCandidate, const CollisionCandidate& rRightCandidate)
+	std::sort(rScratch.candidates.Data(), rScratch.candidates.Data() + rScratch.iCandidateCount, [](const CollisionCandidate& rLeftCandidate, const CollisionCandidate& rRightCandidate)
 	{
 		return std::tie(rLeftCandidate.fTimeOfImpact, rLeftCandidate.uiLayerA, rLeftCandidate.iObjectA, rLeftCandidate.uiLayerB, rLeftCandidate.iObjectB) <
 		       std::tie(rRightCandidate.fTimeOfImpact, rRightCandidate.uiLayerA, rRightCandidate.iObjectA, rRightCandidate.uiLayerB, rRightCandidate.iObjectB);
@@ -400,7 +397,7 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 	// Commit accepted candidates into retained pending-result scratch.
 	for (int64_t i = 0; i < rScratch.iCandidateCount; ++i)
 	{
-		CommitCandidate(rScratch.candidates.at(static_cast<size_t>(i)));
+		CommitCandidate(rScratch.candidates[i]);
 	}
 
 	// Bucket pending results into flat contiguous storage
@@ -409,16 +406,16 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 	// Pass 1: Count results per key
 	for (int64_t i = 0; i < rScratch.iPendingResultCount; ++i)
 	{
-		const PendingCollisionResult& rPending = rScratch.pendingResults.at(static_cast<size_t>(i));
+		const PendingCollisionResult& rPending = rScratch.pendingResults[i];
 		int64_t iSpanIndex = sLayerBaseOffsets[static_cast<size_t>(rPending.iLayerIndex)] + rPending.iObjectIndex;
-		++sResultSpans.at(static_cast<size_t>(iSpanIndex)).iCount;
+		++sResultSpans[iSpanIndex].iCount;
 	}
 
 	// Prefix sum: assign offsets, reset counts for fill pass
 	int64_t iTotalResults = 0;
 	for (int64_t i = 0; i < siResultSpanCount; ++i)
 	{
-		CollisionResultSpan& rSpan = sResultSpans.at(static_cast<size_t>(i));
+		CollisionResultSpan& rSpan = sResultSpans[i];
 		if (rSpan.iCount > 0)
 		{
 			rSpan.iOffset = iTotalResults;
@@ -430,26 +427,22 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 	// Grow result entries if needed
 	if (iTotalResults > 0)
 	{
-		if (sResultEntries.empty())
+		if (sResultEntries.Size() == 0)
 		{
-			// Heap: one-time per-thread pre-allocation (thread_local vectors start empty to avoid allocating during mi_process_init)
-			ScopedSuppressAllocationTracking suppress;
-			sResultEntries.resize(std::max(kiCollisionResultPreallocate, iTotalResults));
+			sResultEntries.Resize(std::max(kiCollisionResultPreallocate, iTotalResults));
 		}
-		else if (iTotalResults > static_cast<int64_t>(sResultEntries.size()))
+		else if (iTotalResults > sResultEntries.Size())
 		{
-			// Heap: rare growth when collision count exceeds pre-allocation
-			ScopedSuppressAllocationTracking suppress;
-			sResultEntries.resize(iTotalResults);
+			sResultEntries.Resize(iTotalResults);
 		}
 	}
 	// Pass 2: Fill results at their assigned offsets
 	for (int64_t i = 0; i < rScratch.iPendingResultCount; ++i)
 	{
-		const PendingCollisionResult& rPending = rScratch.pendingResults.at(static_cast<size_t>(i));
+		const PendingCollisionResult& rPending = rScratch.pendingResults[i];
 		int64_t iSpanIndex = sLayerBaseOffsets[static_cast<size_t>(rPending.iLayerIndex)] + rPending.iObjectIndex;
-		CollisionResultSpan& rSpan = sResultSpans.at(static_cast<size_t>(iSpanIndex));
-		sResultEntries.at(static_cast<size_t>(rSpan.iOffset + rSpan.iCount)) = rPending.result;
+		CollisionResultSpan& rSpan = sResultSpans[iSpanIndex];
+		sResultEntries[rSpan.iOffset + rSpan.iCount] = rPending.result;
 		++rSpan.iCount;
 	}
 
@@ -467,23 +460,19 @@ void Collision::AllocateResultStorage()
 	siResultSpanCount = iTotal;
 
 	// Lazy pre-allocate spans
-	if (sResultSpans.empty())
+	if (sResultSpans.Size() == 0)
 	{
-		// Heap: one-time per-thread pre-allocation (thread_local vectors start empty to avoid allocating during mi_process_init)
-		ScopedSuppressAllocationTracking suppress;
-		sResultSpans.resize(std::max(kiCollisionResultSpanPreallocate, iTotal));
+		sResultSpans.Resize(std::max(kiCollisionResultSpanPreallocate, iTotal));
 	}
-	else if (iTotal > static_cast<int64_t>(sResultSpans.size()))
+	else if (iTotal > sResultSpans.Size())
 	{
-		// Heap: rare growth when total object count exceeds pre-allocation
-		ScopedSuppressAllocationTracking suppress;
-		sResultSpans.resize(iTotal);
+		sResultSpans.Resize(iTotal);
 	}
 
 	// Reset all active spans
 	for (int64_t i = 0; i < iTotal; ++i)
 	{
-		sResultSpans.at(static_cast<size_t>(i)) = {.iOffset = -1, .iCount = 0};
+		sResultSpans[i] = {.iOffset = -1, .iCount = 0};
 	}
 }
 
@@ -491,15 +480,13 @@ void Collision::AllocateResultStorage()
 static void XM_CALLCONV RecordCollision(const CollisionCandidate& rCandidate, FXMVECTOR vecSelfPosition, int64_t iSelf, size_t uiSelfLayer, CollisionLayer& rOtherLayer, int64_t iOther, size_t uiOtherLayer)
 {
 	CollisionEventScratch& rScratch = GetCollisionEventScratch();
-	if (rScratch.iPendingResultCount >= static_cast<int64_t>(rScratch.pendingResults.size())) [[unlikely]]
+	if (rScratch.iPendingResultCount >= rScratch.pendingResults.Size()) [[unlikely]]
 	{
-		LOG(kDefault, kWarning, "Collision: pendingResults overflow (count: {}, capacity: {}). Increase kiCollisionResultPreallocate in Collision.h", rScratch.iPendingResultCount, rScratch.pendingResults.size());
+		LOG(kDefault, kWarning, "Collision: pendingResults overflow (count: {}, capacity: {}). Increase kiCollisionResultPreallocate in Collision.h", rScratch.iPendingResultCount, rScratch.pendingResults.Size());
 		DEBUG_BREAK();
-		// Heap: rare growth when accepted result count exceeds pre-allocation.
-		ScopedSuppressAllocationTracking suppress;
-		rScratch.pendingResults.resize(rScratch.iPendingResultCount * 2);
+		rScratch.pendingResults.Resize(rScratch.iPendingResultCount * 2);
 	}
-	rScratch.pendingResults.at(static_cast<size_t>(rScratch.iPendingResultCount)) =
+	rScratch.pendingResults[rScratch.iPendingResultCount] =
 	{
 		.iLayerIndex = static_cast<int64_t>(uiSelfLayer),
 		.iObjectIndex = iSelf,
@@ -623,15 +610,13 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 	}
 
 	CollisionEventScratch& rScratch = GetCollisionEventScratch();
-	if (rScratch.iCandidateCount >= static_cast<int64_t>(rScratch.candidates.size())) [[unlikely]]
+	if (rScratch.iCandidateCount >= rScratch.candidates.Size()) [[unlikely]]
 	{
-		LOG(kDefault, kWarning, "Collision: candidates overflow (count: {}, capacity: {}). Increase kiCollisionCandidatePreallocate in Collision.h", rScratch.iCandidateCount, rScratch.candidates.size());
+		LOG(kDefault, kWarning, "Collision: candidates overflow (count: {}, capacity: {}). Increase kiCollisionCandidatePreallocate in Collision.h", rScratch.iCandidateCount, rScratch.candidates.Size());
 		DEBUG_BREAK();
-		// Heap: rare growth when candidate count exceeds pre-allocation.
-		ScopedSuppressAllocationTracking suppress;
-		rScratch.candidates.resize(rScratch.iCandidateCount * 2);
+		rScratch.candidates.Resize(rScratch.iCandidateCount * 2);
 	}
-	rScratch.candidates.at(static_cast<size_t>(rScratch.iCandidateCount)) =
+	rScratch.candidates[rScratch.iCandidateCount] =
 	{
 		.fTimeOfImpact = fTimeOfImpact,
 		.uiLayerA = uiLayerA,
@@ -665,11 +650,9 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, LayerPairZones& 
 	};
 
 	// Track tested B objects to avoid duplicates from multi-zone presence (generation counter)
-	if (rLayerB.iCount > static_cast<int64_t>(sTestedBGeneration.size()))
+	if (rLayerB.iCount > sTestedBGeneration.Size())
 	{
-		// Heap: one-time per-thread growth (thread_local vectors start empty to avoid allocating during mi_process_init)
-		ScopedSuppressAllocationTracking suppress;
-		sTestedBGeneration.resize(static_cast<size_t>(rLayerB.iCount));
+		sTestedBGeneration.Resize(rLayerB.iCount);
 	}
 
 	for (int64_t i = 0; i < rLayerA.iCount; ++i)
@@ -687,7 +670,7 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, LayerPairZones& 
 		++suiTestedBCurrentGeneration;
 		if (suiTestedBCurrentGeneration == 0)
 		{
-			std::memset(sTestedBGeneration.data(), 0, sTestedBGeneration.size() * sizeof(uint32_t));
+			std::memset(sTestedBGeneration.Data(), 0, static_cast<size_t>(sTestedBGeneration.Size()) * sizeof(uint32_t));
 			suiTestedBCurrentGeneration = 1;
 		}
 
@@ -705,13 +688,13 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, LayerPairZones& 
 				// Check all B objects in this zone (no layer filtering needed)
 				for (int64_t k = 0; k < rZonePair.iCountB; ++k)
 				{
-					int64_t j = rZonePair.indicesB.at(static_cast<size_t>(k));
+					int64_t j = rZonePair.indicesB[k];
 					// Skip if already tested this B object
-					if (sTestedBGeneration.at(static_cast<size_t>(j)) == suiTestedBCurrentGeneration)
+					if (sTestedBGeneration[j] == suiTestedBCurrentGeneration)
 					{
 						continue;
 					}
-					sTestedBGeneration.at(static_cast<size_t>(j)) = suiTestedBCurrentGeneration;
+					sTestedBGeneration[j] = suiTestedBCurrentGeneration;
 
 					TestAndCollectPair(pairContext, i, j);
 				}
@@ -727,15 +710,15 @@ void Collision::Clear()
 
 bool Collision::HasCollision(size_t uiLayerIndex, int64_t iIndex)
 {
-	return sResultSpans.at(static_cast<size_t>(sLayerBaseOffsets[uiLayerIndex] + iIndex)).iCount > 0;
+	return sResultSpans[sLayerBaseOffsets[uiLayerIndex] + iIndex].iCount > 0;
 }
 
 std::span<const CollisionResult> Collision::GetCollisions(size_t uiLayerIndex, int64_t iIndex)
 {
-	const CollisionResultSpan& rSpan = sResultSpans.at(static_cast<size_t>(sLayerBaseOffsets[uiLayerIndex] + iIndex));
+	const CollisionResultSpan& rSpan = sResultSpans[sLayerBaseOffsets[uiLayerIndex] + iIndex];
 	if (rSpan.iCount > 0)
 	{
-		return {sResultEntries.data() + rSpan.iOffset, static_cast<size_t>(rSpan.iCount)};
+		return {sResultEntries.Data() + rSpan.iOffset, static_cast<size_t>(rSpan.iCount)};
 	}
 	return {};
 }

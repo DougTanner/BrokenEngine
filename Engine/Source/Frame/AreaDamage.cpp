@@ -3,28 +3,26 @@
 namespace engine
 {
 
-thread_local std::vector<AreaDamageSource> AreaDamage::sAreaDamageSources;
+// StableVector construction only records the reserved count, so this reserves no address space and makes
+// no OS call until the first Resize; growth then commits more of that reservation without moving.
+thread_local common::StableVector<AreaDamageSource> AreaDamage::sAreaDamageSources {64 * kiAreaDamageSourcePreallocate};
 thread_local int64_t AreaDamage::siAreaDamageSourceCount = 0;
 
 void AreaDamage::Add(const AreaDamageSource& rSource)
 {
 	int64_t iIndex = siAreaDamageSourceCount;
-	if (sAreaDamageSources.empty())
+	if (sAreaDamageSources.Size() == 0)
 	{
-		// Heap: one-time per-thread pre-allocation (thread_local vectors start empty to avoid allocating during mi_process_init)
-		ScopedSuppressAllocationTracking suppress;
-		sAreaDamageSources.resize(kiAreaDamageSourcePreallocate);
+		sAreaDamageSources.Resize(kiAreaDamageSourcePreallocate);
 	}
 
-	if (siAreaDamageSourceCount >= static_cast<int64_t>(sAreaDamageSources.size()))
+	if (siAreaDamageSourceCount >= sAreaDamageSources.Size())
 	{
-		LOG(kDefault, kWarning, "AreaDamage: sAreaDamageSources overflow (count: {}, capacity: {}). Increase kiAreaDamageSourcePreallocate in AreaDamage.h", siAreaDamageSourceCount, sAreaDamageSources.size());
+		LOG(kDefault, kWarning, "AreaDamage: sAreaDamageSources overflow (count: {}, capacity: {}). Increase kiAreaDamageSourcePreallocate in AreaDamage.h", siAreaDamageSourceCount, sAreaDamageSources.Size());
 		DEBUG_BREAK();
-		// Heap: rare growth when area-damage source count exceeds pre-allocation
-		ScopedSuppressAllocationTracking suppress;
-		sAreaDamageSources.resize(siAreaDamageSourceCount * 2);
+		sAreaDamageSources.Resize(siAreaDamageSourceCount * 2);
 	}
-	sAreaDamageSources.at(static_cast<size_t>(iIndex)) = rSource;
+	sAreaDamageSources[iIndex] = rSource;
 	++siAreaDamageSourceCount;
 }
 
@@ -36,7 +34,7 @@ float AreaDamage::Get(FXMVECTOR vecPosition, uint16_t uiCategoryMask, XMVECTOR& 
 
 	for (int64_t i = 0; i < siAreaDamageSourceCount; ++i)
 	{
-		const AreaDamageSource& rSource = sAreaDamageSources.at(static_cast<size_t>(i));
+		const AreaDamageSource& rSource = sAreaDamageSources[i];
 		// Filter by category
 		if ((rSource.uiCategory & uiCategoryMask) == 0)
 		{

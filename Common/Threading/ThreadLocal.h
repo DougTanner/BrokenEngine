@@ -36,10 +36,12 @@ class ThreadLocal
 public:
 
 	ThreadLocal() = delete;
-	ThreadLocal(int64_t iWorkbufferSize = 0, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true);
+	// iWorkbufferReserveSize is the workbuffer's address-space ceiling in bytes; 0 means 64x the initial size with that
+	// size floored at 64 KiB first, so a thread constructed with no initial workbuffer still has room to grow into.
+	ThreadLocal(int64_t iWorkbufferSize = 0, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true, int64_t iWorkbufferReserveSize = 0);
 	~ThreadLocal();
 
-	// Non-copyable/non-movable: mpLogBuffer/mWorkbuffer alias this object's own backing vectors.
+	// Non-copyable/non-movable: mpLogBuffer/mWorkbuffer alias this object's own backing storage.
 	ThreadLocal(const ThreadLocal&) = delete;
 	ThreadLocal& operator=(const ThreadLocal&) = delete;
 	ThreadLocal(ThreadLocal&&) = delete;
@@ -56,7 +58,7 @@ private:
 
 	// Must precede mpLogBuffer/mWorkbuffer below: those alias this storage (ctor member-init order depends on it).
 	std::vector<char> mLogBufferMemory;
-	std::vector<std::byte> mWorkbufferMemory;
+	StableVector<std::byte> mWorkbufferMemory;
 
 public:
 

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-29T15:55:52.197Z","dependsOn":["Documents/Plans/Engine/WorkbufferGrowthHandleSafety.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-29T15:55:52.197Z","dependsOn":[]} -->
 # Make skeleton joint and node counts fully dynamic
 
 ## Context

@@ -71,6 +71,7 @@
     <ClInclude Include="..\..\..\Common\Math\Random.h" />
     <ClInclude Include="..\..\..\Common\ScopedLambda.h" />
     <ClInclude Include="..\..\..\Common\Smoothed.h" />
+    <ClInclude Include="..\..\..\Common\StableVector.h" />
     <ClInclude Include="..\..\..\Common\Workbuffer.h" />
     <ClInclude Include="..\..\..\Common\Threading\ThreadLocal.h" />
     <ClInclude Include="..\..\..\Common\Timer.h" />

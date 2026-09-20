@@ -110,14 +110,14 @@ private:
 	static thread_local std::vector<CollisionLayer> sLayers;
 	static thread_local int64_t siLayerCount;
 
-	static thread_local std::vector<LayerPairZones> sLayerPairZones;
+	static thread_local common::StableVector<LayerPairZones> sLayerPairZones;
 	static thread_local int64_t siLayerPairCount;
 
-	static thread_local std::vector<CollisionResult> sResultEntries;
-	static thread_local std::vector<CollisionResultSpan> sResultSpans;
+	static thread_local common::StableVector<CollisionResult> sResultEntries;
+	static thread_local common::StableVector<CollisionResultSpan> sResultSpans;
 	static thread_local int64_t siResultSpanCount;
 	static thread_local int64_t sLayerBaseOffsets[kiCollisionLayerPreallocate];
-	static thread_local std::vector<uint32_t> sTestedBGeneration;
+	static thread_local common::StableVector<uint32_t> sTestedBGeneration;
 	static thread_local uint32_t suiTestedBCurrentGeneration;
 };
 

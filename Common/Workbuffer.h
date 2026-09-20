@@ -1,5 +1,7 @@
 #pragma once
 
+#include "StableVector.h"
+
 namespace common
 {
 
@@ -11,14 +13,17 @@ class Workbuffer
 {
 public:
 
-	explicit Workbuffer(std::vector<std::byte>& rBuffer)
+	// The two frame-bookkeeping reservations are 64x their pre-sized depth: growth past that is a runaway, not an under-size.
+	explicit Workbuffer(StableVector<std::byte>& rBuffer)
 	: mBuffer(rBuffer)
+	, mSavedBase(64 * 64)
+	, mSavedSize(64 * 64)
 	{
-		mSavedBase.resize(64); // Pre-sized for the deepest arena nesting source structure ever reaches (see RawPush).
-		mSavedSize.resize(64); // Parallel to mSavedBase: saves each parent frame's exact pre-push miSize for Pop to restore.
+		mSavedBase.Resize(64); // Pre-sized for the deepest arena nesting source structure ever reaches (see RawPush).
+		mSavedSize.Resize(64); // Parallel to mSavedBase: saves each parent frame's exact pre-push miSize for Pop to restore.
 	}
 
-	// Non-copyable/non-movable: mBuffer is a reference member, so a copy would bind into the source's storage.
+	// Non-copyable/non-movable: mBuffer is a reference member, and mSavedBase/mSavedSize own reservations that cannot be copied or moved.
 	Workbuffer(const Workbuffer&) = delete;
 	Workbuffer& operator=(const Workbuffer&) = delete;
 	Workbuffer(Workbuffer&&) = delete;
@@ -45,13 +50,13 @@ public:
 	const T* Data() const
 	{
 		ASSERT(miDepth > 0);
-		return reinterpret_cast<const T*>(mBuffer.data() + miBase);
+		return reinterpret_cast<const T*>(mBuffer.Data() + miBase);
 	}
 	template <typename T>
 	T* Data()
 	{
 		ASSERT(miDepth > 0);
-		return reinterpret_cast<T*>(mBuffer.data() + miBase);
+		return reinterpret_cast<T*>(mBuffer.Data() + miBase);
 	}
 	template <typename T>
 	int64_t Count() const
@@ -66,11 +71,11 @@ public:
 	{
 		ASSERT(miDepth > 0);
 		int64_t iNeeded = miSize + static_cast<int64_t>(sizeof(T));
-		if (iNeeded > static_cast<int64_t>(mBuffer.size())) [[unlikely]]
+		if (iNeeded > mBuffer.Size()) [[unlikely]]
 		{
 			Grow(iNeeded);
 		}
-		std::memcpy(mBuffer.data() + miSize, &rValue, sizeof(T));
+		std::memcpy(mBuffer.Data() + miSize, &rValue, sizeof(T));
 		miSize += static_cast<int64_t>(sizeof(T));
 	}
 
@@ -90,29 +95,28 @@ public:
 	std::span<const T> Span() const
 	{
 		ASSERT(miDepth > 0);
-		return {reinterpret_cast<const T*>(mBuffer.data() + miBase), static_cast<size_t>(miSize - miBase) / sizeof(T)};
+		return {reinterpret_cast<const T*>(mBuffer.Data() + miBase), static_cast<size_t>(miSize - miBase) / sizeof(T)};
 	}
 
 	template<typename T>
 	std::span<T> Span()
 	{
 		ASSERT(miDepth > 0);
-		return {reinterpret_cast<T*>(mBuffer.data() + miBase), static_cast<size_t>(miSize - miBase) / sizeof(T)};
+		return {reinterpret_cast<T*>(mBuffer.Data() + miBase), static_cast<size_t>(miSize - miBase) / sizeof(T)};
 	}
 
 private:
 
 	void RawPush()
 	{
-		if (miDepth == static_cast<int64_t>(mSavedBase.size())) [[unlikely]]
+		if (miDepth == mSavedBase.Size()) [[unlikely]]
 		{
 			// mSavedBase is pre-sized for the deepest arena nesting source structure ever reaches; exceeding it is
-			// an under-sizing bug (DEBUG_BREAK alerts in debug). Growth still proceeds so gameplay never fails.
+			// an under-sizing bug (DEBUG_BREAK alerts in debug). Growth commits more of the existing reservation, so
+			// the already-saved frames keep their addresses.
 			DEBUG_BREAK();
-			// Heap: under-sizing recovery growth, flagged by the DEBUG_BREAK above
-			ScopedSuppressAllocationTracking suppress;
-			mSavedBase.resize(mSavedBase.size() * 2);
-			mSavedSize.resize(mSavedSize.size() * 2);
+			mSavedBase.Resize(mSavedBase.Size() * 2);
+			mSavedSize.Resize(mSavedSize.Size() * 2);
 		}
 		mSavedBase[miDepth] = miBase;
 		mSavedSize[miDepth] = miSize; // Capture parent's exact size before we advance miSize below, so Pop restores it.
@@ -126,20 +130,18 @@ private:
 	template<typename T>
 	T RawPushBuffer(int64_t iSizeInBytes)
 	{
-		if (miDepth == static_cast<int64_t>(mSavedBase.size())) [[unlikely]]
+		if (miDepth == mSavedBase.Size()) [[unlikely]]
 		{
-			// See RawPush: pre-sized for max nesting; DEBUG_BREAK flags under-sizing, growth still succeeds.
+			// See RawPush: pre-sized for max nesting; DEBUG_BREAK flags under-sizing, growth commits more of the reservation in place.
 			DEBUG_BREAK();
-			// Heap: under-sizing recovery growth, flagged by the DEBUG_BREAK above
-			ScopedSuppressAllocationTracking suppress;
-			mSavedBase.resize(mSavedBase.size() * 2);
-			mSavedSize.resize(mSavedSize.size() * 2);
+			mSavedBase.Resize(mSavedBase.Size() * 2);
+			mSavedSize.Resize(mSavedSize.Size() * 2);
 		}
 		// 16-byte frame-start guarantee: align the base up; the padding falls before miBase so the reservation is SIMD-safe.
 		int64_t iAlignedBase = common::RoundUp(miSize, static_cast<int64_t>(16));
 		int64_t iNeeded = iAlignedBase + iSizeInBytes;
-		// Grow before mutating frame accounting so a bad_alloc mid-grow unwinds with a balanced (still-closed) frame.
-		if (iNeeded > static_cast<int64_t>(mBuffer.size())) [[unlikely]]
+		// Grow before mutating frame accounting so a throw mid-grow unwinds with a balanced (still-closed) frame.
+		if (iNeeded > mBuffer.Size()) [[unlikely]]
 		{
 			Grow(iNeeded);
 		}
@@ -150,7 +152,7 @@ private:
 		miSize = iNeeded;
 		miLastPushBufferSize = iSizeInBytes;
 		miLastPushBufferDepth = miDepth;
-		void* pData = mBuffer.data() + miBase;
+		void* pData = mBuffer.Data() + miBase;
 		return static_cast<T>(pData);
 	}
 
@@ -167,14 +169,14 @@ private:
 
 	void Grow(int64_t iNeededCapacity);
 
-	std::vector<std::byte>& mBuffer;
+	StableVector<std::byte>& mBuffer;
 	int64_t miSize = 0;
 	int64_t miBase = 0;
 	int64_t miDepth = 0;
 	int64_t miLastPushBufferSize = 0;
 	int64_t miLastPushBufferDepth = -1;
-	std::vector<int64_t> mSavedBase;
-	std::vector<int64_t> mSavedSize;
+	StableVector<int64_t> mSavedBase;
+	StableVector<int64_t> mSavedSize;
 
 	friend class ScopedWorkbufferArena;
 	template<typename> friend class ScopedWorkbufferAllocation;

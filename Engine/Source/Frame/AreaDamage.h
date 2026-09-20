@@ -27,7 +27,7 @@ public:
 
 private:
 
-	static thread_local std::vector<AreaDamageSource> sAreaDamageSources;
+	static thread_local common::StableVector<AreaDamageSource> sAreaDamageSources;
 	static thread_local int64_t siAreaDamageSourceCount;
 };
 

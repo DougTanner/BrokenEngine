@@ -20,6 +20,8 @@ Every `PersistentWorker` thread runs at `THREAD_PRIORITY_TIME_CRITICAL`, above o
 
 Exactly one `ThreadLocal` may be active per thread. Construction installs the thread's log/workbuffer context, configures deterministic floating-point state, and optionally installs exception handling; destruction clears the thread-local pointer. The frame-tick scope marks code that must not make the OS or library calls that are off limits during simulation.
 
+A thread whose scratch can outgrow the default workbuffer reserve passes its own `iWorkbufferReserveSize` (`ThreadLocal.h`).
+
 Keep workbuffer views, log-buffer references, and tick/indent scopes within their owning thread and lifetime. DataPacker jobs that use Common scratch construct a `ThreadLocal` on their worker before export work.
 
 ## See Also

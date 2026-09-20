@@ -426,6 +426,9 @@
     <ClInclude Include="..\..\..\..\Common\Smoothed.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\StableVector.h">
+      <Filter>Common</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Common\Workbuffer.h">
       <Filter>Common</Filter>
     </ClInclude>

@@ -12,15 +12,17 @@ struct DebugRenderType
 	common::crc_t crc = 0;
 	Pipelines ePipeline = kPipelineCount;
 	int64_t iCount = 0;
-	std::vector<shaders::DebugRenderLayout> layouts;	// Grows on demand
+	// Grows on demand; the reserved count lives here because an explicit initializer in sTypes below would
+	// override it and leave the entry with no reservation to grow into
+	common::StableVector<shaders::DebugRenderLayout> layouts {64 * kiInitialDebugRender};
 };
 
 static DebugRenderType sTypes[]
 {
-	{common::CrcConsteval("DebugBox"),    kPipelineDebugBox,    0, {}},
-	{common::CrcConsteval("DebugSphere"), kPipelineDebugSphere, 0, {}},
-	{common::CrcConsteval("DebugCircle"), kPipelineDebugCircle, 0, {}},
-	{common::CrcConsteval("DebugLine"),   kPipelineDebugLine,   0, {}},
+	{common::CrcConsteval("DebugBox"),    kPipelineDebugBox,    0},
+	{common::CrcConsteval("DebugSphere"), kPipelineDebugSphere, 0},
+	{common::CrcConsteval("DebugCircle"), kPipelineDebugCircle, 0},
+	{common::CrcConsteval("DebugLine"),   kPipelineDebugLine,   0},
 };
 
 static constexpr int64_t kiBox = 0;
@@ -36,18 +38,14 @@ static void AddLayout(int64_t iType, const XMFLOAT4A& f4Row0, const XMFLOAT4A& f
 	{
 		DebugRenderType& rType = sTypes[iType];
 
-		if (rType.layouts.empty())
+		if (rType.layouts.Size() == 0)
 		{
-			// Heap: one-time lazy pre-allocation of debug render staging (vector starts empty so nothing allocates until debug render is enabled)
-			ScopedSuppressAllocationTracking suppress;
-			rType.layouts.resize(kiInitialDebugRender);
+			rType.layouts.Resize(kiInitialDebugRender);
 		}
-		else if (rType.iCount >= static_cast<int64_t>(rType.layouts.size()))
+		else if (rType.iCount >= rType.layouts.Size())
 		{
-			// Heap: rare growth when a frame submits more primitives than current capacity
-			ScopedSuppressAllocationTracking suppress;
-			LOG(kDefault, kVerbose, "DebugRender: growing staging for type {} ({} -> {})", iType, rType.layouts.size(), rType.layouts.size() * 2);
-			rType.layouts.resize(rType.layouts.size() * 2);
+			LOG(kDefault, kVerbose, "DebugRender: growing staging for type {} ({} -> {})", iType, rType.layouts.Size(), rType.layouts.Size() * 2);
+			rType.layouts.Resize(rType.layouts.Size() * 2);
 		}
 
 		shaders::DebugRenderLayout& rLayout = rType.layouts[rType.iCount];
@@ -143,7 +141,7 @@ void DebugRender::BeginRender(int64_t iCommandBuffer)
 			}
 
 			auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::DebugRenderLayout>(rType.crc, kBufferMain, iCommandBuffer);
-			std::memcpy(pLayouts, rType.layouts.data(), rType.iCount * sizeof(shaders::DebugRenderLayout));
+			std::memcpy(pLayouts, rType.layouts.Data(), rType.iCount * sizeof(shaders::DebugRenderLayout));
 		}
 	}
 }
