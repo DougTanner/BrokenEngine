@@ -106,7 +106,7 @@ int ResolveEffectiveMaterial(LoadVerticesContext& rContext, int iOriginalMateria
 // rIndexRemap (original-vertex -> deduped-index). Vertices stay in mesh-local space only when the model has a
 // skeleton, because only then does the runtime pose them with skinning or node matrices; every primitive of a
 // model without a skeleton is baked to world space here.
-void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<uint32_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld)
+void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<uint32_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld, size_t uiPrimitive, int iSkinJointCount)
 {
 	// Position (required) - accessor also supplies the vertex count that drives the loop below
 	const tinygltf::Accessor& rPositionAccessor = rModel.accessors[rPrimitive.attributes.find("POSITION")->second];
@@ -157,6 +157,22 @@ void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<uint
 
 		if (puiJoints != nullptr)
 		{
+			// An index at or above the skin's joint count reads the next material's or instance's joint-matrix stride at runtime.
+			// A zero-weight slot influences nothing and routinely holds an arbitrary index, so it goes unchecked; without
+			// WEIGHTS_0 nothing marks a slot unused, so all four count as used
+			for (int64_t k = 0; k < 4 && iSkinJointCount > 0; ++k)
+			{
+				if (pfWeights != nullptr && pfWeights[j * iWeightsStride + k] == 0.0f)
+				{
+					continue;
+				}
+
+				if (puiJoints[j * iJointsStride + k] >= iSkinJointCount)
+				{
+					throw std::runtime_error(std::format("Scene primitive {} vertex {} joint component {} references joint {}, but the skin declares only {} joints", uiPrimitive, j, k, puiJoints[j * iJointsStride + k], iSkinJointCount));
+				}
+			}
+
 			rVertex.fJoint = static_cast<float>(puiJoints[j * iJointsStride]);
 			rVertex.f4Joint0 = XMFLOAT4(
 				static_cast<float>(puiJoints[j * iJointsStride + 0]),
@@ -348,8 +364,12 @@ void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& 
 		int iEffectiveMaterial = ResolveEffectiveMaterial(rContext, iOriginalMaterial, iCurrentNodeIndex, bHasSkinning, matMeshWorld);
 		Material& rMaterial = rMaterials.at(iEffectiveMaterial);
 
+		// CanonicalizeSceneSkin range-checked rNode.skin before export, and this full count is the per-material joint-matrix
+		// stride the runtime advances by, unlike the kiMaxJointsPerMesh-clamped count the material carries
+		int iSkinJointCount = bHasSkinning ? static_cast<int>(rModel.skins[rNode.skin].joints.size()) : 0;
+
 		std::vector<uint32_t> indexRemap;
-		BuildVertices(rVertices, indexRemap, rPrimitive, rModel, rContext.bHasSkeleton, matMeshWorld);
+		BuildVertices(rVertices, indexRemap, rPrimitive, rModel, rContext.bHasSkeleton, matMeshWorld, i, iSkinJointCount);
 
 		AppendIndices(rMaterial.indexBuffer, rPrimitive, rModel, indexRemap);
 	}

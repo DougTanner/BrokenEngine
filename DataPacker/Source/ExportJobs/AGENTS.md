@@ -27,7 +27,7 @@ Scene export is two-phase. The `.PreExport` marker covers the scene's generated 
 
 Scene texture pre-export deduplicates attempts by source and output format. Each attempt writes a private, untagged stage; all attempts must finish before any final intermediate is published. Keep cleanup ownership separate for stages from this attempt and final paths published by it, because a failure during encoding or publication must not classify one kind of path as the other.
 
-A scene pack supports one node-referenced skin, and a scene whose nodes reference more than one skin is rejected.
+A scene pack supports one node-referenced skin, and a scene whose nodes reference more than one skin is rejected. A vertex joint index is bounded by that skin's full joint count: a scene with a weighted joint index at or above that count, or any joint index at or above it when the primitive carries no weights, is rejected; a zero-weight slot is not checked.
 
 When multiple mesh nodes reuse one glTF material, or primitives under one material differ in deformation mode (skinned versus not), preserve distinct material entries while retaining the source material index used for texture lookup, so no draw mixes deformation modes.
 
