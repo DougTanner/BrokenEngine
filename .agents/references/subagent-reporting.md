@@ -135,11 +135,15 @@ it never fetches that worker's result with a blocking host call such as
 `TaskOutput`, because the notification carries the same handoff text and the
 fetch would take it twice, against
 [`subagent-handoff.md`](subagent-handoff.md), `## Handoffs`. For a Codex main
-session waiting for its own background worker, no mechanism is documented in
-this repository or in the client documentation in the tree, so do not assume
-one. The timeout, no-progress, and interruption rules below are the exception
-route; a wait in them is a bounded host wait call where the client provides
-one.
+session waiting for its own background worker, do useful independent work
+first. Then use a native mailbox or worker wait only when the current host
+advertises it and its live contract, including any minimum duration, complies
+with all higher-priority blocking-wait limits. A wait whose minimum duration
+exceeds such a limit is unavailable for that session. When no compliant native
+wait is advertised, rely on the host's available completion delivery and do
+not invent a wait operation. The timeout, no-progress, and interruption rules
+below are the exception route; a wait in them is a bounded host wait call where
+the client provides one.
 
 Completion can return a wait early. If a healthy worker's wait times out
 without failure or no-progress evidence, wait again; the timeout alone does not

@@ -60,6 +60,10 @@ the command, its exit, and decisive output. Additional concise rows name the
 semantic surfaces reviewed and their verdict and evidence class, and the
 inbound-reference sweep scope and classification verdict. Use shared `Evidence`
 for the source selectors or retained output needed to substantiate those rows.
+When intended trigger intent cannot be resolved from the supplied intent and
+skill sources, return `NEEDS_ACTION` and name the decision needed in shared
+`Residuals` rather than inventing it.
+
 Each `Findings` row is one line on this form:
 
 ```text

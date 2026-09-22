@@ -29,7 +29,23 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
    present Codex companion file. Classify each compatibility conclusion as
    structural acceptance, loader acceptance, documented behavior, or observed
    runtime behavior. Done when each surface has a verdict and every
-   compatibility claim names the evidence class that supports it.
+   compatibility claim names the evidence class that supports it. When the
+   target adds a skill or changes its `description`, When-to-use surface, or
+   invocation policy, also exercise the changed trigger boundary; skip this
+   contrast exercise when those surfaces are unchanged. Derive one intended
+   invocation and one nearby non-invocation from the declared purpose, and add a
+   third case only when the change affects an explicitly documented chaining
+   exception. For an executable-Plan boundary, for example, an explicit request
+   to claim and execute `/next-plan` is the intended invocation, while a request
+   merely to explain `/next-plan` is the nearby non-invocation. Check that the
+   description, body, and client policy agree. Record each concrete case and its
+   reasoning under shared `Decisive checks` and `Evidence`, applying the shared
+   [`Handoffs`](../../../references/subagent-handoff.md#handoffs) retention rule.
+   Report contradictions as evidence-backed findings. If intended trigger intent
+   cannot be resolved, follow the public [`Handoff`](../SKILL.md#handoff) rule.
+   Classify these cases as static semantic evidence under [`Rules`](#rules). Run
+   the Focused Host Checks only when [`validation.md`](validation.md)
+   `## Focused Host Checks` requires them.
 6. Collect inbound references by running `pwsh -NoProfile -File .agents/skills/external-skill-creator/scripts/Find-SkillInboundReferences.ps1 -SkillName <name>`,
    which sweeps the documented root set and returns capped `{path, line, text}`
    records with per-root hit counts; never reconstruct that sweep inline.
