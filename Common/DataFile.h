@@ -186,14 +186,17 @@ static_assert(sizeof(ModelNode) == 116, "ModelNode layout changed — bump DataH
 // Node hierarchy with skin joint mapping
 struct Skeleton
 {
-	static constexpr int64_t kiMaxNodes = 256;
-	static constexpr int64_t kiMaxSkinJoints = 256;
-
 	uint16_t uiNodeCount = 0;
 	uint16_t uiSkinJointCount = 0;
 	// Nodes, skinJointToNode, and inverseBindMatrices are stored in the data stream.
 };
 static_assert(sizeof(Skeleton) == 4, "Skeleton layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
+
+enum class MaterialFlags : uint8_t
+{
+	kSkinned = 0x01,
+};
+using MaterialFlags_t = Flags<MaterialFlags>;
 
 // Per-material skinning info for glTF models
 // Enables runtime mesh world matrix computation: meshWorld = relativeTransform * worldMatrices[iParentNodeIndex]
@@ -201,11 +204,13 @@ struct MaterialInfo
 {
 	int16_t iParentNodeIndex = -1;  // Node index for mesh world matrix computation (-1 = identity mesh world)
 	int16_t iOriginalMaterialIndex = -1;  // Original glTF material index for split materials (-1 = not split)
-	uint8_t uiJointCount = 0;       // 0 for non-skinned meshes, >0 for skinned meshes
+	MaterialFlags_t flags;  // kSkinned: the material deforms by Skeleton::uiSkinJointCount joints
 	uint8_t uiPad[3] {};
 	XMFLOAT4X4 f4x4RelativeTransform {};  // Identity for skinned meshes, meshWorldBind * inverse(ancestorWorldBind) for non-skinned
 };
 static_assert(sizeof(MaterialInfo) == 72, "MaterialInfo layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene/ExportModel kiVersion raw versions (sizeof fold catches size changes only)");
+static_assert(BT_OFFSETOF(MaterialInfo, flags) == 4, "MaterialInfo padding changed — flags no longer at offset 4");
+static_assert(BT_OFFSETOF(MaterialInfo, f4x4RelativeTransform) == 8, "MaterialInfo padding changed — f4x4RelativeTransform no longer at offset 8");
 
 // Per-mesh shader data (small struct without embedded joints)
 // Joint matrices are stored in a separate buffer so MeshData stays small and fixed-size
@@ -227,7 +232,6 @@ struct JointMatrix
 };
 
 // Joint matrix storage constants
-inline constexpr int64_t kiMaxJointsPerMesh = 128;
 inline constexpr int64_t kiInitialJointMatrixCapacity = 8192;  // Room for multiple skinned model instances
 
 // Animation header for pack file
@@ -427,7 +431,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size reorders also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 52 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 53 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

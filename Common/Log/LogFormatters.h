@@ -70,18 +70,13 @@ struct std::formatter<std::wstring> : std::formatter<std::string_view>
 	template<typename CONTEXT>
 	auto format(const std::wstring& rString, CONTEXT& rContext) const
 	{
-		// Hot path: UTF-8-convert into the workbuffer (no heap allocation). The gpThreadLocal guard mirrors Wb/WbV2 and
-		// is load-bearing — without it /analyze flags C6011 (null deref) as an error in the Release code-analysis build.
-		if (common::gpThreadLocal != nullptr) [[likely]]
-		{
-			common::ScopedWorkbufferArena arena = common::gpThreadLocal->mWorkbuffer.Push();
-			arena.Append(rString);
-			return std::formatter<std::string_view>::format(arena.View(), rContext);
-		}
-
-		// Pre-ThreadLocal thread (no workbuffer): owning conversion is acceptable — allocation tracking is inactive this early.
-		std::string narrow = common::ToString(rString);
-		return std::formatter<std::string_view>::format(narrow, rContext);
+		// UTF-8-converts into the workbuffer (no heap allocation), so the calling thread needs a live ThreadLocal. The
+		// ASSERT's _Analysis_assume_ is load-bearing — without it /analyze flags C6011 (null deref) as an error in the
+		// Release code-analysis build.
+		ASSERT(common::gpThreadLocal != nullptr);
+		common::ScopedWorkbufferArena arena = common::gpThreadLocal->mWorkbuffer.Push();
+		arena.Append(rString);
+		return std::formatter<std::string_view>::format(arena.View(), rContext);
 	}
 };
 
@@ -91,16 +86,11 @@ struct std::formatter<std::filesystem::path> : std::formatter<std::string_view>
 	template<typename CONTEXT>
 	auto format(const std::filesystem::path& rPath, CONTEXT& rContext) const
 	{
-		// See the std::wstring formatter above: the gpThreadLocal guard mirrors Wb/WbV2 and is required for /analyze.
-		if (common::gpThreadLocal != nullptr) [[likely]]
-		{
-			common::ScopedWorkbufferArena arena = common::gpThreadLocal->mWorkbuffer.Push();
-			arena.Append(rPath.native());
-			return std::formatter<std::string_view>::format(arena.View(), rContext);
-		}
-
-		std::string narrow = common::ToString(rPath.native());
-		return std::formatter<std::string_view>::format(narrow, rContext);
+		// See the std::wstring formatter above: requires a live ThreadLocal, and the ASSERT is required for /analyze.
+		ASSERT(common::gpThreadLocal != nullptr);
+		common::ScopedWorkbufferArena arena = common::gpThreadLocal->mWorkbuffer.Push();
+		arena.Append(rPath.native());
+		return std::formatter<std::string_view>::format(arena.View(), rContext);
 	}
 };
 
@@ -281,17 +271,11 @@ struct std::formatter<common::Wb> : std::formatter<std::string_view>
 	template <typename CONTEXT>
 	auto format(const common::Wb& rValue, CONTEXT& rContext) const
 	{
-		if (common::gpThreadLocal != nullptr) [[likely]]
-		{
-			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-			common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-			arena.AppendFloat(rValue.fValue, rValue.iPrecision);
-			return std::formatter<std::string_view>::format(arena.View(), rContext);
-		}
-
-		char pcBuffer[64] {};
-		std::to_chars_result result = std::to_chars(pcBuffer, pcBuffer + sizeof(pcBuffer), rValue.fValue, std::chars_format::fixed, rValue.iPrecision);
-		return std::formatter<std::string_view>::format(std::string_view(pcBuffer, result.ptr - pcBuffer), rContext);
+		ASSERT(common::gpThreadLocal != nullptr);
+		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
+		arena.AppendFloat(rValue.fValue, rValue.iPrecision);
+		return std::formatter<std::string_view>::format(arena.View(), rContext);
 	}
 };
 
@@ -301,34 +285,15 @@ struct std::formatter<common::WbV2> : std::formatter<std::string_view>
 	template <typename CONTEXT>
 	auto format(const common::WbV2& rValue, CONTEXT& rContext) const
 	{
-		if (common::gpThreadLocal != nullptr) [[likely]]
-		{
-			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-			common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-			arena.Append(std::string_view("("));
-			arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(","));
-			arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(")"));
-			return std::formatter<std::string_view>::format(arena.View(), rContext);
-		}
-
-		char pcBuffer[128] {};
-		char* pWrite = pcBuffer;
-		char* pEnd = pcBuffer + sizeof(pcBuffer);
-		auto put = [&pWrite, pEnd](char c)
-		{
-			if (pWrite < pEnd)
-			{
-				*(pWrite++) = c;
-			}
-		};
-		put('(');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetX(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(',');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetY(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(')');
-		return std::formatter<std::string_view>::format(std::string_view(pcBuffer, pWrite - pcBuffer), rContext);
+		ASSERT(common::gpThreadLocal != nullptr);
+		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
+		arena.Append(std::string_view("("));
+		arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(","));
+		arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(")"));
+		return std::formatter<std::string_view>::format(arena.View(), rContext);
 	}
 };
 
@@ -338,38 +303,17 @@ struct std::formatter<common::WbV3> : std::formatter<std::string_view>
 	template <typename CONTEXT>
 	auto format(const common::WbV3& rValue, CONTEXT& rContext) const
 	{
-		if (common::gpThreadLocal != nullptr) [[likely]]
-		{
-			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-			common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-			arena.Append(std::string_view("("));
-			arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(","));
-			arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(","));
-			arena.AppendFloat(DirectX::XMVectorGetZ(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(")"));
-			return std::formatter<std::string_view>::format(arena.View(), rContext);
-		}
-
-		char pcBuffer[128] {};
-		char* pWrite = pcBuffer;
-		char* pEnd = pcBuffer + sizeof(pcBuffer);
-		auto put = [&pWrite, pEnd](char c)
-		{
-			if (pWrite < pEnd)
-			{
-				*(pWrite++) = c;
-			}
-		};
-		put('(');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetX(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(',');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetY(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(',');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetZ(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(')');
-		return std::formatter<std::string_view>::format(std::string_view(pcBuffer, pWrite - pcBuffer), rContext);
+		ASSERT(common::gpThreadLocal != nullptr);
+		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
+		arena.Append(std::string_view("("));
+		arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(","));
+		arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(","));
+		arena.AppendFloat(DirectX::XMVectorGetZ(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(")"));
+		return std::formatter<std::string_view>::format(arena.View(), rContext);
 	}
 };
 
@@ -379,41 +323,18 @@ struct std::formatter<common::WbV4> : std::formatter<std::string_view>
 	template <typename CONTEXT>
 	auto format(const common::WbV4& rValue, CONTEXT& rContext) const
 	{
-		if (common::gpThreadLocal != nullptr) [[likely]]
-		{
-			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-			common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-			arena.Append(std::string_view("("));
-			arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(","));
-			arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(","));
-			arena.AppendFloat(DirectX::XMVectorGetZ(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(","));
-			arena.AppendFloat(DirectX::XMVectorGetW(rValue.vec), rValue.iPrecision);
-			arena.Append(std::string_view(")"));
-			return std::formatter<std::string_view>::format(arena.View(), rContext);
-		}
-
-		char pcBuffer[128] {};
-		char* pWrite = pcBuffer;
-		char* pEnd = pcBuffer + sizeof(pcBuffer);
-		auto put = [&pWrite, pEnd](char c)
-		{
-			if (pWrite < pEnd)
-			{
-				*(pWrite++) = c;
-			}
-		};
-		put('(');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetX(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(',');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetY(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(',');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetZ(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(',');
-		pWrite = std::to_chars(pWrite, pEnd, DirectX::XMVectorGetW(rValue.vec), std::chars_format::fixed, rValue.iPrecision).ptr;
-		put(')');
-		return std::formatter<std::string_view>::format(std::string_view(pcBuffer, pWrite - pcBuffer), rContext);
+		ASSERT(common::gpThreadLocal != nullptr);
+		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
+		arena.Append(std::string_view("("));
+		arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(","));
+		arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(","));
+		arena.AppendFloat(DirectX::XMVectorGetZ(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(","));
+		arena.AppendFloat(DirectX::XMVectorGetW(rValue.vec), rValue.iPrecision);
+		arena.Append(std::string_view(")"));
+		return std::formatter<std::string_view>::format(arena.View(), rContext);
 	}
 };

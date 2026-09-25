@@ -29,7 +29,6 @@ enum TextAreas
 	kTextProfileGpuTimers,
 	kTextProfileCpuCounters,
 	kTextProfileMemory,
-	kTextProfileFrameStats,
 	kTextAreasCount
 };
 
@@ -101,9 +100,8 @@ private:
 		{ .fX = 0.5f * kfTextEdge, .fY = kfTextEdge },
 		{ .fX = 0.875f, .fY = 0.15f },
 		{ .fX = 0.725f, .fY = 0.15f },
-		{ .fX = 0.5f * kfTextEdge, .fY = kfTextEdge },
 	};
-	static_assert(kTextAreasCount == 8);
+	static_assert(kTextAreasCount == 7);
 };
 
 inline ImGuiManager* gpImGuiManager = nullptr;

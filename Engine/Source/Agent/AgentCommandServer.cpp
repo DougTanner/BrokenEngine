@@ -92,10 +92,11 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 
 	LOG(kNetwork, kInfo, "AgentCommandServer listening on 127.0.0.1:{}", iPort);
 
-	mListenerThread = std::jthread([this](std::stop_token stopToken)
+	// Small workbuffer: the JSON parse and socket buffers live on the heap, off the sim path.
+	mListenerThread = std::jthread(common::ThreadLocal::Entry([this](std::stop_token stopToken)
 	{
 		ListenerLoop(std::move(stopToken));
-	});
+	}, 64 * 1024));
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 	AudioStreamingFixture::Attach(*mpAudioStreamingFixture);
 #endif
@@ -134,13 +135,8 @@ void AgentCommandServer::ClearDeferredResponse()
 
 void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 {
-	// Heap: agent listener thread — socket buffers and JSON parse, off the sim path. Established before the
-	// ThreadLocal ctor so its buffer allocations are covered too, whatever the main-loop tracking state.
+	// Heap: agent listener thread — socket buffers and JSON parse, off the sim path.
 	ScopedSuppressAllocationTracking suppress;
-
-	// Own ThreadLocal: MXCSR / exception handlers / log buffer for this thread. Small workbuffer — the JSON
-	// parse and socket buffers live on the heap, off the sim path.
-	common::ThreadLocal threadLocal(64 * 1024);
 
 	while (true)
 	{

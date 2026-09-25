@@ -9,7 +9,7 @@ enum class LaunchOptionFlags : uint8_t
 	kRenderDoc    = 1 << 1, // force-load renderdoc.dll before instance creation and expose the in-app capture API (client; requires game kbRenderDoc)
 };
 
-// Command-line launch options, parsed once in wWinMain before any subsystem starts. Later harness plans append
+// Command-line launch options, parsed once in ProcessMain before any subsystem starts. Later harness plans append
 // fields here as new launch args are added. std::filesystem::path / int64_t come from ExternalHeaders (PCH).
 struct LaunchOptions
 {
@@ -29,7 +29,7 @@ bool ParseLaunchOptions();
 
 // True for an agent-harness client: a kbAgent build launched with --agent-port. Every physical (human) input
 // chokepoint is suppressed for the process lifetime, leaving the harness's synthetic input as the sole source.
-// Constant from the wWinMain parse (equals agent-channel existence) — never flips mid-run. Reading game kbAgent is the
+// Constant from the ProcessMain parse (equals agent-channel existence) — never flips mid-run. Reading game kbAgent is the
 // sanctioned engine->game direction. Harness overview: .claude/skills/agent-harness/SKILL.md.
 inline bool PhysicalInputSuppressed()
 {

@@ -39,6 +39,14 @@ void MainMenuScreen::Render(GameBase& rGame)
 		seAutoConnectState = AutoConnectState::kSucceeded;
 	}
 
+	// The model reports only client presence, so the connection-lost modal is what tells a real loss from a
+	// deliberate return to the main menu; only a real loss rearms. Runs before the gate below, which returns
+	// while the modal is up.
+	if (seAutoConnectState == AutoConnectState::kSucceeded && !(model.state & kClientPresent) && rGame.meUiState == UiState::kModal)
+	{
+		seAutoConnectState = AutoConnectState::kReady;
+	}
+
 	if (rGame.meUiState != UiState::kPause || !rGame.InMainMenu())
 	{
 		return;

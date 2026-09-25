@@ -50,9 +50,11 @@ step.
 - Each researcher works blind, from its own brief alone, and never sees another
   researcher's candidate.
 - `Documents/Plans/`, `Documents/Features/`, `Documents/Investigations/`, and
-  `Temp/` are outside a researcher's search and are never evidence paths. Leave
-  such a file unread whether the brief names it or a search surfaces it, and
-  work from the objective the brief states.
+  `Temp/` are outside a researcher's search and are never evidence paths,
+  except the `AGENTS.md` of the three `Documents/` trees, which is guidance
+  rather than a plan and may be read like any other file. Leave every other
+  file under those four trees unread whether the brief names it or a search
+  surfaces it, and work from the objective the brief states.
 - Keep every candidate on the assigned axis; leave a strong idea belonging to
   another axis out.
 - Drop a candidate that cannot name its mechanism or its files, and report the

@@ -369,7 +369,18 @@ bool ProfileManagerBase::ArmRawCpuTimerEventLocked(int64_t iCpuTimer, int64_t iM
 	if constexpr (kbProfiling)
 	{
 		RawCpuTimerState& rRawTimer = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)];
-		if (!(rRawTimer.flags & RawCpuTimerStateFlags::kEventRegistered) || rRawTimer.eventRecord.flags & RawCpuTimerEventFlags::kAvailable || rRawTimer.eventRecord.flags & RawCpuTimerEventFlags::kOverrun)
+		ASSERT(!(rRawTimer.flags & RawCpuTimerStateFlags::kEventArmed));
+		if (!(rRawTimer.flags & RawCpuTimerStateFlags::kEventRegistered))
+		{
+			return false;
+		}
+
+		if (rRawTimer.eventRecord.flags & RawCpuTimerEventFlags::kAvailable)
+		{
+			return false;
+		}
+
+		if (rRawTimer.eventRecord.flags & RawCpuTimerEventFlags::kOverrun)
 		{
 			return false;
 		}
@@ -756,11 +767,6 @@ void ProfileManagerBase::UpdateProfileText()
 		if (meProfileScreen == ProfileScreen::kGpu)
 		{
 			FormatGpuScreen(rWorkbuffer, *this, bReevaluate);
-		}
-
-		if (meProfileScreen == ProfileScreen::kFrames)
-		{
-			FormatFramesScreen(rWorkbuffer);
 		}
 
 		if (meProfileScreen == ProfileScreen::kNetwork)

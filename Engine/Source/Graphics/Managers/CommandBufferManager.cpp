@@ -10,8 +10,8 @@ namespace engine
 {
 
 CommandBufferManager::CommandBufferManager()
-: mSubmitGlobal(common::kThreadSubmitGlobal)
-, mSubmitMain(common::kThreadSubmitMain)
+: mSubmitGlobal(common::kThreadSubmitGlobal, common::kiMinWorkbufferSize)
+, mSubmitMain(common::kThreadSubmitMain, common::kiMinWorkbufferSize)
 {
 	ASSERT(gpCommandBufferManager == nullptr);
 

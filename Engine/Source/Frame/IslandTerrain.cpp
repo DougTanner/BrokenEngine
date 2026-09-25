@@ -405,7 +405,7 @@ float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecL
 {
 	// Frame Purity Constraint (IslandTerrain.h): GlobalElevation/GlobalNormal walk mCoordFrames with
 	// libm trig and must never run from frame-tick code — the sim hot path uses FrameElevation/FrameNormal.
-	ASSERT(common::gpThreadLocal == nullptr || !common::gpThreadLocal->mbInFrameTick);
+	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
 
 	XMFLOAT4A f4Local {};
 	XMStoreFloat4A(&f4Local, vecLocalPosition);
@@ -582,7 +582,7 @@ XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(GridCoord coord, FXMVECTOR vecL
 	// Frame Purity Constraint (see GlobalElevation): must never run from frame-tick code. GlobalNormal
 	// resolves cells itself (batching the 4 taps' lookups below) rather than routing each tap through
 	// GlobalElevation, so it carries its own guard.
-	ASSERT(common::gpThreadLocal == nullptr || !common::gpThreadLocal->mbInFrameTick);
+	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
 
 	// 4-tap finite-difference over the terrain elevation. Each tap resolves its own cell/island list, so a
 	// single fixed baseline works across multiple islands at different scales. The 2-unit cross-tap baseline

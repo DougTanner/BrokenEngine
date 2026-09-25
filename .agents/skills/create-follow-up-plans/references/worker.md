@@ -19,7 +19,7 @@ Done when every surviving proposal carries the evidence step 1 records — or it
 
 ### 2. Draft and classify
 
-Choose the existing owning area and a concise PascalCase filename; never overwrite a collision. Draft the smallest decision-complete plan with `# Title`, `## Context`, `## Design`, `## Critical files`, `## In scope`, `## Out of scope`, `## Acceptance criteria` when the diff is insufficient, and `## Notes`. Include verified root cause, originating gap, implementation boundary, and applicable determinism/CRC, serialization/`.pack`/`kiVersion`, replay, wire, affinity, threading, allocation, shader, build, or live-verification exposure. Pre-stage architectural choices instead of deciding them. Phrase every choice you do make as the author's recommendation with its rationale rather than in binding language, per [`../../../references/authority-order.md`](../../../references/authority-order.md). Do not add unit tests or unsupported implementation detail.
+Choose the owning area `Documents/Plans/AGENTS.md` `## Plan files` lists and a concise PascalCase filename; never overwrite a collision. Draft the smallest decision-complete plan with `# Title`, `## Context`, `## Design`, `## Critical files`, `## In scope`, `## Out of scope`, `## Acceptance criteria` when the diff is insufficient, and `## Notes`. Include verified root cause, originating gap, implementation boundary, and applicable determinism/CRC, serialization/`.pack`/`kiVersion`, replay, wire, affinity, threading, allocation, shader, build, or live-verification exposure. Pre-stage architectural choices instead of deciding them. Phrase every choice you do make as the author's recommendation with its rationale rather than in binding language, per [`../../../references/authority-order.md`](../../../references/authority-order.md). Do not add unit tests or unsupported implementation detail.
 
 Derive the future implementation's Change Workflow Tier 1/2/3 from the highest risk trigger in [`risk-tiers.md`](../../../references/risk-tiers.md) and record that trigger in the Plan. Put only directional prerequisites in `dependsOn`; put mandatory nondirectional constraints in reciprocal standard `## Coordination` sections in every affected Plan. A follow-up authored during a `/next-plan` run never names the Plan that run is completing; the claim-exit step in [`../../next-plan/SKILL.md`](../../next-plan/SKILL.md#steps) shows why the edge cannot survive completion. Do not add score, effort ranking, queue tier, queue row, request file, or claim data.
 
@@ -28,7 +28,7 @@ For a tooling-friction proposal, draft the body from [`tooling-friction-plan-tem
 Create the file with the repository-owned `.agents/scripts/New-PlanFile.ps1`:
 
 ```powershell
-pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
+pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
 ```
 
 Its parameters, the `-DependsOn` single-token rule, its result shape, and its exit handling are in `../../../references/new-plan-file.md`.

@@ -29,6 +29,8 @@ inline thread_local ThreadLocal* gpThreadLocal = nullptr;
 // Note: "4096 - sizeof(DWORD)" is max length for OutputDebugString()
 //       But some Vulkan validation messages can overflow that
 inline constexpr int64_t kiLogBufferSize = 32 * 1024;
+// One page; covers the largest bounded single workbuffer-routed log argument (a MAX_PATH path/wstring, under 1 KiB).
+inline constexpr int64_t kiMinWorkbufferSize = 4 * 1024;
 
 // Exactly one ThreadLocal per thread; it owns gpThreadLocal for its lifetime.
 class ThreadLocal
@@ -36,10 +38,21 @@ class ThreadLocal
 public:
 
 	ThreadLocal() = delete;
-	// iWorkbufferReserveSize is the workbuffer's address-space ceiling in bytes; 0 means 64x the initial size with that
-	// size floored at 64 KiB first, so a thread constructed with no initial workbuffer still has room to grow into.
-	ThreadLocal(int64_t iWorkbufferSize = 0, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true, int64_t iWorkbufferReserveSize = 0);
 	~ThreadLocal();
+
+	// The only way to construct a ThreadLocal: returns a callable that, on whichever thread calls it (a thread start or a
+	// process entry), builds that thread's ThreadLocal and then invokes function with the callable's arguments.
+	// The requires-clause keeps std::jthread's stop_token detection working; decltype(auto) keeps reference results.
+	template <typename FUNCTION>
+	static auto Entry(FUNCTION&& function, int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true)
+	{
+		return [function = std::forward<FUNCTION>(function), iWorkbufferSize, iThreadId, bSetupExceptionHandling]<typename... ARGS>(ARGS&&... args) mutable -> decltype(auto)
+			requires std::invocable<std::decay_t<FUNCTION>&, ARGS...>
+		{
+			ThreadLocal threadLocal(iWorkbufferSize, iThreadId, bSetupExceptionHandling);
+			return std::invoke(function, std::forward<ARGS>(args)...);
+		};
+	}
 
 	// Non-copyable/non-movable: mpLogBuffer/mWorkbuffer alias this object's own backing storage.
 	ThreadLocal(const ThreadLocal&) = delete;
@@ -55,6 +68,10 @@ public:
 	bool mbInFrameTick = false;
 
 private:
+
+	// iWorkbufferReserveSize is the workbuffer's address-space ceiling in bytes; 0 means 64x the initial size with that
+	// size floored at 64 KiB first, so a thread constructed with a small initial workbuffer still has room to grow into.
+	ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true, int64_t iWorkbufferReserveSize = 0);
 
 	// Must precede mpLogBuffer/mWorkbuffer below: those alias this storage (ctor member-init order depends on it).
 	std::vector<char> mLogBufferMemory;

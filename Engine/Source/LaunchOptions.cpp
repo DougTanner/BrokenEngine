@@ -9,8 +9,8 @@ namespace engine
 
 bool ParseLaunchOptions()
 {
-	// Runs in wWinMain before allocation tracking and before any ThreadLocal exists — LOG uses the per-thread
-	// fallback buffer here and any allocation is untracked. CommandLineToArgvW allocates via LocalAlloc; LocalFree it.
+	// Runs in ProcessMain before allocation tracking, so any allocation is untracked. CommandLineToArgvW allocates via
+	// LocalAlloc; LocalFree it.
 	int iArgumentCount = 0;
 	LPWSTR* pArgumentValues = CommandLineToArgvW(GetCommandLineW(), &iArgumentCount);
 	if (pArgumentValues == nullptr)

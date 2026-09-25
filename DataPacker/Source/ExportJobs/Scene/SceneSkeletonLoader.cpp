@@ -67,7 +67,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 
 	SkeletonData skeletonData;
 	skeletonData.skeleton.uiNodeCount = static_cast<uint16_t>(rModel.nodes.size());
-	ASSERT(skeletonData.skeleton.uiNodeCount <= common::Skeleton::kiMaxNodes);
+	ASSERT(rModel.nodes.size() <= static_cast<size_t>(std::numeric_limits<int16_t>::max()));
 
 	// Load skin joint data if a skin exists. CanonicalizeSceneSkin ran before export, so slot 0 holds the skin the
 	// nodes reference; this and every other skin-0 read in the exporter depend on that.
@@ -75,7 +75,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 	{
 		const tinygltf::Skin& rSkin = rModel.skins[0];
 		skeletonData.skeleton.uiSkinJointCount = static_cast<uint16_t>(rSkin.joints.size());
-		ASSERT(skeletonData.skeleton.uiSkinJointCount <= common::Skeleton::kiMaxSkinJoints);
+		ASSERT(rSkin.joints.size() <= skeletonData.skeleton.uiNodeCount);
 
 		// Build skin joint to node index mapping
 		skeletonData.skinJointToNode.resize(rSkin.joints.size());

@@ -4,10 +4,9 @@ namespace common
 {
 
 PersistentWorker::PersistentWorker(std::optional<int64_t> iThreadId, int64_t iWorkbufferSize)
-: mThread([this, iThreadId, iWorkbufferSize]()
+: mThread(ThreadLocal::Entry([this]()
 {
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-	ThreadLocal threadLocal(iWorkbufferSize, iThreadId);
 
 	while (true)
 	{
@@ -27,7 +26,7 @@ PersistentWorker::PersistentWorker(std::optional<int64_t> iThreadId, int64_t iWo
 		}
 		mDone.release();
 	}
-})
+}, iWorkbufferSize, iThreadId))
 {
 }
 

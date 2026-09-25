@@ -569,7 +569,7 @@ void TextureDescriptors::UpdateDescriptorsForTexture(common::crc_t crc)
 
 	// Ensure CRC has an assigned index and store updated imageView. Render-phase caller: CrcToIndex is
 	//   lock-free, safe only because no worker Spawn runs concurrently (see CrcToIndex).
-	ASSERT(common::gpThreadLocal == nullptr || !common::gpThreadLocal->mbInFrameTick);
+	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
 	mImageInfos.at(CrcToIndex(crc)).imageView = vkImageView;
 }
 

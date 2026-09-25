@@ -49,13 +49,14 @@ try {
   }
  }
  $context=Get-NextPlanContext
- # A bare or exact claim this session already holds needs no tree work or scheduler mutation: reuse the same Plan or
- # report an authoritative different-Plan mismatch before the gates below. A partial pattern needs tree-backed
- # resolution below. Remaining claim-status outcomes, unreadable output included, fall through to the ordinary flow,
- # which can synchronize before plan claim-next re-reports the held claim or returns the scheduler's stop.
+ # A bare or exact request reports an authoritative different-Plan mismatch before the gates below. A held claim is
+ # reused without tree work or scheduler mutation only when the session is at the primary tip; off it, the request falls
+ # through so the fast-forward below reports the sync object the /next-plan final claim refresh reads. A partial pattern
+ # needs tree-backed resolution below. Remaining claim-status outcomes, unreadable output included, fall through to the
+ # ordinary flow, which can synchronize before plan claim-next re-reports the held claim or returns the scheduler's stop.
  $heldClaim=$null
  if($null -eq $pattern){try{$claimStatus=Get-NextPlanClaimStatus $context $Plan;if($claimStatus.ExitCode -eq 2 -and [string]$claimStatus.Status.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claimStatus.Status.requestedPlan;heldPlan=[string]$claimStatus.Status.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'};if($claimStatus.ExitCode -eq 0 -and [string]$claimStatus.Status.code -ceq 'claimed'){$heldClaim=$claimStatus.Status}}catch{$heldClaim=$null}}
- if($null -ne $heldClaim){$result.claim=[ordered]@{claimed=$true;plan=[string]$heldClaim.plan;state='existing'};Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
+ if($null -ne $heldClaim -and $context.SessionHead -ceq $context.PrimaryTip){$result.claim=[ordered]@{claimed=$true;plan=[string]$heldClaim.plan;state='existing'};Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
  $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)

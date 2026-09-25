@@ -12,7 +12,6 @@ enum class ProfileScreen : uint8_t
 	kOff,
 	kCpu,
 	kGpu,
-	kFrames,
 	kNetwork,
 	kCount,
 };
@@ -357,7 +356,7 @@ public:
 	// The caller must hold mCpuTimerMutex.
 	RawCpuTimerRecord GetRawCpuTimer(int64_t iCpuTimer) const;
 	bool ArmRawCpuTimerEvent(int64_t iCpuTimer, int64_t iMinimumSampleTick);
-	// The caller must hold mCpuTimerMutex. Used by the same-thread command transaction and the latch hook.
+	// The caller must hold mCpuTimerMutex.
 	bool ArmRawCpuTimerEventLocked(int64_t iCpuTimer, int64_t iMinimumSampleTick);
 	// The caller must hold mCpuTimerMutex. Publication is performed by the derived latch hook.
 	bool PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSampleTick);
@@ -544,7 +543,6 @@ void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& 
 void FormatFpsHeader(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, int64_t iTotalCpuTimeUs);
 void FormatCpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate);
 void FormatGpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate);
-void FormatFramesScreen(common::Workbuffer& rWorkbuffer);
 #endif
 
 } // namespace engine

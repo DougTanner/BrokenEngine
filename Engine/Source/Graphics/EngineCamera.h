@@ -13,7 +13,7 @@ struct FrameInterpolateBase;
 // number of cell widths, so it is exact in float, and it is the only value a grid coordinate contributes to
 // presentation. Collection render bodies read the one stamped on their interpolate copy; every other conversion
 // point builds its own here. Nothing publishes one render-wide for a renderer to find.
-inline RenderBasis MakeRenderBasis(GridCoord coord, GridCoord cameraCoord)
+constexpr RenderBasis MakeRenderBasis(GridCoord coord, GridCoord cameraCoord)
 {
 	return RenderBasis
 	{

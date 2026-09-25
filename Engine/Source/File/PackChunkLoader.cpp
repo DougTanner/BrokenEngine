@@ -27,7 +27,9 @@ void PackChunkLoader::Start()
 	// Start background loading threads (each services the shared priority queue with its own read/scratch buffers)
 	for (int64_t iThreadIndex = 0; iThreadIndex < kiLoadingThreadCount; ++iThreadIndex)
 	{
-		mLoadingThreads[iThreadIndex] = std::thread(&PackChunkLoader::LoadingThread, this, iThreadIndex);
+		// All loading threads share the semantically-correct kThreadLazyLoad id: nothing keys shared state off the
+		// thread id (it only tags log lines and gates the DxDiag-thread check), so distinct ids are unnecessary.
+		mLoadingThreads[iThreadIndex] = std::thread(common::ThreadLocal::Entry(&PackChunkLoader::LoadingThread, common::kiMinWorkbufferSize, common::kThreadLazyLoad), this, iThreadIndex);
 	}
 }
 
@@ -225,10 +227,6 @@ void PackChunkLoader::WaitForLoadersIdle()
 
 void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 {
-	// All loading threads share the semantically-correct kThreadLazyLoad id: nothing keys shared state off the
-	// thread id (it only tags log lines and gates the DxDiag-thread check), so distinct ids are unnecessary.
-	common::ThreadLocal threadLocal(0, common::kThreadLazyLoad);
-
 	// Note: do NOT use THREAD_MODE_BACKGROUND_BEGIN. That mode sets `IoPriorityVeryLow`, which during
 	// app startup (or any contention with OS-level foreground I/O such as Defender, indexing, OneDrive)
 	// causes large `ReadFile`s to stall for many seconds behind foreground requests. BELOW_NORMAL keeps

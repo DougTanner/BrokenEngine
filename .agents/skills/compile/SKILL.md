@@ -66,10 +66,10 @@ the execution and result discipline in
 - `Decisive checks` — one row per build: target, configuration, `status`,
   `exitCode`, `failureKind`, and, for a failing build with a `severity: error`
   diagnostic, the first one's `code` and `file`.
-- `Decisive checks` — for a game build, one row naming the resolved data mode as
-  the envelope's `/p:DataBuildMode` switch, plus your reason whenever your own
-  judgment overrode the `dataBuildMode` that `Resolve-CompileContext.ps1`
-  reported.
+- `Decisive checks` — for a game build, one row naming the envelope's
+  `/p:DataBuildMode`, `/p:RunDataPacker`, and `/p:GameDataDirectory` switch
+  values, plus your reason whenever your own judgment overrode the
+  `dataBuildMode` that `Resolve-CompileContext.ps1` reported.
 - `Evidence` — one row per build carrying its `retainedLog.path`, plus one row
   for this dispatch's envelope file as path plus `##` selector.
 - `Residuals` — one row per failed or skipped required build, counting

@@ -235,6 +235,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 	else
 	{
 		miFocusedPlayerInFleetIndex = -1;
+		mSpawnIntoFleetToggle.Reset();
 	}
 
 	// Update mClientGridCoord based on current selection
@@ -268,6 +269,10 @@ void FleetSelection::Clear()
 	mClientFleets.clear();
 	miFocusedFleetIndex = -1;
 	miFocusedPlayerInFleetIndex = -1;
+	mCreateFleetToggle.Reset();
+	mSpawnIntoFleetToggle.Reset();
+	mDeleteFleetToggle.Reset();
+	mNavigationDelayControl.Reset();
 }
 
 } // namespace game

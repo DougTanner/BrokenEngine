@@ -17,14 +17,17 @@ the `Get-NextPlanContext` baseline holds only until the first claim reports a
 [baseline rule](../../../references/subagent-reporting.md#task-brief) owns its
 later use and storage.
 
-A bare request or an exact request for the Plan this session already holds is
-reported as `reused` with `nextAction: prepare` before the tree is examined, so
-that result is unchanged by a dirty or diverged worktree. An exact request for a
-different Plan follows the mismatch result below. A partial pattern requires
-the normal tree-backed validation and unique-match resolution before
-WorktreeCli compares the resolved Plan with the held claim. A `reused` result
-carries neither a `sync` nor a `retained` object and leaves the recorded
-baseline unchanged when the early lookup succeeds. When that lookup is busy or
+A bare request or an exact request for the Plan this session already holds,
+made while the session is at the primary tip, is reported as `reused` with
+`nextAction: prepare` before the tree is examined, so that result is unchanged
+by a dirty worktree. Off the primary tip, the same request runs the ordinary
+flow below, which can stop at its dirty-worktree or divergence gate or return
+`reused` carrying the `sync` object. An exact request for a different Plan
+follows the mismatch result below. A partial pattern requires the normal
+tree-backed validation and unique-match resolution before WorktreeCli compares
+the resolved Plan with the held claim. The early `reused` result carries
+neither a `sync` nor a `retained` object and leaves the recorded baseline
+unchanged when the early lookup succeeds. When that lookup is busy or
 unreadable, the run falls through into the ordinary flow below, so a later
 `reused` result can carry a `sync` object and the baseline rule above applies.
 

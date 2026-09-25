@@ -2,7 +2,6 @@
 
 #if defined(BT_CLIENT)
 #include "Ui/MenuUtils.h"
-#include "Ui/NetworkUiControl.h"
 #endif
 
 namespace game
@@ -20,10 +19,6 @@ private:
 	void RenderFocusedPlayerPanel(float fTarget);
 
 #if defined(BT_CLIENT)
-	engine::NetworkUiControl<int64_t> mCreateFleetToggle {};
-	engine::NetworkUiControl<int64_t> mSpawnIntoFleetToggle {};
-	engine::NetworkUiControl<int64_t> mDeleteFleetToggle {};
-
 	static float PanelWidth();
 	engine::SlidePanelState mFleetSlide {};
 	engine::SlidePanelState mFocusedPlayerSlide {};

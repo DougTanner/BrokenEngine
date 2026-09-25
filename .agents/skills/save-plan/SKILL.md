@@ -96,7 +96,7 @@ Resolve the explicitly supplied complete proposal as follows:
 9. Classify into `Documents/Plans/`, `Documents/Investigations/`, or
    `Documents/Features/` by the deciding test in `Documents/AGENTS.md`
    `## Planning Trees`. Done when the tree is chosen.
-10. Select an existing area and a concise PascalCase filename matching
+10. Select the owning area and a concise PascalCase filename matching
     `^[A-Z][A-Za-z0-9]*\.md$`. Done when the area and filename are chosen.
 11. Search live Plans for duplicate root cause and implementation boundary
     before writing. Done when the duplicate search has run.
@@ -105,7 +105,7 @@ Resolve the explicitly supplied complete proposal as follows:
 13. Create the Plan with the repository-owned `.agents/scripts/New-PlanFile.ps1`:
 
     ```powershell
-    pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
+    pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
     ```
 
     - Its parameters, the `-DependsOn` single-token rule, its result shape, and

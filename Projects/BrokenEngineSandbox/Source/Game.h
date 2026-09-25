@@ -40,6 +40,17 @@ struct ReplayStagedMeta
 	ReplayMeta meta {};
 };
 
+#if defined(BT_CLIENT)
+// The ship ID is part of the key so a pending request clears when focus moves to another ship, even one with the same mode.
+struct WeaponModeKey
+{
+	engine::global_id_t playerId {};
+	bool bUseMissiles = false;
+
+	bool operator==(const WeaponModeKey&) const = default;
+};
+#endif
+
 class Game : public engine::GameBase
 {
 public:
@@ -125,8 +136,7 @@ public:
 
 #if defined(BT_CLIENT)
 	XMVECTOR mVecVisualErrorOffset {};
-	engine::NetworkUiControl<bool> mWeaponModeToggle {};
-	engine::NetworkUiControl<float> mNavigationDelayControl {};
+	engine::NetworkUiControl<WeaponModeKey> mWeaponModeToggle {};
 
 	FleetSelection mFleetSelection;
 

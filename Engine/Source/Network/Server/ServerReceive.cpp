@@ -258,9 +258,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 		std::snprintf(pcMessage, sizeof(pcMessage), "Protocol version mismatch: server is %u, client is %u", kuiProtocolVersion, uiClientProtocolVersion);
 		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", iClientId, pcMessage);
 
-		SendConnectionResponse(pPeer, false, pcMessage, nullptr);
-		RemoveClient(iClientId);
-		enet_peer_disconnect_later(pPeer, 0);
+		RejectHello(pPeer, iClientId, pcMessage);
 		return;
 	}
 
@@ -271,9 +269,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 		std::snprintf(pcMessage, sizeof(pcMessage), "Frame version mismatch: server is %lld, client is %lld", game::NetworkSessionContract::GetFrameVersion(), iClientFrameVersion);
 		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", iClientId, pcMessage);
 
-		SendConnectionResponse(pPeer, false, pcMessage, nullptr);
-		RemoveClient(iClientId);
-		enet_peer_disconnect_later(pPeer, 0);
+		RejectHello(pPeer, iClientId, pcMessage);
 		return;
 	}
 
@@ -285,9 +281,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 		std::snprintf(pcMessage, sizeof(pcMessage), "Pack integrity mismatch: server token is %llu, client token is %llu. Regenerate generated game data and retry.", static_cast<unsigned long long>(serverPackIntegrityToken), static_cast<unsigned long long>(clientPackIntegrityToken));
 		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", iClientId, pcMessage);
 
-		SendConnectionResponse(pPeer, false, pcMessage, nullptr);
-		RemoveClient(iClientId);
-		enet_peer_disconnect_later(pPeer, 0);
+		RejectHello(pPeer, iClientId, pcMessage);
 		return;
 	}
 
@@ -320,6 +314,23 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 		return;
 	}
 
+	// One live handshaken peer per GUID: fleet ownership is GUID-keyed, so a second peer must not take over the first's identity.
+	// This peer's own record is not yet handshaken (the replay branch returned otherwise), so it cannot match itself.
+	if (!clientGuid.IsEmpty())
+	{
+		auto duplicateIt = std::ranges::find_if(mClients, [&clientGuid](const ClientConnection& rOther) { return rOther.bHandshakeComplete && rOther.clientGuid == clientGuid; });
+		if (duplicateIt != mClients.end())
+		{
+			const char* pcMessage = "Duplicate client GUID: another connected client already uses this identity";
+			LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {} Existing Client: {}", iClientId, pcMessage, duplicateIt->iClientId);
+
+			SendConnectionResponse(pPeer, false, pcMessage, nullptr);
+			RemoveClient(iClientId);
+			enet_peer_disconnect_later(pPeer, 0);
+			return;
+		}
+	}
+
 	// Generate GUID if client sent empty
 	if (clientGuid.IsEmpty())
 	{
@@ -336,6 +347,21 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 	SendConnectionResponse(pPeer, true, nullptr, &clientGuid);
 
 	SendTimespeedToNewClient(pPeer);
+}
+
+void Server::RejectHello(ENetPeer* pPeer, int64_t iClientId, const char* pcMessage)
+{
+	SendConnectionResponse(pPeer, false, pcMessage, nullptr);
+
+	// An accepted client's removal must reach the game layer: the later DISCONNECT event finds no record and publishes nothing.
+	if (const ClientConnection* pClient = FindHandshakenClient(iClientId); pClient != nullptr)
+	{
+		ScopedSuppressAllocationTracking suppress;
+		mPendingDisconnects.push_back({iClientId, pClient->clientGuid});
+	}
+
+	RemoveClient(iClientId);
+	enet_peer_disconnect_later(pPeer, 0);
 }
 
 void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClientId)

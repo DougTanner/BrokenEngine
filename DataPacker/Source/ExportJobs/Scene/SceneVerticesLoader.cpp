@@ -365,7 +365,7 @@ void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& 
 		Material& rMaterial = rMaterials.at(iEffectiveMaterial);
 
 		// CanonicalizeSceneSkin range-checked rNode.skin before export, and this full count is the per-material joint-matrix
-		// stride the runtime advances by, unlike the kiMaxJointsPerMesh-clamped count the material carries
+		// stride the runtime advances by
 		int iSkinJointCount = bHasSkinning ? static_cast<int>(rModel.skins[rNode.skin].joints.size()) : 0;
 
 		std::vector<uint32_t> indexRemap;

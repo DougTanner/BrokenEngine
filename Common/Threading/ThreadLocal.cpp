@@ -10,6 +10,8 @@ ThreadLocal::ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThread
 , mpLogBuffer(mLogBufferMemory.data())
 , mWorkbuffer(mWorkbufferMemory)
 {
+	ASSERT(iWorkbufferSize >= kiMinWorkbufferSize);
+
 	// Sized ahead of the publish below, so this thread's own logging finds a usable workbuffer the moment gpThreadLocal is visible.
 	mWorkbufferMemory.Resize(iWorkbufferSize);
 

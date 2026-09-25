@@ -179,7 +179,9 @@ bool ServerDisplayContentChanged()
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
 	Mix(gpProfileManager->miMimallocCommittedMib);
+	Mix(gpProfileManager->miMimallocPeakCommittedMib);
 	Mix(gpProfileManager->miMimallocHeapUsedMib);
+	Mix(gpProfileManager->miMimallocPeakHeapUsedMib);
 #endif
 
 	if (sbHasLastContentHash && uHash == suLastContentHash)

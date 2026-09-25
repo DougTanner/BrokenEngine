@@ -86,7 +86,13 @@ and the handoff this run returns.
      same wait.
    - Pass the latest `/compile` result's normalized `GameDataDirectory` verbatim
      as `-GameDataDirectory` — the same packed data the launch below selects
-     with `--data-directory`.
+     with `--data-directory`. Only when the approved acceptance needs derived
+     data, such as a deliberately corrupted pack, pass instead a real byte copy
+     of that directory that keeps every `.manifest` unchanged, never links to
+     it, under `<absolute adopted worktree>\Temp`, as both `-GameDataDirectory`
+     and `--data-directory`; the scenario derives the copy. Delete the copy when
+     the run ends with nothing launched or once its last release (step 44)
+     returns exit `0`; otherwise name its path under `Evidence`.
    - Add `-Configuration <name>` only for a build other than `Debug`.
 
 6. Use only the provisioned primary AgentHarness output that claim resolved.

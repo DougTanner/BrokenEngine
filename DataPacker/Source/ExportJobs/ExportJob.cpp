@@ -211,7 +211,6 @@ bool ExportJob::CheckDirty(const std::filesystem::path& rPackFile)
 
 std::vector<std::byte>& ExportJob::RunExport()
 {
-	common::ThreadLocal threadLocal(4 * 1024, miId, false);
 	ScopedLogIndent scopedLogIndentOuter;
 	ScopedLogIndent scopedLogIndentInner;
 

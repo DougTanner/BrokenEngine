@@ -15,11 +15,13 @@ staging, or validation operations inline.
 From the session worktree root:
 
 ```powershell
-pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <existing area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
+pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
 ```
 
-- `-Area` — an existing directory beneath `Documents/Plans`; the script creates
-  none.
+- `-Area` — a directory beneath `Documents/Plans`: an existing one, or an area
+  `Documents/Plans/AGENTS.md` `## Plan files` lists, whose absent directory the
+  script creates; any other missing directory is rejected with
+  `input.area-not-found`.
 - `-Name` — a bare filename matching `^[A-Z][A-Za-z0-9]*\.md$`.
 - `-Body` — a file holding the plan text that goes below the marker. The body
   travels as a file so no transcript text is ever executed.

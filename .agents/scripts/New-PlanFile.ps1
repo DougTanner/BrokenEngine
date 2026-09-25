@@ -112,7 +112,20 @@ try {
 		Complete-PlanFile 1 'error' 'input.area-outside-plans' "Plan -Area must resolve beneath Documents/Plans: '$Area'."
 	}
 	if (-not (Test-Path -LiteralPath $areaFull -PathType Container)) {
-		Complete-PlanFile 1 'error' 'input.area-not-found' "Plan -Area must be an existing directory: '$Area'."
+		# Git keeps no empty directory, so a documented area loses its directory with its last Plan.
+		$documentedAreas = [Collections.Generic.List[string]]::new()
+		$inPlanFiles = $false
+		foreach ($line in [IO.File]::ReadAllLines((Join-Path $plansRoot 'AGENTS.md'))) {
+			if ($line -ceq '## Plan files') { $inPlanFiles = $true; continue }
+			if (-not $inPlanFiles) { continue }
+			if ($line.StartsWith('## ', [StringComparison]::Ordinal)) { break }
+			if ($line -cmatch '^- `([A-Za-z0-9]+)/`') { $documentedAreas.Add($Matches[1]) }
+		}
+		# Case-sensitive, so a wrongly cased directory is never created for Git to track under that name.
+		if (-not ($documentedAreas -ccontains (Get-PlanFileRelativePath $areaFull $plansRoot))) {
+			Complete-PlanFile 1 'error' 'input.area-not-found' "Plan -Area must be an existing directory or an area Documents/Plans/AGENTS.md '## Plan files' lists: '$Area'."
+		}
+		[void] [IO.Directory]::CreateDirectory($areaFull)
 	}
 
 	$targetFull = Join-Path $areaFull $Name

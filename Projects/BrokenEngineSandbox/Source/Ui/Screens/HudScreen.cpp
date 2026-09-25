@@ -198,7 +198,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	int64_t iFleetCount = gpGame->FleetCount();
 
 	// Update fleet toggle: clears pending when fleet count changes
-	mCreateFleetToggle.Update(iFleetCount);
+	gpGame->mFleetSelection.mCreateFleetToggle.Update(iFleetCount);
 
 	// Fleet navigation row: [<] fleet_index/fleet_count [>] [+]
 	ImGui::BeginDisabled(!gpGame->CanFocusPrevFleet());
@@ -231,12 +231,12 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGui::EndDisabled();
 
 	ImGui::SameLine();
-	ImGui::BeginDisabled(mCreateFleetToggle.IsPending());
+	ImGui::BeginDisabled(gpGame->mFleetSelection.mCreateFleetToggle.IsPending() || iFleetCount >= kiMaxFleetsPerClient);
 	if (ImGui::Button("[+]##Fleet"))
 	{
 		if (gpClientSession != nullptr)
 		{
-			mCreateFleetToggle.SetPending();
+			gpGame->mFleetSelection.mCreateFleetToggle.SetPending();
 			gpClientSession->SendCreateFleetRequest();
 			LOG(kDefault, kVerbose, "HUD CreateFleetRequest FleetCount: {}", iFleetCount);
 		}
@@ -246,15 +246,15 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	const Fleet* pFleet = gpGame->FocusedFleet();
 
 	// Delete empty fleet button
-	mDeleteFleetToggle.Update(iFleetCount);
+	gpGame->mFleetSelection.mDeleteFleetToggle.Update(iFleetCount);
 	bool bCanDelete = pFleet != nullptr && pFleet->members.empty();
 	ImGui::SameLine();
-	ImGui::BeginDisabled(!bCanDelete || mDeleteFleetToggle.IsPending());
+	ImGui::BeginDisabled(!bCanDelete || gpGame->mFleetSelection.mDeleteFleetToggle.IsPending());
 	if (ImGui::Button("[-]##Fleet"))
 	{
 		if (pFleet != nullptr && gpClientSession != nullptr)
 		{
-			mDeleteFleetToggle.SetPending();
+			gpGame->mFleetSelection.mDeleteFleetToggle.SetPending();
 			gpClientSession->SendDeleteFleetRequest(pFleet->guid);
 			LOG(kDefault, kVerbose, "HUD DeleteFleetRequest Fleet: ({},{}) FleetCount: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, iFleetCount);
 		}
@@ -267,7 +267,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		ImGui::Separator();
 
 		// Update spawn into fleet toggle based on member count
-		mSpawnIntoFleetToggle.Update(std::ssize(pFleet->members));
+		gpGame->mFleetSelection.mSpawnIntoFleetToggle.Update(std::ssize(pFleet->members));
 
 		for (int64_t i = 0; i < std::ssize(pFleet->members); ++i)
 		{
@@ -315,12 +315,12 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		}
 
 		// Add player button at bottom of list
-		ImGui::BeginDisabled(mSpawnIntoFleetToggle.IsPending());
+		ImGui::BeginDisabled(gpGame->mFleetSelection.mSpawnIntoFleetToggle.IsPending() || pFleet->members.size() >= kuiMaxFleetMembers);
 		if (ImGui::Button("[+]##Player"))
 		{
 			if (gpClientSession != nullptr)
 			{
-				mSpawnIntoFleetToggle.SetPending();
+				gpGame->mFleetSelection.mSpawnIntoFleetToggle.SetPending();
 				gpClientSession->SendSpawnIntoFleetRequest(pFleet->guid);
 				LOG(kDefault, kVerbose, "HUD SpawnIntoFleet Fleet: ({},{})", pFleet->guid.uiHigh, pFleet->guid.uiLow);
 			}
@@ -329,22 +329,28 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 		// Fleet navigation delay slider
 		ImGui::Separator();
-		gpGame->mNavigationDelayControl.Update(pFleet->fNavigationDelay);
-		ImGui::BeginDisabled(gpGame->mNavigationDelayControl.IsPending());
+		gpGame->mFleetSelection.mNavigationDelayControl.Update(NavigationDelayKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->fNavigationDelay});
+		ImGui::BeginDisabled(gpGame->mFleetSelection.mNavigationDelayControl.IsPending());
 		static float sfNavigationDelayEditValue = 0.0f;
-		float fSliderValue = pFleet->fNavigationDelay;
+		static bool sbNavigationDelaySliderWasActive = false;
+		// Reload only while the slider is inactive, so it owns the value for the whole interaction and a release
+		// sends exactly the value the user let go on
+		if (!sbNavigationDelaySliderWasActive)
+		{
+			sfNavigationDelayEditValue = pFleet->fNavigationDelay;
+		}
 		// Reserve the trailing label's width — AlwaysAutoResize windows default the item width to the full content
 		// width, which would push the label past the clip edge
 		ImGui::SetNextItemWidth(-(ImGui::CalcTextSize("Nav Delay").x + ImGui::GetStyle().ItemInnerSpacing.x));
-		if (ImGui::SliderFloat("Nav Delay", &fSliderValue, 0.0f, 60.0f))
-		{
-			sfNavigationDelayEditValue = fSliderValue;
-		}
+		// AlwaysClamp keeps Ctrl+Click typed input in range, so the server never clamps a release back to an equal value
+		ImGui::SliderFloat("Nav Delay", &sfNavigationDelayEditValue, 0.0f, 60.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+		sbNavigationDelaySliderWasActive = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
-			if (gpClientSession != nullptr)
+			// An unchanged release would get back an equal FleetSync, which never clears pending
+			if (gpClientSession != nullptr && sfNavigationDelayEditValue != pFleet->fNavigationDelay)
 			{
-				gpGame->mNavigationDelayControl.SetPending();
+				gpGame->mFleetSelection.mNavigationDelayControl.SetPending();
 				gpClientSession->SendFleetNavigationDelayRequest(pFleet->guid, sfNavigationDelayEditValue);
 			}
 		}
@@ -390,7 +396,7 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 	{
 		PlayersPostRender& rPlayers = *gpGame->RenderFrame(gpGame->mClientGridCoord).postRender.pPlayers;
 		bool bUseMissiles = static_cast<bool>(rPlayers.pFlags[*oPlayerIndex] & PlayerFlags::kUseMissiles);
-		gpGame->mWeaponModeToggle.Update(bUseMissiles);
+		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.playerId = gpGame->ClientPlayerId(), .bUseMissiles = bUseMissiles});
 
 		const char* pLabel = bUseMissiles ? "Missiles" : "Blasters";
 		const ImGuiStyle& rStyle = ImGui::GetStyle();

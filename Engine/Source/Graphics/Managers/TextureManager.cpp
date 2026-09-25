@@ -835,7 +835,7 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 
 	// Register blurred texture in bindless array. Render-phase caller: CrcToIndex is lock-free, safe only
 	//   because no worker Spawn runs concurrently (see TextureDescriptors::CrcToIndex).
-	ASSERT(common::gpThreadLocal == nullptr || !common::gpThreadLocal->mbInFrameTick);
+	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
 	common::crc_t blurredCrc = crc ^ TextureDescriptors::kBlurSalt;
 	int64_t iBlurredIndex = mTextureDescriptors.CrcToIndex(blurredCrc);
 	mTextureDescriptors.mImageInfos.at(iBlurredIndex).imageView = rResult.mVkImageView;

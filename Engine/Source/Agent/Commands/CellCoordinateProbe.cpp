@@ -43,7 +43,7 @@ int32_t ProbeGridCoordValue(const nlohmann::json& rValue)
 // How many of the terrain grid's kiElevationGridDim sample positions along one axis resolve to distinct floats;
 // fewer means neighbouring samples share a float at this coordinate. The positions increase monotonically, so
 // exact inequality against the predecessor — not an approximate comparison — finds every such collapse.
-int64_t DistinctAxisSamplePositions()
+constexpr int64_t DistinctAxisSamplePositions()
 {
 	constexpr float kfGridPitch = kfCellWidth / static_cast<float>(kiElevationGridDim);
 	int64_t iDistinct = 0;

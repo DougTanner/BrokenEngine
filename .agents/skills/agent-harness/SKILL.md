@@ -25,7 +25,7 @@ length-prefixed JSON.
 
 ## Inputs
 
-Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, and normalized `GameDataDirectory`. The brief may state a wall-clock budget for the run; otherwise a 20-minute default applies.
+Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, and normalized `GameDataDirectory`. That result must also include the server executable, and the client executable unless the scenario launches only the server, for the requested configuration; request that build by stating the agent-harness scenario trigger in [`/compile`](../compile/SKILL.md) `## Inputs`. The brief may state a wall-clock budget for the run; otherwise a 20-minute default applies.
 
 ## Handoff
 

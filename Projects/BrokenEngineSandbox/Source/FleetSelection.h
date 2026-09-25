@@ -3,9 +3,19 @@
 #if defined(BT_CLIENT)
 
 #include "Fleet.h"
+#include "Ui/NetworkUiControl.h"
 
 namespace game
 {
+
+// The fleet GUID is part of the key so a pending request clears when focus moves to another fleet, even one with the same delay.
+struct NavigationDelayKey
+{
+	FleetGuid fleetGuid {};
+	float fNavigationDelay = 0.0f;
+
+	bool operator==(const NavigationDelayKey&) const = default;
+};
 
 // Owns the client's fleet list and focus state (focused fleet + member). Drives which grid cell the
 // camera follows. Reaches back into Game (grid coord, client-state persistence, owned-player lists)
@@ -26,6 +36,11 @@ public:
 	void SyncFleets(std::vector<Fleet>&& fleets);
 	void AutoSelectFirstAliveMember();
 	void Clear();
+
+	engine::NetworkUiControl<int64_t> mCreateFleetToggle {};
+	engine::NetworkUiControl<int64_t> mSpawnIntoFleetToggle {};
+	engine::NetworkUiControl<int64_t> mDeleteFleetToggle {};
+	engine::NetworkUiControl<NavigationDelayKey> mNavigationDelayControl {};
 
 private:
 

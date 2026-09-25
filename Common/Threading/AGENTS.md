@@ -18,11 +18,13 @@ Every `PersistentWorker` thread runs at `THREAD_PRIORITY_TIME_CRITICAL`, above o
 
 ## Thread-Local State
 
-Exactly one `ThreadLocal` may be active per thread. Construction installs the thread's log/workbuffer context, configures deterministic floating-point state, and optionally installs exception handling; destruction clears the thread-local pointer. The frame-tick scope marks code that must not make the OS or library calls that are off limits during simulation.
+Exactly one `ThreadLocal` may be active per thread. `ThreadLocal::Entry` (`ThreadLocal.h`) is the only way to install one. Every thread our code starts and both process entry points use it. Construction installs the thread's log/workbuffer context, configures deterministic floating-point state, and optionally installs exception handling; destruction clears the thread-local pointer.
 
-A thread whose scratch can outgrow the default workbuffer reserve passes its own `iWorkbufferReserveSize` (`ThreadLocal.h`).
+Every `Entry` and `PersistentWorker` call passes an initial workbuffer size — there is no default — of at least `kiMinWorkbufferSize` (`ThreadLocal.h`), which the constructor ASSERTs. The workbuffer reserve is not a caller choice; it follows the formula in `ThreadLocal.h`.
 
-Keep workbuffer views, log-buffer references, and tick/indent scopes within their owning thread and lifetime. DataPacker jobs that use Common scratch construct a `ThreadLocal` on their worker before export work.
+The frame-tick scope marks code that must not make the OS or library calls that are off limits during simulation; the checks guarding that code ASSERT a live `ThreadLocal` as well as no active tick. Workbuffer-backed formatting (`../Log/AGENTS.md`) likewise requires a live `ThreadLocal`, so a thread our code did not start, such as an OS or third-party callback, must not reach it or those checks.
+
+Keep workbuffer views, log-buffer references, and tick/indent scopes within their owning thread and lifetime.
 
 ## See Also
 

@@ -17,6 +17,11 @@ static_assert(BT_OFFSETOF(FleetGuid, uiLow) == 8, "FleetGuid::uiLow offset chang
 static_assert(std::is_trivially_copyable_v<FleetGuid>, "FleetGuid must stay trivially copyable — it is the leading member of the trivially copyable ClientStateSettings POD");
 static_assert(std::is_standard_layout_v<FleetGuid>, "FleetGuid must stay standard-layout — BT_OFFSETOF above is only well-defined for standard-layout types");
 
+// DoS ceiling on per-client fleet count — well above any real use; bounds mFleets against a spamming client.
+constexpr int64_t kiMaxFleetsPerClient = 16;
+// Per-fleet member cap — parity with Frame.cpp's kiMaxFleetSize (16); bounds Fleet::members against a spamming client.
+constexpr size_t kuiMaxFleetMembers = 16;
+
 struct FleetMember
 {
 	engine::global_id_t globalPlayerId {};

@@ -9,7 +9,7 @@ namespace engine
 {
 
 SwapchainManager::SwapchainManager(VkSwapchainKHR oldSwapchain)
-: mPresent(common::kThreadPresent)
+: mPresent(common::kThreadPresent, common::kiMinWorkbufferSize)
 {
 	ASSERT(gpSwapchainManager == nullptr);
 

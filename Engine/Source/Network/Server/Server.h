@@ -226,6 +226,7 @@ private:
 	void ClientDesyncReport(std::span<const uint8_t> packetData, int64_t iClientId);
 	void ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPeer* pPeer, int64_t iClientId);
 	void ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, int64_t iClientId);
+	void RejectHello(ENetPeer* pPeer, int64_t iClientId, const char* pcMessage);
 	void ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClientId);
 	void ClientUnsubscribe(std::span<const uint8_t> packetData, int64_t iClientId);
 	void ClientResyncRequest(std::span<const uint8_t> packetData, int64_t iClientId);

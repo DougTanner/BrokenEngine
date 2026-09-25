@@ -241,6 +241,10 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 - `WorktreeCli build` serializes writers per target basename inside the current
   worktree, waits up to 500 seconds, preserves native Windows argument
   boundaries, and owns MSBuild through a kill-on-close Job Object.
+- A `C1090` or `LNK1318` PDB-service failure is reported like any other
+  build failure, with no process check and no retry: the build entry point
+  gives each build its own PDB server (`_MSPDBSRV_ENDPOINT_`), so another
+  build cannot cause it.
 - A lock timeout means another WorktreeCli build still owns that target. Retry
   after it finishes; never delete `.claude/build-locks/` manually.
 - A prior killed build's `unsuccessfulbuild` marker clears on the next

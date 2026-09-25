@@ -167,8 +167,6 @@ void ReadDxDiag()
 {
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 
-	common::ThreadLocal threadLocal(1024, common::kThreadDxDiag);
-
 	try
 	{
 		CHECK_HRESULT(CoInitialize(nullptr));

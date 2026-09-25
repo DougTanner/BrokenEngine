@@ -243,7 +243,6 @@ void ClientSession::OnServerLoad()
 	gpGame->SetPreviousClientArmor(0.0f);
 	gpGame->mVecVisualErrorOffset = {};
 	gpGame->mWeaponModeToggle.Reset();
-	gpGame->mNavigationDelayControl.Reset();
 
 	// Clear fleet state — server will re-sync
 	gpGame->mFleetSelection.Clear();

@@ -634,25 +634,12 @@ void ExportScene::BuildMaterialInfos(tinygltf::Model& rGltfModel, bool bHasSkele
 	// Build parent map for node hierarchy traversal (used for both skeletal and node-based)
 	std::unordered_map<int, int> nodeParentMap = BuildNodeParentMap(rGltfModel);
 
-	// Get skin joint count for skinned materials (always use skin's joint count, not animation node count)
-	uint8_t uiSkinJointCount = 0;
-	if (!rGltfModel.skins.empty())
-	{
-		size_t uiJointCount = rGltfModel.skins.at(0).joints.size();
-		if (uiJointCount > common::kiMaxJointsPerMesh)
-		{
-			LOG(kDefault, kWarning, "WARNING: Model has {} joints, exceeding shader limit of {}. Skinning will use first {} joints only.", uiJointCount, common::kiMaxJointsPerMesh, common::kiMaxJointsPerMesh);
-		}
-		// Clamp before the byte narrowing: an accepted skin may hold up to Skeleton::kiMaxSkinJoints (256), which would wrap to 0 and silently disable skinning
-		uiSkinJointCount = static_cast<uint8_t>(std::min(uiJointCount, static_cast<size_t>(common::kiMaxJointsPerMesh)));
-	}
-
 	for (int64_t i = 0; i < static_cast<int64_t>(rMaterialNodeInfos.size()); ++i)
 	{
 		const MaterialNodeInfo& rInfo = rMaterialNodeInfos.at(i);
 
-		// Set jointCount: skinned materials use skin's joint count, non-skinned have 0
-		rMaterialInfos.at(i).uiJointCount = rInfo.bHasSkinning ? uiSkinJointCount : 0;
+		// Skinned materials deform by the skeleton's uiSkinJointCount joints
+		rMaterialInfos.at(i).flags.Set(common::MaterialFlags::kSkinned, rInfo.bHasSkinning);
 
 		// Store original material index for split materials (-1 means not split, same as original index)
 		rMaterialInfos.at(i).iOriginalMaterialIndex = static_cast<int16_t>(rInfo.iOriginalMaterialIndex);
@@ -694,7 +681,7 @@ void ExportScene::BuildMaterialInfos(tinygltf::Model& rGltfModel, bool bHasSkele
 		// Use original material index for split materials
 		int iOrigMat = rMaterialNodeInfos.at(i).iOriginalMaterialIndex >= 0 ? rMaterialNodeInfos.at(i).iOriginalMaterialIndex : static_cast<int>(i);
 		tinygltf::Material& rTinygltfMaterial = rGltfModel.materials.at(iOrigMat);
-		LOG(kDefault, kVerbose, "  {}: \"{}\"{}; {} {} {} {} {} textures, {} indices{}", i, rTinygltfMaterial.name, (iOrigMat != i ? std::format(" (split from {})", iOrigMat) : ""), rTinygltfMaterial.pbrMetallicRoughness.baseColorTexture.index, rTinygltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, rTinygltfMaterial.normalTexture.index, rTinygltfMaterial.occlusionTexture.index, rTinygltfMaterial.emissiveTexture.index, rMaterials.at(i).indexBuffer.size(), rMaterialInfos.at(i).uiJointCount > 0 ? " (skinned)" : "");
+		LOG(kDefault, kVerbose, "  {}: \"{}\"{}; {} {} {} {} {} textures, {} indices{}", i, rTinygltfMaterial.name, (iOrigMat != i ? std::format(" (split from {})", iOrigMat) : ""), rTinygltfMaterial.pbrMetallicRoughness.baseColorTexture.index, rTinygltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, rTinygltfMaterial.normalTexture.index, rTinygltfMaterial.occlusionTexture.index, rTinygltfMaterial.emissiveTexture.index, rMaterials.at(i).indexBuffer.size(), (rMaterialInfos.at(i).flags & common::MaterialFlags::kSkinned) ? " (skinned)" : "");
 	}
 }
 

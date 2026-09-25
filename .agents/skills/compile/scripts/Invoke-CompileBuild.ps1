@@ -169,6 +169,9 @@ function Invoke-WorktreeCliBuild([string[]] $DataProperties) {
 		$arguments.Add('/t:Rebuild')
 	}
 	$script:Summary.Add("WorktreeCli build arguments: $($arguments -join ' ')")
+	# A private PDB server endpoint keeps this build's cl/link off the shared per-user mspdbsrv, which runs
+	# inside the kill-on-close job of whichever build started it and dies with that job, failing concurrent builds.
+	[Environment]::SetEnvironmentVariable('_MSPDBSRV_ENDPOINT_', [guid]::NewGuid().ToString('N'))
 	# Stdout is not redirected: WorktreeCli's result envelope is the caller's stdout, byte-verbatim.
 	$script:BuildExitCode = (Start-CompileChild $script:WorktreeCliPath $arguments.ToArray() $false).ExitCode
 	return $script:BuildExitCode

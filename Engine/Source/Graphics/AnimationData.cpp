@@ -53,12 +53,12 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 	std::memcpy(&mHeader, pAnimationData, sizeof(mHeader));
 	pAnimationData += sizeof(mHeader);
 
-	// Pack counts size containers and advance aliases; invalid values can over-allocate or leave the eager buffer. Validate container counts
-	// against structural maxima before use. Channels/keyframes only advance aliases and have no producer structural maximum, so the
-	// deserialization ceiling bounds their arithmetic. Bound each section by iAnimationBytes from the chunk table; scene ChunkHeader::iSize
-	// excludes appended animation data.
-	if (mHeader.skeleton.uiNodeCount > common::Skeleton::kiMaxNodes
-		|| mHeader.skeleton.uiSkinJointCount > common::Skeleton::kiMaxSkinJoints
+	// Pack counts size containers and advance aliases; invalid values can over-allocate or leave the eager buffer. Validate the animation
+	// and material counts against structural maxima before use. The node count has no structural maximum: its uint16_t field width, the
+	// BoundAdvance byte extent below, and the exporter ASSERT at the int16_t parent-index width bound it, and the skin-joint count may not
+	// exceed it. Channels/keyframes only advance aliases and have no producer structural maximum, so the deserialization ceiling bounds
+	// their arithmetic. Bound each section by iAnimationBytes from the chunk table; scene ChunkHeader::iSize excludes appended animation data.
+	if (mHeader.skeleton.uiSkinJointCount > mHeader.skeleton.uiNodeCount
 		|| mHeader.uiAnimationCount > common::AnimationHeader::kiMaxAnimations
 		|| mHeader.uiAnimationCount == 0  // chunk loaded only when bHasAnimation, so 0 is corrupt; EvaluateWorldMatrices indexes [0, uiAnimationCount)
 		|| mHeader.uiMaterialCount > common::SceneHeader::kiMaxMaterials
@@ -129,6 +129,8 @@ void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationByte
 		{
 			throw std::ios_base::failure("AnimationData::Load");
 		}
+		// Corrupt chunk: a skinned material in a skeleton with no skin joints
+		ASSERT(!(mpMaterialInfos[i].flags & common::MaterialFlags::kSkinned) || mHeader.skeleton.uiSkinJointCount > 0);
 	}
 	for (uint32_t i = 0; i < mHeader.uiChannelCount; ++i)
 	{
@@ -202,7 +204,7 @@ int64_t AnimationData::SkinnedMaterialCount(uint32_t uiMaterialCount) const
 	int64_t iSkinnedMaterialCount = 0;
 	for (uint32_t uiMaterialIndex = 0; uiMaterialIndex < uiMaterialCount; ++uiMaterialIndex)
 	{
-		if (mpMaterialInfos[uiMaterialIndex].uiJointCount > 0)
+		if (mpMaterialInfos[uiMaterialIndex].flags & common::MaterialFlags::kSkinned)
 		{
 			++iSkinnedMaterialCount;
 		}
@@ -212,8 +214,7 @@ int64_t AnimationData::SkinnedMaterialCount(uint32_t uiMaterialCount) const
 
 void AnimationData::EvaluateAnimation(int64_t iAnimationIndex, float fTime, uint32_t uiMaterialCount, common::MeshData* pMeshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const
 {
-	static constexpr int64_t kiMaxNodes = common::Skeleton::kiMaxNodes;
-	auto pWorldMatrices = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMMATRIX*>(kiMaxNodes * static_cast<int64_t>(sizeof(XMMATRIX)));
+	auto pWorldMatrices = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMMATRIX*>(mHeader.skeleton.uiNodeCount * static_cast<int64_t>(sizeof(XMMATRIX)));
 	EvaluateWorldMatrices(iAnimationIndex, fTime, pWorldMatrices);
 
 	for (uint32_t uiMaterialIndex = 0; uiMaterialIndex < uiMaterialCount; ++uiMaterialIndex)
@@ -221,7 +222,7 @@ void AnimationData::EvaluateAnimation(int64_t iAnimationIndex, float fTime, uint
 		EvaluateMaterial(uiMaterialIndex, pWorldMatrices, pMeshData + uiMaterialIndex, pJointMatrices, iJointMatrixOffset);
 
 		const common::MaterialInfo& rMaterialInfo = mpMaterialInfos[uiMaterialIndex];
-		if (rMaterialInfo.uiJointCount > 0)
+		if (rMaterialInfo.flags & common::MaterialFlags::kSkinned)
 		{
 			iJointMatrixOffset += mHeader.skeleton.uiSkinJointCount;
 		}
@@ -331,15 +332,14 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 	const common::AnimationClip& rAnimation = mpAnimations[iAnimationIndex];
 
 	// Allocate temporary TRS arrays from the thread-local workbuffer
-	constexpr int64_t kiMaxNodes = common::Skeleton::kiMaxNodes;
-	constexpr int64_t kiVecSize = kiMaxNodes * static_cast<int64_t>(sizeof(XMVECTOR));
-	constexpr int64_t kiTotalSize = 3 * kiVecSize;
+	const int64_t iVecSize = mHeader.skeleton.uiNodeCount * static_cast<int64_t>(sizeof(XMVECTOR));
+	const int64_t iTotalSize = 3 * iVecSize;
 
-	auto pBufferAlloc = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(kiTotalSize);
+	auto pBufferAlloc = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(iTotalSize);
 	std::byte* pBuffer = static_cast<std::byte*>(pBufferAlloc);
 	XMVECTOR* pTranslations = reinterpret_cast<XMVECTOR*>(pBuffer);
-	XMVECTOR* pRotations    = reinterpret_cast<XMVECTOR*>(pBuffer + kiVecSize);
-	XMVECTOR* pScales       = reinterpret_cast<XMVECTOR*>(pBuffer + 2 * kiVecSize);
+	XMVECTOR* pRotations    = reinterpret_cast<XMVECTOR*>(pBuffer + iVecSize);
+	XMVECTOR* pScales       = reinterpret_cast<XMVECTOR*>(pBuffer + 2 * iVecSize);
 
 	// Initialize node transforms from bind pose (only for animated nodes)
 	const uint8_t* pbAnimated = mbAnimatedNodes.data() + iAnimationIndex * mHeader.skeleton.uiNodeCount;
@@ -406,8 +406,8 @@ void AnimationData::EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pWo
 {
 	const common::MaterialInfo& rMaterialInfo = mpMaterialInfos[iMaterialIndex];
 
-	// Set joint count from material info (0 for non-skinned, >0 for skinned), clamping to kiMaxJointsPerMesh
-	pMeshData->uiJointCount = std::min(static_cast<uint32_t>(rMaterialInfo.uiJointCount), static_cast<uint32_t>(common::kiMaxJointsPerMesh));
+	// The shader skins only when the joint count is nonzero
+	pMeshData->uiJointCount = (rMaterialInfo.flags & common::MaterialFlags::kSkinned) ? mHeader.skeleton.uiSkinJointCount : 0u;
 	pMeshData->uiJointMatrixOffset = static_cast<uint32_t>(iJointMatrixOffset);
 
 	// Compute mesh world matrix from parent node
@@ -430,7 +430,7 @@ void AnimationData::EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pWo
 	XMStoreFloat4(&pMeshData->normalMatrix[1], matNormal.r[1]);
 	XMStoreFloat4(&pMeshData->normalMatrix[2], matNormal.r[2]);
 
-	if (rMaterialInfo.uiJointCount > 0)
+	if (rMaterialInfo.flags & common::MaterialFlags::kSkinned)
 	{
 		// Compute inverse of mesh world matrix
 		XMMATRIX matMeshWorldInverse = XMMatrixInverse(nullptr, matMeshWorld);
@@ -438,7 +438,7 @@ void AnimationData::EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pWo
 		// Compute joint matrices: inverseBind * nodeWorld * inv(meshWorld)
 		// Write to separate joint matrix buffer at the specified offset
 		// NO explicit transpose - storage conversion handles row-major to column-major
-		for (int64_t i = 0; i < mHeader.skeleton.uiSkinJointCount && i < common::kiMaxJointsPerMesh; ++i)
+		for (int64_t i = 0; i < mHeader.skeleton.uiSkinJointCount; ++i)
 		{
 			uint16_t uiNodeIndex = mpSkinJointToNode[i];
 			XMMATRIX matInverseBind = mpAlignedInverseBindMatrices[i];

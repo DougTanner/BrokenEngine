@@ -10,7 +10,7 @@ Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, 
 - Missing `StandardMenuFeature::kLocalServer` suppresses discovery, auto-connect, the scanning placeholder, and the Local Server entry; missing `kRemoteServer` hides its disabled placeholder. Button width is measured over the full label set either way, so a disabled feature never reflows the column.
 - Screen constructors stay implicit and inert: no body, game dereference, filesystem work, or allocation. `ImGuiManager` is built before `game::Game`, so only `Render` may assume a game exists.
 - Screens gate themselves from authoritative game/UI state; `ImGuiManager` invokes main and modal surfaces independently of in-game screen gating.
-- Auto-connect keeps render-local state so a succeeded connection is not retried and a dropped client rearms it; the model reports only what the session can observe.
+- Auto-connect keeps render-local state so a succeeded connection is not retried and a lost connection rearms it, while a deliberate return to the main menu does not; the model reports only what the session can observe.
 
 ## Screen-Specific Contracts
 

@@ -515,7 +515,7 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const 
 	// Run the jobs
 	for (std::unique_ptr<T>& rpExportJob : rExportJobs)
 	{
-		rpExportJob->mFuture = std::async(std::launch::async, &T::RunExport, rpExportJob.get());
+		rpExportJob->mFuture = std::async(std::launch::async, common::ThreadLocal::Entry(&T::RunExport, 4 * 1024, rpExportJob->miId, false), rpExportJob.get());
 	}
 
 	// Stage beside the finals, never in the cache: the cache lives under LocalAppData and can be on another
@@ -707,7 +707,6 @@ static bool GenerateDataHeader(const std::filesystem::path& rOutPath)
 
 bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 {
-	common::ThreadLocal threadLocal(1024, std::nullopt, false);
 	common::Multithreading multithreading(std::max<int64_t>(0, common::HardwareCoreCount() - 3));
 
 	LOG(kDefault, kDebug, "\nData Packer");
@@ -775,7 +774,6 @@ bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 
 bool MaterializeData(char* argv[])
 {
-	common::ThreadLocal threadLocal(1024, std::nullopt, false);
 	std::array<char*, 4> fileManagerArguments { argv[0], argv[2], argv[3], argv[4] };
 	FileManager::EnsureLocalResult eInitializationResult = FileManager::EnsureLocalResult::kAlreadyLocal;
 	auto pFileManager = std::make_unique<FileManager>(fileManagerArguments, eInitializationResult, FileManager::InitializationMode::kDataOnly);
@@ -805,8 +803,6 @@ static bool RunCommand(int argc, char* argv[])
 	DataPackerRunSummary runSummary;
 	const auto logSummary = [&runSummary, startTime](bool bSuccess)
 	{
-		// MainThread's ThreadLocal is gone here; without one the log prefix is "#: ".
-		common::ThreadLocal threadLocal(1024, std::nullopt, false);
 		{
 			// Clean jobs are the expected case, so only exports and failures get a line inside the block.
 			ScopedLogIndent scopedLogIndent;
@@ -871,7 +867,7 @@ static bool RunCommandWithExceptionHandling(int argc, char* argv[])
 	return bSuccess;
 }
 
-int main(int argc, char* argv[])
+static int ProcessMain(int argc, char* argv[])
 {
 	// Prevent multiple instances from running simultaneously
 	HANDLE hMutex = CreateMutex(nullptr, TRUE, "BrokenEngineDataPacker");
@@ -950,6 +946,11 @@ int main(int argc, char* argv[])
 
 	fflush(stdout);
 	return bSuccess ? 0 : 1;
+}
+
+int main(int argc, char* argv[])
+{
+	return common::ThreadLocal::Entry(ProcessMain, common::kiMinWorkbufferSize, std::nullopt, false)(argc, argv);
 }
 
 #if defined(_CRTDBG_MAP_ALLOC)

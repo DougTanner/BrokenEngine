@@ -97,7 +97,7 @@ static int HandleEagerLoadCompletion()
 
 int MainThread(HINSTANCE hinstance)
 {
-	common::ThreadLocal threadLocal(10 * 1024 * 1024);
+	common::SetupExceptionHandling();
 
 	LOG(kDefault, kInfo, "\nGame name: {}", game::kGameName);
 	LOG(kDefault, kInfo, "Game version: {}", game::kiGameVersion);
@@ -152,7 +152,7 @@ int MainThread(HINSTANCE hinstance)
 	{
 		if (IsDebuggerPresent() == 0) [[likely]]
 		{
-			readDxDiag = std::async(std::launch::async, ReadDxDiag);
+			readDxDiag = std::async(std::launch::async, common::ThreadLocal::Entry(ReadDxDiag, common::kiMinWorkbufferSize, common::kThreadDxDiag));
 		}
 	}
 
@@ -196,7 +196,7 @@ int MainThread(HINSTANCE hinstance)
 			{
 				// Ctor already logged the concrete error. Drain eager startup work while managers are still alive so a
 				// pending required-asset failure is handled before normal cleanup.
-				(void)HandleEagerLoadCompletion();
+				std::ignore = HandleEagerLoadCompletion();
 				return 1;
 			}
 			gpAgentCommandServer = pAgentCommandServer.get();
@@ -842,7 +842,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 } // namespace engine
 
-int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANCE hPrevInstance, [[maybe_unused]] _In_ LPWSTR lpCmdLine, [[maybe_unused]] _In_ int nShowCmd)
+static int ProcessMain(HINSTANCE hInstance)
 {
 	if (!engine::ParseLaunchOptions())
 	{
@@ -952,4 +952,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANC
 #endif
 
 	return iResult;
+}
+
+int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANCE hPrevInstance, [[maybe_unused]] _In_ LPWSTR lpCmdLine, [[maybe_unused]] _In_ int nShowCmd)
+{
+	// No exception handling here: MainThread installs it as its first statement.
+	return common::ThreadLocal::Entry(ProcessMain, 10 * 1024 * 1024, std::nullopt, false)(hInstance);
 }

@@ -10,7 +10,7 @@ class PersistentWorker
 {
 public:
 
-	PersistentWorker(std::optional<int64_t> iThreadId, int64_t iWorkbufferSize = 0);
+	PersistentWorker(std::optional<int64_t> iThreadId, int64_t iWorkbufferSize);
 	~PersistentWorker();
 
 	PersistentWorker(const PersistentWorker&) = delete; // Worker lambda captures `this`; deleting copy also suppresses the implicit move

@@ -467,10 +467,8 @@ void PackChunks::LoadPackFiles()
 		}
 	}
 
-	mLoadingFuture = std::async(std::launch::async, [this]()
+	mLoadingFuture = std::async(std::launch::async, common::ThreadLocal::Entry([this]()
 	{
-		common::ThreadLocal threadLocal(0, common::kThreadEagerLoad);
-
 #if defined(BT_CLIENT)
 		for (uint32_t i = 0; i < data::kDataTypeCount; ++i)
 		{
@@ -528,7 +526,7 @@ void PackChunks::LoadPackFiles()
 		mbEagerLoadComplete.store(true, std::memory_order_release);
 
 		mLoader.Start();
-	});
+	}, common::kiMinWorkbufferSize, common::kThreadEagerLoad));
 }
 
 const std::unordered_map<common::crc_t, EagerChunk>& PackChunks::GetEagerChunkMap() const

@@ -17,12 +17,13 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 ## Startup and Main Loop
 
-- `LaunchOptions` owns command-line parsing. `--loopback-only` is independent of `--agent-port`; `--data-directory` and `--app-data-directory` must each resolve to an existing absolute directory; port values are validated before conversion. The `--log-file` sink opens in `wWinMain` immediately after a successful parse, so `FileManager`-constructor diagnostics reach the file while parse rejections do not.
+- `LaunchOptions` owns command-line parsing. `--loopback-only` is independent of `--agent-port`; `--data-directory` and `--app-data-directory` must each resolve to an existing absolute directory; port values are validated before conversion. The `--log-file` sink opens in `ProcessMain` immediately after a successful parse, so `FileManager`-constructor diagnostics reach the file while parse rejections do not.
 - Agent launches stay minimized and suppress physical client input while preserving the close/Alt+F4 escape path. Synthetic input and command transport live in Agent (`Agent/AGENTS.md`).
 - `FileManager` directory-setup failures during construction and required-asset failures at eager-load completion log their full diagnostic at `kError`. At those two startup boundaries, a normal launch shows that same detail once, an agent launch shows no modal, and both return nonzero through ordinary cleanup without writing a crash report. Other exceptions are rethrown to an attached debugger and otherwise retain the crash-report path.
 - Client sound settings load before `Game` construction. A checked `Mute in background` setting suspends audio on focus loss and focus gain always resumes it; agent launches suspend audio before `Game` construction regardless of the setting so harness clients boot silent.
 - Effective fullscreen resolves in one fixed order: the agent runtime override wins, then `--windowed WxH` forces windowed, then the saved `gFullscreen` preference applies. None of the three writes the saved preference, so an agent command or launch flag never rewrites what the user chose.
 - Client startup waits for terrain elevation and priority textures before renderer construction, then primes each framebuffer before showing the window.
+- `wWinMain` installs the main thread's `ThreadLocal` through `ThreadLocal::Entry` around `ProcessMain`, so it spans launch-option parsing, crash handling, and teardown.
 - `TextureUploadManager` and `FileManager` outlive `MainThread` so crash handling and teardown can use them. Device loss recreates `Graphics` in place.
 - Client COM uses `RO_INIT_MULTITHREADED`. Process and worker priorities, worker counts, and the single-instance policy are set in `Main.cpp`.
 

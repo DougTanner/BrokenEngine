@@ -141,7 +141,7 @@ void TextureUploadManager::StartThread()
 	{
 		return;
 	}
-	mUploadThread = std::thread(&TextureUploadManager::UploadThread, this);
+	mUploadThread = std::thread(common::ThreadLocal::Entry(&TextureUploadManager::UploadThread, common::kiMinWorkbufferSize, common::kThreadTextureUpload), this);
 }
 
 void TextureUploadManager::RequestUpload(common::crc_t crc, LoadPriority ePriority)
@@ -219,8 +219,6 @@ void TextureUploadManager::RethrowException()
 void TextureUploadManager::UploadThread()
 {
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
-
-	common::ThreadLocal threadLocal(1024, common::kThreadTextureUpload);
 
 	while (!mbShutdown)
 	{

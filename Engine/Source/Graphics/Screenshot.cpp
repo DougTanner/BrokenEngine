@@ -107,10 +107,8 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 		sSaveScreenshot.get();
 	}
 	const bool bSwapRedBlue = IsBgra(gpInstanceManager->mFramebufferVkFormat);
-	sSaveScreenshot = std::async(std::launch::async, [data = std::move(data), vkExtent3D, iScreenshot, rRequest, bSwapRedBlue]() mutable
+	sSaveScreenshot = std::async(std::launch::async, common::ThreadLocal::Entry([data = std::move(data), vkExtent3D, iScreenshot, rRequest, bSwapRedBlue]() mutable
 	{
-		common::ThreadLocal threadLocal(0, common::kThreadScreenshot);
-
 		// Heap: the encoder runs off the main loop on its own ThreadLocal, which still participates in tracking. Its
 		// buffers are image-sized and the result path/JSON escape to the main thread, so none of it fits a workbuffer.
 		ScopedSuppressAllocationTracking suppress;
@@ -210,7 +208,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 				SetCaptureResult(rRequest.uiCaptureToken, std::move(result));
 			}
 		}
-	});
+	}, common::kiMinWorkbufferSize, common::kThreadScreenshot));
 }
 
 namespace
@@ -577,14 +575,12 @@ void DumpRenderTarget(int64_t iFramebufferIndex, const DumpRenderTargetRequest& 
 	{
 		sDump.get();
 	}
-	sDump = std::async(std::launch::async, [data = std::move(data), vkExtent3D, vkFormat, rRequest]() mutable
+	sDump = std::async(std::launch::async, common::ThreadLocal::Entry([data = std::move(data), vkExtent3D, vkFormat, rRequest]() mutable
 	{
-		common::ThreadLocal threadLocal(0, common::kThreadScreenshot);
-
 		// Heap: as SaveScreenshot's encoder.
 		ScopedSuppressAllocationTracking suppress;
 		EncodeAndWriteDump(data, vkExtent3D, vkFormat, rRequest);
-	});
+	}, common::kiMinWorkbufferSize, common::kThreadScreenshot));
 }
 
 } // namespace engine

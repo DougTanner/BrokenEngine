@@ -20,7 +20,7 @@ void ConfigureThreadFloatingPoint()
 
 void SetupExceptionHandling()
 {
-	// _set_se_translator and _set_invalid_parameter_handler are per-thread CRT handler slots — install on every thread.
+	// _set_se_translator and std::set_terminate are per-thread CRT handler slots — install on every thread.
 
 	// Combined with compiler flag /EHa, this allows us to trap (and re-throw as C++ exceptions) basic exceptions like nullptr dereferences
 	_set_se_translator([](unsigned int uiCode, [[maybe_unused]] EXCEPTION_POINTERS* pExceptionPointers)
@@ -43,6 +43,13 @@ void SetupExceptionHandling()
 		static char spcCode[64] {};
 		sprintf_s(spcCode, std::size(spcCode) - 1, "_set_se_translator 0x%08x", uiCode);
 		throw std::runtime_error(spcCode);
+	});
+
+	std::set_terminate([]()
+	{
+		LOG(kDefault, kError, "std::set_terminate");
+		DEBUG_BREAK();
+		std::abort();
 	});
 
 	_set_invalid_parameter_handler([](const wchar_t* pcExpression, const wchar_t* pcFunction, const wchar_t* pcFile, unsigned int uiLine, [[maybe_unused]] uintptr_t pReserved)
@@ -158,13 +165,6 @@ void SetupExceptionHandling()
 			}
 
 			return EXCEPTION_CONTINUE_SEARCH;
-		});
-
-		std::set_terminate([]()
-		{
-			LOG(kDefault, kError, "std::set_terminate");
-			DEBUG_BREAK();
-			std::abort();
 		});
 	});
 }
