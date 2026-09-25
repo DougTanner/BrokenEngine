@@ -115,6 +115,8 @@ Order: the full applicable static pass and `/code-style-review` run after propag
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
 
+A verification-only temporary source edit is never made by main: an `implementer` saves each edited file's pre-edit bytes to `Temp/`, makes the edit, and returns `Build required`; after the harness run, a fresh `implementer` whose continuation capsule names those copies restores the files from them byte for byte and returns `Build required` again.
+
 <!-- session-context-part: Change Workflow, Steps 6-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 6 — Review and resolve correctness
 

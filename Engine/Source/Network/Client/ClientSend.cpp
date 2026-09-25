@@ -113,35 +113,17 @@ bool Client::SendSubscribe(GridCoord coord)
 		return false;
 	}
 
-	// Mark a local slot as kSubscribing
-	bool bFoundSlot = false;
-	for (int64_t i = 0; i < std::ssize(mCoordSlots); ++i)
+	// The server picks the slot; the client only needs a free slot for each pending subscribe
+	int64_t iFreeSlots = std::ranges::count_if(mCoordSlots, [](const ClientCoordSlot& rSlot)
 	{
-		if (mCoordSlots.at(i).eState == CoordSubscriptionState::kUnsubscribed || mCoordSlots.at(i).eState == CoordSubscriptionState::kUnsubscribing)
-		{
-			// Purge delayed packets for the old slot's channels before reuse
-			if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
-			{
-				if (mCoordSlots.at(i).eState == CoordSubscriptionState::kUnsubscribing)
-				{
-					NetworkSimulation::PurgeDelayedForSlot(mDelayedPackets, i);
-				}
-			}
-
-			mCoordSlots.at(i).coord = coord;
-			mCoordSlots.at(i).eState = CoordSubscriptionState::kSubscribing;
-			mCoordSlots.at(i).transitionStartTime = std::chrono::steady_clock::now();
-			mCoordSlots.at(i).ackState.iAckFloor = -1;
-			mCoordSlots.at(i).ackState.uiReceivedBitfieldLow = 0;
-			mCoordSlots.at(i).ackState.uiReceivedBitfieldHigh = 0;
-			bFoundSlot = true;
-			break;
-		}
-	}
-	if (!bFoundSlot)
+		return rSlot.eState == CoordSubscriptionState::kUnsubscribed || rSlot.eState == CoordSubscriptionState::kUnsubscribing;
+	});
+	if (iFreeSlots <= std::ssize(mPendingSubscriptions))
 	{
 		return false;
 	}
+	// Heap: pending subscribe list grows on subscribe (SynchronizeSubscriptions suppresses tracking)
+	mPendingSubscriptions.push_back({.coord = coord, .startTime = std::chrono::steady_clock::now()});
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();

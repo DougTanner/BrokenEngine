@@ -633,7 +633,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 			}
 		}
 
-		if (bReturnPressed && InMainMenu())
+		if (bReturnPressed && InMainMenu() && gpClientSession->mpRuntime->mpClient == nullptr)
 		{
 			if (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered)
 			{

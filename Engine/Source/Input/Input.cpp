@@ -108,7 +108,7 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	const ImGuiWindow* pHoveredWindow = pImGuiContext != nullptr ? pImGuiContext->HoveredWindow : nullptr;
 	bool bUserInterfaceOwnsScroll = (pImGuiContext != nullptr && pImGuiContext->WheelingWindow != nullptr)
 	                             || (pImGuiContext != nullptr && !ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner))
-	                             || (pHoveredWindow != nullptr && pHoveredWindow->ScrollMax.y != 0.0f && !(pHoveredWindow->Flags & (ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMouseInputs)));
+	                             || (pHoveredWindow != nullptr && !pHoveredWindow->Collapsed && pHoveredWindow->ScrollMax.y != 0.0f && !(pHoveredWindow->Flags & (ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMouseInputs)));
 	// CompletePoll advances the baseline whether or not the notch was swallowed, so a suppressed notch can never
 	// surface later as zoom applied after the fact.
 	gpCamera->mCameraInput.iScrollDelta = bUserInterfaceOwnsScroll ? 0 : rRawInput.iScrollWheelValue - mPreviousRawInput.iScrollWheelValue;

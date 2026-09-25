@@ -138,6 +138,11 @@ void ClientSessionRuntime::Connect(std::string_view serverAddress, uint16_t uiPo
 	std::string serverAddressString(serverAddress);
 	ClientGuid clientGuid = LoadClientGuidFromDisk();
 	mpClient = std::make_unique<Client>(serverAddressString.c_str(), uiPort, iCoordSlots, clientGuid, &PersistClientGuidToDisk);
+	if (mpClient->mpHost == nullptr)
+	{
+		mrSession.OnConnectionFailed();
+		Disconnect();
+	}
 }
 
 void ClientSessionRuntime::ConnectToDiscoveredServer(uint16_t uiPort, int64_t iCoordSlots)
@@ -554,18 +559,21 @@ void ClientSessionRuntime::UnsubscribeStaleCoords(const GridCoord* pDesiredCoord
 			continue;
 		}
 		GridCoord coord = rSlots.at(i).coord;
-		if (rSlots.at(i).eState == CoordSubscriptionState::kSubscribing)
+		mpClient->SendUnsubscribe(i);
+		if (rSlots.at(i).eState == CoordSubscriptionState::kUnsubscribing)
 		{
-			mpClient->CancelSubscription(i);
 			mrSession.OnCoordReleased(coord);
 		}
-		else
+	}
+
+	const std::vector<PendingSubscription>& rPending = mpClient->mPendingSubscriptions;
+	for (int64_t i = std::ssize(rPending) - 1; i >= 0; --i)
+	{
+		GridCoord coord = rPending.at(i).coord;
+		if (!ContainsCoordinate(pDesiredCoords, iDesiredCount, coord))
 		{
-			mpClient->SendUnsubscribe(i);
-			if (rSlots.at(i).eState == CoordSubscriptionState::kUnsubscribing)
-			{
-				mrSession.OnCoordReleased(coord);
-			}
+			mpClient->CancelSubscription(coord);
+			mrSession.OnCoordReleased(coord);
 		}
 	}
 }
@@ -581,7 +589,7 @@ void ClientSessionRuntime::BuildSubscriptionQueue(const GridCoord* pDesiredCoord
 		{
 			return IsSlotActive(rSlot) && rSlot.coord == rCoord;
 		});
-		if (!bActive)
+		if (!bActive && !std::ranges::contains(mpClient->mPendingSubscriptions, rCoord, &PendingSubscription::coord))
 		{
 			mSubscriptionQueue.push_back(rCoord);
 		}

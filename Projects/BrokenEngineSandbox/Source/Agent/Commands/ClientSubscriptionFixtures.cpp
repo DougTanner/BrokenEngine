@@ -227,6 +227,11 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 				throw std::runtime_error("client_cancelled_subscription_fixture coord is already active");
 			}
 		}
+		// A real pending subscribe could be answered at the fixture's slot, which would make its accept a ghost
+		if (!rClient.mPendingSubscriptions.empty())
+		{
+			throw std::runtime_error("client_cancelled_subscription_fixture requires no pending subscription");
+		}
 		engine::ClientSessionRuntime& rRuntime = *gpClientSession->mpRuntime;
 		if (std::ranges::find(rRuntime.mDesiredCoords, coord) != rRuntime.mDesiredCoords.end())
 		{
@@ -259,16 +264,15 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		const std::unordered_map<engine::GridCoord, std::chrono::steady_clock::time_point> stickyBefore = rRuntime.mUnwantedTimestamps;
 		const std::vector<engine::GridCoord> queueBefore = rRuntime.mSubscriptionQueue;
 		engine::ClientCoordSlot& rSlot = rClient.mCoordSlots.at(iSlot);
-		rSlot.coord = coord;
-		rSlot.eState = engine::CoordSubscriptionState::kSubscribing;
-		rSlot.transitionStartTime = std::chrono::steady_clock::now();
-		uint16_t uiEpoch = static_cast<uint16_t>(rSlot.ackState.uiEpoch + 1);
+		rClient.mPendingSubscriptions.push_back({.coord = coord, .startTime = std::chrono::steady_clock::now()});
+		uint16_t uiRetainedEpoch = rSlot.ackState.uiEpoch;
+		uint16_t uiEpoch = static_cast<uint16_t>(uiRetainedEpoch + 1);
 		if (uiEpoch == 0)
 		{
 			uiEpoch = 1;
 		}
-		rClient.CancelSubscription(iSlot);
-		bool bCancelledToUnsubscribed = rSlot.eState == engine::CoordSubscriptionState::kUnsubscribed;
+		rClient.CancelSubscription(coord);
+		bool bCancelledToUnsubscribed = rClient.mPendingSubscriptions.empty() && rSlot.eState == engine::CoordSubscriptionState::kUnsubscribed;
 
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -282,6 +286,12 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		engine::NetworkMessages::Write(rWorkbuffer, accept);
 		rClient.Receive(rWorkbuffer.Span<uint8_t>());
 		bool bAcceptToUnsubscribing = rSlot.eState == engine::CoordSubscriptionState::kUnsubscribing;
+		if (bAcceptToUnsubscribing)
+		{
+			// The server never issued the invented epoch; retaining it would make the stale-epoch check drop
+			// the server's genuine accept when it next allocates this slot with that same epoch
+			rSlot.ackState.uiEpoch = uiRetainedEpoch;
+		}
 		bool bPolicyUnchanged = desiredBefore == rRuntime.mDesiredCoords && stickyBefore == rRuntime.mUnwantedTimestamps
 		                     && queueBefore == rRuntime.mSubscriptionQueue;
 		if (!bCancelledToUnsubscribed)

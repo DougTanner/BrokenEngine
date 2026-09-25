@@ -132,29 +132,29 @@ inline DropResult ShouldDrop(NetworkSimulationState& rState, const NetworkSimula
 	return {bDrop, riDrops};
 }
 
+// upper_bound (not lower_bound) inserts after equal-key elements, keeping same-channel FIFO stable
+// when the reliable monotonic-release clamp produces identical release times.
+inline void EnqueueDelayed(std::deque<DelayedPacket>& rDelayedPackets, ENetEvent& rEvent, std::chrono::steady_clock::time_point releaseTime)
+{
+	ScopedSuppressAllocationTracking suppress;
+	// Heap: delay queue copies packet data for deferred processing
+	DelayedPacket delayed {};
+	delayed.releaseTime = releaseTime;
+	delayed.data.assign(rEvent.packet->data, rEvent.packet->data + rEvent.packet->dataLength);
+	delayed.pPeer = rEvent.peer;
+	delayed.uiChannelId = rEvent.channelID;
+	auto insertPosition = std::upper_bound(rDelayedPackets.begin(), rDelayedPackets.end(), delayed, [](const DelayedPacket& rA, const DelayedPacket& rB)
+	{
+		return rA.releaseTime < rB.releaseTime;
+	});
+	rDelayedPackets.insert(insertPosition, std::move(delayed));
+	enet_packet_destroy(rEvent.packet);
+}
+
 // Enqueue a received packet into the delay queue. Unreliable packets may be dropped per the sim config;
 // reliable packets are also enqueued (never dropped) in per-channel monotonic FIFO release order.
 inline void EnqueueOrDrop(std::deque<DelayedPacket>& rDelayedPackets, NetworkSimulationState& rState, const NetworkSimulationConfig& rSimConfig, ENetEvent& rEvent)
 {
-	// upper_bound (not lower_bound) inserts after equal-key elements, keeping same-channel FIFO stable
-	// when the reliable monotonic-release clamp produces identical release times.
-	auto enqueueDelayed = [&rDelayedPackets, &rEvent](std::chrono::steady_clock::time_point releaseTime)
-	{
-		ScopedSuppressAllocationTracking suppress;
-		// Heap: delay queue copies packet data for deferred processing
-		DelayedPacket delayed {};
-		delayed.releaseTime = releaseTime;
-		delayed.data.assign(rEvent.packet->data, rEvent.packet->data + rEvent.packet->dataLength);
-		delayed.pPeer = rEvent.peer;
-		delayed.uiChannelId = rEvent.channelID;
-		auto insertPos = std::upper_bound(rDelayedPackets.begin(), rDelayedPackets.end(), delayed, [](const DelayedPacket& rA, const DelayedPacket& rB)
-		{
-			return rA.releaseTime < rB.releaseTime;
-		});
-		rDelayedPackets.insert(insertPos, std::move(delayed));
-		enet_packet_destroy(rEvent.packet);
-	};
-
 	bool bUnreliable = NetworkManager::IsUnreliableChannel(rEvent.channelID);
 	if (bUnreliable)
 	{
@@ -177,24 +177,33 @@ inline void EnqueueOrDrop(std::deque<DelayedPacket>& rDelayedPackets, NetworkSim
 			enet_packet_destroy(rEvent.packet);
 			return;
 		}
-		enqueueDelayed(std::chrono::steady_clock::now() + RandomOneWayDelay(rState, rSimConfig));
+		EnqueueDelayed(rDelayedPackets, rEvent, std::chrono::steady_clock::now() + RandomOneWayDelay(rState, rSimConfig));
 	}
 	else
 	{
 		std::chrono::steady_clock::time_point releaseTime = std::max(std::chrono::steady_clock::now() + RandomOneWayDelay(rState, rSimConfig), rState.channelReleaseTimes[rEvent.channelID]);
 		rState.channelReleaseTimes[rEvent.channelID] = releaseTime;
-		enqueueDelayed(releaseTime);
+		EnqueueDelayed(rDelayedPackets, rEvent, releaseTime);
 	}
 }
 
-// Fast-forward (time multiply > 1) bypasses the delay queue; otherwise enqueue-or-drop per the sim config.
+// Fast-forward (time multiply > 1) skips the delay, but queues behind still-pending delayed packets so each
+// channel stays FIFO until the caller's flush; otherwise enqueue-or-drop per the sim config.
 template <typename FnReceive>
 inline void DispatchOrEnqueue(std::deque<DelayedPacket>& rDelayedPackets, NetworkSimulationState& rState, const NetworkSimulationConfig& rSimConfig, bool bFastForward, ENetEvent& rEvent, FnReceive fnReceive)
 {
 	if (bFastForward)
 	{
-		fnReceive(rEvent);
-		enet_packet_destroy(rEvent.packet);
+		if (rDelayedPackets.empty())
+		{
+			fnReceive(rEvent);
+			enet_packet_destroy(rEvent.packet);
+		}
+		else
+		{
+			// The queue is sorted by release time, so the last release time appends in arrival order.
+			EnqueueDelayed(rDelayedPackets, rEvent, rDelayedPackets.back().releaseTime);
+		}
 	}
 	else
 	{
@@ -239,7 +248,7 @@ inline void ProcessOrFlush(std::deque<DelayedPacket>& rDelayedPackets, bool bFas
 	}
 }
 
-// Drop delayed packets queued on a coord slot's channels (called on slot reuse / unsubscribe-ack / load reset).
+// Drop delayed packets queued on a coord slot's channels (called on load reset).
 inline void PurgeDelayedForSlot(std::deque<DelayedPacket>& rDelayedPackets, int64_t iSlot)
 {
 	std::erase_if(rDelayedPackets, [iSlot](const DelayedPacket& rPacket)

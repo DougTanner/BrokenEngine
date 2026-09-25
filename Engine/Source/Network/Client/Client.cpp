@@ -99,12 +99,11 @@ void Client::FreeSlot(int64_t iSlot)
 	rSlot.ackState.uiEpoch = uiEpoch;
 }
 
-void Client::CancelSubscription(int64_t iSlot)
+void Client::CancelSubscription(GridCoord coord)
 {
-	GridCoord cancelledCoord = mCoordSlots.at(iSlot).coord;
-	FreeSlot(iSlot);
-	mCancelledSubscriptions.push_back(cancelledCoord);
-	LOG(kNetwork, kVerbose, "Client::CancelSubscription Slot: {} Coord: ({},{}) CancelledCount: {}", iSlot, cancelledCoord.x, cancelledCoord.y, mCancelledSubscriptions.size());
+	RemovePendingSubscription(coord);
+	mCancelledSubscriptions.push_back(coord);
+	LOG(kNetwork, kVerbose, "Client::CancelSubscription Coord: ({},{}) CancelledCount: {}", coord.x, coord.y, mCancelledSubscriptions.size());
 }
 
 void Client::ResetAllSlots()
@@ -114,12 +113,17 @@ void Client::ResetAllSlots()
 	{
 		FreeSlot(i);
 	}
+	mPendingSubscriptions.clear();
 	mCancelledSubscriptions.clear();
 }
 
 void Client::RecoverTimedOutSubscriptions()
 {
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	std::erase_if(mPendingSubscriptions, [now](const PendingSubscription& rPending)
+	{
+		return now - rPending.startTime >= kSubscriptionTransitionTimeout;
+	});
 	for (int64_t i = 0; i < std::ssize(mCoordSlots); ++i)
 	{
 		ClientCoordSlot& rSlot = mCoordSlots.at(i);
@@ -131,7 +135,6 @@ void Client::RecoverTimedOutSubscriptions()
 
 		switch (rSlot.eState)
 		{
-			case CoordSubscriptionState::kSubscribing:
 			case CoordSubscriptionState::kUnsubscribing:
 				FreeSlot(i);
 				break;

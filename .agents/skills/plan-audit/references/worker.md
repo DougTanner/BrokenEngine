@@ -127,6 +127,11 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   [`../../verify-external-claims/SKILL.md`](../../verify-external-claims/SKILL.md),
   `## Inputs`, naming the dependent `PA-F-###`. A pending
   verdict makes the audit `NEEDS_ACTION`, not a confirmed finding.
+- A criterion that rests on a runtime value no harness query exposes falls
+  under the pixel-evidence prohibition in
+  [`../../agent-harness/SKILL.md`](../../agent-harness/SKILL.md) `## Handoff`;
+  report it as a must-fix finding that cites that prohibition and offers a
+  replacement a harness query settles or a meaningful user decision.
 - Do not edit any repository file, run `/agent-harness`, or interview the user.
   The manager owns all judgment; delegation conduct is in
   [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md).

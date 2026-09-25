@@ -46,7 +46,6 @@ struct ReceivedStaticData
 enum class CoordSubscriptionState : uint8_t
 {
 	kUnsubscribed,
-	kSubscribing,       // kClientSubscribe sent, waiting for accept
 	kWaitingFullState,  // Accept received, waiting for full state
 	kActive,            // Receiving delta updates
 	kUnsubscribing,     // kClientUnsubscribe sent, waiting for ack
@@ -58,6 +57,13 @@ struct ClientCoordSlot
 	CoordSubscriptionState eState = CoordSubscriptionState::kUnsubscribed;
 	AckState ackState;
 	std::chrono::steady_clock::time_point transitionStartTime {};
+};
+
+// kClientSubscribe sent, waiting for the server's accept or full state to name the slot
+struct PendingSubscription
+{
+	GridCoord coord {};
+	std::chrono::steady_clock::time_point startTime {};
 };
 
 struct ReceivedDebugFrame
@@ -97,7 +103,7 @@ public:
 	// Wire dispatch entry point for one received packet. Public so harness fixtures can exercise the real dispatch,
 	// classification, and response paths.
 	void Receive(std::span<const uint8_t> packetData);
-	void CancelSubscription(int64_t iSlot);
+	void CancelSubscription(GridCoord coord);
 
 	enum class ClientStateFlags : uint8_t
 	{
@@ -121,6 +127,7 @@ public:
 	std::vector<ReceivedStaticData> mReceivedStaticData;
 	std::unique_ptr<ReceivedDebugFrame> mpReceivedDebugFrame;
 	std::vector<ClientCoordSlot> mCoordSlots;
+	std::vector<PendingSubscription> mPendingSubscriptions;
 	common::Smoothed<int64_t> mSmoothedPipelineRttUs;
 	common::InTheLastSecond mBytesInPerSecond;
 	common::InTheLastSecond mBytesOutPerSecond;
@@ -155,8 +162,8 @@ private:
 
 	enum class FullStateFlags : uint8_t
 	{
-		kClearPlaceholder = 1 << 0, // Full state arrived before SubscribeAccept; clear kSubscribing placeholder + adopt coord
-		kRejectAsGhost    = 1 << 1, // No legitimate placeholder or coord mismatch; send epoch-qualified unsubscribe + log
+		kClearPlaceholder = 1 << 0, // Full state arrived before SubscribeAccept; remove the pending subscribe + adopt coord
+		kRejectAsGhost    = 1 << 1, // No pending subscribe or coord mismatch; send epoch-qualified unsubscribe + log
 		kCommit           = 1 << 2, // Caller proceeds to push fullState + activate slot
 	};
 	using FullStateFlags_t = common::Flags<FullStateFlags>;
@@ -172,18 +179,17 @@ private:
 
 	enum class SubscribeAcceptFlags : uint8_t
 	{
-		kClearPlaceholder = 1 << 0, // Clear stale kSubscribing placeholder at any other slot
+		kClearPlaceholder = 1 << 0, // Remove the coord's pending subscribe
 		kHealEpoch        = 1 << 1, // Active slot, same coord: update epoch (late accept after re-subscribe)
 		kCommitInit       = 1 << 2, // Initialize slot to kWaitingFullState
 		kRejectGhost      = 1 << 3, // State mismatch: send unsubscribe + RemoveCancelledSubscription + logs
 	};
 	using SubscribeAcceptFlags_t = common::Flags<SubscribeAcceptFlags>;
-	SubscribeAcceptFlags_t ClassifySubscribeAccept(uint8_t uiSlotIndex, GridCoord coord);
+	SubscribeAcceptFlags_t ClassifySubscribeAccept(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord);
 
 	bool IsStaleRetainedEpoch(int64_t iSlot, uint16_t uiEpoch, GridCoord coord) const;
 	bool RemoveCancelledSubscription(GridCoord coord);
-	int64_t FindSubscribingPlaceholder(GridCoord coord) const;
-	void ClearSubscribingPlaceholder(GridCoord coord);
+	void RemovePendingSubscription(GridCoord coord);
 	void TrackReceivedTick(int64_t iSlot, int64_t iTick);
 
 	ENetHost* mpHost = nullptr;
@@ -212,7 +218,7 @@ private:
 	// Network simulation delay queue
 	std::deque<DelayedPacket> mDelayedPackets;
 	NetworkSimulationState mNetworkSimState;
-	// Coords whose kSubscribing slot was cancelled before the server responded
+	// Coords whose pending subscribe was cancelled before the server responded
 	std::vector<GridCoord> mCancelledSubscriptions;
 public:
 	uint8_t muiCommittedLoadGeneration = 0;

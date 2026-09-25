@@ -75,7 +75,6 @@ bool AgentInput::BeginScript(const AgentScript& rScript)
 void AgentInput::Finish(AgentScriptStatus eStatus)
 {
 	meStatus = eStatus;
-	mbScriptActive = false;
 
 	// Finish clears synthetic keys/buttons and the game-world mouse position, which then follows the physical cursor;
 	// the scroll accumulator persists, and the ImGui position stays pinned until BeginScript. Click emits down/up on
@@ -172,6 +171,14 @@ void AgentInput::AdvanceFrame()
 {
 	if (!mbScriptActive)
 	{
+		return;
+	}
+
+	// The script stays active through the frame that finished it, so an unfocused RawInputManager::Update still
+	// publishes that frame's cleared synthetic state instead of freezing the last overlaid snapshot.
+	if (meStatus != AgentScriptStatus::kPending)
+	{
+		mbScriptActive = false;
 		return;
 	}
 
