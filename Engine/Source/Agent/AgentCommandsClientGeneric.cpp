@@ -21,40 +21,40 @@ std::filesystem::path PathFromParam(const nlohmann::json& rValue)
 	return std::filesystem::path(reinterpret_cast<const char8_t*>(utf8.c_str()));
 }
 
-int32_t KeyHoldFramesParameter(const nlohmann::json& rParameters)
+int32_t FrameCountParameter(const nlohmann::json& rParameters, const char* pcCommand, const char* pcParameter, int32_t iDefault, int64_t iMax)
 {
-	if (!rParameters.contains("holdFrames"))
+	if (!rParameters.contains(pcParameter))
 	{
-		return 1;
+		return iDefault;
 	}
 
-	const nlohmann::json& rHoldFrames = rParameters.at("holdFrames");
-	if (!rHoldFrames.is_number_integer())
+	const nlohmann::json& rFrames = rParameters.at(pcParameter);
+	const std::string integerError = std::string(pcCommand) + " '" + pcParameter + "' must be an integer";
+	if (!rFrames.is_number_integer())
 	{
-		throw std::runtime_error("key 'holdFrames' must be an integer");
+		throw std::runtime_error(integerError);
 	}
 
-	static constexpr int64_t kiMaxKeyHoldFrames = engine::AgentCommandServer::kiDeferredTimeoutDrains - 2;
-	if (rHoldFrames.is_number_unsigned())
+	if (rFrames.is_number_unsigned())
 	{
-		uint64_t uiHoldFrames = rHoldFrames.get<uint64_t>();
-		if (uiHoldFrames > static_cast<uint64_t>(kiMaxKeyHoldFrames))
+		uint64_t uiFrames = rFrames.get<uint64_t>();
+		if (uiFrames > static_cast<uint64_t>(iMax))
 		{
-			throw std::runtime_error("key 'holdFrames' must be an integer in [0," + std::to_string(kiMaxKeyHoldFrames) + "]");
+			throw std::runtime_error(integerError + " in [0," + std::to_string(iMax) + "]");
 		}
-		return static_cast<int32_t>(uiHoldFrames);
+		return static_cast<int32_t>(uiFrames);
 	}
 
-	int64_t iHoldFrames = rHoldFrames.get<int64_t>();
-	if (iHoldFrames < 0)
+	int64_t iFrames = rFrames.get<int64_t>();
+	if (iFrames < 0)
 	{
 		return 0;
 	}
-	if (iHoldFrames > kiMaxKeyHoldFrames)
+	if (iFrames > iMax)
 	{
-		throw std::runtime_error("key 'holdFrames' must be an integer in [0," + std::to_string(kiMaxKeyHoldFrames) + "]");
+		throw std::runtime_error(integerError + " in [0," + std::to_string(iMax) + "]");
 	}
-	return static_cast<int32_t>(iHoldFrames);
+	return static_cast<int32_t>(iFrames);
 }
 
 enum class CaptureCommandPhase : uint8_t
@@ -905,10 +905,8 @@ void CommandClick(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kClick;
 	FillLabelTarget(rParams, script);
-	if (rParams.contains("timeoutFrames"))
-	{
-		script.iTimeoutFrames = std::max<int32_t>(0, static_cast<int32_t>(rParams.at("timeoutFrames").get<int64_t>()));
-	}
+	// Latest stabilization lands on advance timeoutFrames - 1; press, release, and settle add 4 more advances.
+	script.iTimeoutFrames = FrameCountParameter(rParams, "click", "timeoutFrames", script.iTimeoutFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - 3);
 	bool bDescribeUiAfter = !rParams.contains("describeUiAfter") || rParams.at("describeUiAfter").get<bool>();
 	BeginScriptAndDefer(script, &rGame, bDescribeUiAfter, true, script.bHasWindow, script.pcWindow);
 }
@@ -919,10 +917,8 @@ void CommandHover(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kHover;
 	FillLabelTarget(rParams, script);
-	if (rParams.contains("holdFrames"))
-	{
-		script.iHoldFrames = std::max<int32_t>(0, static_cast<int32_t>(rParams.at("holdFrames").get<int64_t>()));
-	}
+	// Latest stabilization lands on advance iTimeoutFrames - 1, and the hold then finishes at least holdFrames advances later.
+	script.iHoldFrames = FrameCountParameter(rParams, "hover", "holdFrames", script.iHoldFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - script.iTimeoutFrames + 1);
 	BeginScriptAndDefer(script, &rGame, true, true, script.bHasWindow, script.pcWindow);
 }
 
@@ -976,7 +972,8 @@ void CommandKey(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& 
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kKey;
 	script.iKeyVk = ParseKeyVk(rParams.at("key").get<std::string>());
-	script.iHoldFrames = KeyHoldFramesParameter(rParams);
+	// The key script adds a press advance before the hold and a finish advance after it.
+	script.iHoldFrames = FrameCountParameter(rParams, "key", "holdFrames", 1, engine::AgentCommandServer::kiDeferredTimeoutDrains - 2);
 	BeginScriptAndDefer(script, nullptr, false, false, false, std::string());
 }
 
