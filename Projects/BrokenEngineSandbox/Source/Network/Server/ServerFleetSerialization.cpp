@@ -56,6 +56,10 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 {
 	common::Read(rFileStream, rFleet.guid.uiHigh);
 	common::Read(rFileStream, rFleet.guid.uiLow);
+	if (rFleet.guid.IsEmpty())
+	{
+		throw std::ios_base::failure("Fleet FleetGuid");
+	}
 	int64_t iMemberCount = 0;
 	common::Read(rFileStream, iMemberCount);
 	common::Read(rFileStream, rFleet.iFlagshipIndex);
