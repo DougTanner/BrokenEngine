@@ -98,7 +98,7 @@
 #include "GameBase.h"
 
 #if defined(BT_CLIENT)
-// Generic client agent commands: declared after GameBase.h because the interface names GameBase and its UI state types.
+// Generic client agent commands: declared after GameBase.h because the interface names its UiState and GameFlags types.
 #include "Agent/AgentCommandsClientGeneric.h"
 #endif // BT_CLIENT
 

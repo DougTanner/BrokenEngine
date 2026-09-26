@@ -2,17 +2,18 @@
 
 #if defined(BT_CLIENT)
 
+#include "Game.h"
 #include "Ui/LocalizationBase.h"
 #include "Ui/MenuUtils.h"
 
 namespace engine
 {
 
-void PauseMenuScreen::Render(GameBase& rGame)
+void PauseMenuScreen::Render()
 {
 	using enum StandardString;
 
-	if (rGame.meUiState != UiState::kPause || rGame.InMainMenu())
+	if (game::gpGame->meUiState != UiState::kPause || game::gpGame->InMainMenu())
 	{
 		return;
 	}
@@ -50,33 +51,33 @@ void PauseMenuScreen::Render(GameBase& rGame)
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringResume)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
 	{
-		rGame.meUiState = UiState::kNone;
+		game::gpGame->meUiState = UiState::kNone;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]))
 	{
-		rGame.meUiState = UiState::kGraphicsSettings;
+		game::gpGame->meUiState = UiState::kGraphicsSettings;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
 	{
-		rGame.meUiState = UiState::kSound;
+		game::gpGame->meUiState = UiState::kSound;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
 	{
-		rGame.meUiState = UiState::kGameSettings;
+		game::gpGame->meUiState = UiState::kGameSettings;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringMainMenu)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
 	{
-		rGame.ApplyStandardMenuAction(StandardMenuAction::kChangeFrameToMainMenu);
-		rGame.meUiState = UiState::kPause;
+		game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kChangeFrameToMainMenu);
+		game::gpGame->meUiState = UiState::kPause;
 	}
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
 	{
-		rGame.mGameFlags.Set(GameFlags::kQuit);
+		game::gpGame->mGameFlags.Set(GameFlags::kQuit);
 	}
 
 	ImGui::End();

@@ -180,6 +180,11 @@ ordering. Do not apply this check to semantic codecs or serialization adapters.
 - Flag a new standard-library or third-party `#include` added to a PCH-backed
   `.h`/`.cpp`; it belongs in `Common/ExternalHeaders.h`, not the individual
   source file (the conventions reference).
+- Flag a stored reference or pointer member, constructor argument, or
+  function parameter of a game-instantiated `*Base` type (`GameBase`,
+  `ProfileManagerBase`) or its game type when the object is reachable through
+  its `gp*` global (the conventions reference). This is a hard flag, not a
+  suggestion.
 
 ### Completeness and duplication
 

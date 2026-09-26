@@ -5,6 +5,8 @@
 #include "Agent/AgentCommandsClientGeneric.h"
 
 #include "Agent/Commands/PresentationContinuityProbe.h"
+#include "Game.h"
+#include "Profile/ProfileManager.h"
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 #include "Ui/WrapperBase.h"
 
@@ -668,12 +670,12 @@ void CommandDumpRenderTarget(const nlohmann::json& rParams, [[maybe_unused]] nlo
 }
 
 // Full structured dump of the last completed ImGui frame (registry read table) plus game UI state.
-nlohmann::json BuildDescribeUi(const GameBase& rGame)
+nlohmann::json BuildDescribeUi()
 {
 	nlohmann::json result;
-	result["uiState"] = UiStateName(rGame.meUiState);
-	result["tweaksVisible"] = rGame.mbShowImGui;
-	result["gameFlags"] = GameFlagNames(rGame.mGameFlags);
+	result["uiState"] = UiStateName(game::gpGame->meUiState);
+	result["tweaksVisible"] = game::gpGame->mbShowImGui;
+	result["gameFlags"] = GameFlagNames(game::gpGame->mGameFlags);
 
 	result["framebuffer"] = {engine::gpGraphics->mFramebufferExtent2D.width, engine::gpGraphics->mFramebufferExtent2D.height};
 
@@ -838,16 +840,14 @@ void FillLabelTarget(const nlohmann::json& rParams, engine::AgentScript& rScript
 
 // Begin a script (throwing "busy" if one is already running) and defer the response until the script completes.
 // For label-based scripts pcErrorWindow (may be null) drives the candidate list on a not-found / ambiguous error.
-// pGame is non-null only when the script may append UI output; the deferred lambda captures the pointer by value
-// because the caller's reference parameter does not outlive this call.
-void BeginScriptAndDefer(const engine::AgentScript& rScript, const GameBase* pGame, bool bDescribeUiAfter, bool bLabelBased, bool bHasWindow, std::string errorWindow)
+void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescribeUiAfter, bool bLabelBased, bool bHasWindow, std::string errorWindow)
 {
 	if (!engine::gpAgentInput->BeginScript(rScript))
 	{
 		throw std::runtime_error("busy");
 	}
 
-	engine::gpAgentCommandServer->DeferResponse([pGame, bDescribeUiAfter, bLabelBased, bHasWindow, errorWindow]() -> std::optional<nlohmann::json>
+	engine::gpAgentCommandServer->DeferResponse([bDescribeUiAfter, bLabelBased, bHasWindow, errorWindow]() -> std::optional<nlohmann::json>
 	{
 		engine::AgentScriptStatus eStatus = engine::gpAgentInput->ScriptStatus();
 		if (eStatus == engine::AgentScriptStatus::kPending)
@@ -887,20 +887,20 @@ void BeginScriptAndDefer(const engine::AgentScript& rScript, const GameBase* pGa
 		}
 		if (bDescribeUiAfter)
 		{
-			result["ui"] = BuildDescribeUi(*pGame);
+			result["ui"] = BuildDescribeUi();
 		}
 		return result;
 	});
 }
 
-void CommandDescribeUi([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult, const GameBase& rGame)
+void CommandDescribeUi([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
 {
-	rResult = BuildDescribeUi(rGame);
+	rResult = BuildDescribeUi();
 }
 
 // click {label, window?, timeoutFrames?=120, describeUiAfter?=true}: stabilize target rect, press/release the left
 // mouse button at its center through ImGui IO, then optionally dump the post-click UI.
-void CommandClick(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult, const GameBase& rGame)
+void CommandClick(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kClick;
@@ -908,18 +908,18 @@ void CommandClick(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 	// Latest stabilization lands on advance timeoutFrames - 1; press, release, and settle add 4 more advances.
 	script.iTimeoutFrames = FrameCountParameter(rParams, "click", "timeoutFrames", script.iTimeoutFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - 3);
 	bool bDescribeUiAfter = !rParams.contains("describeUiAfter") || rParams.at("describeUiAfter").get<bool>();
-	BeginScriptAndDefer(script, &rGame, bDescribeUiAfter, true, script.bHasWindow, script.pcWindow);
+	BeginScriptAndDefer(script, bDescribeUiAfter, true, script.bHasWindow, script.pcWindow);
 }
 
 // hover {label, window?, holdFrames?=2}: move to and stabilize on the target, hold, then dump the UI.
-void CommandHover(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult, const GameBase& rGame)
+void CommandHover(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kHover;
 	FillLabelTarget(rParams, script);
 	// Latest stabilization lands on advance iTimeoutFrames - 1, and the hold then finishes at least holdFrames advances later.
 	script.iHoldFrames = FrameCountParameter(rParams, "hover", "holdFrames", script.iHoldFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - script.iTimeoutFrames + 1);
-	BeginScriptAndDefer(script, &rGame, true, true, script.bHasWindow, script.pcWindow);
+	BeginScriptAndDefer(script, true, true, script.bHasWindow, script.pcWindow);
 }
 
 // set_slider {label, window?, value}: Ctrl+Click the slider to open ImGui temp-input, type the value, commit (Enter).
@@ -934,7 +934,7 @@ void CommandSetSlider(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::
 	FillLabelTarget(rParams, script);
 	double dValue = rParams.at("value").get<double>();
 	std::snprintf(script.pcValueText, sizeof(script.pcValueText), "%g", dValue);
-	BeginScriptAndDefer(script, nullptr, false, true, script.bHasWindow, script.pcWindow);
+	BeginScriptAndDefer(script, false, true, script.bHasWindow, script.pcWindow);
 }
 
 // get_wrapper {key}: read a Tweaks-registered wrapper by its slider map key; set_slider is the write path.
@@ -974,7 +974,7 @@ void CommandKey(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& 
 	script.iKeyVk = ParseKeyVk(rParams.at("key").get<std::string>());
 	// The key script adds a press advance before the hold and a finish advance after it.
 	script.iHoldFrames = FrameCountParameter(rParams, "key", "holdFrames", 1, engine::AgentCommandServer::kiDeferredTimeoutDrains - 2);
-	BeginScriptAndDefer(script, nullptr, false, false, false, std::string());
+	BeginScriptAndDefer(script, false, false, false, std::string());
 }
 
 // mouse {x, y, action:"move|down|up|click|wheel", button?="left", notches?}: raw pixel coords feeding both the ImGui
@@ -1087,17 +1087,17 @@ void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 		}
 	}
 
-	BeginScriptAndDefer(script, nullptr, false, false, false, std::string());
+	BeginScriptAndDefer(script, false, false, false, std::string());
 }
 
-void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult, ProfileManagerBase& rProfileManager)
+void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!rParams.is_object() || !rParams.empty())
 	{
 		throw std::runtime_error("query_profile requires empty params");
 	}
 
-	engine::GpuTimer* pGpuTimers = rProfileManager.GetGpuTimers();
+	engine::GpuTimer* pGpuTimers = gpProfileManager->GetGpuTimers();
 	nlohmann::json gpuTimers = nlohmann::json::array();
 	for (int64_t i = 0; i < engine::kGpuTimerCount; ++i)
 	{
@@ -1111,7 +1111,7 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult,
 		gpuTimers.push_back(std::move(gpuTimer));
 	}
 	rResult["gpuTimers"] = std::move(gpuTimers);
-	const engine::GpuShadowSample& rShadowSample = rProfileManager.mGpuShadowSample;
+	const engine::GpuShadowSample& rShadowSample = gpProfileManager->mGpuShadowSample;
 	rResult["shadowSample"] =
 	{
 		{"sequence", rShadowSample.uiSequence},
@@ -1120,7 +1120,7 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult,
 	int64_t iClockOffset = 0;
 	int64_t iClockTargetBehind = 0;
 	int64_t iClockError = 0;
-	rProfileManager.GetClockCorrection(iClockOffset, iClockTargetBehind, iClockError);
+	gpProfileManager->GetClockCorrection(iClockOffset, iClockTargetBehind, iClockError);
 	rResult["clock"] =
 	{
 		{"offsetTicks", iClockOffset},
@@ -1171,7 +1171,7 @@ nlohmann::json GameFlagNames(GameFlags_t flags)
 	return names;
 }
 
-bool ExecuteClientAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult, const GameBase& rGame, ProfileManagerBase& rProfileManager)
+bool ExecuteClientAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (cmd == "screenshot")
 	{
@@ -1210,17 +1210,17 @@ bool ExecuteClientAgentCommand(std::string_view cmd, const nlohmann::json& rPara
 	}
 	if (cmd == "describe_ui")
 	{
-		CommandDescribeUi(rParams, rResult, rGame);
+		CommandDescribeUi(rParams, rResult);
 		return true;
 	}
 	if (cmd == "click")
 	{
-		CommandClick(rParams, rResult, rGame);
+		CommandClick(rParams, rResult);
 		return true;
 	}
 	if (cmd == "hover")
 	{
-		CommandHover(rParams, rResult, rGame);
+		CommandHover(rParams, rResult);
 		return true;
 	}
 	if (cmd == "set_slider")
@@ -1245,7 +1245,7 @@ bool ExecuteClientAgentCommand(std::string_view cmd, const nlohmann::json& rPara
 	}
 	if (cmd == "query_profile")
 	{
-		CommandQueryProfile(rParams, rResult, rProfileManager);
+		CommandQueryProfile(rParams, rResult);
 		return true;
 	}
 	if (cmd == "presentation_continuity_probe")

@@ -19,10 +19,10 @@ struct StagedGridSave
 	game::SaveStagedState saveState;
 };
 
-bool WriteGridSave(GameBase& rGameBase, const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord clientGridCoord);
-bool ReadGridSave(GameBase& rGameBase, const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord& rClientGridCoord);
+bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord clientGridCoord);
+bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord& rClientGridCoord);
 bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, StagedGridSave& rStagedGrid);
-void AdoptGridSave(GameBase& rGameBase, StagedGridSave&& rStagedGrid);
+void AdoptGridSave(StagedGridSave&& rStagedGrid);
 
 } // namespace engine
 

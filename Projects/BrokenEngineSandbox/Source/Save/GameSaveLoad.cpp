@@ -46,11 +46,6 @@ void OnStateReplaced()
 	game::gpServerSession->ResetClientsForLoad();
 }
 
-GameSaveLoad::GameSaveLoad(engine::GameBase& rGameBase)
-	: mrGameBase(rGameBase)
-{
-}
-
 bool GameSaveLoad::ServerSave()
 {
 	return ServerSave(game::gpGame->QuicksaveFile());
@@ -59,7 +54,7 @@ bool GameSaveLoad::ServerSave()
 bool GameSaveLoad::ServerSave(const std::filesystem::path& rFilename)
 {
 	ScopedSuppressAllocationTracking suppress;
-	return engine::WriteGridSave(mrGameBase, {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, rFilename, game::gpGame->mClientGridCoord);
+	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, rFilename, game::gpGame->mClientGridCoord);
 }
 
 bool GameSaveLoad::ServerLoad()
@@ -70,20 +65,20 @@ bool GameSaveLoad::ServerLoad()
 bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 {
 	ScopedSuppressAllocationTracking suppress;
-	gpProfileManager->LatchRawCpuTimers(false, mrGameBase.TickCounter());
+	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->TickCounter());
 
 	engine::GridCoord loadedClientGridCoord {};
-	if (!engine::ReadGridSave(mrGameBase, {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, loadedClientGridCoord))
+	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, loadedClientGridCoord))
 	{
 		return false;
 	}
 
-	const int64_t iLoadedTick = mrGameBase.TickCounter();
-	const float fLoadedTime = mrGameBase.CurrentTime();
+	const int64_t iLoadedTick = game::gpGame->TickCounter();
+	const float fLoadedTime = game::gpGame->CurrentTime();
 	game::gpGame->Reset();
 	// Reset clears the clock; restore the saved values before client resynchronization.
-	mrGameBase.SetTickCounter(iLoadedTick);
-	mrGameBase.SetCurrentTime(fLoadedTime);
+	game::gpGame->SetTickCounter(iLoadedTick);
+	game::gpGame->SetCurrentTime(fLoadedTime);
 	game::gpGame->SetClientGridCoord(loadedClientGridCoord);
 	game::OnStateReplaced();
 	game::gpServerSession->mpRuntime->ComputeActiveSet();
@@ -94,10 +89,10 @@ bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 void GameSaveLoad::ServerReset()
 {
 	ScopedSuppressAllocationTracking suppress;
-	gpProfileManager->LatchRawCpuTimers(false, mrGameBase.TickCounter());
+	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->TickCounter());
 
 	game::gpGame->CreateNewFrame(game::GameFlags::kGame);
-	mrGameBase.SetNextGlobalId(1);
+	game::gpGame->SetNextGlobalId(1);
 	game::gpGame->Reset();
 	// Fresh-game wipe of fleet manager state. Load path leaves mFleets populated by ReadFleetData;
 	// fresh-game has no save to restore from, so explicitly clear before ResetClientsForLoad runs.
@@ -109,12 +104,12 @@ void GameSaveLoad::ServerReset()
 bool GameSaveLoad::Autosave()
 {
 	ScopedSuppressAllocationTracking suppress;
-	return engine::WriteGridSave(mrGameBase, {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path("ServerAutosave.save"), game::gpGame->mClientGridCoord);
+	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path("ServerAutosave.save"), game::gpGame->mClientGridCoord);
 }
 
 void GameSaveLoad::TickAutosave()
 {
-	if (mrGameBase.mbReplaying || engine::gpReplay->IsRecording() || (mrGameBase.mGameFlags & engine::GameFlags::kLoadReplay))
+	if (game::gpGame->mbReplaying || engine::gpReplay->IsRecording() || (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay))
 	{
 		return;
 	}
@@ -139,7 +134,7 @@ bool GameSaveLoad::Autoload()
 	ScopedSuppressAllocationTracking suppress;
 
 	engine::GridCoord loadedClientGridCoord {};
-	if (!engine::ReadGridSave(mrGameBase, {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save"), loadedClientGridCoord))
+	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save"), loadedClientGridCoord))
 	{
 		return false;
 	}

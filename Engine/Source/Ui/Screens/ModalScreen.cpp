@@ -2,6 +2,7 @@
 
 #if defined(BT_CLIENT)
 
+#include "Game.h"
 #include "Ui/MenuUtils.h"
 
 namespace engine
@@ -16,9 +17,9 @@ constexpr float kfModalMessageActionGapPixels = 36.0f;
 
 } // namespace
 
-void ModalScreen::Render(GameBase& rGame)
+void ModalScreen::Render()
 {
-	if (rGame.meUiState != UiState::kModal)
+	if (game::gpGame->meUiState != UiState::kModal)
 	{
 		return;
 	}
@@ -43,7 +44,7 @@ void ModalScreen::Render(GameBase& rGame)
 
 	{
 		ScopedMenuFont messageFont(kfMenuUiScale * kfModalMessageFontScale);
-		ImGui::TextWrapped("%s", rGame.mModalMessage);
+		ImGui::TextWrapped("%s", game::gpGame->mModalMessage);
 	}
 
 	ImGui::Dummy(ImVec2(0.0f, kfModalMessageActionGapPixels * UiScale()));
@@ -53,8 +54,8 @@ void ModalScreen::Render(GameBase& rGame)
 	ImGui::SetCursorPosX((fWindowWidth - fButtonWidth) / 2.0f);
 	if (MenuButton("OK", ImVec2(fButtonWidth, 0.0f), mfOkHoverAnim))
 	{
-		rGame.meUiState = UiState::kPause;
-		rGame.mModalMessage[0] = '\0';
+		game::gpGame->meUiState = UiState::kPause;
+		game::gpGame->mModalMessage[0] = '\0';
 	}
 
 	ImGui::End();

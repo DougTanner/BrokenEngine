@@ -7,8 +7,6 @@
 namespace engine
 {
 
-class GameBase;
-
 class Replay
 {
 public:
@@ -28,7 +26,7 @@ public:
 
 	std::unordered_map<GridCoord, std::vector<ReplayWriterState>> mReplayWriters;
 
-	Replay(GameBase& rGameBase);
+	Replay();
 	~Replay();
 
 	void SaveLoadReplay();
@@ -51,8 +49,6 @@ private:
 	// Republishes engine::GameBase::mbReplaying, the single owner of "replay playback is running".
 	// Call after every change to the live or pending reader sets.
 	void PublishReplayingState();
-
-	GameBase& mrGameBase;
 
 	struct PendingReplayReader
 	{

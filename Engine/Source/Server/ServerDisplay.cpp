@@ -444,7 +444,7 @@ static void PaintProfilePanel(HDC hdcBuffer, int iLeft, int iTop, [[maybe_unused
 	// CPU timers
 	{
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		FormatCpuTimersText(rWorkbuffer, *gpProfileManager, bReevaluate);
+		FormatCpuTimersText(rWorkbuffer, bReevaluate);
 		std::string_view svTimers = rWorkbuffer.View();
 		SetTextColor(hdcBuffer, RGB(220, 220, 220));
 		PaintWorkbufferText(hdcBuffer, svTimers, iTextX, iTextY, iLineHeight);
@@ -456,7 +456,7 @@ static void PaintProfilePanel(HDC hdcBuffer, int iLeft, int iTop, [[maybe_unused
 	// CPU counters
 	{
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		FormatCpuCountersText(rWorkbuffer, *gpProfileManager, bReevaluate);
+		FormatCpuCountersText(rWorkbuffer, bReevaluate);
 		std::string_view svCounters = rWorkbuffer.View();
 		SetTextColor(hdcBuffer, RGB(150, 220, 150));
 		PaintWorkbufferText(hdcBuffer, svCounters, iTextX, iTextY, iLineHeight);

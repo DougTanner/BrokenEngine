@@ -157,13 +157,13 @@ struct ReconcileDesyncInfo
 	std::unique_ptr<game::Frame> pDesyncClientFrame;
 };
 
-// Owns the per-coord work list and runs one parallel reconcile pass over every eligible coord of a
-// GameBase. The caller keeps the client-state, desync, and visual policy that consumes the result.
+// Owns the per-coord work list and runs one parallel reconcile pass over every eligible coord of the
+// game. The caller keeps the client-state, desync, and visual policy that consumes the result.
 class ReconcileDispatcher
 {
 public:
 
-	ReconcileDispatchResult Run(GameBase& rGameBase, const ReconcileInputs& rInputs);
+	ReconcileDispatchResult Run(const ReconcileInputs& rInputs);
 	std::span<const CoordWork> ActiveWorks() const;
 	void Reset();
 

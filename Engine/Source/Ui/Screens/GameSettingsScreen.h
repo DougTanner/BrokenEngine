@@ -7,13 +7,11 @@
 namespace engine
 {
 
-class GameBase;
-
 class GameSettingsScreen
 {
 public:
 
-	void Render(GameBase& rGame);
+	void Render();
 
 private:
 

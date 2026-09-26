@@ -31,9 +31,6 @@ static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<engine::IslandP
 }
 
 Game::Game()
-#if defined(BT_SERVER)
-	: mGameSaveLoad(*this)
-#endif // BT_SERVER
 {
 	ASSERT(gpGame == nullptr);
 

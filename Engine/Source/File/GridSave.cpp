@@ -4,14 +4,15 @@
 
 #include "File/GridSave.h"
 
+#include "Game.h"
 #include "GameBase.h"
 
 namespace engine
 {
 
-bool WriteGridSave(GameBase& rGameBase, const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord clientGridCoord)
+bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord clientGridCoord)
 {
-	int64_t iFrameCount = static_cast<int64_t>(rGameBase.mCoordFrames.size());
+	int64_t iFrameCount = static_cast<int64_t>(game::gpGame->mCoordFrames.size());
 	int64_t iVersion = game::Frame::kiVersion;
 
 	bool bWritten = engine::gpFileManager->WriteFileAtomically(rFlags, rFilename, [&](std::fstream& fileStream)
@@ -20,14 +21,14 @@ bool WriteGridSave(GameBase& rGameBase, const FileFlags_t& rFlags, const std::fi
 
 		common::Write(fileStream, iFrameCount);
 		clientGridCoord.Write(fileStream);
-		common::Write(fileStream, rGameBase.NextGlobalId());
+		common::Write(fileStream, game::gpGame->NextGlobalId());
 
 		game::WriteSaveState(fileStream);
 
 		// Sort by coord key for deterministic output
 		std::vector<uint64_t> keys;
-		keys.reserve(rGameBase.mCoordFrames.size());
-		for (const auto& [rCoord, rFrames] : rGameBase.mCoordFrames)
+		keys.reserve(game::gpGame->mCoordFrames.size());
+		for (const auto& [rCoord, rFrames] : game::gpGame->mCoordFrames)
 		{
 			keys.push_back(rCoord.ToKey());
 		}
@@ -38,8 +39,8 @@ bool WriteGridSave(GameBase& rGameBase, const FileFlags_t& rFlags, const std::fi
 			engine::GridCoord coord = engine::GridCoord::FromKey(uiKey);
 			coord.Write(fileStream);
 			// NavData is rebuilt lazily on first RunFrameTick — don't persist it.
-			rGameBase.mCoordFrames.at(coord).staticData.Write(fileStream, /*bIncludeNavData=*/false);
-			fileStream << *rGameBase.mCoordFrames.at(coord).pCurrent;
+			game::gpGame->mCoordFrames.at(coord).staticData.Write(fileStream, /*bIncludeNavData=*/false);
+			fileStream << *game::gpGame->mCoordFrames.at(coord).pCurrent;
 		}
 	});
 
@@ -47,7 +48,7 @@ bool WriteGridSave(GameBase& rGameBase, const FileFlags_t& rFlags, const std::fi
 	return bWritten;
 }
 
-bool ReadGridSave(GameBase& rGameBase, const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord& rClientGridCoord)
+bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord& rClientGridCoord)
 {
 	StagedGridSave stagedGrid;
 	if (!ReadGridSave(rFlags, rFilename, stagedGrid))
@@ -55,14 +56,14 @@ bool ReadGridSave(GameBase& rGameBase, const FileFlags_t& rFlags, const std::fil
 		if (stagedGrid.bHeaderValidated)
 		{
 			// Keep the established save-load failure state for callers that rebuild a fresh game after false.
-			rGameBase.mCoordFrames.clear();
+			game::gpGame->mCoordFrames.clear();
 			game::ResetSaveState();
 		}
 		return false;
 	}
 
 	rClientGridCoord = stagedGrid.clientGridCoord;
-	AdoptGridSave(rGameBase, std::move(stagedGrid));
+	AdoptGridSave(std::move(stagedGrid));
 	return true;
 }
 
@@ -162,13 +163,13 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 	return true;
 }
 
-void AdoptGridSave(GameBase& rGameBase, StagedGridSave&& rStagedGrid)
+void AdoptGridSave(StagedGridSave&& rStagedGrid)
 {
-	rGameBase.mCoordFrames = std::move(rStagedGrid.coordFrames);
+	game::gpGame->mCoordFrames = std::move(rStagedGrid.coordFrames);
 	game::AdoptSaveState(std::move(rStagedGrid.saveState));
-	rGameBase.SetNextGlobalId(rStagedGrid.iNextGlobalId);
-	rGameBase.SetTickCounter(rStagedGrid.iTick);
-	rGameBase.SetCurrentTime(rStagedGrid.fCurrentTime);
+	game::gpGame->SetNextGlobalId(rStagedGrid.iNextGlobalId);
+	game::gpGame->SetTickCounter(rStagedGrid.iTick);
+	game::gpGame->SetCurrentTime(rStagedGrid.fCurrentTime);
 }
 
 } // namespace engine

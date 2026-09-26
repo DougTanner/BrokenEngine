@@ -2,6 +2,7 @@
 
 #if defined(BT_CLIENT)
 
+#include "Game.h"
 #include "Ui/GameSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LocalizationBase.h"
@@ -17,11 +18,11 @@ constexpr float kfUiOpacitySliderWidthPixels = 640.0f;
 
 } // namespace
 
-void GameSettingsScreen::Render(GameBase& rGame)
+void GameSettingsScreen::Render()
 {
 	using enum StandardString;
 
-	if (rGame.meUiState != UiState::kGameSettings)
+	if (game::gpGame->meUiState != UiState::kGameSettings)
 	{
 		return;
 	}
@@ -110,7 +111,7 @@ void GameSettingsScreen::Render(GameBase& rGame)
 	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnim))
 	{
 		SaveGameSettings();
-		rGame.meUiState = UiState::kPause;
+		game::gpGame->meUiState = UiState::kPause;
 	}
 
 	ImGui::End();

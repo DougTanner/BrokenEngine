@@ -536,13 +536,13 @@ private:
 	int64_t miCpuTimer;
 };
 
-void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate);
-void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate);
+void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate);
+void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 
 #if defined(BT_CLIENT)
-void FormatFpsHeader(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, int64_t iTotalCpuTimeUs);
-void FormatCpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate);
-void FormatGpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate);
+void FormatFpsHeader(common::Workbuffer& rWorkbuffer, int64_t iTotalCpuTimeUs);
+void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate);
+void FormatGpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 #endif
 
 } // namespace engine

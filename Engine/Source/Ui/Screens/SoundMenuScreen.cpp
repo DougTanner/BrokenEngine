@@ -2,6 +2,7 @@
 
 #if defined(BT_CLIENT)
 
+#include "Game.h"
 #include "Ui/LocalizationBase.h"
 #include "Ui/MenuUtils.h"
 #include "Ui/SoundSettings.h"
@@ -18,11 +19,11 @@ constexpr std::string_view kMuteInBackgroundLabel = "Mute in background";
 
 } // namespace
 
-void SoundMenuScreen::Render(GameBase& rGame)
+void SoundMenuScreen::Render()
 {
 	using enum StandardString;
 
-	if (rGame.meUiState != UiState::kSound)
+	if (game::gpGame->meUiState != UiState::kSound)
 	{
 		return;
 	}
@@ -74,7 +75,7 @@ void SoundMenuScreen::Render(GameBase& rGame)
 	// Back button
 	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnim))
 	{
-		rGame.meUiState = UiState::kPause;
+		game::gpGame->meUiState = UiState::kPause;
 	}
 
 	ImGui::End();

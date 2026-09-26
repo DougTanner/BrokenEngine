@@ -6,23 +6,24 @@
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
 #include "Game.h"
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {
 
 // Helper: appends timer text into the caller's current workbuffer frame. Caller owns Push/Pop.
-void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate)
+void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
 	// Submit-worker threads write these timer fields under mCpuTimerMutex (CommandBufferManager); lock the identical reads here, matching LogTimers. Cold ~2 Hz path, no contention concern. No caller holds the mutex on the path in (SmoothCpuTimers releases before the formatters run).
-	std::lock_guard lock(rProfileManager.mCpuTimerMutex);
+	std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
 
-	int64_t iCpuTimerCount = rProfileManager.GetCpuTimerCount();
+	int64_t iCpuTimerCount = gpProfileManager->GetCpuTimerCount();
 
 	rWorkbuffer.Append("\n\n");
 
 	for (int64_t i = 0; i < iCpuTimerCount; ++i)
 	{
-		CpuTimer& rCpuTimer = rProfileManager.GetCpuTimer(i);
+		CpuTimer& rCpuTimer = gpProfileManager->GetCpuTimer(i);
 
 		int64_t iValue = rCpuTimer.smoothedMicroseconds.Get();
 		if (bReevaluate)
@@ -35,7 +36,7 @@ void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rP
 			continue;
 		}
 
-		rWorkbuffer.Append(rProfileManager.GetCpuTimerName(i));
+		rWorkbuffer.Append(gpProfileManager->GetCpuTimerName(i));
 		rWorkbuffer.Append(": ");
 		rWorkbuffer.Append(iValue);
 		rWorkbuffer.Append(" us");
@@ -61,13 +62,13 @@ void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rP
 }
 
 // Helper: appends counter text into the caller's current workbuffer frame. Caller owns Push/Pop.
-void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate)
+void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
-	int64_t iCpuCounterCount = rProfileManager.GetCpuCounterCount();
+	int64_t iCpuCounterCount = gpProfileManager->GetCpuCounterCount();
 
 	for (int64_t i = 0; i < iCpuCounterCount; ++i)
 	{
-		CpuCounter& rCpuCounter = rProfileManager.GetCpuCounter(i);
+		CpuCounter& rCpuCounter = gpProfileManager->GetCpuCounter(i);
 		if (bReevaluate)
 		{
 			rCpuCounter.flags.Set(ProfileRowFlags::kVisible, rCpuCounter.iCount != 0);
@@ -78,7 +79,7 @@ void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, ProfileManagerBase& 
 			continue;
 		}
 
-		rWorkbuffer.Append(rProfileManager.GetCpuCounterName(i));
+		rWorkbuffer.Append(gpProfileManager->GetCpuCounterName(i));
 		rWorkbuffer.Append(": ");
 		rWorkbuffer.Append(rCpuCounter.iCount);
 		rWorkbuffer.Append("\n");
@@ -127,9 +128,9 @@ void FormatGpuGraphicsInfo(common::Workbuffer& rWorkbuffer)
 	gpImGuiManager->UpdateTextArea(kTextGraphics, rWorkbuffer.View());
 }
 
-void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate)
+void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
-	GpuTimer* pGpuTimers = rProfileManager.GetGpuTimers();
+	GpuTimer* pGpuTimers = gpProfileManager->GetGpuTimers();
 
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	rWorkbuffer.Append("\n\n");
@@ -272,7 +273,7 @@ void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
 
 #if defined(BT_CLIENT)
 
-void FormatFpsHeader(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, int64_t iTotalCpuTimeUs)
+void FormatFpsHeader(common::Workbuffer& rWorkbuffer, int64_t iTotalCpuTimeUs)
 {
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	rWorkbuffer.Append(static_cast<int64_t>(gpGraphics->mRendersInTheLastSecond.Get()));
@@ -289,7 +290,7 @@ void FormatFpsHeader(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfi
 		rWorkbuffer.Append(" (Cpu: >9000 fps, ");
 	}
 
-	GpuTimer* pGpuTimers = rProfileManager.GetGpuTimers();
+	GpuTimer* pGpuTimers = gpProfileManager->GetGpuTimers();
 	int64_t iTotalGpuTime = pGpuTimers[kGpuTimerGlobal].smoothedMicroseconds.Get() + pGpuTimers[kGpuTimerMain].smoothedMicroseconds.Get() + pGpuTimers[kGpuTimerImage].smoothedMicroseconds.Get();
 	if (iTotalGpuTime > 0)
 	{
@@ -299,9 +300,9 @@ void FormatFpsHeader(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfi
 	}
 
 	rWorkbuffer.Append("   Frame updates: ");
-	rWorkbuffer.Append(static_cast<int64_t>(rProfileManager.mFullUpdatesInTheLastSecond.Get()));
+	rWorkbuffer.Append(static_cast<int64_t>(gpProfileManager->mFullUpdatesInTheLastSecond.Get()));
 	rWorkbuffer.Append(" full ");
-	rWorkbuffer.Append(static_cast<int64_t>(rProfileManager.mInterpolateUpdatesInTheLastSecond.Get()));
+	rWorkbuffer.Append(static_cast<int64_t>(gpProfileManager->mInterpolateUpdatesInTheLastSecond.Get()));
 	rWorkbuffer.Append(" interpolate");
 	rWorkbuffer.Append("   Camera height: ");
 	rWorkbuffer.Append(static_cast<int64_t>(engine::gpCamera->mfCameraEyeHeight));
@@ -309,19 +310,19 @@ void FormatFpsHeader(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfi
 	gpImGuiManager->UpdateTextArea(kTextProfileFps, rWorkbuffer.View());
 }
 
-void FormatCpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate)
+void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
 	// Cpu timers
 	{
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		FormatCpuTimersText(rWorkbuffer, rProfileManager, bReevaluate);
+		FormatCpuTimersText(rWorkbuffer, bReevaluate);
 		gpImGuiManager->UpdateTextArea(kTextProfileCpuTimers, rWorkbuffer.View());
 	}
 
 	// Counters text
 	{
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		FormatCpuCountersText(rWorkbuffer, rProfileManager, bReevaluate);
+		FormatCpuCountersText(rWorkbuffer, bReevaluate);
 		gpImGuiManager->UpdateTextArea(kTextProfileCpuCounters, rWorkbuffer.View());
 	}
 
@@ -352,14 +353,14 @@ void FormatCpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfi
 	rWorkbuffer.Append(iTotalCount);
 	rWorkbuffer.Append(")");
 	rWorkbuffer.Append("\nAllocations: ");
-	rWorkbuffer.Append(rProfileManager.GetSmoothedAllocations().Get());
+	rWorkbuffer.Append(gpProfileManager->GetSmoothedAllocations().Get());
 	gpImGuiManager->UpdateTextArea(kTextProfileMemory, rWorkbuffer.View());
 }
 
-void FormatGpuScreen(common::Workbuffer& rWorkbuffer, ProfileManagerBase& rProfileManager, bool bReevaluate)
+void FormatGpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
 	FormatGpuGraphicsInfo(rWorkbuffer);
-	FormatGpuTimerRows(rWorkbuffer, rProfileManager, bReevaluate);
+	FormatGpuTimerRows(rWorkbuffer, bReevaluate);
 	FormatGpuMemoryStats(rWorkbuffer);
 }
 

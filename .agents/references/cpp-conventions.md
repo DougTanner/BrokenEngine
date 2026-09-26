@@ -10,7 +10,7 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
 	- XMVECTOR W invariant: Positions W=1.0; directions / velocities / normals / offsets W=0.0; color alpha defaults 1.0 (opaque)
 	- Function form, not operators: `XMVectorAdd`/`Subtract`/`Multiply`/`Divide`/`Scale`/`Negate` — never `vec + vec`, `f * vec`, `-vec`.
 	- Rotating a vector uses `XMVector3RotateSafe`/`XMVector3InverseRotateSafe`: the SDK versions leave a rounding residue in W that breaks the invariant above, so `Common/ExternalHeaders.h` re-zeroes W and makes the raw names fail to compile.
-- Base classes: Include/use game versions, not Base versions — `game::gpGame` not `GameBase` directly
+- Game-instantiated objects: reach `Game` and every other object the game instantiates behind an engine `*Base` class through its `gp*` global (`game::gpGame`, `gpProfileManager`). Never store a reference or pointer to it (no `GameBase& mrGameBase;`), never pass it as a parameter (`GameBase&`, `ProfileManagerBase&`), and never name the `*Base` type to reach it; the game instantiates the concrete type, and engine code may use game globals (`Engine/Source/AGENTS.md` `## Hub Conventions`). A class's own members use `this`; per-instance data bases such as `FrameInterpolateBase` are passed normally.
 - Workbuffer: Use `gpThreadLocal->mWorkbuffer` for temp allocations instead of local `std::vector`/`std::string`.
 - Allocation tracking: Heap allocations in the main loop trigger `DEBUG_BREAK()`. When unavoidable, wrap with `ScopedSuppressAllocationTracking` + `// Heap:` comment. See `Engine/Source/Memory/AGENTS.md`
 - LOG formatting: logging in allocation-tracked Game/Engine code must remain allocation-free; /repo-code-review owns accepted formatting and wrapper details

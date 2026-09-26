@@ -2,13 +2,6 @@
 
 #if defined(BT_SERVER)
 
-namespace engine
-{
-
-class GameBase;
-
-}
-
 namespace game
 {
 
@@ -25,8 +18,6 @@ class GameSaveLoad
 {
 public:
 
-	GameSaveLoad(engine::GameBase& rGameBase);
-
 	bool ServerSave();
 	bool ServerLoad();
 	bool ServerSave(const std::filesystem::path& rFilename); // appdata-relative; caller validates the bare filename
@@ -37,8 +28,6 @@ public:
 	bool Autoload();
 
 private:
-
-	engine::GameBase& mrGameBase;
 
 	static constexpr std::chrono::seconds kAutosaveInterval = 3600s;
 	common::Timer mAutosaveTimer;

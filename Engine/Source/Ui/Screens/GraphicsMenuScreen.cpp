@@ -2,6 +2,7 @@
 
 #if defined(BT_CLIENT)
 
+#include "Game.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
@@ -40,11 +41,11 @@ void ColumnSlider(const char* pcLabel, Wrapper* pWrapper, std::string_view forma
 
 } // namespace
 
-void GraphicsMenuScreen::Render(GameBase& rGame)
+void GraphicsMenuScreen::Render()
 {
 	using enum StandardString;
 
-	if (rGame.meUiState != UiState::kGraphicsSettings)
+	if (game::gpGame->meUiState != UiState::kGraphicsSettings)
 	{
 		return;
 	}
@@ -200,7 +201,7 @@ void GraphicsMenuScreen::Render(GameBase& rGame)
 	if (bBackPressed)
 	{
 		SaveGraphicsSettings();
-		rGame.meUiState = UiState::kPause;
+		game::gpGame->meUiState = UiState::kPause;
 	}
 
 	ImGui::End();

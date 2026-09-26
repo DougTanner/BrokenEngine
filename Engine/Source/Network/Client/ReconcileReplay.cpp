@@ -5,6 +5,7 @@
 #if defined(BT_CLIENT)
 
 #include "Frame/Frame.h"
+#include "Game.h"
 
 namespace engine
 {
@@ -380,7 +381,7 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 	ApplyCoordWriteback(rWork);
 }
 
-ReconcileDispatchResult ReconcileDispatcher::Run(GameBase& rGameBase, const ReconcileInputs& rInputs)
+ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 {
 	// Heap: work list growth and per-coord scratch retention
 	ScopedSuppressAllocationTracking suppress;
@@ -389,7 +390,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(GameBase& rGameBase, const Reco
 	// Uses resize() + in-place assignment to retain CoordScratch::replayStack capacity
 	// across Run() calls, avoiding per-frame heap churn.
 	size_t eligibleCount = 0;
-	for (const auto& [rCoord, rFrames] : rGameBase.mCoordFrames)
+	for (const auto& [rCoord, rFrames] : game::gpGame->mCoordFrames)
 	{
 		if (rFrames.iConfirmedTick >= 0)
 		{
@@ -401,7 +402,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(GameBase& rGameBase, const Reco
 		mWorks.resize(eligibleCount);
 	}
 	size_t iSlot = 0;
-	for (auto& [rCoord, rFrames] : rGameBase.mCoordFrames)
+	for (auto& [rCoord, rFrames] : game::gpGame->mCoordFrames)
 	{
 		if (rFrames.iConfirmedTick < 0)
 		{
@@ -456,7 +457,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(GameBase& rGameBase, const Reco
 		using enum ReconcileScratchFlags;
 
 		// Audio voice invalidation skip is gated on the client coord experiencing a full replay.
-		if ((rScratch.flags & kReplayed) && rWork.coord == rGameBase.mClientGridCoord)
+		if ((rScratch.flags & kReplayed) && rWork.coord == game::gpGame->mClientGridCoord)
 		{
 			result.bAnyFullReplay = true;
 		}

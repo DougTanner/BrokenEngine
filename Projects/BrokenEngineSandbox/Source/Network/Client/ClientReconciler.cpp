@@ -52,7 +52,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	XMVECTOR vecPreWritebackPosition {};
 	bool bCapturedPrePosition = GetClientSnapshotPosition(vecPreWritebackPosition);
 
-	engine::ReconcileDispatchResult dispatch = mDispatcher.Run(*gpGame, inputs);
+	engine::ReconcileDispatchResult dispatch = mDispatcher.Run(inputs);
 
 	if (dispatch.iActiveCount == 0)
 	{

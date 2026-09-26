@@ -23,7 +23,7 @@ GameBase::GameBase()
 	game::FrameInterpolate::Register();
 
 #if defined(BT_SERVER)
-	mpReplay = std::make_unique<Replay>(*this);
+	mpReplay = std::make_unique<Replay>();
 #endif // BT_SERVER
 }
 

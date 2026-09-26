@@ -5,13 +5,11 @@
 namespace engine
 {
 
-class GameBase;
-
 class MainMenuScreen
 {
 public:
 
-	void Render(GameBase& rGame);
+	void Render();
 
 private:
 

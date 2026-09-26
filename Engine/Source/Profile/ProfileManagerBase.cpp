@@ -756,17 +756,17 @@ void ProfileManagerBase::UpdateProfileText()
 		if (meProfileScreen == ProfileScreen::kCpu || meProfileScreen == ProfileScreen::kGpu)
 		{
 			int64_t iTotalCpuTimeUs = GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Get();
-			FormatFpsHeader(rWorkbuffer, *this, iTotalCpuTimeUs);
+			FormatFpsHeader(rWorkbuffer, iTotalCpuTimeUs);
 		}
 
 		if (meProfileScreen == ProfileScreen::kCpu)
 		{
-			FormatCpuScreen(rWorkbuffer, *this, bReevaluate);
+			FormatCpuScreen(rWorkbuffer, bReevaluate);
 		}
 
 		if (meProfileScreen == ProfileScreen::kGpu)
 		{
-			FormatGpuScreen(rWorkbuffer, *this, bReevaluate);
+			FormatGpuScreen(rWorkbuffer, bReevaluate);
 		}
 
 		if (meProfileScreen == ProfileScreen::kNetwork)

@@ -255,8 +255,7 @@ bool PublishReplayManifest(const ReplayManifest& rManifest, const std::array<uin
 
 } // namespace
 
-Replay::Replay(GameBase& rGameBase)
-	: mrGameBase(rGameBase)
+Replay::Replay()
 {
 	ASSERT(gpReplay == nullptr);
 
@@ -275,17 +274,17 @@ Replay::~Replay()
 
 void Replay::PublishReplayingState()
 {
-	mrGameBase.mbReplaying = !mReplayReaders.empty() || !mPendingReplayReaders.empty();
+	game::gpGame->mbReplaying = !mReplayReaders.empty() || !mPendingReplayReaders.empty();
 }
 
 bool Replay::IsPlaybackActiveOrPending() const
 {
-	return mrGameBase.mbReplaying || (mrGameBase.mGameFlags & engine::GameFlags::kLoadReplay);
+	return game::gpGame->mbReplaying || (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay);
 }
 
 bool Replay::IsRecordingActiveOrPending() const
 {
-	return !mReplayWriters.empty() || (mrGameBase.mGameFlags & engine::GameFlags::kSaveReplay);
+	return !mReplayWriters.empty() || (game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay);
 }
 
 void Replay::ClearReplayTransientState()
@@ -324,8 +323,8 @@ void Replay::InvalidateReplayRecording()
 void Replay::UpdateTerminalReplayWriter(GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame)
 {
 	game::FrameInput emptyInput {};
-	const auto inputIt = mrGameBase.mFrameInputs.find(coord);
-	const game::FrameInput& rLiveInput = inputIt != mrGameBase.mFrameInputs.end() ? inputIt->second : emptyInput;
+	const auto inputIt = game::gpGame->mFrameInputs.find(coord);
+	const game::FrameInput& rLiveInput = inputIt != game::gpGame->mFrameInputs.end() ? inputIt->second : emptyInput;
 	rWriterState.pWriter->Update(rEndFrame.interpolate.iTick + 1, rLiveInput, rEndFrame);
 }
 
@@ -364,15 +363,15 @@ bool Replay::CaptureAcceptedTransfers(GridCoord destination, std::span<const gam
 
 void Replay::ActivateReplayReader(GridCoord coord, PendingReplayReader&& rPendingReader)
 {
-	if (!mrGameBase.mCoordFrames.contains(coord))
+	if (!game::gpGame->mCoordFrames.contains(coord))
 	{
-		mrGameBase.CreateFrameAtCoord(coord);
+		game::gpGame->CreateFrameAtCoord(coord);
 	}
-	engine::CoordFrames& rFrames = mrGameBase.mCoordFrames.at(coord);
+	engine::CoordFrames& rFrames = game::gpGame->mCoordFrames.at(coord);
 	rFrames.pCurrent = std::move(rPendingReader.pSavedStart);
 	rFrames.pNext = std::make_unique<game::Frame>();
 	engine::TransferViaStream(*rFrames.pCurrent, *rFrames.pNext);
-	mrGameBase.mFrameInputs.insert_or_assign(coord, std::move(rPendingReader.initialInput));
+	game::gpGame->mFrameInputs.insert_or_assign(coord, std::move(rPendingReader.initialInput));
 	mReplayReaders.emplace(coord, std::move(rPendingReader.pReader));
 	PublishReplayingState();
 }
@@ -403,15 +402,15 @@ void Replay::SaveLoadReplay()
 {
 	if constexpr (kbDebugInput)
 	{
-		if (mrGameBase.mGameFlags & engine::GameFlags::kLoadReplay)
+		if (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay)
 		{
 			// Heap: DifferenceStream reader + Frame deserialization + ReplayMeta file I/O
 			ScopedSuppressAllocationTracking suppress;
-			gpProfileManager->LatchRawCpuTimers(false, mrGameBase.TickCounter());
+			gpProfileManager->LatchRawCpuTimers(false, game::gpGame->TickCounter());
 
 			// Outside the try: its catch clears the replay fixture and transfer-capture state that a live recording still uses.
 			ASSERT(!IsRecordingActiveOrPending());
-			mrGameBase.mGameFlags.Clear(engine::GameFlags::kLoadReplay);
+			game::gpGame->mGameFlags.Clear(engine::GameFlags::kLoadReplay);
 
 			try
 			{
@@ -708,7 +707,7 @@ void Replay::SaveLoadReplay()
 
 				const ReplayFixtures::TransferCaptureSnapshot recordingCaptureInfo = ReplayFixtures::CaptureSnapshot(*this);
 				game::gpGame->Reset();
-				engine::AdoptGridSave(mrGameBase, std::move(stagedGrid));
+				engine::AdoptGridSave(std::move(stagedGrid));
 
 				const float fInitialTime = stagedReaders.front().pendingReader.pSavedStart->interpolate.fCurrentTime;
 				for (StagedReplayReader& rStagedReader : stagedReaders)
@@ -723,32 +722,32 @@ void Replay::SaveLoadReplay()
 					}
 				}
 				PublishReplayingState();
-				mrGameBase.SetTickCounter(iInitialTick);
-				mrGameBase.SetCurrentTime(fInitialTime);
+				game::gpGame->SetTickCounter(iInitialTick);
+				game::gpGame->SetCurrentTime(fInitialTime);
 
 				game::AdoptReplayMeta(std::move(stagedMeta));
 				game::OnStateReplaced();
 
 				// Replay owns each active generation until its reader reaches the recorded end. Rebuild directly from
 				// the successfully loaded readers so normal subscription/player pruning cannot erase an empty coord.
-				mrGameBase.mActiveCoords.clear();
+				game::gpGame->mActiveCoords.clear();
 				for (const auto& [rCoord, rpReader] : mReplayReaders)
 				{
-					mrGameBase.mActiveCoords.push_back(rCoord);
+					game::gpGame->mActiveCoords.push_back(rCoord);
 				}
 
 				// Game::Reset clears stream-owned diagnostic state. Restore recording evidence so each replay loop
 				// relatches playback.
 				ReplayFixtures::PlaybackAdopted(*this, recordingCaptureInfo);
 				// Replay I/O is outside sim time; do not carry its wall time or pre-load debt into the new loop.
-				mrGameBase.mTimeStep.ClearAccumulator();
-				mrGameBase.mTimeStep.mRealTime.Reset();
-				mrGameBase.mfLastDeltaTime = 0.0f;
+				game::gpGame->mTimeStep.ClearAccumulator();
+				game::gpGame->mTimeStep.mRealTime.Reset();
+				game::gpGame->mfLastDeltaTime = 0.0f;
 			}
 			catch (const std::exception& rException)
 			{
 				LOG(kDefault, kError, "SaveLoadReplay aborted: corrupt replay data: {}", rException.what());
-				if (mrGameBase.mbReplaying)
+				if (game::gpGame->mbReplaying)
 				{
 					ClearReplayAbortState();
 				}
@@ -772,10 +771,10 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 	if constexpr (kbDebugInput)
 	{
 		// Recording start: create one writer per active coord
-		if ((mrGameBase.mGameFlags & engine::GameFlags::kSaveReplay) && mReplayWriters.empty())
+		if ((game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && mReplayWriters.empty())
 		{
 			ASSERT(!IsPlaybackActiveOrPending());
-			mrGameBase.mGameFlags.Clear(engine::GameFlags::kSaveReplay);
+			game::gpGame->mGameFlags.Clear(engine::GameFlags::kSaveReplay);
 
 			if (ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kManifestInvalidation))
 			{
@@ -797,7 +796,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			PublishReplayingState();
 
 			const bool bGridWritten = !ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kGrid) &&
-				engine::WriteGridSave(mrGameBase, {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, std::filesystem::path("F7.replay.grid"), mrGameBase.mClientGridCoord);
+				engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, std::filesystem::path("F7.replay.grid"), game::gpGame->mClientGridCoord);
 			if (!bGridWritten)
 			{
 				LOG(kDefault, kError, "Replay grid write failed; recording not started");
@@ -808,7 +807,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 
 			miReplayInitialTick = 0;
 			bool bHaveInitialTick = false;
-			for (const auto& [rCoord, rFrames] : mrGameBase.mCoordFrames)
+			for (const auto& [rCoord, rFrames] : game::gpGame->mCoordFrames)
 			{
 				if (!bHaveInitialTick)
 				{
@@ -824,7 +823,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					return ReplayTickDecision::kDispatch;
 				}
 
-				game::FrameInput& rFrameInput = mrGameBase.mFrameInputs.try_emplace(rCoord).first->second;
+				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(rCoord).first->second;
 				std::vector<ReplayWriterState>& rWriterGenerations = mReplayWriters.try_emplace(rCoord).first->second;
 				rWriterGenerations.push_back({
 					.pWriter = std::make_unique<engine::DifferenceStreamWriter<game::Frame, game::FrameInput>>(*rFrames.pCurrent, rFrameInput),
@@ -838,9 +837,9 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 		}
 
 		// Recording stop: save all writers
-		if ((mrGameBase.mGameFlags & engine::GameFlags::kSaveReplay) && !mReplayWriters.empty())
+		if ((game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !mReplayWriters.empty())
 		{
-			mrGameBase.mGameFlags.Clear(engine::GameFlags::kSaveReplay);
+			game::gpGame->mGameFlags.Clear(engine::GameFlags::kSaveReplay);
 			game::OnReplayStreamsInvalidated();
 
 			// Preserve the valid manifest's deterministic coord ordering after writer state is cleared.
@@ -869,8 +868,8 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					}
 					else
 					{
-						auto it = mrGameBase.mCoordFrames.find(rCoord);
-						if (it != mrGameBase.mCoordFrames.end())
+						auto it = game::gpGame->mCoordFrames.find(rCoord);
+						if (it != game::gpGame->mCoordFrames.end())
 						{
 							pEndFrame = it->second.pCurrent.get();
 						}
@@ -985,27 +984,27 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				{
 					continue;
 				}
-				if (!mrGameBase.mCoordFrames.contains(rCoord))
+				if (!game::gpGame->mCoordFrames.contains(rCoord))
 				{
 					continue;
 				}
 
-				game::FrameInput& rFrameInput = mrGameBase.mFrameInputs.try_emplace(rCoord).first->second;
-				rWriterState.pWriter->Update(mrGameBase.TickCounter(), rFrameInput, mrGameBase.CurrentFrame(rCoord));
+				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(rCoord).first->second;
+				rWriterState.pWriter->Update(game::gpGame->TickCounter(), rFrameInput, game::gpGame->CurrentFrame(rCoord));
 				bWriterUpdated = true;
 			}
 			if (bWriterUpdated)
 			{
-				if (ReplayFixtures::ObserveWriterInput(*this, mrGameBase.TickCounter()))
+				if (ReplayFixtures::ObserveWriterInput(*this, game::gpGame->TickCounter()))
 				{
-					mrGameBase.mGameFlags.Set(engine::GameFlags::kPaused);
+					game::gpGame->mGameFlags.Set(engine::GameFlags::kPaused);
 				}
 			}
 		}
 
 		// Replay publication state belongs to one fixed tick. HarvestTransfers is intentionally disabled during
 		// playback, so clear the staged maps here before this tick's post-dispatch records are loaded below.
-		if (mrGameBase.mbReplaying)
+		if (game::gpGame->mbReplaying)
 		{
 			game::gpServerSession->mpTransferManager->mTransfers.clear();
 			game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
@@ -1020,44 +1019,44 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 
 		// Terminal readers retire first. Their terminal input is consumed and its saved end frame is checksum
 		// validated before the coord is removed; the terminal input is not dispatched or published a second time.
-		if (mrGameBase.mbReplaying) [[unlikely]]
+		if (game::gpGame->mbReplaying) [[unlikely]]
 		{
 			for (auto it = mReplayReaders.begin(); it != mReplayReaders.end();)
 			{
 				const engine::GridCoord coord = it->first;
 				std::unique_ptr<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>& rpReader = it->second;
-				const bool bTerminalTick = rpReader->IsTerminalTick(mrGameBase.TickCounter());
+				const bool bTerminalTick = rpReader->IsTerminalTick(game::gpGame->TickCounter());
 				if (!bTerminalTick)
 				{
 					++it;
 					continue;
 				}
 
-				game::FrameInput& rFrameInput = mrGameBase.mFrameInputs.try_emplace(coord).first->second;
-				if (!rpReader->LoadDifference(mrGameBase.TickCounter(), rFrameInput))
+				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(coord).first->second;
+				if (!rpReader->LoadDifference(game::gpGame->TickCounter(), rFrameInput))
 				{
 					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", coord.x, coord.y);
 					return abortReplay();
 				}
-				rpReader->ValidateChecksum(mrGameBase.TickCounter(), mrGameBase.CurrentFrame(coord));
+				rpReader->ValidateChecksum(game::gpGame->TickCounter(), game::gpGame->CurrentFrame(coord));
 				if (!rpReader->TerminalConsumed())
 				{
 					LOG(kDefault, kError, "Replay reader terminal data was not fully consumed for coord ({},{})", coord.x, coord.y);
 					return abortReplay();
 				}
 				rFrameInput.statusChanges.clear();
-				mrGameBase.mCoordFrames.erase(coord);
-				mrGameBase.mFrameInputs.erase(coord);
-				std::erase(mrGameBase.mActiveCoords, coord);
+				game::gpGame->mCoordFrames.erase(coord);
+				game::gpGame->mFrameInputs.erase(coord);
+				std::erase(game::gpGame->mActiveCoords, coord);
 				it = mReplayReaders.erase(it);
 			}
 			PublishReplayingState();
 
-			while (!mPendingReplayReaders.empty() && mPendingReplayReaders.front().iActivationTick <= mrGameBase.TickCounter())
+			while (!mPendingReplayReaders.empty() && mPendingReplayReaders.front().iActivationTick <= game::gpGame->TickCounter())
 			{
 				PendingReplayReader pendingReader = std::move(mPendingReplayReaders.front());
 				mPendingReplayReaders.erase(mPendingReplayReaders.begin());
-				if (pendingReader.iActivationTick < mrGameBase.TickCounter())
+				if (pendingReader.iActivationTick < game::gpGame->TickCounter())
 				{
 					LOG(kDefault, kError, "Replay reader activation tick was skipped for coord ({},{})", pendingReader.coord.x, pendingReader.coord.y);
 					return abortReplay();
@@ -1075,8 +1074,8 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			// harvested after dispatch at event tick E is recorded at E and staged here for publication at E.
 			for (auto& [coord, rpReader] : mReplayReaders)
 			{
-				game::FrameInput& rFrameInput = mrGameBase.mFrameInputs.try_emplace(coord).first->second;
-				if (!rpReader->LoadDifference(mrGameBase.TickCounter(), rFrameInput))
+				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(coord).first->second;
+				if (!rpReader->LoadDifference(game::gpGame->TickCounter(), rFrameInput))
 				{
 					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", coord.x, coord.y);
 					return abortReplay();
@@ -1094,7 +1093,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				}
 
 				game::FrameInput postDispatchInput {};
-				if (rpReader->LoadPostDispatch(mrGameBase.TickCounter(), postDispatchInput))
+				if (rpReader->LoadPostDispatch(game::gpGame->TickCounter(), postDispatchInput))
 				{
 					// Replay files are a trust boundary: the generic channel cannot know StatusChange semantics, and a
 					// valid non-transfer entry would reach std::get<TransferData> in the spawn path.
@@ -1107,21 +1106,21 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 						return abortReplay();
 					}
 					game::gpServerSession->mpTransferManager->PrepareReplayTransfers(coord, postDispatchInput.statusChanges);
-					ReplayFixtures::ObservePlaybackEvent(*this, mrGameBase.TickCounter());
+					ReplayFixtures::ObservePlaybackEvent(*this, game::gpGame->TickCounter());
 				}
 
 				if (!rFrameInput.statusChanges.empty())
 				{
 					game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.insert_or_assign(coord, rFrameInput.statusChanges);
 				}
-				rpReader->ValidateChecksum(mrGameBase.TickCounter(), mrGameBase.CurrentFrame(coord));
+				rpReader->ValidateChecksum(game::gpGame->TickCounter(), game::gpGame->CurrentFrame(coord));
 			}
 
 			if (mReplayReaders.empty() && mPendingReplayReaders.empty())
 			{
-				LOG(kDefault, kDebug, "End replay {}, looping", mrGameBase.TickCounter());
+				LOG(kDefault, kDebug, "End replay {}, looping", game::gpGame->TickCounter());
 				ClearReplayTransientState();
-				mrGameBase.mGameFlags.Set(engine::GameFlags::kLoadReplay);
+				game::gpGame->mGameFlags.Set(engine::GameFlags::kLoadReplay);
 				return ReplayTickDecision::kStopBeforeDispatch;
 			}
 		}
