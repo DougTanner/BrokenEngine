@@ -116,6 +116,18 @@ struct SpaceshipsPostRender : public engine::Collection<SpaceshipsPostRender>
 	// Allocate and copy
 	static void AllocateAndCopy(SpaceshipsPostRender& rCurrent, const SpaceshipsPostRender& rPrevious);
 
+	// Simulation never produces non-finite health; reject it as a corrupt stream, since NaN or +inf health never dies.
+	static void PostRead(const SpaceshipsPostRender& rCurrent)
+	{
+		for (int64_t i = 0; i < rCurrent.iCount; ++i)
+		{
+			if (!std::isfinite(rCurrent.pfHealths[i]))
+			{
+				throw std::ios_base::failure("SpaceshipsPostRender pfHealths");
+			}
+		}
+	}
+
 	// Post render phases
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
