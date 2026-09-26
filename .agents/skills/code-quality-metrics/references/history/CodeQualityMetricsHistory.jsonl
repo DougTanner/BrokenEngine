@@ -1188,3 +1188,4 @@
 {"index":1186,"date":"2026-09-25","captureMode":"cpp-change","verbosity":0.03712806568,"structuralErosion":0.570059288495,"supported":558,"parsed":557}
 {"index":1187,"date":"2026-09-25","captureMode":"cpp-change","verbosity":0.037126771365,"structuralErosion":0.570175703288,"supported":558,"parsed":557}
 {"index":1188,"date":"2026-09-25","captureMode":"cpp-change","verbosity":0.037135833464,"structuralErosion":0.570574351222,"supported":558,"parsed":557}
+{"index":1189,"date":"2026-09-26","captureMode":"carry-forward","verbosity":0.037135833464,"structuralErosion":0.570574351222,"supported":558,"parsed":557}
