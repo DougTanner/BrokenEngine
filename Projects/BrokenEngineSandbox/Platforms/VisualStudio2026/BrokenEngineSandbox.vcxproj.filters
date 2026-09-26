@@ -1142,9 +1142,6 @@
     <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersUpdate.cpp">
       <Filter>Game\Frame\Collections\Blasters</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersRender.cpp">
-      <Filter>Game\Frame\Collections\Blasters</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp">
       <Filter>Engine\Memory</Filter>
     </ClCompile>

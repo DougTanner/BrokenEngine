@@ -75,7 +75,6 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 {
 	const MissilesInterpolate& rCurrent = *rFrameInterpolate.pMissiles;
 	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-	gpProfileManager->SetCount(game::kCpuCounterMissiles, rCurrent.iCount);
 
 	if (rCurrent.iCount == 0)
 	{

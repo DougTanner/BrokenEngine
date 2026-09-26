@@ -1127,6 +1127,18 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 		{"targetBehindTicks", iClockTargetBehind},
 		{"errorTicks", iClockError},
 	};
+
+	nlohmann::json counters = nlohmann::json::array();
+	for (int64_t i = 0; i < gpProfileManager->GetCpuCounterCount(); ++i)
+	{
+		engine::CpuCounter& rCounter = gpProfileManager->GetCpuCounter(i);
+		nlohmann::json counter;
+		counter["index"] = i;
+		counter["name"] = std::string(gpProfileManager->GetCpuCounterName(i));
+		counter["count"] = rCounter.iCount;
+		counters.push_back(std::move(counter));
+	}
+	rResult["counters"] = std::move(counters);
 }
 
 } // namespace

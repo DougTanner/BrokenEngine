@@ -729,7 +729,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenSoundEffects.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenWindDeposits.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Blasters\Blasters.cpp" />
-    <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersRender.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersUpdate.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Missiles\Missiles.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Missiles\MissilesRender.cpp" />

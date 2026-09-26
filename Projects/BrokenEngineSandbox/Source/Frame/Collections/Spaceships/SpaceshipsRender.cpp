@@ -84,7 +84,6 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 	const SpaceshipsInterpolate& rCurrent = *rFrameInterpolate.pSpaceships;
 	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-	gpProfileManager->SetCount(game::kCpuCounterSpaceships, rCurrent.iCount);
 
 	if (rCurrent.iCount == 0)
 	{

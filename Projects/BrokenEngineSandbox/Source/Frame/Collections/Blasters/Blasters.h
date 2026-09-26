@@ -43,11 +43,6 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>,
 	static void ClientInitAll(Frame& rFrame);
 #endif
 
-	// Render
-#if defined(BT_CLIENT)
-	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
-#endif
-
 	uint8_t* __restrict puiTypeIndices = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;

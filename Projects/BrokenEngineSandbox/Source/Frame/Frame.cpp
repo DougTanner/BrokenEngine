@@ -609,6 +609,29 @@ void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_
 
 	// Collections
 	engine::ForEachBeginRender(GameInterpolateTypes{}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
+
+	// Population counters: one sum over the cells this transaction renders, published once so a render with no
+	// renderable cell reads zero.
+	int64_t iTotalPlayers = 0;
+	int64_t iTotalBlasters = 0;
+	int64_t iTotalMissiles = 0;
+	int64_t iTotalSpaceships = 0;
+	for (const engine::GridCoord& rCoord : rActiveCoords)
+	{
+		auto it = rRenderInterpolates.find(rCoord);
+		if (it != rRenderInterpolates.end())
+		{
+			iTotalPlayers += it->second.pPlayers->iCount;
+			iTotalBlasters += it->second.pBlasters->iCount;
+			iTotalMissiles += it->second.pMissiles->iCount;
+			iTotalSpaceships += it->second.pSpaceships->iCount;
+		}
+	}
+	gpProfileManager->SetCount(kCpuCounterPlayers, iTotalPlayers);
+	gpProfileManager->SetCount(kCpuCounterBlasters, iTotalBlasters);
+	gpProfileManager->SetCount(kCpuCounterBlastersRendered, iTotalBlasters);
+	gpProfileManager->SetCount(kCpuCounterMissiles, iTotalMissiles);
+	gpProfileManager->SetCount(kCpuCounterSpaceships, iTotalSpaceships);
 }
 
 void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)

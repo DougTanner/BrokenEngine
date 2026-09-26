@@ -468,22 +468,15 @@ static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
 {
-	// mActiveCoords always contains mClientGridCoord after Game::ComputeActiveSet and Game::Reset; boot prerender seeds {kOriginCoord}.
-	if (rActiveCoords.empty())
+	if (rActiveCoords.empty() || rRenderInterpolates.find(cameraCoord) == rRenderInterpolates.end())
 	{
-		return;
-	}
-
-	if (rRenderInterpolates.find(cameraCoord) == rRenderInterpolates.end())
-	{
-		// All-rings-empty frame (rActiveCoords non-empty but no active coord is renderable — e.g. a failed
-		// reconnect to a dead local server). GameBase::Render leaves mRenderInterpolates renderable-only, so a
-		// missing cameraCoord entry means the whole map is empty. Flush the record-once Main CB's indirect counts
-		// to zero (the SAME Begin/EndRender the normal path calls, but with no per-coord Render between them, so
-		// every collection's counter — reset at the top of BeginRender — is written as 0 by EndRender) so nothing
-		// ghost-draws, then bail before touching cameraCoord's absent interpolate. Both BeginRender and EndRender
-		// tolerate the empty map: every collection BeginRender iterates rActiveCoords with an rRenderInterpolates
-		// find-guard (or is a no-op), never .at().
+		// Nothing renderable: an all-rings-empty frame (e.g. a failed reconnect to a dead local server; GameBase::Render
+		// leaves mRenderInterpolates renderable-only, so a missing cameraCoord entry means the whole map is empty), or
+		// an empty rActiveCoords, which is defensive only (Game::ComputeActiveSet and Game::Reset always add
+		// mClientGridCoord; boot prerender seeds {kOriginCoord}). Run the SAME Begin/EndRender as the normal path with
+		// no per-coord Render between them, so every indirect count and per-transaction profile counter is written as
+		// 0 and nothing ghost-draws, then bail before touching cameraCoord's absent interpolate. Every collection
+		// BeginRender walks rActiveCoords behind an rRenderInterpolates find-guard (or is a no-op), never .at().
 		game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
 		game::FrameInterpolate::EndRender(iCommandBuffer);
 		RenderLightingSpreadIndirect(iCommandBuffer);
