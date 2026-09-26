@@ -126,12 +126,19 @@ The `argument-hint` value selects the Plan:
    reviewer is reported as a blocker.
 6. Invoke step 3's claim script idempotently immediately before the final
    preparation handoff. When that result carries a `sync` object, the tree
-   moved under the preparation evidence: diff `sync.from..sync.to` against the
-   paths the preparation handoff cited. When they intersect, return to step 4,
-   rerun the affected Plan review checks in step 5, and repeat this final refresh
-   before approval; reuse review evidence whose inputs did not change. Done when
-   it reports the held claim and the preparation and required Plan review
-   evidence match the current tree.
+   moved under the preparation evidence: main lists, as names only with no
+   diff content, the paths `sync.from..sync.to` changed and keeps those the
+   preparation handoff cited. When that list is non-empty, main never reads
+   that diff itself: it dispatches one `researcher` with `sync.from..sync.to`,
+   the intersecting paths, and the preparation snapshot's path and `##`
+   selectors, and that worker returns under `Decisive checks`, without quoting
+   the diff, one row per path stating whether its change touches a statement
+   the preparation handoff or execution card relies on.
+   When any row reports a touch, return to step 4, rerun the affected Plan
+   review checks in step 5, and repeat this final refresh before approval;
+   reuse review evidence whose inputs did not change. Done when it reports the
+   held claim and either no cited path intersects or every returned row
+   reports no touch.
 7. Present for approval per this file's `### Implementation approval`. Done
    when the user's decision arrives.
 8. Implement the approved change. Done when its own acceptance checks pass.
