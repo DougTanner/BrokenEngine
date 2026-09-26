@@ -839,7 +839,7 @@ void FillLabelTarget(const nlohmann::json& rParams, engine::AgentScript& rScript
 }
 
 // Begin a script (throwing "busy" if one is already running) and defer the response until the script completes.
-// For label-based scripts pcErrorWindow (may be null) drives the candidate list on a not-found / ambiguous error.
+// For label-based scripts, a not-found / ambiguous error's candidate list is limited to errorWindow only when bHasWindow is set.
 void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescribeUiAfter, bool bLabelBased, bool bHasWindow, std::string errorWindow)
 {
 	if (!engine::gpAgentInput->BeginScript(rScript))
