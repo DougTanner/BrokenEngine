@@ -72,11 +72,14 @@ The `argument-hint` value selects the Plan:
    main as a card correction rather than an edit.
 
    Main writes that brief from the claimed Plan's own citations — path plus
-   line range — and leaves reading both the target source and the handoff
-   and reporting references the brief cites to the dispatched `implementer`,
-   naming those references as paths only, and reading source itself only
-   for a decision it must make that the Plan and the returned handoff cannot
-   settle.
+   line range — citing the claimed Plan as its path plus the section line
+   ranges a `^## ` heading Grep of it returns, and reading only the Plan
+   sections it must state from, such as the risk tier that sets the role
+   assignments, just as it reads only the cited `## Task brief` section above,
+   and leaves reading both the target source and the handoff and reporting
+   references the brief cites to the dispatched `implementer`, naming those
+   references as paths only, and reading source itself only for a decision it
+   must make that the Plan and the returned handoff cannot settle.
 
    The brief bounds the card's verification evidence: no verbatim source
    text, except an acceptance item whose purpose is proposed replacement
