@@ -23,7 +23,7 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 ## Timing and Polling
 
 - Rendering smoothness takes priority over command round-trip latency: client simulation and presentation intentionally retain buffered committed ticks, so tuning must preserve smooth pacing rather than introduce stalls or bursts.
-- Both peers drain transient poll outputs each poll, and a server update polls more than once, so a queue left unconsumed across a poll is lost or reapplied rather than carried to the end of the update. New-subscription and resync requests persist until broadcast servicing, including the paused/zero-tick path.
+- Both peers drain transient poll outputs each poll, and a server update polls more than once, so a queue left unconsumed across a poll is lost or reapplied rather than carried to the end of the update. Resync requests persist until broadcast servicing, including the paused/zero-tick path; a new-subscription request persists across servicing passes until it is served or invalid (`Server/AGENTS.md`).
 - Network simulation injects deterministic one-way delay and burst loss above ENet. Reliable packets may be delayed but never deliberately dropped, and each channel preserves FIFO release order.
 - Wire serialization is little-endian x64. Network buffer capacity is tick-rate-independent; jitter safety is wall-clock time.
 

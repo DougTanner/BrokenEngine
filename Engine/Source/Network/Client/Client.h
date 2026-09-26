@@ -59,11 +59,38 @@ struct ClientCoordSlot
 	std::chrono::steady_clock::time_point transitionStartTime {};
 };
 
-// kClientSubscribe sent, waiting for the server's accept or full state to name the slot
-struct PendingSubscription
+enum class SubscribeRequestFlags : uint8_t
+{
+	kCancelled     = 1 << 0,
+	kTimeoutWarned = 1 << 1,
+};
+
+// One kClientSubscribe sent and not yet answered by an accept or reject
+struct SubscribeRequest
 {
 	GridCoord coord {};
 	std::chrono::steady_clock::time_point startTime {};
+	common::Flags<SubscribeRequestFlags> flags;
+};
+
+// Subscribe requests in send order. Per coord: zero or more cancelled records, then at most one live record.
+// The server answers every subscribe exactly once on the reliable channel, which is FIFO, so each accept or
+// reject consumes the coord's oldest record. Full state and static data only consult records.
+class SubscribeRequests
+{
+public:
+	void Add(GridCoord coord);
+	void Cancel(GridCoord coord);
+	// Warns once per live record left unanswered past the timeout; the record stays live until its answer
+	void WarnTimedOut(std::chrono::steady_clock::time_point now);
+	// Removes the coord's oldest record; true only if that record was live
+	bool TakeAnswer(GridCoord coord);
+	bool IsLive(GridCoord coord) const;
+	std::span<const SubscribeRequest> Records() const;
+	void Clear();
+
+private:
+	std::vector<SubscribeRequest> mRecords;
 };
 
 struct ReceivedDebugFrame
@@ -103,7 +130,6 @@ public:
 	// Wire dispatch entry point for one received packet. Public so harness fixtures can exercise the real dispatch,
 	// classification, and response paths.
 	void Receive(std::span<const uint8_t> packetData);
-	void CancelSubscription(GridCoord coord);
 
 	enum class ClientStateFlags : uint8_t
 	{
@@ -127,7 +153,7 @@ public:
 	std::vector<ReceivedStaticData> mReceivedStaticData;
 	std::unique_ptr<ReceivedDebugFrame> mpReceivedDebugFrame;
 	std::vector<ClientCoordSlot> mCoordSlots;
-	std::vector<PendingSubscription> mPendingSubscriptions;
+	SubscribeRequests mSubscribeRequests;
 	common::Smoothed<int64_t> mSmoothedPipelineRttUs;
 	common::InTheLastSecond mBytesInPerSecond;
 	common::InTheLastSecond mBytesOutPerSecond;
@@ -162,9 +188,9 @@ private:
 
 	enum class FullStateFlags : uint8_t
 	{
-		kClearPlaceholder = 1 << 0, // Full state arrived before SubscribeAccept; remove the pending subscribe + adopt coord
-		kRejectAsGhost    = 1 << 1, // No pending subscribe or coord mismatch; send epoch-qualified unsubscribe + log
-		kCommit           = 1 << 2, // Caller proceeds to push fullState + activate slot
+		kAdoptCoord    = 1 << 0, // Full state arrived before SubscribeAccept for a live request; adopt the coord
+		kRejectAsGhost = 1 << 1, // No live request or coord mismatch; send epoch-qualified unsubscribe + log
+		kCommit        = 1 << 2, // Caller proceeds to push fullState + activate slot
 	};
 	using FullStateFlags_t = common::Flags<FullStateFlags>;
 	FullStateFlags_t ClassifyFullState(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord);
@@ -179,17 +205,14 @@ private:
 
 	enum class SubscribeAcceptFlags : uint8_t
 	{
-		kClearPlaceholder = 1 << 0, // Remove the coord's pending subscribe
-		kHealEpoch        = 1 << 1, // Active slot, same coord: update epoch (late accept after re-subscribe)
-		kCommitInit       = 1 << 2, // Initialize slot to kWaitingFullState
-		kRejectGhost      = 1 << 3, // State mismatch: send unsubscribe + RemoveCancelledSubscription + logs
+		kHealEpoch   = 1 << 0, // Active slot, same coord: update epoch (late accept after re-subscribe)
+		kCommitInit  = 1 << 1, // Initialize slot to kWaitingFullState
+		kRejectGhost = 1 << 2, // State mismatch: send unsubscribe + logs
 	};
 	using SubscribeAcceptFlags_t = common::Flags<SubscribeAcceptFlags>;
 	SubscribeAcceptFlags_t ClassifySubscribeAccept(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord);
 
 	bool IsStaleRetainedEpoch(int64_t iSlot, uint16_t uiEpoch, GridCoord coord) const;
-	bool RemoveCancelledSubscription(GridCoord coord);
-	void RemovePendingSubscription(GridCoord coord);
 	void TrackReceivedTick(int64_t iSlot, int64_t iTick);
 
 	ENetHost* mpHost = nullptr;
@@ -218,8 +241,6 @@ private:
 	// Network simulation delay queue
 	std::deque<DelayedPacket> mDelayedPackets;
 	NetworkSimulationState mNetworkSimState;
-	// Coords whose pending subscribe was cancelled before the server responded
-	std::vector<GridCoord> mCancelledSubscriptions;
 public:
 	uint8_t muiCommittedLoadGeneration = 0;
 

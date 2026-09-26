@@ -227,10 +227,10 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 				throw std::runtime_error("client_cancelled_subscription_fixture coord is already active");
 			}
 		}
-		// A real pending subscribe could be answered at the fixture's slot, which would make its accept a ghost
-		if (!rClient.mPendingSubscriptions.empty())
+		// A real outstanding subscribe could be answered at the fixture's slot, which would make its accept a ghost
+		if (!rClient.mSubscribeRequests.Records().empty())
 		{
-			throw std::runtime_error("client_cancelled_subscription_fixture requires no pending subscription");
+			throw std::runtime_error("client_cancelled_subscription_fixture requires no outstanding subscribe request");
 		}
 		engine::ClientSessionRuntime& rRuntime = *gpClientSession->mpRuntime;
 		if (std::ranges::find(rRuntime.mDesiredCoords, coord) != rRuntime.mDesiredCoords.end())
@@ -264,15 +264,15 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		const std::unordered_map<engine::GridCoord, std::chrono::steady_clock::time_point> stickyBefore = rRuntime.mUnwantedTimestamps;
 		const std::vector<engine::GridCoord> queueBefore = rRuntime.mSubscriptionQueue;
 		engine::ClientCoordSlot& rSlot = rClient.mCoordSlots.at(iSlot);
-		rClient.mPendingSubscriptions.push_back({.coord = coord, .startTime = std::chrono::steady_clock::now()});
+		rClient.mSubscribeRequests.Add(coord);
 		uint16_t uiRetainedEpoch = rSlot.ackState.uiEpoch;
 		uint16_t uiEpoch = static_cast<uint16_t>(uiRetainedEpoch + 1);
 		if (uiEpoch == 0)
 		{
 			uiEpoch = 1;
 		}
-		rClient.CancelSubscription(coord);
-		bool bCancelledToUnsubscribed = rClient.mPendingSubscriptions.empty() && rSlot.eState == engine::CoordSubscriptionState::kUnsubscribed;
+		rClient.mSubscribeRequests.Cancel(coord);
+		bool bCancelledToUnsubscribed = !rClient.mSubscribeRequests.IsLive(coord) && rSlot.eState == engine::CoordSubscriptionState::kUnsubscribed;
 
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();

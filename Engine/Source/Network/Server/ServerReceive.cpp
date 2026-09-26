@@ -382,10 +382,12 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 		return;
 	}
 
-	// Already subscribed?
-	if (pClient->FindSlotForCoord(coord) >= 0)
+	// Answer every subscribe exactly once: the client matches each answer to its oldest outstanding request for the coord.
+	int64_t iExistingSlot = pClient->FindSlotForCoord(coord);
+	if (iExistingSlot >= 0)
 	{
 		LOG(kNetwork, kVerbose, "Server::ClientSubscribe AlreadySubscribed Client: {} Coord: ({},{})", iClientId, coord.x, coord.y);
+		SendSubscribeAccept(*pClient, iExistingSlot, coord);
 		return;
 	}
 

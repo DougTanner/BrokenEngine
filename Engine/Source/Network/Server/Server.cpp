@@ -208,7 +208,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		return;
 	}
 
-	// Gate 2: per-update (~ per-tick) global packet/byte budget -- applies to every type including game-range.
+	// Gate 2: per-update (~ per-tick) global packet/byte budget -- applies to every type including game-range, except a handshaken client's subscribe/unsubscribe.
 	// The budget window spans both of an update's polls (Server::Poll resets it only at kUpdateStart).
 	// Record a violation only on the FIRST crossing of each budget within the update window; all further
 	// over-budget packets that update drop silently. A sustained hostile flood still escalates (~1 violation per
@@ -216,26 +216,33 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 	// queued acks after a ~9 s server stall, or a NetworkSimulation fast-forward flush draining the delayed
 	// queue) costs a legitimate client at most 2 lifetime violations (packet + byte). RecordContractViolation may
 	// invalidate pClient, so the first-crossing record is the last touch of the client and returns immediately.
-	const bool bPacketWasUnderBudget = pClient->iTickPacketCount <= kiMaxClientPacketsPerTick;
-	++pClient->iTickPacketCount;
-	if (pClient->iTickPacketCount > kiMaxClientPacketsPerTick)
+	// A handshaken client's subscribe and unsubscribe skip this gate: they are reliable with no client retry, so a
+	// stall burst of acks must not silently drop one, and gates 3-5 still bound them by fixed size and a
+	// violation-counted per-type cap. Pre-handshake ones stay budgeted because gate 4 drops them before gate 5 counts.
+	const bool bBudgetExempt = pClient->bHandshakeComplete && (eType == PacketType::kClientSubscribe || eType == PacketType::kClientUnsubscribe);
+	if (!bBudgetExempt)
 	{
-		if (bPacketWasUnderBudget)
+		const bool bPacketWasUnderBudget = pClient->iTickPacketCount <= kiMaxClientPacketsPerTick;
+		++pClient->iTickPacketCount;
+		if (pClient->iTickPacketCount > kiMaxClientPacketsPerTick)
 		{
-			RecordContractViolation(iClientId, "tick budget", packetData[0], static_cast<int64_t>(packetData.size()));
+			if (bPacketWasUnderBudget)
+			{
+				RecordContractViolation(iClientId, "tick budget", packetData[0], static_cast<int64_t>(packetData.size()));
+			}
+			return;
 		}
-		return;
-	}
 
-	const bool bByteWasUnderBudget = pClient->iTickByteCount <= kiMaxClientInboundBytesPerTick;
-	pClient->iTickByteCount += static_cast<int64_t>(packetData.size());
-	if (pClient->iTickByteCount > kiMaxClientInboundBytesPerTick)
-	{
-		if (bByteWasUnderBudget)
+		const bool bByteWasUnderBudget = pClient->iTickByteCount <= kiMaxClientInboundBytesPerTick;
+		pClient->iTickByteCount += static_cast<int64_t>(packetData.size());
+		if (pClient->iTickByteCount > kiMaxClientInboundBytesPerTick)
 		{
-			RecordContractViolation(iClientId, "tick budget", packetData[0], static_cast<int64_t>(packetData.size()));
+			if (bByteWasUnderBudget)
+			{
+				RecordContractViolation(iClientId, "tick budget", packetData[0], static_cast<int64_t>(packetData.size()));
+			}
+			return;
 		}
-		return;
 	}
 
 	// Gates 3-5 apply to engine types only. Game-range types (>= kGamePacketStart) skip the contract table and

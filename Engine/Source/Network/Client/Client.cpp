@@ -18,6 +18,78 @@ constexpr std::chrono::seconds kSubscriptionTransitionTimeout = 5s;
 
 } // namespace
 
+void SubscribeRequests::Add(GridCoord coord)
+{
+	// Heap: subscribe request list grows on subscribe (SynchronizeSubscriptions suppresses tracking)
+	mRecords.push_back({.coord = coord, .startTime = std::chrono::steady_clock::now()});
+}
+
+void SubscribeRequests::Cancel(GridCoord coord)
+{
+	for (SubscribeRequest& rRecord : mRecords)
+	{
+		if (rRecord.coord == coord)
+		{
+			rRecord.flags.Set(SubscribeRequestFlags::kCancelled);
+		}
+	}
+	LOG(kNetwork, kVerbose, "SubscribeRequests::Cancel Coord: ({},{}) Records: {}", coord.x, coord.y, mRecords.size());
+}
+
+void SubscribeRequests::WarnTimedOut(std::chrono::steady_clock::time_point now)
+{
+	for (SubscribeRequest& rRecord : mRecords)
+	{
+		if (rRecord.flags & SubscribeRequestFlags::kCancelled)
+		{
+			continue;
+		}
+
+		if (rRecord.flags & SubscribeRequestFlags::kTimeoutWarned)
+		{
+			continue;
+		}
+
+		if (now - rRecord.startTime < kSubscriptionTransitionTimeout)
+		{
+			continue;
+		}
+
+		rRecord.flags.Set(SubscribeRequestFlags::kTimeoutWarned);
+		LOG(kNetwork, kWarning, "SubscribeRequests::WarnTimedOut unanswered subscribe Coord: ({},{})", rRecord.coord.x, rRecord.coord.y);
+	}
+}
+
+bool SubscribeRequests::TakeAnswer(GridCoord coord)
+{
+	auto it = std::ranges::find(mRecords, coord, &SubscribeRequest::coord);
+	if (it == mRecords.end())
+	{
+		return false;
+	}
+	bool bLive = !(it->flags & SubscribeRequestFlags::kCancelled);
+	mRecords.erase(it);
+	return bLive;
+}
+
+bool SubscribeRequests::IsLive(GridCoord coord) const
+{
+	return std::ranges::any_of(mRecords, [coord](const SubscribeRequest& rRecord)
+	{
+		return rRecord.coord == coord && !(rRecord.flags & SubscribeRequestFlags::kCancelled);
+	});
+}
+
+std::span<const SubscribeRequest> SubscribeRequests::Records() const
+{
+	return mRecords;
+}
+
+void SubscribeRequests::Clear()
+{
+	mRecords.clear();
+}
+
 Client::Client(const char* pServerAddress, uint16_t uiPort, int64_t iCoordSlots, const ClientGuid& rGuid, GuidAssignedCallback pfnGuidAssigned)
 {
 	ASSERT(gpClient == nullptr);
@@ -99,13 +171,6 @@ void Client::FreeSlot(int64_t iSlot)
 	rSlot.ackState.uiEpoch = uiEpoch;
 }
 
-void Client::CancelSubscription(GridCoord coord)
-{
-	RemovePendingSubscription(coord);
-	mCancelledSubscriptions.push_back(coord);
-	LOG(kNetwork, kVerbose, "Client::CancelSubscription Coord: ({},{}) CancelledCount: {}", coord.x, coord.y, mCancelledSubscriptions.size());
-}
-
 void Client::ResetAllSlots()
 {
 	ClientNetworkFixtures::Reset(*this);
@@ -113,37 +178,21 @@ void Client::ResetAllSlots()
 	{
 		FreeSlot(i);
 	}
-	mPendingSubscriptions.clear();
-	mCancelledSubscriptions.clear();
+	mSubscribeRequests.Clear();
 }
 
 void Client::RecoverTimedOutSubscriptions()
 {
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	std::erase_if(mPendingSubscriptions, [now](const PendingSubscription& rPending)
-	{
-		return now - rPending.startTime >= kSubscriptionTransitionTimeout;
-	});
+	mSubscribeRequests.WarnTimedOut(now);
+	// kWaitingFullState has no timeout: the server keeps an accepted subscription queued until the coord has a frame with
+	// navigation data built, which during replay waits for the coord's recorded activation
 	for (int64_t i = 0; i < std::ssize(mCoordSlots); ++i)
 	{
-		ClientCoordSlot& rSlot = mCoordSlots.at(i);
-		if (rSlot.eState == CoordSubscriptionState::kUnsubscribed || rSlot.eState == CoordSubscriptionState::kActive
-		 || now - rSlot.transitionStartTime < kSubscriptionTransitionTimeout)
+		const ClientCoordSlot& rSlot = mCoordSlots.at(i);
+		if (rSlot.eState == CoordSubscriptionState::kUnsubscribing && now - rSlot.transitionStartTime >= kSubscriptionTransitionTimeout)
 		{
-			continue;
-		}
-
-		switch (rSlot.eState)
-		{
-			case CoordSubscriptionState::kUnsubscribing:
-				FreeSlot(i);
-				break;
-			case CoordSubscriptionState::kWaitingFullState:
-				SendUnsubscribe(i);
-				break;
-			case CoordSubscriptionState::kUnsubscribed:
-			case CoordSubscriptionState::kActive:
-				break;
+			FreeSlot(i);
 		}
 	}
 }

@@ -113,17 +113,17 @@ bool Client::SendSubscribe(GridCoord coord)
 		return false;
 	}
 
-	// The server picks the slot; the client only needs a free slot for each pending subscribe
+	// The server picks the slot; the client needs a free slot for each unanswered subscribe request, cancelled ones
+	// included, so the unanswered count stays within the slot count and under the server's per-update subscribe cap
 	int64_t iFreeSlots = std::ranges::count_if(mCoordSlots, [](const ClientCoordSlot& rSlot)
 	{
 		return rSlot.eState == CoordSubscriptionState::kUnsubscribed || rSlot.eState == CoordSubscriptionState::kUnsubscribing;
 	});
-	if (iFreeSlots <= std::ssize(mPendingSubscriptions))
+	if (iFreeSlots <= std::ssize(mSubscribeRequests.Records()))
 	{
 		return false;
 	}
-	// Heap: pending subscribe list grows on subscribe (SynchronizeSubscriptions suppresses tracking)
-	mPendingSubscriptions.push_back({.coord = coord, .startTime = std::chrono::steady_clock::now()});
+	mSubscribeRequests.Add(coord);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();

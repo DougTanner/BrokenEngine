@@ -566,14 +566,12 @@ void ClientSessionRuntime::UnsubscribeStaleCoords(const GridCoord* pDesiredCoord
 		}
 	}
 
-	const std::vector<PendingSubscription>& rPending = mpClient->mPendingSubscriptions;
-	for (int64_t i = std::ssize(rPending) - 1; i >= 0; --i)
+	for (const SubscribeRequest& rRecord : mpClient->mSubscribeRequests.Records())
 	{
-		GridCoord coord = rPending.at(i).coord;
-		if (!ContainsCoordinate(pDesiredCoords, iDesiredCount, coord))
+		if (!(rRecord.flags & SubscribeRequestFlags::kCancelled) &&!ContainsCoordinate(pDesiredCoords, iDesiredCount, rRecord.coord))
 		{
-			mpClient->CancelSubscription(coord);
-			mrSession.OnCoordReleased(coord);
+			mpClient->mSubscribeRequests.Cancel(rRecord.coord);
+			mrSession.OnCoordReleased(rRecord.coord);
 		}
 	}
 }
@@ -589,7 +587,7 @@ void ClientSessionRuntime::BuildSubscriptionQueue(const GridCoord* pDesiredCoord
 		{
 			return IsSlotActive(rSlot) && rSlot.coord == rCoord;
 		});
-		if (!bActive && !std::ranges::contains(mpClient->mPendingSubscriptions, rCoord, &PendingSubscription::coord))
+		if (!bActive && !mpClient->mSubscribeRequests.IsLive(rCoord))
 		{
 			mSubscriptionQueue.push_back(rCoord);
 		}

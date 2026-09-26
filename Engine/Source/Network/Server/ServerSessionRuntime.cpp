@@ -165,6 +165,18 @@ void ServerSessionRuntime::HandleResyncRequests()
 			}
 
 			engine::GridCoord coord = pClient->slots.at(iSlot).subscription.coord;
+
+			// A slot whose new subscription is still queued gets its full state from that entry, after its static
+			// data; a resync full state sent first would activate the client slot, which then drops the static data
+			bool bNewSubscriptionQueued = std::ranges::any_of(mpServer->mPendingNewSubscriptions, [iClientId, iSlot, coord](const engine::PendingNewSubscription& rPending)
+			{
+				return rPending.iClientId == iClientId && rPending.iSlot == iSlot && rPending.coord == coord;
+			});
+			if (bNewSubscriptionQueued)
+			{
+				continue;
+			}
+
 			auto frameIt = game::gpGame->mCoordFrames.find(coord);
 			if (frameIt == game::gpGame->mCoordFrames.end())
 			{
@@ -183,8 +195,12 @@ void ServerSessionRuntime::HandleResyncRequests()
 
 void ServerSessionRuntime::SendNewSubscriptionFullStates()
 {
-	std::vector<engine::PendingNewSubscription>& rNewSubscriptions = mpServer->mPendingNewSubscriptions;
-	for (const engine::PendingNewSubscription& rSubscription : rNewSubscriptions)
+	// Persist-until-served: Server::Poll leaves this runtime-owned queue intact, and an entry leaves it only once
+	// served or once its client or slot is gone. Serving needs a frame whose navigation data is built, because
+	// static data always carries navigation data; a replay reader activated this tick has a frame whose first
+	// dispatch, and so its build, is next tick. A paused or otherwise zero-tick update builds first in
+	// CompleteUpdate through PreparePausedSubscriptions.
+	std::erase_if(mpServer->mPendingNewSubscriptions, [this](const engine::PendingNewSubscription& rSubscription)
 	{
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rSubscription.iClientId);
 		bool bSlotStillValid = (pClient != nullptr && rSubscription.iSlot < std::ssize(pClient->slots)
@@ -192,22 +208,24 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 		                     && pClient->slots.at(rSubscription.iSlot).subscription.coord == rSubscription.coord);
 		if (!bSlotStillValid)
 		{
-			continue;
+			return true;
 		}
 
 		auto it = game::gpGame->mCoordFrames.find(rSubscription.coord);
-		if (it != game::gpGame->mCoordFrames.end())
+		if (it == game::gpGame->mCoordFrames.end())
 		{
-			mpServer->SendCoordStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coord, it->second.staticData);
-			mpServer->SendCoordFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->TickCounter(), rSubscription.coord, it->second.pCurrent.get());
+			return false;
 		}
-	}
 
-	// Persist-until-served: Server::Poll leaves this runtime-owned queue intact, so clear it here once serviced.
-	// A subscription accepted during a paused or otherwise zero-tick update (iFullTicks == 0) stays queued across
-	// polls until ServerSessionRuntime services it — either after the next tick in CompleteTick or during the
-	// current zero-tick update in CompleteUpdate — and its static data and full state are sent.
-	rNewSubscriptions.clear();
+		if (!it->second.staticData.bNavDataBuilt)
+		{
+			return false;
+		}
+
+		mpServer->SendCoordStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coord, it->second.staticData);
+		mpServer->SendCoordFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->TickCounter(), rSubscription.coord, it->second.pCurrent.get());
+		return true;
+	});
 }
 
 void ServerSessionRuntime::CompleteTick(int64_t iTick)
