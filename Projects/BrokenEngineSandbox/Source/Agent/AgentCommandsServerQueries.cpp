@@ -30,7 +30,8 @@ nlohmann::json Vec3ToJson(XMVECTOR vec)
 void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t& riBegin, int64_t& riEnd)
 {
 	riBegin = std::clamp<int64_t>(iOffset, 0, iTotal);
-	riEnd = std::min<int64_t>(iTotal, riBegin + std::max<int64_t>(iLimit, 0));
+	int64_t iPageLimit = std::max<int64_t>(iLimit, 0);
+	riEnd = iPageLimit >= iTotal - riBegin ? iTotal : riBegin + iPageLimit;
 }
 
 // Minimum+cheap field set per collection: index, local/dir, health, alignment, id — wherever the member exists.
