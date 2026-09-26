@@ -249,17 +249,30 @@ void AgentCommandServer::ServeConnection(SOCKET clientSocket, const std::stop_to
 			{
 				return; // stop can race the completed read; do not publish a request after shutdown begins
 			}
+			request.uiGeneration = muiConnectionGeneration;
 			mPendingRequest = std::move(request);
 		}
 
-		// Wait for the main thread's Drain() to publish the serialized response.
+		// Wait for the main thread's Drain() to publish the serialized response. Between timed waits, peek the socket
+		// outside the lock so a peer that closes mid-wait releases the connection instead of parking it until publish.
+		// MSG_PEEK leaves any unsolicited bytes queued for the next request read.
 		std::string response;
 		{
 			std::unique_lock lock(mMutex);
-			mResponseReady.wait(lock, [this, &rStopToken]()
+			while (!mResponseReady.wait_for(lock, kListenerRetryInterval, [this, &rStopToken]()
 			{
 				return mPendingResponse.has_value() || rStopToken.stop_requested();
-			});
+			}))
+			{
+				lock.unlock();
+				char cPeekByte = 0;
+				const int iPeeked = recv(clientSocket, &cPeekByte, 1, MSG_PEEK);
+				if (iPeeked == 0 || (iPeeked == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK))
+				{
+					return; // peer closed or reset; teardown bumps the generation so its response is dropped
+				}
+				lock.lock();
+			}
 			if (!mPendingResponse.has_value())
 			{
 				return; // stop requested during shutdown
@@ -281,14 +294,15 @@ void AgentCommandServer::Drain()
 	ScopedSuppressAllocationTracking suppress;
 
 	// An in-flight deferred response (async screenshot / dump capture) takes precedence: poll it before accepting a
-	// new request. The originating request stays in flight (its listener thread still waits on mResponseReady) until
-	// the poll yields a result, so no new request can arrive meanwhile (single connection, one request at a time).
+	// new request. While its connection is live, the listener waits on mResponseReady until the poll yields a result,
+	// so no new request arrives. If that peer closes, a later connection's request can wait in mPendingRequest; the
+	// stale poll is discarded below on the next Drain before that request is taken.
 	if (mDeferredPoll)
 	{
 		// Discard a deferred response whose generation differs from the live connection so it cannot enter the next
-		// connection's stream and desynchronize IDs. The listener waits on mResponseReady during deferral, so teardown
-		// follows publication or timeout; mid-capture disconnects are not observed here. Shutdown invalidates the
-		// generation, and no peer remains to receive that response.
+		// connection's stream and desynchronize IDs. The listener tears the connection down when its peer closes
+		// mid-deferral, which bumps the generation. Shutdown also invalidates the generation, and no peer remains to
+		// receive that response.
 		bool bStaleConnection = false;
 		{
 			std::unique_lock lock(mMutex);
@@ -346,6 +360,8 @@ void AgentCommandServer::Drain()
 		request = std::move(*mPendingRequest);
 		mPendingRequest.reset();
 	}
+	// Every response to this request, synchronous or deferred, publishes only while its handoff generation is live.
+	muiDeferredGeneration = request.uiGeneration;
 
 	// Build the response envelope. Malformed JSON or a missing/invalid cmd answers with id:null; a handler
 	// exception echoes the request id. The lock is never held across game-state work.
@@ -417,13 +433,6 @@ void AgentCommandServer::DeferResponse(std::function<std::optional<nlohmann::jso
 	mDeferredPoll = std::move(poll);
 	mbResponseDeferred = true;
 	miDeferredDrainCount = 0;
-
-	// Snapshot the current connection generation so a later disconnect (which bumps it) makes Drain discard this
-	// deferred response instead of publishing it into a subsequent connection's stream.
-	{
-		std::unique_lock lock(mMutex);
-		muiDeferredGeneration = muiConnectionGeneration;
-	}
 }
 
 void AgentCommandServer::PublishResponse(nlohmann::json response)
@@ -441,6 +450,10 @@ void AgentCommandServer::PublishResponse(nlohmann::json response)
 
 	{
 		std::unique_lock lock(mMutex);
+		if (muiDeferredGeneration != muiConnectionGeneration)
+		{
+			return; // the request's connection was torn down; a later connection must never receive this response
+		}
 		mPendingResponse = std::move(responseString);
 	}
 	mResponseReady.notify_one();

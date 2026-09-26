@@ -53,18 +53,20 @@ public:
 
 private:
 
-	// A request parsed off the listener thread and handed to the main thread. bParsed == false means the frame
-	// was not valid JSON (Drain answers with an id:null error).
+	// A request parsed off the listener thread and handed to the main thread, stamped with the connection generation
+	// it arrived on. bParsed == false means the frame was not valid JSON (Drain answers with an id:null error).
 	struct PendingRequest
 	{
 		nlohmann::json request;
+		uint64_t uiGeneration = 0;
 		bool bParsed = false;
 	};
 
 	void ListenerLoop(std::stop_token stopToken);
 	void ServeConnection(SOCKET clientSocket, const std::stop_token& rStopToken);
 
-	// Serialize, cap, and hand a response envelope to the listener thread (stores mPendingResponse + notifies).
+	// Serialize, cap, and hand a response envelope to the listener thread (stores mPendingResponse + notifies). A
+	// response whose request generation is no longer the live connection's is dropped without storing or notifying.
 	void PublishResponse(nlohmann::json response);
 
 	static bool ReadExact(SOCKET clientSocket, uint8_t* pBuffer, int64_t iBytes, const std::stop_token& rStopToken);
@@ -87,7 +89,7 @@ private:
 	std::function<std::optional<nlohmann::json>()> mDeferredPoll; // set = a response is deferred, polled each Drain
 	nlohmann::json mDeferredId; // id echoed when the deferred poll completes
 	bool mbResponseDeferred = false; // set by DeferResponse within the current Drain dispatch
-	uint64_t muiDeferredGeneration = 0; // muiConnectionGeneration snapshot when the response was deferred
+	uint64_t muiDeferredGeneration = 0; // handoff generation of the request Drain last took; its response publishes only while it is live
 	int64_t miDeferredDrainCount = 0; // Drains elapsed since the deferral (liveness timeout)
 
 	std::jthread mListenerThread; // last member: its body reads every other member via `this`
