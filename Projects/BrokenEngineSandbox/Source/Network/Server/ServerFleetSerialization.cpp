@@ -172,7 +172,10 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 		{
 			ReadFleet(rFileStream, fleets.at(static_cast<size_t>(j)));
 		}
-		rFleets.insert_or_assign(guid, std::move(fleets));
+		if (!rFleets.try_emplace(guid, std::move(fleets)).second)
+		{
+			throw std::ios_base::failure("duplicate Fleet owner ClientGuid");
+		}
 		// All loaded fleets start as disconnected
 		rGuidToClientId.insert_or_assign(guid, static_cast<int64_t>(0));
 	}
