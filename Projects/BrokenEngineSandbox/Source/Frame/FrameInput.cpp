@@ -1,5 +1,7 @@
 #include "FrameInput.h"
 
+#include "SpawnTransfer.h"
+
 namespace game
 {
 
@@ -49,6 +51,11 @@ std::istream& operator>>(std::istream& rStream, FrameInput& rInput)
 		}
 		rChange.data = DefaultDataForType(rChange.eType);
 		std::visit([&](auto& payload) { common::Read(rStream, payload); }, rChange.data);
+		// Trust boundary (replay stream): reject a payload the game cannot adopt before the replay reaches the simulation.
+		if (!IsAdoptableStatusChange(rChange))
+		{
+			throw std::ios_base::failure("FrameInput StatusChange payload");
+		}
 	}
 
 	return rStream;

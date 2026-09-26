@@ -3,9 +3,8 @@
 #include "Network/NetworkProtocol.h" // kiMaxStatusChangesPerCell for the shared batch-size bounds below
 
 // The engine owns the batch codec body (NetworkSerialization.cpp): the tagged [type][count] group envelope,
-// the bounded receive cursor, and the all-or-nothing malformed-input rejection. The game supplies the
-// StatusChangeType enum, the concrete payload variants, and the per-type NetworkSessionContract operations
-// that give those payloads their bytes. The game type is forward-declared rather than included so this
+// the bounded receive cursor, the all-or-nothing malformed-input rejection, and each payload type's
+// read/write. The game supplies the StatusChangeType enum and the concrete payload variants. The game type is forward-declared rather than included so this
 // engine header stays free of game dependencies; the codec .cpp includes the game header for the full type.
 namespace game { struct StatusChange; }
 

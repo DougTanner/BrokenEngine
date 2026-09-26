@@ -102,4 +102,14 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 	}
 }
 
+bool IsAdoptableStatusChange(const StatusChange& rChange)
+{
+	if (rChange.eType != StatusChangeType::kTransferBlaster)
+	{
+		return true;
+	}
+
+	return std::get<TransferData>(rChange.data).uiTypeIndex < BlastersInterpolate::sTypes.size();
+}
+
 } // namespace game

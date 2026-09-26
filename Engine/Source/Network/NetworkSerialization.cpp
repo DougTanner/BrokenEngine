@@ -5,6 +5,7 @@
 #include "Network/NetworkCursor.h"
 
 #include "Frame/StatusChange.h"
+#include "SpawnTransfer.h"
 
 namespace engine
 {
@@ -280,10 +281,10 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 	}
 
 	// Trust boundary (network input): drive every read through a bounded cursor and throw on any malformed byte — a
-	// short group header, a shortfall mid-item, an out-of-range type byte, or a decoded count past iMaxCount — rather
-	// than over-reading pEnd or applying a prefix. All-or-nothing at both ends: the send side drops an over-cap batch
-	// whole, and nothing decoded here is published before the throw, so a corrupt batch cannot partially apply.
-	// StatusChangeItemWireSize above is the per-type read-width mirror.
+	// short group header, a shortfall mid-item, an out-of-range type byte, a decoded count past iMaxCount, or a payload
+	// the game cannot adopt — rather than over-reading pEnd or applying a prefix. All-or-nothing at both ends: the send
+	// side drops an over-cap batch whole, and nothing decoded here is published before the throw, so a corrupt batch
+	// cannot partially apply. StatusChangeItemWireSize above is the per-type read-width mirror.
 	BoundedCursor cursor {static_cast<const uint8_t*>(pSource), static_cast<const uint8_t*>(pSource) + iSourceSize};
 	int64_t iOutputCount = 0;
 
@@ -378,6 +379,12 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 					rUpdate.uiPendingFleetWantedCoordTicks = ReadUint8(cursor.pCursor);
 					break;
 				}
+			}
+
+			if (!game::IsAdoptableStatusChange(rChange))
+			{
+				LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: unadoptable {} payload (deserialized {})", game::StatusChangeTypeName(eType), iOutputCount);
+				NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
 			}
 		}
 	}
