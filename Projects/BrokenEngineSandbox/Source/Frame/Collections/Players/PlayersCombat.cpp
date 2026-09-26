@@ -30,7 +30,6 @@ constexpr float kfShieldDownSoundCooldown = 2.0f;
 constexpr float kfArmorHitSoundDamageThreshold = 3.0f;
 
 // Blaster spawn
-constexpr float kfBlasterFireInterval = 0.05f;
 constexpr float kfBlastersSpawnBarrelOffset = kfPlayerRadius * 0.4667f;
 constexpr float kfBlastersSpawnPreMove = 0.0f;
 constexpr float kfBlasterAngleJitter = 0.03f;
@@ -324,6 +323,7 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 		XMVECTOR vecLeftNormal = XMVector3Normalize(XMVector3Cross(vecBaseDirection, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)));
 
 		// Decrement fire timer and spawn as many blasters as fit
+		ASSERT(IsBlasterFireTimeInRange(rCurrentPostRender.pfNextBlasterFireTimes[i]));
 		rCurrentPostRender.pfNextBlasterFireTimes[i] -= fDeltaTime;
 
 		while (rCurrentPostRender.pfNextBlasterFireTimes[i] <= 0.0f)

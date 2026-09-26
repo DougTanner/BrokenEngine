@@ -18,6 +18,7 @@ namespace game
 inline constexpr float kfDestroyTime = 0.7f;
 inline constexpr float kfDestroyExplosionInterval = 0.005f;
 inline constexpr float kfPlayerBlastersSpeed = 150.0f;
+inline constexpr float kfBlasterFireInterval = 0.05f;
 
 // Collision
 inline constexpr float kfPlayerRadius = 1.1f;
@@ -205,6 +206,25 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 
 	// Allocate and copy
 	static void AllocateAndCopy(PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious);
+
+	// Simulation keeps the blaster countdown in [0, kfBlasterFireInterval], which bounds SpawnBlasters to one shot per tick.
+	// Written as one range test so NaN and both infinities fail it too.
+	static bool IsBlasterFireTimeInRange(float fTime)
+	{
+		return fTime >= 0.0f && fTime <= kfBlasterFireInterval;
+	}
+
+	// Reject an out-of-range countdown as a corrupt stream: NaN or +inf never fires, and a large negative value never finishes the burst loop.
+	static void PostRead(const PlayersPostRender& rCurrent)
+	{
+		for (int64_t i = 0; i < rCurrent.iCount; ++i)
+		{
+			if (!IsBlasterFireTimeInRange(rCurrent.pfNextBlasterFireTimes[i]))
+			{
+				throw std::ios_base::failure("PlayersPostRender pfNextBlasterFireTimes");
+			}
+		}
+	}
 
 	// Update (orchestrator in Players.cpp; per-player phase work split into helpers below)
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);

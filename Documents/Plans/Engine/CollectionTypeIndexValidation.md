@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-26T23:33:25.731Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-26T23:33:25.731Z","dependsOn":["Documents/Plans/Engine/ClientServerDataCheckRemoval.md"]} -->
 # Reject out-of-range serialized explosion type indices
 
 ## Context

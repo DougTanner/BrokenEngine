@@ -16,3 +16,4 @@ Players represent a flagship and AI-driven wingmen through one collection. Stabl
 
 - Game identity uses stable global IDs rather than local collection indices.
 - Shared CRC excludes client animation time, the local records tracking each pusher, and server-assigned global identity. Some excluded state still participates in save or transfer.
+- The simulation keeps `pfNextBlasterFireTimes` in [0, `kfBlasterFireInterval`], which `SpawnBlasters` asserts. `PostRead` rejects out-of-range rows on every Frame read.

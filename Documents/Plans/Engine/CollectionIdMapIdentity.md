@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-26T23:33:20.229Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-26T23:33:20.229Z","dependsOn":["Documents/Plans/Engine/ClientServerDataCheckRemoval.md"]} -->
 # Validate indexable collection IDs against paired rows on read
 
 ## Context
