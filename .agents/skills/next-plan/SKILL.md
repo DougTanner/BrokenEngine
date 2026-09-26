@@ -224,6 +224,10 @@ Execution card:
 - Roles: <required and conditional assignments>
 ```
 
+A bullet field's label may carry a parenthetical qualifier before the colon,
+and its content may follow the colon or sit in indented lines nested directly
+under the bullet.
+
 The preparation fills `Roles` from the Change Workflow step and role
 assignments its brief supplies, citing the brief as the evidence and never
 reading the workflow itself. When the tier the preparation classifies differs

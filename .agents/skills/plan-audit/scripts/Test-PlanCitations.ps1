@@ -23,17 +23,18 @@ $script:MaximumTextLength = 160
 $script:MaximumMessageLength = 256
 $script:MaximumOutputBytes = 32768
 # The execution-card fields in the order ../../next-plan/SKILL.md '## Handoff' lists them. A Section
-# field is a '###' heading, present only with a non-blank line under it; the others are bullets,
-# present only with text after the colon.
+# field is a '###' heading, present only with a non-blank line under it; the others are bullets whose
+# label may carry a parenthetical qualifier before the colon, present only with text after the colon
+# or an indented line nested directly under the bullet.
 $script:CardFields = @(
 	[pscustomobject]@{ Name = 'whatDoesThisPlanDo'; Pattern = '^###\s+What does this plan do\?\s*$'; Section = $true }
 	[pscustomobject]@{ Name = 'whyGoodForCodebase'; Pattern = '^###\s+Why this is good for the codebase\s*$'; Section = $true }
-	[pscustomobject]@{ Name = 'goal'; Pattern = '^-\s+Goal:\s*\S'; Section = $false }
-	[pscustomobject]@{ Name = 'outOfScope'; Pattern = '^-\s+Out of scope:\s*\S'; Section = $false }
-	[pscustomobject]@{ Name = 'tierTrigger'; Pattern = '^-\s+Tier trigger:\s*\S'; Section = $false }
-	[pscustomobject]@{ Name = 'interfacesAndInvariants'; Pattern = '^-\s+Interfaces and invariants:\s*\S'; Section = $false }
-	[pscustomobject]@{ Name = 'acceptanceChecks'; Pattern = '^-\s+Acceptance checks:\s*\S'; Section = $false }
-	[pscustomobject]@{ Name = 'roles'; Pattern = '^-\s+Roles:\s*\S'; Section = $false }
+	[pscustomobject]@{ Name = 'goal'; Pattern = '^-\s+Goal(\s+\([^)]*\))?:'; Section = $false }
+	[pscustomobject]@{ Name = 'outOfScope'; Pattern = '^-\s+Out of scope(\s+\([^)]*\))?:'; Section = $false }
+	[pscustomobject]@{ Name = 'tierTrigger'; Pattern = '^-\s+Tier trigger(\s+\([^)]*\))?:'; Section = $false }
+	[pscustomobject]@{ Name = 'interfacesAndInvariants'; Pattern = '^-\s+Interfaces and invariants(\s+\([^)]*\))?:'; Section = $false }
+	[pscustomobject]@{ Name = 'acceptanceChecks'; Pattern = '^-\s+Acceptance checks(\s+\([^)]*\))?:'; Section = $false }
+	[pscustomobject]@{ Name = 'roles'; Pattern = '^-\s+Roles(\s+\([^)]*\))?:'; Section = $false }
 )
 
 $script:Result = [ordered]@{
@@ -217,7 +218,7 @@ function Get-CardPayload
 			}
 			if (-not $field.Section)
 			{
-				$found = $true
+				$found = $PlanLines[$index] -cmatch "$($field.Pattern)\s*\S" -or ($index + 1 -lt $PlanLines.Count -and $PlanLines[$index + 1] -cmatch '^\s+\S')
 				continue
 			}
 			# A heading counts only when it has body text before the next heading or the end of the file.
