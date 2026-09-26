@@ -187,12 +187,22 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientReplayRecordRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientReplayRecordRequest Client: {}", rPacket.iClientId);
+					if (engine::gpReplay->IsPlaybackActiveOrPending())
+					{
+						LOG(kDefault, kWarning, "ServerSession::kClientReplayRecordRequest rejected: playback is active or pending Client: {}", rPacket.iClientId);
+						break;
+					}
 					gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay);
 					break;
 				}
 				case GamePacketType::kClientReplayPlaybackRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientReplayPlaybackRequest Client: {}", rPacket.iClientId);
+					if (engine::gpReplay->IsRecordingActiveOrPending())
+					{
+						LOG(kDefault, kWarning, "ServerSession::kClientReplayPlaybackRequest rejected: active or pending recording Client: {}", rPacket.iClientId);
+						break;
+					}
 					gpGame->mGameFlags.Set(engine::GameFlags::kLoadReplay);
 					break;
 				}

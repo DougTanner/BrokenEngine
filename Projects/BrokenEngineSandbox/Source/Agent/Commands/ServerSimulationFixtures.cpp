@@ -68,6 +68,10 @@ void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe
 			throw std::runtime_error("replay_record requires bool 'start'");
 		}
 		bool bStart = rParams.at("start").get<bool>();
+		if (bStart && engine::gpReplay->IsPlaybackActiveOrPending())
+		{
+			throw std::runtime_error("replay_record start rejected: playback is active or pending");
+		}
 		// kSaveReplay is a pure toggle in SyncReplayTick (empty writer set starts, non-empty stops). While paused the
 		// per-tick loop is skipped, so a set-but-unconsumed flag leaves the effective requested state the inverse of
 		// IsRecording() — compute it, not IsRecording() alone. bEffective is the state the sim will settle into once the
@@ -107,6 +111,10 @@ void CommandReplayPlay([[maybe_unused]] const nlohmann::json& rParams, [[maybe_u
 	else
 	{
 		// Same semantics as F8 / kClientReplayPlaybackRequest: starts playback, or cancels if already replaying.
+		if (engine::gpReplay->IsRecordingActiveOrPending())
+		{
+			throw std::runtime_error("replay_play rejected: active or pending recording");
+		}
 		gpGame->mGameFlags.Set(engine::GameFlags::kLoadReplay);
 		rResult["pending"] = true;
 	}

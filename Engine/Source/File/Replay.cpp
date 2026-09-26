@@ -278,6 +278,16 @@ void Replay::PublishReplayingState()
 	mrGameBase.mbReplaying = !mReplayReaders.empty() || !mPendingReplayReaders.empty();
 }
 
+bool Replay::IsPlaybackActiveOrPending() const
+{
+	return mrGameBase.mbReplaying || (mrGameBase.mGameFlags & engine::GameFlags::kLoadReplay);
+}
+
+bool Replay::IsRecordingActiveOrPending() const
+{
+	return !mReplayWriters.empty() || (mrGameBase.mGameFlags & engine::GameFlags::kSaveReplay);
+}
+
 void Replay::ClearReplayTransientState()
 {
 	// Manifest validation can fail while the live game is still running; only discard state owned exclusively by replay.
@@ -399,6 +409,8 @@ void Replay::SaveLoadReplay()
 			ScopedSuppressAllocationTracking suppress;
 			gpProfileManager->LatchRawCpuTimers(false, mrGameBase.TickCounter());
 
+			// Outside the try: its catch clears the replay fixture and transfer-capture state that a live recording still uses.
+			ASSERT(!IsRecordingActiveOrPending());
 			mrGameBase.mGameFlags.Clear(engine::GameFlags::kLoadReplay);
 
 			try
@@ -762,6 +774,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 		// Recording start: create one writer per active coord
 		if ((mrGameBase.mGameFlags & engine::GameFlags::kSaveReplay) && mReplayWriters.empty())
 		{
+			ASSERT(!IsPlaybackActiveOrPending());
 			mrGameBase.mGameFlags.Clear(engine::GameFlags::kSaveReplay);
 
 			if (ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kManifestInvalidation))

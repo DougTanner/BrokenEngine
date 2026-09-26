@@ -35,6 +35,8 @@ public:
 	[[nodiscard]] ReplayTickDecision SyncReplayTick();
 
 	bool IsRecording() const { return !mReplayWriters.empty(); }
+	bool IsPlaybackActiveOrPending() const;
+	bool IsRecordingActiveOrPending() const;
 	void ResetStreams();
 	[[nodiscard]] bool CaptureAcceptedTransfers(GridCoord destination, std::span<const game::StatusChange> sortedTransfers, const game::Frame& rPreTransferFrame);
 	void RetireCoordinate(GridCoord coord, std::unique_ptr<game::Frame> pLastCompleteFrame);
