@@ -35,6 +35,18 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>,
 	// Allocate and copy
 	static void AllocateAndCopy(BlastersInterpolate& rCurrent, const BlastersInterpolate& rPrevious);
 
+	// Trust boundary: a type index this build never registered is a corrupt stream; reject it before client hydration looks it up.
+	static void PostRead(const BlastersInterpolate& rCurrent)
+	{
+		for (int64_t i = 0; i < rCurrent.iCount; ++i)
+		{
+			if (rCurrent.puiTypeIndices[i] >= sTypes.size())
+			{
+				throw std::ios_base::failure("BlastersInterpolate puiTypeIndices");
+			}
+		}
+	}
+
 	// Interpolate
 	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
