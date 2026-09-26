@@ -14,6 +14,7 @@ namespace
 {
 
 constexpr int32_t kiWheelDelta = 120; // Win32 WHEEL_DELTA — one notch of the DirectXTK lifetime scroll accumulator
+constexpr int64_t kiMaxWheelNotches = INT32_MAX / kiWheelDelta;
 
 // Rect stability threshold: max per-corner pixel delta below which two consecutive frames count as settled.
 constexpr float kfRectStablePixels = 0.5f;
@@ -70,6 +71,16 @@ bool AgentInput::BeginScript(const AgentScript& rScript)
 	mbSyntheticMousePosValid = false;
 	mbImGuiMousePosPinned = false;
 	return true;
+}
+
+bool AgentInput::WheelNotchesFit(int64_t iNotches) const
+{
+	if (iNotches < -kiMaxWheelNotches || iNotches > kiMaxWheelNotches)
+	{
+		return false;
+	}
+	int64_t iSum = static_cast<int64_t>(miSyntheticScrollAccumulator) + iNotches * kiWheelDelta;
+	return iSum >= std::numeric_limits<int>::min() && iSum <= std::numeric_limits<int>::max();
 }
 
 void AgentInput::Finish(AgentScriptStatus eStatus)

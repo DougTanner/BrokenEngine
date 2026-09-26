@@ -1016,7 +1016,27 @@ void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 
 	if (script.eMouseAction == engine::AgentMouseAction::kWheel)
 	{
-		script.iWheelNotches = rParams.contains("notches") ? static_cast<int32_t>(rParams.at("notches").get<int64_t>()) : 1;
+		int64_t iNotches = 1;
+		if (rParams.contains("notches"))
+		{
+			const nlohmann::json& rNotches = rParams.at("notches");
+			bool bValid = rNotches.is_number_integer();
+			if (bValid && rNotches.is_number_unsigned())
+			{
+				bValid = rNotches.get<uint64_t>() <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+			}
+			if (!bValid)
+			{
+				throw std::runtime_error("mouse 'notches' must be an integer");
+			}
+			iNotches = rNotches.get<int64_t>();
+		}
+		// The default single notch is checked too: the lifetime total can sit within one notch of the int limit.
+		if (!engine::gpAgentInput->WheelNotchesFit(iNotches))
+		{
+			throw std::runtime_error("mouse 'notches' wheel delta or lifetime wheel total would exceed int32");
+		}
+		script.iWheelNotches = static_cast<int32_t>(iNotches);
 
 		// Optional target coords: both present routes the ImGui wheel to the window under (x,y); neither supplies a new
 		// ImGui target or preserves a pin from an earlier script. Camera zoom is suppressed when the hovered window can

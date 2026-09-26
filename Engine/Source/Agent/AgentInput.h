@@ -104,6 +104,9 @@ public:
 	// active or not) — consumers diff iScrollWheelValue, so the offset must never drop out of the published value.
 	int SyntheticScrollAccumulator() const { return miSyntheticScrollAccumulator; }
 
+	// True when the notch count's wheel product fits int32_t and adding it to the lifetime accumulator stays representable.
+	bool WheelNotchesFit(int64_t iNotches) const;
+
 	// Deferred-response poll accessors (valid once ScriptStatus() != kPending).
 	AgentScriptStatus ScriptStatus() const { return meStatus; }
 	bool ResolvedDisabled() const { return mbResolvedDisabled; }
