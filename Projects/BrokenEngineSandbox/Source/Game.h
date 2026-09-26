@@ -117,8 +117,8 @@ public:
 	bool CanFocusNextFleet() const { return mFleetSelection.CanFocusNextFleet(); }
 	bool CanFocusPrevFleet() const { return mFleetSelection.CanFocusPrevFleet(); }
 	const Fleet* FocusedFleet() const { return mFleetSelection.FocusedFleet(); }
-	void SelectPlayerInFleet(int64_t iPlayerIndex) { mFleetSelection.SelectPlayerInFleet(iPlayerIndex); }
-	int64_t FocusedPlayerInFleetIndex() const { return mFleetSelection.FocusedPlayerInFleetIndex(); }
+	void SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerId) { mFleetSelection.SelectPlayerInFleet(memberGlobalPlayerId); }
+	engine::global_id_t FocusedMemberGlobalId() const { return mFleetSelection.FocusedMemberGlobalId(); }
 	void SyncFleets(std::vector<Fleet>&& fleets) { mFleetSelection.SyncFleets(std::move(fleets)); }
 #endif
 

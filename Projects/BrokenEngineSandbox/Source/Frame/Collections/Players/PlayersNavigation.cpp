@@ -311,7 +311,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 	if (riNavDirection == 5)
 	{
 		// Follow the flagship via NavQuery without arrival or missing-flagship fallback. A missing flagship makes
-		// the proximity scan a no-op. OnPlayerDeath -> ShiftFlagshipAfterDeath updates the fleet index after
+		// the proximity scan a no-op. OnPlayerDeath -> ShiftFlagshipAfterDeath updates the fleet's flagship after
 		// removal; ProcessFlagshipUpdates publishes kUpdateFleet, whose Update handler writes kIsFlagship. A
 		// follower normally stalls one tick before finding the replacement or taking the fleet override. A promoted
 		// flagship recovers on D+2 when its flag and same-cell wanted coord become navigation-visible; mode 4 clears

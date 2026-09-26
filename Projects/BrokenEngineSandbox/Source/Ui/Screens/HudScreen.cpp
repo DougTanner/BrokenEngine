@@ -272,7 +272,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		for (int64_t i = 0; i < std::ssize(pFleet->members); ++i)
 		{
 			const FleetMember& rMember = pFleet->members.at(static_cast<size_t>(i));
-			bool bSelected = (i == gpGame->FocusedPlayerInFleetIndex());
+			bool bSelected = rMember.globalPlayerId.IsValid() && rMember.globalPlayerId == gpGame->FocusedMemberGlobalId();
 
 			// Find coord for display
 			engine::GridCoord memberCoord {};
@@ -292,7 +292,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoord.x, memberCoord.y, rMember.globalPlayerId.iValue);
 				if (ImGui::Selectable(pcLabel, bSelected))
 				{
-					gpGame->SelectPlayerInFleet(i);
+					gpGame->SelectPlayerInFleet(rMember.globalPlayerId);
 					gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kSelectPlayer);
 				}
 			}
@@ -305,8 +305,8 @@ void HudScreen::RenderFleetPanel(float fTarget)
 				{
 					if (gpClientSession != nullptr)
 					{
-						gpClientSession->SendRespawnInFleetRequest(pFleet->guid, i);
-						LOG(kDefault, kVerbose, "HUD RespawnInFleet Fleet: ({},{}) Member: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, i);
+						gpClientSession->SendRespawnInFleetRequest(pFleet->guid, rMember.globalPlayerId);
+						LOG(kDefault, kVerbose, "HUD RespawnInFleet Fleet: ({},{}) Member: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, rMember.globalPlayerId.iValue);
 					}
 				}
 				ImGui::PopStyleColor();

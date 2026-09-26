@@ -36,12 +36,13 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 		for (int64_t iFleet = 0; iFleet < std::ssize(rFleetVec); ++iFleet)
 		{
 			Fleet& rFleet = rFleetVec.at(static_cast<size_t>(iFleet));
-			if (rFleet.iFlagshipIndex < 0 || rFleet.iFlagshipIndex >= std::ssize(rFleet.members))
+			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
+			if (!rFleet.flagshipGlobalPlayerId.IsValid() || flagshipIt == rFleet.members.end())
 			{
 				continue;
 			}
 
-			const FleetMember& rFlagship = rFleet.members.at(static_cast<size_t>(rFleet.iFlagshipIndex));
+			const FleetMember& rFlagship = *flagshipIt;
 			if (!rFlagship.bAlive)
 			{
 				continue;
@@ -132,7 +133,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 		}
 		const Fleet& rFleet = *matchIt;
 
-		if (rFleet.iFlagshipIndex >= std::ssize(rFleet.members))
+		if (!rFleet.flagshipGlobalPlayerId.IsValid() || !std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId))
 		{
 			continue;
 		}
@@ -148,7 +149,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 			}
 
 			engine::GridCoord memberCoord = rMember.coord;
-			bool bMemberIsFlagship = (i == rFleet.iFlagshipIndex);
+			bool bMemberIsFlagship = (rMember.globalPlayerId == rFleet.flagshipGlobalPlayerId);
 
 			auto frameInputIt = gpGame->mFrameInputs.find(memberCoord);
 			if (frameInputIt == gpGame->mFrameInputs.end())
@@ -197,10 +198,12 @@ void FleetNavigationController::ClearPendingFlagshipUpdates()
 
 void FleetNavigationController::ShiftFlagshipAfterDeath(const engine::ClientGuid& rGuid, Fleet& rFleet)
 {
+	// The flagship's list position is only the rotation start; every caller has already matched the flagship to a member.
+	int64_t iFlagshipPosition = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId) - rFleet.members.begin();
 	int64_t iNewFlagship = -1;
 	for (int64_t k = 1; k < std::ssize(rFleet.members); ++k)
 	{
-		int64_t iCandidate = (rFleet.iFlagshipIndex + k) % std::ssize(rFleet.members);
+		int64_t iCandidate = (iFlagshipPosition + k) % std::ssize(rFleet.members);
 		if (rFleet.members.at(static_cast<size_t>(iCandidate)).bAlive)
 		{
 			iNewFlagship = iCandidate;
@@ -212,8 +215,9 @@ void FleetNavigationController::ShiftFlagshipAfterDeath(const engine::ClientGuid
 		return;
 	}
 
-	rFleet.iFlagshipIndex = iNewFlagship;
-	rFleet.wantedCoord = rFleet.members.at(static_cast<size_t>(iNewFlagship)).coord;
+	const FleetMember& rNewFlagship = rFleet.members.at(static_cast<size_t>(iNewFlagship));
+	rFleet.flagshipGlobalPlayerId = rNewFlagship.globalPlayerId;
+	rFleet.wantedCoord = rNewFlagship.coord;
 	rFleet.fFrameChangeTimer = rFleet.fNavigationDelay;
 	mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoord = rFleet.wantedCoord});
 }

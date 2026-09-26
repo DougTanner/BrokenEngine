@@ -63,7 +63,7 @@ public:
 	void SendUpdatePlayerRequest(int64_t iGlobalPlayerId, bool bUseMissiles, float fNavigationDelay);
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid);
-	void SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, int64_t iMemberIndex);
+	void SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId);
 	void SendDeleteFleetRequest(const FleetGuid& rFleetGuid);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
 

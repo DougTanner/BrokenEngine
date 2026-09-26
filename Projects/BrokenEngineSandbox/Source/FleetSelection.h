@@ -31,8 +31,8 @@ public:
 	bool CanFocusNextFleet() const;
 	bool CanFocusPrevFleet() const;
 	const Fleet* FocusedFleet() const;
-	void SelectPlayerInFleet(int64_t iPlayerIndex);
-	int64_t FocusedPlayerInFleetIndex() const;
+	void SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerId);
+	engine::global_id_t FocusedMemberGlobalId() const;
 	void SyncFleets(std::vector<Fleet>&& fleets);
 	void AutoSelectFirstAliveMember();
 	void Clear();
@@ -46,7 +46,7 @@ private:
 
 	std::vector<Fleet> mClientFleets;
 	int64_t miFocusedFleetIndex = -1;
-	int64_t miFocusedPlayerInFleetIndex = -1;
+	engine::global_id_t mFocusedMemberGlobalId {};
 };
 
 } // namespace game

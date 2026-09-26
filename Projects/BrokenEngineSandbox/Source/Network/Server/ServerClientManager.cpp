@@ -14,7 +14,7 @@ namespace game
 
 #if defined(BT_SERVER)
 
-void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, int64_t iMemberIndex)
+void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId)
 {
 	// A queued spawn revives the client: clear its dead/processed state unconditionally.
 	mDeadClientIds.erase(iClientId);
@@ -25,11 +25,11 @@ void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::C
 	// the frame input, and therefore the simulation and the CRC.
 	bool bAlreadyQueued = std::ranges::any_of(mClientsWaitingForSpawn, [&](const ClientSpawnInfo& rInfo)
 	{
-		return rInfo.iClientId == iClientId && rInfo.fleetGuid == rFleetGuid && rInfo.iMemberIndex == iMemberIndex;
+		return rInfo.iClientId == iClientId && rInfo.fleetGuid == rFleetGuid && rInfo.memberGlobalPlayerId == memberGlobalPlayerId;
 	});
 	if (!bAlreadyQueued)
 	{
-		mClientsWaitingForSpawn.push_back({iClientId, rClientGuid, rFleetGuid, iMemberIndex});
+		mClientsWaitingForSpawn.push_back({iClientId, rClientGuid, rFleetGuid, memberGlobalPlayerId});
 	}
 }
 
@@ -116,14 +116,17 @@ void ServerClientManager::SpawnWaitingClients()
 
 	for (const ClientSpawnInfo& rClientSpawnInformation : mClientsWaitingForSpawn)
 	{
-		engine::global_id_t globalPlayerId {gpGame->GenerateGlobalId()};
+		// A respawned fleet member keeps its global ID; only a new ship mints one.
+		engine::global_id_t globalPlayerId = rClientSpawnInformation.memberGlobalPlayerId.IsValid()
+			? rClientSpawnInformation.memberGlobalPlayerId
+			: engine::global_id_t {gpGame->GenerateGlobalId()};
 
 		bool bIsFlagship = false;
 		engine::GridCoord spawnFleetWantedCoord {};
 		uint8_t uiSpawnPendingFleetTicks = 0;
 		if (!rClientSpawnInformation.fleetGuid.IsEmpty())
 		{
-			ServerFleetManager::FleetLookupResult result = gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.iMemberIndex);
+			ServerFleetManager::FleetLookupResult result = gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalPlayerId);
 			bIsFlagship = result.flags & ServerFleetManager::FleetLookupFlags::kIsFlagship;
 			spawnFleetWantedCoord = result.fleetWantedCoord;
 			uiSpawnPendingFleetTicks = result.uiPendingFleetWantedCoordTicks;
@@ -134,7 +137,7 @@ void ServerClientManager::SpawnWaitingClients()
 		gpGame->mFrameInputs.try_emplace(engine::kOriginCoord).first->second.statusChanges.push_back(spawnChange);
 		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients::kSpawnPlayer Client: {} GlobalId: {} Coord: ({},{}) Flagship: {}", rClientSpawnInformation.iClientId, globalPlayerId.iValue, engine::kOriginCoord.x, engine::kOriginCoord.y, bIsFlagship);
 
-		// Assignment is keyed on the id just minted, so it completes here rather than waiting for the row to exist.
+		// Assignment is keyed on this spawn's id, so it completes here rather than waiting for the row to exist.
 		// Client handles subscriptions — no full state sent here.
 		gpServerSession->SendAssignPlayer(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoord);
 		gpServerSession->SendPlayerState(rClientSpawnInformation.iClientId, PlayerStateWireType::kSpawned, globalPlayerId.iValue, engine::kOriginCoord);

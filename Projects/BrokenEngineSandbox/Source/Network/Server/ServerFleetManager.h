@@ -38,7 +38,7 @@ struct PendingRespawnInFleetRequest
 {
 	int64_t iClientId = 0;
 	FleetGuid fleetGuid {};
-	int64_t iMemberIndex = 0;
+	engine::global_id_t memberGlobalPlayerId {};
 };
 
 class ServerFleetManager
@@ -82,7 +82,7 @@ public:
 		engine::GridCoord fleetWantedCoord {};
 		uint8_t uiPendingFleetWantedCoordTicks = 0;
 	};
-	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, int64_t iMemberIndex);
+	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId);
 
 	void UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, float fDelay);
 

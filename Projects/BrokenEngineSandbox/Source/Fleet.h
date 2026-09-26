@@ -33,7 +33,8 @@ struct Fleet
 {
 	FleetGuid guid {};
 	std::vector<FleetMember> members;
-	int64_t iFlagshipIndex = 0;
+	// Invalid {} only while the fleet has no members; otherwise names one of them.
+	engine::global_id_t flagshipGlobalPlayerId {};
 	engine::GridCoord wantedCoord {};
 	uint8_t uiPendingFleetWantedCoordTicks = 0;
 	float fNavigationDelay = 60.0f;

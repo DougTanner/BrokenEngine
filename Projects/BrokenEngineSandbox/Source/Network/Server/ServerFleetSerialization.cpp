@@ -36,7 +36,7 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	common::Write(rFileStream, rFleet.guid.uiLow);
 	int64_t iMemberCount = std::ssize(rFleet.members);
 	common::Write(rFileStream, iMemberCount);
-	common::Write(rFileStream, rFleet.iFlagshipIndex);
+	common::Write(rFileStream, rFleet.flagshipGlobalPlayerId.iValue);
 	common::Write(rFileStream, rFleet.wantedCoord.x);
 	common::Write(rFileStream, rFleet.wantedCoord.y);
 	common::Write(rFileStream, rFleet.uiPendingFleetWantedCoordTicks);
@@ -62,16 +62,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	}
 	int64_t iMemberCount = 0;
 	common::Read(rFileStream, iMemberCount);
-	common::Read(rFileStream, rFleet.iFlagshipIndex);
-	// Trust boundary (save / replay file): a negative flagship index passes the consumers' upper-bound-only
-	// guard (iFlagshipIndex < ssize(members)) and reaches .at(size_t(negative)), throwing out of ServerUpdate
-	// minutes later. Reject it here. Upper bound (>= iMemberCount) is intentionally NOT rejected: a
-	// legitimately saved empty fleet carries the default iFlagshipIndex 0 == iMemberCount 0, and consumers
-	// already tolerate an out-of-range index gracefully — only the negative value crashes. See plan residual.
-	if (rFleet.iFlagshipIndex < 0)
-	{
-		throw std::ios_base::failure("Fleet iFlagshipIndex");
-	}
+	common::Read(rFileStream, rFleet.flagshipGlobalPlayerId.iValue);
 	int32_t iWantedX = 0;
 	int32_t iWantedY = 0;
 	common::Read(rFileStream, iWantedX);
@@ -104,6 +95,23 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		common::Read(rFileStream, iCoordX);
 		common::Read(rFileStream, iCoordY);
 		rFleet.members.at(static_cast<size_t>(k)) = FleetMember {engine::global_id_t {iGlobalPlayerId}, uiAlive != 0, engine::GridCoord {iCoordX, iCoordY}};
+	}
+	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, so each member ID
+	// must be valid and unique within its fleet, and the flagship must name a member ({} only for an empty fleet).
+	for (int64_t k = 0; k < iMemberCount; ++k)
+	{
+		engine::global_id_t memberGlobalPlayerId = rFleet.members.at(static_cast<size_t>(k)).globalPlayerId;
+		if (!memberGlobalPlayerId.IsValid() || std::ranges::contains(rFleet.members.begin(), rFleet.members.begin() + k, memberGlobalPlayerId, &FleetMember::globalPlayerId))
+		{
+			throw std::ios_base::failure("Fleet member global ID");
+		}
+	}
+	bool bFlagshipValid = rFleet.members.empty()
+		? !rFleet.flagshipGlobalPlayerId.IsValid()
+		: std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
+	if (!bFlagshipValid)
+	{
+		throw std::ios_base::failure("Fleet flagship global ID");
 	}
 }
 

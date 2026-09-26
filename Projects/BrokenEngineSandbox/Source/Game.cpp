@@ -78,14 +78,11 @@ engine::global_id_t Game::ClientPlayerId() const
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
-		int64_t iMember = mFleetSelection.FocusedPlayerInFleetIndex();
-		if (iMember >= 0 && iMember < std::ssize(pFleet->members))
+		engine::global_id_t focusedMemberGlobalId = mFleetSelection.FocusedMemberGlobalId();
+		auto memberIt = std::ranges::find(pFleet->members, focusedMemberGlobalId, &FleetMember::globalPlayerId);
+		if (focusedMemberGlobalId.IsValid() && memberIt != pFleet->members.end() && memberIt->bAlive)
 		{
-			const FleetMember& rMember = pFleet->members.at(static_cast<size_t>(iMember));
-			if (rMember.bAlive)
-			{
-				return rMember.globalPlayerId;
-			}
+			return memberIt->globalPlayerId;
 		}
 	}
 #endif
@@ -676,12 +673,7 @@ void Game::CaptureClientStateIfChanged()
 	if (pFleet != nullptr)
 	{
 		newFleetGuid = pFleet->guid;
-		newShipId = {};
-		int64_t iMember = mFleetSelection.FocusedPlayerInFleetIndex();
-		if (iMember >= 0 && iMember < std::ssize(pFleet->members))
-		{
-			newShipId = pFleet->members.at(static_cast<size_t>(iMember)).globalPlayerId;
-		}
+		newShipId = mFleetSelection.FocusedMemberGlobalId();
 	}
 
 	const float fNewCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget;

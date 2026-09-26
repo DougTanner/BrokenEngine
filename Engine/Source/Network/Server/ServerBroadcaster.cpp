@@ -38,7 +38,7 @@ void ServerBroadcaster::BuildFrameInputs()
 				return false;
 			}
 
-			game::ServerFleetManager::FleetLookupResult result = game::gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.iMemberIndex);
+			game::ServerFleetManager::FleetLookupResult result = game::gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalPlayerId);
 			if (result.flags & game::ServerFleetManager::FleetLookupFlags::kFound)
 			{
 				return false;

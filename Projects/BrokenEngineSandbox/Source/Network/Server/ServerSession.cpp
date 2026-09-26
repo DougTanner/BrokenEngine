@@ -132,13 +132,13 @@ void ServerSession::ParseReceivedGamePackets()
 				}
 				case GamePacketType::kClientRespawnInFleetRequest:
 				{
-					// 16B fleetGuid + 8B memberIndex = 24 bytes (type byte already stripped)
+					// 16B fleetGuid + 8B member globalId = 24 bytes (type byte already stripped)
 					const uint8_t* pCursor = rPacket.payload.data();
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					int64_t iMemberIndex = engine::ReadInt64(pCursor);
-					mpFleetManager->QueueRespawnRequest({rPacket.iClientId, fleetGuid, iMemberIndex});
+					engine::global_id_t memberGlobalPlayerId {engine::ReadInt64(pCursor)};
+					mpFleetManager->QueueRespawnRequest({rPacket.iClientId, fleetGuid, memberGlobalPlayerId});
 					break;
 				}
 				case GamePacketType::kClientFleetNavigationDelay:

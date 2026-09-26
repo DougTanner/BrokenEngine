@@ -13,14 +13,15 @@ struct ClientSpawnInfo
 	engine::ClientGuid clientGuid {};
 	// Default-constructed (empty) guid means this spawn is not fleet-triggered.
 	FleetGuid fleetGuid {};
-	int64_t iMemberIndex = -1;
+	// Invalid {} spawns a new fleet member; a valid ID respawns that member and keeps its ID.
+	engine::global_id_t memberGlobalPlayerId {};
 };
 
 class ServerClientManager
 {
 public:
 
-	void QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid = {}, int64_t iMemberIndex = -1);
+	void QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid = {}, engine::global_id_t memberGlobalPlayerId = {});
 	void NewClients();
 	void SpawnWaitingClients();
 	void Disconnects();

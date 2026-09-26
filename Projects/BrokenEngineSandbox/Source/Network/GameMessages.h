@@ -88,7 +88,7 @@ struct FleetSyncMessage
 		rVisitor.Field(rFleet.guid.uiHigh);
 		rVisitor.Field(rFleet.guid.uiLow);
 		rVisitor.BoundedCount(riMemberCount, kiFleetMemberSize, sizeof(int64_t) + sizeof(float));
-		rVisitor.Field(rFleet.iFlagshipIndex);
+		rVisitor.Field(rFleet.flagshipGlobalPlayerId.iValue);
 		rVisitor.Field(rFleet.fNavigationDelay);
 	}
 
@@ -148,12 +148,6 @@ struct FleetSyncMessage
 			{
 				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 			}
-			if (rFleet.iFlagshipIndex < 0 || (iMemberCount == 0 && rFleet.iFlagshipIndex != 0)
-			 || (iMemberCount > 0 && rFleet.iFlagshipIndex >= iMemberCount))
-			{
-				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
-			}
-
 			rFleet.members.resize(static_cast<size_t>(iMemberCount));
 			for (int64_t j = 0; j < iMemberCount; ++j)
 			{
@@ -165,6 +159,15 @@ struct FleetSyncMessage
 				{
 					engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 				}
+			}
+
+			// An empty fleet has no flagship; a nonempty fleet's flagship names one of its members.
+			bool bFlagshipValid = rFleet.members.empty()
+				? !rFleet.flagshipGlobalPlayerId.IsValid()
+				: rFleet.flagshipGlobalPlayerId.IsValid() && std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
+			if (!bFlagshipValid)
+			{
+				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 			}
 		}
 

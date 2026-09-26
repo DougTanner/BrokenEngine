@@ -138,6 +138,11 @@ void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
 			break;
 		case PlayerEventType::kDied:
 			gpGame->RemoveClientPlayer(rEvent.globalPlayerId);
+			// A respawn keeps this ID and can come back in the weapon mode it had before a dropped request, which would never clear that pending toggle.
+			if (rEvent.globalPlayerId == gpGame->FocusedMemberGlobalId())
+			{
+				gpGame->mWeaponModeToggle.Reset();
+			}
 			UpdateDesiredCoords(SubscriptionChangeReason::kDied);
 			break;
 	}
@@ -308,12 +313,12 @@ void ClientSession::SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid)
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow);
 }
 
-void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, int64_t iMemberIndex)
+void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId)
 {
 	mpRuntime->SendGameRequest(GamePacketType::kClientRespawnInFleetRequest, [&]
 	{
-		LOG(kNetwork, kDebug, "ClientSession::SendRespawnInFleetRequest Fleet: ({},{}) Member: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, iMemberIndex);
-	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, iMemberIndex);
+		LOG(kNetwork, kDebug, "ClientSession::SendRespawnInFleetRequest Fleet: ({},{}) Member: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, memberGlobalPlayerId.iValue);
+	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, memberGlobalPlayerId.iValue);
 }
 
 void ClientSession::SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay)

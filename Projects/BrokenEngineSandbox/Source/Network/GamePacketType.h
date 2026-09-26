@@ -37,7 +37,7 @@ constexpr engine::ClientPacketContract GetGamePacketContract(GamePacketType eTyp
 		case GamePacketType::kClientCreateFleetRequest: return {1, 1, 4};      // 1B type only
 		case GamePacketType::kClientDeleteFleetRequest: return {17, 17, 8};    // 16B fleetGuid + 1B type
 		case GamePacketType::kClientSpawnIntoFleetRequest: return {17, 17, 8}; // 16B fleetGuid + 1B type
-		case GamePacketType::kClientRespawnInFleetRequest: return {25, 25, 16}; // 16B fleetGuid + 8B memberIndex + 1B type
+		case GamePacketType::kClientRespawnInFleetRequest: return {25, 25, 16}; // 16B fleetGuid + 8B member globalId + 1B type
 
 		// Debug-control packets: compile-time gated on kbDebugInput. When debug input is disabled the contract returns the
 		// sentinel so a non-debug server treats them as not-client-sendable -> violation. Rationale: without the gate any
