@@ -25,12 +25,8 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    [`../../next-plan/SKILL.md`](../../next-plan/SKILL.md) `## Handoff` owns, with
    each acceptance check inside the tier's evidence ceiling in
    [`../../verify-acceptance/references/worker.md`](../../verify-acceptance/references/worker.md)
-   `## Tier evidence ceiling`. Fill the card's `Roles` field from the step and
-   role assignments the brief supplies, citing the brief as its evidence, never
-   by reading the workflow yourself. When the tier classified in step 2 differs
-   from the tier those supplied assignments assume, record the mismatch under
-   `Unresolved decisions` in the handoff and leave the roles for main to
-   reconcile. Done when every template field is filled under that heading.
+   `## Tier evidence ceiling`. Done when every template field is filled under
+   that heading.
 5. Confirm the drafted file's structure with one run from the worktree root:
 
    ```powershell

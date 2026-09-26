@@ -63,7 +63,9 @@ The `argument-hint` value selects the Plan:
    That brief carries `Skill: none` — `/prepare-change` excludes a claimed
    executable Plan — and a `Return:` naming the shared handoff form plus the
    extension fields this file's `## Handoff` declares, so
-   exactly one handoff contract binds the worker.
+   exactly one handoff contract binds the worker. It also carries the Change
+   Workflow step and role assignments the claimed Plan triggers, as main states
+   them from the workflow.
 
    The Plan is immutable, current code wins, and every delegation states that
    Plan and card statements are hypotheses, so every contradiction returns to
@@ -211,6 +213,12 @@ Execution card:
 - Acceptance checks: <check and expected observation>
 - Roles: <required and conditional assignments>
 ```
+
+The preparation fills `Roles` from the Change Workflow step and role
+assignments its brief supplies, citing the brief as the evidence and never
+reading the workflow itself. When the tier the preparation classifies differs
+from the tier those assignments assume, it records the mismatch among the
+unresolved decisions it returns and leaves the roles for main to reconcile.
 
 ### Implementation approval
 
