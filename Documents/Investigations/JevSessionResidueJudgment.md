@@ -10,12 +10,12 @@ landing, so the corpus has to be built as `## Pilot` sketches.
 
 ## The decision today
 
-`.agents/skills/code-style-review/references/worker.md:130-135` (step 17)
+`.agents/skills/code-style-review/references/worker.md:139-144` (step 17)
 removes "confirmed temporary debug instrumentation added during the session",
 naming the six kinds above and taking the added-versus-pre-existing
 distinction from the scanner; the confirmation itself is the worker's reading
-of each hit. `worker.md:153-155` keeps that judgment in the worker because the
-scanner is candidates-only, and `worker.md:159-160` forbids adding a debug tag
+of each hit. `worker.md:162-164` keeps that judgment in the worker because the
+scanner is candidates-only, and `worker.md:168-169` forbids adding a debug tag
 to defer the cleanup and altering a pre-existing intentional log. The public
 contract calls the outcome "the session's residue removed"
 (`.agents/skills/code-style-review/SKILL.md:13`).

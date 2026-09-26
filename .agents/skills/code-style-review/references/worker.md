@@ -34,19 +34,28 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      proceeding.
    - Done when `truncated` is false or the unavailability is reported.
 6. For a session-changed scope when the `Jev` input is absent, run the
-   style-rule judgment once: `pwsh -NoProfile -File
+   style-rule judgment once and keep its result: `pwsh -NoProfile -File
    .agents/scripts/Test-StyleRuleJudgment.ps1 -RepositoryRoot <absolute
-   repository toplevel> -Baseline <full 40-character SHA>`, with the same
-   optional `-Head <commit>` and `-IncludeUntracked` switch as step 8; the run
-   sends each changed block's text and identifier list to the TypeSafe service
+   repository toplevel> -Baseline <full 40-character SHA> -OutputPath
+   Temp/code-style-review-judgment.json`, with the same optional
+   `-Head <commit>` and `-IncludeUntracked` switch as step 8; the run sends
+   each changed block's text and identifier list to the TypeSafe service
    through `Invoke-Jev.ps1`.
+   - Create `Temp/` if absent, in a call of its own before the run: it is
+     gitignored, so a fresh worktree lacks it, and the script does not create
+     it.
+   - The run writes the result document to that file and prints one summary
+     line naming its status, code, and message. After this run prints that
+     line, read `status` and every `flagged` entry from the file; steps 7 and
+     10 take the flagged entries from it, and the script is never run a second
+     time in one review.
    - The result is usable only when `status` is `ok`, including the
      `judgment.no-blocks` `ok` with zero rows, recorded as `Judgment: none`.
    - Any other status (the script's header names the halting cases), or no
-     result document at all, halts the review here: run no later step and
-     return the `Status: BLOCKED` handoff with its `Judgment` row
-     ([`../SKILL.md`](../SKILL.md) `## Handoff`); the exception text fills
-     that row when there is no document.
+     result document at all — the run printed no summary line — halts the
+     review here: run no later step and return the `Status: BLOCKED` handoff
+     with its `Judgment` row ([`../SKILL.md`](../SKILL.md) `## Handoff`); the
+     exception text fills that row when there is no document.
    - The gated rules are 14, 16 (including its vector `.at()` clause), 21, 49,
      51, 62, and the "always write `std::`" half of 41. The script still emits
      `rule3` and `rule56` entries; ignore them — no `Judgment` row, no

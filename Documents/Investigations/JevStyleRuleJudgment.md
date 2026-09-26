@@ -16,11 +16,11 @@ scanner-extracted name list as its state.
 
 ## The decision today
 
-`.agents/skills/code-style-review/references/worker.md:59-71` (step 7)
+`.agents/skills/code-style-review/references/worker.md:68-80` (step 7)
 hand-reads rules 3 and 56 across every changed range because the scanner
 emits no candidates for them, and routes the gated rules — 14, 16 (including
 its vector `.at()` clause), 21, 49, 51, 62, and the "always write `std::`"
-half of 41 — through the judgment script in step 6 (`worker.md:36-58`). Every
+half of 41 — through the judgment script in step 6 (`worker.md:36-67`). Every
 one of those is a yes/no over a function-sized span, and before the gate the
 worker read whole ranges to answer them. The scanner's own kinds (2, 15, 19,
 27, 28, 29, 32, 41's `using
@@ -148,7 +148,7 @@ for the user.
 ## What still needs a full model
 
 Every fix, and the meaning-preservation decision the auto-fix requires
-(`references/worker.md:107-110`). Jev replaces the reading of unchanged ranges,
+(`references/worker.md:116-119`). Jev replaces the reading of unchanged ranges,
 not the judgment on a flagged block: the worker still reads a flagged
 function against the guide before it fixes or routes anything, so the shape
 is "Jev shortens the list the worker reads" as `JevDecisionModelWorkflowUses.md`
