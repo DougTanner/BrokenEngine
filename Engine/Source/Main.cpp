@@ -269,8 +269,10 @@ int MainThread(HINSTANCE hinstance)
 		{
 			ValidateRect(sHwnd, nullptr);
 		}
-#endif
 		ProcessMessages();
+#endif
+		// No client pump here: Game, Graphics/ImGui, and Input are already destroyed, and the client WndProc
+		// dereferences game::gpGame on WM_SETFOCUS.
 
 		if (sHwnd != nullptr)
 		{
