@@ -10,12 +10,12 @@ landing, so the corpus has to be built as `## Pilot` sketches.
 
 ## The decision today
 
-`.agents/skills/code-style-review/references/worker.md:139-144` (step 17)
+`.agents/skills/code-style-review/references/worker.md:136-141` (step 17)
 removes "confirmed temporary debug instrumentation added during the session",
 naming the six kinds above and taking the added-versus-pre-existing
 distinction from the scanner; the confirmation itself is the worker's reading
-of each hit. `worker.md:162-164` keeps that judgment in the worker because the
-scanner is candidates-only, and `worker.md:168-169` forbids adding a debug tag
+of each hit. `worker.md:159-161` keeps that judgment in the worker because the
+scanner is candidates-only, and `worker.md:165-166` forbids adding a debug tag
 to defer the cleanup and altering a pre-existing intentional log. The public
 contract calls the outcome "the session's residue removed"
 (`.agents/skills/code-style-review/SKILL.md:13`).
@@ -75,9 +75,8 @@ phrasings do not.
 
 The signal consumed is the probability: hits ordered by it, the threshold
 chosen from the pilot and written in the skill's references. Whether the
-worker reads only hits above the threshold, as it does for the seven gated
-style rules today, or reads every hit in that order, is `## Decisions a Plan
-needs` item 4.
+worker reads only hits above the threshold or reads every hit in that order,
+as it does for the style rules today, is `## Decisions a Plan needs` item 4.
 
 ## What still needs a full model
 
@@ -184,12 +183,12 @@ step 17 in whichever form items 2 and 4 below decide.
    not need scores as temporary; the vendor's dilution warning argues against
    any text the question does not need.
 4. Gate or reading order: the series' shared decision 4 makes this a reading
-   order until a second measurement confirms the first, and
-   `JevStyleRuleJudgment.md` is the user-directed exception that gates the
-   seven rules and halts on a `blocked` result. Whether step 17 follows that
-   exception (read only flagged hits, halt when Jev is unavailable) or the
-   series default (read every hit in probability order, fall through to the
-   hand read when Jev is unavailable) is for the user.
+   order until a second measurement confirms the first, as
+   `JevStyleRuleJudgment.md` became after its real-session review (every
+   rule hand-read, flags read first, no halt). Whether step 17 follows that
+   default (read every hit in probability order, fall through to the hand
+   read when Jev is unavailable) or gates (read only flagged hits, halt when
+   Jev is unavailable) is for the user.
 5. The `[DEBUG-` tag: a scanner kind that is temporary by construction and
    skips the model, or left to the `noul` like every other hit. A kind is the
    simpler answer and would have caught `NavCellData.cpp:60` at landing.

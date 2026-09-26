@@ -49,35 +49,31 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      line, read `status` and every `flagged` entry from the file; steps 7 and
      10 take the flagged entries from it, and the script is never run a second
      time in one review.
-   - The result is usable only when `status` is `ok`, including the
-     `judgment.no-blocks` `ok` with zero rows, recorded as `Judgment: none`.
-   - Any other status (the script's header names the halting cases), or no
-     result document at all — the run printed no summary line — halts the
-     review here: run no later step and return the `Status: BLOCKED` handoff
-     with its `Judgment` row ([`../SKILL.md`](../SKILL.md) `## Handoff`); the
-     exception text fills that row when there is no document.
-   - The gated rules are 14, 16 (including its vector `.at()` clause), 21, 49,
-     51, 62, and the "always write `std::`" half of 41. The script still emits
-     `rule3` and `rule56` entries; ignore them — no `Judgment` row, no
-     candidate — until the next test in
-     `Documents/Investigations/JevStyleRuleJudgment.md` is run.
+   - The result is advisory and usable only when `status` is `ok`, including
+     the `judgment.no-blocks` `ok` with zero rows, recorded as
+     `Judgment: none`.
+   - Any other status, or no result document at all — the run printed no
+     summary line — is recorded as `Judgment: not run — <code>: <message>`
+     ([`../SKILL.md`](../SKILL.md) `## Handoff`), with the exception text as
+     the message when there is no document, and the review continues.
+   - Jev asks about rules 14, 49 and 62. The script also emits `rule3` and
+     `rule56` entries; ignore them — no `Judgment` row, no candidate — until
+     the next test in `Documents/Investigations/JevStyleRuleJudgment.md` is
+     run.
    - When the scope is caller-supplied (no baseline) or the `Jev` input is
-     `skip`, the script is not run and step 7's fallback applies.
-   - Done when an `ok` result is in hand, the fallback is recorded, or the
-     BLOCKED handoff is returned.
+     `skip`, the script is not run.
+   - Done when an `ok` result is in hand, or the `Judgment` row records why
+     there is none.
 7. Read `Documents/C++StyleGuide.txt`; it is the authority every step-10
    adjudication is decided against. Hand-read the selected ranges for every
-   Rule 2 form the narrow scanner does not emit, and for rules 3 and 56 in
-   every review. For the gated rules (step 6), when step 6 returned `ok`, do
-   not hand-read: every `flagged` entry for one of them is a step-10
-   candidate, and a block the result does not flag is not read for those
-   rules. Fallback, applying only when step 6 did not run the script:
-   hand-read the selected ranges for the gated rules too.
+   Rule 2 form the narrow scanner does not emit, and in every review for
+   rules 3, 14, 16 (including its vector `.at()` clause), 21, the "always
+   write `std::`" half of 41, 49, 51, 56 and 62. Step 6's `flagged` entries
+   for rules 14, 49 and 62 are extra step-10 candidates; check them first.
    Those rules and the rules the scanner's `style-rule-<n>` kinds cover are
    this review's whole style mandate; every other guide rule is outside it.
-   Done when the guide is in hand and either the flagged entries are listed
-   for step 10 with rules 3 and 56 read, or the fallback has been read across
-   every selected range.
+   Done when the guide is in hand, step 6's flagged entries are listed for
+   step 10, and the hand read covers every selected range.
 8. Run the session-added candidate scanner once: `pwsh -NoProfile -File
    .agents/scripts/Find-SessionCandidates.ps1 -RepositoryRoot <absolute
    repository toplevel> -Baseline <full 40-character SHA>`,
@@ -95,22 +91,23 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      either scan inline, and treat `truncated` `true` as hits the run did not
      list.
    - Done when the status is `pass` or the unavailability is reported.
-10. Adjudicate every `style-rule-<n>` row and every step-6 gated-rule flagged
-    entry against rule n of the guide, reading the surrounding code; the rows
-    and entries are a starting list, not the finding set. For Rule 2,
-    surrounding code must reject declaration-shaped text inside a block comment
-    or raw string opened on an earlier line. Rule 29 needs the base class, which
-    is off the line, so look it up.
+10. Adjudicate every `style-rule-<n>` row and every step-6 flagged entry for
+    rules 14, 49 and 62 against rule n of the guide, reading the surrounding
+    code; the rows and entries are a starting list, not the finding set. For
+    Rule 2, surrounding code must reject declaration-shaped text inside a
+    block comment or raw string opened on an earlier line. Rule 29 needs the
+    base class, which is off the line, so look it up.
     - The rows carry their own rule number, so this step covers whatever kinds
-      the run emits; the gated rules arrive as step 6's flagged entries, or
-      through step 7's fallback hand read, and rules 3 and 56 arrive from
-      step 7's hand read.
-    - Record each step-6 gated-rule entry as one `Judgment` row
-      ([`../SKILL.md`](../SKILL.md) `## Handoff`); a confirmed entry is a
-      finding for steps 11-17 exactly as a scanner row is. A
-      gated-rule violation seen while adjudicating a flagged block for a
-      different rule is an ordinary finding with no `Judgment` row; `Judgment`
-      records only the script's gated-rule entries.
+      the run emits; step 7's hand read supplies the other hand-read rules'
+      findings.
+    - Record each step-6 flagged entry for rules 14, 49 and 62 as one
+      `Judgment` row ([`../SKILL.md`](../SKILL.md) `## Handoff`): `confirmed`
+      when the violation involves a session-changed line, otherwise
+      `false flag`, even when the construct is a real violation in unchanged
+      code. A confirmed entry is a finding for steps 11-17 exactly as a
+      scanner row is. A violation the hand read finds without a flagged entry
+      is an ordinary finding with no `Judgment` row; `Judgment` records only
+      the script's flagged entries.
     - Done when every style row and flagged entry is accepted as a finding or
       rejected.
 11. Auto-fix only when the resulting C++ meaning is demonstrably unchanged.
@@ -162,8 +159,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 - Every judgment in steps 10 and 17 stays here, because the scanner's
   contract (`.agents/scripts/Find-SessionCandidates.ps1`) is read-only and
   candidates-only.
-- The judgment script's default thresholds were measured against the corpus
-  at [`style-rule-judgment/cases.json`](style-rule-judgment/cases.json).
-- A step-6 halt is never bypassed inside the worker.
+- The judgment script's rule 3 threshold and rule 56 name threshold were
+  measured against the corpus at
+  [`style-rule-judgment/cases.json`](style-rule-judgment/cases.json).
 - Never add a debug tag merely to defer cleanup, and do not alter pre-existing
   intentional debug logs. Never touch strings or non-comment code.

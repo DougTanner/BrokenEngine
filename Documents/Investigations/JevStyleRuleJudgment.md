@@ -7,8 +7,9 @@ against the live API over the 41 hand-labelled code blocks in
 `.agents/skills/code-style-review/references/style-rule-judgment/cases.json`,
 which `.agents/scripts/Test-StyleRuleJudgment.ps1 -CasesPath` re-measures
 with the questions `## The instructions` records; the Plan that wired the
-result into the worker landed, and `/code-style-review` gates its hand read
-on the script's session mode. The result is that one
+result into the worker landed, and since the real-session review
+(`## Decisions a Plan needs` item 4) `/code-style-review` uses the script's
+session mode as an advisory hint. The pilot result is that one
 request per changed function, carrying one `noul` per rule, orders the
 hand-read pass for seven of the ten rules at one threshold, rule 3 needs a
 higher one, rule 61 goes to a scanner instead, and rule 56 needs a
@@ -16,15 +17,17 @@ scanner-extracted name list as its state.
 
 ## The decision today
 
-`.agents/skills/code-style-review/references/worker.md:68-80` (step 7)
-hand-reads rules 3 and 56 across every changed range because the scanner
-emits no candidates for them, and routes the gated rules — 14, 16 (including
-its vector `.at()` clause), 21, 49, 51, 62, and the "always write `std::`"
-half of 41 — through the judgment script in step 6 (`worker.md:36-67`). Every
-one of those is a yes/no over a function-sized span, and before the gate the
-worker read whole ranges to answer them. The scanner's own kinds (2, 15, 19,
-27, 28, 29, 32, 41's `using
-namespace`, 50, 52, 57, 58) are deterministic and stay out of this document.
+`.agents/skills/code-style-review/references/worker.md:67-76` (step 7)
+hand-reads rules 3, 14, 16 (including its vector `.at()` clause), 21, 49, 51,
+56, 62, and the "always write `std::`" half of 41 across every changed range,
+because the scanner emits no candidates for them. Step 6 (`worker.md:36-66`)
+runs the judgment script as an advisory: it asks rules 14, 49, and 62 (rule 3
+is still asked and ignored) at a 0.7 threshold, over block text whose
+session-changed lines carry a `+ ` mark, and its flags are extra step-10
+candidates read first; a result other than `ok` leaves the hand read as it
+is. Every one of those rules is a yes/no over a function-sized span. The
+scanner's own kinds (2, 15, 19, 27, 28, 29, 32, 41's `using namespace`, 50,
+52, 57, 58) are deterministic and stay out of this document.
 
 One more judgment of the same shape lives outside the style guide: the log
 level a new `LOG` call should carry, fixed as five options with one-line
@@ -148,12 +151,13 @@ for the user.
 ## What still needs a full model
 
 Every fix, and the meaning-preservation decision the auto-fix requires
-(`references/worker.md:116-119`). Jev replaces the reading of unchanged ranges,
-not the judgment on a flagged block: the worker still reads a flagged
-function against the guide before it fixes or routes anything, so the shape
-is "Jev shortens the list the worker reads" as `JevDecisionModelWorkflowUses.md`
-requires. A whole-file question is still no substitute: the handoff row needs
-file, line, rule number, and correction (`SKILL.md:44`), and the function
+(`references/worker.md:113-116`). Jev does not replace the judgment on a
+flagged block: the worker still reads a flagged function against the guide
+before it fixes or routes anything, and since the real-session review it also
+hand-reads every range, so the shape is "Jev orders the list the worker
+reads" as `JevDecisionModelWorkflowUses.md` requires. A whole-file question
+is still no substitute: the handoff row needs
+file, line, rule number, and correction (`SKILL.md:43`), and the function
 enumeration supplies the first two.
 
 ## What would make this a Plan
@@ -164,10 +168,12 @@ flagged with under 30% of compliant blocks flagged) for rules 14, 16, 21, 41,
 short of it, 8 of 9 planted names, with `CalcVelocity` at 0.59 the miss. The
 remaining measurement is rule 3's threshold and the rule 56 exception list,
 both of which need real session changes rather than hand-written blocks. The
-seven rules gate the read since the Plan landed; the second measurement — the
-next test — is a rerun of the script's session mode over the last ten landed
-C++ commits with the flagged blocks hand-labelled for rules 3 and 56, before
-either of those two rules' flags is allowed to shorten the read.
+seven rules gated the read from the Plan's landing until the real-session
+review made the judgment advisory (`## Decisions a Plan needs` item 4); the
+second measurement — the next test — is a rerun of the script's session mode
+over the last ten landed C++ commits with the flagged blocks hand-labelled for
+rules 3 and 56, before either of those two rules' flags is allowed to shorten
+the read.
 
 ## Decisions a Plan needs
 
@@ -179,7 +185,9 @@ either of those two rules' flags is allowed to shorten the read.
    The enumerator is a session mode of `Test-StyleRuleJudgment.ps1`, and its
    output rows carry `path`, `line`, `endLine`, and `flagged` (each entry a
    rule, its probability, and for rule 56 the flagged names).
-2. Decided — one request per block carrying the seven block-level `noul`s
+2. Superseded by the real-session review (2026-09-26, item 4): the block
+   request now carries only rules 14, 49, 62, and rule 3. Was: decided — one
+   request per block carrying the seven block-level `noul`s
    (14, 16, 21, 41, 49, 51, 62) plus rule 3, and one request per block
    carrying the rule 56 name list with one `noul` per name; both written by
    a check script that calls `Invoke-Jev.ps1` in-process like
@@ -190,14 +198,23 @@ either of those two rules' flags is allowed to shorten the read.
    those bodies) that carries a statement on the same line or whose next
    non-blank line does not start with `{`, `&&`, or `||`, excluding
    `else if`. Rule 2 forms stay hand-read.
-4. Decided — the instructions are the construct-shaped texts of the pilot,
-   carried in the check script as data, with the exception lists above; the
-   thresholds are 0.5 for the seven rules, 0.7 for rule 56 names, and 0.9 for
-   rule 3, written in the skill's references.
-5. Superseded by user direction at landing — the worker reads only flagged
-   blocks for the seven rules that met the bar, halts on any unusable result,
-   and falls back to the hand read only on the user's "skip jev"; rules 3 and
-   56 stay hand-read until the second measurement above.
+4. **Superseded by the real-session review (2026-09-26).** Real sessions
+   2026-09-24 to 26 made 38 runs with 138 flags, 14 confirmed; rules 16, 21,
+   41 (`std::`), and 51 had 0 of 86 confirmed, no confirmed flag scored below
+   0.58, and at least 28 flags fell on unchanged code. A replay of five landed
+   commits (rules 14, 49, 62 at 0.7, comparing unmarked with `+ `-marked text)
+   removed all four unchanged-code flags and kept every real changed-line
+   finding (one declaration-only header block dropped it while both
+   definition blocks kept it); the corpus run gave no false flag, with one
+   planted rule 49 case at 0.68, under the threshold. So the block rules are
+   14, 49, and 62 at 0.7 over `+ `-marked changed lines; rule 3 stays at 0.9
+   and rule 56 names at 0.7. Was: the construct-shaped pilot texts with the
+   seven rules at 0.5.
+5. **Superseded by the real-session review (2026-09-26, item 4).** The result
+   is an advisory: the worker hand-reads every rule, reads flagged blocks
+   first, and continues on any unusable result; "skip jev" only skips the
+   run. Was, by user direction at landing: read only flagged blocks for the
+   seven rules and halt on any unusable result.
 6. Open, for the user: whether `Diff` (`vecDiff` 0.61) and `ack` (0.85 in
    the pilot's list run) join the rule 56 exception list in
    `Documents/C++StyleGuide.txt:264`; the codebase uses both, and neither

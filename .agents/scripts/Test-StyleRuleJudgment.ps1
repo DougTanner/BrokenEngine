@@ -4,16 +4,20 @@
 # threshold, ordered by probability. The questions name the forbidden construct and this codebase's own
 # exceptions; pasting the guide's rule text makes the model answer "does this rule apply" instead of "is it
 # broken" (Documents/Investigations/JevStyleRuleJudgment.md). Rule 61 is deliberately absent: the Allman
-# brace on its own line reads as "no brace" to the model, and a two-line scanner decides it exactly.
+# brace on its own line reads as "no brace" to the model, and a two-line scanner decides it exactly. Rules 16,
+# 21, 51, and the std:: half of 41 are absent because none of their flags in real sessions was a violation
+# (the same investigation).
+#
+# Every block is sent diff-style: a line the session changed starts with `+ `, every other line with two
+# spaces, and each block question counts a violation only when it involves a `+` line.
 #
 # Two modes. -CasesPath measures the questions against a labelled corpus: each case carries `id`, `code` (an
-# array of lines), and `expected` (the `rule<n>` keys that should fire), and the result adds per-rule hit
-# counts. -RepositoryRoot with -Baseline (optional -Head and -IncludeUntracked, as Find-SessionCandidates.ps1
-# takes them) is the session mode: it finds every changed C++ function or class body between baseline and
-# head from Get-SessionChangeInventory.ps1's regions, judges each, and reports `path`, `line`, `endLine`,
-# and `flagged` per block in path then line order. The session mode is the review worker's gate: any result
-# other than `ok` (a missing key, an unreachable service, a partial answer, an unusable inventory) halts the
-# review, so the worker never reads less than it claims.
+# array of lines, every one marked `+ `), and `expected` (the `rule<n>` keys that should fire), and the result
+# adds per-rule hit counts. -RepositoryRoot with -Baseline (optional -Head and -IncludeUntracked, as
+# Find-SessionCandidates.ps1 takes them) is the session mode: it finds every changed C++ function or class
+# body between baseline and head from Get-SessionChangeInventory.ps1's regions, judges each, and reports
+# `path`, `line`, `endLine`, and `flagged` per block in path then line order. The result is advisory: a
+# result other than `ok` leaves the review worker's hand read unchanged.
 [CmdletBinding()]
 param(
 	[string] $CasesPath,
@@ -22,7 +26,7 @@ param(
 	[string] $Head,
 	[switch] $IncludeUntracked,
 	[string] $OutputPath,
-	[double] $BlockThreshold = 0.5,
+	[double] $BlockThreshold = 0.7,
 	[double] $Rule3Threshold = 0.9,
 	[double] $NameThreshold = 0.7
 )
@@ -51,30 +55,10 @@ $script:BlockQuestions = [ordered]@{
 		true = 'An identifier uses Num as a standalone word for a count, such as iNumUnits or kuiNumThreads'
 		false = 'No identifier uses Num for a count; Number, Numerator, and similar whole words do not count'
 	}
-	rule16 = [ordered]@{
-		instructions = 'Does `code` index a std::map, std::unordered_map, or std::vector with operator[] (square brackets) in actual code, rather than .at(), insert_or_assign, or try_emplace? Square brackets inside a comment or a string literal, on a C array, on a std::span, or on a std::array are not violations.'
-		true = 'A map or vector is indexed with square brackets in executable code, such as mTextureMap[crc] or mIslands[i]'
-		false = 'Every map and vector access uses .at(), insert_or_assign, try_emplace, find, or iteration; any square brackets are on arrays, spans, comments, or strings'
-	}
-	rule21 = [ordered]@{
-		instructions = 'Does a function declaration or definition in `code` take a raw pointer parameter paired with a separate size or count parameter (such as `const uint8_t* pData, size_t uiSize`) where std::span should be used, or does the code use std::bitset?'
-		true = 'A pointer-plus-size parameter pair or a std::bitset is present'
-		false = 'No pointer-plus-size parameter pair and no std::bitset; a lone pointer parameter without a size, or a std::span, is fine'
-	}
-	rule41 = [ordered]@{
-		instructions = 'Does `code` name a C++ standard-library type or function without its std:: prefix, such as bare `vector`, `string`, `unordered_map`, `min`, or `move`? Types from other namespaces, engine types, Vulkan types, and DirectX Math types are not standard-library names. The fixed-width and size types size_t, int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, and uint64_t are written without std:: by convention and are never violations. A line that already writes std:: is not a violation.'
-		true = 'A standard-library type or function appears without the std:: prefix'
-		false = 'Every standard-library name that appears is written with std::, or no standard-library name appears'
-	}
 	rule49 = [ordered]@{
 		instructions = 'Does `code` define a trivial accessor or pass-through function: a getter, setter, Is*, Can*, drain, or take method that reads or writes one piece of state, or any function whose entire body is a single return of state, a single assignment, or a single call forwarded to another object? Spreading that one statement over several lines does not change the answer. A function whose body performs several statements that must happen together, or a serialization or codec adapter that defines a layer contract, is not a violation.'
 		true = 'A function exists whose whole body is one state read, one assignment, or one forwarded call, or that is named as a getter, setter, Is*, or Can* over independently accessible state'
 		false = 'Every function body does real multi-statement work or is a serialization or codec adapter, or no function is defined'
-	}
-	rule51 = [ordered]@{
-		instructions = 'Does `code` split a function call''s arguments or a declaration''s parameters across more than one line (other than a lambda or brace-initializer argument), or wrap an if, while, assignment, or return Boolean expression across lines when that expression joined onto one line would be 140 columns or fewer? A split of a Boolean expression that is longer than 140 columns is allowed. A single very long line is never a violation.'
-		true = 'Arguments or parameters are wrapped across lines, or a Boolean expression that would fit in 140 columns is split across lines'
-		false = 'Every call and declaration keeps its arguments on one line, and any wrapped Boolean expression is longer than 140 columns'
 	}
 	rule62 = [ordered]@{
 		instructions = 'Does `code` contain an if statement whose condition joins two or more independent guard conditions with || and whose body is a single exit statement (return, continue, or break), where each condition on its own should have been a separate if with its own exit? An || inside a Boolean assignment or a non-exit body, an && condition, and separate ifs with their own bodies are not violations.'
@@ -187,18 +171,24 @@ function Get-SessionBlock([object] $Inventory) {
 		if ($script:CppClasses -ccontains $entry.class) { [void] $cppPaths.Add($entry.path) }
 	}
 	$blocks = [Collections.Generic.List[object]]::new()
-	$seen = [Collections.Generic.HashSet[string]]::new()
+	# Block key to the set of its lines a region changed; a second region in the same block adds to that set.
+	$marks = @{}
 	if ($null -eq $Inventory.regions) { return $blocks }
 	$add = {
-		param([string] $Path, [int] $Line, [int] $EndLine, [string[]] $Lines)
-		if (-not $seen.Add("$Path`n$Line")) { return }
-		$blocks.Add([ordered]@{ path = $Path; line = $Line; endLine = $EndLine; text = (($Lines[($Line - 1)..($EndLine - 1)]) -join "`n") })
+		param([string] $Path, [int] $Line, [int] $EndLine)
+		$key = "$Path`n$Line"
+		if (-not $marks.ContainsKey($key)) {
+			$marks[$key] = [Collections.Generic.HashSet[int]]::new()
+			$blocks.Add([ordered]@{ path = $Path; line = $Line; endLine = $EndLine; key = $key })
+		}
+		for ($number = [Math]::Max($Line, $first); $number -le [Math]::Min($EndLine, $end); $number++) { [void] $marks[$key].Add($number) }
 	}
 	foreach ($region in $Inventory.regions) {
 		if (-not $cppPaths.Contains($region.path) -or $null -eq $region.startLine) { continue }
 		$lines = Get-HeadSideLine $region.path
 		$start = [Math]::Max(1, [int] $region.startLine)
 		$end = [Math]::Min($lines.Count, [int] $region.endLine)
+		$first = $start
 		while ($start -le $end) {
 			# Blank lines at the region's start or after a closer are skipped so a separator does not look down into the next body.
 			while ($start -le $end -and [string]::IsNullOrWhiteSpace($lines[$start - 1])) { $start++ }
@@ -215,7 +205,7 @@ function Get-SessionBlock([object] $Inventory) {
 					if (Test-BlockOpener $lines $number) { $opener = $number; break }
 				}
 			}
-			if ($opener -eq 0) { & $add $region.path $start $end $lines; break }
+			if ($opener -eq 0) { & $add $region.path $start $end; break }
 			$declaration = $opener
 			for ($number = $opener - 1; $number -ge 1; $number--) {
 				if (-not [string]::IsNullOrWhiteSpace($lines[$number - 1])) { $declaration = $number; break }
@@ -224,10 +214,15 @@ function Get-SessionBlock([object] $Inventory) {
 			for ($number = $opener + 1; $number -le $lines.Count; $number++) {
 				if ($lines[$number - 1] -cmatch '^\};?\s*$') { $closer = $number; break }
 			}
-			& $add $region.path $declaration $closer $lines
-			if ($declaration -gt $start) { & $add $region.path $start ($declaration - 1) $lines }
+			& $add $region.path $declaration $closer
+			if ($declaration -gt $start) { & $add $region.path $start ($declaration - 1) }
 			$start = $closer + 1
 		}
+	}
+	foreach ($block in $blocks) {
+		$lines = Get-HeadSideLine $block.path
+		$blockMarks = $marks[$block.key]
+		$block.text = @($block.line..$block.endLine | ForEach-Object { $(if ($blockMarks.Contains($_)) { '+ ' } else { '  ' }) + $lines[$_ - 1] }) -join "`n"
 	}
 	$blocks.Sort([Comparison[object]] {
 		param($left, $right)
@@ -258,15 +253,16 @@ else {
 	if (-not (Test-Path -LiteralPath $CasesPath -PathType Leaf)) { Complete-StyleRuleJudgment 1 'error' 'cases.missing' "Cases file not found: '$CasesPath'." }
 	$cases = @(Get-Content -LiteralPath $CasesPath -Raw | ConvertFrom-Json -Depth 8)
 	if ($cases.Count -eq 0) { Complete-StyleRuleJudgment 1 'error' 'cases.empty' 'Cases file holds no cases.' }
-	$codes = @($cases | ForEach-Object { $_.code -join "`n" })
+	$codes = @($cases | ForEach-Object { @($_.code | ForEach-Object { "+ $_" }) -join "`n" })
 }
 
 # Named apart from the table it copies: variable names are case-insensitive, so `$blockQuestions` would be
 # the table itself.
 $blockQuestionSet = [ordered]@{}
+$markedLines = ' Only the lines of `code` that start with `+` changed; the lines that start with two spaces are unchanged context, and a violation counts only when it involves a `+` line.'
 foreach ($key in $script:BlockQuestions.Keys) {
 	$question = $script:BlockQuestions[$key]
-	$blockQuestionSet[$key] = [ordered]@{ type = 'noul'; instructions = $question.instructions; criteria = [ordered]@{ true = $question.true; false = $question.false } }
+	$blockQuestionSet[$key] = [ordered]@{ type = 'noul'; instructions = $question.instructions + $markedLines; criteria = [ordered]@{ true = $question.true; false = $question.false } }
 }
 
 # Two requests per block, block questions then name questions, so response 2i and 2i+1 belong to block i.
