@@ -50,8 +50,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      10 take the flagged entries from it, and the script is never run a second
      time in one review.
    - The result is advisory and usable only when `status` is `ok`, including
-     the `judgment.no-blocks` `ok` with zero rows, recorded as
-     `Judgment: none`.
+     `judgment.no-blocks` (zero rows, `Judgment: none`) and `blocks.partial`
+     (`Judgment: partial — <message>`; failed blocks: `error`, no `flagged`).
    - Any other status, or no result document at all — the run printed no
      summary line — is recorded as `Judgment: not run — <code>: <message>`
      ([`../SKILL.md`](../SKILL.md) `## Handoff`), with the exception text as

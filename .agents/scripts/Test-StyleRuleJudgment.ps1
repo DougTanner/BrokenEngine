@@ -356,6 +356,7 @@ else {
 	$result.measurement = $perRule
 }
 $result.blocks = $blocks
-if ($jevExit -ne 0) { Complete-StyleRuleJudgment 1 'error' 'jev.partial' 'Some requests failed; their blocks carry an error instead of probabilities.' }
 $flaggedBlocks = @($blocks | Where-Object { $_.Contains('flagged') -and $_['flagged'].Count -gt 0 }).Count
+$failedBlocks = @($blocks | Where-Object { $_.Contains('error') }).Count
+if ($jevExit -ne 0) { Complete-StyleRuleJudgment 0 'ok' 'blocks.partial' "$($blocks.Count - $failedBlocks) of $($blocks.Count) blocks judged; $failedBlocks failed and carry an error; $flaggedBlocks flagged for a hand read." }
 Complete-StyleRuleJudgment 0 'ok' 'blocks.judged' "$($blocks.Count) blocks judged; $flaggedBlocks flagged for a hand read."

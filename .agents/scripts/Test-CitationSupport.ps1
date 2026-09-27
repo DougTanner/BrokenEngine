@@ -221,6 +221,7 @@ for ($i = 0; $i -lt $asked.Count; $i++) {
 $result.flagged = @($result.flagged | Sort-Object -Property { $_['supportsProbability'] })
 $result.passed = @($result.passed | Sort-Object -Property { $_['supportsProbability'] })
 if ($IncludeShiftedControls) { $result.controls = $controlCounts }
-if ($jevExit -ne 0) { Complete-CitationSupport 1 'error' 'jev.partial' "Some requests failed; their citations are listed under skipped." }
 $flaggedCitations = @($result.flagged | Where-Object { -not $_.Contains('control') }).Count
+$failedRequests = @($result.skipped | Where-Object { $_['reason'].StartsWith('request-failed') }).Count
+if ($jevExit -ne 0) { Complete-CitationSupport 0 'ok' 'citations.partial' "$($result.counts.asked) citations checked; $failedRequests requests failed and are listed under skipped; $flaggedCitations need a human read." }
 Complete-CitationSupport 0 'ok' 'citations.checked' "$($result.counts.asked) citations checked; $flaggedCitations need a human read."

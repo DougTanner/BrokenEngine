@@ -83,9 +83,9 @@ $responses = $indexed | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
 			$status = 0
 			if ($null -ne $_.Exception.PSObject.Properties['Response'] -and $null -ne $_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
 			$response.error = "HTTP $status $($_.Exception.Message)"
-			# Only rate limiting and overload are worth a retry; the API documents both as transient.
-			if ($status -ne 429 -and $status -ne 529) { break }
-			Start-Sleep -Milliseconds (500 * [Math]::Pow(2, $attempt))
+			# Only rate limiting and overload, which the API documents as transient, and 520, an undocumented edge status observed to clear on retry, are worth a retry.
+			if ($status -ne 429 -and $status -ne 520 -and $status -ne 529) { break }
+			if ($attempt -lt $using:script:MaximumAttempts) { Start-Sleep -Milliseconds (500 * [Math]::Pow(2, $attempt)) }
 		}
 	}
 	$response

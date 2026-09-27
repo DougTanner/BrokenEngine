@@ -19,8 +19,8 @@ its method precisely enough to rerun.
 
 `Invoke-Jev.ps1` takes `-RequestPath <json>` holding one `{state, questions}`
 object or an array of them, posts each to the endpoint in parallel (eight at a
-time, retrying only rate-limit and overload responses), and returns one result
-document: `status`, `code`, `message`, `requestCount`, `failedCount`,
+time, retrying rate-limit, overload, and HTTP 520 responses), and returns one
+result document: `status`, `code`, `message`, `requestCount`, `failedCount`,
 `inputTokens`, and `responses[]` in request order, each with the answers under
 the question ids the request used. Without `-OutputPath` the document is the
 whole of stdout, for an agent to read; with it the document is written to that

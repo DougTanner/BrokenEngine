@@ -59,7 +59,8 @@ Return the shared handoff form in
   `none` when the script returned zero flagged rule 14, 49 or 62 entries;
   `skipped (user)` on `Jev: skip`; `not applicable (cleanup scope)` for a
   caller-supplied scope; `not run — <code>: <message>` when the script
-  returned no usable result.
+  returned no usable result; plus one `partial — <message>` row on a
+  `blocks.partial` result.
 
 The shared `Build required` field names the exact affected targets, or `none`.
 Each shared `Residuals` row names an unresolved item; use `none` when absent.
