@@ -50,7 +50,15 @@ void LoadTweaksSettings()
 	{
 		gpGame->mbShowImGui = settings.bShowImGui;
 		engine::gpImGuiManager->mpTweaksScreen->LoadState(settings.sectionState);
-		engine::gSunAngleOverride.Set(settings.fSunAngle);
+		// Wrapper::Set clamps to the wrapper range, but std::clamp passes a NaN through unchanged.
+		if (std::isfinite(settings.fSunAngle))
+		{
+			engine::gSunAngleOverride.Set(settings.fSunAngle);
+		}
+		else
+		{
+			engine::gSunAngleOverride.ResetToDefault();
+		}
 	}
 	else
 	{
