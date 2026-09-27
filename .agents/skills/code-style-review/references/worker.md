@@ -56,7 +56,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      summary line — is recorded as `Judgment: not run — <code>: <message>`
      ([`../SKILL.md`](../SKILL.md) `## Handoff`), with the exception text as
      the message when there is no document, and the review continues.
-   - Jev asks about rules 14, 49 and 62. The script also emits `rule3` and
+   - Jev asks about rule 49. The script also emits `rule3` and
      `rule56` entries; ignore them — no `Judgment` row, no candidate — until
      the next test in `Documents/Investigations/JevStyleRuleJudgment.md` is
      run.
@@ -84,8 +84,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - rule 41: the "always write `std::`" half;
    - rule 47: include grouping and order.
 
-   Step 6's `flagged` entries for rules 14, 49 and 62 are extra step-10
-   candidates; check them first. Those rules and the rules the scanner's
+   Step 6's `flagged` entries for rule 49 are extra step-10 candidates; check
+   them first. The hand-read rules and the rules the scanner's
    `style-rule-<n>` kinds cover are this review's whole style mandate; a rule
    is on both lists when each covers a different form. Every other guide rule
    has another owner: `/repo-code-review` owns rules 9, 53 and 60 and rule
@@ -113,7 +113,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      list.
    - Done when the status is `pass` or the unavailability is reported.
 10. Adjudicate every `style-rule-<n>` row and every step-6 flagged entry for
-    rules 14, 49 and 62 against rule n of the guide, reading the surrounding
+    rule 49 against rule n of the guide, reading the surrounding
     code; the rows and entries are a starting list, not the finding set. For
     Rule 2, surrounding code must reject declaration-shaped text inside a
     block comment or raw string opened on an earlier line. Rule 29 needs the
@@ -138,7 +138,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
     - The rows carry their own rule number, so this step covers whatever kinds
       the run emits; step 7's hand read supplies the other hand-read rules'
       findings.
-    - Record each step-6 flagged entry for rules 14, 49 and 62 as one
+    - Record each step-6 flagged entry for rule 49 as one
       `Judgment` row ([`../SKILL.md`](../SKILL.md) `## Handoff`): `confirmed`
       only when adjudication against rule n of the guide finds the flagged
       construct is a real violation of that rule and the violation involves a

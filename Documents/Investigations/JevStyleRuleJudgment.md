@@ -4,14 +4,13 @@ Open question: can Jev take over the hand-read pass of `/code-style-review`,
 the rules `.agents/scripts/Find-SessionCandidates.ps1` emits no candidates
 for? Part of the series in `JevDecisionModelWorkflowUses.md`. Piloted once
 against the live API over 41 hand-labelled code blocks in
-`.agents/skills/code-style-review/references/style-rule-judgment/cases.json`
-(42 since the rule 62 log-plus-return negative case was added).
+`.agents/skills/code-style-review/references/style-rule-judgment/cases.json`,
+which holds those 41 plus a rule 62 log-plus-return negative case.
 `.agents/scripts/Test-StyleRuleJudgment.ps1 -CasesPath` re-measures that
 corpus with the script's current questions, and `## The instructions`
-records the measured ones. The Plan that wired the
-result into the worker landed, and since the real-session review
-(`## Decisions a Plan needs` item 4) `/code-style-review` uses the script's
-session mode as an advisory hint. The pilot result is that one
+records the measured ones. `/code-style-review` uses the script's session
+mode as an advisory hint (`## Decisions a Plan needs` items 4 and 5). The
+pilot result is that one
 request per changed function, carrying one `noul` per rule, orders the
 hand-read pass for seven of the ten rules at one threshold, rule 3 needs a
 higher one, rule 61 goes to a scanner instead, and rule 56 needs a
@@ -23,13 +22,16 @@ scanner-extracted name list as its state.
 hand-reads rules 3, 14, 16 (including its vector `.at()` clause), 21, 49, 51,
 56, 62, and the "always write `std::`" half of 41 across every changed range,
 because the scanner emits no candidates for them. Step 6 (`worker.md:36-66`)
-runs the judgment script as an advisory: it asks rules 14, 49, and 62 (rule 3
-is still asked and ignored) at a 0.7 threshold, over block text whose
+runs the judgment script as an advisory: it asks rule 49 (rule 3 is also
+asked and ignored) at a 0.7 threshold, over block text whose
 session-changed lines carry a `+ ` mark, and its flags are extra step-10
 candidates read first; a result other than `ok` leaves the hand read as it
-is. Every one of those rules is a yes/no over a function-sized span. The
-scanner's own kinds (2, 15, 19, 27, 28, 29, 32, 41's `using namespace`, 50,
-52, 57, 58) are deterministic and stay out of this document.
+is. Every one of those rules is a yes/no over a function-sized span. Rules 14
+and 62 are the scanner kinds `style-rule-14` and `style-rule-62`
+(decision 9) and stay on the step-7 hand-read list for the forms the scanner
+misses. The scanner's own kinds (2, 15, 19, 27, 28, 29, 32, 41's
+`using namespace`, 50, 52, 57, 58) are deterministic and stay out of this
+document.
 
 One more judgment of the same shape lives outside the style guide: the log
 level a new `LOG` call should carry, fixed as five options with one-line
@@ -155,8 +157,8 @@ for the user.
 Every fix, and the meaning-preservation decision the auto-fix requires
 (`references/worker.md:113-116`). Jev does not replace the judgment on a
 flagged block: the worker still reads a flagged function against the guide
-before it fixes or routes anything, and since the real-session review it also
-hand-reads every range, so the shape is "Jev orders the list the worker
+before it fixes or routes anything, and it also hand-reads every range
+(decision 5), so the shape is "Jev orders the list the worker
 reads" as `JevDecisionModelWorkflowUses.md` requires. A whole-file question
 is still no substitute: the handoff row needs
 file, line, rule number, and correction (`SKILL.md:43`), and the function
@@ -170,8 +172,7 @@ flagged with under 30% of compliant blocks flagged) for rules 14, 16, 21, 41,
 short of it, 8 of 9 planted names, with `CalcVelocity` at 0.59 the miss. The
 remaining measurement is rule 3's threshold and the rule 56 exception list,
 both of which need real session changes rather than hand-written blocks. The
-seven rules gated the read from the Plan's landing until the real-session
-review made the judgment advisory (`## Decisions a Plan needs` item 4); the
+judgment is advisory (`## Decisions a Plan needs` items 4 and 5); the
 second measurement — the next test — is a rerun of the script's session mode
 over the last ten landed C++ commits with the flagged blocks hand-labelled for
 rules 3 and 56, before either of those two rules' flags is allowed to shorten
@@ -187,10 +188,8 @@ the read.
    The enumerator is a session mode of `Test-StyleRuleJudgment.ps1`, and its
    output rows carry `path`, `line`, `endLine`, and `flagged` (each entry a
    rule, its probability, and for rule 56 the flagged names).
-2. Superseded by the real-session review (2026-09-26, item 4): the block
-   request now carries only rules 14, 49, 62, and rule 3. Was: decided — one
-   request per block carrying the seven block-level `noul`s
-   (14, 16, 21, 41, 49, 51, 62) plus rule 3, and one request per block
+2. Decided — one request per block carrying the rule 49 and rule 3 `noul`s
+   over `+ `-marked text (decisions 4 and 9), and one request per block
    carrying the rule 56 name list with one `noul` per name; both written by
    a check script that calls `Invoke-Jev.ps1` in-process like
    `Test-CitationSupport.ps1` and reports per block the rules at or above
@@ -200,23 +199,20 @@ the read.
    those bodies) that carries a statement on the same line or whose next
    non-blank line does not start with `{`, `&&`, or `||`, excluding
    `else if`. Rule 2 forms stay hand-read.
-4. **Superseded by the real-session review (2026-09-26).** Real sessions
-   2026-09-24 to 26 made 38 runs with 138 flags, 14 confirmed; rules 16, 21,
-   41 (`std::`), and 51 had 0 of 86 confirmed, no confirmed flag scored below
-   0.58, and at least 28 flags fell on unchanged code. A replay of five landed
-   commits (rules 14, 49, 62 at 0.7, comparing unmarked with `+ `-marked text)
-   removed all four unchanged-code flags and kept every real changed-line
-   finding (one declaration-only header block dropped it while both
-   definition blocks kept it); the corpus run gave no false flag, with one
-   planted rule 49 case at 0.68, under the threshold. So the block rules are
-   14, 49, and 62 at 0.7 over `+ `-marked changed lines; rule 3 stays at 0.9
-   and rule 56 names at 0.7. Was: the construct-shaped pilot texts with the
-   seven rules at 0.5.
-5. **Superseded by the real-session review (2026-09-26, item 4).** The result
-   is an advisory: the worker hand-reads every rule, reads flagged blocks
-   first, and continues on any unusable result; "skip jev" only skips the
-   run. Was, by user direction at landing: read only flagged blocks for the
-   seven rules and halt on any unusable result.
+4. Decided — the block rule asked is 49 at 0.7 over `+ `-marked changed
+   lines (rules 14 and 62 are scanner kinds, decision 9); rule 3 is asked at
+   0.9 and rule 56 names at 0.7. The real-session review measured 38 runs
+   with 138 flags, 14 confirmed: rules 16, 21, 41 (`std::`), and 51 had 0 of
+   86 confirmed, no confirmed flag scored below 0.58, and at least 28 flags
+   fell on unchanged code. A replay of five landed commits (rules 14, 49, 62
+   at 0.7, comparing unmarked with `+ `-marked text) removed all four
+   unchanged-code flags and kept every real changed-line finding (one
+   declaration-only header block dropped it while both definition blocks
+   kept it); the corpus run gave no false flag, with one planted rule 49
+   case at 0.68, under the threshold.
+5. Decided — the result is an advisory: the worker hand-reads every rule,
+   reads flagged blocks first, and continues on any unusable result; "skip
+   jev" only skips the run.
 6. Open, for the user: whether `Diff` (`vecDiff` 0.61) and `ack` (0.85 in
    the pilot's list run) join the rule 56 exception list in
    `Documents/C++StyleGuide.txt:264`; the codebase uses both, and neither
@@ -224,6 +220,16 @@ the read.
 7. Open, for the user: whether the `LOG` level `choice` joins this Plan or
    waits for its own measurement.
 8. The shared decisions in `JevDecisionModelWorkflowUses.md`.
+9. Decided — a rule a script can decide never goes to Jev
+   (`JevDecisionModelWorkflowUses.md`), so rules 14 and 62 are scanner kinds
+   and the block request carries only rule 49 and rule 3.
+   `Find-SessionCandidates.ps1` reports
+   `style-rule-14` for `Num` as its own word in an identifier not reached
+   through `::`, `->`, or `.`, outside comments and quotes, and
+   `style-rule-62` for an `if` whose condition has a top-level `||` and whose
+   braced body is one `return`, `continue`, or `break`. Both rules stay on the
+   step-7 hand-read list for a line an earlier kind claims and for rule 62's
+   unbraced form.
 
 ## The instructions
 
@@ -280,16 +286,17 @@ state is `{ code }`, referenced as `code` in each text.
   would be 140 columns or fewer? A split of a Boolean expression that is
   longer than 140 columns is allowed. A single very long line is never a
   violation.
-- 62 (measured, then replaced by the `rule62` text in
-  `Test-StyleRuleJudgment.ps1`, which requires the body to be only the one
-  exit statement, after this text flagged a log-plus-return body): Does
+- 62 (measured; the `style-rule-62` scanner kind in
+  `Find-SessionCandidates.ps1` decides rule 62 (decision 9) and requires the
+  body to be only the one exit statement, because this text falsely flagged a
+  log-plus-return body): Does
   `code` contain an if statement whose condition joins two or more
   independent guard conditions with || and whose body is a single exit
   statement (return, continue, or break), where each condition on its own
   should have been a separate if with its own exit? An || inside a Boolean
   assignment or a non-exit body, an && condition, and separate ifs with their
   own bodies are not violations.
-- 56, block form (measured, then replaced by the list form): Does a variable
+- 56, block form (measured; the list form below is the one asked): Does a variable
   or function name in `code` contain an abbreviated, truncated, or contracted
   word, such as ctx, cmd, buf, cnt, msg, calc, idx, tmp, prev, or pos, in
   place of the complete word? These are NOT abbreviations: the loop counters
@@ -297,7 +304,8 @@ state is `{ code }`, referenced as `code` in each text.
   i, ui, b, f, e, c, m, k, g, s, vec, mat, f2, f3, f4, vk); and established
   identifiers of this codebase such as Vk, Crc, Ui, Xm, Gpu, Cpu, Uuid, Id,
   Rtt, Fps.
-- 61 (measured, then rejected for a scanner): Does `code` contain an if or
+- 61 (measured; the `style-rule-61` scanner kind decides rule 61, decision
+  3): Does `code` contain an if or
   else whose body is a statement not enclosed in curly braces? This codebase
   uses Allman style: the line after `if (condition)` or `else` is an opening
   brace `{` on its own line, then the body, then `}`; that is CORRECT and is

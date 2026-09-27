@@ -1,9 +1,12 @@
 # Citation check for Plan and Investigation prose: finds every backticked `path:line` or `path:start-end`
 # citation of a C++ file, checks deterministically that the file is tracked and present and the range is
-# inside it, then asks Jev through Invoke-Jev.ps1 whether the cited lines support the sentence that cites
-# them. The result lists citations a human should open first — `says_nothing` and `contradicts` answers,
-# then low-probability `supports` — and never changes a file. Without a key or a reachable service the
-# result is `blocked` and the citations stay unchecked, which is the behaviour the workflow has without Jev.
+# inside it, then asks Jev through Invoke-Jev.ps1 three yes-means-bad questions about the sentence that cites
+# them: is something it attributes to the region absent, do the lines do the opposite, does it describe a
+# different region. Each question sees the cited lines and their enclosing function or class. A citation's
+# `problemProbability` is the highest of the three; at 0.5 or above it is flagged. The result lists citations
+# a human should open first, highest `problemProbability` first, and never changes a file. Without a key or a
+# reachable service the result is `blocked` and the citations stay unchecked, which is the behaviour the
+# workflow has without Jev.
 [CmdletBinding()]
 param(
 	[string[]] $Path = @('Documents/Plans'),
@@ -18,6 +21,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 $script:CitationPattern = '`(?<path>[A-Za-z0-9_][A-Za-z0-9_/.-]*\.(?:cpp|h|inl)):(?<ranges>\d+(?:-\d+)?(?:,\s*\d+(?:-\d+)?)*)`'
 # A sentence ends at punctuation followed by whitespace; the dot inside `File.cpp` is never followed by
@@ -25,24 +29,44 @@ $script:CitationPattern = '`(?<path>[A-Za-z0-9_][A-Za-z0-9_/.-]*\.(?:cpp|h|inl))
 $script:SentencePattern = '(?<=[.!?;])\s+'
 $script:ShiftDistance = 40
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
-$script:Question = [ordered]@{
-	relation = [ordered]@{
-		type = 'choice'
-		instructions = 'The claim is a sentence from a planning document that cites one or more regions of C++ source by file and line range; `citation` names the one region under test, and `code` is that region with a few lines of leading context. How does the code relate to what the claim says about the cited region?'
+$script:MaximumBlockLines = 120
+$script:FlagProbability = 0.5
+$script:Setting = 'The claim is a sentence from a planning document that cites one or more regions of C++ source by file and line range; `citation` names the one region under test, `cited` is exactly the cited lines, and `context` is the function or class that encloses them (or the cited lines with a few leading lines when no single short one does). '
+# Three yes-means-bad questions, one per way a citation goes wrong; merging them into one choice let "lacks
+# something" and "says the opposite" share an option (Documents/Investigations/JevEvidenceCitationCheck.md).
+$script:Questions = [ordered]@{
+	absent = [ordered]@{
+		type = 'noul'
+		instructions = $script:Setting + 'Does the claim attribute to the cited region a named symbol, behaviour, or structure that is not in `cited`?'
 		criteria = [ordered]@{
-			supports = 'The code shown is what the claim describes: the named symbols, behaviour, or structure the claim attributes to this region are present in it'
-			contradicts = 'The code covers the same behaviour or symbols but does the opposite of what is claimed, or lacks something the claim says is there'
-			says_nothing = 'The code is unrelated to the claim, or is a different region than the one the claim describes'
+			true = 'Something the claim says is in the cited region is missing from the cited lines'
+			false = 'Everything the claim attributes to the cited region is present in the cited lines'
+		}
+	}
+	opposite = [ordered]@{
+		type = 'noul'
+		instructions = $script:Setting + 'Do the lines in `cited` do the opposite of what the claim says about the cited region?'
+		criteria = [ordered]@{
+			true = 'The cited lines cover what the claim describes but behave the opposite way, such as accepting a value the claim says is rejected'
+			false = 'The cited lines do not contradict what the claim says about them'
+		}
+	}
+	elsewhere = [ordered]@{
+		type = 'noul'
+		instructions = $script:Setting + 'Does the claim describe a different region than the cited one, such as a neighbouring function in `context` or another part of the file?'
+		criteria = [ordered]@{
+			true = 'The claim is about other code than the cited lines'
+			false = 'The claim is about the cited lines'
 		}
 	}
 }
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-citation-support/v1'
+	schemaVersion = 'broken-engine-citation-support/v2'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Citation check did not run.'
-	counts = [ordered]@{ citations = 0; missingFile = 0; outsideFile = 0; tooLong = 0; asked = 0; supports = 0; contradicts = 0; saysNothing = 0 }
+	counts = [ordered]@{ citations = 0; missingFile = 0; outsideFile = 0; tooLong = 0; asked = 0; passed = 0; flagged = 0 }
 	controls = $null
 	inputTokens = 0
 	flagged = @()
@@ -64,7 +88,7 @@ function Complete-CitationSupport([int] $ExitCode, [string] $Status, [string] $C
 	else {
 		[IO.File]::WriteAllText($OutputPath, $json, $script:Utf8)
 		$c = $result.counts
-		"$Status $Code $Message (citations $($c.citations), asked $($c.asked), supports $($c.supports), contradicts $($c.contradicts), says_nothing $($c.saysNothing)) -> $OutputPath"
+		"$Status $Code $Message (citations $($c.citations), asked $($c.asked), passed $($c.passed), flagged $($c.flagged)) -> $OutputPath"
 	}
 	exit $ExitCode
 }
@@ -101,6 +125,36 @@ function Resolve-CitedPath([string] $Cited) {
 function Get-Window([string[]] $Lines, [int] $Start, [int] $End) {
 	$first = [Math]::Max(1, $Start - $ContextLines)
 	return (($Lines[($first - 1)..($End - 1)]) -join "`n")
+}
+function Get-Context([string[]] $Lines, [int] $Start, [int] $End) {
+	# Allman shape, no brace parser: the opener is the column-0 `{` found walking up from the range start
+	# without crossing a column-0 closer, else looking down through non-blank lines; the block runs from the
+	# non-blank line before it through the first column-0 `}` or `};` after it.
+	$opener = 0
+	for ($number = $Start; $number -ge 1; $number--) {
+		if ($number -lt $Start -and $Lines[$number - 1] -cmatch '^\};?\s*$') { break }
+		if (Test-AgentBlockOpener $Lines $number) { $opener = $number; break }
+	}
+	if ($opener -eq 0) {
+		for ($number = $Start + 1; $number -le $Lines.Count; $number++) {
+			if ([string]::IsNullOrWhiteSpace($Lines[$number - 1]) -or $Lines[$number - 1] -cmatch '^\};?\s*$') { break }
+			if (Test-AgentBlockOpener $Lines $number) { $opener = $number; break }
+		}
+	}
+	if ($opener -gt 0) {
+		$declaration = $opener
+		for ($number = $opener - 1; $number -ge 1; $number--) {
+			if (-not [string]::IsNullOrWhiteSpace($Lines[$number - 1])) { $declaration = $number; break }
+		}
+		$closer = 0
+		for ($number = $opener + 1; $number -le $Lines.Count; $number++) {
+			if ($Lines[$number - 1] -cmatch '^\};?\s*$') { $closer = $number; break }
+		}
+		if ($closer -gt 0 -and $declaration -le $Start -and $End -le $closer -and $closer - $declaration + 1 -le $script:MaximumBlockLines) {
+			return (($Lines[($declaration - 1)..($closer - 1)]) -join "`n")
+		}
+	}
+	return Get-Window $Lines $Start $End
 }
 
 $markdownFiles = @(foreach ($entry in $Path) {
@@ -157,7 +211,7 @@ foreach ($candidate in $candidates) {
 	if ($length -gt $MaximumRangeLines) { $result.counts.tooLong++; $result.skipped += [ordered]@{ document = $candidate.document; documentLine = $candidate.documentLine; citation = $candidate.citation; reason = 'too-long' }; continue }
 	$candidate.resolvedPath = $resolved
 	$candidate.control = $false
-	$requests.Add([ordered]@{ state = [ordered]@{ claim = $candidate.claim; citation = $candidate.citation; file = $resolved; lines = "$($candidate.start)-$($candidate.end)"; code = (Get-Window $fileLines $candidate.start $candidate.end) }; questions = $script:Question })
+	$requests.Add([ordered]@{ state = [ordered]@{ claim = $candidate.claim; citation = $candidate.citation; file = $resolved; lines = "$($candidate.start)-$($candidate.end)"; cited = (($fileLines[($candidate.start - 1)..($candidate.end - 1)]) -join "`n"); context = (Get-Context $fileLines $candidate.start $candidate.end) }; questions = $script:Questions })
 	$asked.Add($candidate)
 	if ($IncludeShiftedControls) {
 		# Shift forward when the file has room, otherwise backward; skip files too short for either.
@@ -169,7 +223,7 @@ foreach ($candidate in $candidates) {
 		$control.control = $true
 		$control.start = $shiftedStart
 		$control.end = $shiftedEnd
-		$requests.Add([ordered]@{ state = [ordered]@{ claim = $candidate.claim; citation = $candidate.citation; file = $resolved; lines = "$shiftedStart-$shiftedEnd"; code = (Get-Window $fileLines $shiftedStart $shiftedEnd) }; questions = $script:Question })
+		$requests.Add([ordered]@{ state = [ordered]@{ claim = $candidate.claim; citation = $candidate.citation; file = $resolved; lines = "$shiftedStart-$shiftedEnd"; cited = (($fileLines[($shiftedStart - 1)..($shiftedEnd - 1)]) -join "`n"); context = (Get-Context $fileLines $shiftedStart $shiftedEnd) }; questions = $script:Questions })
 		$asked.Add($control)
 	}
 }
@@ -189,37 +243,31 @@ finally {
 if ($jev.status -eq 'blocked') { Complete-CitationSupport 2 'blocked' $jev.code "Jev did not run, so no citation was checked: $($jev.message)" }
 $result.inputTokens = [int64]$jev.inputTokens
 
-$controlCounts = [ordered]@{ asked = 0; supports = 0; contradicts = 0; saysNothing = 0 }
+$controlCounts = [ordered]@{ asked = 0; passed = 0; flagged = 0 }
 for ($i = 0; $i -lt $asked.Count; $i++) {
 	$candidate = $asked[$i]
 	$response = $jev.responses[$i]
 	if ($null -ne $response.error) { $result.skipped += [ordered]@{ document = $candidate.document; documentLine = $candidate.documentLine; citation = $candidate.citation; reason = "request-failed: $($response.error)" }; continue }
-	$answer = $response.answers.relation
 	$row = [ordered]@{
 		document = $candidate.document
 		documentLine = $candidate.documentLine
 		citation = $candidate.citation
 		file = $candidate.resolvedPath
 		lines = "$($candidate.start)-$($candidate.end)"
-		relation = $answer.choice
-		supportsProbability = [Math]::Round([double]$answer.probabilities.supports, 3)
-		confidence = [Math]::Round([double]$answer.confidence, 3)
-		claim = $candidate.claim
 	}
+	foreach ($key in $script:Questions.Keys) { $row[$key] = [Math]::Round([double]$response.answers.$key.noul, 3) }
+	$row.problemProbability = [Math]::Max([Math]::Max($row.absent, $row.opposite), $row.elsewhere)
+	$row.claim = $candidate.claim
 	$counts = if ($candidate.control) { $controlCounts } else { $result.counts }
 	$counts.asked++
-	switch ($answer.choice) {
-		'supports' { $counts.supports++ }
-		'contradicts' { $counts.contradicts++ }
-		'says_nothing' { $counts.saysNothing++ }
-	}
 	if ($candidate.control) { $row.control = $true }
-	if ($answer.choice -eq 'supports') { $result.passed += $row } else { $result.flagged += $row }
+	if ($row.problemProbability -ge $script:FlagProbability) { $counts.flagged++; $result.flagged += $row } else { $counts.passed++; $result.passed += $row }
 }
-# Reading order: flagged rows first, and within each list the least-supported citation first.
-# The rows are dictionaries, so the sort key is a script block; a bare property name would not sort them.
-$result.flagged = @($result.flagged | Sort-Object -Property { $_['supportsProbability'] })
-$result.passed = @($result.passed | Sort-Object -Property { $_['supportsProbability'] })
+# Reading order: flagged rows first, and within each list the most likely problem first; -Stable keeps ties
+# in citation order. The rows are dictionaries, so the sort key is a script block; a bare property name would
+# not sort them.
+$result.flagged = @($result.flagged | Sort-Object -Property { $_['problemProbability'] } -Descending -Stable)
+$result.passed = @($result.passed | Sort-Object -Property { $_['problemProbability'] } -Descending -Stable)
 if ($IncludeShiftedControls) { $result.controls = $controlCounts }
 $flaggedCitations = @($result.flagged | Where-Object { -not $_.Contains('control') }).Count
 $failedRequests = @($result.skipped | Where-Object { $_['reason'].StartsWith('request-failed') }).Count

@@ -54,9 +54,9 @@ Return the shared handoff form in
 - `Documentation Residuals` — one row each: identifier, file:line, and
   `/update-claude-docs` or the caller; or none.
 - `Functions/regions touched` — one row per function or region, or none.
-- `Judgment` — one row per flagged rule 14, 49 or 62 entry: `path:line`, the
-  rule, its probability, and `confirmed` or `false flag` from adjudication;
-  `none` when the script returned zero flagged rule 14, 49 or 62 entries;
+- `Judgment` — one row per flagged rule 49 entry: `path:line`, the rule, its
+  probability, and `confirmed` or `false flag` from adjudication; `none` when
+  the script returned zero flagged rule 49 entries;
   `skipped (user)` on `Jev: skip`; `not applicable (cleanup scope)` for a
   caller-supplied scope; `not run — <code>: <message>` when the script
   returned no usable result; plus one `partial — <message>` row on a

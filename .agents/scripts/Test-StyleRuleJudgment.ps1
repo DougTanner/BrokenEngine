@@ -4,9 +4,10 @@
 # threshold, ordered by probability. The questions name the forbidden construct and this codebase's own
 # exceptions; pasting the guide's rule text makes the model answer "does this rule apply" instead of "is it
 # broken" (Documents/Investigations/JevStyleRuleJudgment.md). Rule 61 is deliberately absent: the Allman
-# brace on its own line reads as "no brace" to the model, and a two-line scanner decides it exactly. Rules 16,
-# 21, 51, and the std:: half of 41 are absent because none of their flags in real sessions was a violation
-# (the same investigation).
+# brace on its own line reads as "no brace" to the model, and a two-line scanner decides it exactly. Rules 14
+# and 62 are absent because Find-SessionCandidates.ps1's style-rule-14 and style-rule-62 kinds decide them.
+# Rules 16, 21, 51, and the std:: half of 41 are absent because none of their flags in real sessions was a
+# violation (the same investigation).
 #
 # Every block is sent diff-style: a line the session changed starts with `+ `, every other line with two
 # spaces, and each block question counts a violation only when it involves a `+` line.
@@ -50,20 +51,10 @@ $script:BlockQuestions = [ordered]@{
 		true = 'At least one variable name is missing its required prefix (like `int64_t count`, `bool done`, `Unit* unit`) or has a prefix that contradicts its type (like `bool iEnabled`)'
 		false = 'Every variable name carries the prefix its type requires, or there are no variable declarations to judge'
 	}
-	rule14 = [ordered]@{
-		instructions = 'Does an identifier in `code` use "Num" as a word meaning a count, where "Count" is required (kuiNumThreads is wrong, kuiThreadCount is right)? "Num" inside an ordinary English word such as Numerator, Number, or Enumerated is not a violation.'
-		true = 'An identifier uses Num as a standalone word for a count, such as iNumUnits or kuiNumThreads'
-		false = 'No identifier uses Num for a count; Number, Numerator, and similar whole words do not count'
-	}
 	rule49 = [ordered]@{
 		instructions = 'Does `code` define a trivial accessor or pass-through function: a getter, setter, Is*, Can*, drain, or take method that reads or writes one piece of state, or any function whose entire body is a single return of state, a single assignment, or a single call forwarded to another object? Spreading that one statement over several lines does not change the answer. A function whose body performs several statements that must happen together, or a serialization or codec adapter that defines a layer contract, is not a violation.'
 		true = 'A function exists whose whole body is one state read, one assignment, or one forwarded call, or that is named as a getter, setter, Is*, or Can* over independently accessible state'
 		false = 'Every function body does real multi-statement work or is a serialization or codec adapter, or no function is defined'
-	}
-	rule62 = [ordered]@{
-		instructions = 'Does `code` contain an if statement whose condition joins two or more independent guard conditions with || and whose body is exactly one statement, that statement being a return, continue, or break, where each condition on its own should have been a separate if with its own exit? An || inside a Boolean assignment or a non-exit body, a body that holds any other statement before or after the exit (such as a log call followed by return), an && condition, and separate ifs with their own bodies are not violations.'
-		true = 'One if packs several independent guards with || and its body consists only of one return, continue, or break statement'
-		false = 'No if with an || condition has a body that is only one exit statement; guards are already one condition per if, the body holds other statements besides the exit, or the || is used elsewhere'
 	}
 }
 
@@ -149,16 +140,6 @@ function Get-InventoryDocument() {
 	return $document
 }
 
-function Test-BlockOpener([string[]] $Lines, [int] $Number) {
-	# A column-0 `{` opens a function or class body unless the nearest non-blank line above it is a namespace.
-	if ($Lines[$Number - 1] -cnotmatch '^\{\s*$') { return $false }
-	for ($above = $Number - 1; $above -ge 1; $above--) {
-		if ([string]::IsNullOrWhiteSpace($Lines[$above - 1])) { continue }
-		return $Lines[$above - 1] -cnotmatch '^\s*namespace\b'
-	}
-	return $true
-}
-
 function Get-SessionBlock([object] $Inventory) {
 	# Allman-shape enumeration, no brace parser: a region's block is the column-0 `{` its start line looks
 	# down to (through non-blank lines only, before any column-0 closer) or, failing that, walks up to, from
@@ -197,12 +178,12 @@ function Get-SessionBlock([object] $Inventory) {
 			for ($number = $start; $number -le $lines.Count; $number++) {
 				if ($number -gt $start -and [string]::IsNullOrWhiteSpace($lines[$number - 1])) { break }
 				if ($lines[$number - 1] -cmatch '^\};?\s*$') { break }
-				if (Test-BlockOpener $lines $number) { $opener = $number; break }
+				if (Test-AgentBlockOpener $lines $number) { $opener = $number; break }
 			}
 			if ($opener -eq 0) {
 				for ($number = $start - 1; $number -ge 1; $number--) {
 					if ($lines[$number - 1] -cmatch '^\};?\s*$') { break }
-					if (Test-BlockOpener $lines $number) { $opener = $number; break }
+					if (Test-AgentBlockOpener $lines $number) { $opener = $number; break }
 				}
 			}
 			if ($opener -eq 0) { & $add $region.path $start $end; break }

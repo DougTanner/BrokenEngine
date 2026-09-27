@@ -3,9 +3,11 @@
 Open question: can Jev check every `path:line` citation the workflow produces —
 finding evidence, acceptance-table rows, Plan context sentences — against the
 code it points at, and report the ones that no longer say what they are cited
-for? Part of the series in `JevDecisionModelWorkflowUses.md`. Two pilots have
-run over current Plan citations; the second, over every citation with a blind
-read of a sample, is the one to trust.
+for? Part of the series in `JevDecisionModelWorkflowUses.md`. Three pilots have
+run over current Plan citations. The second, over every citation with a blind
+read of a sample, is the one to trust for how often a pass or a flag is right.
+The third compared the split question the script asks against the second's
+wording, on the citations the two rank differently, and chose the wording.
 
 ## The decision today
 
@@ -22,19 +24,22 @@ it still holds, by opening the file.
 
 The citation-check shape from the TypeSafe docs: code does the deterministic
 part — the file exists, the line range is inside it, a quoted fragment
-string-matches — and only citations that pass get a `choice` over the pair:
-`supports` (the code shown is what the claim describes), `contradicts` (it
-covers the same behavior but does the opposite or lacks what is claimed),
-`says_nothing` (unrelated). State is a JSON object with `claim` (the citing
-sentence), `code` (the cited lines plus two before), and `file`. The
-`supports` probability orders the human read: `says_nothing` and `contradicts`
-answers are listed first, then `supports` answers in ascending probability,
-and nothing is accepted on Jev's word alone.
+string-matches — and only citations that pass get three yes-means-bad `noul`
+questions about the pair: `absent` (something the claim attributes to the
+region is not in the cited lines), `opposite` (the cited lines do the opposite
+of what the claim says), and `elsewhere` (the claim describes a different
+region). State is a JSON object with `claim` (the citing sentence),
+`citation`, `file`, `lines`, `cited` (exactly the cited lines), and `context`
+(the enclosing column-0 block when the range lies inside one of at most 120
+lines, otherwise the cited lines plus two before). A citation's
+`problemProbability` is the highest of the three answers and orders the human
+read: flagged rows (at least 0.5) first, then passed rows, each from the
+highest `problemProbability` down, and nothing is accepted on Jev's word alone.
 
-The same pair question serves `/verify-external-claims`, whose `locator`
-returns a `VERIFIED | REFUTED | UNRESOLVED` verdict per proposition from a
-fetched source: the source excerpt is the `code` field and the proposition the
-`claim`, and the verdict maps onto the three options. That use is on the
+The same claim-and-region pair serves `/verify-external-claims`, whose
+`locator` returns a `VERIFIED | REFUTED | UNRESOLVED` verdict per proposition
+from a fetched source: the source excerpt is the `cited` field and the
+proposition the `claim`. That use is on the
 critical path of a review round, so it comes after the offline Plan sweep.
 
 The pre-parsed selection shape covers the follow-up: when a citation says
@@ -142,10 +147,82 @@ it: a Plan sweep that lists citations by ascending `supports` probability,
 with the pre-check failures (23 of the 700 point at a missing file or past its
 end, which needs no model) first.
 
+## Third pilot: split question, enclosing context
+
+Method: `Test-CitationSupport.ps1 -IncludeShiftedControls` over
+`Documents/Plans`, run at one commit twice: once with the second pilot's
+three-way `choice`, once with the three `noul` questions and the
+`cited`/`context` state that `## The question to Jev` describes. Both runs
+found 229 citations, skipped 23 at the pre-check (4 past the end of the file,
+19 over 60 lines), and answered all 206 others; no row was left out for a
+failed request. The rule below was fixed before either run.
+
+The two wordings were compared at the same flag count. K = 49 is the three-way
+run's flag count (30 `contradicts`, 19 `says_nothing`); the split run's flag
+set is its 49 citations with the highest `problemProbability`. The two sets
+differ in 38 rows: 19 flagged only by the three-way question and 19 only by
+the split. All 38 were labelled (sampling fraction 1 in each direction, so each
+weight is 1), shuffled so direction was not visible. Three `locator` agents
+labelled them `holds` or `stale` from the claim, file, and lines alone, told
+not to open either run's output; the label is the majority of the three. The
+split question ships only if its split-only rows hold strictly more stale
+citations than the three-way-only rows.
+
+| flagged only by | rows | labelled stale | labelled holds | stale, unanimous / 2-1 |
+|---|---|---|---|---|
+| three-way question | 19 | 4 | 15 | 2 / 2 |
+| split question | 19 | 5 | 14 | 3 / 2 |
+
+Outcome: 5 against 4, so the split question ships. The labellers agreed on 30
+of 38 rows and split 2-1 on 8 (4 of them labelled stale, 4 holds).
+
+| | three-way | split |
+|---|---|---|
+| real citations flagged (the three-way by its choice, the split at `problemProbability` >= 0.5) | 49 / 206 | 148 / 206 |
+| shifted controls flagged, same rule | 184 / 190 (97%) | 188 / 190 (99%) |
+
+How firm the outcome is. The margin is one row, and five 2-1 votes can each
+reverse it: one labeller changing either split-only stale row
+(`AnimationData.cpp:65-72`, `ExplosionsSpawn.cpp:218-234`) would make it
+4 against 4, and one changing any three-way-only row held by 2-1
+(`Explosions.h:171-184`, `Spaceships.cpp:649-653`, `PlayerEvents.cpp:64`)
+would make it 5 against 5; either keeps the three-way question. The split's 49th value,
+`problemProbability` 0.79, is shared by 10 citations and only 2 are inside
+the top 49, taken by listing order: `Collection.h:338-353`, flagged by both,
+and `Buffer.cpp:77-84`, split-only and labelled `holds`. Any other listing
+order that swaps only labelled rows keeps the split ahead, since no split-only
+stale row sits at 0.79. An order that pushes `Collection.h:338-353` out makes
+it three-way-only and pulls in one of six tied rows the three-way passed,
+none labelled; if `Collection.h:338-353` were stale and the incoming row
+held, the count would be 5 against 5 and the three-way question would stay.
+
+What the stale rows are. Four of the five split-only stale citations point
+next to the code the claim describes: `Graphics.cpp:692` names a comment at
+688-691, `Graphics.cpp:662-711` stops before the sampler recreation at 712-717,
+`ReconcileReplayTick.cpp:113-130` starts after the stamp at 112, and
+`AnimationData.cpp:65-72` starts after the material-count check at 64. The
+fifth, `ExplosionsSpawn.cpp:218-234`, is wrong in content: the region now has
+the replay guard the claim says is missing. Of the four three-way-only stale
+citations, one is one line off (`Localization.h:9-10`, a comment at 8-9) and
+three cite a region that holds other code, with no nearby line the labellers
+matched to the claim.
+
+What the numbers say. The split question lifts off-by-one and adjacent-range
+citations, the kind the second pilot's two missed passes were, above
+citations that hold; the three-way question's extra flags hold 15 times in 19.
+It does not make a flag more trustworthy: at 0.5 it flags 148 of 206 real
+citations and 188 of 190 shifted controls, so its output is a reading order,
+not a verdict. The 0.5 cutoff that splits `flagged` from `passed` is a fixed
+number, not one chosen from this measurement, which departs from shared
+decision 3 in `JevDecisionModelWorkflowUses.md`; the ship decision used no
+cutoff. The labels are LLM labels, not the human blind read
+`## What would make this a Plan` asks for, so that condition stays unmet.
+
 ## What would make this a Plan
 
 The check runs as a reading order only: `Test-CitationSupport.ps1` over the
-Plan tree, its flagged rows listed as residuals in ascending probability,
+Plan tree, its flagged rows listed as residuals from the highest
+`problemProbability` down,
 nothing hidden and nothing changed. The moved-citation follow-up and the
 finding-row and `/verify-external-claims` uses wait until a wording or a
 richer state (the enclosing function, or a quoted fragment) brings the flag
@@ -158,7 +235,8 @@ the two one-line-off misses argue for that richer state.
    claimed Plan only, or over the whole tree from `Test-PlanSchedulerState.ps1`.
 2. Whether the pre-check failures (missing file, range past end of file) are
    reported on their own, since they need no model and are certain.
-3. Context size around the cited lines, and whether the enclosing function is
-   used instead of a fixed window — the change most likely to raise flag
-   precision.
+3. Decided by the third pilot, which measured it together with the split
+   question rather than on its own: each question sees the cited lines and
+   their enclosing column-0 block of at most 120 lines, falling back to the
+   cited lines plus two before; no wider fixed window.
 4. The shared decisions in `JevDecisionModelWorkflowUses.md`.

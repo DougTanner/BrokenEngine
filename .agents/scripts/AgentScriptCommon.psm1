@@ -64,4 +64,14 @@ function Measure-AgentTokenCount([string] $Text) {
 	return [int64](($byteCount + 3) -shr 2)
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount
+function Test-AgentBlockOpener([string[]] $Lines, [int] $Number) {
+	# A column-0 `{` opens a function or class body unless the nearest non-blank line above it is a namespace.
+	if ($Lines[$Number - 1] -cnotmatch '^\{\s*$') { return $false }
+	for ($above = $Number - 1; $above -ge 1; $above--) {
+		if ([string]::IsNullOrWhiteSpace($Lines[$above - 1])) { continue }
+		return $Lines[$above - 1] -cnotmatch '^\s*namespace\b'
+	}
+	return $true
+}
+
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Test-AgentBlockOpener

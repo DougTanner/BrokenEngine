@@ -92,7 +92,7 @@ the list a full model then reads", never "Jev decides".
 | `JevCommentBlockTriage.md` | `/comment-review`'s six classes | `choice` + `ok` per block; `ok` probability orders reading | run: at `ok` < 0.5, 35/40 changed blocks flagged, 13/40 untouched flagged | hand-labelled 100 blocks from a second commit |
 | `JevPlanAreaFiling.md` | `Documents/Plans/AGENTS.md` areas; the Plans/Features/Investigations test | `choice` over areas | run twice: 56/58 and 57/58 agree, every flag a false flag; a path count reproduces all 58; the tree question turns on user intent the document does not carry | none: not promoted |
 | `JevDuplicatePlanDetection.md` | `/create-follow-up-plans` duplicate rule | `score` with levels = actions (distinct, related, same fix) | run: the three merged Plans are the top three of 50 pairs; no distinct pair reached 1.0 | a second historical merge; a code-side shortlist |
-| `JevEvidenceCitationCheck.md` | finding evidence rows, acceptance rows, Plan citations | `choice` supports / contradicts / says_nothing | run twice, tracked script: 440/625 real citations `supports`, 36/585 shifted regions; blind read of 66: passes right 20/22, flags right only 15/44 | reading order only; enclosing-function context, then a human blind read |
+| `JevEvidenceCitationCheck.md` | finding evidence rows, acceptance rows, Plan citations | three `noul`s (absent, opposite, elsewhere) over the cited lines and their enclosing block; the highest orders reading | run twice, tracked script: 440/625 real citations `supports`, 36/585 shifted regions; blind read of 66: passes right 20/22, flags right only 15/44; third pilot at 49 flags each, LLM-labelled: citations only the split question flags are stale 5/19, only the three-way 4/19, so the split ships | reading order only; a human blind read |
 | `JevStyleRuleJudgment.md` | `/code-style-review` hand-read rules 3, 14, 16, 21, 41, 49, 51, 56, 61, 62 | one request per changed function with one `noul` per rule; rule 56 as one `noul` per name over the function's name list | run twice over 41 blocks: seven rules meet the success bar at 0.5 (no miss, at most one clean block flagged each), rule 56 needs the name-list form, rule 61 goes to a scanner, rule 3 needs 0.9 | session mode over the last ten landed C++ commits, flagged blocks hand-labelled for rules 3 and 56 |
 | `JevSessionResidueJudgment.md` | `/code-style-review` step 17: whether a scanner `log`, `printf`, `debug-break`, `assert-false`, `fixme`, or `hack` hit is temporary | one `noul` per hit; probability orders the read; same request as the style rules or its own is open | not run: a removed line never lands, so positives must be planted and recorded | scanner hits over the last ten landed C++ commits as negatives, 20+ planted temporary lines as positives, then recorded step 17 removals |
 | `JevSimplicityReviewTrigger.md` | `/plan-simplicity-review` dispatch trigger | two `noul`s, low threshold | not run | record beside main's decision for 30 plans |
@@ -137,8 +137,7 @@ Promote in the order the pilots justify, not the order of expected saving:
    not promoted: its second pilot showed the filing rule is a path count a
    script reproduces exactly, so it falls under `## Not suitable`.
 3. `JevStyleRuleJudgment.md` landed as a gate and, after its real-session
-   review, is an advisory hint for rules 14, 49, and 62; every rule stays
-   hand-read.
+   review, is an advisory hint for rule 49; every rule stays hand-read.
 4. Every remaining candidate waits for a corpus that does not exist yet, and
    `JevSimplicityReviewTrigger.md` and `JevFindingTriage.md` are the cheapest
    ways to start collecting one, because they record Jev's answer beside a
