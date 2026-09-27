@@ -36,7 +36,8 @@ $script:CppClasses = @('cpp', 'dual-language-header')
 # it. An entry's Except clears a match that is one of the rule's permitted forms. The style-rule-61,
 # style-rule-22 and style-rule-59 kinds are not in this table: each needs another head-side line too, so
 # Test-Rule61Line, Test-Rule22Line and Test-Rule59Line decide them, in that order, before the table. That
-# worker's step 7 hand-read list is the complement of the style-rule-<n> kinds, so update it with them.
+# worker's step 7 hand-read list and these style-rule-<n> kinds together make the review's style mandate,
+# and a rule is on both when each covers a different form, so update step 7 when a kind changes.
 $script:ScalarType = '(?:(?:unsigned|signed)\s+)?(?:bool|char|wchar_t|short|int|long(?:\s+long)?|float|double)|unsigned|u?int(?:8|16|32|64)_t|size_t|u?intptr_t|ptrdiff_t'
 $script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)|unsigned|u?int(?:8|16|32|64)_t|ptrdiff_t'
 # The prose-prone kinds share style-rule-2's comment-and-string alternative, so a line holding a comment

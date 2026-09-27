@@ -67,11 +67,32 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 7. Read `Documents/C++StyleGuide.txt`; it is the authority every step-10
    adjudication is decided against. Hand-read the selected ranges for every
    Rule 2 form the narrow scanner does not emit, and in every review for
-   rules 3, 14, 16 (including its vector `.at()` clause), 21, the "always
-   write `std::`" half of 41, 49, 51, 56 and 62. Step 6's `flagged` entries
-   for rules 14, 49 and 62 are extra step-10 candidates; check them first.
-   Those rules and the rules the scanner's `style-rule-<n>` kinds cover are
-   this review's whole style mandate; every other guide rule is outside it.
+   rules 3, 4, 7, 8, 12, 13, 14, 16 (including its vector `.at()` clause), 21,
+   24, 31, 38, 42, 48, 49, 51, 56 and 62, and for these halves of rules split
+   with another owner:
+   - rule 5: a mutex locked and unlocked by hand instead of through a RAII
+     lock owner;
+   - rule 18: a read-only reference or pointer parameter, or a range-for
+     reference, missing `const`;
+   - rule 20: brace initialization of a class that is neither an aggregate nor
+     initializer-list constructed;
+   - rule 25: `static constexpr` at function scope and `inline constexpr` at
+     global header scope, not the other way round;
+   - rule 29: an override declared without `virtual` and without `override`;
+   - rule 36: a class member initialized in a `.cpp` file instead of by an
+     inline initializer in the header;
+   - rule 41: the "always write `std::`" half;
+   - rule 47: include grouping and order.
+
+   Step 6's `flagged` entries for rules 14, 49 and 62 are extra step-10
+   candidates; check them first. Those rules and the rules the scanner's
+   `style-rule-<n>` kinds cover are this review's whole style mandate; a rule
+   is on both lists when each covers a different form. Every other guide rule
+   has another owner: `/repo-code-review` owns rules 9, 53 and 60 and rule
+   47's external-header half
+   ([`../../repo-code-review/references/checks.md`](../../repo-code-review/references/checks.md)),
+   `/comment-review` owns rule 64, and the compiler owns rules 43 (RTTI off,
+   warnings as errors) and 63 (the rotate poison in `Common/ExternalHeaders.h`).
    Done when the guide is in hand, step 6's flagged entries are listed for
    step 10, and the hand read covers every selected range.
 8. Run the session-added candidate scanner once: `pwsh -NoProfile -File

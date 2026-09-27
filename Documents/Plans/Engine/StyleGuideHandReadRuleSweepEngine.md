@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-27T13:29:06.781Z","dependsOn":["Documents/Plans/ChangeWorkflow/CodeStyleReviewHandReadMandate.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-27T13:29:06.781Z","dependsOn":[]} -->
 # Cleanup: Engine — fix existing code that breaks the style guide rules the /code-style-review hand read checks
 
 ## Context
