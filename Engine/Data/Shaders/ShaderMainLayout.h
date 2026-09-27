@@ -19,6 +19,10 @@ struct MainLayout
 
 	vec4 pf4MediumWavesOne[256] INIT;
 	vec4 pf4MediumWavesTwo[256] INIT;
+	int32_t iWaterLowCount INIT;
+	int32_t iWaterMediumCount INIT;
+	int32_t iWaterActiveQuadX INIT;
+	int32_t iWaterActiveQuadY INIT;
 
 	// Lighting — water normal map atlas (3 weighted samples)
 	float fLightingSampledNormalsOneSize INIT;

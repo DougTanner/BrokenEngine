@@ -26,8 +26,8 @@ layout (set = 1, binding = 4, rgba16f) uniform writeonly image2D normalImage; //
 // dimensions, so prior-LOD texels outside it remain unused.
 void main()
 {
-	int iActiveX = globalLayout.iWaterActiveQuadX;
-	int iActiveY = globalLayout.iWaterActiveQuadY;
+	int iActiveX = mainLayout.iWaterActiveQuadX;
+	int iActiveY = mainLayout.iWaterActiveQuadY;
 	ivec2 i2Coord = ivec2(gl_GlobalInvocationID.xy);
 	if (i2Coord.x > iActiveX || i2Coord.y > iActiveY)
 	{
@@ -81,7 +81,7 @@ void main()
 	if (globalLayout.fWaterLowAmplitude > 0.0f && fLowWeight > 0.0f)
 	{
 		float fLowSteepness = globalLayout.fWaterLowSteepness;
-		for (int i = 0; i < globalLayout.iWaterLowCount; ++i)
+		for (int i = 0; i < mainLayout.iWaterLowCount; ++i)
 		{
 			float fOmega = mainLayout.pf4LowWavesTwo[i].x;
 			float fAmplitude = mainLayout.pf4LowWavesTwo[i].y;
@@ -109,7 +109,7 @@ void main()
 	if (globalLayout.fWaterMediumAmplitude > 0.0f && fMediumWeight > 0.0f)
 	{
 		float fMediumSteepness = globalLayout.fWaterMediumSteepness;
-		for (int i = 0; i < globalLayout.iWaterMediumCount; ++i)
+		for (int i = 0; i < mainLayout.iWaterMediumCount; ++i)
 		{
 			float fOmega = mainLayout.pf4MediumWavesTwo[i].x;
 			float fAmplitude = mainLayout.pf4MediumWavesTwo[i].y;

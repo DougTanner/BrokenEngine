@@ -211,10 +211,6 @@ struct GlobalLayout
 	vec4 f4WaterNormalRotationThree INIT;
 
 	// Water
-	int32_t iWaterLowCount INIT;
-	int32_t iWaterMediumCount INIT;
-	int32_t iWaterActiveQuadX INIT;
-	int32_t iWaterActiveQuadY INIT;
 	float fWaterOriginX INIT;
 	float fWaterOriginY INIT;
 	float fWaterHeight INIT;

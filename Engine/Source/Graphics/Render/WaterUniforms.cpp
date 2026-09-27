@@ -207,9 +207,6 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 	rGlobalLayout.fWaterLowAmplitude = gWaterLowAmplitude.Get();
 	rGlobalLayout.fWaterMediumAmplitude = gWaterMediumAmplitude.Get();
 
-	rGlobalLayout.iWaterLowCount = static_cast<int>(std::min(gWaterLowCount.Get<int64_t>(), static_cast<int64_t>(gWaterLowMax.Get())));
-	rGlobalLayout.iWaterMediumCount = static_cast<int>(gWaterMediumCount.Get<int64_t>());
-
 	PopulateWaterReducedUv(rGlobalLayout, fCurrentTime);
 }
 

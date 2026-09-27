@@ -57,9 +57,9 @@ void main()
 	// stale displacement textures. Otherwise, the active LOD's quad count maps each vertex to its matching texel.
 	vec3 f3Displacement = vec3(0.0f);
 	vec3 f3WaveNormal = vec3(0.0f, 0.0f, 1.0f);
-	if (globalLayout.iWaterLowCount > 0 || globalLayout.iWaterMediumCount > 0)
+	if (mainLayout.iWaterLowCount > 0 || mainLayout.iWaterMediumCount > 0)
 	{
-		ivec2 i2Grid = ivec2(round(f2InTexcoord * vec2(globalLayout.iWaterActiveQuadX, globalLayout.iWaterActiveQuadY)));
+		ivec2 i2Grid = ivec2(round(f2InTexcoord * vec2(mainLayout.iWaterActiveQuadX, mainLayout.iWaterActiveQuadY)));
 		f3Displacement = texelFetch(displacementTextureSampler, i2Grid, 0).xyz;
 		f3WaveNormal = texelFetch(displacementNormalTextureSampler, i2Grid, 0).xyz;
 	}

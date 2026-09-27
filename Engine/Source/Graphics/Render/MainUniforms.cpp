@@ -323,12 +323,12 @@ static void RebuildMediumWaveInvariants(int64_t iCount)
 	}
 }
 
-// Geometric "low" wave band: writes the pf4LowWaves* Gerstner terms, or zeroes the count when faded out.
-static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, shaders::GlobalLayout& rGlobalLayout, double dWaveTime, double dWaveCameraX, double dWaveCameraY, float fLowAmplitudeScale)
+// Geometric "low" wave band: writes iWaterLowCount and the pf4LowWaves* Gerstner terms, or zeroes the count when faded out.
+static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, double dWaveTime, double dWaveCameraX, double dWaveCameraY, float fLowAmplitudeScale)
 {
 	if (fLowAmplitudeScale <= 0.0f)
 	{
-		rGlobalLayout.iWaterLowCount = 0;
+		rMainLayout.iWaterLowCount = 0;
 		return;
 	}
 
@@ -363,14 +363,15 @@ static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, shaders::
 
 	std::memcpy(rMainLayout.pf4LowWavesOne, sLowWaveStaging.pf4WavesOne, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4LowWavesOne[0]));
 	std::memcpy(rMainLayout.pf4LowWavesTwo, sLowWaveStaging.pf4WavesTwo, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4LowWavesTwo[0]));
+	rMainLayout.iWaterLowCount = static_cast<int32_t>(iCount);
 }
 
-// Geometric "medium" wave band: writes the pf4MediumWaves* Gerstner terms, or zeroes the count when faded out.
-static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, shaders::GlobalLayout& rGlobalLayout, double dWaveTime, double dWaveCameraX, double dWaveCameraY, float fMediumAmplitudeScale)
+// Geometric "medium" wave band: writes iWaterMediumCount and the pf4MediumWaves* Gerstner terms, or zeroes the count when faded out.
+static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double dWaveTime, double dWaveCameraX, double dWaveCameraY, float fMediumAmplitudeScale)
 {
 	if (fMediumAmplitudeScale <= 0.0f)
 	{
-		rGlobalLayout.iWaterMediumCount = 0;
+		rMainLayout.iWaterMediumCount = 0;
 		return;
 	}
 
@@ -404,17 +405,18 @@ static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, shader
 
 	std::memcpy(rMainLayout.pf4MediumWavesOne, sMediumWaveStaging.pf4WavesOne, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4MediumWavesOne[0]));
 	std::memcpy(rMainLayout.pf4MediumWavesTwo, sMediumWaveStaging.pf4WavesTwo, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4MediumWavesTwo[0]));
+	rMainLayout.iWaterMediumCount = static_cast<int32_t>(iCount);
 }
 
 // Wave phase reduction: read elapsed time from already-populated global layout.
-// Non-const: when a per-stack camera-eye-height fade clamps amplitude to zero, the band helpers zero
-// the matching iWater*Count so the WaterDisplacement.comp Gerstner loop short-circuits to no work.
-static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, shaders::GlobalLayout& rGlobalLayout, GraphicsQualityLevel eWaterLevel)
+// The band helpers publish each iWater*Count beside its MainLayout wave arrays; when a per-stack camera-eye-height
+// fade clamps amplitude to zero they zero the count so the WaterDisplacement.comp Gerstner loop short-circuits to no work.
+static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, const shaders::GlobalLayout& rGlobalLayout, GraphicsQualityLevel eWaterLevel)
 {
 	if (eWaterLevel == GraphicsQualityLevel::kLow)
 	{
-		rGlobalLayout.iWaterLowCount = 0;
-		rGlobalLayout.iWaterMediumCount = 0;
+		rMainLayout.iWaterLowCount = 0;
+		rMainLayout.iWaterMediumCount = 0;
 		return;
 	}
 
@@ -437,15 +439,15 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, shaders::Glo
 	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.Get();
 	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraEyeHeight) / std::max(fMediumFadeEnd - fMediumFadeStart, 1e-3f), 0.0f, 1.0f);
 
-	PopulateGerstnerLowWaves(rMainLayout, rGlobalLayout, dWaveTime, dWaveCameraX, dWaveCameraY, fLowAmplitudeScale);
+	PopulateGerstnerLowWaves(rMainLayout, dWaveTime, dWaveCameraX, dWaveCameraY, fLowAmplitudeScale);
 
 	if (eWaterLevel == GraphicsQualityLevel::kMedium)
 	{
-		rGlobalLayout.iWaterMediumCount = 0;
+		rMainLayout.iWaterMediumCount = 0;
 		return;
 	}
 
-	PopulateGerstnerMediumWaves(rMainLayout, rGlobalLayout, dWaveTime, dWaveCameraX, dWaveCameraY, fMediumAmplitudeScale);
+	PopulateGerstnerMediumWaves(rMainLayout, dWaveTime, dWaveCameraX, dWaveCameraY, fMediumAmplitudeScale);
 }
 
 // Hex shield
@@ -489,7 +491,8 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	}
 
 	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoord);
-	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
+	const shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<const shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
+	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 	GraphicsQualityLevel eWaterLevel = static_cast<GraphicsQualityLevel>(std::clamp(gWaterLevel.Get<int64_t>(), int64_t {0}, static_cast<int64_t>(GraphicsQualityLevel::kCount) - 1));
 
 	RenderLightingMain(iCommandBuffer);
@@ -508,8 +511,8 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	//   1) WaterDisplacement.comp — bounds-checks each thread, only writes the top-left rectangle.
 	//   2) Water.vert — scales f2InTexcoord to the matching texel index via texelFetch.
 	// Both shaders must read the SAME values; populating once here keeps them in lockstep.
-	rGlobalLayout.iWaterActiveQuadX = static_cast<int32_t>(rWaterLevelOfDetail.iQuadCountX);
-	rGlobalLayout.iWaterActiveQuadY = static_cast<int32_t>(rWaterLevelOfDetail.iQuadCountY);
+	rMainLayout.iWaterActiveQuadX = static_cast<int32_t>(rWaterLevelOfDetail.iQuadCountX);
+	rMainLayout.iWaterActiveQuadY = static_cast<int32_t>(rWaterLevelOfDetail.iQuadCountY);
 
 	// Low writes a zero dispatch because Water.vert also bypasses the displacement textures. Medium and High use
 	// one workgroup per kiComputeTileSize block over the active LOD sub-region, written per framebuffer to match
@@ -580,7 +583,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 	// Post-render MainLayout setup (camera matrices, wave params, hex shields, camera shake)
 	const game::FrameInterpolate& rFrameInterpolate = rCameraInterpolate;
-	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
 	static int32_t siRenderCount = 0;
 	rMainLayout.iFrameNumber = static_cast<int>(engine::gpCamera->miFrame);
