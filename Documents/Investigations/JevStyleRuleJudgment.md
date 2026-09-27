@@ -3,10 +3,12 @@
 Open question: can Jev take over the hand-read pass of `/code-style-review`,
 the rules `.agents/scripts/Find-SessionCandidates.ps1` emits no candidates
 for? Part of the series in `JevDecisionModelWorkflowUses.md`. Piloted once
-against the live API over the 41 hand-labelled code blocks in
-`.agents/skills/code-style-review/references/style-rule-judgment/cases.json`,
-which `.agents/scripts/Test-StyleRuleJudgment.ps1 -CasesPath` re-measures
-with the questions `## The instructions` records; the Plan that wired the
+against the live API over 41 hand-labelled code blocks in
+`.agents/skills/code-style-review/references/style-rule-judgment/cases.json`
+(42 since the rule 62 log-plus-return negative case was added).
+`.agents/scripts/Test-StyleRuleJudgment.ps1 -CasesPath` re-measures that
+corpus with the script's current questions, and `## The instructions`
+records the measured ones. The Plan that wired the
 result into the worker landed, and since the real-session review
 (`## Decisions a Plan needs` item 4) `/code-style-review` uses the script's
 session mode as an advisory hint. The pilot result is that one
@@ -278,7 +280,10 @@ state is `{ code }`, referenced as `code` in each text.
   would be 140 columns or fewer? A split of a Boolean expression that is
   longer than 140 columns is allowed. A single very long line is never a
   violation.
-- 62: Does `code` contain an if statement whose condition joins two or more
+- 62 (measured, then replaced by the `rule62` text in
+  `Test-StyleRuleJudgment.ps1`, which requires the body to be only the one
+  exit statement, after this text flagged a log-plus-return body): Does
+  `code` contain an if statement whose condition joins two or more
   independent guard conditions with || and whose body is a single exit
   statement (return, continue, or break), where each condition on its own
   should have been a separate if with its own exit? An || inside a Boolean

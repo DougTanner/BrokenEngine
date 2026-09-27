@@ -61,9 +61,9 @@ $script:BlockQuestions = [ordered]@{
 		false = 'Every function body does real multi-statement work or is a serialization or codec adapter, or no function is defined'
 	}
 	rule62 = [ordered]@{
-		instructions = 'Does `code` contain an if statement whose condition joins two or more independent guard conditions with || and whose body is a single exit statement (return, continue, or break), where each condition on its own should have been a separate if with its own exit? An || inside a Boolean assignment or a non-exit body, an && condition, and separate ifs with their own bodies are not violations.'
-		true = 'One if packs several independent guards with || in front of a single return, continue, or break'
-		false = 'No if with an || condition guards a single exit statement; guards are already one condition per if, or the || is used elsewhere'
+		instructions = 'Does `code` contain an if statement whose condition joins two or more independent guard conditions with || and whose body is exactly one statement, that statement being a return, continue, or break, where each condition on its own should have been a separate if with its own exit? An || inside a Boolean assignment or a non-exit body, a body that holds any other statement before or after the exit (such as a log call followed by return), an && condition, and separate ifs with their own bodies are not violations.'
+		true = 'One if packs several independent guards with || and its body consists only of one return, continue, or break statement'
+		false = 'No if with an || condition has a body that is only one exit statement; guards are already one condition per if, the body holds other statements besides the exit, or the || is used elsewhere'
 	}
 }
 

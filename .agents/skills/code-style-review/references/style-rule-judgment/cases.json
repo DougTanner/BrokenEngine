@@ -78,6 +78,22 @@
     ]
   },
   {
+    "id": "clean-packed-guard-log-return",
+    "expected": [],
+    "code": [
+      "void ApplyZoomTarget(Camera& rCamera, float fTarget)",
+      "{",
+      "\tif (!std::isfinite(fTarget) || fTarget < rCamera.fMinZoom || fTarget > rCamera.fMaxZoom)",
+      "\t{",
+      "\t\tLOG(\"Rejected zoom target %f\", fTarget);",
+      "\t\treturn;",
+      "\t}",
+      "",
+      "\trCamera.fZoomTarget = fTarget;",
+      "}"
+    ]
+  },
+  {
     "id": "clean-or-in-bool-assignment",
     "expected": [],
     "code": [

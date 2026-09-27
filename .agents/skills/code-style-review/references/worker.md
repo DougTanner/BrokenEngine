@@ -116,9 +116,11 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
       findings.
     - Record each step-6 flagged entry for rules 14, 49 and 62 as one
       `Judgment` row ([`../SKILL.md`](../SKILL.md) `## Handoff`): `confirmed`
-      when the violation involves a session-changed line, otherwise
-      `false flag`, even when the construct is a real violation in unchanged
-      code. A confirmed entry is a finding for steps 11-17 exactly as a
+      only when adjudication against rule n of the guide finds the flagged
+      construct is a real violation of that rule and the violation involves a
+      session-changed line; otherwise `false flag`, including a construct
+      the rule does not cover and a real violation in unchanged code. A
+      confirmed entry is a finding for steps 11-17 exactly as a
       scanner row is. A violation the hand read finds without a flagged entry
       is an ordinary finding with no `Judgment` row; `Judgment` records only
       the script's flagged entries.
