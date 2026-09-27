@@ -402,6 +402,7 @@ void Game::Reset()
 
 #if defined(BT_SERVER)
 	engine::gpReplay->ResetStreams();
+	mGameFlags.Clear(engine::GameFlags::kSaveReplay);
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
