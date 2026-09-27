@@ -1,15 +1,17 @@
-# Added-lines-only candidate scanner for /code-style-review: it reports candidate temporary
+# Candidate scanner for /code-style-review: by default it reports candidate temporary
 # instrumentation and style-rule candidates on lines this session added, so a review never has to
 # separate them from pre-existing code by hand. The scan reports candidates only —
 # it never decides whether a hit is temporary or a row is a violation, never edits a file, and writes
 # nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is safe under a
-# read-only sandbox. Stdout carries only the result document.
-[CmdletBinding()]
+# read-only sandbox. Stdout carries only the result document. With -Path it instead scans every line of
+# the named tracked C++ files for the style-rule-<n> kinds only.
+[CmdletBinding(DefaultParameterSetName = 'Session')]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
-	[Parameter(Mandatory)][string] $Baseline,
-	[string] $Head,
-	[switch] $IncludeUntracked
+	[Parameter(Mandatory, ParameterSetName = 'Session')][string] $Baseline,
+	[Parameter(ParameterSetName = 'Session')][string] $Head,
+	[Parameter(ParameterSetName = 'Session')][switch] $IncludeUntracked,
+	[Parameter(Mandatory, ParameterSetName = 'WholeFile')][string[]] $Path
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,9 +33,15 @@ $script:CppClasses = @('cpp', 'dual-language-header')
 # One entry per candidate kind: the residue kinds .agents/skills/code-style-review/references/worker.md
 # step 17 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 10
 # adjudicates. The order is the order a line is attributed: a line reports the first kind that matches
-# it. An entry's Except clears a match that is one of the rule's permitted forms. The style-rule-61 kind
-# is not in this table: it needs the next line too, so Test-Rule61Line decides it before the table. That
+# it. An entry's Except clears a match that is one of the rule's permitted forms. The style-rule-61,
+# style-rule-22 and style-rule-59 kinds are not in this table: each needs another head-side line too, so
+# Test-Rule61Line, Test-Rule22Line and Test-Rule59Line decide them, in that order, before the table. That
 # worker's step 7 hand-read list is the complement of the style-rule-<n> kinds, so update it with them.
+$script:ScalarType = '(?:(?:unsigned|signed)\s+)?(?:bool|char|wchar_t|short|int|long(?:\s+long)?|float|double)|unsigned|u?int(?:8|16|32|64)_t|size_t|u?intptr_t|ptrdiff_t'
+$script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)|unsigned|u?int(?:8|16|32|64)_t|ptrdiff_t'
+# The prose-prone kinds share style-rule-2's comment-and-string alternative, so a line holding a comment
+# or a quote character is never reported for them.
+$script:CommentOrQuote = '(?://|/\*|\*/|["''])'
 $script:CandidatePatterns = @(
 	@{ Kind = 'log'; Pattern = '\bLOG\s*\(' }
 	@{ Kind = 'printf'; Pattern = '\bprintf\s*\(' }
@@ -55,7 +63,34 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'style-rule-52'; Pattern = '\w\{\}' }
 	@{ Kind = 'style-rule-57'; Pattern = '\b\w+(?:Impl|Internal)\s*\(' }
 	@{ Kind = 'style-rule-58'; Pattern = '^\s*#\s*ifn?def\b' }
+	@{ Kind = 'style-rule-1'; Pattern = '^ +\S'; Except = '^ +\*' }
+	@{ Kind = 'style-rule-5'; Pattern = '\bnew\s+[A-Za-z_]|\bdelete\b|\b(?:malloc|calloc|realloc|free)\s*\('; Except = $script:CommentOrQuote + '|=\s*delete\b|\boperator\s+(?:new|delete)\b' }
+	@{ Kind = 'style-rule-6'; Pattern = '\bBT_(?:DEBUG|RELEASE|PROFILE)\b|^\s*#\s*(?:el)?if\b.*\bkb[A-Z]'; Except = $script:CommentOrQuote }
+	@{ Kind = 'style-rule-10'; Pattern = '^\s*#\s*include\s*["<][^">]*\\' }
+	# A `(void)name;` discard is also a parenthesized builtin type followed by an operand, so rule 39
+	# precedes rule 11.
+	@{ Kind = 'style-rule-39'; Pattern = '\(\s*void\s*\)\s*[A-Za-z_]\w*\s*;' }
+	@{ Kind = 'style-rule-11'; Pattern = '(?<!\b(?:alignas|alignof|sizeof|decltype)\s*)\((?:const\s+)?(?:void|' + $script:ScalarType + '|[A-Za-z_][\w:]*(?=\s*(?:const\s*)?\*))(?:\s*const)?(?:\s*\*)*\s*\)\s*(?!(?:const|override|noexcept|final|volatile|mutable)\b)[\w(]'; Except = '^\s*//' }
+	@{ Kind = 'style-rule-17'; Pattern = '\b(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*\s*[={][^;]*\.size\s*\(\s*\)|\bfor\s*\(\s*(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*[^;]*;[^;]*\.size\s*\(\s*\)' }
+	@{ Kind = 'style-rule-20'; Pattern = '^\s*(?:(?:static|inline|constexpr|const|thread_local|mutable)\s+)*(?:' + $script:ScalarType + ')\s+[A-Za-z_]\w*\s*\{' }
+	@{ Kind = 'style-rule-23'; Pattern = '\btypedef\b'; Except = $script:CommentOrQuote }
+	@{ Kind = 'style-rule-25'; Pattern = '\bconstexpr\b'; Except = '\b(?:static|inline)\b|\bif\s+constexpr\b|\bconstexpr\s+[^=;{]*[\w)*&>]\s*\(' }
+	@{ Kind = 'style-rule-26'; Pattern = '\busing\s+enum\b' }
+	@{ Kind = 'style-rule-30'; Pattern = '>\s+>' }
+	@{ Kind = 'style-rule-33'; Pattern = '\b(?:CHAR_BIT|MB_LEN_MAX|S?CHAR_MIN|S?CHAR_MAX|UCHAR_MAX|SHRT_MIN|SHRT_MAX|USHRT_MAX|INT_MIN|INT_MAX|UINT_MAX|LONG_MIN|LONG_MAX|ULONG_MAX|LLONG_MIN|LLONG_MAX|ULLONG_MAX)\b' }
+	# The prefix walks the line past string literals, character literals and comments, treating a quote
+	# directly after a digit as a digit separator, so only a literal in code is reported.
+	@{ Kind = 'style-rule-34'; Pattern = '^(?:[^"''/]|/(?![/*])|(?<=\d)''|''(?:\\.|[^''\\])*''|"(?:\\.|[^"\\])*")*?(?<![\w.''])\d{4,}(?![\d''])'; Except = '^\s*#\s*(?:pragma|line)\b|^\s*\*(?:\s|/|$)' }
+	@{ Kind = 'style-rule-35'; Pattern = '\b(?:(?:CreateDirectory|RemoveDirectory|DeleteFile|GetFileAttributes(?:Ex)?|SetFileAttributes|PathFileExists|FindFirstFile(?:Ex)?|FindNextFile)[AW]?|FindClose|_w?mkdir|_w?rmdir|_w?unlink|_w?access(?:_s)?|_w?stat(?:32|64|i64)?|_w?findfirst(?:32|64)?|_w?findnext(?:32|64)?|mkdir|rmdir|unlink|opendir|readdir)\s*\('; Except = $script:CommentOrQuote }
+	@{ Kind = 'style-rule-36'; Pattern = '^\s*(?:(?:static|inline|thread_local|volatile|mutable)\s+)*(?:const\s+)?(?:(?:' + $script:ScalarType + ')(?:\s*\*+\s*|\s+)|(?!(?:return|delete|co_return|throw|goto|case|else|do)\b)[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*+\s*)(?:const\s+)?[A-Za-z_]\w*\s*;' }
+	@{ Kind = 'style-rule-37'; Pattern = '\bstd::get\s*<\s*\d+\s*>\s*\(|\bstd::tie\s*\(' }
+	@{ Kind = 'style-rule-40'; Pattern = '[(,]\s*const\s+(?:(?:char|wchar_t)\s*\*|std::w?string\s*&)'; Except = '\bfor\s*\(\s*const\s+(?:(?:char|wchar_t)\s*\*|std::w?string\s*&)' }
+	@{ Kind = 'style-rule-44'; Pattern = '\bXM(?:Load|Store)Float(?:2|3|4|3x4|4x3|4x4)\s*\(' }
+	@{ Kind = 'style-rule-46'; Pattern = '\bXM\w*Est\s*\(' }
+	@{ Kind = 'style-rule-54'; Pattern = '^\s*(?:(?:static|inline|const|mutable)\s+)*Vk[A-Z]\w*\s+[A-Za-z_]\w*\s*(?:[=;{]|$)'; Except = '^\s*(?:(?:static|inline|const|mutable)\s+)*Vk([A-Z]\w*)\s+[A-Za-z_]\w*Vk\1\s*(?:[=;{]|$)' }
+	@{ Kind = 'style-rule-55'; Pattern = '^\s*enum\b(?!\s+(?:class|struct)\b)'; Except = $script:CommentOrQuote }
 )
+$script:ScannedPatterns = $script:CandidatePatterns
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
 $script:HeadSha = ''
@@ -145,6 +180,23 @@ function Get-AddedLine([object] $Inventory) {
 	return $added
 }
 
+function Get-FileLine([string[]] $Paths) {
+	# Whole-file mode scans every working-tree line of each named file, which must be a tracked C++ file.
+	$relative = @($Paths | ForEach-Object { $_ -replace '\\', '/' })
+	$tracked = [Collections.Generic.HashSet[string]]::new([string[]] @((Invoke-CandidateGit (@('--literal-pathspecs', 'ls-files', '-z', '--') + $relative)) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) }))
+	$scanned = [Collections.Generic.List[object]]::new()
+	foreach ($file in $relative) {
+		if ($file -cnotmatch '\.(?:h|cpp)$' -or -not $tracked.Contains($file) -or -not (Test-Path -LiteralPath (Join-Path $script:Root $file) -PathType Leaf)) {
+			Complete-SessionCandidates 2 'blocked' 'candidates.path-invalid' "-Path must name tracked *.h or *.cpp files relative to the repository root: '$file'."
+		}
+		$lines = Get-NewSideLine $file
+		for ($number = 1; $number -le $lines.Count; $number++) {
+			$scanned.Add([pscustomobject] @{ Path = $file; Line = $number; Text = $lines[$number - 1] })
+		}
+	}
+	return $scanned
+}
+
 function Test-Rule61Line([string] $Path, [int] $Line, [string] $Text) {
 	# An `if` (an `else if` counts as its `if`) or `else` line breaks rule 61 when a statement follows the
 	# condition on the same line, or when the next non-blank head-side line is neither `{` nor a `&&`/`||`
@@ -177,8 +229,37 @@ function Test-Rule61Line([string] $Path, [int] $Line, [string] $Text) {
 	return $false
 }
 
+function Test-Rule22Line([string] $Path, [int] $Line, [string] $Text) {
+	# A line breaks rule 22 when it ends without a comma and the next non-blank head-side line starts with
+	# the closing `}`. A line ending in `;`, `{`, `}`, `:` or `\` is a statement, a brace, a label or a macro
+	# continuation, not a list element.
+	$code = ($Text -replace '//.*$', '').Trim()
+	if ($code.Length -eq 0 -or $code -cmatch '^(?:#|/\*|\*)' -or $code -cmatch '[,;{}:\\]$') { return $false }
+	$lines = Get-NewSideLine $Path
+	for ($number = $Line + 1; $number -le $lines.Count; $number++) {
+		$next = $lines[$number - 1].Trim()
+		if ($next.Length -eq 0) { continue }
+		return $next.StartsWith('}')
+	}
+	return $false
+}
+
+function Test-Rule59Line([string] $Path, [int] $Line, [string] $Text) {
+	# A case or default label breaks rule 59 when its indent is not exactly one tab deeper than the nearest
+	# preceding head-side switch line indented no deeper than the label, so a nested switch in an earlier case
+	# body is skipped while a label written at its own switch's indent is still caught.
+	if (-not ($Text -cmatch '^(\s*)(?:case\b|default\s*:)')) { return $false }
+	$indent = $Matches[1]
+	$lines = Get-NewSideLine $Path
+	for ($number = $Line - 1; $number -ge 1; $number--) {
+		if (-not ($lines[$number - 1] -cmatch '^(\s*)switch\b') -or $Matches[1].Length -gt $indent.Length) { continue }
+		return $indent -cne "$($Matches[1])`t"
+	}
+	return $false
+}
+
 function Test-CandidatePattern([string] $Text) {
-	foreach ($pattern in $script:CandidatePatterns) {
+	foreach ($pattern in $script:ScannedPatterns) {
 		if ($Text -cnotmatch $pattern.Pattern) { continue }
 		if ($pattern.ContainsKey('Except') -and $Text -cmatch $pattern.Except) { continue }
 		return $pattern.Kind
@@ -191,18 +272,32 @@ try {
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-SessionCandidates 2 'blocked' 'candidates.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
-	if (-not (Test-Path -LiteralPath $script:InventoryScript -PathType Leaf)) {
-		Complete-SessionCandidates 2 'blocked' 'candidates.inventory-missing' "The session change inventory script is missing: '$($script:InventoryScript)'."
+	if ($PSCmdlet.ParameterSetName -ceq 'WholeFile') {
+		# A residue kind such as log would otherwise hide a style kind on an existing line.
+		$script:ScannedPatterns = @($script:CandidatePatterns | Where-Object { $_.Kind.StartsWith('style-rule-') })
+		$scannedLines = Get-FileLine $Path
+		$regionsCapped = $false
+		$scope = "$(@($Path).Count) named C++ file(s)"
 	}
-	$inventory = Get-InventoryDocument
-	$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
-	# A passing inventory always carries truncation.regions, so both counts are read directly.
-	$emittedRegionCount = @($inventory.regions).Count
-	$regionsCapped = $emittedRegionCount -ge $script:InventoryRegionCap -or [int] $inventory.truncation.regions.full -gt $emittedRegionCount
+	else {
+		if (-not (Test-Path -LiteralPath $script:InventoryScript -PathType Leaf)) {
+			Complete-SessionCandidates 2 'blocked' 'candidates.inventory-missing' "The session change inventory script is missing: '$($script:InventoryScript)'."
+		}
+		$inventory = Get-InventoryDocument
+		$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
+		# A passing inventory always carries truncation.regions, so both counts are read directly.
+		$emittedRegionCount = @($inventory.regions).Count
+		$regionsCapped = $emittedRegionCount -ge $script:InventoryRegionCap -or [int] $inventory.truncation.regions.full -gt $emittedRegionCount
+		$scannedLines = Get-AddedLine $inventory
+		$scope = 'session-added C++ lines'
+	}
 
 	$hits = [Collections.Generic.List[object]]::new()
-	foreach ($line in (Get-AddedLine $inventory)) {
-		$kind = if (Test-Rule61Line $line.Path $line.Line $line.Text) { 'style-rule-61' } else { Test-CandidatePattern $line.Text }
+	foreach ($line in $scannedLines) {
+		$kind = if (Test-Rule61Line $line.Path $line.Line $line.Text) { 'style-rule-61' }
+		elseif (Test-Rule22Line $line.Path $line.Line $line.Text) { 'style-rule-22' }
+		elseif (Test-Rule59Line $line.Path $line.Line $line.Text) { 'style-rule-59' }
+		else { Test-CandidatePattern $line.Text }
 		if ($null -eq $kind) { continue }
 		$text = $line.Text.Trim()
 		if ($text.Length -gt $script:MaximumTextLength) { $text = $text.Substring(0, $script:MaximumTextLength) }
@@ -220,6 +315,8 @@ try {
 	$counts = [ordered]@{ total = $sorted.Count }
 	foreach ($pattern in $script:CandidatePatterns) { $counts[$pattern.Kind] = @($sorted | Where-Object { $_.kind -ceq $pattern.Kind }).Count }
 	$counts['style-rule-61'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-61' }).Count
+	$counts['style-rule-22'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-22' }).Count
+	$counts['style-rule-59'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-59' }).Count
 	$result.counts = $counts
 	$emitted = [Collections.Generic.List[object]]::new()
 	foreach ($hit in ($sorted | Select-Object -First $script:MaximumHits)) { $emitted.Add($hit) }
@@ -231,7 +328,7 @@ try {
 		$drop = [Math]::Max(1, [int] [Math]::Ceiling($emitted.Count * 0.1))
 		$emitted.RemoveRange($emitted.Count - $drop, $drop)
 	}
-	Complete-SessionCandidates 0 'pass' 'ok' "Scanned the session-added C++ lines and found $($sorted.Count) candidate(s)."
+	Complete-SessionCandidates 0 'pass' 'ok' "Scanned the $scope and found $($sorted.Count) candidate(s)."
 }
 catch {
 	Complete-SessionCandidates 1 'error' 'internal.error' $_.Exception.Message

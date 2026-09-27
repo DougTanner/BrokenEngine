@@ -33,6 +33,12 @@ plus the session's residue removed and semantic candidates routed to the caller.
 - `Jev` — `skip`, supplied only after the user says "skip jev"; the worker then
   never runs the judgment script. Absent otherwise.
 
+The scanner also has a whole-file mode that lists the `style-rule-<n>`
+candidates on every line of named tracked `*.h`/`*.cpp` files, each a path
+relative to the repository root with no `./` prefix:
+`pwsh -NoProfile -Command "& '.agents/scripts/Find-SessionCandidates.ps1' -RepositoryRoot '<absolute repository toplevel>' -Path '<file>','<file>'"`.
+A review never runs it; a caller passes one directory's files per run.
+
 ## Handoff
 
 Return the shared handoff form in

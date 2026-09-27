@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-27T12:47:15.288Z","dependsOn":["Documents/Plans/ChangeWorkflow/CodeStyleReviewRule18Coverage.md","Documents/Plans/ChangeWorkflow/CodeStyleReviewScannerRuleKinds.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-27T12:47:15.288Z","dependsOn":["Documents/Plans/ChangeWorkflow/CodeStyleReviewRule18Coverage.md"]} -->
 # Fix: /code-style-review — extend the step 7 hand-read list to the judgment-shaped style guide rules
 
 ## Context

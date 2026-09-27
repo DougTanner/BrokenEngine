@@ -97,6 +97,20 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
     Rule 2, surrounding code must reject declaration-shaped text inside a
     block comment or raw string opened on an earlier line. Rule 29 needs the
     base class, which is off the line, so look it up.
+    - These kinds' permitted forms are off the line, so reject a row that is
+      one: rule 5, ownership handed straight to a RAII owner; rule 11, a macro
+      argument or a function type; rule 17, a container that is not a
+      `std::vector`; rule 22, an enum body or a function body, which is not an
+      initializer list; rule 25, a namespace-scope `constexpr` variable in a
+      `.cpp` file, since rule 25 governs only function scope and header global
+      scope; rule 26, an enum declared in the file's own header — the file
+      itself when it is a header, or for a `.cpp` the header declaring the
+      functions or class it defines; rule 36, a class type with a constructor,
+      or an out-parameter filled on the next line; rule 40, a local, member,
+      cast, or template argument rather than a parameter, or a parameter type
+      an external callback signature fixes; rule 44, storage that is not an
+      aligned type; rule 54, a non-handle `Vk` struct type, or a local rather
+      than a member; rule 55, an index-and-count enum.
     - The rows carry their own rule number, so this step covers whatever kinds
       the run emits; step 7's hand read supplies the other hand-read rules'
       findings.
