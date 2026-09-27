@@ -83,6 +83,7 @@ build/bootstrap coordination. Never embed transcript paths or home paths.
 
 ## Acceptance criteria
 - The recorded symptom no longer reproduces under the documented invocation
-- The static-checks runner, invoked as `.agents/references/static-checks.md`
-  documents it, reports every row the change triggers passing
+- The static-checks runner, invoked as `.agents/references/change-workflow.md`
+  `#### Step 5 — Run targeted pre-review checks` documents it, reports every
+  row the change triggers passing
 ```

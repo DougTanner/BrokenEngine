@@ -110,7 +110,7 @@ Main splits the work into disjoint slices where possible. Review-fix exceptions 
 
 Order: the full applicable static pass and `/code-style-review` run after propagation; each `Build required` handoff compiles as it arrives and may run in parallel with the static pass, except that when the change touches C++ the pre-review build waits for `/code-style-review`. Focused implementation self-checks remain inside the implementation slices.
 
-- `implementer` runs the full applicable static pass in `.agents/references/static-checks.md` after propagation — every tier, when the change touches C++ or GLSL; main cites that reference in the brief's `Governing paths` and the `implementer` reads it there. Otherwise main runs the one documented command in that reference itself.
+- main runs `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot <worktree root> -Baseline <baseline SHA>` after propagation — every tier; the runner selects its own checks, and its header documents the result and options.
 - `mechanic` runs `/code-style-review` — for changed C++; a later `/resolve-findings` round that changes C++ re-runs it over the newly changed ranges before that round's `Build required` handoff compiles.
 - `builder` runs `/compile` — every `Build required` handoff, before the covered work advances.
 

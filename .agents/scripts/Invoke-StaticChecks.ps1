@@ -1,11 +1,18 @@
 # The static checks for the Run targeted pre-review checks
 # step, selected from the session change inventory and run in one pass: `validate-skill`
-# for each changed skill package, `plan-scheduler` for a changed Plan, and
-# `markdown-links` for every changed markdown file. The first two compose the existing bundled scripts
-# and carry their results through unaltered; only the markdown link and anchor check is new here. The
+# for each changed skill package and `markdown-links` for every changed markdown file. The first
+# composes the existing bundled skill validator; only the markdown link and anchor check is new here. The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
 # safe under a read-only sandbox. Stdout carries only the result document.
+# The result document holds one `checks` row per check, each carrying a boolean `triggered` and a
+# `status` (pass, fail, blocked, or skipped). The run passes (exit 0) when no triggered row fails or is
+# blocked, including when none triggers; otherwise it exits 2 if any triggered row is blocked, else 1. A
+# setup failure (invalid root, missing composed script, unavailable inventory) exits 2 with no rows, and
+# an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
+# files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
+# files when checking the working tree. Only `markdown-links` reads content from that commit;
+# `validate-skill` validates the working tree's copy of each selected package.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -21,7 +28,6 @@ Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 $script:MaximumMessageLength = 256
 
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
-$script:SchedulerScript = Join-Path $PSScriptRoot 'Test-PlanSchedulerState.ps1'
 $script:ValidateSkillScript = Join-Path $PSScriptRoot '../skills/external-skill-creator/scripts/Validate-Skill.ps1'
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
@@ -33,7 +39,7 @@ $script:LinkPattern = '\[(?:[^\[\]]*)\]\(\s*([^)\s]+)'
 $script:SchemePattern = '^[A-Za-z][A-Za-z0-9+.-]*:'
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-static-checks/v1'
+	schemaVersion = 'broken-engine-static-checks/v2'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Static checks did not run.'
@@ -298,19 +304,6 @@ function Invoke-ValidateSkillCheck([object] $Inventory) {
 	return New-CheckRow 'validate-skill' $true $status ([ordered]@{ passedCount = $passedCount; results = [object[]] $results.ToArray() })
 }
 
-function Invoke-PlanSchedulerCheck([object] $Inventory) {
-	if (-not [bool] $Inventory.triggers.planTouched) { return New-CheckRow 'plan-scheduler' $false 'skipped' $null }
-	$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) @('-NoProfile', '-File', $script:SchedulerScript, '-RepositoryRoot', $script:Root) $script:Root
-	$document = $null
-	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) { $document = $run.Stdout | ConvertFrom-Json }
-	if ($null -eq $document) { return New-CheckRow 'plan-scheduler' $true 'blocked' ([ordered]@{ exitCode = $run.ExitCode; reason = $run.Stderr.Trim() }) }
-	# The scheduler check's own blocked result (an unprovisioned WorktreeCli) is a blocked row here. Its
-	# other status words come from `plan validate` ('valid' for a healthy scheduler), so the pass/fail
-	# decision is read from the exit code it passes through instead of from that vocabulary.
-	$status = if ([string] $document.status -ceq 'blocked') { 'blocked' } elseif ($run.ExitCode -eq 0) { 'pass' } else { 'fail' }
-	return New-CheckRow 'plan-scheduler' $true $status $document
-}
-
 function Invoke-MarkdownLinkCheck([object] $Inventory, [bool] $Truncated) {
 	# There is no markdown entry class: .md spans the skill, plan, and doc classes, and doc also holds
 	# .txt, so this check selects by extension across every entry.
@@ -335,7 +328,7 @@ try {
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-StaticChecks 2 'blocked' 'static-checks.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
-	foreach ($composed in @($script:InventoryScript, $script:SchedulerScript, $script:ValidateSkillScript)) {
+	foreach ($composed in @($script:InventoryScript, $script:ValidateSkillScript)) {
 		if (-not (Test-Path -LiteralPath $composed -PathType Leaf)) {
 			Complete-StaticChecks 2 'blocked' 'static-checks.script-missing' "A composed script is missing: '$composed'."
 		}
@@ -345,10 +338,9 @@ try {
 	$truncated = [bool] $inventory.truncated
 	$result.truncated = $truncated
 
-	# The three rows are always present, in the order the deleted static-checks table listed them.
+	# Both rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
-		(Invoke-PlanSchedulerCheck $inventory)
 		(Invoke-MarkdownLinkCheck $inventory $truncated)
 	)
 	$result.checks = [object[]] $checks

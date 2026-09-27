@@ -183,8 +183,9 @@ within its hit and output caps. Never embed transcript paths or home paths.
   `status` `blocked`; revert the scratch edit afterwards
 - The session-mode scan of the same scratch edit reports the same hits it did
   before the `-Path` parameter set was added, apart from the new kinds
-- The static-checks runner, invoked as `.agents/references/static-checks.md`
-  documents it, reports every row the change triggers passing
+- The static-checks runner, invoked as `.agents/references/change-workflow.md`
+  `#### Step 5 — Run targeted pre-review checks` documents it, reports every
+  row the change triggers passing
 
 ## Notes
 Originating record:

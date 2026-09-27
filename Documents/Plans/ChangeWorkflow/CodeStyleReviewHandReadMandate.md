@@ -108,8 +108,9 @@ paths or home paths.
   outside this review's hand-read list and scanner kinds
 - The `Find-SessionCandidates.ps1` comment no longer calls the hand-read list
   the complement of the kinds
-- The static-checks runner, invoked as `.agents/references/static-checks.md`
-  documents it, reports every row the change triggers passing
+- The static-checks runner, invoked as `.agents/references/change-workflow.md`
+  `#### Step 5 — Run targeted pre-review checks` documents it, reports every
+  row the change triggers passing
 
 ## Notes
 Originating record:
