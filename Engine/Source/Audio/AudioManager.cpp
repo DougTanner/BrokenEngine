@@ -25,7 +25,12 @@ constexpr int64_t kiSilentRecoveryRetryFrames = 120;
 std::wstring AudioManager::GetEndpointId(IMMDevice* pDevice)
 {
 	LPWSTR pcDeviceId = nullptr;
-	CHECK_HRESULT(pDevice->GetId(&pcDeviceId));
+	HRESULT hresult = pDevice->GetId(&pcDeviceId);
+	if (FAILED(hresult))
+	{
+		LOG(kAudio, kWarning, "  GetId failed: {}", common::HresultToString(hresult).data());
+		return std::wstring();
+	}
 	common::ScopedLambda freeDeviceId([=]()
 	{
 		CoTaskMemFree(pcDeviceId);
@@ -41,94 +46,39 @@ void AudioManager::CreateAudioEngineForEndpoint(const std::wstring& rEndpointId)
 std::wstring AudioManager::InitializeAudioEndpoint()
 {
 	Microsoft::WRL::ComPtr<IMMDeviceEnumerator> pMMDeviceEnumerator;
-	CHECK_HRESULT(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(pMMDeviceEnumerator.GetAddressOf())));
-	LOG(kAudio, kInfo, "  Got MMDeviceEnumerator");
+	HRESULT hresult = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(pMMDeviceEnumerator.GetAddressOf()));
+	if (FAILED(hresult))
+	{
+		LOG(kAudio, kWarning, "  CoCreateInstance(MMDeviceEnumerator) failed: {}", common::HresultToString(hresult).data());
+	}
+	else
+	{
+		LOG(kAudio, kInfo, "  Got MMDeviceEnumerator");
+	}
 
 	Microsoft::WRL::ComPtr<IMMDevice> pDefaultAudioEndpoint;
 	std::wstring defaultAudioEndpointId;
-	if (pMMDeviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDefaultAudioEndpoint) == S_OK)
+	if (pMMDeviceEnumerator != nullptr && pMMDeviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDefaultAudioEndpoint) == S_OK)
 	{
 		LOG(kAudio, kInfo, "  Got DefaultAudioEndpoint");
 		defaultAudioEndpointId = GetEndpointId(pDefaultAudioEndpoint.Get());
 		if (!defaultAudioEndpointId.empty())
 		{
 			LOG(kAudio, kInfo, "    pcDeviceId: \"{}\"", defaultAudioEndpointId);
+			CreateAudioEngineForEndpoint(defaultAudioEndpointId);
 		}
 		else
 		{
-			LOG(kAudio, kWarning, "  GetId returned nullptr; falling back to first active device");
+			LOG(kAudio, kWarning, "  Default audio endpoint gave no id; falling back to the OS default");
 		}
 	}
 	else
 	{
-		LOG(kAudio, kWarning, "  GetDefaultAudioEndpoint failed; falling back to first active device");
+		LOG(kAudio, kWarning, "  No default audio endpoint available; falling back to the OS default");
 	}
 
-	Microsoft::WRL::ComPtr<IMMDeviceCollection> pMMDeviceCollection;
-	CHECK_HRESULT(pMMDeviceEnumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pMMDeviceCollection));
-
-	// Enumeration-dependent selection. A null collection is not fatal: fall through to the OS-default
-	// construction below so the stable-engine contract still holds (silent engine instead of null).
-	std::wstring selectedDeviceId;
-	if (pMMDeviceCollection != nullptr)
-	{
-		UINT uiCount = 0;
-		CHECK_HRESULT(pMMDeviceCollection->GetCount(&uiCount));
-		LOG(kAudio, kInfo, "  uiCount: {}", uiCount);
-
-		if (!defaultAudioEndpointId.empty())
-		{
-			LOG(kAudio, kInfo, "  Searching for default audio endpoint: {}", defaultAudioEndpointId);
-			for (UINT i = 0; i < uiCount; ++i)
-			{
-				Microsoft::WRL::ComPtr<IMMDevice> pMMDevice;
-				CHECK_HRESULT(pMMDeviceCollection->Item(i, pMMDevice.GetAddressOf()));
-				std::wstring audioEndpointId = GetEndpointId(pMMDevice.Get());
-				if (audioEndpointId.empty())
-				{
-					LOG(kAudio, kWarning, "  GetId returned nullptr; skipping device");
-					continue;
-				}
-				if (audioEndpointId.find(defaultAudioEndpointId) == std::wstring::npos)
-				{
-					continue;
-				}
-
-				CreateAudioEngineForEndpoint(audioEndpointId);
-				selectedDeviceId = audioEndpointId;
-				LOG(kAudio, kInfo, "    Found: {}", audioEndpointId);
-				break;
-			}
-		}
-
-		if (mpAudioEngine == nullptr || !mpAudioEngine->IsAudioDevicePresent())
-		{
-			LOG(kAudio, kDebug, "  mpAudioEngine == nullptr || !mpAudioEngine->IsAudioDevicePresent()");
-			if (uiCount > 0)
-			{
-				Microsoft::WRL::ComPtr<IMMDevice> pMMDevice;
-				CHECK_HRESULT(pMMDeviceCollection->Item(0, pMMDevice.GetAddressOf()));
-				std::wstring audioEndpointId = GetEndpointId(pMMDevice.Get());
-				if (!audioEndpointId.empty())
-				{
-					LOG(kAudio, kInfo, "    Using first in the list: {}", audioEndpointId);
-					CreateAudioEngineForEndpoint(audioEndpointId);
-					selectedDeviceId = audioEndpointId;
-				}
-				else
-				{
-					LOG(kAudio, kWarning, "  GetId returned nullptr; no first-active device available");
-				}
-			}
-		}
-	}
-	else
-	{
-		LOG(kAudio, kInfo, "  EnumAudioEndpoints returned an empty collection; constructing silent-capable engine against the OS default");
-	}
-
-	// Always yield one stable engine. When no endpoint produced one (no active device, a found device
-	// with a null id, or a null endpoint collection), construct against the OS default (deviceId == nullptr): with the mastering limiter
+	// Always yield one stable engine. When no endpoint produced one (no enumerator, a failed default-endpoint
+	// query, or an empty default id), construct against the OS default (deviceId == nullptr): with the mastering limiter
 	// flag and no AudioEngine_ThrowOnNoAudioHW, DirectXTK keeps a silent-mode shell instead of throwing.
 	// The voice subsystems receive this pointer once and it is never recreated — only Reset recovers it.
 	if (mpAudioEngine == nullptr)
@@ -136,7 +86,7 @@ std::wstring AudioManager::InitializeAudioEndpoint()
 		LOG(kAudio, kWarning, "  No usable audio endpoint; constructing silent-capable engine against the OS default");
 		mpAudioEngine = std::make_unique<AudioEngine>(kAudioEngineFlags, nullptr, nullptr, AudioCategory_GameEffects);
 	}
-	return selectedDeviceId;
+	return defaultAudioEndpointId;
 }
 
 void AudioManager::CacheMasteringVoiceChannels()
@@ -237,13 +187,11 @@ void AudioManager::ConfigureLiveGraph(const std::wstring& rSelectedDeviceId)
 	{
 		XAUDIO2_VOICE_DETAILS voiceDetails {};
 		pMasteringVoice->GetVoiceDetails(&voiceDetails);
-		DWORD uiChannelMask = 0;
-		CHECK_HRESULT(pMasteringVoice->GetChannelMask(&uiChannelMask));
 
 		char pcHex[20] {};
 		LOG(kAudio, kInfo, "    Audio engine: channels {} channel mask {} rate {}", mpAudioEngine->GetOutputChannels(), common::ToHex(std::span(pcHex), mpAudioEngine->GetChannelMask()), mpAudioEngine->GetOutputSampleRate());
 		LOG(kAudio, kInfo, "    Output format: channels {} channel mask {} format {}", mpAudioEngine->GetOutputFormat().Format.nChannels, common::ToHex(std::span(pcHex), mpAudioEngine->GetOutputFormat().dwChannelMask), mpAudioEngine->GetOutputFormat().Format.wFormatTag);
-		LOG(kAudio, kInfo, "    MasteringVoice: channels {} channel mask {} sample rate {}", voiceDetails.InputChannels, common::ToHex(std::span(pcHex), uiChannelMask), voiceDetails.InputSampleRate);
+		LOG(kAudio, kInfo, "    MasteringVoice: channels {} sample rate {}", voiceDetails.InputChannels, voiceDetails.InputSampleRate);
 	}
 
 	CacheMasteringVoiceChannels();
@@ -290,11 +238,6 @@ AudioManager::AudioManager()
 	catch ([[maybe_unused]] const std::exception& rException)
 	{
 		LOG(kDefault, kError, "Failed to create AudioManager: {}", rException.what());
-		return;
-	}
-	catch (...)
-	{
-		LOG(kDefault, kError, "Failed to create AudioManager");
 		return;
 	}
 }
