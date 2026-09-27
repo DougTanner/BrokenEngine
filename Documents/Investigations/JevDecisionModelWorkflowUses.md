@@ -68,11 +68,10 @@ the list a full model then reads", never "Jev decides".
   (`Documents/Plans/AGENTS.md`), file classes come from the change inventory,
   and executable membership is deterministic validation
   (`.agents/skills/update-vcxproj/SKILL.md`). A model answer would be strictly
-  worse than the answer the repository already has. `JevPlanAreaFiling.md` is
-  the measured case: its rule read like a judgment but is a count over named
-  paths, and a script reproduced every filing, while Jev got 56 or 57 of 58. So
-  before a pilot, write the rule's deterministic part as code and measure how
-  much is left for the model; a candidate whose remainder is empty stops here.
+  worse than the answer the repository already has. A rule can read like a
+  judgment yet be a count over named paths, so before a pilot, write the
+  rule's deterministic part as code and measure how much is left for the
+  model; a candidate whose remainder is empty stops here.
 - Anything that must be the evidence of record. The root `AGENTS.md` Diagnosis
   Discipline directive requires a root cause confirmed from close code
   inspection or evidence, and every finding must carry its evidence
@@ -90,18 +89,9 @@ the list a full model then reads", never "Jev decides".
 | document | where the choice is fixed today | primitive | pilot | next test |
 |---|---|---|---|---|
 | `JevCommentBlockTriage.md` | `/comment-review`'s six classes | `choice` + `ok` per block; `ok` probability orders reading | run: at `ok` < 0.5, 35/40 changed blocks flagged, 13/40 untouched flagged | hand-labelled 100 blocks from a second commit |
-| `JevPlanAreaFiling.md` | `Documents/Plans/AGENTS.md` areas; the Plans/Features/Investigations test | `choice` over areas | run twice: 56/58 and 57/58 agree, every flag a false flag; a path count reproduces all 58; the tree question turns on user intent the document does not carry | none: not promoted |
-| `JevDuplicatePlanDetection.md` | `/create-follow-up-plans` duplicate rule | `score` with levels = actions (distinct, related, same fix) | run: the three merged Plans are the top three of 50 pairs; no distinct pair reached 1.0 | a second historical merge; a code-side shortlist |
 | `JevEvidenceCitationCheck.md` | finding evidence rows, acceptance rows, Plan citations | three `noul`s (absent, opposite, elsewhere) over the cited lines and their enclosing block; the highest orders reading | run twice, tracked script: 440/625 real citations `supports`, 36/585 shifted regions; blind read of 66: passes right 20/22, flags right only 15/44; third pilot at 49 flags each, LLM-labelled: citations only the split question flags are stale 5/19, only the three-way 4/19, so the split ships | reading order only; a human blind read |
 | `JevStyleRuleJudgment.md` | `/code-style-review` hand-read rules 3, 14, 16, 21, 41, 49, 51, 56, 61, 62 | one request per changed function with one `noul` per rule; rule 56 as one `noul` per name over the function's name list | run twice over 41 blocks: seven rules meet the success bar at 0.5 (no miss, at most one clean block flagged each), rule 56 needs the name-list form, rule 61 goes to a scanner, rule 3 needs 0.9 | session mode over the last ten landed C++ commits, flagged blocks hand-labelled for rules 3 and 56 |
-| `JevSessionResidueJudgment.md` | `/code-style-review` step 17: whether a scanner `log`, `printf`, `debug-break`, `assert-false`, `fixme`, or `hack` hit is temporary | one `noul` per hit; probability orders the read; same request as the style rules or its own is open | not run: a removed line never lands, so positives must be planted and recorded | scanner hits over the last ten landed C++ commits as negatives, 20+ planted temporary lines as positives, then recorded step 17 removals |
-| `JevSimplicityReviewTrigger.md` | `/plan-simplicity-review` dispatch trigger | two `noul`s, low threshold | not run | record beside main's decision for 30 plans |
-| `JevRiskTierSurfaceFlags.md` | `risk-tiers.md` Tier-3 surfaces | one `noul` per surface per hunk, max-gated, escalate-only | not run: no tier corpus | record the tier per landed change, then 40 changes |
-| `JevFindingTriage.md` | `/resolve-findings` intent and scope; the YAGNI warning; severity rule | four questions per finding in one request | not run: findings are not stored | record `(finding, labels, decision)` for 50 findings |
-| `JevAffectedFileRanking.md` | `/update-affected-code` and `/prepare-change` search order | one `noul` per (change, hit) as sort key | not run | 20 Plan-completing commits: changed files versus search hits |
-| `JevSkillRouting.md` | skill `description` matching | wide `choice` plus gating `noul`s, then a top-three re-read | not run: transcripts are local-only | 100 labelled past requests |
-| `JevAgentsDocRubric.md` | `/update-claude-docs` six-criterion audit rubric | six `score`s per document, weighted in code | not run | past audit reports, or one full-model audit as labels |
-| `JevTranscriptIntervalClassification.md` | `/next-plan-review` control-work classes; checkpoint review's result classes | three `choice`s per transcript interval | not run: needs an interval extractor | 300 intervals from three reviewed sessions |
+| `JevRiskTierSurfaceFlags.md` | `risk-tiers.md` Tier-3 surfaces | one `noul` per surface per hunk beside a path-to-surface list; flags are a hint in the reviewer brief, never a tier | not run: no tier corpus | record the tier per landed change, then 40 changes |
 
 Smaller fixed choices the sweep of the workflow found, not worth their own
 document yet: whether a `/compile` change set may affect generated bytes and so
@@ -126,22 +116,16 @@ already applies to diffs.
 
 Promote in the order the pilots justify, not the order of expected saving:
 
-1. `JevEvidenceCitationCheck.md` and `JevDuplicatePlanDetection.md` first.
-   Both run offline over the Plan tree, cost nothing on the critical path, and
-   report residuals rather than deciding anything. The citation check's full
-   sweep showed its flags are a reading order and not a verdict, which is the
-   shape every candidate is held to anyway; the duplicate check still has one
-   concrete next test a human can finish in an hour.
+1. `JevEvidenceCitationCheck.md` first. It runs offline over the Plan tree,
+   costs nothing on the critical path, and reports residuals rather than
+   deciding anything. Its full sweep showed its flags are a reading order and
+   not a verdict, which is the shape every candidate is held to anyway.
 2. `JevCommentBlockTriage.md` as the first in-round use, wired as a reading
-   order only, after its second-commit measurement. `JevPlanAreaFiling.md` is
-   not promoted: its second pilot showed the filing rule is a path count a
-   script reproduces exactly, so it falls under `## Not suitable`.
+   order only, after its second-commit measurement.
 3. `JevStyleRuleJudgment.md` landed as a gate and, after its real-session
    review, is an advisory hint for rule 49; every rule stays hand-read.
-4. Every remaining candidate waits for a corpus that does not exist yet, and
-   `JevSimplicityReviewTrigger.md` and `JevFindingTriage.md` are the cheapest
-   ways to start collecting one, because they record Jev's answer beside a
-   decision the workflow already makes.
+4. `JevRiskTierSurfaceFlags.md` waits for a tier corpus that does not exist
+   yet.
 
 ## Decisions every Plan in the series shares
 
@@ -154,10 +138,11 @@ Promote in the order the pilots justify, not the order of expected saving:
    printed; a missing key or unreachable service is `blocked`, and every
    consumer then behaves as the workflow does without Jev. A reading-order use
    falls through silently; a sweep that reports residuals says it did not run.
-3. Threshold policy: every threshold is a number written in the owning skill's
-   references, chosen from the candidate's measurement, and every use errs
-   toward an extra read rather than a miss.
-4. No gate: no candidate hides an item from a reviewer, lowers a tier, skips a
-   review, or dispatches a fix on its own until a second measurement on a
-   later change confirms the first — and the vendor's warning about
-   thresholds not composing applies the moment one does.
+3. Threshold policy: every use is an advisory hint to an agent that still does
+   its full pass, so a miss costs nothing and a false flag costs agent
+   attention. Every threshold is a number written in the owning skill's
+   references, chosen from the candidate's measurement and tuned so false
+   flags stay rare; the starting point flags an item only at a probability
+   of at least 0.7 that it is bad.
+4. No gate: no candidate ever hides an item from a reviewer, filters,
+   routes, sets or lowers a tier, skips a review, or dispatches a fix.

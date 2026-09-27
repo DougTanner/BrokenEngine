@@ -58,12 +58,14 @@ Classes Jev chose for touched blocks: dense 10, history 7, false 5, speculative
 4, boilerplate 3, ok 11. For untouched blocks: ok 29, false 7, boilerplate 2,
 dense 1, speculative 1.
 
-What the numbers say. As a reading order the ranking is useful: at the 0.5
-threshold the reviewer reads roughly a third of the blocks first and meets seven
-of every eight blocks the sweep changed among them. As a filter it is not safe:
-one touched block in eight sits above 0.5, and reaching every touched block
-means reading two thirds of the untouched ones. The `false` class is
-over-assigned on untouched blocks (7 of 11 untouched flags), which matches how
+What the numbers say. The `ok` probability separates the two groups: at the
+0.5 threshold roughly a third of the blocks are flagged, and seven of every
+eight blocks the sweep changed are among them. The same threshold also flags a
+third of the untouched blocks, so the pilot does not settle the threshold
+(`## What would make this a Plan`). As a filter the ranking is not safe: one
+touched block in eight sits above 0.5, and reaching every touched block means
+flagging two thirds of the untouched ones. The `false` class is over-assigned
+on untouched blocks (7 of 11 untouched flags), which matches how
 `comment-classes.md` defines that class: no fixed example applies, and `false`
 is decided by reading the adjacent code and accepting the class only when that
 code contradicts the stated fact. The class hint for `false` should be shown as
@@ -77,14 +79,22 @@ the whole function. The sample is 80 blocks from one commit.
 
 ## What would make this a Plan
 
-Success is defined before the wiring exists: over a second, hand-labelled sample
-of at least 100 blocks from a different commit, the `ok`-probability threshold
-chosen from this pilot flags at least 85% of the hand-labelled findings while
-flagging under 40% of the clean blocks. Report the two rates separately, since a
-miss and a false flag cost different things. If that holds, the Plan wires Jev
-as a reading order — flagged blocks first, every other block still read — and
-never as a filter that hides blocks until a further measurement on a later
-change confirms the first.
+Success is defined before the wiring exists. Jev's answer is an advisory hint:
+it only orders and annotates the worker's reading, and the worker still reads
+every block, so a miss costs nothing and a false flag costs worker attention.
+The pass mark therefore favours few false flags over catching nearly every bad
+comment. Over a second, hand-labelled sample of at least 100 blocks from a
+different commit, the `ok`-probability threshold, which starts at a not-`ok`
+probability of at least 0.7 (`ok` below 0.3), is to be dialled in to flag at
+most 5% of the clean blocks (2 in 40) while flagging at least half of the
+hand-labelled findings; both numbers are starting points the test refines.
+Report the two rates separately, since a miss and a false flag cost different
+things. The pilot's 35 of 40 touched blocks at 0.5 shows the bad comments can
+be reached, but its 13 of 40 untouched blocks at the same threshold are too
+many false flags for an advisory hint.
+
+If the pass mark holds, the Plan wires Jev as a reading order — flagged blocks
+first, every other block still read — and never as a filter that hides blocks.
 
 ## Decisions a Plan needs
 
@@ -96,11 +106,11 @@ change confirms the first.
    separate script is the likely answer.
 2. How much surrounding code goes into the state: the fixed 3-before/15-after
    window of the pilot, or the enclosing function found by brace matching.
-3. The threshold, as a number written in the skill's references, and what the
-   worker does when `Invoke-Jev.ps1` returns `blocked`: report the list
-   unavailable, which is the existing scanner's precedent, or fall through and
-   read every block in scanner order, which is the behaviour the workflow has
-   today.
+3. The threshold the second sample settles against the pass mark above, as a
+   number written in the skill's references, and what the worker does when
+   `Invoke-Jev.ps1` returns `blocked`: report the list unavailable, which is
+   the existing scanner's precedent, or fall through and read every block in
+   scanner order, which is the behaviour the workflow has today.
 4. Whether the class hint is shown at all, and if so that `false` is shown as
    "check against code" rather than as a proposed class.
 5. The shared decisions in `JevDecisionModelWorkflowUses.md`; the call itself

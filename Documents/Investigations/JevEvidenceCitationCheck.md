@@ -229,6 +229,10 @@ richer state (the enclosing function, or a quoted fragment) brings the flag
 precision above one in two on a second blind read, this time by a human, and
 the two one-line-off misses argue for that richer state.
 
+Reliability testing starts from a flag cutoff of 0.7, the block and name
+threshold of the advisory style-rule judgment (`Test-StyleRuleJudgment.ps1`),
+in place of the fixed 0.5.
+
 ## Decisions a Plan needs
 
 1. Where the Plan sweep is invoked: from `/next-plan` at claim time for the
