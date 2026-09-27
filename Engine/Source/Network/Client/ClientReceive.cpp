@@ -14,27 +14,12 @@ namespace engine
 
 static std::unique_ptr<game::Frame> DecompressAndReadFrame(int32_t iUncompressedSize, const NetworkMessages::PacketPayload& rCompressedPayload)
 {
-	if (iUncompressedSize <= 0 || rCompressedPayload.iSize <= 0 || static_cast<int64_t>(iUncompressedSize) > kiMaxUncompressedFrameBytes
-	 || rCompressedPayload.pData == nullptr)
-	{
-		NetworkMessages::ThrowCorruptStream("DecompressAndReadFrame");
-	}
-
 	std::string decompressed(iUncompressedSize, '\0');
-	int iDecompressResult = LZ4_decompress_safe(reinterpret_cast<const char*>(rCompressedPayload.pData), decompressed.data(), rCompressedPayload.iSize, iUncompressedSize);
-
-	if (iDecompressResult != iUncompressedSize)
-	{
-		NetworkMessages::ThrowCorruptStream("DecompressAndReadFrame");
-	}
+	LZ4_decompress_safe(reinterpret_cast<const char*>(rCompressedPayload.pData), decompressed.data(), rCompressedPayload.iSize, iUncompressedSize);
 
 	std::istringstream frameStream(std::move(decompressed), std::ios::binary);
 	std::unique_ptr<game::Frame> pFrame = std::make_unique<game::Frame>();
 	game::NetworkSessionContract::ReadFrame(frameStream, *pFrame);
-	if (!frameStream)
-	{
-		NetworkMessages::ThrowCorruptStream("DecompressAndReadFrame");
-	}
 	return pFrame;
 }
 
@@ -176,11 +161,6 @@ void Client::ServerCoordFullState(std::span<const uint8_t> packetData)
 	int64_t iTick = message.iTick;
 	GridCoord coord = message.coord;
 
-	if (uiSlotIndex >= std::ssize(mCoordSlots))
-	{
-		NetworkMessages::ThrowCorruptStream("Client::ServerCoordFullState");
-	}
-
 	LOG(kNetwork, kVerbose, "Client::ServerCoordFullState Frame: {} Slot: {} Coord: ({},{})", iTick, uiSlotIndex, coord.x, coord.y);
 	ScopedLogIndent scopedLogIndent;
 
@@ -212,10 +192,6 @@ void Client::ServerCoordFullState(std::span<const uint8_t> packetData)
 	}
 
 	std::unique_ptr<game::Frame> pFrame = DecompressAndReadFrame(message.iUncompressedSize, message.compressedPayload);
-	if (pFrame->interpolate.iTick != iTick)
-	{
-		NetworkMessages::ThrowCorruptStream("Client::ServerCoordFullState");
-	}
 
 	if (actions & FullStateFlags::kAdoptCoord)
 	{
@@ -251,15 +227,6 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 	uint8_t uiSlotIndex = message.uiSlotIndex;
 	uint16_t uiEpoch = message.uiEpoch;
 	GridCoord coord = message.coord;
-	if (message.staticData.iSize <= 0)
-	{
-		NetworkMessages::ThrowCorruptStream("Client::ServerCoordStaticData");
-	}
-
-	if (uiSlotIndex >= std::ssize(mCoordSlots))
-	{
-		NetworkMessages::ThrowCorruptStream("Client::ServerCoordStaticData");
-	}
 
 	const ClientCoordSlot& rSlot = mCoordSlots.at(uiSlotIndex);
 	// Before the accept (this lane can overtake it and the unsubscribe ACK), a kUnsubscribed or reallocated kUnsubscribing
@@ -295,22 +262,6 @@ void Client::ServerCoordStaticData(std::span<const uint8_t> packetData)
 	ReceivedStaticData received {};
 	received.coord = coord;
 	received.staticData.Read(staticStream, /*bIncludeNavData=*/true);
-	if (!staticStream)
-	{
-		LOG(kNetwork, kWarning, "Client::ServerCoordStaticData static data read failed Coord: ({},{}) Slot: {}", coord.x, coord.y, uiSlotIndex);
-		NetworkMessages::ThrowCorruptStream("Client::ServerCoordStaticData");
-	}
-
-	// Trust boundary: the Hello pack-integrity gate already proved both peers hold the same island manifest,
-	// so a placement naming an unloaded island template is corrupt server data, not a stale payload.
-	for (const IslandPlacement& rPlacement : received.staticData.islands)
-	{
-		if (!gpIslandTerrain->mIslands.contains(rPlacement.islandCrc))
-		{
-			LOG(kNetwork, kWarning, "Client::ServerCoordStaticData unknown island CRC {} Coord: ({},{}) Slot: {}", rPlacement.islandCrc, coord.x, coord.y, uiSlotIndex);
-			NetworkMessages::ThrowCorruptStream("Client::ServerCoordStaticData");
-		}
-	}
 
 	// Heap: received static data vector grows on new subscription
 	mReceivedStaticData.push_back(std::move(received));
@@ -358,10 +309,6 @@ void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool
 			}
 		}
 
-		if (rMessage.uiSlotIndex >= std::ssize(mCoordSlots))
-		{
-			NetworkMessages::ThrowCorruptStream("Client::ServerCoordUpdateOrResend");
-		}
 		CoordUpdateFlags_t actions = ClassifyCoordUpdate(rMessage.uiSlotIndex, rMessage.uiEpoch);
 		if (!(actions & CoordUpdateFlags::kCommit))
 		{
@@ -376,7 +323,7 @@ void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool
 
 		if (rMessage.compressedPayload.iSize > 0)
 		{
-			int64_t iCount = game::NetworkSessionContract::DecompressStatusChanges(rMessage.compressedPayload.pData, rMessage.compressedPayload.iSize, mStatusChangeScratch.data(), kiMaxStatusChangesPerCell);
+			int64_t iCount = game::NetworkSessionContract::DecompressStatusChanges(rMessage.compressedPayload.pData, rMessage.compressedPayload.iSize, mStatusChangeScratch.data());
 			// Heap: exact-size copy out of the reused 1024-cap decode scratch, so the buffered update carries no capacity slack
 			update.statusChanges.assign(mStatusChangeScratch.begin(), mStatusChangeScratch.begin() + iCount);
 		}
@@ -433,10 +380,6 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerConnectionResponseMessage message {};
 	NetworkMessages::Read(packetData, message);
-	if (message.uiDebugInput > 1)
-	{
-		NetworkMessages::ThrowCorruptStream("Client::ServerConnectionResponse");
-	}
 
 	bool bAccepted = message.uiAccepted != 0;
 
@@ -578,11 +521,6 @@ void Client::ServerUnsubscribeAck(std::span<const uint8_t> packetData)
 
 	uint8_t uiSlotIndex = message.uiSlotIndex;
 
-	if (uiSlotIndex >= std::ssize(mCoordSlots))
-	{
-		NetworkMessages::ThrowCorruptStream("Client::ServerUnsubscribeAck");
-	}
-
 	ClientCoordSlot& rSlot = mCoordSlots.at(uiSlotIndex);
 	if (rSlot.eState != CoordSubscriptionState::kUnsubscribing)
 	{
@@ -621,20 +559,7 @@ void Client::ServerTimespeedUpdate(std::span<const uint8_t> packetData)
 	}
 
 	NetworkMessages::ServerTimespeedUpdateMessage message {};
-	if (std::ssize(packetData) != NetworkMessages::ServerTimespeedUpdateMessage::kiFixedSize)
-	{
-		NetworkMessages::ThrowCorruptStream("Client::ServerTimespeedUpdate");
-	}
-
 	NetworkMessages::Read(packetData, message);
-
-	// Defensive (trust boundary: network input): TimeStep divides by both fields, so a zero is an
-	// integer divide-by-zero and a negative runs the client clock backward
-	if (message.iMultiply < 1 || message.iDivide < 1)
-	{
-		LOG(kNetwork, kWarning, "Client::ServerTimespeedUpdate Rejected non-positive ratio Multiply: {} Divide: {}", message.iMultiply, message.iDivide);
-		NetworkMessages::ThrowCorruptStream("Client::ServerTimespeedUpdate");
-	}
 
 	LOG(kNetwork, kDebug, "Client::ServerTimespeedUpdate Multiply: {} Divide: {}", message.iMultiply, message.iDivide);
 	game::gpGame->mTimeStep.SetTimeScale(message.iMultiply, message.iDivide);

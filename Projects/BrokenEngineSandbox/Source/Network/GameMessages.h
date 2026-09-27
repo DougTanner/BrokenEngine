@@ -60,18 +60,6 @@ inline constexpr const PlayerStateDescriptor& GetPlayerStateDescriptor(PlayerSta
 	return kpPlayerStateDescriptors[static_cast<size_t>(eWireType)];
 }
 
-inline constexpr const PlayerStateDescriptor* FindPlayerStateDescriptor(uint8_t uiWireType)
-{
-	for (const PlayerStateDescriptor& rDescriptor : kpPlayerStateDescriptors)
-	{
-		if (static_cast<uint8_t>(rDescriptor.eWireType) == uiWireType)
-		{
-			return &rDescriptor;
-		}
-	}
-	return nullptr;
-}
-
 struct FleetSyncMessage
 {
 	static constexpr int64_t kiFleetCountSize = sizeof(int64_t);
@@ -124,19 +112,13 @@ struct FleetSyncMessage
 		ASSERT(rWorkbuffer.Count<uint8_t>() == iExpectedSize);
 	}
 
-	// Reads the payload with MessageReader directly rather than through NetworkMessages::Read, so it raises the
-	// shared corruption signal itself, under its own reader-name literal. rOutFleets is written as the payload is
-	// decoded, so a throw can leave it partially filled; callers read into a scratch vector and commit only after
-	// this returns.
+	// Only the client reads this server-to-client payload, and it trusts its server, so the decode checks neither
+	// reader validity nor the flagship relation; the server's fleet invariant provides that relation.
 	static void ReadPayload(const std::vector<uint8_t>& rPayload, std::vector<Fleet>& rOutFleets)
 	{
 		engine::NetworkMessages::MessageReader reader {std::span<const uint8_t>(rPayload.data(), rPayload.size())};
 		int64_t iFleetCount = 0;
 		reader.BoundedCount(iFleetCount, kiFleetHeaderSize, 0);
-		if (!reader.IsValid())
-		{
-			engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
-		}
 
 		rOutFleets.resize(static_cast<size_t>(iFleetCount));
 		for (int64_t i = 0; i < iFleetCount; ++i)
@@ -144,10 +126,6 @@ struct FleetSyncMessage
 			Fleet& rFleet = rOutFleets[static_cast<size_t>(i)];
 			int64_t iMemberCount = 0;
 			VisitFleetHeader(reader, rFleet, iMemberCount);
-			if (!reader.IsValid())
-			{
-				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
-			}
 			rFleet.members.resize(static_cast<size_t>(iMemberCount));
 			for (int64_t j = 0; j < iMemberCount; ++j)
 			{
@@ -155,25 +133,7 @@ struct FleetSyncMessage
 				uint8_t uiFlags = 0;
 				VisitFleetMember(reader, rMember, uiFlags);
 				rMember.flags.meFlags = static_cast<FleetMemberFlags>(uiFlags);
-				if (!reader.IsValid())
-				{
-					engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
-				}
 			}
-
-			// An empty fleet has no flagship; a nonempty fleet's flagship names one of its members.
-			bool bFlagshipValid = rFleet.members.empty()
-				? !rFleet.flagshipGlobalPlayerId.IsValid()
-				: rFleet.flagshipGlobalPlayerId.IsValid() && std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-			if (!bFlagshipValid)
-			{
-				engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
-			}
-		}
-
-		if (!reader.AtEnd())
-		{
-			engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
 		}
 	}
 };

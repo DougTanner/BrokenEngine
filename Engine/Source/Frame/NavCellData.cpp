@@ -481,27 +481,14 @@ void NavData::Read(std::istream& rStream)
 {
 	int32_t iVertexCount = 0;
 	common::Read(rStream, iVertexCount);
-	// Trust boundary (client static-data message; NavData rides there, not full-state): bound each count
-	// against the stream before resize.
-	common::ValidateDeserializedCount(iVertexCount, sizeof(XMFLOAT2), rStream, "NavData::Read vertices");
 	vertices.resize(iVertexCount);
 	for (int32_t i = 0; i < iVertexCount; ++i)
 	{
 		common::Read(rStream, vertices.at(i));
-		const XMFLOAT2& rVertex = vertices.at(i);
-		if (!std::isfinite(rVertex.x))
-		{
-			throw std::ios_base::failure("NavData::Read vertices");
-		}
-		if (!std::isfinite(rVertex.y))
-		{
-			throw std::ios_base::failure("NavData::Read vertices");
-		}
 	}
 
 	int32_t iPolygonCount = 0;
 	common::Read(rStream, iPolygonCount);
-	common::ValidateDeserializedCount(iPolygonCount, sizeof(int32_t), rStream, "NavData::Read polygons");
 	polygonOffsets.resize(iPolygonCount);
 	for (int32_t i = 0; i < iPolygonCount; ++i)
 	{
@@ -510,7 +497,6 @@ void NavData::Read(std::istream& rStream)
 
 	int32_t iEdgeCount = 0;
 	common::Read(rStream, iEdgeCount);
-	common::ValidateDeserializedCount(iEdgeCount, sizeof(int32_t) + sizeof(int32_t), rStream, "NavData::Read edges");
 	visEdgeA.resize(iEdgeCount);
 	visEdgeB.resize(iEdgeCount);
 	for (int32_t i = 0; i < iEdgeCount; ++i)
@@ -520,39 +506,6 @@ void NavData::Read(std::istream& rStream)
 	for (int32_t i = 0; i < iEdgeCount; ++i)
 	{
 		common::Read(rStream, visEdgeB.at(i));
-	}
-
-	// The 3-vertex minimum is the producer's guarantee: NavBuild's bake skips shorter paths, and
-	// BuildCellNavData only rebases the offsets it copies.
-	if (iPolygonCount > 0 && polygonOffsets.at(0) != 0)
-	{
-		throw std::ios_base::failure("NavData::Read topology");
-	}
-
-	// Range-check every offset before any span arithmetic, so no later subtraction runs on a hostile value.
-	for (int32_t i = 0; i < iPolygonCount; ++i)
-	{
-		if (polygonOffsets.at(i) < 0 || polygonOffsets.at(i) > iVertexCount - 3)
-		{
-			throw std::ios_base::failure("NavData::Read topology");
-		}
-	}
-
-	for (int32_t i = 0; i < iPolygonCount; ++i)
-	{
-		auto [iStart, iEnd] = PolygonRange(polygonOffsets, i, iVertexCount);
-		if (iEnd - iStart < 3)
-		{
-			throw std::ios_base::failure("NavData::Read topology");
-		}
-	}
-
-	for (int32_t i = 0; i < iEdgeCount; ++i)
-	{
-		if (visEdgeA.at(i) < 0 || visEdgeA.at(i) >= iVertexCount || visEdgeB.at(i) < 0 || visEdgeB.at(i) >= iVertexCount)
-		{
-			throw std::ios_base::failure("NavData::Read topology");
-		}
 	}
 
 	// Derived broad-phase data is not serialized; rebuild it from the vertices just read so the client

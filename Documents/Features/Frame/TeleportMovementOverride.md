@@ -63,8 +63,8 @@ Deliberately left open for the implementing session to decide with the user:
   `StatusChangeTypeName`, and add the explicit `DefaultDataForType` case. `DefaultDataForType`
   has a `default:` arm returning `TransferData{}`, so a forgotten case fails silently rather
   than failing to compile — this must be checked by hand.
-- `Engine/Source/Network/NetworkSerialization.cpp` — per-item wire size and both codec switches
-  (the file's own comment at `:147` names the set of sites that move together).
+- `Engine/Source/Network/NetworkSerialization.cpp` — both codec switches, and
+  `kiMaxStatusChangeBytesPerItem` (`NetworkSerialization.h`) if the payload grows past it.
 - `FrameInput::kiVersion` bump — required for any `StatusChange` payload change
   (`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`, `FrameInput` serialization rule).
 - `engine::kuiProtocolVersion` bump — required for any incompatible `StatusChange` layout
@@ -92,7 +92,7 @@ transfer path.
 ## In scope
 
 - One new append-only `StatusChangeType` and payload for relocating an existing player, with
-  its serialization, wire-size, and codec sites.
+  its serialization and codec sites.
 - Applying the relocation in the Phase 5 Spawn handler in `Players.cpp`, after Collision and
   before the shared CRC stamp.
 - Refusing an out-of-cell target.

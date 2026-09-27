@@ -6,12 +6,12 @@ Game-layer packet extensions, status-change payload formats, and multiplayer orc
 
 - `GamePacketType` starts at `engine::PacketType::kGamePacketStart`; enumerator order is wire order and new values append. Every client-to-server type needs a game contract row and follows the engine validation and rate-limit checklist.
 - Debug-control requests are contract-gated by `kbDebugInput`; a non-debug server treats them as contract violations, so a Debug client sends them only to a server whose accepted connection response says it accepts them ([Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract)).
-- Drained game packets arrive with their type byte removed. A server-to-client fixed payload has no contract row, so its reader keeps an exact-size check that throws on mismatch; client-to-server sizing follows `../../../../Engine/Source/Network/AGENTS.md` `## Transport Contracts`. Variable payloads decode through the engine-owned `NetworkMessages::MessageReader`, whose bounded-read rules are in that same section.
-- Player events append into workbuffer-backed output without consuming raw packets. Fleet synchronization consumes matching raw packets and replaces the destination only after a complete valid decode; a valid empty fleet is still an applied result.
+- Drained game packets arrive with their type byte removed. A server-to-client fixed payload has no contract row, and the client trusts its size under the corrupt-input policy; client-to-server sizing follows `../../../../Engine/Source/Network/AGENTS.md` `## Transport Contracts`. Variable payloads decode through the engine-owned `NetworkMessages::MessageReader`, whose bounded-read rules are in that same section.
+- Player events append into workbuffer-backed output without consuming raw packets. Fleet synchronization consumes matching raw packets and replaces the whole destination with each decoded sync; an empty fleet list is still an applied result.
 
 ## Status-Change Wire Format
 
-- `StatusChangeType` is declared with Frame status data, but its append-only wire compatibility contract is owned here. Adding a type requires matching write, read, per-type wire-size, and default-data handling in the engine codec; keep the per-item maximum large enough for every payload.
+- `StatusChangeType` is declared with Frame status data, but its append-only wire compatibility contract is owned here. Adding a type requires matching write, read, and default-data handling in the engine codec; keep the per-item maximum large enough for every payload.
 - Any incompatible `StatusChange` or `TransferData` layout change — type tag, field order, field width, variant arm membership, or per-item wire size — requires the game codec author to increment `engine::kuiProtocolVersion`; Engine Network owns the shared Hello rejection gate.
 - The protocol gate is distinct from `FrameInput::kiVersion` (replay-input compatibility) and `Frame::kiVersion` (deterministic-Frame/save/replay compatibility); neither Frame version substitutes for the protocol bump.
 - Client-only values still occupy identical server-side wire space.

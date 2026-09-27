@@ -1,12 +1,12 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-26T23:33:20.229Z","dependsOn":["Documents/Plans/Engine/ClientServerDataCheckRemoval.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-26T23:33:20.229Z","dependsOn":[]} -->
 # Validate indexable collection IDs against paired rows on read
 
 ## Context
 
 The accepted finding `CAI/shard-0017/001` identifies a collection identity gap
-at the save/replay/full-state boundary. `OptionalIdToIndex::Read` verifies map
-cardinality, unique keys, and a permutation of row indices, but never checks
-that each key is a valid ID or equals the ID stored in the paired PostRender
+at the save read (`Frame::operator>>`). Replays share that reader and are
+exempt developer tools. `OptionalIdToIndex::Read` verifies map cardinality,
+unique keys, and a permutation of row indices, but never checks that each key is a valid ID or equals the ID stored in the paired PostRender
 row (`Engine/Source/Frame/Collections/Collection.h:206-253`).
 `Frame::operator>>` validates only count/capacity parity before moving the
 loaded frame (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:829-840`).
@@ -23,9 +23,9 @@ work.
 
 The author's recommendation is to validate each indexable collection after
 both its Interpolate map and paired PostRender ID column have been deserialized,
-at the existing frame adoption gate. For every map entry, reject an invalid
-sentinel and require the key to equal the paired row ID at the mapped index;
-retain the existing cardinality/permutation checks. Throw the existing
+at the save read's existing frame adoption gate in `Frame::operator>>`. For
+every map entry, reject an invalid sentinel and require the key to equal the
+paired row ID at the mapped index; retain the existing cardinality/permutation checks. Throw the existing
 corrupt-stream exception before `loadedFrame` is moved into live state. Keep
 stable-ID lookup and the normal swap-and-pop lifecycle unchanged for valid
 frames.
@@ -43,7 +43,7 @@ frames.
 - Cross-checking every indexable Interpolate `idToIndexMap` key against the
   exact ID in its paired PostRender row before frame adoption.
 - Rejecting invalid/sentinel IDs and mismatched row identities through the
-  existing save/replay/network corrupt-input path.
+  save read's existing corrupt-input path.
 - The generic map-read and game frame adoption regions named above.
 
 ## Out of scope
@@ -57,7 +57,7 @@ frames.
 ## Risk tier and invariants
 
 Expected Change Workflow Tier 2 (downgraded from Tier 3). The change validates
-serialized save/replay/network state and protects deterministic collection
+serialized save state and protects deterministic collection
 identity/lifecycle.
 
 Preserve these invariants:
@@ -80,8 +80,8 @@ so serialization layout, CRC, and every valid frame's behavior are unchanged.
   before adoption; a zero/sentinel key is rejected as well.
 - A valid frame with aligned IDs still loads, updates, destroys, and transfers
   rows through the existing map path.
-- Client and server `Debug|x64` builds clean through `/compile`; save/full-state
-  read exercises cover the paired identity gate.
+- Client and server `Debug|x64` builds clean through `/compile`; save read
+  exercises cover the paired identity gate.
 
 ## Coordination
 

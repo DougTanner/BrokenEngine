@@ -5,7 +5,6 @@
 #include "Network/NetworkCursor.h"
 
 #include "Frame/StatusChange.h"
-#include "SpawnTransfer.h"
 
 namespace engine
 {
@@ -120,36 +119,6 @@ static void DeserializePlayerTransfer(const uint8_t*& pCursor, game::TransferDat
 	rData.fleetWantedCoord = ReadGridCoord(pCursor);
 	rData.uiPendingFleetWantedCoordTicks = ReadUint8(pCursor);
 	rData.uiPendingWeaponModeTicks = ReadUint8(pCursor);
-}
-
-// Serialized wire size of one item of each StatusChangeType, excluding the per-group [type:1][count:2] header.
-// Receive-side mirror of the per-case write widths in SerializeGroup (and the Serialize* helpers) below —
-// DeserializeStatusChangeBatch bounds-checks each item against this before reading, then rejects the whole batch on
-// any shortfall. Any StatusChangeType payload change must update this alongside the two switches, DefaultDataForType,
-// and kiMaxStatusChangeBytesPerItem.
-static int64_t StatusChangeItemWireSize(game::StatusChangeType eType)
-{
-	static constexpr int64_t kiU8 = sizeof(uint8_t);
-	static constexpr int64_t kiU16 = sizeof(uint16_t);
-	static constexpr int64_t kiU32 = sizeof(uint32_t);
-	static constexpr int64_t kiI64 = sizeof(int64_t);
-	static constexpr int64_t kiF32 = sizeof(float);
-	static constexpr int64_t kiVec4 = sizeof(XMFLOAT4A);
-	static constexpr int64_t kiCoord = 2 * kiU32; // GridCoord = two int32
-
-	switch (eType)
-	{
-		case game::StatusChangeType::kSpawnPlayer:       return kiI64 + kiU8 + kiCoord + kiU8 + 2 * kiF32;
-		case game::StatusChangeType::kTransferBlaster:   return 2 * kiVec4 + kiU8 + kiU32;
-		case game::StatusChangeType::kTransferSpaceship: return 3 * kiVec4 + kiU32 + 3 * kiF32;
-		case game::StatusChangeType::kTransferMissile:   return 3 * kiVec4 + kiU32 + 7 * kiF32;
-		case game::StatusChangeType::kTransferPlayer:    return 3 * kiVec4 + kiU32 + 8 * kiF32 + kiU16 + kiI64 + kiCoord + 2 * kiU8;
-		case game::StatusChangeType::kDestroyPlayer:     return kiI64;
-		case game::StatusChangeType::kUpdatePlayer:      return kiI64 + kiU8 + kiF32 + kiU8;
-		case game::StatusChangeType::kUpdateFleet:       return kiI64 + kiU8 + kiCoord + kiU8;
-	}
-
-	return 0;
 }
 
 // Serialize a group of StatusChanges that share the same type
@@ -270,58 +239,27 @@ int64_t SerializeStatusChangeBatch(const game::StatusChange* pChanges, int64_t i
 	return pCursor - static_cast<uint8_t*>(pDest);
 }
 
-int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, game::StatusChange* pDest, int64_t iMaxCount)
+int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, game::StatusChange* pDest)
 {
 	if (iSourceSize == 0)
 	{
 		return 0;
 	}
 
-	// Trust boundary (network input): drive every read through a bounded cursor and throw on any malformed byte — a
-	// short group header, a shortfall mid-item, an out-of-range type byte, a decoded count past iMaxCount, or a payload
-	// the game cannot adopt — rather than over-reading pEnd or applying a prefix. All-or-nothing at both ends: the send
-	// side drops an over-cap batch whole, and nothing decoded here is published before the throw, so a corrupt batch
-	// cannot partially apply. StatusChangeItemWireSize above is the per-type read-width mirror.
+	// Only the client decodes a batch, and it trusts its server's bytes, so the cursor only drives the loop to the end of
+	// the batch; nothing is checked per group or item.
 	BoundedCursor cursor {static_cast<const uint8_t*>(pSource), static_cast<const uint8_t*>(pSource) + iSourceSize};
 	int64_t iOutputCount = 0;
 
-	// [type:1][count:2] group header, then uiGroupCount items of StatusChangeItemWireSize(eType) bytes each. Every
-	// header consumes bytes, so the cursor must land exactly on pEnd; any leftover byte is a truncated trailing header.
-	static constexpr int64_t kiGroupHeaderSize = static_cast<int64_t>(sizeof(uint8_t) + sizeof(uint16_t));
 	while (cursor.Remaining() > 0)
 	{
-		if (!cursor.Has(kiGroupHeaderSize))
-		{
-			LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: truncated group header ({} of {} bytes, deserialized {})", cursor.Remaining(), kiGroupHeaderSize, iOutputCount);
-			NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
-		}
-
 		uint8_t uiType = ReadUint8(cursor.pCursor);
 		uint16_t uiGroupCount = ReadUint16(cursor.pCursor);
 
-		if (uiType >= kiTypeCount)
-		{
-			LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: out-of-range type byte {} (deserialized {})", static_cast<int>(uiType), iOutputCount);
-			NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
-		}
-
-		if (iOutputCount + static_cast<int64_t>(uiGroupCount) > iMaxCount)
-		{
-			LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: decoded count {} exceeds cap {} (type {})", iOutputCount + static_cast<int64_t>(uiGroupCount), iMaxCount, static_cast<int>(uiType));
-			NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
-		}
-
 		game::StatusChangeType eType = static_cast<game::StatusChangeType>(uiType);
-		int64_t iItemWireSize = StatusChangeItemWireSize(eType);
 
 		for (uint16_t i = 0; i < uiGroupCount; ++i)
 		{
-			if (!cursor.Has(iItemWireSize))
-			{
-				LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: truncated mid-group (type {}, deserialized {})", static_cast<int>(uiType), iOutputCount);
-				NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
-			}
-
 			game::StatusChange& rChange = pDest[iOutputCount++];
 			rChange = {};
 			rChange.eType = eType;
@@ -375,12 +313,6 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 					break;
 				}
 			}
-
-			if (!game::IsAdoptableStatusChange(rChange))
-			{
-				LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: unadoptable {} payload (deserialized {})", game::StatusChangeTypeName(eType), iOutputCount);
-				NetworkMessages::ThrowCorruptStream("DeserializeStatusChangeBatch");
-			}
 		}
 	}
 
@@ -414,7 +346,7 @@ int64_t CompressStatusChangeBatch(const game::StatusChange* pChanges, int64_t iC
 	if (iCompressedSize <= 0)
 	{
 		// Belt (the caller sizes pDest to fit any valid capped batch): a 0 return means the batch did not fit. Drop it
-		// rather than ship the 4-byte prefix alone, which the receive side would reject as a corrupt payload.
+		// rather than ship the 4-byte prefix alone, which carries no decodable batch.
 		LOG(kNetwork, kError, "CompressStatusChangeBatch: LZ4 compression failed (items {}, serialized {}, dest capacity {})", iCount, iSerializedSize, iDestCapacity);
 		return 0;
 	}
@@ -422,43 +354,21 @@ int64_t CompressStatusChangeBatch(const game::StatusChange* pChanges, int64_t iC
 	return static_cast<int64_t>(sizeof(int32_t)) + iCompressedSize;
 }
 
-int64_t DecompressStatusChangeBatch(const void* pSource, int64_t iSourceSize, game::StatusChange* pDest, int64_t iMaxCount)
+int64_t DecompressStatusChangeBatch(const void* pSource, int64_t iSourceSize, game::StatusChange* pDest)
 {
-	if (iSourceSize <= static_cast<int64_t>(sizeof(int32_t)))
-	{
-		NetworkMessages::ThrowCorruptStream("DecompressStatusChangeBatch");
-	}
-
 	// Read uncompressed size prefix
 	const uint8_t* pInput = static_cast<const uint8_t*>(pSource);
 	int32_t iUncompressedSize = 0;
 	std::memcpy(&iUncompressedSize, pInput, sizeof(int32_t));
 
-	// Trust boundary (network input): clamp the wire-controlled size against the true maximum serialized batch size
-	// before it drives the decompress-buffer reservation, rejecting a hostile prefix that would otherwise allocate up
-	// to ~2 GB. A valid batch's uncompressed size is at or below this bound by construction (the send side sizes its
-	// compress scratch from the same constant).
-	if (iUncompressedSize <= 0 || iUncompressedSize > kiMaxSerializedStatusChangeBatchBytes)
-	{
-		LOG(kNetwork, kWarning, "DecompressStatusChangeBatch: out-of-range uncompressed size prefix {} (bound {})", iUncompressedSize, kiMaxSerializedStatusChangeBatchBytes);
-		NetworkMessages::ThrowCorruptStream("DecompressStatusChangeBatch");
-	}
-
-	// LZ4 writes iResult bytes and only those bytes are deserialized; bounded reads stop at iResult, so no zero-fill or
-	// extra slack is needed.
+	// LZ4 writes iResult bytes and only those bytes are deserialized, so no zero-fill or extra slack is needed.
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferAllocation<uint8_t*> decompressedAllocation = rWorkbuffer.PushBuffer<uint8_t*>(iUncompressedSize);
 	uint8_t* pDecompressed = decompressedAllocation;
 
 	int iResult = LZ4_decompress_safe(reinterpret_cast<const char*>(pInput + sizeof(int32_t)), reinterpret_cast<char*>(pDecompressed), static_cast<int>(iSourceSize - sizeof(int32_t)), iUncompressedSize);
 
-	if (iResult <= 0)
-	{
-		LOG(kNetwork, kWarning, "DecompressStatusChangeBatch: LZ4 decompression failed (error {})", iResult);
-		NetworkMessages::ThrowCorruptStream("DecompressStatusChangeBatch");
-	}
-
-	int64_t iCount = DeserializeStatusChangeBatch(pDecompressed, iResult, pDest, iMaxCount);
+	int64_t iCount = DeserializeStatusChangeBatch(pDecompressed, iResult, pDest);
 
 	return iCount;
 }

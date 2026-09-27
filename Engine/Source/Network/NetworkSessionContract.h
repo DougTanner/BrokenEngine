@@ -16,7 +16,7 @@ concept NetworkSessionContractType = requires(typename T::GamePacket ePacket)
 	{ T::WriteFrame(std::declval<std::ostream&>(), std::declval<const typename T::Frame&>()) } -> std::same_as<void>;
 	{ T::ReadFrame(std::declval<std::istream&>(), std::declval<typename T::Frame&>()) } -> std::same_as<void>;
 	{ T::CompressStatusChanges(std::declval<const typename T::StatusChange*>(), 0, nullptr, 0) } -> std::same_as<int64_t>;
-	{ T::DecompressStatusChanges(nullptr, 0, std::declval<typename T::StatusChange*>(), 0) } -> std::same_as<int64_t>;
+	{ T::DecompressStatusChanges(nullptr, 0, std::declval<typename T::StatusChange*>()) } -> std::same_as<int64_t>;
 };
 
 static_assert(NetworkSessionContractType<game::NetworkSessionContract>);

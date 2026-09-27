@@ -2,9 +2,8 @@
 
 #include "Network/NetworkProtocol.h" // kiMaxStatusChangesPerCell for the shared batch-size bounds below
 
-// The engine owns the batch codec body (NetworkSerialization.cpp): the tagged [type][count] group envelope,
-// the bounded receive cursor, the all-or-nothing malformed-input rejection, and each payload type's
-// read/write. The game supplies the StatusChangeType enum and the concrete payload variants. The game type is forward-declared rather than included so this
+// The engine owns the batch codec body (NetworkSerialization.cpp): the tagged [type][count] group envelope
+// and each payload type's read/write. The game supplies the StatusChangeType enum and the concrete payload variants. The game type is forward-declared rather than included so this
 // engine header stays free of game dependencies; the codec .cpp includes the game header for the full type.
 namespace game { struct StatusChange; }
 
@@ -34,14 +33,14 @@ inline constexpr int64_t kiMaxCompressedStatusChangeBatchBytes = static_cast<int
 // Returns bytes written to pDest
 int64_t SerializeStatusChangeBatch(const game::StatusChange* pChanges, int64_t iCount, void* pDest);
 
-// Returns number of StatusChanges written to pDest; throws std::ios_base::failure on malformed input
-int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, game::StatusChange* pDest, int64_t iMaxCount);
+// Returns number of StatusChanges written to pDest
+int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, game::StatusChange* pDest);
 
 // Serialization + LZ4 compression
 // Returns bytes written to pDest (4-byte uncompressed size prefix + compressed data)
 int64_t CompressStatusChangeBatch(const game::StatusChange* pChanges, int64_t iCount, void* pDest, int64_t iDestCapacity);
 
-// Returns number of StatusChanges written to pDest; throws std::ios_base::failure on malformed input
-int64_t DecompressStatusChangeBatch(const void* pSource, int64_t iSourceSize, game::StatusChange* pDest, int64_t iMaxCount);
+// Returns number of StatusChanges written to pDest
+int64_t DecompressStatusChangeBatch(const void* pSource, int64_t iSourceSize, game::StatusChange* pDest);
 
 } // namespace engine

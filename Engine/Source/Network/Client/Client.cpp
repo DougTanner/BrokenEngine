@@ -348,17 +348,11 @@ void Client::Receive(std::span<const uint8_t> packetData)
 					// Heap: raw game packet buffer grows on game-specific packets
 					mReceivedGamePackets.emplace_back(packetData[0], std::vector<uint8_t>(packetData.begin() + 1, packetData.end()));
 				}
-				else
-				{
-					// The protocol-version gate makes both sides share this type table, so an engine type byte
-					// the client cannot name is corrupt server data rather than an unsupported feature.
-					NetworkMessages::ThrowCorruptStream("Client::Receive");
-				}
 				break;
 		}
 	}
-	// Trust boundary: only a reader that decided the server's bytes are impossible throws std::ios_base::failure,
-	// and a client cannot keep playing against a server it cannot decode — assert so the crash report names the reader.
+	// The client trusts its server, so a shared reader throwing std::ios_base::failure here means server bytes the
+	// client cannot decode, and it cannot keep playing against them — assert so the crash report names the reader.
 	// The std::exception catch below is log-and-continue, so an ordinary local failure (bad_alloc, .at(), file I/O
 	// beneath a handler) is never blamed on the peer.
 	catch (const std::ios_base::failure& rException)

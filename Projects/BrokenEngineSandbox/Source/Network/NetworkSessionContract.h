@@ -42,9 +42,9 @@ struct NetworkSessionContract
 	{
 		return engine::CompressStatusChangeBatch(pChanges, iCount, pDestination, iCapacity);
 	}
-	static int64_t DecompressStatusChanges(const void* pSource, int64_t iSize, StatusChange* pDestination, int64_t iCapacity)
+	static int64_t DecompressStatusChanges(const void* pSource, int64_t iSize, StatusChange* pDestination)
 	{
-		return engine::DecompressStatusChangeBatch(pSource, iSize, pDestination, iCapacity);
+		return engine::DecompressStatusChangeBatch(pSource, iSize, pDestination);
 	}
 };
 

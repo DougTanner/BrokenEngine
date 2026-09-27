@@ -721,7 +721,6 @@ void FrameInterpolate::ServerRead(std::istream& rStream)
 	static_cast<engine::FrameInterpolateBase&>(*this).ServerRead(rStream);
 
 	common::Read(rStream, fSpawnTimer);
-	fSpawnTimer = AdmitSpawnTimer(fSpawnTimer);
 	common::Read(rStream, gameFlags);
 
 	engine::SharedCollectionRead(rStream, *pPlayers);
@@ -847,12 +846,6 @@ void Frame::ServerRead(std::istream& rStream)
 {
 	interpolate.ServerRead(rStream);
 	postRender.ServerRead(rStream);
-
-	engine::FrameInterpolateBase& rInterpolateBase = interpolate;
-	engine::FramePostRenderBase& rPostRenderBase = postRender;
-	engine::ValidateCollectionPairs(rInterpolateBase.ServerCollections(), rPostRenderBase.ServerCollections());
-	engine::ValidateCollectionPair(*interpolate.pPlayers, *postRender.pPlayers);
-	engine::ValidateCollectionPairs(GameInterpolateCollections(interpolate), GamePostRenderCollections(postRender));
 }
 
 std::ostream& operator<<(std::ostream& rStream, const Frame& rCurrent)

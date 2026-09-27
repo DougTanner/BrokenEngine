@@ -70,10 +70,10 @@ void ClientSession::ProcessReceivedGamePackets()
 	}
 	catch (const std::ios_base::failure& rException)
 	{
-		// Trust boundary: only a reader that decided the server's bytes are impossible throws this type, and a client
-		// cannot keep playing against a server it cannot decode — assert so the process ends with a crash report naming
-		// the reader. The std::exception catch below is log-and-continue, so an ordinary local failure is never blamed
-		// on the peer. ParsePlayerEvents decodes two packet types, so what() carries which one failed.
+		// The client trusts its server, so a shared reader throwing this type means server bytes the client cannot
+		// decode, and it cannot keep playing against them — assert so the process ends with a crash report naming the
+		// reader. The std::exception catch below is log-and-continue, so an ordinary local failure is never blamed on
+		// the peer.
 		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt player-event packet: {}", rException.what());
 		ASSERT(false);
 	}

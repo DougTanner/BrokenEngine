@@ -6,7 +6,6 @@
 #include "Network/Client/Client.h"
 #include "Network/Client/ClientSession.h"
 #include "Network/Client/ClientSessionRuntime.h"
-#include "Network/GamePacketType.h"
 #include "Network/NetworkMessages.h"
 
 namespace game
@@ -33,24 +32,24 @@ void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rPar
 
 		if (!rParams.is_object())
 		{
-			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope|status_change|game_packet\"}");
+			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
 		if (rParams.size() != 1)
 		{
-			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope|status_change|game_packet\"}");
+			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
 		if (!rParams.contains("case"))
 		{
-			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope|status_change|game_packet\"}");
+			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
 		if (!rParams.at("case").is_string())
 		{
-			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope|status_change|game_packet\"}");
+			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
 		const std::string caseName = rParams.at("case").get<std::string>();
-		if (caseName != "engine_envelope" && caseName != "status_change" && caseName != "game_packet")
+		if (caseName != "engine_envelope")
 		{
-			throw std::runtime_error("client_packet_fault_fixture 'case' must be engine_envelope|status_change|game_packet");
+			throw std::runtime_error("client_packet_fault_fixture 'case' must be engine_envelope");
 		}
 		if (!sArmedPacketFault.empty())
 		{
@@ -72,52 +71,8 @@ void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rPar
 		{
 			throw std::runtime_error("client_packet_fault_fixture requires a connected client");
 		}
-		engine::Client& rClient = *gpClientSession->mpRuntime->mpClient;
 
-		std::vector<uint8_t> packet;
-		if (caseName == "engine_envelope")
-		{
-			packet = {static_cast<uint8_t>(engine::PacketType::kServerCoordFullState), 0, 0};
-		}
-		else if (caseName == "status_change")
-		{
-			int64_t iSlot = -1;
-			for (int64_t i = 0; i < std::ssize(rClient.mCoordSlots); ++i)
-			{
-				if (rClient.mCoordSlots.at(i).eState == engine::CoordSubscriptionState::kActive)
-				{
-					iSlot = i;
-					break;
-				}
-			}
-			if (iSlot < 0)
-			{
-				throw std::runtime_error("client_packet_fault_fixture 'status_change' requires an active coord slot");
-			}
-
-			uint8_t payloadBytes[8] {};
-			constexpr int32_t kiOutOfRangeUncompressedSize = std::numeric_limits<int32_t>::max();
-			std::memcpy(payloadBytes, &kiOutOfRangeUncompressedSize, sizeof(int32_t));
-
-			engine::NetworkMessages::ServerCoordUpdateMessage message {};
-			message.uiLoadGeneration = rClient.muiCommittedLoadGeneration;
-			message.uiSlotIndex = static_cast<uint8_t>(iSlot);
-			message.uiEpoch = rClient.mCoordSlots.at(iSlot).ackState.uiEpoch;
-			message.iTick = gpGame->TickCounter();
-			message.iEchoedTimestampNs = 0;
-			message.compressedPayload = {.pData = payloadBytes, .iSize = static_cast<int32_t>(sizeof(payloadBytes))};
-
-			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-			common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-			engine::NetworkMessages::Write(rWorkbuffer, message);
-			std::string_view built = rWorkbuffer.View();
-			const uint8_t* pBuilt = reinterpret_cast<const uint8_t*>(built.data());
-			packet.assign(pBuilt, pBuilt + built.size());
-		}
-		else
-		{
-			packet = {static_cast<uint8_t>(GamePacketType::kServerAssignPlayer), 0};
-		}
+		std::vector<uint8_t> packet = {static_cast<uint8_t>(engine::PacketType::kServerCoordFullState), 0, 0};
 
 		rResult["case"] = caseName;
 		rResult["type"] = packet.front();
@@ -154,12 +109,7 @@ void InjectArmedClientPacketFault()
 	{
 		return;
 	}
-	const bool bGamePacket = packet.front() >= static_cast<uint8_t>(engine::PacketType::kGamePacketStart);
 	pSession->mpRuntime->mpClient->Receive(packet);
-	if (bGamePacket)
-	{
-		pSession->ProcessReceivedGamePackets();
-	}
 }
 
 void ResetClientPacketFaultFixture(ClientSession& rSession)

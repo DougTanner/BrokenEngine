@@ -1,10 +1,10 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-26T23:33:25.731Z","dependsOn":["Documents/Plans/Engine/ClientServerDataCheckRemoval.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-08-26T23:33:25.731Z","dependsOn":[]} -->
 # Reject out-of-range serialized explosion type indices
 
 ## Context
 
 The accepted finding `CAI/shard-0017/002` identifies raw registry-index bytes
-being accepted at the collection trust boundary. `Collection::Read` and
+being accepted at the save read, the collection trust boundary. `Collection::Read` and
 `CollectionRead` hydrate member arrays without semantic validation
 (`Engine/Source/Frame/Collections/Collection.h:338-353`), while
 `TypeRegistry::GetType` throws only when a later phase calls `sTypes.at`
@@ -24,8 +24,9 @@ audit work.
 
 The author's recommendation is to extend `ExplosionsInterpolate::PostRead` to
 check every deserialized `puiTypeIndices` value against the immutable
-`ExplosionsInterpolate::sTypes` registry before the loaded collection can be
-adopted. Treat `kuiInvalidTypeIndex` and any value outside the registry as
+`ExplosionsInterpolate::sTypes` registry before the save read can adopt the
+loaded collection. The hook is shared, so the check also runs on client reads
+of server data, which the client trusts; that is redundant but harmless. Treat `kuiInvalidTypeIndex` and any value outside the registry as
 corrupt input and throw `std::ios_base::failure`; retain trail
 count normalization and the current startup-only registration order. Keep
 other collection registries outside this focused candidate unless the same
@@ -42,8 +43,8 @@ read path proves they are part of this exact explosion record.
 
 - Validation of every serialized explosion `puiTypeIndices` entry against the
   registered explosion-type count and invalid sentinel before adoption.
-- Routing an invalid explosion type through the existing corrupt save/replay/
-  network result rather than a later `.at()` exception.
+- Routing an invalid explosion type through the save read's existing corrupt
+  result rather than a later `.at()` exception.
 - Preserving `PostRead` trail-count normalization and valid registry behavior.
 
 ## Out of scope
@@ -57,9 +58,9 @@ read path proves they are part of this exact explosion record.
 
 ## Risk tier and invariants
 
-Expected Change Workflow Tier 2 (downgraded from Tier 3). Serialized save/
-replay/network bytes select runtime registry objects and can reach
-deterministic simulation phases.
+Expected Change Workflow Tier 2 (downgraded from Tier 3). Serialized save
+bytes select runtime registry objects and can reach deterministic simulation
+phases.
 
 Preserve these invariants:
 
@@ -82,7 +83,8 @@ valid explosion rows are untouched, so only corrupt input changes outcome.
 - Valid explosion frames retain the same post-read normalization and phase
   behavior on both client and server.
 - Client and server `Debug|x64` builds clean through `/compile`; malformed
-  save/full-state input is dropped through the existing corrupt-data boundary.
+  save input is rejected through the save read's existing corrupt-data
+  boundary.
 
 ## Coordination
 

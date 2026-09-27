@@ -169,7 +169,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 					}
 				}
 			}
-			// FleetSyncMessage::ReadPayload guarantees the flagship names a member, or is {} for an empty fleet.
+			// The server's fleet invariant guarantees the flagship names a member, or is {} for an empty fleet.
 			if (!mFocusedMemberGlobalId.IsValid())
 			{
 				mFocusedMemberGlobalId = rFleet.flagshipGlobalPlayerId;

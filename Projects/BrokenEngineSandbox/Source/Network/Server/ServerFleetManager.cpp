@@ -378,7 +378,7 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 		mNavigation.QueueFlagshipUpdate({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoord = rFleet.wantedCoord});
 	}
 
-	// After the flagship assignment: FleetSyncMessage::ReadPayload rejects a nonempty fleet without a flagship.
+	// After the flagship assignment: clients trust the sync, so it must never carry a nonempty fleet without a flagship.
 	SendFleetSyncToClient(iClientId, rClientGuid);
 }
 
