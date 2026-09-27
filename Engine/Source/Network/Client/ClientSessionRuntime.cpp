@@ -48,7 +48,7 @@ void PersistClientGuidToDisk(const ClientGuid& rGuid)
 {
 	// Heap: filesystem path and file stream operations for GUID persistence
 	ScopedSuppressAllocationTracking suppress;
-	const ClientGuidFile guidFile {rGuid};
+	ClientGuidFile guidFile {rGuid};
 	if (!WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path("ClientGuid.bin"), guidFile))
 	{
 		LOG(kNetwork, kError, "Failed to persist ClientGuid.bin (next session will re-handshake as a new client)");
@@ -334,9 +334,9 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 			{
 				// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
 				// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
-				const int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimToWall(engine::kTickNs).count();
-				const int64_t iInitialTargetBehind = (engine::kiJitterSafetyUs * 1000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
-				const int64_t iAppliedBehind = std::min<int64_t>(iInitialTargetBehind, iTick);
+				int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimToWall(engine::kTickNs).count();
+				int64_t iInitialTargetBehind = (engine::kiJitterSafetyUs * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
+				int64_t iAppliedBehind = std::min<int64_t>(iInitialTargetBehind, iTick);
 				game::gpGame->SetTickCounter(iTick - iAppliedBehind);
 				game::gpGame->SetCurrentTime(fFullStateTime - static_cast<float>(iAppliedBehind) * engine::kfDeltaTime);
 				game::gpGame->ResetRenderClock();
@@ -532,7 +532,7 @@ void ClientSessionRuntime::SynchronizeSubscriptions()
 		desiredArena.PushBack(rCoord);
 	}
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	std::erase_if(mUnwantedTimestamps, [&](const auto& rPair)
+	std::erase_if(mUnwantedTimestamps, [&](const std::pair<const GridCoord, std::chrono::steady_clock::time_point>& rPair)
 	{
 		if (now - rPair.second >= kStickySubscriptionDuration)
 		{
@@ -652,7 +652,7 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 	// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
 	// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
 	int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimToWall(engine::kTickNs).count();
-	int64_t iComputedTargetBehind = ((3 * iJitterMicroseconds + kiJitterSafetyUs) * 1000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
+	int64_t iComputedTargetBehind = ((3 * iJitterMicroseconds + kiJitterSafetyUs) * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
 	if (miCurrentTargetBehind == 0)
 	{
 		miCurrentTargetBehind = iComputedTargetBehind;

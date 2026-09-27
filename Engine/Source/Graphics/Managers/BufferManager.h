@@ -37,8 +37,8 @@ public:
 	template<typename T>
 	struct DynamicStorageBufferResult
 	{
-		T* pData;
-		int64_t iCapacity;
+		T* pData = nullptr;
+		int64_t iCapacity = 0;
 	};
 
 	template<typename T>
@@ -91,11 +91,11 @@ public:
 	static constexpr int64_t kiVisibleAreaLodCount = 4;
 	struct VisibleAreaMeshLod
 	{
-		int64_t iIndexOffset;   // First index for this LOD inside the concat index region
-		int64_t iIndexCount;
-		int64_t iVertexOffset;  // Vertex base added by vkCmdDrawIndexedIndirect's vertexOffset
-		int64_t iQuadCountX;    // For visible-area snap math
-		int64_t iQuadCountY;
+		int64_t iIndexOffset = 0;   // First index for this LOD inside the concat index region
+		int64_t iIndexCount = 0;
+		int64_t iVertexOffset = 0;  // Vertex base added by vkCmdDrawIndexedIndirect's vertexOffset
+		int64_t iQuadCountX = 0;    // For visible-area snap math
+		int64_t iQuadCountY = 0;
 	};
 	VisibleAreaMeshLod mWaterMeshLods[kiVisibleAreaLodCount] {};
 	Buffer mWaterMeshBuffer;

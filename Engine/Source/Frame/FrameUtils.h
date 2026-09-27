@@ -40,10 +40,10 @@ template<bool kbBlendVelocityToDirection = false>
 
 struct FrameBounds
 {
-	float fMinX {};
-	float fMinY {};
-	float fMaxX {};
-	float fMaxY {};
+	float fMinX = 0.0f;
+	float fMinY = 0.0f;
+	float fMaxX = 0.0f;
+	float fMaxY = 0.0f;
 };
 
 struct SegmentHit
@@ -351,8 +351,8 @@ bool LogDifferencesCollections(TUPLE_CURRENT&& current, TUPLE_OTHER&& other, std
 // Reverse walk over a paired collection, releasing every element the predicate selects.
 // Reverse order keeps swap-and-pop removal safe: the row swapped in from the tail has already been visited,
 // so release must not disturb the loop index.
-template <typename TInterpolate, typename TPostRender, typename TPredicate, typename TRelease>
-void DestroySweep(TInterpolate& rInterpolate, [[maybe_unused]] TPostRender& rPostRender, TPredicate predicate, TRelease release)
+template <typename INTERPOLATE, typename POST_RENDER, typename PREDICATE, typename RELEASE>
+void DestroySweep(INTERPOLATE& rInterpolate, [[maybe_unused]] POST_RENDER& rPostRender, PREDICATE predicate, RELEASE release)
 {
 	for (int64_t i = rInterpolate.iCount - 1; i >= 0; --i)
 	{

@@ -291,7 +291,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 	// Rank candidates by attenuated volume so the closest / loudest sounds win the
 	// kiMaxStaticVoices slots. Out-of-range candidates (below the hysteresis floor) are
 	// skipped entirely; matching active voices get deactivated in DeactivationPass.
-	const int64_t iSoundCount = rSoundsPostRender.iCount;
+	int64_t iSoundCount = rSoundsPostRender.iCount;
 	if (iSoundCount <= 0)
 	{
 		return;
@@ -328,7 +328,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 	});
 
 	// Walk in priority order; allocate or sync up to kiMaxStaticVoices slots.
-	const int64_t iSlotCap = std::min(iCandidateCount, kiMaxStaticVoices);
+	int64_t iSlotCap = std::min(iCandidateCount, kiMaxStaticVoices);
 	for (int64_t iSlot = 0; iSlot < iSlotCap; ++iSlot)
 	{
 		float fAttenuated = pPriority[iSlot].fAttenuated;
@@ -582,7 +582,7 @@ void StaticVoices::UpdateListenerPosition()
 	// and is exposed in the Sound > Tweaks sub-tab. Distances on the consumer side
 	// (Apply3dVolume / ComputeAttenuatedVolume) are 3D against mVecListenerPosition (camera
 	// eye), so altitude naturally pushes ground emitters into the fade band as the camera climbs.
-	const float fEyeHeight = engine::gpCamera->mfCameraEyeHeight;
+	float fEyeHeight = engine::gpCamera->mfCameraEyeHeight;
 	mfEffectiveFadeStart = gListenerDistanceStart.Resolve(fEyeHeight);
 	mfEffectiveFadeEnd = gListenerDistanceEnd.Resolve(fEyeHeight);
 	mfCurveDistanceScaler = gListenerCurve.Resolve(fEyeHeight);

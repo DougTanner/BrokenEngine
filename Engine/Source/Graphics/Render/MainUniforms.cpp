@@ -20,7 +20,7 @@ static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoords, G
 	}
 
 	float fZ = gBaseHeight.Get();
-	constexpr XMFLOAT4A kf4EdgeColor = {0.0f, 1.0f, 1.0f, 1.0f};
+	static constexpr XMFLOAT4A kf4EdgeColor = {0.0f, 1.0f, 1.0f, 1.0f};
 
 	for (const GridCoord& rCoord : rActiveCoords)
 	{
@@ -59,7 +59,7 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 	}
 
 	float fZ = gBaseHeight.Get();
-	constexpr XMFLOAT4A kf4BoundaryColor = {1.0f, 0.0f, 1.0f, 1.0f};
+	static constexpr XMFLOAT4A kf4BoundaryColor = {1.0f, 0.0f, 1.0f, 1.0f};
 
 	for (const GridCoord& rCoord : rActiveCoords)
 	{
@@ -109,7 +109,7 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 	// the magenta boundary rectangle / cyan frame edges at gBaseHeight. Debug lines are an overlay
 	// (no depth test), so the underwater Z is never occluded by terrain or water.
 	float fZ = common::kfUnderwaterMaskThresholdMeters;
-	constexpr XMFLOAT4A kf4ValidAreaColor = {0.0f, 1.0f, 0.0f, 1.0f};
+	static constexpr XMFLOAT4A kf4ValidAreaColor = {0.0f, 1.0f, 0.0f, 1.0f};
 
 	for (const GridCoord& rCoord : rActiveCoords)
 	{
@@ -157,8 +157,8 @@ static void DebugRenderNavData(const std::vector<GridCoord>& rActiveCoords, Grid
 	}
 
 	float fZ = gBaseHeight.Get();
-	constexpr XMFLOAT4A kf4PolygonColor = {1.0f, 1.0f, 0.0f, 1.0f};
-	constexpr XMFLOAT4A kf4VertexColor = {1.0f, 0.5f, 0.0f, 1.0f};
+	static constexpr XMFLOAT4A kf4PolygonColor = {1.0f, 1.0f, 0.0f, 1.0f};
+	static constexpr XMFLOAT4A kf4VertexColor = {1.0f, 0.5f, 0.0f, 1.0f};
 
 	for (const GridCoord& rCoord : rActiveCoords)
 	{

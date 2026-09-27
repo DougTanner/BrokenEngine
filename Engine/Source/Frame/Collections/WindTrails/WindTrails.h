@@ -23,8 +23,8 @@ struct WindTrailsInterpolate : public Collection<WindTrailsInterpolate, Collecti
 	struct SyncData
 	{
 		XMVECTOR vecPosition;
-		float fIntensity;
-		float fWidth;
+		float fIntensity = 0.0f;
+		float fWidth = 0.0f;
 		float fLengthMultiplier = 1.0f;
 	};
 

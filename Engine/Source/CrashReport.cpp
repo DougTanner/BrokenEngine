@@ -21,8 +21,8 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 	wchar_t pcCrashReportFile[128] {};
 	swprintf_s(pcCrashReportFile, std::size(pcCrashReportFile), L"\\%s-Crash-Report.txt", pcGameName);
 
-	const size_t uiDirectoryLength = wcsnlen_s(pcDirectory, std::size(spcAppDataOverride));
-	const size_t uiSuffixLength = 1 + wcslen(pcGameName) + wcslen(pcCrashReportFile);
+	size_t uiDirectoryLength = wcsnlen_s(pcDirectory, std::size(spcAppDataOverride));
+	size_t uiSuffixLength = 1 + wcslen(pcGameName) + wcslen(pcCrashReportFile);
 	if (uiDirectoryLength >= std::size(spcAppDataOverride))
 	{
 		return;
@@ -44,8 +44,8 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 // buffer is either the complete intended path or empty, never a partial one the crash handler would write to.
 static bool AppendReportPath(wchar_t (&rBuffer)[MAX_PATH + 1], const wchar_t* pcText)
 {
-	const size_t uiUsedLength = wcsnlen_s(rBuffer, std::size(rBuffer));
-	const size_t uiTextLength = wcsnlen_s(pcText, std::size(rBuffer));
+	size_t uiUsedLength = wcsnlen_s(rBuffer, std::size(rBuffer));
+	size_t uiTextLength = wcsnlen_s(pcText, std::size(rBuffer));
 	if (uiTextLength >= std::size(rBuffer) - uiUsedLength)
 	{
 		rBuffer[0] = L'\0';
@@ -68,7 +68,7 @@ void ResolveCrashReportPaths()
 	std::replace(std::begin(pcCrashReportFile), std::end(pcCrashReportFile), L' ', L'-');
 
 	wchar_t pcDesktopDirectory[MAX_PATH + 1] {};
-	const bool bDesktopFound = SHGetSpecialFolderPathW(HWND_DESKTOP, pcDesktopDirectory, CSIDL_DESKTOP, FALSE) != FALSE;
+	bool bDesktopFound = SHGetSpecialFolderPathW(HWND_DESKTOP, pcDesktopDirectory, CSIDL_DESKTOP, FALSE) != FALSE;
 	if (bDesktopFound && AppendReportPath(spcDesktopReportPath, pcDesktopDirectory) && AppendReportPath(spcDesktopReportPath, L"\\"))
 	{
 		AppendReportPath(spcDesktopReportPath, pcCrashReportFile);

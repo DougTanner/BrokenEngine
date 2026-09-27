@@ -10,34 +10,34 @@ Wrapper gMuteInBackground(true);
 
 HeightLerpWrapperQuartet gListenerDistanceStart
 {
-	Wrapper(150.0f, 0.0f, 1000.0f),  // StartHeight
-	Wrapper(600.0f, 0.0f, 1000.0f),  // EndHeight
-	Wrapper(200.0f, 0.0f, 1000.0f),  // Low
-	Wrapper(600.0f, 0.0f, 1000.0f),  // High
+	Wrapper(150.0f, 0.0f, 1'000.0f),  // StartHeight
+	Wrapper(600.0f, 0.0f, 1'000.0f),  // EndHeight
+	Wrapper(200.0f, 0.0f, 1'000.0f),  // Low
+	Wrapper(600.0f, 0.0f, 1'000.0f),  // High
 };
 
 HeightLerpWrapperQuartet gListenerDistanceEnd
 {
-	Wrapper(150.0f, 0.0f, 1000.0f),  // StartHeight
-	Wrapper(600.0f, 0.0f, 1000.0f),  // EndHeight
-	Wrapper(400.0f, 0.0f, 2000.0f),  // Low
-	Wrapper(1200.0f, 0.0f, 2000.0f), // High
+	Wrapper(150.0f, 0.0f, 1'000.0f),   // StartHeight
+	Wrapper(600.0f, 0.0f, 1'000.0f),   // EndHeight
+	Wrapper(400.0f, 0.0f, 2'000.0f),   // Low
+	Wrapper(1'200.0f, 0.0f, 2'000.0f), // High
 };
 
 HeightLerpWrapperQuartet gListenerCurve
 {
-	Wrapper(150.0f, 0.0f, 1000.0f),  // StartHeight
-	Wrapper(600.0f, 0.0f, 1000.0f),  // EndHeight
-	Wrapper(10.0f, 1.0f, 100.0f),    // Low
-	Wrapper(10.0f, 1.0f, 100.0f),    // High
+	Wrapper(150.0f, 0.0f, 1'000.0f),  // StartHeight
+	Wrapper(600.0f, 0.0f, 1'000.0f),  // EndHeight
+	Wrapper(10.0f, 1.0f, 100.0f),     // Low
+	Wrapper(10.0f, 1.0f, 100.0f),     // High
 };
 
 HeightLerpWrapperQuartet gListenerAudibleFloor
 {
-	Wrapper(150.0f, 0.0f, 1000.0f),  // StartHeight
-	Wrapper(600.0f, 0.0f, 1000.0f),  // EndHeight
-	Wrapper(0.15f, 0.0f, 0.5f),      // Low
-	Wrapper(0.15f, 0.0f, 0.5f),      // High
+	Wrapper(150.0f, 0.0f, 1'000.0f),  // StartHeight
+	Wrapper(600.0f, 0.0f, 1'000.0f),  // EndHeight
+	Wrapper(0.15f, 0.0f, 0.5f),       // Low
+	Wrapper(0.15f, 0.0f, 0.5f),       // High
 };
 
 } // namespace engine

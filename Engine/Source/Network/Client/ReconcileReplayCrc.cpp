@@ -169,7 +169,8 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 {
 	engine::CoordFrames& rFrames = *rWork.pFrames;
 
-	CrcFastPathCoordResult result {
+	CrcFastPathCoordResult result
+	{
 		.preWritebackLayout = {
 			.iHead = rFrames.iSnapshotHead,
 			.iCount = rFrames.iSnapshotCount,

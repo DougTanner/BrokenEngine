@@ -40,7 +40,7 @@ const TweaksSliderMapRegistrar gSoundRegistrar
 
 void TweaksScreenBase::RenderSoundSection()
 {
-	const int64_t iSection = giTweakSectionSound;
+	int64_t iSection = giTweakSectionSound;
 
 	if (ImGui::BeginTabBar("SoundTabs"))
 	{

@@ -21,7 +21,7 @@ void PointLightsPostRender::AllocateAndCopy(PointLightsPostRender& rCurrent, con
 void PointLightsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
 	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rFrame.interpolate.fCurrentTime,
-		[](auto& rI, auto& rPR, int64_t& i)
+		[](PointLightsInterpolate& rI, PointLightsPostRender& rPR, int64_t& i)
 		{
 			RemoveIndexableElement(rI, rPR, rPR.puiIds[i], rI.Members(), rPR.Members());
 			--i;

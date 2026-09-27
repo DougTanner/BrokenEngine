@@ -82,7 +82,7 @@ bool CurveWidget(std::string_view label, CurveData& rCurve)
 		// right-click deletion, preventing a click aimed at an existing point from adding a stray one.
 		ImVec2 mousePixels = ImGui::GetMousePos();
 		int iNearestPoint = -1;
-		const float fGrabTolerance = kfGrabTolerance * UiScale();
+		float fGrabTolerance = kfGrabTolerance * UiScale();
 		float fNearestDistSq = fGrabTolerance * fGrabTolerance;
 		for (int i = 0; i < rCurve.GetPointCount(); ++i)
 		{

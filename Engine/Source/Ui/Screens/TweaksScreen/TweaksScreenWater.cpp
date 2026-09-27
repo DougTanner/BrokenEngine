@@ -123,7 +123,7 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 
 void TweaksScreenBase::RenderWaterSection()
 {
-	const int64_t iSection = giTweakSectionWater;
+	int64_t iSection = giTweakSectionWater;
 
 	if (ImGui::BeginTabBar("WaterTabs"))
 	{

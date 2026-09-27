@@ -110,7 +110,7 @@ struct LazyChunk
 	MovableAtomicChunkRangeReloadState eRangeReloadState {};
 
 	// GPU upload results (written by upload thread, read by main thread)
-	VkImage vkImage = VK_NULL_HANDLE;
+	VkImage uploadVkImage = VK_NULL_HANDLE;
 	VmaAllocation vmaAllocation = VK_NULL_HANDLE;
 };
 
@@ -349,7 +349,7 @@ bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::file
 
 	fnWrite(stream);
 	stream.close();
-	const bool bGood = !stream.fail();
+	bool bGood = !stream.fail();
 
 	return CommitAtomicWrite(rFlags, rFilename, bGood);
 }

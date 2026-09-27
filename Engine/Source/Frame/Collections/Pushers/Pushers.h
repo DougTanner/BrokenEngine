@@ -46,9 +46,9 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	struct SyncData
 	{
 		XMVECTOR vecPosition;
-		float fRadius;
-		float fIntensity;
-		float fPower;
+		float fRadius = 0.0f;
+		float fIntensity = 0.0f;
+		float fPower = 0.0f;
 		PusherFlags_t flags;
 	};
 

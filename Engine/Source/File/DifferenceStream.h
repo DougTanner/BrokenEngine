@@ -23,7 +23,7 @@ public:
 
 	DifferenceStreamWriter(const SAVED_TYPE& rSavedStart, const DIFFERENCE_TYPE& rInitialDifference, bool bRecordInitialChecksum = true)
 	{
-		mDifferences.reserve(1024);
+		mDifferences.reserve(1'024);
 
 		// Initialize starting state and frame
 		int64_t iStartTick = rSavedStart.interpolate.iTick;
@@ -34,7 +34,7 @@ public:
 
 		// Normal streams validate their saved start on the first replay tick. A coordinate activated by
 		// a transfer instead validates its post-transfer frame when its one-shot input is consumed.
-		mChecksums.reserve(1024);
+		mChecksums.reserve(1'024);
 		mbRecordsInitialChecksum = bRecordInitialChecksum;
 		if (mbRecordsInitialChecksum)
 		{
@@ -86,7 +86,7 @@ public:
 		int64_t iPostDispatchCount = mPostDispatchRecords.size();
 
 		// Write header with version info, start/end states and metadata
-		const bool bHeaderWritten = gpFileManager->WriteFileAtomically(fileFlags, rFilename, [&](std::fstream& rHeaderStream)
+		bool bHeaderWritten = gpFileManager->WriteFileAtomically(fileFlags, rFilename, [&](std::fstream& rHeaderStream)
 		{
 			// Write version headers (matches WriteVersionedFile pattern)
 			WriteVersionHeader<SAVED_TYPE>(rHeaderStream);
@@ -120,8 +120,8 @@ public:
 		LOG(kReplay, kVerbose, "DifferenceStreamWriter save at frame {}: Count {} Checksum {}", rSavedEnd.interpolate.iTick, iDifferenceCount, rSavedEnd.Crc());
 
 		// Write difference records
-		const std::filesystem::path framesFilename = std::filesystem::path(rFilename).concat(".frames");
-		const bool bFramesWritten = gpFileManager->WriteFileAtomically(fileFlags, framesFilename, [&](std::fstream& rFramesStream)
+		std::filesystem::path framesFilename = std::filesystem::path(rFilename).concat(".frames");
+		bool bFramesWritten = gpFileManager->WriteFileAtomically(fileFlags, framesFilename, [&](std::fstream& rFramesStream)
 		{
 			for (const auto& [iTick, difference] : mDifferences)
 			{
@@ -140,8 +140,8 @@ public:
 		// The caller records the terminal input and its saved end frame before Save. Do not duplicate
 		// either boundary here: the reader consumes that terminal input before retiring the coord. That
 		// input carries no post-dispatch events; those are exact-tick one-shots outside carry-forward.
-		const std::filesystem::path checksumsFilename = std::filesystem::path(rFilename).concat(".checksums");
-		const bool bChecksumsWritten = gpFileManager->WriteFileAtomically(fileFlags, checksumsFilename, [&](std::fstream& rChecksumStream)
+		std::filesystem::path checksumsFilename = std::filesystem::path(rFilename).concat(".checksums");
+		bool bChecksumsWritten = gpFileManager->WriteFileAtomically(fileFlags, checksumsFilename, [&](std::fstream& rChecksumStream)
 		{
 			if (!mChecksums.empty())
 			{
@@ -167,8 +167,8 @@ public:
 		if constexpr (kbReplayFullFrames)
 		{
 			// Write complete frame snapshots for debugging
-			const std::filesystem::path fullFramesFilename = std::filesystem::path(rFilename).concat(".fullframes");
-			const bool bFullFramesWritten = gpFileManager->WriteFileAtomically(fileFlags, fullFramesFilename, [&](std::fstream& rFullFramesStream)
+			std::filesystem::path fullFramesFilename = std::filesystem::path(rFilename).concat(".fullframes");
+			bool bFullFramesWritten = gpFileManager->WriteFileAtomically(fileFlags, fullFramesFilename, [&](std::fstream& rFullFramesStream)
 			{
 				rFullFramesStream << mFullFramesStream.str();
 			});
@@ -190,7 +190,7 @@ public:
 
 	void CleanupFiles(const FileFlags_t& rFileFlags, const std::filesystem::path& rFilename) const
 	{
-		const auto RemovePartialFile = [&](const std::filesystem::path& rPartialFilename)
+		auto RemovePartialFile = [&](const std::filesystem::path& rPartialFilename)
 		{
 			try
 			{
@@ -361,7 +361,7 @@ public:
 		}
 		// end + 1 is representable by the header gate above. Bound the span before loading differences
 		// so a hostile tick range cannot overflow later byte-count calculations or drive allocations.
-		const int64_t iChecksumSpan = mSavedEnd.interpolate.iTick - rSavedStart.interpolate.iTick + 1;
+		int64_t iChecksumSpan = mSavedEnd.interpolate.iTick - rSavedStart.interpolate.iTick + 1;
 		if (iChecksumSpan > std::numeric_limits<int64_t>::max() / static_cast<int64_t>(sizeof(common::crc_t)))
 		{
 			LOG(kDefault, kWarning, "Checksum range is too large");
@@ -434,14 +434,14 @@ public:
 			LOG(kDefault, kWarning, "Checksum file is missing");
 			return;
 		}
-		const int64_t iChecksumBytes = common::StreamBytesRemaining(checksumStream);
+		int64_t iChecksumBytes = common::StreamBytesRemaining(checksumStream);
 		if (iChecksumBytes < 0 || iChecksumBytes % static_cast<int64_t>(sizeof(common::crc_t)) != 0)
 		{
 			LOG(kDefault, kWarning, "Checksum file size is invalid");
 			return;
 		}
-		const int64_t iChecksumCount = iChecksumBytes / static_cast<int64_t>(sizeof(common::crc_t));
-		const int64_t iExpectedChecksumCount = iChecksumSpan;
+		int64_t iChecksumCount = iChecksumBytes / static_cast<int64_t>(sizeof(common::crc_t));
+		int64_t iExpectedChecksumCount = iChecksumSpan;
 		if (iChecksumCount != iExpectedChecksumCount)
 		{
 			LOG(kDefault, kWarning, "Checksum file size doesn't match replay tick span");

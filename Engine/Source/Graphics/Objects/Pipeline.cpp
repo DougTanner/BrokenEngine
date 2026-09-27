@@ -91,17 +91,17 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 
 	mInfo = rInfo;
 
-	mVkExternalDescriptorSetLayout = mInfo.vkExternalDescriptorSetLayout != VK_NULL_HANDLE ? mInfo.vkExternalDescriptorSetLayout : gpTextureManager->mTextureDescriptors.mGlobalDescriptorSetLayout;
-	mVkExternalDescriptorSetLayoutSet1 = mInfo.vkExternalDescriptorSetLayoutSet1;
+	mExternalVkDescriptorSetLayout = mInfo.externalVkDescriptorSetLayout != VK_NULL_HANDLE ? mInfo.externalVkDescriptorSetLayout : gpTextureManager->mTextureDescriptors.mGlobalVkDescriptorSetLayout;
+	mExternalSet1VkDescriptorSetLayout = mInfo.externalSet1VkDescriptorSetLayout;
 
 	if (mInfo.flags & kRenderTarget)
 	{
-		ASSERT(mInfo.vkRenderPass != VK_NULL_HANDLE);
+		ASSERT(mInfo.targetVkRenderPass != VK_NULL_HANDLE);
 		ASSERT(mInfo.vkExtent3D.width != 0 && mInfo.vkExtent3D.height != 0);
 	}
 
 	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible;
-	for (int64_t i = 0; i < static_cast<int64_t>(mInfo.pDescriptorInfos.size()); ++i)
+	for (size_t i = 0; i < mInfo.pDescriptorInfos.size(); ++i)
 	{
 		if (mInfo.pDescriptorInfos[i].flags & kPerCommandBufferUniformBuffers || mInfo.pDescriptorInfos[i].flags & kPerCommandBufferStorageBuffers || mInfo.pDescriptorInfos[i].flags & kGlobalLayoutUniformBuffers || mInfo.pDescriptorInfos[i].flags & kMainLayoutUniformBuffers)
 		{
@@ -172,10 +172,10 @@ void Pipeline::Destroy() noexcept
 	mVkDescriptorSetLayout = VK_NULL_HANDLE;
 
 	// Destroy Set 2 layout
-	if (mVkDescriptorSetLayoutSet2 != VK_NULL_HANDLE)
+	if (mSet2VkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
-		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mVkDescriptorSetLayoutSet2, nullptr);
-		mVkDescriptorSetLayoutSet2 = VK_NULL_HANDLE;
+		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mSet2VkDescriptorSetLayout, nullptr);
+		mSet2VkDescriptorSetLayout = VK_NULL_HANDLE;
 	}
 
 	if (mIndirectVkBuffer != VK_NULL_HANDLE)
@@ -208,7 +208,7 @@ void Pipeline::RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffe
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
-	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mVkExternalDescriptorSetLayout, iDescriptorSetIndex, mVkDescriptorSets);
+	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iDescriptorSetIndex, mVkDescriptorSets);
 	mInfo.pVertexBuffer->RecordBindVertexBuffer(vkCommandBuffer);
 
 	vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(mInfo.pVertexBuffer->mInfo.iCount), static_cast<uint32_t>(iInstanceCount), 0, 0, static_cast<uint32_t>(iFirstInstance));
@@ -224,7 +224,7 @@ void Pipeline::RecordBindPipelineAndDescriptors(int64_t iCommandBuffer, VkComman
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
-	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mVkExternalDescriptorSetLayout, iDescriptorSetIndex, mVkDescriptorSets);
+	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iDescriptorSetIndex, mVkDescriptorSets);
 }
 
 void Pipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants)
@@ -238,7 +238,7 @@ void Pipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkComm
 	}
 
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
-	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mVkExternalDescriptorSetLayout, iCommandBuffer, mVkDescriptorSets);
+	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iCommandBuffer, mVkDescriptorSets);
 	mInfo.pVertexBuffer->RecordBindVertexBuffer(vkCommandBuffer);
 	// Device-local reads slot 0; host-visible indexes per-framebuffer
 	int64_t iIndirectSlot = mInfo.flags & kIndirectDeviceLocal ? 0 : iCommandBuffer;
@@ -286,7 +286,7 @@ void Pipeline::RecordCompute(int64_t iCommandBuffer, VkCommandBuffer vkCommandBu
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mVkPipeline);
-	BindComputeDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mVkExternalDescriptorSetLayout, iCommandBuffer, iDescriptorSetIndex, mVkDescriptorSets);
+	BindComputeDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iCommandBuffer, iDescriptorSetIndex, mVkDescriptorSets);
 	vkCmdDispatch(vkCommandBuffer, static_cast<uint32_t>(iGroupCountX), static_cast<uint32_t>(iGroupCountY), static_cast<uint32_t>(iGroupCountZ));
 }
 
@@ -316,7 +316,7 @@ void Pipeline::RecordComputeIndirectFrom(int64_t iCommandBuffer, VkCommandBuffer
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mVkPipeline);
-	BindComputeDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mVkExternalDescriptorSetLayout, iCommandBuffer, iDescriptorSetIndex, mVkDescriptorSets);
+	BindComputeDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iCommandBuffer, iDescriptorSetIndex, mVkDescriptorSets);
 	vkCmdDispatchIndirect(vkCommandBuffer, vkIndirectBuffer, vkIndirectOffset);
 }
 

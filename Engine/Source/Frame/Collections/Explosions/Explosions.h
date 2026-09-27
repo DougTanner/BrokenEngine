@@ -158,7 +158,7 @@ struct ExplosionType
 };
 
 struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
-                               public TypeRegistry<ExplosionType>
+	public TypeRegistry<ExplosionType>
 {
 	static constexpr int64_t kiVersion = 1;
 
@@ -285,7 +285,7 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 	// SpawnInfo for spawn parameters
 	struct SpawnInfo
 	{
-		uint8_t uiTypeIndex;
+		uint8_t uiTypeIndex = 0;
 		XMVECTOR vecPosition;
 		XMVECTOR vecDirection;
 		ExplosionFlags_t flags {};

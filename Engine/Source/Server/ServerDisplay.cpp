@@ -117,10 +117,10 @@ void ServerUpdateDisplayStats()
 	miStats.version = MI_STAT_VERSION;
 	mi_stats_get(&miStats);
 
-	gpProfileManager->miMimallocCommittedMib = miStats.committed.current / (1024 * 1024);
-	gpProfileManager->miMimallocPeakCommittedMib = miStats.committed.peak / (1024 * 1024);
-	gpProfileManager->miMimallocHeapUsedMib = miStats.page_committed.current / (1024 * 1024);
-	gpProfileManager->miMimallocPeakHeapUsedMib = miStats.page_committed.peak / (1024 * 1024);
+	gpProfileManager->miMimallocCommittedMib = miStats.committed.current / (1'024 * 1'024);
+	gpProfileManager->miMimallocPeakCommittedMib = miStats.committed.peak / (1'024 * 1'024);
+	gpProfileManager->miMimallocHeapUsedMib = miStats.page_committed.current / (1'024 * 1'024);
+	gpProfileManager->miMimallocPeakHeapUsedMib = miStats.page_committed.peak / (1'024 * 1'024);
 #endif
 
 	gpProfileManager->UpdateProfileText();
@@ -133,11 +133,11 @@ bool ServerDisplayContentChanged()
 	// stats. The free-running tick/time and CPU-timer values are deliberately excluded so an idle server
 	// (stable entity/map state) stops repainting instead of blitting an all-but-identical frame at 4 Hz.
 	// POD-only fold — no heap allocation, so it stays inside the caller's ScopedSuppressAllocationTracking.
-	uint64_t uHash = 14695981039346656037ULL;
+	uint64_t uHash = 14'695'981'039'346'656'037ULL;
 	auto Mix = [&uHash](int64_t iValue)
 	{
 		uHash ^= static_cast<uint64_t>(iValue);
-		uHash *= 1099511628211ULL;
+		uHash *= 1'099'511'628'211ULL;
 	};
 
 	Mix(static_cast<int64_t>(seActiveTab));

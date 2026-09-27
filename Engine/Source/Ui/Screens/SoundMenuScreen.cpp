@@ -21,8 +21,6 @@ constexpr std::string_view kMuteInBackgroundLabel = "Mute in background";
 
 void SoundMenuScreen::Render()
 {
-	using enum StandardString;
-
 	if (game::gpGame->meUiState != UiState::kSound)
 	{
 		return;
@@ -46,26 +44,26 @@ void SoundMenuScreen::Render()
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
-	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(kStringAudio)), kfMainMenuHeadingScale);
+	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)), kfMainMenuHeadingScale);
 
-	const float fSliderWidth = kfSoundSliderWidthPixels * UiScale();
+	float fSliderWidth = kfSoundSliderWidthPixels * UiScale();
 	ImGui::SetNextItemWidth(fSliderWidth);
 	WrapperSlider("Master Volume", &gMasterVolume);
 	ImGui::SetNextItemWidth(fSliderWidth);
 	WrapperSlider("Music Volume", &gMusicVolume);
 	ImGui::SetNextItemWidth(fSliderWidth);
 	WrapperSlider("Sound Volume", &gSoundVolume);
-	const float fMuteRowWidth = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(kMuteInBackgroundLabel.data()).x;
+	float fMuteRowWidth = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(kMuteInBackgroundLabel.data()).x;
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, 0.5f * (ImGui::GetContentRegionAvail().x - fMuteRowWidth)));
 	WrapperToggle(kMuteInBackgroundLabel, &gMuteInBackground);
 
 	ImGui::Separator();
 
 	// One themed width shared by both buttons (measured under the live menu font)
-	float fButtonWidth = MenuButtonsWidth({TranslatedString(kStringDefaults), U"Back"});
+	float fButtonWidth = MenuButtonsWidth({TranslatedString(StandardString::kStringDefaults), U"Back"});
 
 	// Defaults button
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringDefaults)), ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnim))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringDefaults)), ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnim))
 	{
 		ResetSoundSettings();
 	}

@@ -9,8 +9,8 @@ Wrapper gIslandAmbientOcclusion(0.65f, 0.0f, 1.0f);
 // Terrain Detail
 HeightLerpWrapperQuartet gTerrainDetailNormalsMultiplier
 {
-	.StartHeight = Wrapper(300.0f, 150.0f, 2000.0f),
-	.EndHeight = Wrapper(600.0f, 150.0f, 2000.0f),
+	.StartHeight = Wrapper(300.0f, 150.0f, 2'000.0f),
+	.EndHeight = Wrapper(600.0f, 150.0f, 2'000.0f),
 	.Low = Wrapper(1.0f, 0.0f, 1.0f),
 	.High = Wrapper(0.0f, 0.0f, 1.0f),
 };

@@ -20,9 +20,9 @@ constexpr int64_t kiDetailBlockSize = 8 * static_cast<int64_t>(shaders::kiShadow
 
 // Reference render width. WaterFullDetail anchors the resolution-independent Gerstner water grid to it, and
 // SmokeSimulationPixels scales the smoke-sim resolution relative to it.
-constexpr int64_t kiReferenceWidth = 3840;
+constexpr int64_t kiReferenceWidth = 3'840;
 // Smoke-sim pixel budget at the reference width (smoke resolution scales by actual/reference width).
-constexpr float kfSmokeReferencePixels = 8192.0f;
+constexpr float kfSmokeReferencePixels = 8'192.0f;
 
 static constexpr int64_t SnapToDetailBlock(int64_t iExtent)
 {
@@ -56,7 +56,7 @@ std::tuple<int64_t, int64_t> WaterFullDetail()
 	// Gerstner frequencies are fixed, so the water vertex grid must be fixed too — anchor to a
 	// reference 4K resolution instead of the live framebuffer extent. Block-snap matches FullDetail()
 	// so the snapped result is deterministic and divides cleanly for shadow-execution-aligned consumers.
-	constexpr int64_t kiReferenceHeight = 2160;
+	static constexpr int64_t kiReferenceHeight = 2'160;
 	int64_t iX = SnapToDetailBlock(kiReferenceWidth);
 	int64_t iY = SnapToDetailBlock(kiReferenceHeight);
 
@@ -695,7 +695,7 @@ bool Graphics::Destroy()
 	{
 		// Must follow the loader drain: a whole-texture job finishing inside the drain stores kUploading and posts
 		// an upload, and the reset maps kUploading back to kDiskLoaded and re-arms the pending-adoption counter —
-		// so without this wait the reset could rewrite a chunk whose upload thread is still writing vkImage and
+		// so without this wait the reset could rewrite a chunk whose upload thread is still writing uploadVkImage and
 		// vmaAllocation.
 		gpTextureUploadManager->WaitIdle();
 	}

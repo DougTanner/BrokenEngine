@@ -281,7 +281,7 @@ void Client::ServerCoordUpdateOrResend(std::span<const uint8_t> packetData, bool
 		{
 			miLastEchoedTimestampNs = rMessage.iEchoedTimestampNs;
 			int64_t iNowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-			int64_t iRttUs = (iNowNs - rMessage.iEchoedTimestampNs) / 1000;
+			int64_t iRttUs = (iNowNs - rMessage.iEchoedTimestampNs) / 1'000;
 			if (iRttUs >= 0)
 			{
 				mSmoothedPipelineRttUs = iRttUs;
@@ -410,7 +410,7 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 
 		// Seed smoothed pipeline RTT from game-layer handshake measurement so the value flows through the network sim
 		int64_t iNowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-		int64_t iRttUs = (miHelloSendTimeNs > 0) ? (iNowNs - miHelloSendTimeNs) / 1000 : 0;
+		int64_t iRttUs = (miHelloSendTimeNs > 0) ? (iNowNs - miHelloSendTimeNs) / 1'000 : 0;
 		if (iRttUs > 0 && iRttUs < 60'000'000)
 		{
 			mSmoothedPipelineRttUs.Seed(iRttUs);
@@ -465,7 +465,7 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 	}
 
 	// This accept answers the coord's oldest request; a cancelled or missing one makes a heal or commit unsubscribe
-	const bool bLive = mSubscribeRequests.TakeAnswer(coord);
+	bool bLive = mSubscribeRequests.TakeAnswer(coord);
 	ClientCoordSlot& rSlot = mCoordSlots.at(uiSlotIndex);
 	SubscribeAcceptFlags_t actions = ClassifySubscribeAccept(uiSlotIndex, uiEpoch, coord);
 

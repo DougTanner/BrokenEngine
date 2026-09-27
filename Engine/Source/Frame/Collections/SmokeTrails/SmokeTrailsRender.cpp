@@ -24,7 +24,7 @@ void SmokeTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const auto& { return rInterpolate.smokeTrails; });
+		[](const game::FrameInterpolate& rInterpolate) -> const SmokeTrailsInterpolate& { return rInterpolate.smokeTrails; });
 
 	if (iTotalCapacity == 0)
 	{

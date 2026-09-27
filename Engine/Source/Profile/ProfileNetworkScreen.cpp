@@ -15,14 +15,14 @@ namespace
 
 void AppendBytes(common::Workbuffer& rWorkbuffer, int64_t iBytes)
 {
-	if (iBytes >= 1024 * 1024)
+	if (iBytes >= 1'024 * 1'024)
 	{
-		rWorkbuffer.AppendFloat(static_cast<float>(iBytes) / (1024.0f * 1024.0f), 1);
+		rWorkbuffer.AppendFloat(static_cast<float>(iBytes) / (1'024.0f * 1'024.0f), 1);
 		rWorkbuffer.Append(" MB/s");
 	}
 	else
 	{
-		rWorkbuffer.AppendFloat(static_cast<float>(iBytes) / 1024.0f, 1);
+		rWorkbuffer.AppendFloat(static_cast<float>(iBytes) / 1'024.0f, 1);
 		rWorkbuffer.Append(" KB/s");
 	}
 }
@@ -36,7 +36,7 @@ void ProfileManagerBase::FormatNetworkScreen(common::Workbuffer& rWorkbuffer)
 	// Header with simulation level info
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		constexpr engine::NetworkSimulationConfig kSimConfig = engine::GetNetworkSimulationConfig(keNetworkSimulation);
+		static constexpr engine::NetworkSimulationConfig kSimConfig = engine::GetNetworkSimulationConfig(keNetworkSimulation);
 		rWorkbuffer.Append("Network (Sim: ");
 		if (game::gpGame->mTimeStep.miTimeMultiply > 1)
 		{
@@ -89,7 +89,7 @@ void ProfileManagerBase::FormatNetworkTransport(common::Workbuffer& rWorkbuffer)
 
 void ProfileManagerBase::FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENetPeer& rPeer)
 {
-	[[maybe_unused]] constexpr engine::NetworkSimulationConfig kSimConfig = engine::GetNetworkSimulationConfig(keNetworkSimulation);
+	[[maybe_unused]] static constexpr engine::NetworkSimulationConfig kSimConfig = engine::GetNetworkSimulationConfig(keNetworkSimulation);
 	int64_t iRtt = static_cast<int64_t>(rPeer.roundTripTime);
 	rWorkbuffer.Append("RTT: ");
 	rWorkbuffer.Append(iRtt);
@@ -103,10 +103,10 @@ void ProfileManagerBase::FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffe
 	}
 
 	rWorkbuffer.Append("  Pipe: ");
-	rWorkbuffer.AppendFloat(engine::gpClient->mSmoothedPipelineRttUs.Get() / 1000.0f, 1);
+	rWorkbuffer.AppendFloat(engine::gpClient->mSmoothedPipelineRttUs.Get() / 1'000.0f, 1);
 	rWorkbuffer.Append(" ms\n");
 
-	float fLoss = rPeer.packetLoss * 100.0f / 65536.0f;
+	float fLoss = rPeer.packetLoss * 100.0f / 65'536.0f;
 	rWorkbuffer.Append("Loss: ");
 	rWorkbuffer.AppendFloat(fLoss, 1);
 	rWorkbuffer.Append("%");
@@ -143,12 +143,12 @@ void ProfileManagerBase::FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffe
 	rWorkbuffer.Append("Pkt Loss: ");
 	rWorkbuffer.AppendFloat(fPacketLossPercent, 1);
 	rWorkbuffer.Append("%  Jitter: ");
-	rWorkbuffer.AppendFloat(engine::gpClient->mSmoothedJitterUs.Get() / 1000.0f, 1);
+	rWorkbuffer.AppendFloat(engine::gpClient->mSmoothedJitterUs.Get() / 1'000.0f, 1);
 	rWorkbuffer.Append(" ms\n");
 
 	mSmoothedRtt = iRtt;
 	mSmoothedRtt.Update();
-	mSmoothedJitter = engine::gpClient->mSmoothedJitterUs.Get() / 1000;
+	mSmoothedJitter = engine::gpClient->mSmoothedJitterUs.Get() / 1'000;
 	mSmoothedJitter.Update();
 }
 
@@ -261,7 +261,7 @@ void ProfileManagerBase::FormatNetworkReconciliation(common::Workbuffer& rWorkbu
 	bool bKnockOnFlag = false;
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		constexpr engine::NetworkSimulationBounds kBounds = engine::GetNetworkSimulationBounds(keNetworkSimulation);
+		static constexpr engine::NetworkSimulationBounds kBounds = engine::GetNetworkSimulationBounds(keNetworkSimulation);
 		bCrcFlag = iCrc < kBounds.iCrcMin;
 		bAssumedFlag = iAssumed > kBounds.iAssumedMax;
 		bFastFlag = iFast > kBounds.iFastReplayMax;

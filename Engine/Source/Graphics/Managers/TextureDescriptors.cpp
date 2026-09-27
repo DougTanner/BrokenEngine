@@ -73,8 +73,8 @@ void TextureDescriptors::Create()
 		.pBindings = pBindings,
 	};
 
-	CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &layoutCreateInfo, nullptr, &mGlobalDescriptorSetLayout));
-	VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, mGlobalDescriptorSetLayout, "GlobalSet0");
+	CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &layoutCreateInfo, nullptr, &mGlobalVkDescriptorSetLayout));
+	VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, mGlobalVkDescriptorSetLayout, "GlobalSet0");
 
 	int64_t iFramebufferCount = static_cast<int64_t>(gpSwapchainManager->mFramebuffers.size());
 	mGlobalDescriptorSets.resize(iFramebufferCount);
@@ -86,7 +86,7 @@ void TextureDescriptors::Create()
 			.pNext = nullptr,
 			.descriptorPool = gpDeviceManager->mVkDescriptorPool,
 			.descriptorSetCount = 1,
-			.pSetLayouts = &mGlobalDescriptorSetLayout,
+			.pSetLayouts = &mGlobalVkDescriptorSetLayout,
 		};
 		CHECK_VK(vkAllocateDescriptorSets(gpDeviceManager->mVkDevice, &allocInfo, &mGlobalDescriptorSets.at(i)));
 		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET, mGlobalDescriptorSets.at(i), std::format("GlobalSet0{}", i).c_str());
@@ -97,18 +97,18 @@ void TextureDescriptors::Create()
 
 void TextureDescriptors::Destroy()
 {
-	if (mGlobalDescriptorSetLayout != VK_NULL_HANDLE)
+	if (mGlobalVkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
 		vkFreeDescriptorSets(gpDeviceManager->mVkDevice, gpDeviceManager->mVkDescriptorPool, static_cast<uint32_t>(mGlobalDescriptorSets.size()), mGlobalDescriptorSets.data());
-		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mGlobalDescriptorSetLayout, nullptr);
-		mGlobalDescriptorSetLayout = VK_NULL_HANDLE;
+		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mGlobalVkDescriptorSetLayout, nullptr);
+		mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;
 		mGlobalDescriptorSets.clear();
 	}
 }
 
 void TextureDescriptors::WriteGlobalDescriptorSets()
 {
-	for (int64_t i = 0; i < static_cast<int64_t>(mGlobalDescriptorSets.size()); ++i)
+	for (size_t i = 0; i < mGlobalDescriptorSets.size(); ++i)
 	{
 		VkDescriptorBufferInfo globalBufferInfo {.buffer = gpBufferManager->mGlobalLayoutUniformBuffers[i].GetBuffer(), .offset = 0, .range = VK_WHOLE_SIZE};
 		VkDescriptorBufferInfo mainBufferInfo {.buffer = gpBufferManager->mMainLayoutUniformBuffers[i].GetBuffer(), .offset = 0, .range = VK_WHOLE_SIZE};

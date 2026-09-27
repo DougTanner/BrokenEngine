@@ -10,13 +10,14 @@ namespace engine
 std::error_code VkErrorCode(VkResult vkResult) noexcept;
 void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_location loc);
 
-void VkNameImpl(VkObjectType type, uint64_t handle, std::string_view name);
+void SetVkObjectName(VkObjectType type, uint64_t handle, std::string_view name);
 
-inline void VkName([[maybe_unused]] VkObjectType type, [[maybe_unused]] auto handle, [[maybe_unused]] std::string_view name)
+template <typename T>
+inline void VkName([[maybe_unused]] VkObjectType type, [[maybe_unused]] T handle, [[maybe_unused]] std::string_view name)
 {
 	if constexpr (kbVulkanDebugLayers)
 	{
-		VkNameImpl(type, reinterpret_cast<uint64_t>(handle), name);
+		SetVkObjectName(type, reinterpret_cast<uint64_t>(handle), name);
 	}
 }
 

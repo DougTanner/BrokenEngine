@@ -18,7 +18,7 @@ struct SmokeTrailsType
 };
 
 struct SmokeTrailsInterpolate : public Collection<SmokeTrailsInterpolate, CollectionFlags::kIdToIndex>,
-                                public TypeRegistry<SmokeTrailsType>
+	public TypeRegistry<SmokeTrailsType>
 {
 	static constexpr const char* kName = "SmokeTrails";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("SmokeTrails");
@@ -31,7 +31,7 @@ struct SmokeTrailsInterpolate : public Collection<SmokeTrailsInterpolate, Collec
 	struct SyncData
 	{
 		XMVECTOR vecPosition;
-		float fIntensity;
+		float fIntensity = 0.0f;
 	};
 
 	// Sync owned trail with parent-provided data

@@ -18,7 +18,7 @@ struct AudioStreamingVoiceControl;
 #endif
 
 inline constexpr int64_t kiBufferCount = 3;
-inline constexpr int64_t kiBufferSize = 16 * 1024;
+inline constexpr int64_t kiBufferSize = 16 * 1'024;
 inline constexpr float kfCrossfadeDuration = 1.0f;
 
 enum class StreamingVoiceFlags : uint8_t

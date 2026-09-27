@@ -109,10 +109,10 @@ public:
 	Client(const char* pServerAddress, uint16_t uiPort, int64_t iCoordSlots, const ClientGuid& rGuid, GuidAssignedCallback pfnGuidAssigned);
 	~Client();
 
-	template <typename TType, typename... TArgs>
-	void SendSimplePacket(TType eType, uint8_t uiChannel, uint32_t uiPacketFlags, const TArgs&... args)
+	template <typename TTYPE, typename... TARGS>
+	void SendSimplePacket(TTYPE eType, uint8_t uiChannel, uint32_t uiPacketFlags, const TARGS&... args)
 	{
-		static_assert(std::is_enum_v<TType>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
+		static_assert(std::is_enum_v<TTYPE>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
 
 		if (!(mStateFlags & ClientStateFlags::kConnected) || mpServerPeer == nullptr)
 		{

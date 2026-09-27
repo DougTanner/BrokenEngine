@@ -43,7 +43,7 @@ void ProfileManagerBase::RenderImPlotGraphs()
 		return;
 	}
 
-	const float fUiScale = engine::UiScale();
+	float fUiScale = engine::UiScale();
 	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, 10.0f * fUiScale), ImGuiCond_Always);
 	ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x * 0.48f, ImGui::GetIO().DisplaySize.y - 20.0f * fUiScale), ImGuiCond_Always);
 

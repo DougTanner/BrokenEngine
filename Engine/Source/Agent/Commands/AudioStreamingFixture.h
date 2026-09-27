@@ -287,7 +287,7 @@ private:
 	std::atomic<uint64_t> muiHeldGeneration {0};
 	std::atomic<StagingOwner> meStagingOwner {StagingOwner::kNone};
 	ChunkReadRequest mInvalidRequest;
-	std::array<std::byte, 16 * 1024> mInvalidBuffer {};
+	std::array<std::byte, 16 * 1'024> mInvalidBuffer {};
 	common::crc_t mInvalidCrc = 0;
 	uint64_t muiInvalidOffset = 0;
 	uint64_t muiInvalidLength = 0;

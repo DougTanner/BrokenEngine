@@ -19,7 +19,7 @@ inline constexpr int64_t kLanguageCount = 6;
 struct LanguageOption
 {
 	Language eLanguage;
-	const char* pcLabel;
+	const char* pcLabel = nullptr;
 };
 
 // Each label stays in its own language, so it is never routed through the translation table.

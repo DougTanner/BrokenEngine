@@ -94,32 +94,22 @@ struct LayerPairZones
 	}
 };
 
-// thread_local definitions for Collision static members
-thread_local float Collision::sfAreaMinX = 0.0f;
-thread_local float Collision::sfAreaMinY = 0.0f;
-thread_local float Collision::sfZoneWidth = 0.0f;
-thread_local float Collision::sfZoneHeight = 0.0f;
-
 // Default-constructed (no allocation): thread_local constructors run during
 // mi_process_init before the allocator is ready, so pre-allocation would crash.
 // The existing growth code handles lazy initialization on first use.
 thread_local std::vector<CollisionLayer> Collision::sLayers;
-thread_local int64_t Collision::siLayerCount = 0;
 
 // StableVector construction only records the reserved count, so these reserve no address space and make
 // no OS call until their first Resize; growth then commits more of that reservation without moving.
 thread_local common::StableVector<LayerPairZones> Collision::sLayerPairZones {64 * kiCollisionLayerPairPreallocate};
-thread_local int64_t Collision::siLayerPairCount = 0;
 
 // These three are first sized from live data rather than from a pre-allocate constant, so each reserves
 // a fixed live-data ceiling instead of a multiple of one.
-static constexpr int64_t kiCollisionLiveDataReserveBytes = 64 * 1024 * 1024;
+static constexpr int64_t kiCollisionLiveDataReserveBytes = 64 * 1'024 * 1'024;
 thread_local common::StableVector<CollisionResult> Collision::sResultEntries {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResult))};
 thread_local common::StableVector<CollisionResultSpan> Collision::sResultSpans {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResultSpan))};
-thread_local int64_t Collision::siResultSpanCount = 0;
 thread_local int64_t Collision::sLayerBaseOffsets[kiCollisionLayerPreallocate] {};
 thread_local common::StableVector<uint32_t> Collision::sTestedBGeneration {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(uint32_t))};
-thread_local uint32_t Collision::suiTestedBCurrentGeneration = 0;
 
 using enum CollisionFlags;
 

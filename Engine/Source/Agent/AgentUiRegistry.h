@@ -71,7 +71,7 @@ public:
 	static constexpr int64_t kAmbiguous = -2;
 	int64_t ResolveLabel(const char* pcLabel, const char* pcWindow) const;
 
-	static constexpr int64_t kiMaxItems = 1024;
+	static constexpr int64_t kiMaxItems = 1'024;
 	static constexpr int64_t kiMaxWindows = 64;
 	static constexpr int64_t kiMaxPendingLabels = 256;
 

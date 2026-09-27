@@ -27,7 +27,7 @@ template <std::integral TYPE>
 void WriteReplayManifestValue(std::ostream& rStream, TYPE value)
 {
 	using UnsignedType = std::make_unsigned_t<TYPE>;
-	const UnsignedType uiValue = std::bit_cast<UnsignedType>(value);
+	UnsignedType uiValue = std::bit_cast<UnsignedType>(value);
 	for (size_t i = 0; i < sizeof(TYPE); ++i)
 	{
 		rStream.put(static_cast<char>((uiValue >> (i * 8)) & 0xFFu));
@@ -41,7 +41,7 @@ bool ReadReplayManifestValue(std::istream& rStream, TYPE& rValue)
 	UnsignedType uiValue = 0;
 	for (size_t i = 0; i < sizeof(TYPE); ++i)
 	{
-		const int iByte = rStream.get();
+		int iByte = rStream.get();
 		if (iByte == std::char_traits<char>::eof())
 		{
 			return false;
@@ -96,12 +96,12 @@ std::filesystem::path ReplayArtifactFilename(ReplayArtifactKind eKind, uint64_t 
 {
 	switch (eKind)
 	{
-	case ReplayArtifactKind::kGrid: return "F7.replay.grid";
-	case ReplayArtifactKind::kMeta: return "F7.replay.meta";
-	case ReplayArtifactKind::kCoordHeader: return "F7.replay." + std::to_string(uiCoordKey) + "." + std::to_string(iActivationTick);
-	case ReplayArtifactKind::kFrames: return "F7.replay." + std::to_string(uiCoordKey) + "." + std::to_string(iActivationTick) + ".frames";
-	case ReplayArtifactKind::kChecksums: return "F7.replay." + std::to_string(uiCoordKey) + "." + std::to_string(iActivationTick) + ".checksums";
-	case ReplayArtifactKind::kFullFrames: return "F7.replay." + std::to_string(uiCoordKey) + "." + std::to_string(iActivationTick) + ".fullframes";
+		case ReplayArtifactKind::kGrid: return "F7.replay.grid";
+		case ReplayArtifactKind::kMeta: return "F7.replay.meta";
+		case ReplayArtifactKind::kCoordHeader: return "F7.replay." + std::to_string(uiCoordKey) + "." + std::to_string(iActivationTick);
+		case ReplayArtifactKind::kFrames: return "F7.replay." + std::to_string(uiCoordKey) + "." + std::to_string(iActivationTick) + ".frames";
+		case ReplayArtifactKind::kChecksums: return "F7.replay." + std::to_string(uiCoordKey) + "." + std::to_string(iActivationTick) + ".checksums";
+		case ReplayArtifactKind::kFullFrames: return "F7.replay." + std::to_string(uiCoordKey) + "." + std::to_string(iActivationTick) + ".fullframes";
 	}
 	DEBUG_BREAK();
 	return {};
@@ -118,19 +118,19 @@ bool AppendReplayManifestPayload(const ReplayManifest& rManifest, std::vector<st
 	{
 		return false;
 	}
-	const size_t uiFixedBytes = sizeof(int64_t) * 4 + 1;
-	if (rManifest.records.size() > (std::numeric_limits<size_t>::max() - uiFixedBytes) / 16
-	 || rManifest.inventory.size() > (std::numeric_limits<size_t>::max() - uiFixedBytes - rManifest.records.size() * 16) / 57)
+	static constexpr size_t kuiFixedBytes = sizeof(int64_t) * 4 + 1;
+	if (rManifest.records.size() > (std::numeric_limits<size_t>::max() - kuiFixedBytes) / 16
+	 || rManifest.inventory.size() > (std::numeric_limits<size_t>::max() - kuiFixedBytes - rManifest.records.size() * 16) / 57)
 	{
 		return false;
 	}
 
 	rPayload.clear();
-	rPayload.reserve(uiFixedBytes + rManifest.records.size() * 16 + rManifest.inventory.size() * 57);
-	const auto appendValue = [&rPayload]<std::integral TYPE>(TYPE value)
+	rPayload.reserve(kuiFixedBytes + rManifest.records.size() * 16 + rManifest.inventory.size() * 57);
+	auto appendValue = [&rPayload]<std::integral TYPE>(TYPE value)
 	{
 		using UnsignedType = std::make_unsigned_t<TYPE>;
-		const UnsignedType uiValue = std::bit_cast<UnsignedType>(value);
+		UnsignedType uiValue = std::bit_cast<UnsignedType>(value);
 		for (size_t i = 0; i < sizeof(TYPE); ++i)
 		{
 			rPayload.push_back(static_cast<std::byte>((uiValue >> (i * 8)) & 0xFFu));
@@ -326,7 +326,7 @@ void Replay::InvalidateReplayRecording()
 void Replay::UpdateTerminalReplayWriter(GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame)
 {
 	game::FrameInput emptyInput {};
-	const auto inputIt = game::gpGame->mFrameInputs.find(coord);
+	auto inputIt = game::gpGame->mFrameInputs.find(coord);
 	const game::FrameInput& rLiveInput = inputIt != game::gpGame->mFrameInputs.end() ? inputIt->second : emptyInput;
 	rWriterState.pWriter->Update(rEndFrame.interpolate.iTick + 1, rLiveInput, rEndFrame);
 }
@@ -455,7 +455,7 @@ void Replay::SaveLoadReplay()
 				{
 					throw std::ios_base::failure("ReplayManifest activation count");
 				}
-				const int64_t iInitialTick = manifest.iInitialTick;
+				int64_t iInitialTick = manifest.iInitialTick;
 				if (iInitialTick < 0 || iInitialTick > std::numeric_limits<int64_t>::max() - 1)
 				{
 					throw std::ios_base::failure("ReplayManifest initial tick");
@@ -585,7 +585,7 @@ void Replay::SaveLoadReplay()
 				for (const ReplayManifestInventoryEntry& rEntry : manifest.inventory)
 				{
 					engine::FileContentDigest actualDigest;
-					const std::filesystem::path filename = ReplayArtifactFilename(rEntry.eKind, rEntry.uiCoordKey, rEntry.iActivationTick);
+					std::filesystem::path filename = ReplayArtifactFilename(rEntry.eKind, rEntry.uiCoordKey, rEntry.iActivationTick);
 					if (!engine::gpFileManager->ComputeOrdinaryFileSha256({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, filename, actualDigest)
 					 || actualDigest.iByteCount != rEntry.digest.iByteCount || actualDigest.sha256 != rEntry.digest.sha256)
 					{
@@ -615,7 +615,7 @@ void Replay::SaveLoadReplay()
 					staged.pendingReader.coord = rRecord.coord;
 					staged.pendingReader.iActivationTick = rRecord.iActivationTick;
 					staged.pendingReader.pSavedStart = std::make_unique<game::Frame>();
-					const std::filesystem::path coordReplayPath = ReplayArtifactFilename(ReplayArtifactKind::kCoordHeader, rRecord.coord.ToKey(), rRecord.iActivationTick);
+					std::filesystem::path coordReplayPath = ReplayArtifactFilename(ReplayArtifactKind::kCoordHeader, rRecord.coord.ToKey(), rRecord.iActivationTick);
 					bool bLoaded = false;
 					bool bVersionMismatch = false;
 					int64_t iFileVersion = 0;
@@ -650,7 +650,7 @@ void Replay::SaveLoadReplay()
 				previousSavedEndTicks.reserve(stagedReaders.size());
 				for (const StagedReplayReader& rStagedReader : stagedReaders)
 				{
-					const int64_t iSavedEndTick = rStagedReader.pendingReader.pReader->GetSavedEnd().interpolate.iTick;
+					int64_t iSavedEndTick = rStagedReader.pendingReader.pReader->GetSavedEnd().interpolate.iTick;
 					auto [previousIt, bInserted] = previousSavedEndTicks.try_emplace(rStagedReader.record.coord, iSavedEndTick);
 					if (!bInserted)
 					{
@@ -688,7 +688,7 @@ void Replay::SaveLoadReplay()
 					if (rStagedReader.record.iActivationTick == iInitialTick)
 					{
 						initialCoords.insert(rStagedReader.record.coord);
-						const auto gridFrameIt = stagedGrid.coordFrames.find(rStagedReader.record.coord);
+						auto gridFrameIt = stagedGrid.coordFrames.find(rStagedReader.record.coord);
 						if (gridFrameIt == stagedGrid.coordFrames.end())
 						{
 							throw std::ios_base::failure("ReplayManifest initial coord absent from grid");
@@ -708,11 +708,11 @@ void Replay::SaveLoadReplay()
 					throw std::ios_base::failure("ReplayManifest initial coords do not match grid");
 				}
 
-				const ReplayFixtures::TransferCaptureSnapshot recordingCaptureInfo = ReplayFixtures::CaptureSnapshot(*this);
+				ReplayFixtures::TransferCaptureSnapshot recordingCaptureInfo = ReplayFixtures::CaptureSnapshot(*this);
 				game::gpGame->Reset();
 				engine::AdoptGridSave(std::move(stagedGrid));
 
-				const float fInitialTime = stagedReaders.front().pendingReader.pSavedStart->interpolate.fCurrentTime;
+				float fInitialTime = stagedReaders.front().pendingReader.pSavedStart->interpolate.fCurrentTime;
 				for (StagedReplayReader& rStagedReader : stagedReaders)
 				{
 					if (rStagedReader.record.iActivationTick == iInitialTick)
@@ -799,7 +799,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			mPendingReplayReaders.clear();
 			PublishReplayingState();
 
-			const bool bGridWritten = !ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kGrid) &&
+			bool bGridWritten = !ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kGrid) &&
 				engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, std::filesystem::path("F7.replay.grid"), game::gpGame->mClientGridCoord);
 			if (!bGridWritten)
 			{
@@ -863,8 +863,8 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			{
 				for (ReplayWriterState& rWriterState : rWriterGenerations)
 				{
-					const std::filesystem::path coordReplayPath = ReplayArtifactFilename(ReplayArtifactKind::kCoordHeader, rCoord.ToKey(), rWriterState.iActivationTick);
-					const engine::FileFlags_t fileFlags {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup};
+					std::filesystem::path coordReplayPath = ReplayArtifactFilename(ReplayArtifactKind::kCoordHeader, rCoord.ToKey(), rWriterState.iActivationTick);
+					engine::FileFlags_t fileFlags {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup};
 					const game::Frame* pEndFrame = nullptr;
 					if (rWriterState.bTerminal)
 					{
@@ -901,10 +901,10 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					}
 					if (bWriterSaved && ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kFullFramesRecord, rCoord, rWriterState.iActivationTick))
 					{
-						const std::filesystem::path fullFramesPath = std::filesystem::path(coordReplayPath).concat(".fullframes");
+						std::filesystem::path fullFramesPath = std::filesystem::path(coordReplayPath).concat(".fullframes");
 						std::fstream fullFramesStream = engine::gpFileManager->OpenFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, fullFramesPath);
 						fullFramesStream.seekg(0, std::ios::end);
-						const std::streamoff iBeforeBytes = fullFramesStream.tellg();
+						std::streamoff iBeforeBytes = fullFramesStream.tellg();
 						bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0
 						                         && iBeforeBytes <= std::numeric_limits<std::streamsize>::max();
 						std::vector<std::byte> prefix;
@@ -948,13 +948,14 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			miReplayInitialTick = 0;
 
 			// Write replay metadata for F8 load
-			const bool bMetadataWritten = !ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kMetadata) &&
+			bool bMetadataWritten = !ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kMetadata) &&
 				game::WriteReplayMeta({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1));
 			bReplayWritten = bMetadataWritten && bReplayWritten;
 
 			if (bReplayWritten)
 			{
-				ReplayManifest manifest {
+				ReplayManifest manifest
+				{
 					.iInitialTick = recordedRecords.empty() ? 0 : recordedRecords.front().iActivationTick,
 					.records = recordedRecords,
 					.bHasFullFrames = kbReplayFullFrames,
@@ -1027,9 +1028,9 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 		{
 			for (auto it = mReplayReaders.begin(); it != mReplayReaders.end();)
 			{
-				const engine::GridCoord coord = it->first;
+				engine::GridCoord coord = it->first;
 				std::unique_ptr<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>& rpReader = it->second;
-				const bool bTerminalTick = rpReader->IsTerminalTick(game::gpGame->TickCounter());
+				bool bTerminalTick = rpReader->IsTerminalTick(game::gpGame->TickCounter());
 				if (!bTerminalTick)
 				{
 					++it;
@@ -1070,7 +1071,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					LOG(kDefault, kError, "Replay reader activation overlaps live reader for coord ({},{})", pendingReader.coord.x, pendingReader.coord.y);
 					return abortReplay();
 				}
-				const GridCoord coord = pendingReader.coord;
+				GridCoord coord = pendingReader.coord;
 				ActivateReplayReader(coord, std::move(pendingReader));
 			}
 

@@ -24,7 +24,7 @@ class SwapchainManager;
 class TextureManager;
 class Wrapper;
 
-enum DestroyType
+enum class DestroyType
 {
 	kNone,
 	kCommandBuffers,
@@ -58,7 +58,7 @@ float SmokeSimulationPixelsY();
 struct ScreenshotRequest
 {
 	std::filesystem::path path;
-	int64_t iMaxWidth = 1568;
+	int64_t iMaxWidth = 1'568;
 	bool bPng = false;
 	int64_t iQuality = 80;
 	// Set only by the agent screenshot handler: the async save publishes its result JSON to the capture-result slot

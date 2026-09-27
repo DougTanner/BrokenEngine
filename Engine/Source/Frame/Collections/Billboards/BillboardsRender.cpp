@@ -24,7 +24,7 @@ void BillboardsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const auto& { return rInterpolate.billboards; });
+		[](const game::FrameInterpolate& rInterpolate) -> const BillboardsInterpolate& { return rInterpolate.billboards; });
 
 	if (iTotalCapacity == 0)
 	{

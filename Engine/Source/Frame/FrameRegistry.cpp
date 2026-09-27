@@ -85,7 +85,7 @@ static void ValidateSourceLayers(std::span<const RegistrySourceLayer> sourceLaye
 	{
 		for (int64_t iRowA : rLayerA.rows)
 		{
-			const registry_id_t idA = rLayerA.puiIds[iRowA];
+			registry_id_t idA = rLayerA.puiIds[iRowA];
 			ASSERT(idA.IsValid());
 
 			int64_t iIndexB = 0;
@@ -115,7 +115,7 @@ RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, st
 	}
 #endif
 
-	const int64_t iEligibleRows = TotalEligibleRows(sourceLayers);
+	int64_t iEligibleRows = TotalEligibleRows(sourceLayers);
 	ASSERT(static_cast<int64_t>(scratch.size()) >= RegistryScratchBytes(iEligibleRows));
 
 	RegistryQueryContext context {};
@@ -134,7 +134,7 @@ RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, st
 	{
 		for (int64_t iRow : rLayer.rows)
 		{
-			const EligibleRowRef found = FindEligibleRow(sourceLayers, rLayer.puiTargets[iRow]);
+			EligibleRowRef found = FindEligibleRow(sourceLayers, rLayer.puiTargets[iRow]);
 			if (found.pLayer != nullptr)
 			{
 				ASSERT(context.subscriberCounts[found.iEligibleIndex] < std::numeric_limits<uint16_t>::max());
@@ -153,14 +153,14 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 	ValidateRows(rBatch.rows, rBatch.iSourceCount);
 #endif
 
-	const float fRadiusSquared = fRadius * fRadius;
+	float fRadiusSquared = fRadius * fRadius;
 
 	for (size_t uiEntry = 0; uiEntry < rBatch.rows.size(); ++uiEntry)
 	{
-		const int64_t iConsumerRow = rBatch.rows[uiEntry];
-		const XMVECTOR vecOrigin = rBatch.pVecOrigins[iConsumerRow];
-		const XMVECTOR vecDirection = rBatch.pVecDirections[iConsumerRow];
-		const alignment_t consumerAlignment = rBatch.pAlignments != nullptr ? rBatch.pAlignments[iConsumerRow] : alignment_t {};
+		int64_t iConsumerRow = rBatch.rows[uiEntry];
+		XMVECTOR vecOrigin = rBatch.pVecOrigins[iConsumerRow];
+		XMVECTOR vecDirection = rBatch.pVecDirections[iConsumerRow];
+		alignment_t consumerAlignment = rBatch.pAlignments != nullptr ? rBatch.pAlignments[iConsumerRow] : alignment_t {};
 
 		const RegistrySourceLayer* pBestLayer = nullptr;
 		int64_t iBestRow = 0;
@@ -171,24 +171,24 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 		int64_t iEligibleIndex = 0;
 		for (const RegistrySourceLayer& rLayer : rContext.sourceLayers)
 		{
-			const bool bFilterAlignment = rLayer.pAlignments != nullptr && rBatch.pAlignments != nullptr;
+			bool bFilterAlignment = rLayer.pAlignments != nullptr && rBatch.pAlignments != nullptr;
 			for (int64_t iRow : rLayer.rows)
 			{
-				const int64_t iCandidateIndex = iEligibleIndex++;
+				int64_t iCandidateIndex = iEligibleIndex++;
 
 				if (bFilterAlignment && !rContext.pAlignments->CanCollide(consumerAlignment, rLayer.pAlignments[iRow]))
 				{
 					continue;
 				}
 
-				const XMVECTOR vecToSource = XMVectorSubtract(rLayer.pVecCurrentPositions[iRow], vecOrigin);
+				XMVECTOR vecToSource = XMVectorSubtract(rLayer.pVecCurrentPositions[iRow], vecOrigin);
 				if (XMVectorGetX(XMVector3LengthSq(vecToSource)) > fRadiusSquared)
 				{
 					continue;
 				}
 
-				const float fAngle = std::abs(XMVectorGetX(XMVector3AngleBetweenNormals(vecDirection, XMVector3Normalize(vecToSource))));
-				const uint16_t uiSubscribers = rContext.subscriberCounts[iCandidateIndex];
+				float fAngle = std::abs(XMVectorGetX(XMVector3AngleBetweenNormals(vecDirection, XMVector3Normalize(vecToSource))));
+				uint16_t uiSubscribers = rContext.subscriberCounts[iCandidateIndex];
 
 				// Strictly better wins, so an exact tie leaves the earlier layer and row in place.
 				if (uiSubscribers < uiBestSubscribers || (uiSubscribers == uiBestSubscribers && fAngle < fBestAngle))
@@ -217,7 +217,7 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 
 bool ResolveRegistryHandle(const RegistryQueryContext& rContext, registry_id_t id, RegistryResult& rResult)
 {
-	const EligibleRowRef found = FindEligibleRow(rContext.sourceLayers, id);
+	EligibleRowRef found = FindEligibleRow(rContext.sourceLayers, id);
 	if (found.pLayer == nullptr)
 	{
 		return false;
@@ -229,7 +229,7 @@ bool ResolveRegistryHandle(const RegistryQueryContext& rContext, registry_id_t i
 
 void ReleaseRegistryTarget(RegistryQueryContext& rContext, registry_id_t& rId)
 {
-	const EligibleRowRef found = FindEligibleRow(rContext.sourceLayers, rId);
+	EligibleRowRef found = FindEligibleRow(rContext.sourceLayers, rId);
 	if (found.pLayer != nullptr)
 	{
 		ASSERT(rContext.subscriberCounts[found.iEligibleIndex] > 0);

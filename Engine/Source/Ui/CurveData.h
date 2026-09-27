@@ -86,7 +86,7 @@ public:
 			mPoints[iIndex] = ImVec2(1.0f, point.y);
 			return;
 		}
-		constexpr float kfSeparation = 1e-4f;
+		static constexpr float kfSeparation = 1e-4f;
 		float fMinX = mPoints[iIndex - 1].x + kfSeparation;
 		float fMaxX = mPoints[iIndex + 1].x - kfSeparation;
 		point.x = std::clamp(point.x, fMinX, fMaxX);
@@ -184,8 +184,8 @@ private:
 	}
 
 	std::vector<ImVec2> mPoints;
-	float mfYMin;
-	float mfYMax;
+	float mfYMin = 0.0f;
+	float mfYMax = 0.0f;
 };
 
 } // namespace engine

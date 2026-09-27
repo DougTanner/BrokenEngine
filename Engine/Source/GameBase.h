@@ -181,7 +181,7 @@ using StandardMenuState_t = common::Flags<StandardMenuState>;
 struct StandardMenuModel
 {
 	// Must refer to storage that outlives the render pass; a workbuffer allocation would dangle.
-	const char* pcTitle;
+	const char* pcTitle = nullptr;
 	StandardMenuFeature_t features;
 	StandardMenuState_t state;
 };

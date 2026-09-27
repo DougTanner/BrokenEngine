@@ -318,7 +318,7 @@ void BuildCellNavData(NavData& rNavData, const std::vector<IslandPlacement>& rPl
 	// coordinate enters it. Topology offsets are rebased per island.
 	for (const IslandPlacement& rPlacement : rPlacements)
 	{
-		const auto islandIt = gpIslandTerrain->mIslands.find(rPlacement.islandCrc);
+		auto islandIt = gpIslandTerrain->mIslands.find(rPlacement.islandCrc);
 		if (islandIt == gpIslandTerrain->mIslands.end())
 		{
 			// ReadGridSave rejects a save or replay placement CRC with no loaded template and generation only

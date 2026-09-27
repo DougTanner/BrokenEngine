@@ -8,12 +8,12 @@ namespace engine
 // Zone grid dimensions and pre-allocation size
 inline constexpr int32_t kiCollisionZonesX = 8;
 inline constexpr int32_t kiCollisionZonesY = 8;
-inline constexpr int64_t kiCollisionZonePreallocate = 2048;
+inline constexpr int64_t kiCollisionZonePreallocate = 2'048;
 inline constexpr int64_t kiCollisionLayerPreallocate = 16;
 inline constexpr int64_t kiCollisionLayerPairPreallocate = 16;
 inline constexpr int64_t kiCollisionCandidatePreallocate = 512;
-inline constexpr int64_t kiCollisionResultPreallocate = 1024;
-inline constexpr int64_t kiCollisionResultSpanPreallocate = 1024;
+inline constexpr int64_t kiCollisionResultPreallocate = 1'024;
+inline constexpr int64_t kiCollisionResultSpanPreallocate = 1'024;
 
 // Collision Flags - Behavior modifiers
 enum class CollisionFlags : uint8_t
@@ -102,23 +102,23 @@ private:
 	static void AllocateResultStorage();
 
 	// thread_local: each Dispatch worker and reconcile thread gets its own copy
-	static thread_local float sfAreaMinX;
-	static thread_local float sfAreaMinY;
-	static thread_local float sfZoneWidth;
-	static thread_local float sfZoneHeight;
+	static inline thread_local float sfAreaMinX = 0.0f;
+	static inline thread_local float sfAreaMinY = 0.0f;
+	static inline thread_local float sfZoneWidth = 0.0f;
+	static inline thread_local float sfZoneHeight = 0.0f;
 
 	static thread_local std::vector<CollisionLayer> sLayers;
-	static thread_local int64_t siLayerCount;
+	static inline thread_local int64_t siLayerCount = 0;
 
 	static thread_local common::StableVector<LayerPairZones> sLayerPairZones;
-	static thread_local int64_t siLayerPairCount;
+	static inline thread_local int64_t siLayerPairCount = 0;
 
 	static thread_local common::StableVector<CollisionResult> sResultEntries;
 	static thread_local common::StableVector<CollisionResultSpan> sResultSpans;
-	static thread_local int64_t siResultSpanCount;
+	static inline thread_local int64_t siResultSpanCount = 0;
 	static thread_local int64_t sLayerBaseOffsets[kiCollisionLayerPreallocate];
 	static thread_local common::StableVector<uint32_t> sTestedBGeneration;
-	static thread_local uint32_t suiTestedBCurrentGeneration;
+	static inline thread_local uint32_t suiTestedBCurrentGeneration = 0;
 };
 
 } // namespace engine

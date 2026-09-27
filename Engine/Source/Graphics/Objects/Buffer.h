@@ -33,7 +33,7 @@ struct BarrierInfo
 {
 	BufferBarrier eSource = BufferBarrier::kNone;
 	BufferBarrier eDestination = BufferBarrier::kNone;
-	VkBuffer vkBuffer = VK_NULL_HANDLE;
+	VkBuffer barrierVkBuffer = VK_NULL_HANDLE;
 };
 
 struct BufferInfo
@@ -96,7 +96,7 @@ struct StagingBuffer
 	StagingBuffer& operator=(const StagingBuffer&) = delete;
 	~StagingBuffer();
 
-	VkBuffer vkBuffer = VK_NULL_HANDLE;
+	VkBuffer stagingVkBuffer = VK_NULL_HANDLE;
 	VmaAllocation vmaAllocation = VK_NULL_HANDLE;
 	VmaAllocationInfo vmaAllocationInfo {};
 };

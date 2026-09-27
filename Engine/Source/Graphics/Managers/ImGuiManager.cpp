@@ -138,17 +138,17 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 		.ImageCount = static_cast<uint32_t>(gpSwapchainManager->mFramebuffers.size()),
 		.PipelineInfoMain
 		{
-			.RenderPass = mImGuiRenderPass,
+			.RenderPass = mImGuiVkRenderPass,
 			.Subpass = 0,
 			.MSAASamples = VK_SAMPLE_COUNT_1_BIT,
 		},
-		.MinAllocationSize = 1024 * 1024,
+		.MinAllocationSize = 1'024 * 1'024,
 	};
 	// ImGui_ImplVulkan_Init unconditionally returns true (failures trip internal IM_ASSERTs), so its result is not worth checking.
 	ImGui_ImplVulkan_Init(&initInfo);
 
 	// Minimized/zero-height: keep the 1.0f default scale rather than collapsing style to 0
-	const float fHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
+	float fHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
 	if (fHeight > 0.0f)
 	{
 		mfUiScale = fHeight / kfUiReferenceHeight;
@@ -309,7 +309,7 @@ ImGuiManager::~ImGuiManager()
 		vkDestroyFramebuffer(gpDeviceManager->mVkDevice, vkFramebuffer, nullptr);
 	}
 
-	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mImGuiRenderPass, nullptr);
+	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mImGuiVkRenderPass, nullptr);
 
 	if (gpImGuiManager == this)
 	{
@@ -403,8 +403,8 @@ void ImGuiManager::CreateRenderPass()
 		.dependencyCount = 1,
 		.pDependencies = &vkSubpassDependency,
 	};
-	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkRenderPassCreateInfo, nullptr, &mImGuiRenderPass));
-	VkName(VK_OBJECT_TYPE_RENDER_PASS, mImGuiRenderPass, "ImGui");
+	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkRenderPassCreateInfo, nullptr, &mImGuiVkRenderPass));
+	VkName(VK_OBJECT_TYPE_RENDER_PASS, mImGuiVkRenderPass, "ImGui");
 }
 
 void ImGuiManager::CreateFramebuffers()
@@ -418,7 +418,7 @@ void ImGuiManager::CreateFramebuffers()
 			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			.pNext = nullptr,
 			.flags = 0,
-			.renderPass = mImGuiRenderPass,
+			.renderPass = mImGuiVkRenderPass,
 			.attachmentCount = 1,
 			.pAttachments = &vkImageView,
 			.width = gpGraphics->mFramebufferExtent2D.width,
@@ -433,7 +433,8 @@ void ImGuiManager::CreateFramebuffers()
 void ImGuiManager::Prepare(int64_t iFramebuffer)
 {
 	// Changed() advances the single-consumer change tracking; apply re-reads via GetUiTheme() for the trust-boundary clamp
-	if (std::get<2>(gUiTheme.Changed<UiTheme>()))
+	auto [eUiTheme, ePreviousUiTheme, bUiThemeChanged] = gUiTheme.Changed<UiTheme>();
+	if (bUiThemeChanged)
 	{
 		ApplyThemeColors(GetUiTheme());
 	}
@@ -455,9 +456,9 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	// recreates ImGuiManager on a fresh ImGui context (an extent change escalates the kSwapchain destroy tier, which
 	// rebuilds this manager), so this per-frame guard is defense-in-depth for any future path that changes the
 	// extent without recreation.
-	const float fPreviousUiScale = mfUiScale;
+	float fPreviousUiScale = mfUiScale;
 	// Minimized/zero-height: keep previous scale rather than collapsing style to 0
-	const float fHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
+	float fHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
 	if (fHeight > 0.0f)
 	{
 		mfUiScale = fHeight / kfUiReferenceHeight;
@@ -549,7 +550,7 @@ void ImGuiManager::UpdateTextArea(TextAreas eTextArea, std::string_view characte
 
 void ImGuiManager::RenderTextAreas()
 {
-	const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+	ImVec2 displaySize = ImGui::GetIO().DisplaySize;
 	ImDrawList* pDrawList = ImGui::GetBackgroundDrawList();
 	ImFont* pFont = ImGui::GetFont();
 
@@ -561,9 +562,9 @@ void ImGuiManager::RenderTextAreas()
 		}
 
 		const char* pcTextEnd = rTextArea.pcText + rTextArea.iCharacterCount;
-		const ImVec2 pos(rTextArea.fX * displaySize.x, rTextArea.fY * displaySize.y);
-		const float fFontSize = 0.25f * rTextArea.fSize * displaySize.y;
-		const ImVec2 shadowPos(pos.x + 0.00075f * displaySize.x, pos.y + 0.00175f * displaySize.y);
+		ImVec2 pos(rTextArea.fX * displaySize.x, rTextArea.fY * displaySize.y);
+		float fFontSize = 0.25f * rTextArea.fSize * displaySize.y;
+		ImVec2 shadowPos(pos.x + 0.00075f * displaySize.x, pos.y + 0.00175f * displaySize.y);
 
 		// Heap: ImGui may grow internal draw-list vertex/index buffers for first-use or worst-case profile text.
 		ScopedSuppressAllocationTracking suppress;
@@ -627,7 +628,7 @@ void ImGuiManager::Submit(int64_t iFramebuffer)
 	{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.pNext = nullptr,
-		.renderPass = mImGuiRenderPass,
+		.renderPass = mImGuiVkRenderPass,
 		.framebuffer = mImGuiFramebuffers.at(iFramebuffer),
 		.renderArea = VkRect2D
 		{

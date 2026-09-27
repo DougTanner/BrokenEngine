@@ -23,7 +23,7 @@ std::filesystem::path PathFromParam(const nlohmann::json& rValue)
 	return std::filesystem::path(reinterpret_cast<const char8_t*>(utf8.c_str()));
 }
 
-int32_t FrameCountParameter(const nlohmann::json& rParameters, const char* pcCommand, const char* pcParameter, int32_t iDefault, int64_t iMax)
+int32_t FrameCountParameter(const nlohmann::json& rParameters, std::string_view command, const char* pcParameter, int32_t iDefault, int64_t iMax)
 {
 	if (!rParameters.contains(pcParameter))
 	{
@@ -31,7 +31,7 @@ int32_t FrameCountParameter(const nlohmann::json& rParameters, const char* pcCom
 	}
 
 	const nlohmann::json& rFrames = rParameters.at(pcParameter);
-	const std::string integerError = std::string(pcCommand) + " '" + pcParameter + "' must be an integer";
+	std::string integerError = std::string(command) + " '" + pcParameter + "' must be an integer";
 	if (!rFrames.is_number_integer())
 	{
 		throw std::runtime_error(integerError);
@@ -109,8 +109,8 @@ struct RenderDocCaptureState
 	int64_t iFrames = 1;
 };
 
-template <typename QueueCaptureT>
-void BeginCaptureAndDefer(QueueCaptureT queueCapture)
+template <typename QUEUE_CAPTURE>
+void BeginCaptureAndDefer(QUEUE_CAPTURE queueCapture)
 {
 	HWND hwnd = engine::gpGraphics->mHwnd;
 	bool bRestoreMinimized = IsIconic(hwnd) != FALSE;
@@ -396,7 +396,7 @@ void CommandResize(const nlohmann::json& rParams, nlohmann::json& rResult)
 
 	int64_t iWidth = rParams.at("width").get<int64_t>();
 	int64_t iHeight = rParams.at("height").get<int64_t>();
-	if (iWidth < 320 || iWidth > 16384 || iHeight < 180 || iHeight > 16384)
+	if (iWidth < 320 || iWidth > 16'384 || iHeight < 180 || iHeight > 16'384)
 	{
 		throw std::runtime_error("resize 'width'/'height' out of bounds [320x180, 16384x16384]");
 	}
@@ -746,7 +746,7 @@ std::string CandidateLabels(const char* pcWindow)
 			candidates += ", ";
 		}
 		candidates += rItem.pcLabel;
-		if (candidates.size() > 1024) // bound the error message
+		if (candidates.size() > 1'024) // bound the error message
 		{
 			candidates += ", ...";
 			break;
@@ -814,12 +814,12 @@ int32_t ParseKeyVk(const std::string& rName)
 }
 
 // Fill a bounded char buffer from a string param (.get<std::string>() throws on non-string).
-void CopyStringParam(char* pcDst, int64_t iDstSize, const std::string& rSource)
+void CopyStringParam(char* pcDst, int64_t iDstSize, std::string_view source)
 {
 	int64_t i = 0;
-	for (; i < iDstSize - 1 && i < static_cast<int64_t>(rSource.size()); ++i)
+	for (; i < iDstSize - 1 && i < static_cast<int64_t>(source.size()); ++i)
 	{
-		pcDst[i] = rSource[i];
+		pcDst[i] = source[i];
 	}
 	pcDst[i] = '\0';
 }
@@ -946,7 +946,7 @@ void CommandGetWrapper(const nlohmann::json& rParams, nlohmann::json& rResult)
 		throw std::runtime_error("get_wrapper requires string 'key'");
 	}
 
-	const std::string key = rParams.at("key").get<std::string>();
+	std::string key = rParams.at("key").get<std::string>();
 	const std::unordered_map<std::string_view, Wrapper*>& rSliderMap = TweaksSliderMap::Get();
 	auto it = rSliderMap.find(key);
 	if (it == rSliderMap.end())
@@ -1070,17 +1070,17 @@ void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 		if (button == "left")
 		{
 			script.iImGuiMouseButton = 0;
-			script.uiOverlayMouseButtonBit = engine::kMouseButtonLeft;
+			script.uiOverlayMouseButtonBit = std::to_underlying(engine::MouseButtons::kMouseButtonLeft);
 		}
 		else if (button == "right")
 		{
 			script.iImGuiMouseButton = 1;
-			script.uiOverlayMouseButtonBit = engine::kMouseButtonRight;
+			script.uiOverlayMouseButtonBit = std::to_underlying(engine::MouseButtons::kMouseButtonRight);
 		}
 		else if (button == "middle")
 		{
 			script.iImGuiMouseButton = 2;
-			script.uiOverlayMouseButtonBit = engine::kMouseButtonMiddle;
+			script.uiOverlayMouseButtonBit = std::to_underlying(engine::MouseButtons::kMouseButtonMiddle);
 		}
 		else
 		{

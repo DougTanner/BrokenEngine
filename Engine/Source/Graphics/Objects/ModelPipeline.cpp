@@ -13,7 +13,7 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 
 	// Grow by the model descriptor plus its five appended slots before the scan, so the slots the loop
 	// writes in place exist. Grown entries default to kEmpty, so the scan still stops at the first of them.
-	const int64_t iDescriptorInfoCount = static_cast<int64_t>(pipelineInfo.pDescriptorInfos.size()) + kiModelAdditionalDescriptors + 1;
+	int64_t iDescriptorInfoCount = static_cast<int64_t>(pipelineInfo.pDescriptorInfos.size()) + kiModelAdditionalDescriptors + 1;
 	pipelineInfo.pDescriptorInfos.resize(iDescriptorInfoCount);
 
 	// Add Model flag to the first empty descriptor slot
@@ -77,8 +77,8 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 	mpiFirstIndices.resize(miMaterialCount);
 	mpbTransparentMaterials.resize(miMaterialCount);
 
-	const int64_t iIndexStartsOffset = common::SceneHeader::IndexStartsOffset(rSceneHeader.uiTextureCount);
-	const int64_t iMaterialDataOffset = common::SceneHeader::MaterialDataOffset(rSceneHeader.uiTextureCount, rSceneHeader.uiMaterialCount);
+	int64_t iIndexStartsOffset = common::SceneHeader::IndexStartsOffset(rSceneHeader.uiTextureCount);
+	int64_t iMaterialDataOffset = common::SceneHeader::MaterialDataOffset(rSceneHeader.uiTextureCount, rSceneHeader.uiMaterialCount);
 
 	// Trust boundary (chunk bytes): the index-start and material arrays are aliased over the scene chunk and walked
 	// by the per-material loop below. A <=-max-but-oversized count would walk them off the chunk, so reject before
@@ -128,13 +128,13 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 		}
 
 		// All pipelines use global Set 0
-		pipelineInfo.vkExternalDescriptorSetLayout = gpTextureManager->mTextureDescriptors.mGlobalDescriptorSetLayout;
+		pipelineInfo.externalVkDescriptorSetLayout = gpTextureManager->mTextureDescriptors.mGlobalVkDescriptorSetLayout;
 
 		// Multi-set: Pipeline 0 owns Set 1; inner Pipelines 1..N share its layout
-		pipelineInfo.vkExternalDescriptorSetLayoutSet1 = VK_NULL_HANDLE;
+		pipelineInfo.externalSet1VkDescriptorSetLayout = VK_NULL_HANDLE;
 		if (bMultiSet && i > 0)
 		{
-			pipelineInfo.vkExternalDescriptorSetLayoutSet1 = mpPipelines.at(0).mVkDescriptorSetLayout;
+			pipelineInfo.externalSet1VkDescriptorSetLayout = mpPipelines.at(0).mVkDescriptorSetLayout;
 		}
 
 		mpPipelines.at(i).Create(pipelineInfo);

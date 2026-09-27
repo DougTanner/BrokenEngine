@@ -56,7 +56,7 @@ static void LogTransferSummary(const CoordWork& rWork, int64_t iTick, int64_t iT
 		size_t iPos = 0;
 		for (int64_t i = 0; i < iTransferPlayerIdCount; ++i)
 		{
-			constexpr size_t kiReserve = 24;
+			static constexpr size_t kiReserve = 24;
 			if (iPos + kiReserve > sizeof(acPlayerIds))
 			{
 				break;
@@ -111,7 +111,8 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 
 	pNext->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated);
 
-	engine::ActiveFrameRef ref {
+	engine::ActiveFrameRef ref
+	{
 		.pNext = pNext,
 		.pCurrent = pCurrent,
 		.pFrameInput = &rFrameInput,

@@ -100,7 +100,7 @@ void AppendMemoryStats(common::Workbuffer& rWorkbuffer, bool bEager)
 			rWorkbuffer.Append("  ");
 			rWorkbuffer.Append(data::kpcDataTypeNames[i]);
 			rWorkbuffer.Append(": ");
-			rWorkbuffer.AppendFloat(static_cast<float>(stats.iBytes) / (1024.0f * 1024.0f), 1);
+			rWorkbuffer.AppendFloat(static_cast<float>(stats.iBytes) / (1'024.0f * 1'024.0f), 1);
 			rWorkbuffer.Append(" MB (");
 			rWorkbuffer.Append(stats.iCount);
 			rWorkbuffer.Append(")\n");
@@ -224,11 +224,11 @@ void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
 	vmaCalculateStatistics(gpDeviceManager->mpAllocator, &stats);
 
 	rWorkbuffer.Append("Allocated: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.blockBytes) / (1024.0f * 1024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.blockBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB\nUsed: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.allocationBytes) / (1024.0f * 1024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.allocationBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB\nUnused: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.blockBytes - stats.total.statistics.allocationBytes) / (1024.0f * 1024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.blockBytes - stats.total.statistics.allocationBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB\nAllocations: ");
 	rWorkbuffer.Append(static_cast<int64_t>(stats.total.statistics.allocationCount));
 	rWorkbuffer.Append("  Blocks: ");
@@ -250,9 +250,9 @@ void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
 			rWorkbuffer.Append(bDeviceLocal ? " (Device Local)\n" : " (Host)\n");
 
 			rWorkbuffer.Append("  Budget: ");
-			rWorkbuffer.AppendFloat(static_cast<float>(budgets[i].budget) / (1024.0f * 1024.0f), 1);
+			rWorkbuffer.AppendFloat(static_cast<float>(budgets[i].budget) / (1'024.0f * 1'024.0f), 1);
 			rWorkbuffer.Append(" MB  Usage: ");
-			rWorkbuffer.AppendFloat(static_cast<float>(budgets[i].usage) / (1024.0f * 1024.0f), 1);
+			rWorkbuffer.AppendFloat(static_cast<float>(budgets[i].usage) / (1'024.0f * 1'024.0f), 1);
 			rWorkbuffer.Append(" MB");
 
 			if (budgets[i].budget > 0)
@@ -336,19 +336,19 @@ void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	FormatCellReadout(rWorkbuffer);
 	rWorkbuffer.Append("Data Memory\n");
 	rWorkbuffer.Append("Eager: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(eagerStats.iBytes) / (1024.0f * 1024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(eagerStats.iBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB (");
 	rWorkbuffer.Append(eagerStats.iCount);
 	rWorkbuffer.Append(")\n");
 	AppendMemoryStats(rWorkbuffer, true);
 	rWorkbuffer.Append("Lazy: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(lazyStats.iBytes) / (1024.0f * 1024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(lazyStats.iBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB (");
 	rWorkbuffer.Append(lazyStats.iCount);
 	rWorkbuffer.Append(")\n");
 	AppendMemoryStats(rWorkbuffer, false);
 	rWorkbuffer.Append("Total: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(iTotalBytes) / (1024.0f * 1024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(iTotalBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB (");
 	rWorkbuffer.Append(iTotalCount);
 	rWorkbuffer.Append(")");

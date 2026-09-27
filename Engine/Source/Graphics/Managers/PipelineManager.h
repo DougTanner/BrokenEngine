@@ -60,7 +60,7 @@ enum Pipelines
 
 	kPipelineHdrResolve,
 
-	kPipelineCount
+	kPipelineCount,
 };
 
 class PipelineManager

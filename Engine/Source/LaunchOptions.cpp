@@ -37,7 +37,7 @@ bool ParseLaunchOptions()
 				int64_t iPort = static_cast<int64_t>(std::wcstoll(pArgumentValues[++i], nullptr, 10));
 				// Reject out-of-range ports: htons truncates to uint16_t, so the listener would bind a port the
 				// agent was never told about (65636 -> 100, -1 -> 65535). Fail fast — do not run with a mangled port.
-				if (iPort < 1 || iPort > 65535)
+				if (iPort < 1 || iPort > 65'535)
 				{
 					LOG(kDefault, kError, "Launch option --agent-port out of range [1, 65535]: {}", iPort);
 					gLaunchOptions.iAgentPort = 0;
@@ -147,7 +147,7 @@ bool ParseLaunchOptions()
 				// Parse "WxH" (case-insensitive separator). Reject malformed or out-of-range dimensions — a zero
 				// extent would size a degenerate window / swapchain, and an oversized value wraps negative at Main's
 				// LONG window cast or truncates at the uint32 extent cast below. Bound to [1, kiMaxDimension].
-				constexpr int64_t kiMaxDimension = 16384;
+				static constexpr int64_t kiMaxDimension = 16'384;
 				const wchar_t* pcValue = pArgumentValues[++i];
 				wchar_t* pcEnd = nullptr;
 				int64_t iWidth = static_cast<int64_t>(std::wcstoll(pcValue, &pcEnd, 10));

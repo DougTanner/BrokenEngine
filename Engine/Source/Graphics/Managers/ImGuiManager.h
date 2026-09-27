@@ -29,12 +29,12 @@ enum TextAreas
 	kTextProfileGpuTimers,
 	kTextProfileCpuCounters,
 	kTextProfileMemory,
-	kTextAreasCount
+	kTextAreasCount,
 };
 
 struct TextArea
 {
-	static constexpr int64_t kiMaxChars = 4096;
+	static constexpr int64_t kiMaxChars = 4'096;
 
 	float fX = 0.0f;
 	float fY = 0.0f;
@@ -73,7 +73,7 @@ private:
 	void ApplyThemeColors(UiTheme eTheme);
 	void RenderTextAreas();
 
-	VkRenderPass mImGuiRenderPass = VK_NULL_HANDLE;
+	VkRenderPass mImGuiVkRenderPass = VK_NULL_HANDLE;
 	std::vector<VkFramebuffer> mImGuiFramebuffers;
 	ImDrawData* mpDrawData = nullptr;
 	std::unique_ptr<MainMenuScreen> mpMainMenuScreen;
@@ -106,7 +106,7 @@ private:
 
 inline ImGuiManager* gpImGuiManager = nullptr;
 
-inline constexpr float kfUiReferenceHeight = 2160.0f;
+inline constexpr float kfUiReferenceHeight = 2'160.0f;
 
 // Resolution scale relative to the 2160-high reference monitor; multiply raw pixel constants by this
 inline float UiScale()

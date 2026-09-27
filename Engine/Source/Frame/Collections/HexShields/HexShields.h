@@ -18,7 +18,7 @@ struct HexShieldsType
 };
 
 struct HexShieldsInterpolate : public Collection<HexShieldsInterpolate, CollectionFlags::kIdToIndex>,
-                               public TypeRegistry<HexShieldsType>
+	public TypeRegistry<HexShieldsType>
 {
 	static constexpr const char* kName = "HexShields";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("HexShields");
@@ -38,9 +38,9 @@ struct HexShieldsInterpolate : public Collection<HexShieldsInterpolate, Collecti
 		XMFLOAT4 pf4Directions[shaders::kiHexShieldDirections];
 		float pfVertIntensities[shaders::kiHexShieldDirections];
 		float pfFragIntensities[shaders::kiHexShieldDirections];
-		float fLightingIntensity;
-		float fSize;
-		float fColorMix;
+		float fLightingIntensity = 0.0f;
+		float fSize = 0.0f;
+		float fColorMix = 0.0f;
 	};
 
 	// Sync

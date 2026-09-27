@@ -12,9 +12,9 @@ namespace engine
 // export tiles a ~400 m master into 1x1 (400x400 Huge), 2x1/3x1 strips (Large), mid tiles (Medium), and
 // 4x4 (100x100 Small). Area separates them where the larger dimension cannot — a 2x1 strip (200x400) and
 // the 1x1 master (400x400) share the same long edge.
-inline constexpr float kfHugeIslandAreaMeters = 120000.0f;   // 1x1     = 400x400 = 160k
-inline constexpr float kfLargeIslandAreaMeters = 48000.0f;   // 2x1/3x1 strips    = 53k-80k
-inline constexpr float kfMediumIslandAreaMeters = 16000.0f;  // mid tiles; 4x4 (10k) falls below -> Small
+inline constexpr float kfHugeIslandAreaMeters = 120'000.0f;   // 1x1     = 400x400 = 160k
+inline constexpr float kfLargeIslandAreaMeters = 48'000.0f;   // 2x1/3x1 strips    = 53k-80k
+inline constexpr float kfMediumIslandAreaMeters = 16'000.0f;  // mid tiles; 4x4 (10k) falls below -> Small
 
 IslandTerrain::IslandTerrain()
 {
@@ -327,8 +327,8 @@ bool SamplePlacementHeightmap(float fDx, float fDy, float fCos, float fSin, floa
 	return true;
 }
 
-template <typename ElevationCallable>
-XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ElevationCallable&& rElevation)
+template <typename ELEVATION_CALLABLE>
+XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ELEVATION_CALLABLE&& rElevation)
 {
 	auto vecTopLeft = XMVectorAdd(vecPosition, XMVectorSet(-fDistance, fDistance, 0.0f, 0.0f));
 	vecTopLeft = XMVectorSetZ(vecTopLeft, rElevation(vecTopLeft));

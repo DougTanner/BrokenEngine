@@ -104,12 +104,12 @@ struct PipelineInfo
 	Shader* ppShaders[2] {};
 	Buffer* pVertexBuffer = nullptr;
 	// External Set 0 layout (global descriptor set from TextureManager, not owned)
-	VkDescriptorSetLayout vkExternalDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout externalVkDescriptorSetLayout = VK_NULL_HANDLE;
 	// Multi-set: external Set 1 layout provided by first ModelPipeline material (not owned)
-	VkDescriptorSetLayout vkExternalDescriptorSetLayoutSet1 = VK_NULL_HANDLE;
+	VkDescriptorSetLayout externalSet1VkDescriptorSetLayout = VK_NULL_HANDLE;
 
 	// Render target
-	VkRenderPass vkRenderPass = VK_NULL_HANDLE;
+	VkRenderPass targetVkRenderPass = VK_NULL_HANDLE;
 	VkExtent3D vkExtent3D {};
 	int32_t iColorAttachmentCount = 1;
 
@@ -171,12 +171,12 @@ public:
 	VkPipeline mVkPipeline = VK_NULL_HANDLE;
 
 	// Multi-set: Set 2 layout and descriptor sets (per-material bindings)
-	VkDescriptorSetLayout mVkDescriptorSetLayoutSet2 = VK_NULL_HANDLE;
+	VkDescriptorSetLayout mSet2VkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> mVkDescriptorSetsSet2;
 	// External Set 0 layout (global descriptor set from TextureManager, not owned)
-	VkDescriptorSetLayout mVkExternalDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout mExternalVkDescriptorSetLayout = VK_NULL_HANDLE;
 	// Multi-set: external Set 1 layout provided by first ModelPipeline material (not owned)
-	VkDescriptorSetLayout mVkExternalDescriptorSetLayoutSet1 = VK_NULL_HANDLE;
+	VkDescriptorSetLayout mExternalSet1VkDescriptorSetLayout = VK_NULL_HANDLE;
 
 	// Host-visible indirect buffer (used by GPU for vkCmdDrawIndexedIndirect)
 	VkBuffer mIndirectVkBuffer = VK_NULL_HANDLE;

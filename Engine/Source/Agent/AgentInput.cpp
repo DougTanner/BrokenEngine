@@ -487,25 +487,25 @@ void AgentInput::Overlay(RawInput& rRawInput)
 	}
 
 	// OR synthetic mouse buttons.
-	if (muiSyntheticMouseButtons & kMouseButtonLeft)
+	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonLeft))
 	{
-		rRawInput.mouseButtons.Set(kMouseButtonLeft, true);
+		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonLeft, true);
 	}
-	if (muiSyntheticMouseButtons & kMouseButtonMiddle)
+	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonMiddle))
 	{
-		rRawInput.mouseButtons.Set(kMouseButtonMiddle, true);
+		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonMiddle, true);
 	}
-	if (muiSyntheticMouseButtons & kMouseButtonRight)
+	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonRight))
 	{
-		rRawInput.mouseButtons.Set(kMouseButtonRight, true);
+		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonRight, true);
 	}
-	if (muiSyntheticMouseButtons & kMouseButtonExtraOne)
+	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonExtraOne))
 	{
-		rRawInput.mouseButtons.Set(kMouseButtonExtraOne, true);
+		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonExtraOne, true);
 	}
-	if (muiSyntheticMouseButtons & kMouseButtonExtraTwo)
+	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonExtraTwo))
 	{
-		rRawInput.mouseButtons.Set(kMouseButtonExtraTwo, true);
+		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonExtraTwo, true);
 	}
 
 	// Overwrite mouse position with the synthetic pixel pos (normalized as the hardware path does).

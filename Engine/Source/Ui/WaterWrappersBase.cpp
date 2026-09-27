@@ -52,9 +52,9 @@ Wrapper gLightingWaterSkyboxNormalSoftenNoon(0.5f, 0.0f, 1.0f);
 Wrapper gLightingWaterSkyboxNormalBlendWave(0.1f, 0.0f, 0.4f);
 Wrapper gLightingWaterSkyboxIntensity(0.0003f, 0.0001f, 0.002f);
 Wrapper gLightingWaterSkyboxAdd(1.5f, 0.0f, 4.0f);
-Wrapper gLightingWaterSkyboxOne(2000.0f, 0.0f, 10000.0f);
+Wrapper gLightingWaterSkyboxOne(2'000.0f, 0.0f, 10'000.0f);
 Wrapper gLightingWaterSkyboxOnePower(200.0f, 50.0f, 400.0f);
-Wrapper gLightingWaterSkyboxTwo(3000.0f, 0.0f, 5000.0f);
+Wrapper gLightingWaterSkyboxTwo(3'000.0f, 0.0f, 5'000.0f);
 Wrapper gLightingWaterSkyboxTwoPower(30.0f, 1.0f, 100.0f);
 Wrapper gLightingWaterSkyboxThree(360.0f, 1.0f, 800.0f);
 Wrapper gLightingWaterSkyboxThreePower(2.0f, 0.001f, 4.0f);
@@ -89,8 +89,8 @@ Wrapper gWaterLowWavelengthAdjust(-0.75f, -2.0f, 0.0f);
 Wrapper gWaterLowAmplitudeAdjust(1.0f, 0.0f, 4.0f);
 Wrapper gWaterLowSpeedAdjust(0.288f, 0.0f, 4.0f);
 // Camera-height fade for low-frequency wave amplitudes: 1.0 at or below Start, 0.0 at or above End, and linear between.
-Wrapper gWaterLowAmplitudeFadeStart(300.0f, 0.0f, 1000.0f);
-Wrapper gWaterLowAmplitudeFadeEnd(600.0f, 0.0f, 1000.0f);
+Wrapper gWaterLowAmplitudeFadeStart(300.0f, 0.0f, 1'000.0f);
+Wrapper gWaterLowAmplitudeFadeEnd(600.0f, 0.0f, 1'000.0f);
 
 // Medium frequency waves
 Wrapper gWaterMediumCount(int64_t {255}, std::vector<int64_t> {15, 31, 63, 127, 255});
@@ -103,8 +103,8 @@ Wrapper gWaterMediumWavelengthAdjust(0.8f, 0.0f, 1.0f);
 Wrapper gWaterMediumAmplitudeAdjust(0.9f, 0.0f, 5.0f);
 Wrapper gWaterMediumSpeedAdjust(2.0f, 0.0f, 5.0f);
 // Camera-height fade for medium-frequency wave amplitudes (independent of low). Same start/end convention as low.
-Wrapper gWaterMediumAmplitudeFadeStart(300.0f, 0.0f, 1000.0f);
-Wrapper gWaterMediumAmplitudeFadeEnd(600.0f, 0.0f, 1000.0f);
+Wrapper gWaterMediumAmplitudeFadeStart(300.0f, 0.0f, 1'000.0f);
+Wrapper gWaterMediumAmplitudeFadeEnd(600.0f, 0.0f, 1'000.0f);
 
 // Depth
 Wrapper gWaterTerrainHeight(3.5f, 1.0f, 8.0f);

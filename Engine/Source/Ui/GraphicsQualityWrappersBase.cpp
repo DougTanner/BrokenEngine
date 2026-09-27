@@ -27,11 +27,11 @@ constexpr float kfObjectShadowsRenderMultipliers[kuiLevelCount] {0.5f, 1.0f, 2.0
 
 struct LightingLevelValues
 {
-	float fDepositTextureMultiplier;
-	float fSpreadTextureMultiplierStart;
-	float fSpreadTextureMultiplierEnd;
-	float fSpreadPassCount;
-	float fBlurSampleCount;
+	float fDepositTextureMultiplier = 0.0f;
+	float fSpreadTextureMultiplierStart = 0.0f;
+	float fSpreadTextureMultiplierEnd = 0.0f;
+	float fSpreadPassCount = 0.0f;
+	float fBlurSampleCount = 0.0f;
 };
 
 constexpr LightingLevelValues kLightingLevels[kuiLevelCount]

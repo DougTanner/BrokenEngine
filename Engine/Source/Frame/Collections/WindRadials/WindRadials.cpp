@@ -21,7 +21,7 @@ void WindRadialsPostRender::AllocateAndCopy(WindRadialsPostRender& rCurrent, con
 void WindRadialsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
 	DestroyExpiredControlled(rFrame.interpolate.windRadials, rFrame.postRender.windRadials, rFrame.interpolate.fCurrentTime,
-		[](auto& rI, auto& rPR, int64_t& i)
+		[](WindRadialsInterpolate& rI, WindRadialsPostRender& rPR, int64_t& i)
 		{
 			DestroyElement(rI, rPR, i, rI.Members(), rPR.Members());
 			--i;

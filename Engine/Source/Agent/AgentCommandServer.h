@@ -42,7 +42,7 @@ public:
 
 	// Deferred-poll liveness bound (~30 s at 60 fps): a capture lost to a device-loss Graphics recreation (mailboxes
 	// wiped) never resolves, so cap the wait and publish a failure rather than deadlock the channel forever.
-	static constexpr int64_t kiDeferredTimeoutDrains = 1800;
+	static constexpr int64_t kiDeferredTimeoutDrains = 1'800;
 
 	// Drops a deferred command while its captured runtime dependencies are still alive.
 	void ClearDeferredResponse();
@@ -71,10 +71,10 @@ private:
 
 	static bool ReadExact(SOCKET clientSocket, uint8_t* pBuffer, int64_t iBytes, const std::stop_token& rStopToken);
 	static bool SendExact(SOCKET clientSocket, const uint8_t* pBuffer, int64_t iBytes, const std::chrono::steady_clock::time_point& rDeadline);
-	static bool SendFrame(SOCKET clientSocket, const std::string& rPayload);
+	static bool SendFrame(SOCKET clientSocket, std::string_view payload);
 
-	static constexpr uint32_t kuiMaxRequestBytes = 1u * 1024u * 1024u; // 1 MiB — larger request frames are rejected
-	static constexpr int64_t kiMaxResponseBytes = 16ll * 1024ll * 1024ll; // 16 MiB response cap
+	static constexpr uint32_t kuiMaxRequestBytes = 1u * 1'024u * 1'024u; // 1 MiB — larger request frames are rejected
+	static constexpr int64_t kiMaxResponseBytes = 16ll * 1'024ll * 1'024ll; // 16 MiB response cap
 
 	SOCKET mListenSocket = INVALID_SOCKET;
 	SOCKET mActiveSocket = INVALID_SOCKET; // current connection; final close is owned by ListenerLoop after I/O exits

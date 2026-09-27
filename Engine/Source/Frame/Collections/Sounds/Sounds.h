@@ -29,9 +29,9 @@ struct SoundsInterpolate : public Collection<SoundsInterpolate, CollectionFlags:
 		XMVECTOR vecPosition;
 		XMVECTOR vecVelocity;
 		common::crc_t uiCrc;
-		float fVolume;
-		float fPitch;
-		float fFadeOutTime;
+		float fVolume = 0.0f;
+		float fPitch = 0.0f;
+		float fFadeOutTime = 0.0f;
 	};
 
 	// Sync owned sound with parent-provided data

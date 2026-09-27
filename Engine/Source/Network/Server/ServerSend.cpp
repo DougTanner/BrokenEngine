@@ -43,7 +43,8 @@ void Server::SendCoordFullState(int64_t iClientId, int64_t iSlot, int64_t iTick,
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
-	NetworkMessages::ServerCoordFullStateMessage message {
+	NetworkMessages::ServerCoordFullStateMessage message
+	{
 		.uiLoadGeneration = muiLoadGeneration,
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = rSlot.ack.uiEpoch,
@@ -77,7 +78,8 @@ void Server::SendCoordStaticData(int64_t iClientId, int64_t iSlot, GridCoord coo
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
-	NetworkMessages::ServerCoordStaticDataMessage message {
+	NetworkMessages::ServerCoordStaticDataMessage message
+	{
 		.uiLoadGeneration = muiLoadGeneration,
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = pClient->slots.at(iSlot).ack.uiEpoch,
@@ -94,7 +96,8 @@ void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char*
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
-	NetworkMessages::ServerConnectionResponseMessage message {
+	NetworkMessages::ServerConnectionResponseMessage message
+	{
 		.uiLoadGeneration = muiLoadGeneration,
 		.uiAccepted = bAccepted ? 1u : 0u,
 		.uiDebugInput = kbDebugInput ? 1u : 0u,
@@ -112,7 +115,8 @@ void Server::SendSubscribeAccept(ClientConnection& rClient, int64_t iSlot, GridC
 	uint16_t uiEpoch = (iSlot < std::ssize(rClient.slots)) ? rClient.slots.at(iSlot).ack.uiEpoch : 0;
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	NetworkMessages::ServerSubscribeAcceptMessage message {
+	NetworkMessages::ServerSubscribeAcceptMessage message
+	{
 		.uiLoadGeneration = muiLoadGeneration,
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = uiEpoch,
@@ -124,7 +128,8 @@ void Server::SendSubscribeAccept(ClientConnection& rClient, int64_t iSlot, GridC
 
 void Server::WriteBufferedFramePacket(common::Workbuffer& rWorkbuffer, PacketType eType, int64_t iSlot, uint16_t uiEpoch, const PerCoordBufferedFrame& rBuffered, int64_t iTimestampNs)
 {
-	NetworkMessages::CoordUpdateFields fields {
+	NetworkMessages::CoordUpdateFields fields
+	{
 		.uiLoadGeneration = muiLoadGeneration,
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = uiEpoch,
@@ -280,7 +285,7 @@ void Server::SendResends(ClientConnection& rClient, int64_t iTick)
 
 void Server::UpdateResendLogState(ClientConnection& rClient, int64_t iSlot, int64_t iSlotResendCount, GridCoord coord)
 {
-	constexpr int64_t kiResendLogCooldownTicks = 64;
+	static constexpr int64_t kiResendLogCooldownTicks = 64;
 
 	bool bWasResending = rClient.slots.at(iSlot).iPrevResendCount > 0;
 	bool bIsResending = iSlotResendCount > 0;

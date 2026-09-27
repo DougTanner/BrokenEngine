@@ -40,7 +40,7 @@ struct uuid_t
 	}
 
 	constexpr bool operator==(const uuid_t& other) const = default;
-	constexpr auto operator<=>(const uuid_t& other) const = default;
+	constexpr std::strong_ordering operator<=>(const uuid_t& other) const = default;
 
 	void Write(std::ostream& stream) const { common::Write(stream, iValue); }
 	void Read(std::istream& stream) { common::Read(stream, iValue); }
@@ -78,7 +78,7 @@ struct id_t
 	constexpr uuid_t ToUuid() const { return uuid; }
 
 	constexpr bool operator==(const id_t& other) const = default;
-	constexpr auto operator<=>(const id_t& other) const = default;
+	constexpr std::strong_ordering operator<=>(const id_t& other) const = default;
 
 	void Write(std::ostream& stream) const { uuid.Write(stream); }
 	void Read(std::istream& stream) { uuid.Read(stream); }
@@ -113,7 +113,7 @@ template <>
 struct formatter<engine::global_id_t> : formatter<std::string_view>
 {
 	template <typename CONTEXT>
-	auto format(const engine::global_id_t id, CONTEXT& rContext) const
+	typename CONTEXT::iterator format(const engine::global_id_t id, CONTEXT& rContext) const
 	{
 		if (id.iValue == 0)
 		{

@@ -10,9 +10,6 @@
 namespace engine
 {
 
-using enum DescriptorFlags;
-using enum PipelineFlags;
-
 static constexpr float kfDepthBiasConstantFactor = -3.0f;
 static constexpr float kfDepthBiasSlopeFactor = -3.0f;
 static constexpr int64_t kiMaxColorAttachments = 6;
@@ -74,18 +71,18 @@ static void CreateSingleSetPipelineLayout(VkDescriptorSetLayoutCreateInfo& rLayo
 
 	VkDescriptorBindingFlags pBindingFlags[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 	VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo {};
-	ConfigureUpdateAfterBind(rLayoutCreateInfo, pBindings, iDescriptorCount, pBindingFlags, bindingFlagsCreateInfo, rPipeline.mInfo.flags & kUpdateAfterBind);
+	ConfigureUpdateAfterBind(rLayoutCreateInfo, pBindings, iDescriptorCount, pBindingFlags, bindingFlagsCreateInfo, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
 
 	CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &rLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayout));
 	VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayout, rPipeline.mInfo.name.data());
 
 	rPipelineLayoutCreateInfo.pSetLayouts = &rPipeline.mVkDescriptorSetLayout;
-	rPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & kPushConstants ? 1 : 0;
+	rPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? 1 : 0;
 	VkPushConstantRange vkPushConstantRange {};
 	vkPushConstantRange.stageFlags = vkPushConstantStageFlags;
 	vkPushConstantRange.offset = 0;
 	vkPushConstantRange.size = ResolvePushConstantBytes(rPipeline);
-	rPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & kPushConstants ? &vkPushConstantRange : nullptr;
+	rPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? &vkPushConstantRange : nullptr;
 	CHECK_VK(vkCreatePipelineLayout(gpDeviceManager->mVkDevice, &rPipelineLayoutCreateInfo, nullptr, &rPipeline.mVkPipelineLayout));
 	VkName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, rPipeline.mVkPipelineLayout, rPipeline.mInfo.name.data());
 }
@@ -113,12 +110,12 @@ static void* CreateHostVisibleIndirectBuffer(Pipeline& rPipeline, int64_t iSlotC
 
 static void SetupIndirectBuffer(Pipeline& rPipeline, int64_t iCommandBufferCount)
 {
-	if (rPipeline.mInfo.flags & kIndirectHostVisible)
+	if (rPipeline.mInfo.flags & PipelineFlags::kIndirectHostVisible)
 	{
 		rPipeline.miIndirectSlotCount = iCommandBufferCount;
 		rPipeline.mpIndirectMappedMemory = static_cast<VkDrawIndexedIndirectCommand*>(CreateHostVisibleIndirectBuffer(rPipeline, iCommandBufferCount, sizeof(VkDrawIndexedIndirectCommand)));
 	}
-	else if (rPipeline.mInfo.flags & kIndirectDeviceLocal)
+	else if (rPipeline.mInfo.flags & PipelineFlags::kIndirectDeviceLocal)
 	{
 		rPipeline.miIndirectSlotCount = iCommandBufferCount;
 		Buffer::CreateBuffer(rPipeline.mInfo.name, iCommandBufferCount * sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, rPipeline.mIndirectVkBuffer, rPipeline.mIndirectVmaAllocation);
@@ -191,41 +188,41 @@ static void SplitBindingsBySet(const Pipeline& rPipeline, const VkDescriptorSetL
 static void CreateMultiSetPipelineLayout(Pipeline& rPipeline, VkDescriptorSetLayoutCreateInfo& rLayoutCreateInfo, VkPipelineLayoutCreateInfo& rPipelineLayoutCreateInfo, const VkPushConstantRange& rVkPushConstantRange, const VkDescriptorSetLayoutBinding* pVkSet1Bindings, int64_t iSet1Count, const VkDescriptorSetLayoutBinding* pVkSet2Bindings, int64_t iSet2Count)
 {
 	// Create Set 1 layout (unless using external layout from first ModelPipeline material)
-	if (rPipeline.mVkExternalDescriptorSetLayoutSet1 == VK_NULL_HANDLE)
+	if (rPipeline.mExternalSet1VkDescriptorSetLayout == VK_NULL_HANDLE)
 	{
 		rLayoutCreateInfo.bindingCount = static_cast<uint32_t>(iSet1Count);
 		rLayoutCreateInfo.pBindings = pVkSet1Bindings;
 		VkDescriptorBindingFlags pBindingFlagsSet1[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfoSet1 {};
-		ConfigureUpdateAfterBind(rLayoutCreateInfo, pVkSet1Bindings, iSet1Count, pBindingFlagsSet1, bindingFlagsCreateInfoSet1, rPipeline.mInfo.flags & kUpdateAfterBind);
+		ConfigureUpdateAfterBind(rLayoutCreateInfo, pVkSet1Bindings, iSet1Count, pBindingFlagsSet1, bindingFlagsCreateInfoSet1, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
 		CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &rLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayout));
 		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayout, rPipeline.mInfo.name.data());
 	}
 
 	// Create Set 2 layout (kMultiSet models only)
-	if (rPipeline.mInfo.flags & kMultiSet)
+	if (rPipeline.mInfo.flags & PipelineFlags::kMultiSet)
 	{
 		rLayoutCreateInfo.bindingCount = static_cast<uint32_t>(iSet2Count);
 		rLayoutCreateInfo.pBindings = pVkSet2Bindings;
 		VkDescriptorBindingFlags pBindingFlagsSet2[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfoSet2 {};
-		ConfigureUpdateAfterBind(rLayoutCreateInfo, pVkSet2Bindings, iSet2Count, pBindingFlagsSet2, bindingFlagsCreateInfoSet2, rPipeline.mInfo.flags & kUpdateAfterBind);
-		CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &rLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayoutSet2));
-		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayoutSet2, rPipeline.mInfo.name.data());
+		ConfigureUpdateAfterBind(rLayoutCreateInfo, pVkSet2Bindings, iSet2Count, pBindingFlagsSet2, bindingFlagsCreateInfoSet2, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
+		CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &rLayoutCreateInfo, nullptr, &rPipeline.mSet2VkDescriptorSetLayout));
+		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mSet2VkDescriptorSetLayout, rPipeline.mInfo.name.data());
 	}
 
 	// Pipeline layout: [global Set 0, Set 1, optional Set 2]
 	VkDescriptorSetLayout pSetLayouts[3] =
 	{
-		rPipeline.mVkExternalDescriptorSetLayout,
-		rPipeline.mVkExternalDescriptorSetLayoutSet1 != VK_NULL_HANDLE ? rPipeline.mVkExternalDescriptorSetLayoutSet1 : rPipeline.mVkDescriptorSetLayout,
-		rPipeline.mVkDescriptorSetLayoutSet2,
+		rPipeline.mExternalVkDescriptorSetLayout,
+		rPipeline.mExternalSet1VkDescriptorSetLayout != VK_NULL_HANDLE ? rPipeline.mExternalSet1VkDescriptorSetLayout : rPipeline.mVkDescriptorSetLayout,
+		rPipeline.mSet2VkDescriptorSetLayout,
 	};
-	uint32_t uiSetCount = (rPipeline.mInfo.flags & kMultiSet) ? 3 : 2;
+	uint32_t uiSetCount = (rPipeline.mInfo.flags & PipelineFlags::kMultiSet) ? 3 : 2;
 	rPipelineLayoutCreateInfo.setLayoutCount = uiSetCount;
 	rPipelineLayoutCreateInfo.pSetLayouts = pSetLayouts;
-	rPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & kPushConstants ? 1 : 0;
-	rPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & kPushConstants ? &rVkPushConstantRange : nullptr;
+	rPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? 1 : 0;
+	rPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? &rVkPushConstantRange : nullptr;
 	CHECK_VK(vkCreatePipelineLayout(gpDeviceManager->mVkDevice, &rPipelineLayoutCreateInfo, nullptr, &rPipeline.mVkPipelineLayout));
 	VkName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, rPipeline.mVkPipelineLayout, rPipeline.mInfo.name.data());
 }
@@ -240,7 +237,7 @@ static void CreateDescriptorSetLayouts(Pipeline& rPipeline, VkDescriptorSetLayou
 	vkPushConstantRange.offset = 0;
 	vkPushConstantRange.size = ResolvePushConstantBytes(rPipeline);
 
-	if (rPipeline.mVkExternalDescriptorSetLayout != VK_NULL_HANDLE)
+	if (rPipeline.mExternalVkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
 		// Graphics pipeline with global Set 0: split bindings by shader reflection set index
 		VkDescriptorSetLayoutBinding pVkSet1Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
@@ -260,19 +257,19 @@ static void CreateDescriptorSetLayouts(Pipeline& rPipeline, VkDescriptorSetLayou
 // pipeline so they outlive the vkCreateGraphicsPipelines call; the Configure* stages populate it in place.
 struct GraphicsPipelineState
 {
-	VkVertexInputBindingDescription vkVertexInputBindingDescription;
-	VkPipelineVertexInputStateCreateInfo vkPipelineVertexInputStateCreateInfo;
-	VkPipelineInputAssemblyStateCreateInfo vkPipelineInputAssemblyStateCreateInfo;
-	VkViewport vkViewport;
-	VkRect2D scissorVkRect2D;
-	VkPipelineViewportStateCreateInfo vkPipelineViewportStateCreateInfo;
-	VkPipelineRasterizationLineStateCreateInfoEXT vkPipelineRasterizationLineStateCreateInfoEXT;
-	VkPipelineRasterizationStateCreateInfo vkPipelineRasterizationStateCreateInfo;
-	VkPipelineMultisampleStateCreateInfo vkPipelineMultisampleStateCreateInfo;
-	VkPipelineDepthStencilStateCreateInfo vkPipelineDepthStencilStateCreateInfo;
-	VkPipelineColorBlendAttachmentState vkPipelineColorBlendAttachmentState;
-	VkPipelineColorBlendStateCreateInfo vkPipelineColorBlendStateCreateInfo;
-	VkPipelineColorBlendAttachmentState pMrtBlendStates[kiMaxColorAttachments];
+	VkVertexInputBindingDescription vkVertexInputBindingDescription {};
+	VkPipelineVertexInputStateCreateInfo vkPipelineVertexInputStateCreateInfo {};
+	VkPipelineInputAssemblyStateCreateInfo vkPipelineInputAssemblyStateCreateInfo {};
+	VkViewport vkViewport {};
+	VkRect2D scissorVkRect2D {};
+	VkPipelineViewportStateCreateInfo vkPipelineViewportStateCreateInfo {};
+	VkPipelineRasterizationLineStateCreateInfoEXT vkPipelineRasterizationLineStateCreateInfoEXT {};
+	VkPipelineRasterizationStateCreateInfo vkPipelineRasterizationStateCreateInfo {};
+	VkPipelineMultisampleStateCreateInfo vkPipelineMultisampleStateCreateInfo {};
+	VkPipelineDepthStencilStateCreateInfo vkPipelineDepthStencilStateCreateInfo {};
+	VkPipelineColorBlendAttachmentState vkPipelineColorBlendAttachmentState {};
+	VkPipelineColorBlendStateCreateInfo vkPipelineColorBlendStateCreateInfo {};
+	VkPipelineColorBlendAttachmentState pMrtBlendStates[kiMaxColorAttachments] {};
 };
 
 // Builds the vertex-input state: stride + attribute descriptions come from shader reflection (or are
@@ -356,8 +353,8 @@ static void ConfigureViewportScissor(GraphicsPipelineState& rState, const Pipeli
 
 	VkExtent2D vkExtent2D
 	{
-		.width = rPipeline.mInfo.flags & kRenderTarget ? rPipeline.mInfo.vkExtent3D.width : gpGraphics->mFramebufferExtent2D.width,
-		.height = rPipeline.mInfo.flags & kRenderTarget ? rPipeline.mInfo.vkExtent3D.height : gpGraphics->mFramebufferExtent2D.height,
+		.width = rPipeline.mInfo.flags & PipelineFlags::kRenderTarget ? rPipeline.mInfo.vkExtent3D.width : gpGraphics->mFramebufferExtent2D.width,
+		.height = rPipeline.mInfo.flags & PipelineFlags::kRenderTarget ? rPipeline.mInfo.vkExtent3D.height : gpGraphics->mFramebufferExtent2D.height,
 	};
 
 	// Negative viewport height (VK_KHR_maintenance1) flips the Vulkan Y axis to match DirectX convention
@@ -383,8 +380,8 @@ static void ConfigureRasterization(GraphicsPipelineState& rState, const Pipeline
 		.lineStipplePattern = 0,
 	};
 
-	const bool bSmoothLines = (rPipeline.mInfo.flags & PipelineFlags::kLineList) && (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kSmoothLinesEnabled);
-	const bool bWideLines = (rPipeline.mInfo.flags & PipelineFlags::kLineList) && (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kWideLinesEnabled);
+	bool bSmoothLines = (rPipeline.mInfo.flags & PipelineFlags::kLineList) && (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kSmoothLinesEnabled);
+	bool bWideLines = (rPipeline.mInfo.flags & PipelineFlags::kLineList) && (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kWideLinesEnabled);
 
 	rState.vkPipelineRasterizationStateCreateInfo = VkPipelineRasterizationStateCreateInfo
 	{
@@ -406,7 +403,7 @@ static void ConfigureRasterization(GraphicsPipelineState& rState, const Pipeline
 	if constexpr (kbVulkanWireframe)
 	{
 		bool bWireframe = gWireframe.Get<bool>();
-		if (rPipeline.mInfo.flags & kRenderTarget || rPipeline.mInfo.flags & kNoWireframe)
+		if (rPipeline.mInfo.flags & PipelineFlags::kRenderTarget || rPipeline.mInfo.flags & PipelineFlags::kNoWireframe)
 		{
 			bWireframe = false;
 		}
@@ -416,8 +413,8 @@ static void ConfigureRasterization(GraphicsPipelineState& rState, const Pipeline
 	{
 		rState.vkPipelineRasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 	}
-	rState.vkPipelineRasterizationStateCreateInfo.cullMode = rPipeline.mInfo.flags & kCullBack ? VK_CULL_MODE_BACK_BIT : (rPipeline.mInfo.flags & kCullFront ? VK_CULL_MODE_FRONT_BIT : VK_CULL_MODE_NONE);
-	if (rPipeline.mInfo.flags & kDepthBias)
+	rState.vkPipelineRasterizationStateCreateInfo.cullMode = rPipeline.mInfo.flags & PipelineFlags::kCullBack ? VK_CULL_MODE_BACK_BIT : (rPipeline.mInfo.flags & PipelineFlags::kCullFront ? VK_CULL_MODE_FRONT_BIT : VK_CULL_MODE_NONE);
+	if (rPipeline.mInfo.flags & PipelineFlags::kDepthBias)
 	{
 		rState.vkPipelineRasterizationStateCreateInfo.depthBiasEnable = VK_TRUE;
 		rState.vkPipelineRasterizationStateCreateInfo.depthBiasConstantFactor = kfDepthBiasConstantFactor;
@@ -442,8 +439,8 @@ static void ConfigureMultisampling(GraphicsPipelineState& rState, const Pipeline
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.rasterizationSamples = rPipeline.mInfo.flags & kRenderTarget ? VK_SAMPLE_COUNT_1_BIT : (gMultisampling.Get<bool>() ? gSampleCount.Get<VkSampleCountFlagBits>() : VK_SAMPLE_COUNT_1_BIT),
-		.sampleShadingEnable = (rPipeline.mInfo.flags & kSampleShading && gSampleShading.Get<bool>()) ? VK_TRUE : VK_FALSE,
+		.rasterizationSamples = rPipeline.mInfo.flags & PipelineFlags::kRenderTarget ? VK_SAMPLE_COUNT_1_BIT : (gMultisampling.Get<bool>() ? gSampleCount.Get<VkSampleCountFlagBits>() : VK_SAMPLE_COUNT_1_BIT),
+		.sampleShadingEnable = (rPipeline.mInfo.flags & PipelineFlags::kSampleShading && gSampleShading.Get<bool>()) ? VK_TRUE : VK_FALSE,
 		.minSampleShading = gMinSampleShading.Get(),
 		.pSampleMask = nullptr,
 		.alphaToCoverageEnable = VK_FALSE,
@@ -466,7 +463,7 @@ static void ConfigureBlendState(GraphicsPipelineState& rState, const Pipeline& r
 		// .alphaBlendOp
 		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
 	};
-	if (rPipeline.mInfo.flags & kNoColorWrite)
+	if (rPipeline.mInfo.flags & PipelineFlags::kNoColorWrite)
 	{
 		rState.vkPipelineColorBlendAttachmentState.colorWriteMask = 0;
 	}
@@ -483,17 +480,17 @@ static void ConfigureBlendState(GraphicsPipelineState& rState, const Pipeline& r
 		.blendConstants = {0.0f, 0.0f, 0.0f, 0.0f},
 	};
 
-	rState.vkPipelineColorBlendAttachmentState.blendEnable = (rPipeline.mInfo.flags & kAlphaBlend || rPipeline.mInfo.flags & kAdd || rPipeline.mInfo.flags & kAddAlpha || rPipeline.mInfo.flags & kMax) ? VK_TRUE : VK_FALSE;
-	rState.vkPipelineColorBlendAttachmentState.colorBlendOp = rPipeline.mInfo.flags & kMax ? VK_BLEND_OP_MAX : VK_BLEND_OP_ADD;
-	rState.vkPipelineColorBlendAttachmentState.alphaBlendOp = rPipeline.mInfo.flags & kMax ? VK_BLEND_OP_MAX : VK_BLEND_OP_ADD;
-	if (rPipeline.mInfo.flags & kAlphaBlend)
+	rState.vkPipelineColorBlendAttachmentState.blendEnable = (rPipeline.mInfo.flags & PipelineFlags::kAlphaBlend || rPipeline.mInfo.flags & PipelineFlags::kAdd || rPipeline.mInfo.flags & PipelineFlags::kAddAlpha || rPipeline.mInfo.flags & PipelineFlags::kMax) ? VK_TRUE : VK_FALSE;
+	rState.vkPipelineColorBlendAttachmentState.colorBlendOp = rPipeline.mInfo.flags & PipelineFlags::kMax ? VK_BLEND_OP_MAX : VK_BLEND_OP_ADD;
+	rState.vkPipelineColorBlendAttachmentState.alphaBlendOp = rPipeline.mInfo.flags & PipelineFlags::kMax ? VK_BLEND_OP_MAX : VK_BLEND_OP_ADD;
+	if (rPipeline.mInfo.flags & PipelineFlags::kAlphaBlend)
 	{
 		rState.vkPipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		rState.vkPipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 		rState.vkPipelineColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 		rState.vkPipelineColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 	}
-	else if (rPipeline.mInfo.flags & kAddAlpha)
+	else if (rPipeline.mInfo.flags & PipelineFlags::kAddAlpha)
 	{
 		rState.vkPipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		rState.vkPipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -510,7 +507,7 @@ static void ConfigureBlendState(GraphicsPipelineState& rState, const Pipeline& r
 
 	// Configure MRT blend states
 	int32_t iColorAttachmentCount = rPipeline.mInfo.iColorAttachmentCount;
-	if (iColorAttachmentCount == 1 && rPipeline.mInfo.vkRenderPass == gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass)
+	if (iColorAttachmentCount == 1 && rPipeline.mInfo.targetVkRenderPass == gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass)
 	{
 		iColorAttachmentCount = 3;
 	}
@@ -611,8 +608,8 @@ void PipelineCreator::CreateGraphicsPipeline(Pipeline& rPipeline)
 	ConfigureMultisampling(state, rPipeline);
 	ConfigureBlendState(state, rPipeline);
 
-	state.vkPipelineDepthStencilStateCreateInfo.depthTestEnable = rPipeline.mInfo.flags & kDepthTest ? VK_TRUE : VK_FALSE;
-	state.vkPipelineDepthStencilStateCreateInfo.depthWriteEnable = rPipeline.mInfo.flags & kDepthWrite ? VK_TRUE : VK_FALSE;
+	state.vkPipelineDepthStencilStateCreateInfo.depthTestEnable = rPipeline.mInfo.flags & PipelineFlags::kDepthTest ? VK_TRUE : VK_FALSE;
+	state.vkPipelineDepthStencilStateCreateInfo.depthWriteEnable = rPipeline.mInfo.flags & PipelineFlags::kDepthWrite ? VK_TRUE : VK_FALSE;
 
 	VkGraphicsPipelineCreateInfo vkGraphicsPipelineCreateInfo
 	{
@@ -648,8 +645,8 @@ void PipelineCreator::CreateGraphicsPipeline(Pipeline& rPipeline)
 
 	vkGraphicsPipelineCreateInfo.layout = rPipeline.mVkPipelineLayout;
 	// Default (non-kRenderTarget) scene pipelines render into the F16 HDR intermediate; the resolve pass
-	// (itself kRenderTarget with vkRenderPass = mVkRenderPass) writes the swapchain.
-	vkGraphicsPipelineCreateInfo.renderPass = rPipeline.mInfo.flags & kRenderTarget ? rPipeline.mInfo.vkRenderPass : gpSwapchainManager->mHdrVkRenderPass;
+	// (itself kRenderTarget with targetVkRenderPass = mVkRenderPass) writes the swapchain.
+	vkGraphicsPipelineCreateInfo.renderPass = rPipeline.mInfo.flags & PipelineFlags::kRenderTarget ? rPipeline.mInfo.targetVkRenderPass : gpSwapchainManager->mHdrVkRenderPass;
 
 	CHECK_VK(vkCreateGraphicsPipelines(gpDeviceManager->mVkDevice, gpDeviceManager->mVkPipelineCache, 1, &vkGraphicsPipelineCreateInfo, nullptr, &rPipeline.mVkPipeline));
 	VkName(VK_OBJECT_TYPE_PIPELINE, rPipeline.mVkPipeline, rPipeline.mInfo.name.data());
@@ -676,7 +673,7 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		// .pPushConstantRanges
 	};
 
-	if (rPipeline.mInfo.flags & kIndirectHostVisible)
+	if (rPipeline.mInfo.flags & PipelineFlags::kIndirectHostVisible)
 	{
 		// Per-framebuffer host-visible dispatch buffer: the CPU writes the active-region workgroup dims each
 		// frame (WriteIndirectComputeBuffer), and RecordComputeIndirect reads slot iCommandBuffer — so size it
@@ -686,14 +683,14 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		rPipeline.miIndirectSlotCount = iCommandBufferCount;
 		rPipeline.mpIndirectComputeMappedMemory = static_cast<VkDispatchIndirectCommand*>(CreateHostVisibleIndirectBuffer(rPipeline, iCommandBufferCount, sizeof(VkDispatchIndirectCommand)));
 	}
-	else if (rPipeline.mInfo.flags & kIndirectDeviceLocal)
+	else if (rPipeline.mInfo.flags & PipelineFlags::kIndirectDeviceLocal)
 	{
 		// Single-slot dispatch buffer (always read at offset 0); bounds the RecordComputeIndirect index assert
 		rPipeline.miIndirectSlotCount = 1;
 		Buffer::CreateBuffer(rPipeline.mInfo.name, sizeof(VkDispatchIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, rPipeline.mIndirectVkBuffer, rPipeline.mIndirectVmaAllocation);
 	}
 
-	ASSERT(!(rPipeline.mInfo.flags & kMultiSet)); // Set 2 / multi-material is graphics-only
+	ASSERT(!(rPipeline.mInfo.flags & PipelineFlags::kMultiSet)); // Set 2 / multi-material is graphics-only
 
 	Shader* pComputeShader = rPipeline.mInfo.ppShaders[0];
 
@@ -727,20 +724,20 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		}
 	}
 
-	if (rPipeline.mVkExternalDescriptorSetLayout != VK_NULL_HANDLE && iSet1Count > 0)
+	if (rPipeline.mExternalVkDescriptorSetLayout != VK_NULL_HANDLE && iSet1Count > 0)
 	{
 		// Migrated compute pipeline: global Set 0 plus a per-pipeline Set 1.
 		uniformTextureVkDescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(iSet1Count);
 		uniformTextureVkDescriptorSetLayoutCreateInfo.pBindings = pVkSet1Bindings;
 		VkDescriptorBindingFlags pBindingFlagsSet1[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfoSet1 {};
-		ConfigureUpdateAfterBind(uniformTextureVkDescriptorSetLayoutCreateInfo, pVkSet1Bindings, iSet1Count, pBindingFlagsSet1, bindingFlagsCreateInfoSet1, rPipeline.mInfo.flags & kUpdateAfterBind);
+		ConfigureUpdateAfterBind(uniformTextureVkDescriptorSetLayoutCreateInfo, pVkSet1Bindings, iSet1Count, pBindingFlagsSet1, bindingFlagsCreateInfoSet1, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
 		CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &uniformTextureVkDescriptorSetLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayout));
 		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayout, rPipeline.mInfo.name.data());
 
 		VkDescriptorSetLayout pSetLayouts[2] =
 		{
-			rPipeline.mVkExternalDescriptorSetLayout,
+			rPipeline.mExternalVkDescriptorSetLayout,
 			rPipeline.mVkDescriptorSetLayout,
 		};
 		VkPushConstantRange vkPushConstantRange {};
@@ -749,8 +746,8 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		vkPushConstantRange.size = ResolvePushConstantBytes(rPipeline);
 		vkPipelineLayoutCreateInfo.setLayoutCount = 2;
 		vkPipelineLayoutCreateInfo.pSetLayouts = pSetLayouts;
-		vkPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & kPushConstants ? 1 : 0;
-		vkPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & kPushConstants ? &vkPushConstantRange : nullptr;
+		vkPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? 1 : 0;
+		vkPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? &vkPushConstantRange : nullptr;
 		CHECK_VK(vkCreatePipelineLayout(gpDeviceManager->mVkDevice, &vkPipelineLayoutCreateInfo, nullptr, &rPipeline.mVkPipelineLayout));
 		VkName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, rPipeline.mVkPipelineLayout, rPipeline.mInfo.name.data());
 	}
@@ -758,7 +755,7 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 	{
 		// Standalone compute, including when global Set 0 is unavailable: shader set-0 bindings form the per-pipeline set. Clear the
 		// external-layout pointer so binder and writer treat it as standalone.
-		rPipeline.mVkExternalDescriptorSetLayout = VK_NULL_HANDLE;
+		rPipeline.mExternalVkDescriptorSetLayout = VK_NULL_HANDLE;
 		CreateSingleSetPipelineLayout(uniformTextureVkDescriptorSetLayoutCreateInfo, pVkDescriptorSetLayoutBindings, iDescriptorCount, rPipeline, vkPipelineLayoutCreateInfo, VK_SHADER_STAGE_COMPUTE_BIT);
 	}
 

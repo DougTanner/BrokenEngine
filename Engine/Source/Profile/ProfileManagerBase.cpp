@@ -238,7 +238,7 @@ void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 		if (flags & CpuStopFlags::kSmoothNow) [[unlikely]]
 		{
 			rCpuTimer.flags.Set(ProfileRowFlags::kSmoothAtStop);
-			rCpuTimer.smoothedMicroseconds = rCpuTimer.iTotalFrameTimeNs / 1000;
+			rCpuTimer.smoothedMicroseconds = rCpuTimer.iTotalFrameTimeNs / 1'000;
 			rCpuTimer.iTotalFrameTimeNs = 0;
 			rCpuTimer.smoothedAllocations = rCpuTimer.iAllocationsThisFrame;
 			rCpuTimer.iAllocationsThisFrame = 0;
@@ -283,7 +283,7 @@ void ProfileManagerBase::LatchRawCpuTimer(int64_t iCpuTimer, bool bAccept)
 		if (bAccept)
 		{
 			++rRawTimer.record.uiSampleSequence;
-			rRawTimer.record.iSampleUs = rRawTimer.iTotalTimeNs / 1000;
+			rRawTimer.record.iSampleUs = rRawTimer.iTotalTimeNs / 1'000;
 			rRawTimer.record.iInvocationCount = rRawTimer.iInvocationCount;
 			rRawTimer.record.iAuxiliaryCount = iAuxiliaryCount;
 		}
@@ -314,7 +314,7 @@ void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
 			if (bAccept)
 			{
 				++rRawTimer.record.uiSampleSequence;
-				rRawTimer.record.iSampleUs = rRawTimer.iTotalTimeNs / 1000;
+				rRawTimer.record.iSampleUs = rRawTimer.iTotalTimeNs / 1'000;
 				rRawTimer.record.iInvocationCount = rRawTimer.iInvocationCount;
 				rRawTimer.record.iAuxiliaryCount = iAuxiliaryCount;
 			}
@@ -553,7 +553,7 @@ void ProfileManagerBase::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTi
 			CHECK_VK(vkResultGetQueryPoolResults);
 
 			// Convert timestamp units to microseconds using device-specific timestampPeriod
-			int64_t iCurrentMicroseconds = static_cast<int64_t>(static_cast<float>(puiResults[1] - puiResults[0]) * gpInstanceManager->mVkPhysicalDeviceProperties.limits.timestampPeriod / 1000.0f);
+			int64_t iCurrentMicroseconds = static_cast<int64_t>(static_cast<float>(puiResults[1] - puiResults[0]) * gpInstanceManager->mVkPhysicalDeviceProperties.limits.timestampPeriod / 1'000.0f);
 			mGpuTimers[eGpuTimer].smoothedMicroseconds = iCurrentMicroseconds;
 
 			if (bLatchShadowSample && eGpuTimer == kGpuTimerShadow)
@@ -710,7 +710,7 @@ void ProfileManagerBase::SmoothCpuTimers()
 			CpuTimer& rCpuTimer = GetCpuTimer(i);
 			if (!(rCpuTimer.flags & ProfileRowFlags::kSmoothAtStop))
 			{
-				rCpuTimer.smoothedMicroseconds = rCpuTimer.iTotalFrameTimeNs / 1000;
+				rCpuTimer.smoothedMicroseconds = rCpuTimer.iTotalFrameTimeNs / 1'000;
 				rCpuTimer.iTotalFrameTimeNs = 0;
 				rCpuTimer.smoothedAllocations = rCpuTimer.iAllocationsThisFrame;
 				rCpuTimer.iAllocationsThisFrame = 0;

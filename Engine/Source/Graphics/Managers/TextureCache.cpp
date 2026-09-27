@@ -79,7 +79,7 @@ void TextureCache::CopyImageToHostMemory(VkImage srcImage, VkExtent3D extent, Vk
 				},
 			};
 
-			vkCmdCopyImageToBuffer(oneShotCommandBuffer.mVkCommandBuffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer.vkBuffer, 1, &vkBufferImageCopy);
+			vkCmdCopyImageToBuffer(oneShotCommandBuffer.mVkCommandBuffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer.stagingVkBuffer, 1, &vkBufferImageCopy);
 
 			uiOffset += common::SizeInBytes(format, iMipWidth, iMipHeight);
 			iMipWidth = std::max(iMipWidth / 2, 1ll);
@@ -169,7 +169,7 @@ void TextureCache::GeneratePbrLutBrdf()
 		.flags = {PipelineFlags::kRenderTarget},
 		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersModelModelGenBrdfLutvertCrc), &gpPipelineManager->mShaders.at(data::kShadersModelModelGenBrdfLutfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.vkRenderPass = mPbrLutBrdfTexture.mVkRenderPass,
+		.targetVkRenderPass = mPbrLutBrdfTexture.mVkRenderPass,
 		.vkExtent3D = mPbrLutBrdfTexture.mInfo.extent,
 		.pDescriptorInfos =
 		{
@@ -220,7 +220,7 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 	}
 
 	// The on-disk iDataSize is opaque (cache file is a trust boundary); validate it against the size computed from the already-validated dims/format before trusting it. A too-small value would overread in the upload memcpy below; a negative value would blow up the std::vector ctor.
-	const int64_t iExpectedDataSize = common::ComputeImageByteSize(rTexture.mInfo.format, rTexture.mInfo.extent.width, rTexture.mInfo.extent.height, rTexture.mInfo.mipLevels, rTexture.mInfo.arrayLayers, 1);
+	int64_t iExpectedDataSize = common::ComputeImageByteSize(rTexture.mInfo.format, rTexture.mInfo.extent.width, rTexture.mInfo.extent.height, rTexture.mInfo.mipLevels, rTexture.mInfo.arrayLayers, 1);
 	if (header.iDataSize != iExpectedDataSize)
 	{
 		fileStream.close();

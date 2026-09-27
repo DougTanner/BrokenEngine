@@ -77,7 +77,7 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	rMenuInput.f2Gamepad = rRawInput.f2LeftThumbstick;
 
 	// Menus
-	rMenuInput.flags.Set(kPauseMenu, inputPoll.KeyboardPressed(VK_ESCAPE) || inputPoll.MousePressed(kMouseButtonMiddle) || inputPoll.GamepadPressed(kGamepadMenu) || inputPoll.GamepadPressed(kGamepadButtonB));
+	rMenuInput.flags.Set(kPauseMenu, inputPoll.KeyboardPressed(VK_ESCAPE) || inputPoll.MousePressed(MouseButtons::kMouseButtonMiddle) || inputPoll.GamepadPressed(GamepadButtons::kGamepadMenu) || inputPoll.GamepadPressed(GamepadButtons::kGamepadButtonB));
 	if constexpr (kbDebugInput)
 	{
 		rMenuInput.flags.Set(kMenuDebugTexture, inputPoll.KeyboardPressed(VK_F2));
@@ -90,7 +90,7 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	XMFLOAT2 f2Move {};
 	if constexpr (kbFreeCamera)
 	{
-		constexpr float kfFreeCameraAxis = 0.5f;
+		static constexpr float kfFreeCameraAxis = 0.5f;
 		if (rRawInput.pKeyboardKeys['W']) { f2Move.y += kfFreeCameraAxis; }
 		if (rRawInput.pKeyboardKeys['S']) { f2Move.y -= kfFreeCameraAxis; }
 		if (rRawInput.pKeyboardKeys['A']) { f2Move.x -= kfFreeCameraAxis; }
@@ -121,9 +121,9 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 		rIo.BackendFlags |= ImGuiBackendFlags_HasGamepad;
 
 		// Map gamepad buttons to ImGui keys
-		rIo.AddKeyEvent(ImGuiKey_GamepadFaceDown, rRawInput.gamepadButtons & kGamepadButtonA);
-		rIo.AddKeyEvent(ImGuiKey_GamepadFaceRight, rRawInput.gamepadButtons & kGamepadButtonB);
-		rIo.AddKeyEvent(ImGuiKey_GamepadStart, rRawInput.gamepadButtons & kGamepadMenu);
+		rIo.AddKeyEvent(ImGuiKey_GamepadFaceDown, rRawInput.gamepadButtons & GamepadButtons::kGamepadButtonA);
+		rIo.AddKeyEvent(ImGuiKey_GamepadFaceRight, rRawInput.gamepadButtons & GamepadButtons::kGamepadButtonB);
+		rIo.AddKeyEvent(ImGuiKey_GamepadStart, rRawInput.gamepadButtons & GamepadButtons::kGamepadMenu);
 
 		// D-pad stored as analog values in f2Dpad
 		rIo.AddKeyEvent(ImGuiKey_GamepadDpadUp, rRawInput.f2Dpad.y > 0.5f);

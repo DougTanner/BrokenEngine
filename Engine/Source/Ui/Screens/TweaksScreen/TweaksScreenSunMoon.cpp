@@ -50,7 +50,7 @@ const TweaksSliderMapRegistrar gSunMoonRegistrar
 
 void TweaksScreenBase::RenderSunMoonSection()
 {
-	const int64_t iSection = giTweakSectionSunMoon;
+	int64_t iSection = giTweakSectionSunMoon;
 
 	WrapperSeparatorText("Color Phase Boundaries (radians)");
 	WrapperSlider("Morning Start", iSection);

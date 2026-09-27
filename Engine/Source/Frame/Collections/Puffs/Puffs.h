@@ -53,8 +53,8 @@ struct PuffControllerType
 };
 
 struct PuffsInterpolate : public Collection<PuffsInterpolate>,
-                          public TypeRegistry<PuffsType>,
-                          public ControllerTypeRegistry<PuffsInterpolate, PuffControllerType>
+	public TypeRegistry<PuffsType>,
+	public ControllerTypeRegistry<PuffsInterpolate, PuffControllerType>
 {
 	static constexpr const char* kName = "Puffs";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("Puffs");

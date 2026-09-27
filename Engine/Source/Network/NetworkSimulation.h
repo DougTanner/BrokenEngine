@@ -95,8 +95,8 @@ namespace NetworkSimulation
 
 inline float Random01(NetworkSimulationState& rState)
 {
-	rState.uiRandomState = rState.uiRandomState * 1103515245 + 12345;
-	return static_cast<float>(rState.uiRandomState >> 16) / 65536.0f;
+	rState.uiRandomState = rState.uiRandomState * 1'103'515'245 + 12'345;
+	return static_cast<float>(rState.uiRandomState >> 16) / 65'536.0f;
 }
 
 inline std::chrono::steady_clock::duration RandomOneWayDelay(NetworkSimulationState& rState, const NetworkSimulationConfig& rConfig)
@@ -189,8 +189,8 @@ inline void EnqueueOrDrop(std::deque<DelayedPacket>& rDelayedPackets, NetworkSim
 
 // Fast-forward (time multiply > 1) skips the delay, but queues behind still-pending delayed packets so each
 // channel stays FIFO until the caller's flush; otherwise enqueue-or-drop per the sim config.
-template <typename FnReceive>
-inline void DispatchOrEnqueue(std::deque<DelayedPacket>& rDelayedPackets, NetworkSimulationState& rState, const NetworkSimulationConfig& rSimConfig, bool bFastForward, ENetEvent& rEvent, FnReceive fnReceive)
+template <typename FNRECEIVE>
+inline void DispatchOrEnqueue(std::deque<DelayedPacket>& rDelayedPackets, NetworkSimulationState& rState, const NetworkSimulationConfig& rSimConfig, bool bFastForward, ENetEvent& rEvent, FNRECEIVE fnReceive)
 {
 	if (bFastForward)
 	{
@@ -212,8 +212,8 @@ inline void DispatchOrEnqueue(std::deque<DelayedPacket>& rDelayedPackets, Networ
 }
 
 // Process delayed packets whose release time has passed.
-template <typename FnHandlePacket>
-inline void ProcessDelayed(std::deque<DelayedPacket>& rDelayedPackets, FnHandlePacket handlePacket)
+template <typename FNHANDLEPACKET>
+inline void ProcessDelayed(std::deque<DelayedPacket>& rDelayedPackets, FNHANDLEPACKET handlePacket)
 {
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	while (!rDelayedPackets.empty() && rDelayedPackets.front().releaseTime <= now)
@@ -224,8 +224,8 @@ inline void ProcessDelayed(std::deque<DelayedPacket>& rDelayedPackets, FnHandleP
 }
 
 // Flush all delayed packets immediately, ignoring release times.
-template <typename FnHandlePacket>
-inline void FlushDelayed(std::deque<DelayedPacket>& rDelayedPackets, FnHandlePacket handlePacket)
+template <typename FNHANDLEPACKET>
+inline void FlushDelayed(std::deque<DelayedPacket>& rDelayedPackets, FNHANDLEPACKET handlePacket)
 {
 	while (!rDelayedPackets.empty())
 	{
@@ -235,8 +235,8 @@ inline void FlushDelayed(std::deque<DelayedPacket>& rDelayedPackets, FnHandlePac
 }
 
 // Fast-forward flushes the whole delay queue immediately; otherwise releases packets whose time has passed.
-template <typename FnHandlePacket>
-inline void ProcessOrFlush(std::deque<DelayedPacket>& rDelayedPackets, bool bFastForward, FnHandlePacket handlePacket)
+template <typename FNHANDLEPACKET>
+inline void ProcessOrFlush(std::deque<DelayedPacket>& rDelayedPackets, bool bFastForward, FNHANDLEPACKET handlePacket)
 {
 	if (bFastForward)
 	{

@@ -145,9 +145,9 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 
 #if defined(BT_CLIENT)
 		// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
-		const bool bPrimary = (j == 0);
-		const float fLengthMul = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailLength->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailLength->Get();
-		const float fDurationMul = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->Get();
+		bool bPrimary = (j == 0);
+		float fLengthMul = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailLength->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailLength->Get();
+		float fDurationMul = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->Get();
 		fTrailIntensity *= bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailIntensity->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailIntensity->Get();
 		// Scaling the head's travel distance by Duration keeps head speed constant when Update later scales
 		// pfTrailTimes by the same Duration multiplier — so increasing Duration extends both space and time
@@ -175,20 +175,20 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 
 	// Per-type tweak multipliers (Particles tab). Null on server, optional on client.
 	auto Scale = [](const Wrapper* pWrapper) { return pWrapper != nullptr ? pWrapper->Get() : 1.0f; };
-	const float fPositionJitterScale         = Scale(rType.pParticlePositionJitterScale);
-	const float fVelocityBaseScale           = Scale(rType.pParticleVelocityBaseScale);
-	const float fVelocitySpreadScale         = Scale(rType.pParticleVelocitySpreadScale);
-	const float fVerticalVelocityBaseScale   = Scale(rType.pParticleVerticalVelocityBaseScale);
-	const float fVerticalVelocitySpreadScale = Scale(rType.pParticleVerticalVelocitySpreadScale);
-	const float fIntensitySpreadScale        = Scale(rType.pParticleIntensitySpreadScale);
-	[[maybe_unused]] const float fVisibleIntensityScale = Scale(rType.pParticleVisibleIntensityScale);
-	[[maybe_unused]] const float fWidthScale          = Scale(rType.pParticleWidthScale);
-	[[maybe_unused]] const float fLengthScale         = Scale(rType.pParticleLengthScale);
-	[[maybe_unused]] const float fLengthSpreadScale   = Scale(rType.pParticleLengthSpreadScale);
-	[[maybe_unused]] const float fVelocityDecayScale  = Scale(rType.pParticleVelocityDecayScale);
-	[[maybe_unused]] const float fGravityScale        = Scale(rType.pParticleGravityScale);
-	[[maybe_unused]] const float fIntensityDecayScale = Scale(rType.pParticleIntensityDecayScale);
-	[[maybe_unused]] const float fIntensityPowerScale = Scale(rType.pParticleIntensityPowerScale);
+	float fPositionJitterScale         = Scale(rType.pParticlePositionJitterScale);
+	float fVelocityBaseScale           = Scale(rType.pParticleVelocityBaseScale);
+	float fVelocitySpreadScale         = Scale(rType.pParticleVelocitySpreadScale);
+	float fVerticalVelocityBaseScale   = Scale(rType.pParticleVerticalVelocityBaseScale);
+	float fVerticalVelocitySpreadScale = Scale(rType.pParticleVerticalVelocitySpreadScale);
+	float fIntensitySpreadScale        = Scale(rType.pParticleIntensitySpreadScale);
+	[[maybe_unused]] float fVisibleIntensityScale = Scale(rType.pParticleVisibleIntensityScale);
+	[[maybe_unused]] float fWidthScale          = Scale(rType.pParticleWidthScale);
+	[[maybe_unused]] float fLengthScale         = Scale(rType.pParticleLengthScale);
+	[[maybe_unused]] float fLengthSpreadScale   = Scale(rType.pParticleLengthSpreadScale);
+	[[maybe_unused]] float fVelocityDecayScale  = Scale(rType.pParticleVelocityDecayScale);
+	[[maybe_unused]] float fGravityScale        = Scale(rType.pParticleGravityScale);
+	[[maybe_unused]] float fIntensityDecayScale = Scale(rType.pParticleIntensityDecayScale);
+	[[maybe_unused]] float fIntensityPowerScale = Scale(rType.pParticleIntensityPowerScale);
 
 	for (uint32_t p = 0; p < uiTotalParticles; ++p)
 	{

@@ -26,7 +26,7 @@ void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const auto& { return rInterpolate.pointLights; });
+		[](const game::FrameInterpolate& rInterpolate) -> const PointLightsInterpolate& { return rInterpolate.pointLights; });
 
 	if (iTotalCapacity == 0)
 	{

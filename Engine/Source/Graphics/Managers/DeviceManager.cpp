@@ -288,12 +288,12 @@ DeviceManager::DeviceManager()
 		// color/normals/AO/masks/elevation = 5 * 128 * up-to-kiMaxFramebuffers (4) = 2560, plus every other
 		// pipeline's samplers (incl. the elevation array, a third kPipelineTerrain consumer — Terrain.vert's
 		// submerged-vert sink).
-		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 8192},
-		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1024},
+		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 8'192},
+		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1'024},
 		// Three global samplers * up to four framebuffers + two standalone particle samplers = 14; reserve 16.
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 16},
-		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 4 * 1024},
-		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1024},
+		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 4 * 1'024},
+		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1'024},
 	};
 	VkDescriptorPoolCreateInfo vkDescriptorPoolCreateInfo
 	{
@@ -385,7 +385,7 @@ DeviceManager::~DeviceManager()
 
 void DeviceManager::LoadPipelineCache()
 {
-	static constexpr int64_t kiMaxPipelineCacheBytes = 64 * 1024 * 1024;
+	static constexpr int64_t kiMaxPipelineCacheBytes = 64 * 1'024 * 1'024;
 
 	if constexpr (kbVulkanPipelineCache)
 	{
@@ -446,7 +446,7 @@ void DeviceManager::LoadPipelineCache()
 						{
 							common::crc_t uiStoredCrc = 0;
 							std::memcpy(&uiStoredCrc, cacheData.data(), sizeof(uiStoredCrc));
-							const common::crc_t uiCrc = common::Crc(cacheData.data() + sizeof(uiStoredCrc), iSize - static_cast<int64_t>(sizeof(uiStoredCrc)));
+							common::crc_t uiCrc = common::Crc(cacheData.data() + sizeof(uiStoredCrc), iSize - static_cast<int64_t>(sizeof(uiStoredCrc)));
 							if (uiCrc != uiStoredCrc)
 							{
 								LOG(kGraphics, kDebug, "Discarded pipeline cache with CRC mismatch ({} bytes)", iSize);
@@ -457,10 +457,10 @@ void DeviceManager::LoadPipelineCache()
 								VkPipelineCacheHeaderVersionOne header {};
 								std::memcpy(&header, cacheData.data() + sizeof(uiStoredCrc), sizeof(header));
 								const VkPhysicalDeviceProperties& rProps = gpInstanceManager->mVkPhysicalDeviceProperties;
-								const bool bCompatible = header.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
-								                      && header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
-								                      && header.vendorID == rProps.vendorID && header.deviceID == rProps.deviceID
-								                      && std::memcmp(header.pipelineCacheUUID, rProps.pipelineCacheUUID, VK_UUID_SIZE) == 0;
+								bool bCompatible = header.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
+								                && header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
+								                && header.vendorID == rProps.vendorID && header.deviceID == rProps.deviceID
+								                && std::memcmp(header.pipelineCacheUUID, rProps.pipelineCacheUUID, VK_UUID_SIZE) == 0;
 
 								if (bCompatible)
 								{

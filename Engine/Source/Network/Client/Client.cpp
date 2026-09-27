@@ -115,8 +115,8 @@ Client::Client(const char* pServerAddress, uint16_t uiPort, int64_t iCoordSlots,
 	}
 	mpHost->checksum = enet_crc32;
 	// 1MB send/receive buffers to handle bursty packet traffic
-	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_SNDBUF, 1024 * 1024);
-	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_RCVBUF, 1024 * 1024);
+	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_SNDBUF, 1'024 * 1'024);
+	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_RCVBUF, 1'024 * 1'024);
 
 	ENetAddress address {};
 	enet_address_set_host(&address, pServerAddress);
@@ -282,7 +282,7 @@ void Client::DispatchIncoming(ENetEvent& rEvent, bool bFastForward)
 {
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		constexpr NetworkSimulationConfig kSimConfig = GetNetworkSimulationConfig(keNetworkSimulation);
+		static constexpr NetworkSimulationConfig kSimConfig = GetNetworkSimulationConfig(keNetworkSimulation);
 		NetworkSimulation::DispatchOrEnqueue(mDelayedPackets, mNetworkSimState, kSimConfig, bFastForward, rEvent,
 			[this](ENetEvent& rInner) { Receive(rInner); });
 	}

@@ -168,7 +168,7 @@ IMPORTANT do not use auto in range-based for loops
 
 39. Use [[maybe_unused]] when a variable is unused: void Func([[maybe_unused]] int64_t iUnused)
 
-40. Use std::string_view or std::wstring_view instead of "const char*" or std::string& or std::wstring& parameters into functions: void UpdateTextArea(TextAreas eTextArea, std::string_view pcCharacters);
+40. Use std::string_view or std::wstring_view instead of "const char*" or std::string& or std::wstring& parameters into functions; a "const char*" or "const wchar_t*" parameter stays when a caller can pass null or when its value reaches an API that needs a null-terminated string: void UpdateTextArea(TextAreas eTextArea, std::string_view pcCharacters); bool BeginSubtab(const char* pcLabel, int64_t iSection, int8_t iTab);
 
 41. Explicitly use std:: namespace, do not `using namespace std;`: std::vector, std::string, std::unordered_map
 NOTE: The following global namespaces are allowed: `using namespace DirectX;`

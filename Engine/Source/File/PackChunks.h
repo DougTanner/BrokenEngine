@@ -22,7 +22,7 @@ struct AudioChunkReadEntry
 	common::crc_t crc = 0;
 	uint64_t uiOffset = 0;
 	uint64_t uiLength = 0;
-	std::array<std::byte, 16 * 1024> data {};
+	std::array<std::byte, 16 * 1'024> data {};
 };
 
 #endif // BT_CLIENT
@@ -156,7 +156,7 @@ private:
 	int64_t miDecompressScratchSize = 0;
 
 	// Sub-read size for chunked disk reads (256KB balances NVMe throughput vs L3 cache pressure)
-	static constexpr int64_t kiSubReadSize = 256 * 1024;
+	static constexpr int64_t kiSubReadSize = 256 * 1'024;
 
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 public:

@@ -77,7 +77,7 @@ static int HandleEagerLoadCompletion()
 {
 	try
 	{
-		(void)gpFileManager->GetEagerChunkMap();
+		static_cast<void>(gpFileManager->GetEagerChunkMap());
 	}
 	catch (const std::system_error&)
 	{
@@ -344,7 +344,7 @@ int MainThread(HINSTANCE hinstance)
 	// Render and present all framebuffers, then show window
 	gpProfileManager->BootStart(kBootTimerRenderPresent);
 	std::vector<GridCoord> bootActiveCoords = {kOriginCoord};
-	for (int64_t i = 0; i < static_cast<int64_t>(gpCommandBufferManager->mPerFramebufferCommandBuffers.size()); ++i)
+	for (size_t i = 0; i < gpCommandBufferManager->mPerFramebufferCommandBuffers.size(); ++i)
 	{
 		gpGraphics->RenderGlobal(pGame->RenderFrame(pGame->mClientGridCoord).interpolate.fCurrentTime);
 		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoords, kOriginCoord);
@@ -655,14 +655,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		return TRUE;
 	}
 
-	const bool bInputSuppressed = PhysicalInputSuppressed();
+	bool bInputSuppressed = PhysicalInputSuppressed();
 
 	// When suppressed, keep the ImGui Win32 backend running for lifecycle bookkeeping (focus, tracking) but starve it
 	// of physical input messages (mouse/keyboard/char/wheel ranges) so real human activity never becomes ImGui IO.
 	// Non-client mouse messages (WM_NCMOUSEMOVE etc.) are deliberately NOT added to the bypass ranges: the backend may
 	// queue a physical pos from them, but ImGuiManager::Prepare's re-pin/sentinel is always the last mouse-pos event
 	// before NewFrame, so gating them is unnecessary and is not done.
-	const bool bInputMessage = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || (message >= WM_KEYFIRST && message <= WM_KEYLAST);
+	bool bInputMessage = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || (message >= WM_KEYFIRST && message <= WM_KEYLAST);
 	if (!(bInputSuppressed && bInputMessage))
 	{
 		if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam) != 0)
@@ -959,5 +959,5 @@ static int ProcessMain(HINSTANCE hInstance)
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANCE hPrevInstance, [[maybe_unused]] _In_ LPWSTR lpCmdLine, [[maybe_unused]] _In_ int nShowCmd)
 {
 	// No exception handling here: MainThread installs it as its first statement.
-	return common::ThreadLocal::Entry(ProcessMain, 10 * 1024 * 1024, std::nullopt, false)(hInstance);
+	return common::ThreadLocal::Entry(ProcessMain, 10 * 1'024 * 1'024, std::nullopt, false)(hInstance);
 }

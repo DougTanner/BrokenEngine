@@ -20,8 +20,6 @@ constexpr float kfUiOpacitySliderWidthPixels = 640.0f;
 
 void GameSettingsScreen::Render()
 {
-	using enum StandardString;
-
 	if (game::gpGame->meUiState != UiState::kGameSettings)
 	{
 		return;
@@ -45,7 +43,7 @@ void GameSettingsScreen::Render()
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
-	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(kStringGameSettings)), kfMainMenuHeadingScale);
+	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGameSettings)), kfMainMenuHeadingScale);
 
 	// Language row: the six labels stay in their own language, so they are never localized through the string table.
 	// Font and geometry are stepped down to the utility tier so a six-button row reads below the primary controls.
@@ -97,10 +95,10 @@ void GameSettingsScreen::Render()
 	ImGui::Separator();
 
 	// One themed width shared by both buttons (measured under the live menu font)
-	float fButtonWidth = MenuButtonsWidth({TranslatedString(kStringDefaults), U"Back"});
+	float fButtonWidth = MenuButtonsWidth({TranslatedString(StandardString::kStringDefaults), U"Back"});
 
 	// Defaults button
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringDefaults)), ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnim))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringDefaults)), ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnim))
 	{
 		ResetGameSettings();
 	}

@@ -27,7 +27,7 @@ void WindRadialsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 	}
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const auto& { return rInterpolate.windRadials; });
+		[](const game::FrameInterpolate& rInterpolate) -> const WindRadialsInterpolate& { return rInterpolate.windRadials; });
 
 	if (iTotalCapacity == 0)
 	{

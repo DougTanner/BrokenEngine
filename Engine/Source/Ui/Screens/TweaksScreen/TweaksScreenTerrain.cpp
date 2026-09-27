@@ -40,7 +40,7 @@ const TweaksSliderMapRegistrar gTerrainRegistrar
 
 void TweaksScreenBase::RenderTerrainSection()
 {
-	const int64_t iSection = giTweakSectionTerrain;
+	int64_t iSection = giTweakSectionTerrain;
 
 	WrapperSeparatorText("Ambient Occlusion");
 	WrapperSlider("Ambient Occlusion", iSection);

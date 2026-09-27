@@ -48,7 +48,7 @@ const TweaksSliderMapRegistrar gSmokeRegistrar
 
 void TweaksScreenBase::RenderSmokeSection()
 {
-	const int64_t iSection = giTweakSectionSmoke;
+	int64_t iSection = giTweakSectionSmoke;
 
 	if (ImGui::BeginTabBar("SmokeTabs"))
 	{

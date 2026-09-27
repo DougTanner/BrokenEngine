@@ -190,11 +190,11 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 
 	PopulateWaterDirectional(rGlobalLayout, fSunAngle);
 
-	const float fBreakStart = gWaterBreakStartDepth.Get();
-	const float fBreakEnd = gWaterBreakEndDepth.Get();
-	const float fEffectiveBreakStart = std::min(fBreakStart, fBreakEnd);
-	const float fBreakRange = fBreakEnd - fEffectiveBreakStart;
-	const float fMediumShoreWidth = gWaterMediumShoreSoftness.Get();
+	float fBreakStart = gWaterBreakStartDepth.Get();
+	float fBreakEnd = gWaterBreakEndDepth.Get();
+	float fEffectiveBreakStart = std::min(fBreakStart, fBreakEnd);
+	float fBreakRange = fBreakEnd - fEffectiveBreakStart;
+	float fMediumShoreWidth = gWaterMediumShoreSoftness.Get();
 	rGlobalLayout.fWaterBreakEndDepthInv = 1.0f / fBreakEnd;
 	rGlobalLayout.fWaterBreakBlendStart = fEffectiveBreakStart;
 	rGlobalLayout.fWaterBreakBlendInvRange = fBreakRange > 0.0f ? 1.0f / fBreakRange : 0.0f;

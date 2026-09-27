@@ -42,7 +42,7 @@ const TweaksSliderMapRegistrar gShadowRegistrar
 
 void TweaksScreenBase::RenderShadowSection()
 {
-	const int64_t iSection = giTweakSectionShadow;
+	int64_t iSection = giTweakSectionShadow;
 
 	WrapperSeparatorText("Quality / Perf");
 	WrapperSlider("Resolution", iSection);

@@ -13,9 +13,9 @@ namespace
 
 struct LayoutMapping
 {
-	VkImageLayout vkImageLayout;
-	VkAccessFlags accessFlags;
-	VkPipelineStageFlags stageFlags;
+	VkImageLayout vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkAccessFlags accessFlags = 0;
+	VkPipelineStageFlags stageFlags = 0;
 };
 
 static constexpr LayoutMapping kLayoutMappings[]
@@ -197,7 +197,7 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(void*, i
 	if (mInfo.textureFlags & kRenderPass)
 	{
 		// Use dedicated allocations only for large render targets (VMA recommends for resources >32MB or frequently resized)
-		static constexpr VkDeviceSize kLargeSizeThreshold = 32 * 1024 * 1024;
+		static constexpr VkDeviceSize kLargeSizeThreshold = 32 * 1'024 * 1'024;
 		if (common::SizeInBytes(mInfo.format, mInfo.extent.width, mInfo.extent.height) * mInfo.arrayLayers >= kLargeSizeThreshold)
 		{
 			vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
@@ -274,7 +274,7 @@ void Texture::UploadImageData(const std::function<void(void*, int64_t, int64_t)>
 			uiWidth = std::max(1u, uiWidth / 2);
 			uiHeight = std::max(1u, uiHeight / 2);
 
-			vkCmdCopyBufferToImage(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+			vkCmdCopyBufferToImage(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.stagingVkBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 		}
 	}
 

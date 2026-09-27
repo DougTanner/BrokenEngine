@@ -28,7 +28,7 @@ void ServerBroadcaster::BuildFrameInputs()
 		game::gpGame->mFrameInputs.try_emplace(rCoord);
 	}
 
-	const bool bAdvancing = game::gpGame->mfLastDeltaTime > 0.0f;
+	bool bAdvancing = game::gpGame->mfLastDeltaTime > 0.0f;
 	if (bAdvancing)
 	{
 		std::erase_if(game::gpServerSession->mpClientManager->mClientsWaitingForSpawn, [&](const game::ClientSpawnInfo& rClientSpawnInformation)
@@ -86,7 +86,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	const std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>>& rTransfers = game::gpServerSession->mpTransferManager->mTransfers;
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-	const bool bReplaying = game::gpGame->mbReplaying;
+	bool bReplaying = game::gpGame->mbReplaying;
 	auto ForEachPublicationCoord = [&](auto&& rCallback)
 	{
 		if (!bReplaying)
@@ -260,7 +260,7 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 		{
 			continue;
 		}
-		const int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer(game::gpGame->CurrentFrame(updateCoord)), rRequest.globalId).Value();
+		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer(game::gpGame->CurrentFrame(updateCoord)), rRequest.globalId).Value();
 		if (iPlayerUuid == 0)
 		{
 			continue;

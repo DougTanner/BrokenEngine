@@ -6,7 +6,6 @@ namespace engine
 // StableVector construction only records the reserved count, so this reserves no address space and makes
 // no OS call until the first Resize; growth then commits more of that reservation without moving.
 thread_local common::StableVector<AreaDamageSource> AreaDamage::sAreaDamageSources {64 * kiAreaDamageSourcePreallocate};
-thread_local int64_t AreaDamage::siAreaDamageSourceCount = 0;
 
 void AreaDamage::Add(const AreaDamageSource& rSource)
 {

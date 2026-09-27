@@ -27,7 +27,7 @@ void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 {
 	siRendered = 0;
 
-	EraseStaleRenderState(sPreviousPositions, rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const auto&
+	EraseStaleRenderState(sPreviousPositions, rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const std::unordered_map<WindTrailsInterpolate::id_t, int64_t>&
 	{
 		return rInterpolate.windTrails.idToIndexMap;
 	});
@@ -38,7 +38,7 @@ void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 	}
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const auto& { return rInterpolate.windTrails; });
+		[](const game::FrameInterpolate& rInterpolate) -> const WindTrailsInterpolate& { return rInterpolate.windTrails; });
 
 	if (iTotalCapacity == 0)
 	{

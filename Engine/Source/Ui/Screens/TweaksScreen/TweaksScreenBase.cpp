@@ -82,9 +82,9 @@ TweaksScreenBase::TweaksScreenBase()
 	// registering here would double-register.
 
 	// Initialize staggered window positions (Y set to 0, will use mfToggleBarBottom at runtime)
-	constexpr float kfStartX = 10.0f;
-	constexpr float kfOffsetX = 30.0f;
-	const float fUiScale = UiScale();
+	static constexpr float kfStartX = 10.0f;
+	static constexpr float kfOffsetX = 30.0f;
+	float fUiScale = UiScale();
 
 	for (int64_t i = 0; i < SectionCount(); ++i)
 	{
@@ -114,7 +114,7 @@ void TweaksScreenBase::RenderWaveCountRadioButtons(Wrapper& rCountWrapper)
 void TweaksScreenBase::ChevronIndexSelector(std::string_view label, Wrapper& rWrapper, const std::string_view* pNames, int64_t iCount)
 {
 	// Match WrapperSlider's alpha-fade-while-dragging behavior so this widget keeps its layout slot when another slider is active.
-	const bool bAnotherSliderActive = !mActiveSlider.empty();
+	bool bAnotherSliderActive = !mActiveSlider.empty();
 	if (bAnotherSliderActive)
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.0f);
@@ -136,7 +136,7 @@ void TweaksScreenBase::ChevronIndexSelector(std::string_view label, Wrapper& rWr
 		rWrapper.SetIndex((iIndex + 1) % iCount);
 	}
 	ImGui::SameLine();
-	const std::string_view name = pNames[iIndex];
+	std::string_view name = pNames[iIndex];
 	ImGui::Text("%.*s [%lld/%lld] %.*s", static_cast<int>(label.size()), label.data(), iIndex + 1, iCount, static_cast<int>(name.size()), name.data());
 
 	if (bAnotherSliderActive)
@@ -147,7 +147,7 @@ void TweaksScreenBase::ChevronIndexSelector(std::string_view label, Wrapper& rWr
 
 bool TweaksScreenBase::BeginSubtab(const char* pcLabel, int64_t iSection, int8_t iTab)
 {
-	const bool bApplySavedSubtab = (mApplySubtab & SectionFlag(iSection)) && mActiveSubtab[iSection] == iTab;
+	bool bApplySavedSubtab = (mApplySubtab & SectionFlag(iSection)) && mActiveSubtab[iSection] == iTab;
 	if (!ImGui::BeginTabItem(pcLabel, nullptr, bApplySavedSubtab ? ImGuiTabItemFlags_SetSelected : 0))
 	{
 		return false;
@@ -420,7 +420,7 @@ void TweaksScreenBase::RenderSectionWindow(int64_t iSection)
 		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 	}
 
-	constexpr float kfStartX = 10.0f;
+	static constexpr float kfStartX = 10.0f;
 	ImVec2 f2InitialPosition = (mWindowPositions[iSection].y > 0.0f) ? mWindowPositions[iSection] : ImVec2 {kfStartX * UiScale(), mfToggleBarBottom};
 	ImGui::SetNextWindowPos(f2InitialPosition, ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowCollapsed(mSectionCollapsed & SectionFlag(iSection), ImGuiCond_FirstUseEver);
@@ -456,7 +456,7 @@ void TweaksScreenBase::RunSliderAuditFrame()
 		{
 			std::memcpy(mPreAuditSubtab, mActiveSubtab, sizeof(mActiveSubtab));
 			ScopedSuppressAllocationTracking suppress;
-			const size_t iSliderCount = TweaksSliderMap::Get().size();
+			size_t iSliderCount = TweaksSliderMap::Get().size();
 			mAuditTouched.reserve(iSliderCount);
 			mAuditMissed.reserve(8); // typical drift is small; reserve nominal to avoid 1-element bucket churn
 		}
@@ -471,7 +471,7 @@ void TweaksScreenBase::RunSliderAuditFrame()
 		mbAuditMode = true;
 
 		// Synthetic offscreen window: BeginTabBar / WrapperSeparatorText / etc. need an active window, but we don't want anything visible or interactive.
-		ImGui::SetNextWindowPos(ImVec2(-10000.0f, -10000.0f));
+		ImGui::SetNextWindowPos(ImVec2(-10'000.0f, -10'000.0f));
 		ImGui::SetNextWindowSize(ImVec2(1.0f, 1.0f));
 		static constexpr ImGuiWindowFlags kAuditFlags = ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus;
 		if (ImGui::Begin("##slider-audit", nullptr, kAuditFlags))

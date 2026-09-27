@@ -40,10 +40,10 @@ public:
 		}
 	}
 
-	template <typename TType, typename... TArgs>
-	static void SendSimplePacket(ENetPeer* pPeer, TType eType, uint8_t uiChannel, uint32_t uiFlags, const TArgs&... args)
+	template <typename TTYPE, typename... TARGS>
+	static void SendSimplePacket(ENetPeer* pPeer, TTYPE eType, uint8_t uiChannel, uint32_t uiFlags, const TARGS&... args)
 	{
-		static_assert(std::is_enum_v<TType>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
+		static_assert(std::is_enum_v<TTYPE>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
 
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();

@@ -23,13 +23,13 @@ public:
 private:
 
 	std::unordered_map<common::crc_t, Shader>& mrShaders;
-	Pipeline* mpPipelines;
-	Pipeline* mpSpreadPipelines;
-	std::string* mpSpreadPipelineNames;
+	Pipeline* mpPipelines = nullptr;
+	Pipeline* mpSpreadPipelines = nullptr;
+	std::string* mpSpreadPipelineNames = nullptr;
 	Pipeline& mrCombinePipeline;
 	Pipeline& mrLightingTemporalPipeline;
 	Pipeline& mrLightingHistoryCopyPipeline;
-	Texture** mppWaterNormalTextures;
+	Texture** mppWaterNormalTextures = nullptr;
 };
 
 } // namespace engine

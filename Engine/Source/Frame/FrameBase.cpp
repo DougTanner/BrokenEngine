@@ -164,13 +164,13 @@ void FramePostRenderBase::ServerRead(std::istream& rStream)
 
 void FrameInterpolateBase::Register()
 {
-	ForEachRegister(InterpolateTypes{});
+	ForEachRegister(InterpolateTypes {});
 }
 
 #if defined(BT_CLIENT)
 void FrameInterpolateBase::GraphicsResources()
 {
-	ForEachGraphicsResources(InterpolateTypes{});
+	ForEachGraphicsResources(InterpolateTypes {});
 }
 #endif
 
@@ -198,7 +198,7 @@ void FrameInterpolateBase::Update([[maybe_unused]] game::FrameInterpolate& __res
 	rCurrent.frameFlags = frameFlags;
 #endif
 
-	ForEachInterpolateUpdate(InterpolateTypes{}, rCurrent, rPreviousFrame);
+	ForEachInterpolateUpdate(InterpolateTypes {}, rCurrent, rPreviousFrame);
 }
 
 void FramePostRenderBase::AllocateAndCopy([[maybe_unused]] game::FramePostRender& __restrict rCurrent, [[maybe_unused]] const game::FramePostRender& __restrict rPrevious)
@@ -228,7 +228,7 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	rCurrent.uiFrameId = rPrevious.uiFrameId;
 	rCurrent.alignments.CopyFrom(rPrevious.alignments);
 
-	ForEachPostRenderUpdate(PostRenderBaseTypes{}, rFrame, rPreviousFrame, rStaticData);
+	ForEachPostRenderUpdate(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	// Setup pusher zones for spatial acceleration
 	PushersInterpolate::SetupZones(rFrame, LocalFrameArea());
@@ -236,48 +236,48 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 
 void FramePostRenderBase::PreCollision([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
-	ForEachPostRenderPreCollision(PostRenderBaseTypes{}, rFrame, rPreviousFrame, rStaticData);
+	ForEachPostRenderPreCollision(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
 void FramePostRenderBase::PostCollision([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
-	ForEachPostRenderPostCollision(PostRenderBaseTypes{}, rFrame, rPreviousFrame, rStaticData);
+	ForEachPostRenderPostCollision(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
 void FramePostRenderBase::AreaDamage([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
-	ForEachPostRenderAreaDamage(PostRenderBaseTypes{}, rFrame, rPreviousFrame, rStaticData);
+	ForEachPostRenderAreaDamage(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
 void FramePostRenderBase::Transfer([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
-	ForEachPostRenderTransfer(PostRenderBaseTypes{}, rFrame, rStaticData);
+	ForEachPostRenderTransfer(PostRenderBaseTypes {}, rFrame, rStaticData);
 }
 
 void FramePostRenderBase::Destroy([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
-	ForEachPostRenderDestroy(PostRenderBaseTypes{}, rFrame, rStaticData);
+	ForEachPostRenderDestroy(PostRenderBaseTypes {}, rFrame, rStaticData);
 }
 
 void FramePostRenderBase::Spawn([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
-	ForEachPostRenderSpawn(PostRenderBaseTypes{}, rFrame, rStaticData);
+	ForEachPostRenderSpawn(PostRenderBaseTypes {}, rFrame, rStaticData);
 }
 
 #if defined(BT_CLIENT)
 void FrameInterpolateBase::BeginRender([[maybe_unused]] int64_t iCommandBuffer, [[maybe_unused]] const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, [[maybe_unused]] const std::vector<GridCoord>& rActiveCoords)
 {
-	ForEachBeginRender(InterpolateTypes{}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
+	ForEachBeginRender(InterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
 }
 
 void FrameInterpolateBase::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rCurrent, [[maybe_unused]] int64_t iCommandBuffer)
 {
-	ForEachInterpolateRender(InterpolateTypes{}, rCurrent, iCommandBuffer);
+	ForEachInterpolateRender(InterpolateTypes {}, rCurrent, iCommandBuffer);
 }
 
 void FrameInterpolateBase::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	ForEachEndRender(InterpolateTypes{}, iCommandBuffer);
+	ForEachEndRender(InterpolateTypes {}, iCommandBuffer);
 }
 #endif // BT_CLIENT
 

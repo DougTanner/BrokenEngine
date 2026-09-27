@@ -77,7 +77,7 @@ private:
 	struct PooledVoice
 	{
 		common::crc_t mAudioCrc;
-		IXAudio2SourceVoice* mpVoice;
+		IXAudio2SourceVoice* mpVoice = nullptr;
 	};
 	struct AcquiredVoice
 	{

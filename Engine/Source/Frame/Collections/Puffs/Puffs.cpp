@@ -21,7 +21,7 @@ void PuffsPostRender::AllocateAndCopy(PuffsPostRender& rCurrent, const PuffsPost
 void PuffsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
 	DestroyExpiredControlled(rFrame.interpolate.puffs, rFrame.postRender.puffs, rFrame.interpolate.fCurrentTime,
-		[](auto& rI, auto& rPR, int64_t& i)
+		[](PuffsInterpolate& rI, PuffsPostRender& rPR, int64_t& i)
 		{
 			DestroyElement(rI, rPR, i, rI.Members(), rPR.Members());
 			--i;

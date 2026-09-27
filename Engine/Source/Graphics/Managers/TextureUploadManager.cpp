@@ -110,11 +110,11 @@ void TextureUploadManager::DestroyTransferResources()
 	// Clean up any GPU-uploaded texture images that were not adopted by TextureManager
 	for (const auto& [rCrc, rLazyChunk] : gpFileManager->GetLazyChunkMap())
 	{
-		if (rLazyChunk.vkImage != VK_NULL_HANDLE)
+		if (rLazyChunk.uploadVkImage != VK_NULL_HANDLE)
 		{
 			LazyChunk& rMutableChunk = gpFileManager->GetLazyChunk(rCrc);
-			vmaDestroyImage(gpDeviceManager->mpAllocator, rMutableChunk.vkImage, rMutableChunk.vmaAllocation);
-			rMutableChunk.vkImage = VK_NULL_HANDLE;
+			vmaDestroyImage(gpDeviceManager->mpAllocator, rMutableChunk.uploadVkImage, rMutableChunk.vmaAllocation);
+			rMutableChunk.uploadVkImage = VK_NULL_HANDLE;
 			rMutableChunk.vmaAllocation = VK_NULL_HANDLE;
 		}
 	}
@@ -314,7 +314,7 @@ void TextureUploadManager::UploadThread()
 				.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.image = rLazyChunk.vkImage,
+				.image = rLazyChunk.uploadVkImage,
 				.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = dimensions.uiMipLevels, .baseArrayLayer = 0, .layerCount = dimensions.uiArrayLayers},
 			};
 			if (bFirstChunk)
@@ -468,7 +468,7 @@ void TextureUploadManager::CreateTransferImage(LazyChunk& rLazyChunk, const Chun
 	};
 	VmaAllocationCreateInfo vmaAllocationCreateInfo {};
 	vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-	CHECK_VK(vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &rLazyChunk.vkImage, &rLazyChunk.vmaAllocation, nullptr));
+	CHECK_VK(vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &rLazyChunk.uploadVkImage, &rLazyChunk.vmaAllocation, nullptr));
 }
 
 void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions)
@@ -497,7 +497,7 @@ void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const Chun
 			vkBufferImageCopy.imageSubresource.layerCount = 1;
 			vkBufferImageCopy.imageOffset = {0, static_cast<int32_t>(muiCurrentMipY), 0};
 			vkBufferImageCopy.imageExtent = {uiMipWidth, uiRemainingHeight, 1};
-			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.uploadVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 
 			vkStagingUsed += iRemainingMipBytes;
 			mCurrentDataOffset += iRemainingMipBytes;
@@ -539,7 +539,7 @@ void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const Chun
 			vkBufferImageCopy.imageSubresource.layerCount = 1;
 			vkBufferImageCopy.imageOffset = {0, static_cast<int32_t>(muiCurrentMipY), 0};
 			vkBufferImageCopy.imageExtent = {uiMipWidth, uiCopyHeight, 1};
-			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.uploadVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 
 			mCurrentDataOffset += iCopyBytes;
 			muiCurrentMipY += uiCopyHeight;

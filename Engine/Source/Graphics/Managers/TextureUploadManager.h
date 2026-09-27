@@ -55,13 +55,13 @@ private:
 	// the image-create and staging-copy steps.
 	struct ChunkDimensions
 	{
-		bool bCubemap;
-		VkFormat vkFormat;
-		uint32_t uiBlockHeight;
-		uint32_t uiArrayLayers;
-		uint32_t uiMipLevels;
-		uint32_t uiBaseWidth;
-		uint32_t uiBaseHeight;
+		bool bCubemap = false;
+		VkFormat vkFormat = VK_FORMAT_UNDEFINED;
+		uint32_t uiBlockHeight = 0;
+		uint32_t uiArrayLayers = 0;
+		uint32_t uiMipLevels = 0;
+		uint32_t uiBaseWidth = 0;
+		uint32_t uiBaseHeight = 0;
 	};
 	bool DequeueNextUpload();
 	bool HandleUploadEarlyOut(LazyChunk& rLazyChunk);
@@ -69,7 +69,7 @@ private:
 	void RecordStagingCopies(LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions);
 	void SubmitChunkUpload(LazyChunk& rLazyChunk, VkImageMemoryBarrier& rVkImageMemoryBarrier, bool bDone);
 
-	static constexpr int64_t kiByteBudgetPerFrame = 4 * 1024 * 1024;
+	static constexpr int64_t kiByteBudgetPerFrame = 4 * 1'024 * 1'024;
 
 	// Zeroes the five "In-progress upload state" fields below (full reset between textures / on teardown)
 	void ResetUploadProgress();

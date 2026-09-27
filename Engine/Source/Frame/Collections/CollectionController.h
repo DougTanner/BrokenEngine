@@ -58,11 +58,10 @@ struct ControllerType
 };
 
 // Interpolates between keyframes based on elapsed time
-template <typename TControllerType>
-inline auto InterpolateKeyframes(const TControllerType& rController, float fElapsedTime)
-	-> std::remove_extent_t<decltype(TControllerType::keyframes)>
+template <typename CONTROLLER_TYPE>
+inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime)
 {
-	using KeyframeType = std::remove_extent_t<decltype(TControllerType::keyframes)>;
+	using KeyframeType = std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)>;
 	int64_t iKeyframeCount = rController.uiKeyframeCount;
 
 	if (fElapsedTime <= rController.pfTimes[0])
@@ -89,11 +88,10 @@ inline auto InterpolateKeyframes(const TControllerType& rController, float fElap
 }
 
 // Scales a controller's keyframes before interpolation without modifying its registered definition.
-template <typename TControllerType, typename TScaleFunction>
-inline auto InterpolateScaledKeyframes(const TControllerType& rController, float fElapsedTime, TScaleFunction scaleFunction)
-	-> std::remove_extent_t<decltype(TControllerType::keyframes)>
+template <typename CONTROLLER_TYPE, typename SCALE_FUNCTION>
+inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateScaledKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime, SCALE_FUNCTION scaleFunction)
 {
-	TControllerType scaledController = rController;
+	CONTROLLER_TYPE scaledController = rController;
 	for (int64_t j = 0; j < rController.uiKeyframeCount; ++j)
 	{
 		scaleFunction(scaledController, rController, j);
@@ -102,8 +100,8 @@ inline auto InterpolateScaledKeyframes(const TControllerType& rController, float
 }
 
 // Spawns a paired controlled element while leaving collection-specific seeding to the caller.
-template <typename TInterpolate, typename TPostRender, typename TGrowFunction, typename TAddFunction, typename TSeedFunction>
-void XM_CALLCONV AddControlledElement(TInterpolate& rInterpolate, [[maybe_unused]] const TPostRender& rPostRender, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, TGrowFunction growFunction, TAddFunction addFunction, TSeedFunction seedFunction)
+template <typename INTERPOLATE, typename POST_RENDER, typename GROW_FUNCTION, typename ADD_FUNCTION, typename SEED_FUNCTION>
+void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_RENDER& rPostRender, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION growFunction, ADD_FUNCTION addFunction, SEED_FUNCTION seedFunction)
 {
 	growFunction();
 	int64_t iSpawnIndex = addFunction();
@@ -115,16 +113,16 @@ void XM_CALLCONV AddControlledElement(TInterpolate& rInterpolate, [[maybe_unused
 }
 
 // Mixin providing static controller type registry for collections with keyframe animation.
-// TControllerType defaults to ControllerType for standard keyframe animation (PointLights).
+// CONTROLLER_TYPE defaults to ControllerType for standard keyframe animation (PointLights).
 // Collections with custom keyframes (Puffs) can specify their own controller type.
 // Threading contract: registration is startup-only (single-threaded, before Dispatch() workers fan out);
 // sControllerTypes is immutable afterward, so parallel frame-tick .at() reads need no synchronization.
-template <typename TCollection, typename TControllerType = ControllerType>
+template <typename COLLECTION, typename CONTROLLER_TYPE = ControllerType>
 struct ControllerTypeRegistry
 {
-	static inline std::vector<TControllerType> sControllerTypes;
+	static inline std::vector<CONTROLLER_TYPE> sControllerTypes;
 
-	static void RegisterControllerType(uint8_t& ruiIndex, const TControllerType& rType)
+	static void RegisterControllerType(uint8_t& ruiIndex, const CONTROLLER_TYPE& rType)
 	{
 		ASSERT(ruiIndex == kuiInvalidTypeIndex);
 		ASSERT(sControllerTypes.size() < kuiInvalidTypeIndex);
@@ -138,16 +136,16 @@ struct ControllerTypeRegistry
 		sControllerTypes.push_back(rType);
 	}
 
-	static const TControllerType& GetControllerType(uint8_t uiIndex)
+	static const CONTROLLER_TYPE& GetControllerType(uint8_t uiIndex)
 	{
 		return sControllerTypes.at(uiIndex);
 	}
 };
 
 // Removes controlled elements whose keyframe animation has expired.
-// removeFn signature: void(TInterpolate&, TPostRender&, int64_t& i)
-template <typename TInterpolate, typename TPostRender, typename TRemoveFn>
-void DestroyExpiredControlled(TInterpolate& rInterpolate, TPostRender& rPostRender, float fCurrentTime, TRemoveFn removeFn)
+// removeFn signature: void(INTERPOLATE&, POST_RENDER&, int64_t& i)
+template <typename INTERPOLATE, typename POST_RENDER, typename REMOVE_FN>
+void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, float fCurrentTime, REMOVE_FN removeFn)
 {
 	for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 	{
@@ -157,7 +155,7 @@ void DestroyExpiredControlled(TInterpolate& rInterpolate, TPostRender& rPostRend
 			continue;
 		}
 
-		const auto& rController = TInterpolate::GetControllerType(uiControllerTypeIndex);
+		const auto& rController = INTERPOLATE::GetControllerType(uiControllerTypeIndex);
 		if (!rController.bDestroysSelf)
 		{
 			continue;

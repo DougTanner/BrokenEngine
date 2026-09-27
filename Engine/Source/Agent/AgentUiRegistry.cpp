@@ -111,8 +111,8 @@ void AgentUiRegistry::RemovePendingLabel(int64_t iIndex)
 
 void AgentUiRegistry::HookItemAdd(ImGuiID uiId, const XMFLOAT4& rf4Rect, const char* pcWindow, bool bDisabled, bool bVisible)
 {
-	const int64_t iPendingLabel = FindPendingLabel(uiId);
-	const bool bEmptyRect = rf4Rect.x >= rf4Rect.z || rf4Rect.y >= rf4Rect.w;
+	int64_t iPendingLabel = FindPendingLabel(uiId);
+	bool bEmptyRect = rf4Rect.x >= rf4Rect.z || rf4Rect.y >= rf4Rect.w;
 	if (iPendingLabel >= 0 && bEmptyRect)
 	{
 		// A tab reports a zero-size layout placeholder after its label and before its real tab rectangle.

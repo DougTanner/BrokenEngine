@@ -138,8 +138,8 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			rSub.pCurrent = std::move(pFrame);
 			rSub.pNext = std::make_unique<game::Frame>();
 
-			const int64_t iTick = rSub.pCurrent->interpolate.iTick;
-			const float fCurrentTime = rSub.pCurrent->interpolate.fCurrentTime;
+			int64_t iTick = rSub.pCurrent->interpolate.iTick;
+			float fCurrentTime = rSub.pCurrent->interpolate.fCurrentTime;
 			if (!bHasLoadedClock)
 			{
 				if (iTick < 0 || iTick > std::numeric_limits<int64_t>::max() - engine::TimeStep::kiMaxAccumulatorTicks || !std::isfinite(fCurrentTime))

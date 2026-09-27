@@ -8,9 +8,6 @@
 namespace engine
 {
 
-using enum DescriptorFlags;
-using enum PipelineFlags;
-
 PipelineManager::PipelineManager()
 : mDynamicPipelines(mShaders)
 , mWorldLightingShadowPipelines(mShaders, mpPipelines, mSpreadPipelines, mSpreadPipelineNames, mCombinePipeline, mLightingTemporalPipeline, mLightingHistoryCopyPipeline, mppWaterNormalTextures)
@@ -55,9 +52,9 @@ PipelineManager::PipelineManager()
 			throw std::ios_base::failure("PipelineManager shader");
 		}
 
-		const int64_t iSetIndicesOffset = common::ShaderHeader::SetIndicesOffset(rShaderHeader.iDescriptorSetLayoutBindings);
-		const int64_t iAttributesOffset = common::ShaderHeader::AttributesOffset(rShaderHeader.iDescriptorSetLayoutBindings);
-		const int64_t iSpirvOffset = common::ShaderHeader::SpirvOffset(rShaderHeader.iDescriptorSetLayoutBindings, rShaderHeader.iVertexInputAttributeDescriptions);
+		int64_t iSetIndicesOffset = common::ShaderHeader::SetIndicesOffset(rShaderHeader.iDescriptorSetLayoutBindings);
+		int64_t iAttributesOffset = common::ShaderHeader::AttributesOffset(rShaderHeader.iDescriptorSetLayoutBindings);
+		int64_t iSpirvOffset = common::ShaderHeader::SpirvOffset(rShaderHeader.iDescriptorSetLayoutBindings, rShaderHeader.iVertexInputAttributeDescriptions);
 
 		// Trust boundary (chunk bytes): the three aliased sections plus the SPIR-V tail (>= the 4-byte magic the
 		// Shader ctor reads) must fit the chunk's actual bytes, else the alias walks / iSpirvSize run off the buffer.
@@ -96,15 +93,15 @@ PipelineManager::PipelineManager()
 		mpPipelines[kPipelineLog].Create(
 		{
 			.name = "Log",
-			.flags = {kRenderTarget, kPushConstants},
+			.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants},
 			.ppShaders = {&mShaders.at(data::kShadersLogvertCrc), &mShaders.at(data::kShadersClearfragCrc)},
 			.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-			.vkRenderPass = gpTextureManager->mRenderTargetTextures.mLogTexture.mVkRenderPass,
+			.targetVkRenderPass = gpTextureManager->mRenderTargetTextures.mLogTexture.mVkRenderPass,
 			.vkExtent3D = gpTextureManager->mRenderTargetTextures.mLogTexture.mInfo.extent,
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kMainLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
 			},
 		});
 	}
@@ -114,12 +111,12 @@ PipelineManager::PipelineManager()
 	mpPipelines[kPipelineUiDepthPrepass].Create(
 	{
 		.name = "UiDepthPrepass",
-		.flags = {kDepthTest, kDepthWrite, kNoColorWrite, kNoWireframe},
+		.flags = {PipelineFlags::kDepthTest, PipelineFlags::kDepthWrite, PipelineFlags::kNoColorWrite, PipelineFlags::kNoWireframe},
 		.ppShaders = {&mShaders.at(data::kShadersUiUiDepthPrepassvertCrc), &mShaders.at(data::kShadersUiUiDepthPrepassfragCrc)},
 		.pVertexBuffer = nullptr,
 		.pDescriptorInfos =
 		{
-			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mUiRectStorageBuffers.data()},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mUiRectStorageBuffers.data()},
 		},
 	});
 
@@ -129,16 +126,16 @@ PipelineManager::PipelineManager()
 		mpPipelines[kPipelineDebugTexture].Create(
 		{
 			.name = "DebugTexture",
-			.flags = {kNoWireframe},
+			.flags = {PipelineFlags::kNoWireframe},
 			.ppShaders = {&mShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mShaders.at(data::kShadersDebugTexturefragCrc)},
 			.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTextures},
-				{.flags = kCombinedSamplers, .iCount = 3, .ppTextures = rTextures.mppLightingDepositTextures},
-				{.flags = kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTexturesB},
-				{.flags = kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTexturesC},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTextures},
+				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = 3, .ppTextures = rTextures.mppLightingDepositTextures},
+				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTexturesB},
+				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTexturesC},
 			},
 		});
 	}
@@ -152,16 +149,16 @@ PipelineManager::PipelineManager()
 	mpPipelines[kPipelineHdrResolve].Create(
 	{
 		.name = "HdrResolve",
-		.flags = {kRenderTarget, kNoWireframe},
+		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kNoWireframe},
 		.ppShaders = {&mShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mShaders.at(data::kShadersHdrResolvefragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.vkRenderPass = gpSwapchainManager->mVkRenderPass,
+		.targetVkRenderPass = gpSwapchainManager->mVkRenderPass,
 		.vkExtent3D = gpSwapchainManager->mHdrTexture.mInfo.extent,
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kMainLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &gpSwapchainManager->mHdrTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpSwapchainManager->mHdrTexture},
 		},
 	});
 
@@ -205,17 +202,17 @@ void PipelineManager::CreateTerrainDataPipelines()
 		.name = "TerrainElevation",
 		// kMax: see kPipelineShadowElevation — MAX-blend overlapping islands' heightmaps so the tallest
 		// terrain wins per pixel. RTT clears to mfSeaFloorElevation, so single-island pixels are unchanged.
-		.flags = {kRenderTarget, kPushConstants, kMax, kUpdateAfterBind},
+		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kMax, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mShaders.at(data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc), &mShaders.at(data::kShadersTerrainTerrainElevationfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.vkRenderPass = gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.mVkRenderPass,
+		.targetVkRenderPass = gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.mVkRenderPass,
 		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.mInfo.extent,
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
 			// The unflagged default keeps this offscreen elevation prepass linear without player-facing anisotropy.
-			{.flags = {kCombinedSamplers, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 2 (elevation, kPipelineTerrainElevation)
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 2 (elevation, kPipelineTerrainElevation)
 		},
 	});
 }
@@ -226,7 +223,7 @@ void PipelineManager::CreateSmokeWindPipelines()
 	{
 		Pipelines ePipeline;
 		std::string_view name;
-		Texture* pTargetTexture;
+		Texture* pTargetTexture = nullptr;
 	};
 	SmokeClearPipelineDescription pSmokeClearPipelineDescriptions[]
 	{
@@ -238,14 +235,14 @@ void PipelineManager::CreateSmokeWindPipelines()
 		mpPipelines[rDescription.ePipeline].Create(
 		{
 			.name = rDescription.name,
-			.flags = {kRenderTarget, kPushConstants, kIndirectHostVisible},
+			.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible},
 			.ppShaders = {&mShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mShaders.at(data::kShadersClearfragCrc)},
 			.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-			.vkRenderPass = rDescription.pTargetTexture->mVkRenderPass,
+			.targetVkRenderPass = rDescription.pTargetTexture->mVkRenderPass,
 			.vkExtent3D = rDescription.pTargetTexture->mInfo.extent,
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			},
 		});
 	}
@@ -257,9 +254,9 @@ void PipelineManager::CreateSmokeWindPipelines()
 		Pipelines ePipeline;
 		std::string_view name;
 		common::crc_t shaderCrc;
-		VkBuffer* pSourceOccupancyVkBuffer;
-		VkBuffer* pActiveTileVkBuffer;
-		VkBuffer* pDestinationOccupancyVkBuffer;
+		VkBuffer* pSourceOccupancyVkBuffer = nullptr;
+		VkBuffer* pActiveTileVkBuffer = nullptr;
+		VkBuffer* pDestinationOccupancyVkBuffer = nullptr;
 	};
 	SmokeOccupancyPipelineDescription pSmokeOccupancyPipelineDescriptions[]
 	{
@@ -271,14 +268,14 @@ void PipelineManager::CreateSmokeWindPipelines()
 		mpPipelines[rDescription.ePipeline].Create(
 		{
 			.name = rDescription.name,
-			.flags = {kCompute},
+			.flags = {PipelineFlags::kCompute},
 			.ppShaders = {&mShaders.at(rDescription.shaderCrc)},
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pSourceOccupancyVkBuffer},
-				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pActiveTileVkBuffer},
-				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pDestinationOccupancyVkBuffer},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pSourceOccupancyVkBuffer},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pActiveTileVkBuffer},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pDestinationOccupancyVkBuffer},
 			},
 		});
 	}
@@ -286,37 +283,37 @@ void PipelineManager::CreateSmokeWindPipelines()
 	mpPipelines[kPipelineSmokeSpreadComputeB].Create(
 	{
 		.name = "SmokeSpreadComputeB",
-		.flags = {kCompute, kUpdateAfterBind},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mShaders.at(data::kShadersSmokeSmokeSpreadTwocompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = {kCombinedSamplers, kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
-			{.flags = {kCombinedSamplers, kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
-			{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
-			{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo},
-			{.flags = kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
-			{.flags = kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeOccupancyVkBuffers[1]},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeOccupancyVkBuffers[1]},
 		},
 	});
 
 	mpPipelines[kPipelineSmokeSpreadComputeA].Create(
 	{
 		.name = "SmokeSpreadComputeA",
-		.flags = {kCompute, kUpdateAfterBind},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mShaders.at(data::kShadersSmokeSmokeSpreadOnecompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = {kCombinedSamplers, kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo},
-			{.flags = {kCombinedSamplers, kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
-			{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
-			{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
-			{.flags = kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
-			{.flags = kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeOccupancyVkBuffers[0]},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeOccupancyVkBuffers[0]},
 		},
 	});
 
@@ -326,8 +323,8 @@ void PipelineManager::CreateSmokeWindPipelines()
 	{
 		Pipelines ePipeline;
 		std::string_view name;
-		VkBuffer* pSourceOccupancyVkBuffer;
-		VkBuffer* pActiveTileVkBuffer;
+		VkBuffer* pSourceOccupancyVkBuffer = nullptr;
+		VkBuffer* pActiveTileVkBuffer = nullptr;
 	};
 	WindOccupancyPipelineDescription pWindOccupancyPipelineDescriptions[]
 	{
@@ -339,13 +336,13 @@ void PipelineManager::CreateSmokeWindPipelines()
 		mpPipelines[rDescription.ePipeline].Create(
 		{
 			.name = rDescription.name,
-			.flags = {kCompute},
+			.flags = {PipelineFlags::kCompute},
 			.ppShaders = {&mShaders.at(data::kShadersWindWindOccupancyDilatecompCrc)},
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pSourceOccupancyVkBuffer},
-				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pActiveTileVkBuffer},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pSourceOccupancyVkBuffer},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pActiveTileVkBuffer},
 			},
 		});
 	}
@@ -355,10 +352,10 @@ void PipelineManager::CreateSmokeWindPipelines()
 		Pipelines ePipeline;
 		std::string_view name;
 		common::crc_t shaderCrc;
-		Texture* pSourceTexture;
-		Texture* pDestinationTexture;
-		VkBuffer* pActiveTileVkBuffer;
-		VkBuffer* pOccupancyVkBuffer;
+		Texture* pSourceTexture = nullptr;
+		Texture* pDestinationTexture = nullptr;
+		VkBuffer* pActiveTileVkBuffer = nullptr;
+		VkBuffer* pOccupancyVkBuffer = nullptr;
 	};
 	WindSpreadPipelineDescription pWindSpreadPipelineDescriptions[]
 	{
@@ -370,16 +367,16 @@ void PipelineManager::CreateSmokeWindPipelines()
 		mpPipelines[rDescription.ePipeline].Create(
 		{
 			.name = rDescription.name,
-			.flags = {kCompute, kUpdateAfterBind},
+			.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind},
 			.ppShaders = {&mShaders.at(rDescription.shaderCrc)},
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = {kCombinedSamplers, kSamplerWindClamp}, .pTexture = rDescription.pSourceTexture},
-				{.flags = {kCombinedSamplers, kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
-				{.flags = kStorageImages, .pTexture = rDescription.pDestinationTexture},
-				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pActiveTileVkBuffer},
-				{.flags = kStorageBuffer, .pVkBuffers = rDescription.pOccupancyVkBuffer},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerWindClamp}, .pTexture = rDescription.pSourceTexture},
+				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeatLinear}, .textureCrc = data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc},
+				{.flags = DescriptorFlags::kStorageImages, .pTexture = rDescription.pDestinationTexture},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pActiveTileVkBuffer},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pOccupancyVkBuffer},
 			},
 		});
 	}
@@ -395,8 +392,8 @@ void PipelineManager::CreateParticlePipelines()
 		std::string_view updateName;
 		std::string_view renderName;
 		std::string_view spawnName;
-		Buffer* pStorageBuffer;
-		Buffer* pSpawnStorageBuffers;
+		Buffer* pStorageBuffer = nullptr;
+		Buffer* pSpawnStorageBuffers = nullptr;
 		common::crc_t renderVertexShaderCrc;
 	};
 	ParticlePipelineDescription pParticlePipelineDescriptions[]
@@ -409,45 +406,45 @@ void PipelineManager::CreateParticlePipelines()
 		mpPipelines[rDescription.eUpdatePipeline].Create(
 		{
 			.name = rDescription.updateName,
-			.flags = {kCompute, kIndirectDeviceLocal},
+			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectDeviceLocal},
 			.ppShaders = {&mShaders.at(data::kShadersParticlesParticlesUpdatecompCrc)},
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kStorageBuffer, .pBuffers = rDescription.pStorageBuffer},
-				{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kStorageBuffer, .pBuffers = rDescription.pStorageBuffer},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
 			},
 		});
 
 		mpPipelines[rDescription.eRenderPipeline].Create(
 		{
 			.name = rDescription.renderName,
-			.flags = {kIndirectDeviceLocal, kDepthTest, kAdd, kUpdateAfterBind},
+			.flags = {PipelineFlags::kIndirectDeviceLocal, PipelineFlags::kDepthTest, PipelineFlags::kAdd, PipelineFlags::kUpdateAfterBind},
 			.ppShaders = {&mShaders.at(rDescription.renderVertexShaderCrc), &mShaders.at(data::kShadersParticlesParticlesRenderfragCrc)},
 			.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kMainLayoutUniformBuffers},
-				{.flags = kStorageBuffer, .pBuffers = rDescription.pStorageBuffer},
-				{.flags = {kCombinedSamplers, kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
-				{.flags = kSamplerClamp},
-				{.flags = kTextures},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kStorageBuffer, .pBuffers = rDescription.pStorageBuffer},
+				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+				{.flags = DescriptorFlags::kSamplerClamp},
+				{.flags = DescriptorFlags::kTextures},
 			},
 		});
 
 		mpPipelines[rDescription.eSpawnPipeline].Create(
 		{
 			.name = rDescription.spawnName,
-			.flags = {kCompute},
+			.flags = {PipelineFlags::kCompute},
 			.ppShaders = {&mShaders.at(data::kShadersParticlesParticlesSpawncompCrc)},
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kPerCommandBufferStorageBuffers, .pBuffers = rDescription.pSpawnStorageBuffers},
-				{.flags = kStorageBuffer, .pBuffers = rDescription.pStorageBuffer},
-				{.flags = kStorageBuffer, .pVkBuffers = &mpPipelines[rDescription.eUpdatePipeline].mIndirectVkBuffer},
-				{.flags = kStorageBuffer, .pVkBuffers = &mpPipelines[rDescription.eRenderPipeline].mIndirectVkBuffer},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = rDescription.pSpawnStorageBuffers},
+				{.flags = DescriptorFlags::kStorageBuffer, .pBuffers = rDescription.pStorageBuffer},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &mpPipelines[rDescription.eUpdatePipeline].mIndirectVkBuffer},
+				{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &mpPipelines[rDescription.eRenderPipeline].mIndirectVkBuffer},
 			},
 		});
 	}
@@ -465,7 +462,7 @@ void PipelineManager::CreateDebugRenderPipelines()
 		Pipelines ePipeline;
 		std::string_view name;
 		common::crc_t crc;
-		Buffer* pVertexBuffer;
+		Buffer* pVertexBuffer = nullptr;
 		common::crc_t vertexShaderCrc;
 	};
 
@@ -484,14 +481,14 @@ void PipelineManager::CreateDebugRenderPipelines()
 		mpPipelines[rEntry.ePipeline].Create(
 		{
 			.name = rEntry.name,
-			.flags = {kIndirectHostVisible, kLineList, kAlphaBlend, kUpdateAfterBind},
+			.flags = {PipelineFlags::kIndirectHostVisible, PipelineFlags::kLineList, PipelineFlags::kAlphaBlend, PipelineFlags::kUpdateAfterBind},
 			.ppShaders = {&mShaders.at(rEntry.vertexShaderCrc), &mShaders.at(data::kShadersDebugDebugRenderfragCrc)},
 			.pVertexBuffer = rEntry.pVertexBuffer,
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kMainLayoutUniformBuffers},
-				{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(rEntry.crc).data()},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(rEntry.crc).data()},
 			},
 		});
 	}

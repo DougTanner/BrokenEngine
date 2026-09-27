@@ -434,12 +434,12 @@ protected:
 
 	CpuTimer mEngineCpuTimers[kEngineCpuTimerCount];
 
-	CpuCounter* mpGameCpuCounters;
-	CpuTimer* mpGameCpuTimers;
-	const std::string_view* mpGameCpuCounterNames;
-	const std::string_view* mpGameCpuTimerNames;
-	int64_t miCpuCounterCount;
-	int64_t miCpuTimerCount;
+	CpuCounter* mpGameCpuCounters = nullptr;
+	CpuTimer* mpGameCpuTimers = nullptr;
+	const std::string_view* mpGameCpuCounterNames = nullptr;
+	const std::string_view* mpGameCpuTimerNames = nullptr;
+	int64_t miCpuCounterCount = 0;
+	int64_t miCpuTimerCount = 0;
 
 #if defined(BT_CLIENT)
 	GpuTimer mGpuTimers[kGpuTimerCount];
@@ -533,7 +533,7 @@ public:
 
 private:
 
-	int64_t miCpuTimer;
+	int64_t miCpuTimer = 0;
 };
 
 void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate);

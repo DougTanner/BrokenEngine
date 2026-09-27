@@ -26,7 +26,7 @@ struct BillboardsType
 };
 
 struct BillboardsInterpolate : public Collection<BillboardsInterpolate, CollectionFlags::kIdToIndex>,
-                               public TypeRegistry<BillboardsType>
+	public TypeRegistry<BillboardsType>
 {
 	static constexpr const char* kName = "Billboards";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("Billboards");
@@ -38,10 +38,10 @@ struct BillboardsInterpolate : public Collection<BillboardsInterpolate, Collecti
 	struct SyncData
 	{
 		XMVECTOR vecPosition;
-		uint8_t uiTypeIndex;
+		uint8_t uiTypeIndex = 0;
 		BillboardFlags_t flags;
-		float fRotation;
-		float fExtra;
+		float fRotation = 0.0f;
+		float fExtra = 0.0f;
 	};
 
 	// Sync owned billboard with parent-provided data

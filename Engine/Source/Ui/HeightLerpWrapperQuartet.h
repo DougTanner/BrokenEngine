@@ -20,8 +20,8 @@ struct HeightLerpWrapperQuartet
 
 constexpr float LerpAtHeight(float fEyeHeight, float fStartHeight, float fEndHeight, float fLow, float fHigh)
 {
-	const float fSpan = std::max(fEndHeight - fStartHeight, 0.001f);
-	const float fT = std::clamp((fEyeHeight - fStartHeight) / fSpan, 0.0f, 1.0f);
+	float fSpan = std::max(fEndHeight - fStartHeight, 0.001f);
+	float fT = std::clamp((fEyeHeight - fStartHeight) / fSpan, 0.0f, 1.0f);
 	return std::lerp(fLow, fHigh, fT);
 }
 

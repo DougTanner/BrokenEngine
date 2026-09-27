@@ -332,8 +332,8 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 	const common::AnimationClip& rAnimation = mpAnimations[iAnimationIndex];
 
 	// Allocate temporary TRS arrays from the thread-local workbuffer
-	const int64_t iVecSize = mHeader.skeleton.uiNodeCount * static_cast<int64_t>(sizeof(XMVECTOR));
-	const int64_t iTotalSize = 3 * iVecSize;
+	int64_t iVecSize = mHeader.skeleton.uiNodeCount * static_cast<int64_t>(sizeof(XMVECTOR));
+	int64_t iTotalSize = 3 * iVecSize;
 
 	auto pBufferAlloc = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(iTotalSize);
 	std::byte* pBuffer = static_cast<std::byte*>(pBufferAlloc);
@@ -470,7 +470,7 @@ void LoadAnimationDataFromEagerChunks()
 		if (rChunk.pHeader->flags & common::ChunkFlags::kScene && rChunk.pHeader->sceneHeader.bHasAnimation)
 		{
 			// Animation data comes after scene arrays and material data (aligned to 16 bytes, matching export)
-			const int64_t iAnimationSectionOffset = common::SceneHeader::AnimationSectionOffset(rChunk.pHeader->sceneHeader.uiTextureCount, rChunk.pHeader->sceneHeader.uiMaterialCount);
+			int64_t iAnimationSectionOffset = common::SceneHeader::AnimationSectionOffset(rChunk.pHeader->sceneHeader.uiTextureCount, rChunk.pHeader->sceneHeader.uiMaterialCount);
 
 			AnimationData& rAnimationData = gAnimationDataMap.try_emplace(rCrc).first->second;
 			// Trust boundary: eager scene chunks are on-disk pack bytes parsed at boot. A corrupt animation

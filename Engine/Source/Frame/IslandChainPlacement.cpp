@@ -287,8 +287,8 @@ void GenerateIslandChain(GridCoord coord, std::vector<IslandPlacement>& rOut)
 {
 	rOut.clear();
 
-	const float fCellW = kfCellWidth;
-	const float fCellH = kfCellHeight;
+	float fCellW = kfCellWidth;
+	float fCellH = kfCellHeight;
 
 	// The coordinate seeds the RNG streams and nothing else: every cell generates the same centered local
 	// geometry, so no coordinate-scaled term can collapse an edge at a large coordinate.

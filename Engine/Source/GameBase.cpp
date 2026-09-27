@@ -208,7 +208,8 @@ void GameBase::ClientUpdate()
 	{
 		// Heap: transport receive buffers and game packet/frame adoption
 		ScopedSuppressAllocationTracking suppress;
-		NetworkTimeState networkTimeState {
+		NetworkTimeState networkTimeState
+		{
 			.bFastForward = mTimeStep.miTimeMultiply > 1,
 			.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimToWall(game::NetworkSessionContract::kTickDuration)).count(),
 			.iExpectedUpdatesPerSecond = kiTickRate * mTimeStep.miTimeMultiply / mTimeStep.miTimeDivide,
@@ -295,7 +296,8 @@ void GameBase::ServerUpdate()
 {
 	common::LogTickScope logTickScope(miTickCounter);
 
-	NetworkTimeState networkTimeState {
+	NetworkTimeState networkTimeState
+	{
 		.bFastForward = mTimeStep.miTimeMultiply > 1,
 		.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimToWall(game::NetworkSessionContract::kTickDuration)).count(),
 		.iExpectedUpdatesPerSecond = kiTickRate * mTimeStep.miTimeMultiply / mTimeStep.miTimeDivide,
@@ -353,8 +355,8 @@ void GameBase::ServerUpdate()
 	bool bRawCpuTimersNoDispatchLatched = false;
 	for (int64_t i = 0; i < iFullTicks; ++i)
 	{
-		const int64_t iPreviousTickCounter = miTickCounter;
-		const float fPreviousCurrentTime = mfCurrentTime;
+		int64_t iPreviousTickCounter = miTickCounter;
+		float fPreviousCurrentTime = mfCurrentTime;
 		++miTickCounter;
 		mfCurrentTime += kfDeltaTime;
 
@@ -451,7 +453,7 @@ void GameBase::ServerUpdate()
 #if defined(BT_SERVER)
 void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveCoords)
 {
-	const int64_t iActiveCount = static_cast<int64_t>(rActiveCoords.size());
+	int64_t iActiveCount = static_cast<int64_t>(rActiveCoords.size());
 
 	// Pre-resolve frame references to avoid repeated map lookups across all phases
 	{
@@ -483,7 +485,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 	gpProfileManager->CpuStart(game::kCpuTimerFrameInterpolate);
 	gpProfileManager->CpuStart(game::kCpuTimerFramePostRender);
 
-	const int64_t iFrameRefCount = static_cast<int64_t>(rActiveFrameRefs.size());
+	int64_t iFrameRefCount = static_cast<int64_t>(rActiveFrameRefs.size());
 	auto processRange = [&](int64_t iBegin, int64_t iEnd)
 	{
 		for (int64_t j = iBegin; j < iEnd; ++j)

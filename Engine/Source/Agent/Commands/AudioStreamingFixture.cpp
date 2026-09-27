@@ -278,7 +278,7 @@ AudioStreamingFixtureAudioSnapshot AudioStreamingFixture::InspectAudio() const
 	}
 	for (size_t i = 0; i + 1 < rVoices.mPreviousStreams.size(); ++i)
 	{
-		const AudioStreamingFixtureVoiceSummary older = InspectVoice(*rVoices.mPreviousStreams.at(i));
+		AudioStreamingFixtureVoiceSummary older = InspectVoice(*rVoices.mPreviousStreams.at(i));
 		++snapshot.olderFades.iCount;
 		snapshot.olderFades.iPendingSlots += older.iPendingSlots;
 		snapshot.olderFades.iUnderrunningCount += older.flags & AudioStreamingFixtureVoiceFlags::kUnderrunning ? 1 : 0;
@@ -361,11 +361,11 @@ bool AudioStreamingFixture::ArmHold(AudioStreamingFixtureHoldOwner eOwner, commo
 	{
 		return false;
 	}
-	const uint64_t uiGeneration = NextHoldGeneration(HoldGeneration(uiToken));
+	uint64_t uiGeneration = NextHoldGeneration(HoldGeneration(uiToken));
 	mHoldCrc.store(crc, std::memory_order_seq_cst);
 	muiHoldOffset.store(uiOffset, std::memory_order_seq_cst);
 	muiHoldLength.store(uiLength, std::memory_order_seq_cst);
-	const uint64_t uiArmedToken = PackHoldToken(eOwner, AudioStreamingFixtureHoldState::kArmed, uiGeneration);
+	uint64_t uiArmedToken = PackHoldToken(eOwner, AudioStreamingFixtureHoldState::kArmed, uiGeneration);
 	return muiHoldToken.compare_exchange_strong(uiToken, uiArmedToken, std::memory_order_seq_cst);
 }
 
@@ -379,7 +379,7 @@ void AudioStreamingFixture::ReleaseHold(AudioStreamingFixtureHoldOwner eOwner)
 	uint64_t uiToken = muiHoldToken.load(std::memory_order_seq_cst);
 	while (HoldOwner(uiToken) == eOwner && HoldState(uiToken) != AudioStreamingFixtureHoldState::kIdle)
 	{
-		const uint64_t uiIdleToken = PackHoldToken(AudioStreamingFixtureHoldOwner::kNone, AudioStreamingFixtureHoldState::kIdle, NextHoldGeneration(HoldGeneration(uiToken)));
+		uint64_t uiIdleToken = PackHoldToken(AudioStreamingFixtureHoldOwner::kNone, AudioStreamingFixtureHoldState::kIdle, NextHoldGeneration(HoldGeneration(uiToken)));
 		if (muiHoldToken.compare_exchange_weak(uiToken, uiIdleToken, std::memory_order_seq_cst))
 		{
 			muiHoldToken.notify_all();
@@ -500,7 +500,7 @@ void AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase ePhase, uint32
 
 void AudioStreamingFixture::RecordEntry(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, uint32_t uiPoolIndex, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, AudioStreamingFixtureQueueState eState, uint64_t uiGeneration, bool bCancelAcknowledged)
 {
-	const uint64_t uiGate = muiScenarioGate.load(std::memory_order_seq_cst);
+	uint64_t uiGate = muiScenarioGate.load(std::memory_order_seq_cst);
 	if ((uiGate & 1) == 0)
 	{
 		return;
@@ -513,13 +513,13 @@ void AudioStreamingFixture::RecordEntry(AudioStreamingFixturePartition ePartitio
 	}
 	auto write = [&](auto& rHistory)
 	{
-		const uint32_t uiIndex = rHistory.uiHead.fetch_add(1, std::memory_order_seq_cst);
+		uint32_t uiIndex = rHistory.uiHead.fetch_add(1, std::memory_order_seq_cst);
 		if (uiIndex >= rHistory.entries.size())
 		{
 			rHistory.uiDropped.fetch_add(1, std::memory_order_seq_cst);
 			return;
 		}
-		const uint64_t uiSequence = muiNextSequence.fetch_add(1, std::memory_order_seq_cst) + 1;
+		uint64_t uiSequence = muiNextSequence.fetch_add(1, std::memory_order_seq_cst) + 1;
 		HistoryEntry& rEntry = rHistory.entries[uiIndex];
 		rEntry.record =
 		{
@@ -541,9 +541,9 @@ void AudioStreamingFixture::RecordEntry(AudioStreamingFixturePartition ePartitio
 	};
 	switch (ePartition)
 	{
-	case AudioStreamingFixturePartition::kMain: write(mMainHistory); break;
-	case AudioStreamingFixturePartition::kLoader0: write(mLoader0History); break;
-	case AudioStreamingFixturePartition::kLoader1: write(mLoader1History); break;
+		case AudioStreamingFixturePartition::kMain: write(mMainHistory); break;
+		case AudioStreamingFixturePartition::kLoader0: write(mLoader0History); break;
+		case AudioStreamingFixturePartition::kLoader1: write(mLoader1History); break;
 	}
 	muiActiveWriters.fetch_sub(1, std::memory_order_seq_cst);
 }
@@ -567,7 +567,7 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		snapshot.uiReservationStart = muiReservationStart;
 		snapshot.uiReservationBoundary = muiNextSequence.load(std::memory_order_acquire);
 		snapshot.uiRetryCount = muiRetryCount.load(std::memory_order_seq_cst);
-		const uint64_t uiHoldToken = muiHoldToken.load(std::memory_order_seq_cst);
+		uint64_t uiHoldToken = muiHoldToken.load(std::memory_order_seq_cst);
 		snapshot.eHoldOwner = HoldOwner(uiHoldToken);
 		snapshot.eHoldState = HoldState(uiHoldToken);
 		snapshot.flags.Set(AudioStreamingFixtureSnapshotFlags::kLoaderStaged, meStagingOwner.load(std::memory_order_seq_cst) != StagingOwner::kNone);
@@ -576,7 +576,7 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		for (uint32_t uiIndex = 0; uiIndex < pPackChunks->mAudioReadEntries.size(); ++uiIndex)
 		{
 			const AudioChunkReadEntry& rEntry = pPackChunks->mAudioReadEntries[uiIndex];
-			const uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
+			uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
 			poolOwnerships[uiIndex] = uiOwnership;
 			AudioStreamingFixturePoolEntry& rPoolEntry = snapshot.poolEntries[uiIndex];
 			rPoolEntry.uiIndex = uiIndex;
@@ -606,10 +606,10 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		{
 			ruiHead = rHistory.uiHead.load(std::memory_order_acquire);
 			ruiDropped = rHistory.uiDropped.load(std::memory_order_acquire);
-			const uint32_t uiCount = std::min<uint32_t>(ruiHead, static_cast<uint32_t>(rHistory.entries.size()));
+			uint32_t uiCount = std::min<uint32_t>(ruiHead, static_cast<uint32_t>(rHistory.entries.size()));
 			for (uint32_t i = 0; i < uiCount; ++i)
 			{
-				const uint64_t uiPublished = rHistory.entries[i].uiPublishedSequence.load(std::memory_order_acquire);
+				uint64_t uiPublished = rHistory.entries[i].uiPublishedSequence.load(std::memory_order_acquire);
 				if (uiPublished != 0 && snapshot.iRecordCount < static_cast<int64_t>(snapshot.records.size()))
 				{
 					snapshot.records[snapshot.iRecordCount++] = rHistory.entries[i].record;
@@ -719,7 +719,7 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 		ReleaseInvalid();
 		return result;
 	}
-	std::array<std::byte, 16 * 1024 + 1> bytes {};
+	std::array<std::byte, 16 * 1'024 + 1> bytes {};
 	ChunkReadRequest request;
 	common::crc_t missingCrc = std::numeric_limits<common::crc_t>::max();
 	while (pPackChunks->mLazyChunkMap.contains(missingCrc))
@@ -739,7 +739,7 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 	result.bOutOfRangeFailed = pPackChunks->TryReadChunkData(request, crc, static_cast<uint64_t>(pAudioChunk->iDataSize), std::span(bytes).first(1)) == ChunkReadResult::kFailed;
 	result.bZeroLengthFailed = pPackChunks->TryReadChunkData(request, crc, 0, std::span<std::byte>()) == ChunkReadResult::kFailed;
 	result.bOversizeFailed = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes)) == ChunkReadResult::kFailed;
-	const ChunkReadResult eShort = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes).first(1));
+	ChunkReadResult eShort = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes).first(1));
 	result.bShortAccepted = eShort == ChunkReadResult::kPending || eShort == ChunkReadResult::kReady;
 	request.Reset();
 	if (mInvalidRequest.mpPackChunks == nullptr)
@@ -752,7 +752,7 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 			result.bPending = true;
 			return result;
 		}
-		const ChunkReadResult eResult = pPackChunks->TryReadChunkData(mInvalidRequest, crc, muiInvalidOffset, std::span(mInvalidBuffer).first(muiInvalidLength));
+		ChunkReadResult eResult = pPackChunks->TryReadChunkData(mInvalidRequest, crc, muiInvalidOffset, std::span(mInvalidBuffer).first(muiInvalidLength));
 		result.bPending = eResult == ChunkReadResult::kPending;
 		if (!result.bPending)
 		{
@@ -760,8 +760,8 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 		}
 		return result;
 	}
-	const uint32_t uiIndex = mInvalidRequest.uiEntryIndex;
-	const uint64_t uiGeneration = mInvalidRequest.uiGeneration;
+	uint32_t uiIndex = mInvalidRequest.uiEntryIndex;
+	uint64_t uiGeneration = mInvalidRequest.uiGeneration;
 	uint64_t uiOwnership = pPackChunks->mAudioReadEntries[uiIndex].uiOwnership.load(std::memory_order_acquire);
 	if (AudioReadState(uiOwnership) != AudioChunkReadState::kLoading)
 	{
@@ -769,7 +769,7 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 		return result;
 	}
 	std::fill(mInvalidBuffer.begin(), mInvalidBuffer.end(), std::byte {0x5a});
-	const ChunkReadResult ePoll = pPackChunks->TryReadChunkData(mInvalidRequest, mInvalidCrc, muiInvalidOffset, std::span(mInvalidBuffer).first(muiInvalidLength - 1));
+	ChunkReadResult ePoll = pPackChunks->TryReadChunkData(mInvalidRequest, mInvalidCrc, muiInvalidOffset, std::span(mInvalidBuffer).first(muiInvalidLength - 1));
 	result.bTooSmallPollFailed = ePoll == ChunkReadResult::kFailed;
 	result.bTooSmallPollNoWrite = std::ranges::all_of(mInvalidBuffer, [](std::byte uiValue)
 	{
@@ -818,7 +818,7 @@ bool AudioStreamingFixture::HoldAudioRead(common::crc_t crc, uint64_t uiOffset, 
 	}
 	pFixture->muiHeldGeneration.store(uiGeneration, std::memory_order_seq_cst);
 	pFixture->muiHeldIndex.store(uiIndex, std::memory_order_seq_cst);
-	const uint64_t uiConsumedToken = PackHoldToken(HoldOwner(uiHoldToken), AudioStreamingFixtureHoldState::kConsumed, HoldGeneration(uiHoldToken));
+	uint64_t uiConsumedToken = PackHoldToken(HoldOwner(uiHoldToken), AudioStreamingFixtureHoldState::kConsumed, HoldGeneration(uiHoldToken));
 	if (!pFixture->muiHoldToken.compare_exchange_strong(uiHoldToken, uiConsumedToken, std::memory_order_seq_cst))
 	{
 		pFixture->muiHeldGeneration.store(0, std::memory_order_seq_cst);

@@ -18,7 +18,7 @@ const TweaksSliderMapRegistrar gMiscRegistrar
 
 void TweaksScreenBase::RenderMiscSection()
 {
-	const int64_t iSection = giTweakSectionMisc;
+	int64_t iSection = giTweakSectionMisc;
 
 	WrapperSeparatorText("Misc");
 	WrapperSlider("Debug Texture Range", iSection);

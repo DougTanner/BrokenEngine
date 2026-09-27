@@ -147,7 +147,7 @@ bool DropRetainedEndFrame(Replay& rReplay, GridCoord coord)
 	{
 		return false;
 	}
-	const size_t uiGenerationIndex = rWriterGenerations.back().bTerminal ? rWriterGenerations.size() - 1 : rWriterGenerations.size() - 2;
+	size_t uiGenerationIndex = rWriterGenerations.back().bTerminal ? rWriterGenerations.size() - 1 : rWriterGenerations.size() - 2;
 	Replay::ReplayWriterState& rWriterState = rWriterGenerations.at(uiGenerationIndex);
 	if (rWriterState.pRetainedEndFrame == nullptr)
 	{

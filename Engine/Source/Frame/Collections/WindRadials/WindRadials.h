@@ -38,7 +38,7 @@ struct WindRadialControllerType
 };
 
 struct WindRadialsInterpolate : public Collection<WindRadialsInterpolate>,
-                                public ControllerTypeRegistry<WindRadialsInterpolate, WindRadialControllerType>
+	public ControllerTypeRegistry<WindRadialsInterpolate, WindRadialControllerType>
 {
 	static constexpr const char* kName = "WindRadials";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("WindRadials");

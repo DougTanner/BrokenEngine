@@ -167,7 +167,7 @@ void Camera::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaT
 		{
 			bFreeCameraActive = true;
 			XMVECTOR vecMove = XMVectorSet(mCameraInput.f2Move.x, mCameraInput.f2Move.y, 0.0f, 0.0f);
-			constexpr float kfFreeCameraSpeed = 200.0f;
+			static constexpr float kfFreeCameraSpeed = 200.0f;
 			mVecPosition = XMVectorAdd(mVecPosition, XMVectorScale(vecMove, kfFreeCameraSpeed * fDeltaTime));
 			mVecPreviousTargetPosition = mVecPosition;
 			mbJumping = false;
@@ -403,9 +403,9 @@ void Camera::CalculateMatricesAndVisibleArea()
 
 	struct VisibleCorner
 	{
-		float fScreenX;
-		float fScreenY;
-		XMFLOAT4* pTarget;
+		float fScreenX = 0.0f;
+		float fScreenY = 0.0f;
+		XMFLOAT4* pTarget = nullptr;
 	};
 	const VisibleCorner corners[] =
 	{
@@ -466,7 +466,7 @@ void Camera::CalculateMatricesAndVisibleArea()
 	// LOD hysteresis: refuse to flip back across the shared boundary if eye distance is still
 	// near it. Boundaries are at kfMinEyeHeight * 4^L; 5% band absorbs FP rounding around
 	// asymptotic settling.
-	constexpr float kfLodHysteresisFraction = 0.05f;
+	static constexpr float kfLodHysteresisFraction = 0.05f;
 	if (iLod == miVisibleAreaLod - 1)
 	{
 		float fBoundary = kfMinEyeHeight * std::pow(4.0f, static_cast<float>(miVisibleAreaLod));
@@ -491,7 +491,7 @@ void Camera::CalculateMatricesAndVisibleArea()
 	float fQuadsY = static_cast<float>(rLodMesh.iQuadCountY);
 
 	int iZoomBucket = static_cast<int>(std::floor(fEyeDistance));
-	constexpr float kfZoomBucketHysteresis = 0.1f;
+	static constexpr float kfZoomBucketHysteresis = 0.1f;
 	if (iZoomBucket == miVisibleAreaZoomBucket - 1 && fEyeDistance > static_cast<float>(miVisibleAreaZoomBucket) - kfZoomBucketHysteresis)
 	{
 		iZoomBucket = miVisibleAreaZoomBucket;

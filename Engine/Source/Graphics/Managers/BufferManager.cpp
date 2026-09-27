@@ -8,8 +8,6 @@
 namespace engine
 {
 
-using enum BufferFlags;
-
 BufferManager::BufferManager()
 {
 	ASSERT(gpBufferManager == nullptr);
@@ -25,7 +23,7 @@ BufferManager::BufferManager()
 	mQuadsVertexBuffer.Create(
 	{
 		.name = "Quads",
-		.flags = {kIndexVertex, kDeviceLocal},
+		.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
 		.iCount = 6,
 		.vkIndexType = VK_INDEX_TYPE_UINT16,
 		.iVertexStride = sizeof(float) * 2,
@@ -79,7 +77,7 @@ BufferManager::BufferManager()
 		auto [it, bInserted] = mModelMap.try_emplace(rCrc, BufferInfo
 		{
 			.name = rChunk.pHeader->pcPath,
-			.flags = {kIndexVertex, kDeviceLocal},
+			.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
 			.iCount = rModelHeader.iIndexCount,
 			.vkIndexType = common::ModelHeader::UsesU16Indices(rModelHeader.iVertexCount) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32,
 			.iVertexStride = rModelHeader.iStride,
@@ -100,7 +98,7 @@ BufferManager::BufferManager()
 	mLongParticlesStorageBuffer.Create(
 	{
 		.name = "LongParticles",
-		.flags = {kStorage, kDeviceLocal},
+		.flags = {BufferFlags::kStorage, BufferFlags::kDeviceLocal},
 		.dataVkDeviceSize = sizeof(shaders::ParticlesLayout),
 	},
 	[&](void* pData)
@@ -111,7 +109,7 @@ BufferManager::BufferManager()
 	mSquareParticlesStorageBuffer.Create(
 	{
 		.name = "SquareParticles",
-		.flags = {kStorage, kDeviceLocal},
+		.flags = {BufferFlags::kStorage, BufferFlags::kDeviceLocal},
 		.dataVkDeviceSize = sizeof(shaders::ParticlesLayout),
 	},
 	[&](void* pData)
@@ -126,7 +124,7 @@ void BufferManager::CreateDebugMeshBuffers()
 	{
 		// Box: 8 vertices (unit cube -0.5..+0.5), 12 edges = 24 indices
 		{
-			constexpr float h = 0.5f;
+			static constexpr float h = 0.5f;
 			float pfVertices[] =
 			{
 				-h, -h, -h,  h, -h, -h,  h,  h, -h, -h,  h, -h,
@@ -141,7 +139,7 @@ void BufferManager::CreateDebugMeshBuffers()
 			mDebugBoxVertexBuffer.Create(
 			{
 				.name = "DebugBox",
-				.flags = {kIndexVertex, kDeviceLocal},
+				.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
 				.iCount = std::size(puiIndices),
 				.vkIndexType = VK_INDEX_TYPE_UINT16,
 				.iVertexStride = sizeof(float) * 3,
@@ -156,8 +154,8 @@ void BufferManager::CreateDebugMeshBuffers()
 
 		// Sphere: 3 great circles (XY, XZ, YZ), 32 segments each
 		{
-			constexpr int64_t kiSegments = 32;
-			constexpr int64_t kiCircles = 3;
+			static constexpr int64_t kiSegments = 32;
+			static constexpr int64_t kiCircles = 3;
 			float pfVertices[kiCircles * kiSegments * 3] {};
 			uint16_t puiIndices[kiCircles * kiSegments * 2] {};
 
@@ -171,10 +169,10 @@ void BufferManager::CreateDebugMeshBuffers()
 					int64_t iVertex = (c * kiSegments + s) * 3;
 					switch (c)
 					{
-					case 0: pfVertices[iVertex] = fCos; pfVertices[iVertex + 1] = fSin; pfVertices[iVertex + 2] = 0.0f; break; // XY
-					case 1: pfVertices[iVertex] = fCos; pfVertices[iVertex + 1] = 0.0f; pfVertices[iVertex + 2] = fSin; break; // XZ
-					case 2: pfVertices[iVertex] = 0.0f; pfVertices[iVertex + 1] = fCos; pfVertices[iVertex + 2] = fSin; break; // YZ
-					default: break;
+						case 0: pfVertices[iVertex] = fCos; pfVertices[iVertex + 1] = fSin; pfVertices[iVertex + 2] = 0.0f; break; // XY
+						case 1: pfVertices[iVertex] = fCos; pfVertices[iVertex + 1] = 0.0f; pfVertices[iVertex + 2] = fSin; break; // XZ
+						case 2: pfVertices[iVertex] = 0.0f; pfVertices[iVertex + 1] = fCos; pfVertices[iVertex + 2] = fSin; break; // YZ
+						default: break;
 					}
 					int64_t iIndex = (c * kiSegments + s) * 2;
 					puiIndices[iIndex] = static_cast<uint16_t>(c * kiSegments + s);
@@ -184,7 +182,7 @@ void BufferManager::CreateDebugMeshBuffers()
 			mDebugSphereVertexBuffer.Create(
 			{
 				.name = "DebugSphere",
-				.flags = {kIndexVertex, kDeviceLocal},
+				.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
 				.iCount = std::size(puiIndices),
 				.vkIndexType = VK_INDEX_TYPE_UINT16,
 				.iVertexStride = sizeof(float) * 3,
@@ -199,7 +197,7 @@ void BufferManager::CreateDebugMeshBuffers()
 
 		// Circle: 1 circle in XY plane, 32 segments
 		{
-			constexpr int64_t kiSegments = 32;
+			static constexpr int64_t kiSegments = 32;
 			float pfVertices[kiSegments * 3] {};
 			uint16_t puiIndices[kiSegments * 2] {};
 
@@ -217,7 +215,7 @@ void BufferManager::CreateDebugMeshBuffers()
 			mDebugCircleVertexBuffer.Create(
 			{
 				.name = "DebugCircle",
-				.flags = {kIndexVertex, kDeviceLocal},
+				.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
 				.iCount = std::size(puiIndices),
 				.vkIndexType = VK_INDEX_TYPE_UINT16,
 				.iVertexStride = sizeof(float) * 3,
@@ -237,7 +235,7 @@ void BufferManager::CreateDebugMeshBuffers()
 			mDebugLineVertexBuffer.Create(
 			{
 				.name = "DebugLine",
-				.flags = {kIndexVertex, kDeviceLocal},
+				.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
 				.iCount = std::size(puiIndices),
 				.vkIndexType = VK_INDEX_TYPE_UINT16,
 				.iVertexStride = sizeof(float) * 3,
@@ -321,35 +319,35 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 		mGlobalLayoutUniformBuffers.at(i).Create(
 		{
 			.name = "GlobalLayout",
-			.flags = {kUniform, kCopyToDeviceLocalEveryFrame},
+			.flags = {BufferFlags::kUniform, BufferFlags::kCopyToDeviceLocalEveryFrame},
 			.dataVkDeviceSize = sizeof(shaders::GlobalLayout),
 		});
 
 		mMainLayoutUniformBuffers.at(i).Create(
 		{
 			.name = "MainLayout",
-			.flags = {kUniform, kCopyToDeviceLocalEveryFrame},
+			.flags = {BufferFlags::kUniform, BufferFlags::kCopyToDeviceLocalEveryFrame},
 			.dataVkDeviceSize = sizeof(shaders::MainLayout),
 		});
 
 		mUiRectStorageBuffers.at(i).Create(
 		{
 			.name = "UiRects",
-			.flags = {kStorage, kHostVisible},
+			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 			.dataVkDeviceSize = ImGuiManager::kiMaxUiRects * sizeof(XMFLOAT4),
 		});
 
 		mLongParticlesSpawnStorageBuffers.at(i).Create(
 		{
 			.name = "LongParticlesSpawn",
-			.flags = {kStorage, kHostVisible},
+			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 			.dataVkDeviceSize = sizeof(shaders::ParticlesSpawnLayout),
 		});
 
 		mSquareParticlesSpawnStorageBuffers.at(i).Create(
 		{
 			.name = "SquareParticlesSpawn",
-			.flags = {kStorage, kHostVisible},
+			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 			.dataVkDeviceSize = sizeof(shaders::ParticlesSpawnLayout),
 		});
 	}
@@ -362,7 +360,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 		mMeshDataStorageBuffers.at(i).Create(
 		{
 			.name = "MeshData",
-			.flags = {kStorage, kHostVisible},
+			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 			.dataVkDeviceSize = common::MeshData::kiMaxMeshes * sizeof(common::MeshData),
 		},
 		[&](void* pData)
@@ -392,7 +390,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 		mJointMatrixStorageBuffers.at(i).Create(
 		{
 			.name = "JointMatrices",
-			.flags = {kStorage, kHostVisible},
+			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 			.dataVkDeviceSize = common::kiInitialJointMatrixCapacity * sizeof(common::JointMatrix),
 		},
 		[&](void* pData)
@@ -440,7 +438,7 @@ Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType 
 		rBuffers.at(i).Create(
 		{
 			.name = name,
-			.flags = {kStorage, kHostVisible},
+			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 			.dataVkDeviceSize = elementSize,
 			.iElementSize = elementSize,
 		});
@@ -466,7 +464,7 @@ void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eTy
 	rBuffer.Create(
 	{
 		.name = name,
-		.flags = {kStorage, kHostVisible},
+		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 		.dataVkDeviceSize = newSize,
 		.iElementSize = elementSize,
 	});
@@ -532,7 +530,7 @@ void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCou
 	mMeshDataStorageBuffers.at(iCommandBuffer).Create(
 	{
 		.name = "MeshData",
-		.flags = {kStorage, kHostVisible},
+		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 		.dataVkDeviceSize = miMeshDataCapacity[iCommandBuffer] * sizeof(common::MeshData),
 	});
 
@@ -559,7 +557,7 @@ void BufferManager::GrowJointMatrixBuffer(int64_t iCommandBuffer, int64_t iValid
 	mJointMatrixStorageBuffers.at(iCommandBuffer).Create(
 	{
 		.name = "JointMatrices",
-		.flags = {kStorage, kHostVisible},
+		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 		.dataVkDeviceSize = miJointMatrixCapacity[iCommandBuffer] * sizeof(common::JointMatrix),
 	});
 
@@ -778,7 +776,7 @@ void BufferManager::CreateWaterMesh()
 	mWaterMeshBuffer.Create(
 	{
 		.name = "WaterMesh",
-		.flags = {kIndexVertex, kDeviceLocal},
+		.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
 		.iCount = static_cast<int64_t>(indices.size()),
 		.vkIndexType = VK_INDEX_TYPE_UINT32,
 		.iVertexStride = sizeof(float) * 2,

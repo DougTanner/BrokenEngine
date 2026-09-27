@@ -88,7 +88,7 @@ public:
 #if defined(BT_RELEASE)
 	static constexpr float kfEyeHeightMax = kfEyeHeightMaxRelease; // Shipping: gameplay zoom-out ceiling
 #else
-	static constexpr float kfEyeHeightMax = 2000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
+	static constexpr float kfEyeHeightMax = 2'000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
 #endif
 	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
 	// than the wanted on-screen pixel size. Because their texel-height references never fall below live eye height,

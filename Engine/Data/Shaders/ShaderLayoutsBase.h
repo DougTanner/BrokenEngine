@@ -348,7 +348,7 @@ struct ParticlesLayout
 #if defined(BT_ENGINE)
 
 // NOTE: Uniform buffer structs (GlobalLayout, MainLayout) use scalar layout (no padding requirements)
-static_assert(sizeof(GlobalLayout) <= 65536);
+static_assert(sizeof(GlobalLayout) <= 65'536);
 
 } // namespace shaders
 

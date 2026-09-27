@@ -180,10 +180,10 @@ public:
 	explicit Server(uint16_t uiPort);
 	~Server();
 
-	template <typename TType, typename... TArgs>
-	void SendSimplePacket(ENetPeer* pPeer, TType eType, uint8_t uiChannel, uint32_t uiPacketFlags, const TArgs&... args)
+	template <typename TTYPE, typename... TARGS>
+	void SendSimplePacket(ENetPeer* pPeer, TTYPE eType, uint8_t uiChannel, uint32_t uiPacketFlags, const TARGS&... args)
 	{
-		static_assert(std::is_enum_v<TType>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
+		static_assert(std::is_enum_v<TTYPE>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
 
 		NetworkManager::SendSimplePacket(pPeer, eType, uiChannel, uiPacketFlags, args...);
 	}
@@ -209,7 +209,7 @@ public:
 	// Records a client->server contract violation against eKind's count; escalates to disconnect at
 	// kiCorruptViolationDisconnectCount corrupt or kiRateViolationDisconnectCount outstanding rate violations.
 	// Callers MUST NOT touch their ClientConnection* afterward -- the client may have been removed.
-	void RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, const char* pcReason, uint8_t uiPacketType, int64_t iSize);
+	void RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, uint8_t uiPacketType, int64_t iSize);
 
 	// Wire dispatch entry point for one received packet. Public so a harness fixture can inject a
 	// deliberately malformed packet through the real admission, dispatch, and violation path.

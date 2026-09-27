@@ -16,7 +16,7 @@ bool Client::SendAck()
 
 	// ACKs are sent at most once per simulation-tick interval (1/kiTickRate seconds), independently of render rate.
 	// They continue while simulation is paused or stalled so server resends and RTT remain active.
-	constexpr std::chrono::nanoseconds kAckInterval {1'000'000'000 / kiTickRate};
+	static constexpr std::chrono::nanoseconds kAckInterval {1'000'000'000 / kiTickRate};
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	if (now - mLastAckSendTime < kAckInterval)
 	{
@@ -47,7 +47,8 @@ bool Client::SendAck()
 
 	// Pipeline RTT: embed client timestamp for server to echo back
 	int64_t iTimestampNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-	NetworkMessages::ClientAckStreamMessage message {
+	NetworkMessages::ClientAckStreamMessage message
+	{
 		.uiSlotCount = uiAckSlotCount,
 		.pEntries = entries,
 		.iEntryCapacity = NetworkManager::kiMaxEnetCoordSlots,
@@ -72,7 +73,8 @@ void Client::SendDesyncReport(int64_t iTick, GridCoord coord, common::crc_t expe
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	NetworkMessages::ClientDesyncReportMessage message {
+	NetworkMessages::ClientDesyncReportMessage message
+	{
 		.iTick = iTick,
 		.coord = coord,
 		.uiExpectedCrc = static_cast<uint64_t>(expected),
@@ -146,7 +148,8 @@ void Client::SendUnsubscribe(int64_t iSlot)
 	rSlot.transitionStartTime = std::chrono::steady_clock::now();
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	NetworkMessages::ClientUnsubscribeMessage message {
+	NetworkMessages::ClientUnsubscribeMessage message
+	{
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = rSlot.ackState.uiEpoch,
 	};
@@ -175,7 +178,8 @@ void Client::SendHello()
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
-	NetworkMessages::ClientHelloMessage message {
+	NetworkMessages::ClientHelloMessage message
+	{
 		.uiProtocolVersion = kuiProtocolVersion,
 		.iFrameVersion = game::NetworkSessionContract::GetFrameVersion(),
 		.packIntegrityToken = gpFileManager->GetPackIntegrityToken(),

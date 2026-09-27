@@ -68,7 +68,7 @@ public:
 	static constexpr common::crc_t kBlurSalt = 0x424C5552; // "BLUR"
 
 	// Global descriptor Set 0 shared by all graphics pipelines
-	VkDescriptorSetLayout mGlobalDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> mGlobalDescriptorSets;
 
 	// Texture binding tracking for deferred descriptor updates

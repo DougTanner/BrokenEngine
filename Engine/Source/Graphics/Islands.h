@@ -16,7 +16,7 @@ struct GridCoord;
 // sizeof(AxisAlignedQuadLayout): with kiCoordSlots = 16 and kiMaxIslandsPerCell = 107 this is 436,560 bytes
 // (426.33 KiB), independent of the number of island templates.
 inline constexpr int64_t kiMaxActivePlacements = (game::NetworkSessionContract::kiCoordSlots + 1) * kiMaxIslandsPerCell;
-inline constexpr VkDeviceSize kiIslandMeshArenaBytes = 64ull * 1024ull * 1024ull;
+inline constexpr VkDeviceSize kiIslandMeshArenaBytes = 64ull * 1'024ull * 1'024ull;
 
 // SSBO and indirect buffers have one instance per framebuffer index, sized by kiMaxFramebuffers. UpdateActiveIslands runs before
 // RenderGlobal and writes only the re-acquired instance: its prior frame has presented and completed its GPU read, while this frame has not

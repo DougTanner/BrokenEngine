@@ -26,7 +26,7 @@ struct AreaLightsType
 };
 
 struct AreaLightsInterpolate : public Collection<AreaLightsInterpolate, CollectionFlags::kIdToIndex>,
-                               public TypeRegistry<AreaLightsType>
+	public TypeRegistry<AreaLightsType>
 {
 	static constexpr const char* kName = "AreaLights";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("AreaLights");
@@ -37,7 +37,7 @@ struct AreaLightsInterpolate : public Collection<AreaLightsInterpolate, Collecti
 	// SyncData for parent-provided values
 	struct SyncData
 	{
-		uint8_t uiTypeIndex;
+		uint8_t uiTypeIndex = 0;
 		XMVECTOR vecVisiblePositions[4];
 		float fIntensityMultiplier = 1.0f;
 	};

@@ -200,14 +200,14 @@ void RawInputManager::Update(bool bLostFocus)
 			mRawInput.f2Dpad.x = gamepadState.dpad.left ? -1.0f : (gamepadState.dpad.right ? 1.0f : 0.0f);
 			mRawInput.f2Dpad.y = gamepadState.dpad.up ? 1.0f : (gamepadState.dpad.down ? -1.0f : 0.0f);
 
-			mRawInput.gamepadButtons.Set(kGamepadButtonA, gamepadState.IsAPressed());
-			mRawInput.gamepadButtons.Set(kGamepadButtonB, gamepadState.IsBPressed());
-			mRawInput.gamepadButtons.Set(kGamepadButtonX, gamepadState.IsXPressed());
-			mRawInput.gamepadButtons.Set(kGamepadButtonY, gamepadState.IsYPressed());
-			mRawInput.gamepadButtons.Set(kGamepadLeftShoulder, gamepadState.IsLeftShoulderPressed());
-			mRawInput.gamepadButtons.Set(kGamepadRightShoulder, gamepadState.IsRightShoulderPressed());
-			mRawInput.gamepadButtons.Set(kGamepadStart, gamepadState.IsStartPressed());
-			mRawInput.gamepadButtons.Set(kGamepadMenu, gamepadState.IsMenuPressed());
+			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadButtonA, gamepadState.IsAPressed());
+			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadButtonB, gamepadState.IsBPressed());
+			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadButtonX, gamepadState.IsXPressed());
+			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadButtonY, gamepadState.IsYPressed());
+			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadLeftShoulder, gamepadState.IsLeftShoulderPressed());
+			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadRightShoulder, gamepadState.IsRightShoulderPressed());
+			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadStart, gamepadState.IsStartPressed());
+			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadMenu, gamepadState.IsMenuPressed());
 		}
 		else
 		{

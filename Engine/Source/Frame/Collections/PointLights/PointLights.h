@@ -27,8 +27,8 @@ struct PointLightsType
 };
 
 struct PointLightsInterpolate : public Collection<PointLightsInterpolate, CollectionFlags::kIdToIndex>,
-                                public TypeRegistry<PointLightsType>,
-                                public ControllerTypeRegistry<PointLightsInterpolate>
+	public TypeRegistry<PointLightsType>,
+	public ControllerTypeRegistry<PointLightsInterpolate>
 {
 	static constexpr const char* kName = "PointLights";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("PointLights");
@@ -43,11 +43,11 @@ struct PointLightsInterpolate : public Collection<PointLightsInterpolate, Collec
 	struct SyncData
 	{
 		XMVECTOR vecPosition;
-		float fVisibleArea;
-		float fVisibleIntensity;
-		float fLightingArea;
-		float fLightingIntensity;
-		float fRotation;
+		float fVisibleArea = 0.0f;
+		float fVisibleIntensity = 0.0f;
+		float fLightingArea = 0.0f;
+		float fLightingIntensity = 0.0f;
+		float fRotation = 0.0f;
 	};
 
 	// Sync owned point light with parent-provided data

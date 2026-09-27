@@ -61,8 +61,8 @@ void ParticleManager::RenderGlobal(int64_t iCommandBuffer)
 	shaders::ParticlesSpawnLayout& rLongParticlesSpawnLayout = *reinterpret_cast<shaders::ParticlesSpawnLayout*>(&gpBufferManager->mLongParticlesSpawnStorageBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 	shaders::ParticlesSpawnLayout& rSquareParticlesSpawnLayout = *reinterpret_cast<shaders::ParticlesSpawnLayout*>(&gpBufferManager->mSquareParticlesSpawnStorageBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
-	const float fStretchVelocityStart = 1.0f;
-	const float fStretchVelocityEnd = 10.0f;
+	float fStretchVelocityStart = 1.0f;
+	float fStretchVelocityEnd = 10.0f;
 	rGlobalLayout.fParticlesStretchVelocityStart = fStretchVelocityStart;
 	rGlobalLayout.fParticlesStretchVelocityMultiplier = 2.0f;
 	// Compute the stretch-range reciprocal once on the CPU; it is invariant across shader invocations.

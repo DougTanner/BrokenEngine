@@ -8,9 +8,6 @@
 namespace engine
 {
 
-using enum TextureFlags;
-using enum TextureLayout;
-
 void RenderTargetTextures::DestroyLightingTextures()
 {
 	miDebugTextureCount = 0;
@@ -76,7 +73,7 @@ void RenderTargetTextures::CreateLightingTextures()
 		.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback (shared by all 3 lighting textures)
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
 	mpLightingTextures[0].Create(lightingTextureInfo);
 	lightingTextureInfo.name = "GreenLighting";
@@ -201,7 +198,7 @@ void RenderTargetTextures::CreateLightingTextures()
 				.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 				.viewType = VK_IMAGE_VIEW_TYPE_2D,
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.eTextureLayout = kShaderReadOnly,
+				.eTextureLayout = TextureLayout::kShaderReadOnly,
 			});
 			std::string strSpreadOnlyName = std::format("SpreadOnly{}_{}", pColorNames[iColor], iPass);
 			mpSpreadOnlyTextures[iPass][iColor].Create(TextureInfo
@@ -217,7 +214,7 @@ void RenderTargetTextures::CreateLightingTextures()
 				.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 				.viewType = VK_IMAGE_VIEW_TYPE_2D,
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.eTextureLayout = kShaderReadOnly,
+				.eTextureLayout = TextureLayout::kShaderReadOnly,
 			});
 		}
 	}
@@ -340,7 +337,7 @@ void RenderTargetTextures::CreateLightingTextures()
 			.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 			.viewType = VK_IMAGE_VIEW_TYPE_2D,
 			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.eTextureLayout = kShaderReadOnly,
+			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		});
 	}
 	mAmbientCombineTexture.Create(TextureInfo
@@ -356,7 +353,7 @@ void RenderTargetTextures::CreateLightingTextures()
 		.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
 	// History textures: previous-frame combine outputs reprojected + EMA-blended by LightingTemporal.comp.
@@ -378,7 +375,7 @@ void RenderTargetTextures::CreateLightingTextures()
 			.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 			.viewType = VK_IMAGE_VIEW_TYPE_2D,
 			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.eTextureLayout = kShaderReadOnly,
+			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		});
 	}
 	mAmbientHistoryTexture.Create(TextureInfo
@@ -394,7 +391,7 @@ void RenderTargetTextures::CreateLightingTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
 	// Final output points to combine textures (tone-mapped UNORM)

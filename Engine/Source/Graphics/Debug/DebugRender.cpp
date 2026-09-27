@@ -5,7 +5,7 @@
 namespace engine
 {
 
-static constexpr int64_t kiInitialDebugRender = 128 * 1024;
+static constexpr int64_t kiInitialDebugRender = 128 * 1'024;
 
 struct DebugRenderType
 {

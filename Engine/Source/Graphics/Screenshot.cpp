@@ -106,7 +106,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 	{
 		sSaveScreenshot.get();
 	}
-	const bool bSwapRedBlue = IsBgra(gpInstanceManager->mFramebufferVkFormat);
+	bool bSwapRedBlue = IsBgra(gpInstanceManager->mFramebufferVkFormat);
 	sSaveScreenshot = std::async(std::launch::async, common::ThreadLocal::Entry([data = std::move(data), vkExtent3D, iScreenshot, rRequest, bSwapRedBlue]() mutable
 	{
 		// Heap: the encoder runs off the main loop on its own ThreadLocal, which still participates in tracking. Its
@@ -215,11 +215,11 @@ namespace
 {
 
 // Throws if iIndex is outside [0, iCount); otherwise returns it as an array subscript.
-size_t CheckDumpIndex(int64_t iIndex, int64_t iCount, const std::string& rName)
+size_t CheckDumpIndex(int64_t iIndex, int64_t iCount, std::string_view name)
 {
 	if (iIndex < 0 || iIndex >= iCount)
 	{
-		throw std::runtime_error("render target '" + rName + "' index out of range [0, " + std::to_string(iCount) + ")");
+		throw std::runtime_error("render target '" + std::string(name) + "' index out of range [0, " + std::to_string(iCount) + ")");
 	}
 	return static_cast<size_t>(iIndex);
 }
@@ -233,110 +233,110 @@ constexpr const char* kpcValidDumpNames =
 
 // Resolve a dump name (+ indices) to a live RenderTargetTextures member. Throws std::runtime_error listing valid
 // names on an unknown name, or on an out-of-range index (both surfaced to the agent).
-Texture* ResolveRenderTarget(const std::string& rName, int64_t iIndex, int64_t iChannel)
+Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64_t iChannel)
 {
 	RenderTargetTextures& r = gpTextureManager->mRenderTargetTextures;
 
-	if (rName == "Log")
+	if (name == "Log")
 	{
 		return &r.mLogTexture;
 	}
-	if (rName == "TerrainElevation")
+	if (name == "TerrainElevation")
 	{
 		return &r.mTerrainElevationTexture;
 	}
-	if (rName == "SmokeGradient")
+	if (name == "SmokeGradient")
 	{
 		return &r.mSmokeGradientTexture;
 	}
-	if (rName == "SmokeOne")
+	if (name == "SmokeOne")
 	{
 		return &r.mSmokeTextureOne;
 	}
-	if (rName == "SmokeTwo")
+	if (name == "SmokeTwo")
 	{
 		return &r.mSmokeTextureTwo;
 	}
-	if (rName == "WindOne")
+	if (name == "WindOne")
 	{
 		return &r.mWindTextureOne;
 	}
-	if (rName == "WindTwo")
+	if (name == "WindTwo")
 	{
 		return &r.mWindTextureTwo;
 	}
-	if (rName == "AmbientCombine")
+	if (name == "AmbientCombine")
 	{
 		return &r.mAmbientCombineTexture;
 	}
-	if (rName == "AmbientHistory")
+	if (name == "AmbientHistory")
 	{
 		return &r.mAmbientHistoryTexture;
 	}
-	if (rName == "ShadowElevation")
+	if (name == "ShadowElevation")
 	{
 		return &r.mShadowElevationTexture;
 	}
-	if (rName == "Shadow")
+	if (name == "Shadow")
 	{
 		return &r.mShadowTexture;
 	}
-	if (rName == "ShadowBlur")
+	if (name == "ShadowBlur")
 	{
 		return &r.mShadowBlurTexture;
 	}
-	if (rName == "ShadowBlurIntermediate")
+	if (name == "ShadowBlurIntermediate")
 	{
 		return &r.mShadowBlurIntermediateTexture;
 	}
-	if (rName == "ShadowHistory")
+	if (name == "ShadowHistory")
 	{
 		return &r.mShadowHistoryTexture;
 	}
-	if (rName == "ObjectShadows")
+	if (name == "ObjectShadows")
 	{
 		return &r.mObjectShadowsTexture;
 	}
-	if (rName == "ObjectShadowsBlur")
+	if (name == "ObjectShadowsBlur")
 	{
 		return &r.mObjectShadowsBlurTexture;
 	}
-	if (rName == "ObjectShadowsBlurIntermediate")
+	if (name == "ObjectShadowsBlurIntermediate")
 	{
 		return &r.mObjectShadowsBlurIntermediateTexture;
 	}
-	if (rName == "WaterDisplacement")
+	if (name == "WaterDisplacement")
 	{
 		return &r.mWaterDisplacementTexture;
 	}
-	if (rName == "WaterDisplacementNormal")
+	if (name == "WaterDisplacementNormal")
 	{
 		return &r.mWaterDisplacementNormalTexture;
 	}
 
-	if (rName == "Lighting")
+	if (name == "Lighting")
 	{
-		return &r.mpLightingTextures[CheckDumpIndex(iIndex, 3, rName)];
+		return &r.mpLightingTextures[CheckDumpIndex(iIndex, 3, name)];
 	}
-	if (rName == "Combine")
+	if (name == "Combine")
 	{
-		return &r.mpCombineTextures[CheckDumpIndex(iIndex, 3, rName)];
+		return &r.mpCombineTextures[CheckDumpIndex(iIndex, 3, name)];
 	}
-	if (rName == "LightingHistory")
+	if (name == "LightingHistory")
 	{
-		return &r.mpLightingHistoryTextures[CheckDumpIndex(iIndex, 3, rName)];
-	}
-
-	if (rName == "Spread")
-	{
-		return &r.mpSpreadTextures[CheckDumpIndex(iIndex, shaders::kiMaxSpreadPasses, rName)][CheckDumpIndex(iChannel, 3, rName)];
-	}
-	if (rName == "SpreadOnly")
-	{
-		return &r.mpSpreadOnlyTextures[CheckDumpIndex(iIndex, shaders::kiMaxSpreadPasses, rName)][CheckDumpIndex(iChannel, 3, rName)];
+		return &r.mpLightingHistoryTextures[CheckDumpIndex(iIndex, 3, name)];
 	}
 
-	throw std::runtime_error("unknown render target '" + rName + "'; valid names: " + kpcValidDumpNames);
+	if (name == "Spread")
+	{
+		return &r.mpSpreadTextures[CheckDumpIndex(iIndex, shaders::kiMaxSpreadPasses, name)][CheckDumpIndex(iChannel, 3, name)];
+	}
+	if (name == "SpreadOnly")
+	{
+		return &r.mpSpreadOnlyTextures[CheckDumpIndex(iIndex, shaders::kiMaxSpreadPasses, name)][CheckDumpIndex(iChannel, 3, name)];
+	}
+
+	throw std::runtime_error("unknown render target '" + std::string(name) + "'; valid names: " + kpcValidDumpNames);
 }
 
 const char* FormatName(VkFormat vkFormat)

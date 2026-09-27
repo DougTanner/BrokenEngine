@@ -11,9 +11,6 @@
 namespace engine
 {
 
-using enum TextureFlags;
-using enum TextureLayout;
-
 // Extra texture-descriptor slots reserved for pre-blurred lighting texture copies (one per registered lighting texture CRC)
 static constexpr int64_t kiLightingBlurSlots = 16;
 
@@ -85,7 +82,7 @@ void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_vie
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		.viewType = vkImageViewType,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	}, rPixelWriter);
 }
 
@@ -189,7 +186,7 @@ TextureManager::TextureManager()
 			.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			.viewType = bCubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,
 			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.eTextureLayout = kShaderReadOnly,
+			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		}, bCubemap ? mWhiteCubeTexture.mVkImageView : mWhiteTexture.mVkImageView);
 
 		// Water normal maps: copy the DataPacker-baked per-mip Toksvig variance table (already
@@ -474,7 +471,7 @@ void TextureManager::CreateSamplers()
 VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 {
 	// Map sampler flags to slots; flags are mutually exclusive, so order matters only when a caller violates the asserted contract.
-	static constexpr struct { DescriptorFlags flag; SamplerSlot slot; } kFlagToSlot[]
+	static constexpr struct FlagToSlotEntry { DescriptorFlags flag; SamplerSlot slot; } kFlagToSlot[]
 	{
 		{DescriptorFlags::kSamplerElevation, kSamplerSlotElevation},
 		{DescriptorFlags::kSamplerClamp, kSamplerSlotClamp},
@@ -492,13 +489,13 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 
 	// Sampler flags are mutually exclusive — if a caller accidentally sets two, the first table match silently picks one and masks the bug.
 	int64_t iSamplerFlagCount = 0;
-	for (const auto& rEntry : kFlagToSlot)
+	for (const FlagToSlotEntry& rEntry : kFlagToSlot)
 	{
 		iSamplerFlagCount += (flags & rEntry.flag ? 1 : 0);
 	}
 	ASSERT(iSamplerFlagCount <= 1);
 
-	for (const auto& rEntry : kFlagToSlot)
+	for (const FlagToSlotEntry& rEntry : kFlagToSlot)
 	{
 		if (flags & rEntry.flag)
 		{
@@ -607,7 +604,7 @@ void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bo
 	LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(crc);
 
 	// Adopt the GPU-uploaded image (sets mVkImage and creates VkImageView)
-	rTexture.AdoptTransferredImage(rLazyChunk.vkImage, rLazyChunk.vmaAllocation);
+	rTexture.AdoptTransferredImage(rLazyChunk.uploadVkImage, rLazyChunk.vmaAllocation);
 
 	bool bIsLightingTexture = gpTextureUploadManager->mLightingTextureCrcs.contains(crc);
 
@@ -769,7 +766,7 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kComputeReadWrite,
+		.eTextureLayout = TextureLayout::kComputeReadWrite,
 	});
 
 	// Create or recreate result texture (Texture::Create self-destroys any prior image)
@@ -787,7 +784,7 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
 	Texture& rIntermediate = itIntermediate->second;
@@ -818,18 +815,18 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 	}
 
 	// Horizontal pass: source → intermediate
-	rIntermediate.TransitionImageLayout(vkCommandBuffer, kComputeReadWrite, kComputeReadWrite);
+	rIntermediate.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
 	rBlurH.RecordCompute(0, vkCommandBuffer, TileCount(uiWidth), TileCount(uiHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
 
 	// Transition intermediate: storage write → shader read for V pass sampler
-	rIntermediate.TransitionImageLayout(vkCommandBuffer, kComputeReadWrite, kShaderReadOnly);
+	rIntermediate.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 
 	// Vertical pass: intermediate → result
-	rResult.TransitionImageLayout(vkCommandBuffer, kShaderReadOnly, kComputeReadWrite);
+	rResult.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
 	rBlurV.RecordCompute(0, vkCommandBuffer, TileCount(uiWidth), TileCount(uiHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
 
 	// Transition result back to shader read for bindless sampling
-	rResult.TransitionImageLayout(vkCommandBuffer, kComputeReadWrite, kShaderReadOnly);
+	rResult.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 
 	oneShotCommandBuffer.Execute();
 

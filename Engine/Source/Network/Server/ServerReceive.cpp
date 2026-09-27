@@ -36,7 +36,8 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 	}
 
 	NetworkMessages::AckStreamEntry entries[NetworkManager::kiMaxEnetCoordSlots] {};
-	NetworkMessages::ClientAckStreamMessage message {
+	NetworkMessages::ClientAckStreamMessage message
+	{
 		.pEntries = entries,
 		.iEntryCapacity = NetworkManager::kiMaxEnetCoordSlots,
 	};
@@ -244,7 +245,8 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPe
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
-		NetworkMessages::ServerDebugFrameMessage response {
+		NetworkMessages::ServerDebugFrameMessage response
+		{
 			.iTick = iTick,
 			.coord = coord,
 			.iUncompressedSize = static_cast<int32_t>(rFrameData.size()),

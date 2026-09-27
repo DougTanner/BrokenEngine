@@ -9,9 +9,6 @@
 namespace engine
 {
 
-using enum DescriptorFlags;
-using enum PipelineFlags;
-
 WorldLightingShadowPipelines::WorldLightingShadowPipelines(std::unordered_map<common::crc_t, Shader>& rShaders, Pipeline* pPipelines, Pipeline* pSpreadPipelines, std::string* pSpreadPipelineNames, Pipeline& rCombinePipeline, Pipeline& rLightingTemporalPipeline, Pipeline& rLightingHistoryCopyPipeline, Texture** ppWaterNormalTextures)
 : mrShaders(rShaders)
 , mpPipelines(pPipelines)
@@ -40,19 +37,19 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 		mpSpreadPipelines[iPass].Create(
 		{
 			.name = mpSpreadPipelineNames[iPass],
-			.flags = {kRenderTarget, kPushConstants, kIndirectHostVisible},
+			.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible},
 			.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mrShaders.at(data::kShadersLightingLightingSpreadfragCrc)},
 			.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-			.vkRenderPass = rTextures.mSpreadVkRenderPass,
+			.targetVkRenderPass = rTextures.mSpreadVkRenderPass,
 			.vkExtent3D = rTextures.mpSpreadTextures[iPass][0].mInfo.extent,
 			.iColorAttachmentCount = 6,
 			.pDescriptorInfos =
 			{
-				{.flags = kGlobalLayoutUniformBuffers},
-				{.flags = kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[0] : &rTextures.mpSpreadTextures[iPass - 1][0]},
-				{.flags = kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[1] : &rTextures.mpSpreadTextures[iPass - 1][1]},
-				{.flags = kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[2] : &rTextures.mpSpreadTextures[iPass - 1][2]},
-				{.flags = kCombinedSamplers, .pTexture = &rTextures.mTerrainElevationTexture},
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[0] : &rTextures.mpSpreadTextures[iPass - 1][0]},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[1] : &rTextures.mpSpreadTextures[iPass - 1][1]},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[2] : &rTextures.mpSpreadTextures[iPass - 1][2]},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mTerrainElevationTexture},
 			},
 		});
 	}
@@ -71,18 +68,18 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 	mrCombinePipeline.Create(
 	{
 		.name = "LightCombine",
-		.flags = {kCompute, kIndirectHostVisible},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightCombinecompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadRed},
-			{.flags = kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadGreen},
-			{.flags = kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadBlue},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mAmbientCombineTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadRed},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadGreen},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadBlue},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mAmbientCombineTexture},
 		},
 	});
 
@@ -91,38 +88,38 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 	mrLightingTemporalPipeline.Create(
 	{
 		.name = "LightingTemporal",
-		.flags = {kCompute, kIndirectHostVisible},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingTemporalcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[0]},
-			{.flags = kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[1]},
-			{.flags = kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[2]},
-			{.flags = kCombinedSamplers, .pTexture = &rTextures.mAmbientHistoryTexture},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mAmbientCombineTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[0]},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[1]},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[2]},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mAmbientHistoryTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mAmbientCombineTexture},
 		},
 	});
 
 	mrLightingHistoryCopyPipeline.Create(
 	{
 		.name = "LightingHistoryCopy",
-		.flags = {kCompute, kIndirectHostVisible},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingHistoryCopycompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mAmbientCombineTexture},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[0]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[1]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[2]},
-			{.flags = kStorageImages, .pTexture = &rTextures.mAmbientHistoryTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[1]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[2]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mAmbientCombineTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[0]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[1]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[2]},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mAmbientHistoryTexture},
 		},
 	});
 }
@@ -136,82 +133,82 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		// heightmaps so the tallest terrain wins per pixel instead of last-draw-wins. RTT clears to
 		// mfSeaFloorElevation (the shared ocean floor, the lowest any heightmap reaches), so single-island
 		// pixels are unchanged (max(floor, v) == v).
-		.flags = {kRenderTarget, kPushConstants, kMax, kUpdateAfterBind},
+		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kMax, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc), &mrShaders.at(data::kShadersTerrainTerrainElevationfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.vkRenderPass = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mVkRenderPass,
+		.targetVkRenderPass = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mVkRenderPass,
 		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mInfo.extent,
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
 			// The unflagged default keeps this offscreen shadow prepass linear without player-facing anisotropy.
-			{.flags = {kCombinedSamplers, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 2 (elevation)
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 2 (elevation)
 		},
 	});
 
 	mpPipelines[kPipelineShadow].Create(
 	{
 		.name = "Shadow",
-		.flags = {kCompute},
+		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowElevationTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowElevationTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowTexture},
 		},
 	});
 
 	mpPipelines[kPipelineShadowBlurH].Create(
 	{
 		.name = "ShadowBlurH",
-		.flags = {kCompute},
+		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowBlurHcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture},
 		},
 	});
 
 	mpPipelines[kPipelineShadowBlurV].Create(
 	{
 		.name = "ShadowBlurV",
-		.flags = {kCompute},
+		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowBlurVcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
 		},
 	});
 
 	mpPipelines[kPipelineObjectShadowsBlurH].Create(
 	{
 		.name = "ObjectShadowsBlurH",
-		.flags = {kCompute},
+		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowObjectShadowsBlurHcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture},
 		},
 	});
 
 	mpPipelines[kPipelineObjectShadowsBlurV].Create(
 	{
 		.name = "ObjectShadowsBlurV",
-		.flags = {kCompute},
+		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowObjectShadowsBlurVcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
 		},
 	});
 
@@ -220,26 +217,26 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	mpPipelines[kPipelineShadowTemporal].Create(
 	{
 		.name = "ShadowTemporal",
-		.flags = {kCompute},
+		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowTemporalcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
 		},
 	});
 
 	mpPipelines[kPipelineShadowHistoryCopy].Create(
 	{
 		.name = "ShadowHistoryCopy",
-		.flags = {kCompute},
+		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowHistoryCopycompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture},
 		},
 	});
 }
@@ -250,24 +247,24 @@ void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 	mpPipelines[kPipelineLightingBlurH].Create(
 	{
 		.name = "LightingBlurH",
-		.flags = {kCompute, kPushConstants},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingBlurHcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0]},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0]},
 		},
 	});
 
 	mpPipelines[kPipelineLightingBlurV].Create(
 	{
 		.name = "LightingBlurV",
-		.flags = {kCompute, kPushConstants},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingBlurVcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0]},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0]},
 		},
 	});
 }
@@ -285,48 +282,48 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 	{
 		.name = "Terrain",
 		// Terrain records one vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain from Islands' per-template indirect buffers.
-		.flags = {kDepthTest, kDepthWrite, kCullBack, kUpdateAfterBind},
+		.flags = {PipelineFlags::kDepthTest, PipelineFlags::kDepthWrite, PipelineFlags::kCullBack, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersTerrainTerrainvertCrc), &mrShaders.at(data::kShadersTerrainTerrainfragCrc)},
 		// pVertexBuffer is null: vertex buffer is per-island and bound at draw time. Vertex input
 		// stride and attribute layout come from shader reflection (Terrain.vert declares vec2 f2InPosition).
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kMainLayoutUniformBuffers},
-			{.flags = {kCombinedSamplers, kSamplerBorder}, .iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures)), .ppTextures = gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures},
-			{.flags = {kCombinedSamplers, kSamplerBorderWhite}, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures)), .ppTextures = gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorderWhite}, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
 			// Bindless per-island color / normal / AO arrays.
 			// Compositing fragment shader indexes these with the per-instance `uiTextureSlot` forwarded
 			// from Terrain.vert; `kSamplerClamp` matches the per-slot RegisterTextureBinding flag in
 			// IslandTerrainResidency.cpp so descriptor writes line up with the sampler descriptor layout.
-			{.flags = {kCombinedSamplers, kSamplerClamp, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mColorTextures.data()}, // set=1 binding 6 (color)
-			{.flags = {kCombinedSamplers, kSamplerClamp, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mNormalsTextures.data()}, // set=1 binding 7 (normals)
-			{.flags = {kCombinedSamplers, kSamplerClamp, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mAmbientOcclusionTextures.data()}, // set=1 binding 8 (ambient occlusion)
-			{.flags = {kCombinedSamplers, kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC7Rock0jpgCrc},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5SandNormal0jpgCrc},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5SandNormal1pngCrc},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5SandNormal2pngCrc},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC7SandpngCrc},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal1jpgCrc},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal2jpgCrc},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal4jpgCrc},
-			{.flags = {kCombinedSamplers, kSamplerBorder}, .pTexture = &gpTextureManager->mRenderTargetTextures.mAmbientCombineTexture},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mColorTextures.data()}, // set=1 binding 6 (color)
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mNormalsTextures.data()}, // set=1 binding 7 (normals)
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mAmbientOcclusionTextures.data()}, // set=1 binding 8 (ambient occlusion)
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC7Rock0jpgCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5SandNormal0jpgCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5SandNormal1pngCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5SandNormal2pngCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC7SandpngCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal1jpgCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal2jpgCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesTerrainBC5RockNormal4jpgCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .pTexture = &gpTextureManager->mRenderTargetTextures.mAmbientCombineTexture},
 			// AxisAlignedQuadLayout instance buffer used by Terrain.vert to transform island-local
 			// mesh vertices into world space (set=1 binding=19). Mirrors kPipelineShadowElevation's
 			// SSBO usage; gl_InstanceIndex is supplied per-island via firstInstance at draw time.
-			{.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
 			// Bindless per-island material masks use set=1 binding=20; packed RGBA stores Rock/Sand/Snow/Flow. The masks follow the SSBO so fragment
 			// bindings 9..18 and the Terrain.vert SSBO at 19 stay fixed.
-			{.flags = {kCombinedSamplers, kSamplerClamp, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mMasksTextures.data()}, // set=1 binding 20 (masks)
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mMasksTextures.data()}, // set=1 binding 20 (masks)
 			// Per-island heightmap array (R16_SFLOAT), set=1 binding 21 (appended after masks at 20 so bindings
 			// 0..20 stay put). Terrain.vert samples it at the island-local UV to sink THIS island's submerged
 			// verts (own elevation < zero-out) to the flat sea floor, so an overlapping neighbor's MAX-composite
 			// height never lifts this island's underwater mesh. Same array pointer the prepasses consume, so the
 			// existing per-slot RegisterTextureBinding / eviction machinery patches this binding automatically.
-			{.flags = {kCombinedSamplers, kSamplerElevation, kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 21 (Terrain.vert own-heightmap sink)
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerElevation, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 21 (Terrain.vert own-heightmap sink)
 		},
 	});
 
@@ -338,15 +335,15 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 	mpPipelines[kPipelineWaterDisplacement].Create(
 	{
 		.name = "WaterDisplacement",
-		.flags = {kCompute, kIndirectHostVisible},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersWaterWaterDisplacementcompCrc)},
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kMainLayoutUniformBuffers},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture},
-			{.flags = kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
 		},
 	});
 
@@ -355,28 +352,28 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 	mpPipelines[kPipelineWater].Create(
 	{
 		.name = "Water",
-		.flags = {kAlphaBlend, kCullBack, kDepthTest, kDepthWrite, kDepthBias, kUpdateAfterBind, kIndirectHostVisible},
+		.flags = {PipelineFlags::kAlphaBlend, PipelineFlags::kCullBack, PipelineFlags::kDepthTest, PipelineFlags::kDepthWrite, PipelineFlags::kDepthBias, PipelineFlags::kUpdateAfterBind, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersWaterWatervertCrc), &mrShaders.at(data::kShadersWaterWaterfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mWaterMeshBuffer,
 		.pDescriptorInfos =
 		{
-			{.flags = kGlobalLayoutUniformBuffers},
-			{.flags = kMainLayoutUniformBuffers},
-			{.flags = {kCombinedSamplers, kSamplerBorder}, .iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures)), .ppTextures = gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures},
-			{.flags = {kCombinedSamplers, kSamplerBorderWhite}, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
-			{.flags = kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
-			{.flags = kCombinedSamplers, .textureCrc = TextureManager::kPrefilteredWaterCrc},
-			{.flags = {kCombinedSamplers, kSamplerRepeat}, .textureCrc = data::kTexturesWaterBC4NoisepngCrc},
-			{.flags = {kCombinedSamplers, kSamplerMirroredRepeatWater}, .iCount = TextureManager::kiWaterNormalCount, .ppTextures = mppWaterNormalTextures},
-			{.flags = kCombinedSamplers, .textureCrc = data::kTexturesWaterDepthLutpngCrc},
-			{.flags = {kCombinedSamplers, kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
-			{.flags = {kCombinedSamplers, kSamplerBorder}, .pTexture = &gpTextureManager->mRenderTargetTextures.mAmbientCombineTexture},
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures)), .ppTextures = gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorderWhite}, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .textureCrc = TextureManager::kPrefilteredWaterCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesWaterBC4NoisepngCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeatWater}, .iCount = TextureManager::kiWaterNormalCount, .ppTextures = mppWaterNormalTextures},
+			{.flags = DescriptorFlags::kCombinedSamplers, .textureCrc = data::kTexturesWaterDepthLutpngCrc},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .pTexture = &gpTextureManager->mRenderTargetTextures.mAmbientCombineTexture},
 			// Compute-pre-computed Gerstner displacement + normal sampled in Water.vert via texelFetch.
 			// Explicit bindings keep the shader-side numbers at 13/14 — binding 12 is intentionally
 			// unused; renumbering the displacement bindings isn't worth the churn.
-			{.flags = kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacement, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture},
-			{.flags = kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacementNormal, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacement, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacementNormal, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
 		},
 	});
 }

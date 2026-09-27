@@ -80,8 +80,8 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 			}
 
 			// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
-			const float fDurationMultiplier = (j == 0) ? sTuning.pPrimaryTrailDuration->Get() : sTuning.pSecondaryTrailDuration->Get();
-			const float fEffectiveTrailTime = rCurrent.pfTrailTimes[j][i] * fDurationMultiplier;
+			float fDurationMultiplier = (j == 0) ? sTuning.pPrimaryTrailDuration->Get() : sTuning.pSecondaryTrailDuration->Get();
+			float fEffectiveTrailTime = rCurrent.pfTrailTimes[j][i] * fDurationMultiplier;
 			float fTrailEndTime = fTimePercent * rType.fTrailDelayTime + fEffectiveTrailTime;
 
 			// For expired trails, sync with zero intensity (they'll be removed in Destroy phase)

@@ -43,8 +43,6 @@ void ColumnSlider(const char* pcLabel, Wrapper* pWrapper, std::string_view forma
 
 void GraphicsMenuScreen::Render()
 {
-	using enum StandardString;
-
 	if (game::gpGame->meUiState != UiState::kGraphicsSettings)
 	{
 		return;
@@ -78,7 +76,7 @@ void GraphicsMenuScreen::Render()
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
 
-	float fHeaderButtonWidth = MenuButtonsWidth({TranslatedString(kStringDefaults), U"Back"});
+	float fHeaderButtonWidth = MenuButtonsWidth({TranslatedString(StandardString::kStringDefaults), U"Back"});
 	bool bBackPressed = false;
 	if (ImGui::BeginTable("GraphicsHeader", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_NoSavedSettings))
 	{
@@ -93,7 +91,7 @@ void GraphicsMenuScreen::Render()
 		{
 			ScopedMenuFont headingFont(fMenuFontScale * kfGraphicsHeadingScale);
 			fHeaderHeight = ImGui::GetTextLineHeight();
-			ImGui::TextUnformatted(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(kStringGraphics)));
+			ImGui::TextUnformatted(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(StandardString::kStringGraphics)));
 		}
 
 		ImGui::TableNextColumn();
@@ -102,7 +100,7 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::TableNextColumn();
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + std::max(0.0f, (fHeaderHeight - ImGui::GetFrameHeight()) * 0.5f));
-		if (MenuButton(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(kStringDefaults)), ImVec2(fHeaderButtonWidth, 0.0f), mfDefaultsHoverAnim))
+		if (MenuButton(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(StandardString::kStringDefaults)), ImVec2(fHeaderButtonWidth, 0.0f), mfDefaultsHoverAnim))
 		{
 			ResetGraphicsSettings();
 		}

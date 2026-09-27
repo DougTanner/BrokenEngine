@@ -89,10 +89,10 @@ void ExtractContourEdges(std::vector<ContourEdge>& rEdges, const float* pfHeight
 				return std::clamp((fA - fThresholdValue) / fDenom, 0.0f, 1.0f);
 			};
 
-			const uint64_t uiKeyTop = EncodeEdgeKey(0, iY, iX);
-			const uint64_t uiKeyRight = EncodeEdgeKey(1, iY, iX + 1);
-			const uint64_t uiKeyBottom = EncodeEdgeKey(0, iY + 1, iX);
-			const uint64_t uiKeyLeft = EncodeEdgeKey(1, iY, iX);
+			uint64_t uiKeyTop = EncodeEdgeKey(0, iY, iX);
+			uint64_t uiKeyRight = EncodeEdgeKey(1, iY, iX + 1);
+			uint64_t uiKeyBottom = EncodeEdgeKey(0, iY + 1, iX);
+			uint64_t uiKeyLeft = EncodeEdgeKey(1, iY, iX);
 
 			// Top edge (TL to TR)
 			float fTopT = Lerp(fTL, fTR, fWorldThreshold);
@@ -196,8 +196,8 @@ void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const
 	// false T-junctions.
 	struct EdgeRef
 	{
-		size_t iEdgeIndex;
-		bool bIsEndpointB; // false = matched on f2A / uiKeyA, true = matched on f2B / uiKeyB
+		size_t iEdgeIndex = 0;
+		bool bIsEndpointB = false; // false = matched on f2A / uiKeyA, true = matched on f2B / uiKeyB
 	};
 	std::unordered_multimap<uint64_t, EdgeRef> vertexToEdge;
 	vertexToEdge.reserve(rEdges.size() * 2);
@@ -224,15 +224,15 @@ void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const
 
 		std::vector<XMFLOAT2> polygon = { rEdges.at(i).f2A, rEdges.at(i).f2B };
 		used.at(i) = true;
-		const uint64_t uiHeadKey = rEdges.at(i).uiKeyA;
+		uint64_t uiHeadKey = rEdges.at(i).uiKeyA;
 		uint64_t uiTailKey = rEdges.at(i).uiKeyB;
 
 		bool bGrowing = true;
 		while (bGrowing)
 		{
 			bGrowing = false;
-			auto range = vertexToEdge.equal_range(uiTailKey);
-			for (auto it = range.first; it != range.second; ++it)
+			auto [itBegin, itEnd] = vertexToEdge.equal_range(uiTailKey);
+			for (auto it = itBegin; it != itEnd; ++it)
 			{
 				size_t j = it->second.iEdgeIndex;
 				if (used.at(j))

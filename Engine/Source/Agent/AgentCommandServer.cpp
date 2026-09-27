@@ -96,7 +96,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 	mListenerThread = std::jthread(common::ThreadLocal::Entry([this](std::stop_token stopToken)
 	{
 		ListenerLoop(std::move(stopToken));
-	}, 64 * 1024));
+	}, 64 * 1'024));
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 	AudioStreamingFixture::Attach(*mpAudioStreamingFixture);
 #endif
@@ -266,7 +266,7 @@ void AgentCommandServer::ServeConnection(SOCKET clientSocket, const std::stop_to
 			{
 				lock.unlock();
 				char cPeekByte = 0;
-				const int iPeeked = recv(clientSocket, &cPeekByte, 1, MSG_PEEK);
+				int iPeeked = recv(clientSocket, &cPeekByte, 1, MSG_PEEK);
 				if (iPeeked == 0 || (iPeeked == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK))
 				{
 					return; // peer closed or reset; teardown bumps the generation so its response is dropped
@@ -473,9 +473,9 @@ bool AgentCommandServer::ReadExact(SOCKET clientSocket, uint8_t* pBuffer, int64_
 		FD_ZERO(&readSet);
 		FD_SET(clientSocket, &readSet);
 		timeval timeout {};
-		timeout.tv_sec = static_cast<long>(kListenerRetryInterval.count() / 1000);
-		timeout.tv_usec = static_cast<long>((kListenerRetryInterval.count() % 1000) * 1000);
-		const int iReady = select(0, &readSet, nullptr, nullptr, &timeout);
+		timeout.tv_sec = static_cast<long>(kListenerRetryInterval.count() / 1'000);
+		timeout.tv_usec = static_cast<long>((kListenerRetryInterval.count() % 1'000) * 1'000);
+		int iReady = select(0, &readSet, nullptr, nullptr, &timeout);
 		if (iReady == SOCKET_ERROR)
 		{
 			return false;
@@ -489,7 +489,7 @@ bool AgentCommandServer::ReadExact(SOCKET clientSocket, uint8_t* pBuffer, int64_
 			return false;
 		}
 
-		const int iReceived = recv(clientSocket, reinterpret_cast<char*>(pBuffer + iTotal), static_cast<int>(iBytes - iTotal), 0);
+		int iReceived = recv(clientSocket, reinterpret_cast<char*>(pBuffer + iTotal), static_cast<int>(iBytes - iTotal), 0);
 		if (iReceived > 0)
 		{
 			iTotal += iReceived;
@@ -511,14 +511,14 @@ bool AgentCommandServer::SendExact(SOCKET clientSocket, const uint8_t* pBuffer, 
 	int64_t iTotal = 0;
 	while (iTotal < iBytes)
 	{
-		const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 		if (now >= rDeadline)
 		{
 			return false;
 		}
 
 		std::chrono::microseconds waitDuration = std::chrono::duration_cast<std::chrono::microseconds>(rDeadline - now);
-		const std::chrono::microseconds wakeDuration = std::chrono::duration_cast<std::chrono::microseconds>(kListenerRetryInterval);
+		std::chrono::microseconds wakeDuration = std::chrono::duration_cast<std::chrono::microseconds>(kListenerRetryInterval);
 		if (waitDuration > wakeDuration)
 		{
 			waitDuration = wakeDuration;
@@ -531,7 +531,7 @@ bool AgentCommandServer::SendExact(SOCKET clientSocket, const uint8_t* pBuffer, 
 		timeval timeout {};
 		timeout.tv_sec = static_cast<long>(waitDuration.count() / 1'000'000);
 		timeout.tv_usec = static_cast<long>(waitDuration.count() % 1'000'000);
-		const int iReady = select(0, nullptr, &writeSet, nullptr, &timeout);
+		int iReady = select(0, nullptr, &writeSet, nullptr, &timeout);
 		if (iReady == SOCKET_ERROR)
 		{
 			return false;
@@ -541,7 +541,7 @@ bool AgentCommandServer::SendExact(SOCKET clientSocket, const uint8_t* pBuffer, 
 			continue;
 		}
 
-		const int iSent = send(clientSocket, reinterpret_cast<const char*>(pBuffer + iTotal), static_cast<int>(iBytes - iTotal), 0);
+		int iSent = send(clientSocket, reinterpret_cast<const char*>(pBuffer + iTotal), static_cast<int>(iBytes - iTotal), 0);
 		if (iSent > 0)
 		{
 			iTotal += iSent;
@@ -556,15 +556,15 @@ bool AgentCommandServer::SendExact(SOCKET clientSocket, const uint8_t* pBuffer, 
 	return true;
 }
 
-bool AgentCommandServer::SendFrame(SOCKET clientSocket, const std::string& rPayload)
+bool AgentCommandServer::SendFrame(SOCKET clientSocket, std::string_view payload)
 {
-	uint32_t uiLength = static_cast<uint32_t>(rPayload.size());
-	const std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + kResponseFlushTimeout;
+	uint32_t uiLength = static_cast<uint32_t>(payload.size());
+	std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + kResponseFlushTimeout;
 	if (!SendExact(clientSocket, reinterpret_cast<const uint8_t*>(&uiLength), sizeof(uiLength), deadline))
 	{
 		return false;
 	}
-	return SendExact(clientSocket, reinterpret_cast<const uint8_t*>(rPayload.data()), static_cast<int64_t>(rPayload.size()), deadline);
+	return SendExact(clientSocket, reinterpret_cast<const uint8_t*>(payload.data()), static_cast<int64_t>(payload.size()), deadline);
 }
 
 } // namespace engine

@@ -38,7 +38,7 @@ const TweaksSliderMapRegistrar gWindRegistrar
 
 void TweaksScreenBase::RenderWindSection()
 {
-	const int64_t iSection = giTweakSectionWind;
+	int64_t iSection = giTweakSectionWind;
 
 	if (ImGui::BeginTabBar("WindTabs"))
 	{

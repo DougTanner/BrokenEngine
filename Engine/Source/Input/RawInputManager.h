@@ -5,7 +5,7 @@ namespace engine
 
 inline constexpr int64_t kiKeyboardKeyCount = 0xFF;
 
-enum MouseButtons : uint32_t
+enum class MouseButtons : uint32_t
 {
 	kMouseButtonLeft     = 1u << 0,
 	kMouseButtonMiddle   = 1u << 1,
@@ -14,7 +14,7 @@ enum MouseButtons : uint32_t
 	kMouseButtonExtraTwo = 1u << 4,
 };
 
-enum GamepadButtons : uint32_t
+enum class GamepadButtons : uint32_t
 {
 	kGamepadButtonA       = 1u << 0,
 	kGamepadButtonB       = 1u << 1,

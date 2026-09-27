@@ -84,7 +84,7 @@ void operator delete[](void* p, std::align_val_t al, const std::nothrow_t&) noex
 
 #endif
 
-constexpr int64_t kiMimallocArenaReserveMb = 10 * 1024;
+constexpr int64_t kiMimallocArenaReserveMb = 10 * 1'024;
 
 struct MemoryInitializer
 {
@@ -103,7 +103,7 @@ struct MemoryInitializer
 		mi_option_set(mi_option_arena_eager_commit, 1);
 
 		// Pre-reserve a large arena at startup (eliminates OS memory calls during gameplay)
-		mi_option_set(mi_option_reserve_os_memory, kiMimallocArenaReserveMb * 1024);
+		mi_option_set(mi_option_reserve_os_memory, kiMimallocArenaReserveMb * 1'024);
 
 #if defined(DEBUG) || defined(_DEBUG)
 		// Route mimalloc output to VS Output window
@@ -122,10 +122,10 @@ struct MemoryInitializer
 		stats.version = MI_STAT_VERSION;
 		mi_stats_get(&stats);
 
-		int64_t iPeakCommittedMb = stats.committed.peak / (1024 * 1024);
+		int64_t iPeakCommittedMb = stats.committed.peak / (1'024 * 1'024);
 
 		// May log during static destruction: Log.cpp initializes via init_seg(lib), so it is destroyed after this default-phase object.
-		LOG(kDefault, kInfo, "Mimalloc peak heap usage: {} MiB, peak committed: {} MiB (arena reserve: {} MiB)", stats.page_committed.peak / (1024 * 1024), iPeakCommittedMb, kiMimallocArenaReserveMb);
+		LOG(kDefault, kInfo, "Mimalloc peak heap usage: {} MiB, peak committed: {} MiB (arena reserve: {} MiB)", stats.page_committed.peak / (1'024 * 1'024), iPeakCommittedMb, kiMimallocArenaReserveMb);
 
 		if (iPeakCommittedMb > kiMimallocArenaReserveMb)
 		{

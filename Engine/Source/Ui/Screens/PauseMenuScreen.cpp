@@ -11,8 +11,6 @@ namespace engine
 
 void PauseMenuScreen::Render()
 {
-	using enum StandardString;
-
 	if (game::gpGame->meUiState != UiState::kPause || game::gpGame->InMainMenu())
 	{
 		return;
@@ -37,45 +35,45 @@ void PauseMenuScreen::Render()
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
 	// Share the Main Menu's restrained title scale and primary action tier.
-	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(kStringResume), TranslatedString(kStringGraphics), TranslatedString(kStringAudio), TranslatedString(kStringGameSettings), TranslatedString(kStringMainMenu), TranslatedString(kStringQuit)}), kfPrimaryButtonMinWidthPixels * UiScale());
+	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(StandardString::kStringResume), TranslatedString(StandardString::kStringGraphics), TranslatedString(StandardString::kStringAudio), TranslatedString(StandardString::kStringGameSettings), TranslatedString(StandardString::kStringMainMenu), TranslatedString(StandardString::kStringQuit)}), kfPrimaryButtonMinWidthPixels * UiScale());
 	float fHeadingWidth = 0.0f;
 	{
 		ScopedMenuFont headingFont(kfMenuUiScale * kfMainMenuHeadingScale);
-		fHeadingWidth = ImGui::CalcTextSize(AppendUtf8(rWorkbuffer, TranslatedString(kStringPaused))).x;
+		fHeadingWidth = ImGui::CalcTextSize(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringPaused))).x;
 	}
 
 	float fContentStartX = ImGui::GetCursorPosX();
 	ImGui::SetCursorPosX(fContentStartX + (fButtonWidth - fHeadingWidth) * 0.5f);
-	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(kStringPaused)), kfMainMenuHeadingScale);
+	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringPaused)), kfMainMenuHeadingScale);
 	ImGui::SetCursorPosX(fContentStartX);
 
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringResume)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringResume)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
 	{
 		game::gpGame->meUiState = UiState::kNone;
 	}
 
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]))
 	{
 		game::gpGame->meUiState = UiState::kGraphicsSettings;
 	}
 
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
 	{
 		game::gpGame->meUiState = UiState::kSound;
 	}
 
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
 	{
 		game::gpGame->meUiState = UiState::kGameSettings;
 	}
 
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringMainMenu)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringMainMenu)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
 	{
 		game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kChangeFrameToMainMenu);
 		game::gpGame->meUiState = UiState::kPause;
 	}
 
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
 	{
 		game::gpGame->mGameFlags.Set(GameFlags::kQuit);
 	}

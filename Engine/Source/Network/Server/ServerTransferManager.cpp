@@ -176,7 +176,7 @@ void ServerTransferManager::ApplyPreparedTransfers(common::ScopedWorkbufferArena
 		for (const auto& [rCoord, rTransfers] : mTransfers)
 		{
 			game::Frame& rDestFrame = *game::gpGame->mCoordFrames.at(rCoord).pNext;
-			const common::crc_t preCrc = preCrcsArena.Span<const common::crc_t>()[iPreCrcIndex++];
+			common::crc_t preCrc = preCrcsArena.Span<const common::crc_t>()[iPreCrcIndex++];
 			rDestFrame.postRender.sharedCrc = rDestFrame.Crcs();
 
 			char acCrcPre[20] {}, acCrcPost[20] {};
@@ -249,7 +249,7 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 	for (const ClientTransferInfo& rClientTransfer : clientTransfers)
 	{
 		game::Frame& rDestFrame = *game::gpGame->mCoordFrames.at(rClientTransfer.destination).pNext;
-		const engine::RegistryOwnershipLayer destinationLayer = game::Frame::OwnershipLayer(rDestFrame);
+		engine::RegistryOwnershipLayer destinationLayer = game::Frame::OwnershipLayer(rDestFrame);
 
 		// An invalid uuid means the transferred player never landed in the destination, so there is nothing to bind.
 		if (!engine::RegistryUuidByGlobalId(destinationLayer, rClientTransfer.globalPlayerId).IsValid())

@@ -49,8 +49,8 @@ Server::Server(uint16_t uiPort)
 	}
 	mpHost->checksum = enet_crc32;
 	// 1MB send/receive buffers to handle bursty packet dispatches
-	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_SNDBUF, 1024 * 1024);
-	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_RCVBUF, 1024 * 1024);
+	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_SNDBUF, 1'024 * 1'024);
+	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_RCVBUF, 1'024 * 1'024);
 }
 
 Server::~Server()
@@ -160,7 +160,7 @@ void Server::DispatchIncoming(ENetEvent& rEvent, bool bFastForward)
 {
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		constexpr NetworkSimulationConfig kSimConfig = GetNetworkSimulationConfig(keNetworkSimulation);
+		static constexpr NetworkSimulationConfig kSimConfig = GetNetworkSimulationConfig(keNetworkSimulation);
 		NetworkSimulation::DispatchOrEnqueue(mDelayedPackets, mNetworkSimState, kSimConfig, bFastForward, rEvent, [this](ENetEvent& rInner)
 		{
 			Receive(rInner);
@@ -245,10 +245,10 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 	// A handshaken client's subscribe and unsubscribe skip this gate: they are reliable with no client retry, so a
 	// stall burst of acks must not silently drop one, and gates 3-5 still bound them by fixed size and a
 	// violation-counted per-type cap. Pre-handshake ones stay budgeted because gate 4 drops them before gate 5 counts.
-	const bool bBudgetExempt = pClient->bHandshakeComplete && (eType == PacketType::kClientSubscribe || eType == PacketType::kClientUnsubscribe);
+	bool bBudgetExempt = pClient->bHandshakeComplete && (eType == PacketType::kClientSubscribe || eType == PacketType::kClientUnsubscribe);
 	if (!bBudgetExempt)
 	{
-		const bool bPacketWasUnderBudget = pClient->iTickPacketCount <= kiMaxClientPacketsPerTick;
+		bool bPacketWasUnderBudget = pClient->iTickPacketCount <= kiMaxClientPacketsPerTick;
 		++pClient->iTickPacketCount;
 		if (pClient->iTickPacketCount > kiMaxClientPacketsPerTick)
 		{
@@ -259,7 +259,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 			return;
 		}
 
-		const bool bByteWasUnderBudget = pClient->iTickByteCount <= kiMaxClientInboundBytesPerTick;
+		bool bByteWasUnderBudget = pClient->iTickByteCount <= kiMaxClientInboundBytesPerTick;
 		pClient->iTickByteCount += static_cast<int64_t>(packetData.size());
 		if (pClient->iTickByteCount > kiMaxClientInboundBytesPerTick)
 		{
@@ -275,7 +275,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 	// keep their existing dispatch path (default branch: FindHandshakenClient gate + parse-time contract checks).
 	if (static_cast<uint8_t>(eType) < static_cast<uint8_t>(PacketType::kGamePacketStart))
 	{
-		const ClientPacketContract contract = GetClientPacketContract(eType);
+		ClientPacketContract contract = GetClientPacketContract(eType);
 
 		// Gate 3: contract lookup -- sentinel row (not client-sendable)
 		// or size outside [min, max].
@@ -548,7 +548,7 @@ ClientConnection* Server::FindHandshakenClient(int64_t iClientId)
 	return (pClient != nullptr && pClient->bHandshakeComplete) ? pClient : nullptr;
 }
 
-void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, const char* pcReason, uint8_t uiPacketType, int64_t iSize)
+void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, uint8_t uiPacketType, int64_t iSize)
 {
 	ClientConnection* pClient = FindClient(iClientId);
 	if (pClient == nullptr)
@@ -584,12 +584,12 @@ void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eK
 	// back to zero) plus one Disconnecting line per hostile client, no per-packet spam, no cooldown state.
 	if (riViolations == 1)
 	{
-		LOG(kNetwork, kWarning, "Server::RecordContractViolation First Client: {} Kind: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, pcReason, uiPacketType, iSize);
+		LOG(kNetwork, kWarning, "Server::RecordContractViolation First Client: {} Kind: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, reason, uiPacketType, iSize);
 	}
 
 	if (riViolations >= iDisconnectCount)
 	{
-		LOG(kNetwork, kWarning, "Server::RecordContractViolation Disconnecting Client: {} Kind: {} Violations: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, riViolations, pcReason, uiPacketType, iSize);
+		LOG(kNetwork, kWarning, "Server::RecordContractViolation Disconnecting Client: {} Kind: {} Violations: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, riViolations, reason, uiPacketType, iSize);
 
 		// Capture peer/GUID before the client record is removed below.
 		ENetPeer* pPeer = pClient->pPeer;

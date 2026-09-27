@@ -263,7 +263,7 @@ void FileManager::BackupExistingFile(const FileFlags_t& rFlags, const std::files
 
 	std::filesystem::path file = GetFilePath(rFlags, rFilename);
 	std::error_code existsErrorCode;
-	const bool bExists = std::filesystem::exists(file, existsErrorCode);
+	bool bExists = std::filesystem::exists(file, existsErrorCode);
 	if (existsErrorCode)
 	{
 		// OS trust boundary (permissions, unavailable media): the atomic write of the main file is unaffected, so continue without the backup
@@ -307,7 +307,7 @@ bool FileManager::ComputeSha256(std::span<const std::byte> bytes, std::array<uin
 	std::array<uint8_t, 32> digest {};
 	while (!bytes.empty())
 	{
-		const size_t uiChunkSize = std::min(bytes.size(), static_cast<size_t>(std::numeric_limits<ULONG>::max()));
+		size_t uiChunkSize = std::min(bytes.size(), static_cast<size_t>(std::numeric_limits<ULONG>::max()));
 		if (!hasher.Update(bytes.first(uiChunkSize)))
 		{
 			return false;
@@ -324,8 +324,8 @@ bool FileManager::ComputeSha256(std::span<const std::byte> bytes, std::array<uin
 
 bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FileContentDigest& rOut)
 {
-	const std::filesystem::path filePath = GetFilePath(rFlags, rFilename);
-	const DWORD uiAttributes = ::GetFileAttributesW(filePath.c_str());
+	std::filesystem::path filePath = GetFilePath(rFlags, rFilename);
+	DWORD uiAttributes = ::GetFileAttributesW(filePath.c_str());
 	if (uiAttributes == INVALID_FILE_ATTRIBUTES || (uiAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0)
 	{
 		return false;
@@ -344,8 +344,8 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	}
 
 	Sha256Hasher hasher;
-	auto bufferAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(64 * 1024);
-	std::span<std::byte> buffer(static_cast<std::byte*>(bufferAllocation), 64 * 1024);
+	auto bufferAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(64 * 1'024);
+	std::span<std::byte> buffer(static_cast<std::byte*>(bufferAllocation), 64 * 1'024);
 	int64_t iByteCount = 0;
 	for (;;)
 	{

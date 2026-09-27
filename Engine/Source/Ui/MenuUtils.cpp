@@ -114,7 +114,7 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 #if defined(BT_CLIENT)
 	if (gpAgentUiRegistry != nullptr)
 	{
-		const float fFinal = pWrapper->Get();
+		float fFinal = pWrapper->Get();
 		for (const std::pair<const char*, float>& rOption : aOptions)
 		{
 			gpAgentUiRegistry->RecordItemChecked(ImGui::GetID(rOption.first), fFinal == rOption.second);
@@ -132,8 +132,8 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float f
 	ImGui::SameLine();
 	ImGui::PushID(label.data());
 #if defined(BT_CLIENT)
-	const ImGuiID uiMinusId = ImGui::GetID("-");
-	const ImGuiID uiPlusId = ImGui::GetID("+");
+	ImGuiID uiMinusId = ImGui::GetID("-");
+	ImGuiID uiPlusId = ImGui::GetID("+");
 #endif
 	if (ImGui::Button("-"))
 	{
@@ -238,15 +238,15 @@ ImU32 ChromeColor(const ImVec4& rf4Color, float fAlphaScale = 1.0f)
 
 float ComputeMouseOpennessTarget(ImVec2 vFixedExtent, ImVec2 vAnchor, float fPivotX)
 {
-	const float fRectMinX = vAnchor.x - fPivotX * vFixedExtent.x;
-	const float fRectMaxX = fRectMinX + vFixedExtent.x;
-	const float fRectMinY = vAnchor.y;
-	const float fRectMaxY = vAnchor.y + vFixedExtent.y;
+	float fRectMinX = vAnchor.x - fPivotX * vFixedExtent.x;
+	float fRectMaxX = fRectMinX + vFixedExtent.x;
+	float fRectMinY = vAnchor.y;
+	float fRectMaxY = vAnchor.y + vFixedExtent.y;
 
-	const ImVec2 vMouse = ImGui::GetIO().MousePos;
-	const float fDx = std::max({fRectMinX - vMouse.x, 0.0f, vMouse.x - fRectMaxX});
-	const float fDy = std::max({fRectMinY - vMouse.y, 0.0f, vMouse.y - fRectMaxY});
-	const float fDistance = std::sqrt(fDx * fDx + fDy * fDy);
+	ImVec2 vMouse = ImGui::GetIO().MousePos;
+	float fDx = std::max({fRectMinX - vMouse.x, 0.0f, vMouse.x - fRectMaxX});
+	float fDy = std::max({fRectMinY - vMouse.y, 0.0f, vMouse.y - fRectMaxY});
+	float fDistance = std::sqrt(fDx * fDx + fDy * fDy);
 
 	return 1.0f - std::clamp(fDistance / (kfActivationDistancePixels * engine::UiScale()), 0.0f, 1.0f);
 }
@@ -260,7 +260,7 @@ float UpdateSlideAndGetEdgeX(SlidePanelState& rState, ImVec2 vAnchor, float fSid
 	//   left  panel (fSidePivotSign < 0): pivot (1.0, 0) — returned x is the right edge
 	// At openness=0 the off-screen edge is fixed at exactly 1 pixel beyond the screen boundary,
 	// width-independent — keeps the panel fully offscreen regardless of its measured width.
-	const float fOffscreenX = (fSidePivotSign > 0.0f) ? rIo.DisplaySize.x + 1.0f : -1.0f;
+	float fOffscreenX = (fSidePivotSign > 0.0f) ? rIo.DisplaySize.x + 1.0f : -1.0f;
 
 	if (rState.vLastSize.x <= 0.0f)
 	{
@@ -271,7 +271,7 @@ float UpdateSlideAndGetEdgeX(SlidePanelState& rState, ImVec2 vAnchor, float fSid
 	rState.fOpenness += (fTarget - rState.fOpenness) * std::min(common::ExponentialInterpolant(kfSlideRate, rIo.DeltaTime), 1.0f);
 
 	// At openness=1 the on-screen anchor edge sits at vAnchor.x (offset by size to flip pivot side).
-	const float fOnscreenX = (fSidePivotSign > 0.0f) ? (vAnchor.x - rState.vLastSize.x) : (vAnchor.x + rState.vLastSize.x);
+	float fOnscreenX = (fSidePivotSign > 0.0f) ? (vAnchor.x - rState.vLastSize.x) : (vAnchor.x + rState.vLastSize.x);
 	return std::lerp(fOffscreenX, fOnscreenX, rState.fOpenness);
 }
 
@@ -315,17 +315,17 @@ void DrawFullScreenDim()
 void DrawPanelAccents(ImDrawList* pDrawList, const ImVec2& vMin, const ImVec2& vMax)
 {
 	const MenuChrome& rChrome = GetMenuChrome();
-	const float fUiScale = engine::UiScale();
-	const float fPanelRounding = kfPanelRounding * fUiScale;
+	float fUiScale = engine::UiScale();
+	float fPanelRounding = kfPanelRounding * fUiScale;
 	pDrawList->AddRect(vMin, vMax, ChromeColor(rChrome.f4PanelBorder), fPanelRounding, 0, kfPanelBorderThickness * fUiScale);
 	pDrawList->AddRectFilled(ImVec2(vMin.x + fPanelRounding, vMin.y), ImVec2(vMax.x - fPanelRounding, vMin.y + kfAccentStripThickness * fUiScale), ChromeColor(rChrome.f4Accent));
 }
 
 bool MenuButton(const char* pcLabel, const ImVec2& vSize, float& rfHoverAnim, bool bSelected)
 {
-	const float fUiScale = engine::UiScale();
-	const float fButtonRounding = kfButtonRounding * fUiScale;
-	const float fButtonAccentBarWidth = kfButtonAccentBarWidth * fUiScale;
+	float fUiScale = engine::UiScale();
+	float fButtonRounding = kfButtonRounding * fUiScale;
+	float fButtonAccentBarWidth = kfButtonAccentBarWidth * fUiScale;
 
 	ImVec2 vTextSize = ImGui::CalcTextSize(pcLabel);
 	const ImGuiStyle& rStyle = ImGui::GetStyle();

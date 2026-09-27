@@ -8,7 +8,7 @@ namespace engine
 // Pinned mastering-voice sample rate. Must match DataPacker's audiorepair::kiAudioExportSampleRate
 // (packed audio is resampled to this) so source rate == mastering rate and XAudio2 bypasses per-voice
 // SRC. Windows shared-mode does any final device-rate conversion once at the mastering output.
-inline constexpr int kiMasteringSampleRate = 48000;
+inline constexpr int kiMasteringSampleRate = 48'000;
 
 inline constexpr float VolumeToPower(float fMasterVolume, float fSoundVolume, float fLocalVolume = 1.0f)
 {

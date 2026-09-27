@@ -28,7 +28,7 @@ public:
 private:
 
 	static thread_local common::StableVector<AreaDamageSource> sAreaDamageSources;
-	static thread_local int64_t siAreaDamageSourceCount;
+	static inline thread_local int64_t siAreaDamageSourceCount = 0;
 };
 
 } // namespace engine

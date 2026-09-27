@@ -494,7 +494,7 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 	LOG(kGraphics, kInfo, "  maxPerStageResources: {}", mVkPhysicalDeviceProperties.limits.maxPerStageResources);
 	// Validated on the finally-selected device, not on provisional candidates (a weak iGPU enumerated before the winning dGPU would trip it spuriously)
 	ASSERT(mVkPhysicalDeviceProperties.limits.maxPerStageResources > 200);
-	ASSERT(mVkPhysicalDeviceProperties.limits.maxUniformBufferRange >= 65536);
+	ASSERT(mVkPhysicalDeviceProperties.limits.maxUniformBufferRange >= 65'536);
 	vkGetPhysicalDeviceMemoryProperties(mVkPhysicalDevice, &mVkPhysicalDeviceMemoryProperties);
 
 	vkGetPhysicalDeviceFeatures2(mVkPhysicalDevice, &mVkPhysicalDeviceFeatures2);

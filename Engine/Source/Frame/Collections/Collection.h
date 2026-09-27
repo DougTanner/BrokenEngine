@@ -24,8 +24,8 @@ struct GridCoord;
 // Multi-array helpers process member pointers in tuple order.
 
 // Computes ordered-fold CRC of multiple member arrays for deterministic replay validation.
-template <typename TTuple>
-common::crc_t MultiCrc(int64_t iCount, TTuple&& members)
+template <typename TUPLE>
+common::crc_t MultiCrc(int64_t iCount, TUPLE&& members)
 {
 	common::crc_t checksum = 0;
 	// Zero-capacity member pointers may be null, and Crc(pointer, 0) returns the seeded empty-input hash;
@@ -38,14 +38,14 @@ common::crc_t MultiCrc(int64_t iCount, TTuple&& members)
 			{
 				checksum = (checksum ^ common::Crc(elementPtrRef, iCount)) * common::kCrcMultiplier;
 			}), ...);
-		}, std::forward<TTuple>(members));
+		}, std::forward<TUPLE>(members));
 	}
 	return checksum;
 }
 
 // Serializes multiple member arrays to stream in order.
-template <typename TTuple>
-void MultiWrite(std::ostream& rStream, int64_t iCount, TTuple&& members)
+template <typename TUPLE>
+void MultiWrite(std::ostream& rStream, int64_t iCount, TUPLE&& members)
 {
 	std::apply([&](auto&... memberPtrRefs)
 	{
@@ -53,12 +53,12 @@ void MultiWrite(std::ostream& rStream, int64_t iCount, TTuple&& members)
 		{
 			common::Write(rStream, elementPtrRef, iCount);
 		}), ...);
-	}, std::forward<TTuple>(members));
+	}, std::forward<TUPLE>(members));
 }
 
 // Deserializes multiple member arrays from stream (must match write order). Arrays must already be allocated.
-template <typename TTuple>
-void MultiRead(std::istream& rStream, int64_t iCount, TTuple&& members)
+template <typename TUPLE>
+void MultiRead(std::istream& rStream, int64_t iCount, TUPLE&& members)
 {
 	std::apply([&](auto&... memberPtrRefs)
 	{
@@ -66,25 +66,25 @@ void MultiRead(std::istream& rStream, int64_t iCount, TTuple&& members)
 		{
 			common::Read(rStream, elementPtrRef, iCount);
 		}), ...);
-	}, std::forward<TTuple>(members));
+	}, std::forward<TUPLE>(members));
 }
 
-template <typename TStruct>
-void ValidateAfterRead(std::istream& rStream, TStruct& rStruct)
+template <typename STRUCT>
+void ValidateAfterRead(std::istream& rStream, STRUCT& rStruct)
 {
-	if constexpr (requires { TStruct::PostRead(rStruct); })
+	if constexpr (requires { STRUCT::PostRead(rStruct); })
 	{
 		// A failed MultiRead leaves member storage partial; only validate a complete read.
 		if (rStream.good())
 		{
-			TStruct::PostRead(rStruct);
+			STRUCT::PostRead(rStruct);
 		}
 	}
 }
 
 // Allocates collection storage and reads data from stream. Used internally by CollectionRead().
-template <typename TStruct, typename TTuple>
-void AllocateAndRead(TStruct& rStruct, std::istream& rStream, TTuple&& members)
+template <typename STRUCT, typename TUPLE>
+void AllocateAndRead(STRUCT& rStruct, std::istream& rStream, TUPLE&& members)
 {
 	if (rStruct.iCapacity > 0)
 	{
@@ -95,7 +95,7 @@ void AllocateAndRead(TStruct& rStruct, std::istream& rStream, TTuple&& members)
 		ResetDataToNull(rStruct, members);
 	}
 
-	MultiRead(rStream, rStruct.iCount, std::forward<TTuple>(members));
+	MultiRead(rStream, rStruct.iCount, std::forward<TUPLE>(members));
 	ValidateAfterRead(rStream, rStruct);
 }
 
@@ -118,13 +118,13 @@ void RegisterLightingTextureCrc(common::crc_t crc);
 // Type is passed as template parameter (must be defined before collection).
 // Threading contract: registration is startup-only (single-threaded, before Dispatch() workers fan out);
 // sTypes is immutable afterward, so parallel frame-tick .at() reads need no synchronization.
-template <typename TType>
+template <typename TYPE>
 struct TypeRegistry
 {
-	using Type = TType;
-	static inline std::vector<TType> sTypes;
+	using Type = TYPE;
+	static inline std::vector<TYPE> sTypes;
 
-	static void RegisterType(uint8_t& ruiIndex, const TType& rType)
+	static void RegisterType(uint8_t& ruiIndex, const TYPE& rType)
 	{
 		ASSERT(ruiIndex == kuiInvalidTypeIndex);
 		ASSERT(sTypes.size() < kuiInvalidTypeIndex);
@@ -154,7 +154,7 @@ struct TypeRegistry
 		}
 	}
 
-	static const TType& GetType(uint8_t uiIndex)
+	static const TYPE& GetType(uint8_t uiIndex)
 	{
 		return sTypes.at(uiIndex);
 	}
@@ -367,12 +367,12 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 };
 
 // Computes complete CRC of collection (metadata + all member arrays) for deterministic replay validation.
-template <typename TStruct, typename TTuple>
-inline common::crc_t CollectionCrc(const TStruct& rCurrent, TTuple&& members)
+template <typename STRUCT, typename TUPLE>
+inline common::crc_t CollectionCrc(const STRUCT& rCurrent, TUPLE&& members)
 {
 	common::crc_t checksum = 0;
 	checksum = (checksum ^ rCurrent.Crc()) * common::kCrcMultiplier;
-	checksum = (checksum ^ engine::MultiCrc(rCurrent.iCount, std::forward<TTuple>(members))) * common::kCrcMultiplier;
+	checksum = (checksum ^ engine::MultiCrc(rCurrent.iCount, std::forward<TUPLE>(members))) * common::kCrcMultiplier;
 	return checksum;
 }
 
@@ -383,18 +383,18 @@ concept HasSharedMembers = requires(const T t) { t.SharedMembers(); };
 // deserialize SharedMembers() (SharedCollectionRead below), so a shared collection's server-build
 // Members() must be the identical tuple. There is no separate wire serializer — the broadcast streams
 // the save-format Write walk (CollectionWrite with cols.Members() in FrameBase.cpp / Frame.cpp).
-template <typename TStruct>
+template <typename STRUCT>
 inline constexpr bool kbServerMembersParity = std::is_same_v<
-	decltype(std::declval<const TStruct&>().Members()),
-	decltype(std::declval<const TStruct&>().SharedMembers())>;
+	decltype(std::declval<const STRUCT&>().Members()),
+	decltype(std::declval<const STRUCT&>().SharedMembers())>;
 
-template <typename TStruct>
-inline common::crc_t SharedCollectionCrc(const TStruct& rCurrent)
+template <typename STRUCT>
+inline common::crc_t SharedCollectionCrc(const STRUCT& rCurrent)
 {
-	if constexpr (HasSharedMembers<TStruct>)
+	if constexpr (HasSharedMembers<STRUCT>)
 	{
 #if defined(BT_SERVER)
-		static_assert(kbServerMembersParity<TStruct>, "Server-build Members() must be identical to SharedMembers() — wire format / CRC parity");
+		static_assert(kbServerMembersParity<STRUCT>, "Server-build Members() must be identical to SharedMembers() — wire format / CRC parity");
 #endif
 		return CollectionCrc(rCurrent, rCurrent.SharedMembers());
 	}
@@ -406,8 +406,8 @@ inline common::crc_t SharedCollectionCrc(const TStruct& rCurrent)
 
 // Reads collection from a server-format stream. Allocates full Members() (zero-initialized) so client-only
 // pointers are valid, then reads only SharedMembers() from the stream to match what the server wrote.
-template <typename TStruct>
-inline std::istream& SharedCollectionRead(std::istream& rStream, TStruct& rCurrent)
+template <typename STRUCT>
+inline std::istream& SharedCollectionRead(std::istream& rStream, STRUCT& rCurrent)
 {
 	rCurrent.Read(rStream);
 
@@ -426,10 +426,10 @@ inline std::istream& SharedCollectionRead(std::istream& rStream, TStruct& rCurre
 		ResetDataToNull(rCurrent, rCurrent.Members());
 	}
 
-	if constexpr (HasSharedMembers<TStruct>)
+	if constexpr (HasSharedMembers<STRUCT>)
 	{
 #if defined(BT_SERVER)
-		static_assert(kbServerMembersParity<TStruct>, "Server-build Members() must be identical to SharedMembers() — wire format / CRC parity");
+		static_assert(kbServerMembersParity<STRUCT>, "Server-build Members() must be identical to SharedMembers() — wire format / CRC parity");
 #endif
 		// A shared member missing from Members() would have no allocated storage to read into
 		ASSERT(IsMemberTupleSubset(rCurrent.SharedMembers(), rCurrent.Members()));
@@ -446,28 +446,28 @@ inline std::istream& SharedCollectionRead(std::istream& rStream, TStruct& rCurre
 }
 
 // Writes complete collection to stream (metadata + all member arrays) for save file serialization.
-template <typename TStruct, typename TTuple>
-inline std::ostream& CollectionWrite(std::ostream& rStream, const TStruct& rCurrent, TTuple&& members)
+template <typename STRUCT, typename TUPLE>
+inline std::ostream& CollectionWrite(std::ostream& rStream, const STRUCT& rCurrent, TUPLE&& members)
 {
 	rCurrent.Write(rStream);
-	engine::MultiWrite(rStream, rCurrent.iCount, std::forward<TTuple>(members));
+	engine::MultiWrite(rStream, rCurrent.iCount, std::forward<TUPLE>(members));
 	return rStream;
 }
 
 // Reads complete collection from stream (metadata + all member arrays) to restore from save files.
-template <typename TStruct, typename TTuple>
-inline std::istream& CollectionRead(std::istream& rStream, TStruct& rCurrent, TTuple&& members)
+template <typename STRUCT, typename TUPLE>
+inline std::istream& CollectionRead(std::istream& rStream, STRUCT& rCurrent, TUPLE&& members)
 {
 	rCurrent.Read(rStream);
-	engine::AllocateAndRead(rCurrent, rStream, std::forward<TTuple>(members));
+	engine::AllocateAndRead(rCurrent, rStream, std::forward<TUPLE>(members));
 	return rStream;
 }
 
 #if defined(BT_CLIENT)
 // Accumulates total capacity across all active coords for a collection's BeginRender phase.
-// TAccessor: callable returning a const reference to the collection from a FrameInterpolate.
-template <typename TAccessor>
-int64_t AccumulateRenderCapacity(const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, TAccessor accessor)
+// ACCESSOR: callable returning a const reference to the collection from a FrameInterpolate.
+template <typename ACCESSOR>
+int64_t AccumulateRenderCapacity(const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR accessor)
 {
 	int64_t iTotalCapacity = 0;
 	for (const GridCoord& rCoord : rActiveCoords)
@@ -482,13 +482,13 @@ int64_t AccumulateRenderCapacity(const std::unordered_map<GridCoord, game::Frame
 }
 
 // Erases entries from a render state map whose IDs are no longer present in any active collection.
-// TAccessor: callable returning the collection's idToIndexMap from a FrameInterpolate reference.
-template <typename TMapType, typename TAccessor>
-void EraseStaleRenderState(TMapType& rRenderStateMap, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, TAccessor accessor)
+// ACCESSOR: callable returning the collection's idToIndexMap from a FrameInterpolate reference.
+template <typename MAP_TYPE, typename ACCESSOR>
+void EraseStaleRenderState(MAP_TYPE& rRenderStateMap, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR accessor)
 {
 	// Heap: unordered_map erase for stale render state entries
 	ScopedSuppressAllocationTracking suppress;
-	std::erase_if(rRenderStateMap, [&rRenderInterpolates, &rActiveCoords, &accessor](const auto& pair)
+	std::erase_if(rRenderStateMap, [&rRenderInterpolates, &rActiveCoords, &accessor](const typename MAP_TYPE::value_type& pair)
 	{
 		for (const GridCoord& rCoord : rActiveCoords)
 		{

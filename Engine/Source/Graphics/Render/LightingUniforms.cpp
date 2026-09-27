@@ -232,7 +232,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	// Per-ring rotation angles: jitter slider sets the seed; the shader scales by interpolated jitter
 	// Each ring uses its own seed for uncorrelated rotations
 	float fJitter = gSpreadJitter.Get();
-	common::RandomEngine ringRandomEngine(1000 * static_cast<uint32_t>(static_cast<float>(shaders::kiMaxSpreadPasses) * fJitter));
+	common::RandomEngine ringRandomEngine(1'000 * static_cast<uint32_t>(static_cast<float>(shaders::kiMaxSpreadPasses) * fJitter));
 	for (int64_t i = 0; i < _countof(rGlobalLayout.pfSpreadRingRotations); ++i)
 	{
 		rGlobalLayout.pfSpreadRingRotations[i] = common::Random<XM_2PI>(ringRandomEngine);

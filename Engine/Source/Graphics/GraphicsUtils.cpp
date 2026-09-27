@@ -37,8 +37,8 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 	LOG(kDefault, kError, "CheckVk failed: {} - \"{}\" at {}:{} in {}", pcResult, expression, loc.file_name(), loc.line(), loc.function_name());
 
 	// Format exception message with call site information
-	auto pcException = rWorkbuffer.PushBuffer<char*>(1024);
-	std::snprintf(pcException, 1023, "CheckVk failed: \"%.*s\" at %s:%u in %s\nVkResult: %s", static_cast<int>(expression.size()), expression.data(), loc.file_name(), loc.line(), loc.function_name(), pcResult);
+	auto pcException = rWorkbuffer.PushBuffer<char*>(1'024);
+	std::snprintf(pcException, 1'023, "CheckVk failed: \"%.*s\" at %s:%u in %s\nVkResult: %s", static_cast<int>(expression.size()), expression.data(), loc.file_name(), loc.line(), loc.function_name(), pcResult);
 
 	if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR)
 	{
@@ -62,7 +62,7 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 	throw std::runtime_error(pcException);
 }
 
-void VkNameImpl([[maybe_unused]] VkObjectType type, [[maybe_unused]] uint64_t handle, [[maybe_unused]] std::string_view name)
+void SetVkObjectName([[maybe_unused]] VkObjectType type, [[maybe_unused]] uint64_t handle, [[maybe_unused]] std::string_view name)
 {
 	if constexpr (kbVulkanDebugLayers)
 	{

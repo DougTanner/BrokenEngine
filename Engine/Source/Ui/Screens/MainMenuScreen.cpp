@@ -22,9 +22,6 @@ void CenterMenuItem(float fContentStartX, float fContentWidth, float fItemWidth)
 
 void MainMenuScreen::Render()
 {
-	using enum StandardString;
-	using enum StandardMenuState;
-
 	enum class AutoConnectState
 	{
 		kReady,
@@ -35,7 +32,7 @@ void MainMenuScreen::Render()
 
 	StandardMenuModel model = game::gpGame->GetStandardMenuModel();
 
-	if (model.state & kConnectionAccepted)
+	if (model.state & StandardMenuState::kConnectionAccepted)
 	{
 		seAutoConnectState = AutoConnectState::kSucceeded;
 	}
@@ -43,7 +40,7 @@ void MainMenuScreen::Render()
 	// The model reports only client presence, so the connection-lost modal is what tells a real loss from a
 	// deliberate return to the main menu; only a real loss rearms. Runs before the gate below, which returns
 	// while the modal is up.
-	if (seAutoConnectState == AutoConnectState::kSucceeded && !(model.state & kClientPresent) && game::gpGame->meUiState == UiState::kModal)
+	if (seAutoConnectState == AutoConnectState::kSucceeded && !(model.state & StandardMenuState::kClientPresent) && game::gpGame->meUiState == UiState::kModal)
 	{
 		seAutoConnectState = AutoConnectState::kReady;
 	}
@@ -53,7 +50,7 @@ void MainMenuScreen::Render()
 		return;
 	}
 
-	if (seAutoConnectState == AutoConnectState::kAttempted && !(model.state & kClientPresent))
+	if (seAutoConnectState == AutoConnectState::kAttempted && !(model.state & StandardMenuState::kClientPresent))
 	{
 		seAutoConnectState = AutoConnectState::kReady;
 	}
@@ -78,7 +75,7 @@ void MainMenuScreen::Render()
 	// Shared text-driven width over every button label (including the SCANNING... discovery state), floored to the
 	// primary-button minimum. Measured over the full label set so a disabled feature cannot reflow the column.
 	// Height auto-sizes per button (0.0f).
-	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(kStringLocalServer), TranslatedString(kStringRemoteServer), TranslatedString(kStringGraphics), TranslatedString(kStringAudio), TranslatedString(kStringGameSettings), TranslatedString(kStringQuit), U"SCANNING..."}), kfPrimaryButtonMinWidthPixels * UiScale());
+	float fButtonWidth = std::max(MenuButtonsWidth({TranslatedString(StandardString::kStringLocalServer), TranslatedString(StandardString::kStringRemoteServer), TranslatedString(StandardString::kStringGraphics), TranslatedString(StandardString::kStringAudio), TranslatedString(StandardString::kStringGameSettings), TranslatedString(StandardString::kStringQuit), U"SCANNING..."}), kfPrimaryButtonMinWidthPixels * UiScale());
 	float fHeadingWidth = 0.0f;
 	{
 		ScopedMenuFont headingFont(kfMenuUiScale * kfMainMenuHeadingScale);
@@ -94,7 +91,7 @@ void MainMenuScreen::Render()
 	if (model.features & StandardMenuFeature::kLocalServer)
 	{
 		// Auto-start discovery when main menu is shown
-		if (!(model.state & kClientPresent) && !(model.state & kDiscoveryScannerPresent) && !(model.state & kServerDiscovered))
+		if (!(model.state & StandardMenuState::kClientPresent) && !(model.state & StandardMenuState::kDiscoveryScannerPresent) && !(model.state & StandardMenuState::kServerDiscovered))
 		{
 			game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kStartDiscovery);
 			// Discovery changes the live state the auto-connect decision below reads this same pass.
@@ -102,7 +99,7 @@ void MainMenuScreen::Render()
 		}
 
 		// Auto-connect
-		if ((model.state & kAutoConnect) && seAutoConnectState == AutoConnectState::kReady && !(model.state & kClientPresent) && (model.state & kServerDiscovered))
+		if ((model.state & StandardMenuState::kAutoConnect) && seAutoConnectState == AutoConnectState::kReady && !(model.state & StandardMenuState::kClientPresent) && (model.state & StandardMenuState::kServerDiscovered))
 		{
 			seAutoConnectState = AutoConnectState::kAttempted;
 			game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kConnectToDiscoveredServer);
@@ -111,10 +108,10 @@ void MainMenuScreen::Render()
 		}
 
 		// Local Server button (discovers localhost + LAN)
-		if (model.state & kServerDiscovered)
+		if (model.state & StandardMenuState::kServerDiscovered)
 		{
 			CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-			if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringLocalServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
+			if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringLocalServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
 			{
 				game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kConnectToDiscoveredServer);
 			}
@@ -133,13 +130,13 @@ void MainMenuScreen::Render()
 	{
 		ImGui::BeginDisabled();
 		CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-		MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringRemoteServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]);
+		MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringRemoteServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]);
 		ImGui::EndDisabled();
 	}
 
 	// Graphics button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
 	{
 		game::gpGame->meUiState = UiState::kGraphicsSettings;
 		gSunAngleOverride.Set(gpCamera->RawSunAngle());
@@ -147,21 +144,21 @@ void MainMenuScreen::Render()
 
 	// Audio button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
 	{
 		game::gpGame->meUiState = UiState::kSound;
 	}
 
 	// Game Settings button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
 	{
 		game::gpGame->meUiState = UiState::kGameSettings;
 	}
 
 	// Quit button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
 	{
 		game::gpGame->mGameFlags.Set(GameFlags::kQuit);
 	}

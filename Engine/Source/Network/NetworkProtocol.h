@@ -62,7 +62,7 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 // Protocol constants
 inline constexpr uint32_t kuiProtocolVersion = 20;
 inline constexpr uint8_t kuiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
-inline constexpr uint16_t kuiDefaultPort = 27015;
+inline constexpr uint16_t kuiDefaultPort = 27'015;
 inline constexpr int64_t kiMaxResendFrames = 8;
 inline constexpr int64_t kiFloorStallLogThreshold = 15;
 inline constexpr int64_t kiMaxBufferedFrames = 256;
@@ -79,8 +79,8 @@ inline constexpr int64_t kiJitterSafetyUs = 109'375;
 // Must stay below EvaluateClock's |error| >= 4 aggressive-correction threshold so steady state never
 // triggers it.
 inline constexpr int64_t kiSimCeilingSlackTicks = 3;
-inline constexpr int64_t kiMaxPacketSize = 64 * 1024;
-inline constexpr int64_t kiMaxStatusChangesPerCell = 1024;
+inline constexpr int64_t kiMaxPacketSize = 64 * 1'024;
+inline constexpr int64_t kiMaxStatusChangesPerCell = 1'024;
 
 // Tag-distinct 128-bit identifier. TAG only separates instantiations at compile time and contributes no
 // storage, so every instantiation shares one layout; see engine::id_t in Frame/Collections/CollectionId.h.
@@ -139,7 +139,7 @@ inline constexpr int64_t kiMaxClientPacketsPerTick = 256;
 
 // Global per-client inbound byte budget per update window. >10x legitimate steady state; caps hostile
 // parse work at ~2 MiB/s/client.
-inline constexpr int64_t kiMaxClientInboundBytesPerTick = 64 * 1024;
+inline constexpr int64_t kiMaxClientInboundBytesPerTick = 64 * 1'024;
 
 // Lifetime corrupt-data violation count that forces a disconnect. Never reset -- legitimate clients send no
 // corrupt data.
@@ -185,7 +185,7 @@ inline constexpr ClientPacketContract GetClientPacketContract(PacketType eType)
 // LAN discovery constants
 inline constexpr uint16_t kuiDiscoveryPort = kuiDefaultPort + 1;
 inline constexpr uint32_t kuiDiscoveryMagic = 0x42524B4E; // "BRKN"
-inline constexpr std::chrono::milliseconds kDiscoveryScanDuration {1500};
+inline constexpr std::chrono::milliseconds kDiscoveryScanDuration {1'500};
 
 // Network buffer size for ACK bitfield and snapshot ring buffers (decoupled from physics tick rate)
 inline constexpr int64_t kiNetworkBufferSize = 128;

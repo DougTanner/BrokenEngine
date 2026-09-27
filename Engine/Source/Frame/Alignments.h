@@ -15,7 +15,7 @@ struct alignment_t
 	constexpr uint32_t Value() const { return uiValue; }
 
 	constexpr bool operator==(const alignment_t&) const = default;
-	constexpr auto operator<=>(const alignment_t&) const = default;
+	constexpr std::strong_ordering operator<=>(const alignment_t&) const = default;
 
 	void Write(std::ostream& rStream) const { common::Write(rStream, uiValue); }
 	void Read(std::istream& rStream) { common::Read(rStream, uiValue); }

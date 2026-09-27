@@ -328,7 +328,7 @@ int64_t CompressStatusChangeBatch(const game::StatusChange* pChanges, int64_t iC
 
 	// Serialize into a workbuffer reservation (SerializeStatusChangeBatch writes only iSerializedSize bytes and only
 	// those are compressed, so no zero-fill), then LZ4 compress into pDest
-	constexpr int64_t kiMaxGroupHeaders = kiTypeCount * 3;
+	static constexpr int64_t kiMaxGroupHeaders = kiTypeCount * 3;
 	int64_t iMaxSerializedSize = kiMaxGroupHeaders + iCount * kiMaxStatusChangeBytesPerItem;
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;

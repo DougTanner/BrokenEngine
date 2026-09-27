@@ -53,7 +53,7 @@ const TweaksSliderMapRegistrar gPbrRegistrar
 
 void TweaksScreenBase::RenderPbrSection()
 {
-	const int64_t iSection = giTweakSectionPbr;
+	int64_t iSection = giTweakSectionPbr;
 
 	if (ImGui::BeginTable("PbrColumns", 2))
 	{

@@ -96,11 +96,11 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	XMVECTOR vecSunMoon = vecMidnight;
 	XMVECTOR vecAmbient = vecAmbientMidnight;
 
-	const float fMorning = gSunMoonMorning.Get();
-	const float fNoonStart = gSunMoonNoonStart.Get();
-	const float fNoonEnd = gSunMoonNoonEnd.Get();
-	const float fEvening = gSunMoonEvening.Get();
-	const float fNightStart = gSunMoonNightStart.Get();
+	float fMorning = gSunMoonMorning.Get();
+	float fNoonStart = gSunMoonNoonStart.Get();
+	float fNoonEnd = gSunMoonNoonEnd.Get();
+	float fEvening = gSunMoonEvening.Get();
+	float fNightStart = gSunMoonNightStart.Get();
 
 	if (fSunAngle >= fMorning && fSunAngle < fNoonStart)
 	{
@@ -168,7 +168,7 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 
 	// Precomputed day-cycle products (every operand is invocation-invariant): SunLighting (terrain), the smoke
 	// helpers (AddSmoke/BlendSmokePrecomputed), and Water.frag. Folding here removes the equivalent per-pixel work.
-	const XMVECTOR vecRec601 = XMVectorSet(0.299f, 0.587f, 0.114f, 0.0f);
+	XMVECTOR vecRec601 = XMVectorSet(0.299f, 0.587f, 0.114f, 0.0f);
 
 	// Terrain sun/moon (SunLighting): per-target-scaled colors + Rec.601 magnitudes for the ambient-shadow blend.
 	XMVECTOR vecSunTerrain = XMVectorScale(vecSunMoon, fSunIntensityTerrain);
@@ -202,7 +202,7 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	// Fold Main-phase PBR tunables here while day-cycle colors are CPU-local; reading mapped write-combined uniforms back stalls. Direct BRDF
 	// products include Object intensity and fPbrSun. IBL uses separate unscaled Rec.709 luminance / fPbrDayBrightness so it stays linear in
 	// fPbrSun; scaling that luminance compounds to fPbrSun^3. The brightness reciprocal is intentionally unguarded.
-	const XMVECTOR vecRec709 = XMVectorSet(0.2126f, 0.7152f, 0.0722f, 0.0f);
+	XMVECTOR vecRec709 = XMVectorSet(0.2126f, 0.7152f, 0.0722f, 0.0f);
 	float fPbrSun = gPbrSun.Get();
 	float fPbrDayBrightnessInv = 1.0f / gPbrDayBrightness.Get();
 	XMVECTOR vecPbrSunColorObjects = XMVectorScale(vecSunMoon, fSunIntensityObjects * fPbrSun);
@@ -467,7 +467,7 @@ static void PopulateTerrainParameters(shaders::GlobalLayout& rGlobalLayout, floa
 
 	// PopulateSunMoonDirection folds fTerrainSnowBlend into f4TerrainSnowSunNormal.
 	rGlobalLayout.fTerrainSnowAmbientOcclusionExclusion = gTerrainSnowAmbientOcclusionExclusion.Get();
-	const float fTerrainDetailNormalsMultiplier = gTerrainDetailNormalsMultiplier.Resolve(engine::gpCamera->mfCameraEyeHeight);
+	float fTerrainDetailNormalsMultiplier = gTerrainDetailNormalsMultiplier.Resolve(engine::gpCamera->mfCameraEyeHeight);
 
 	rGlobalLayout.fTerrainRockSize = gTerrainRockSize.Get();
 	rGlobalLayout.fTerrainRockBlend = gTerrainRockBlend.Get();

@@ -27,7 +27,7 @@ void AreaLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const auto& { return rInterpolate.areaLights; });
+		[](const game::FrameInterpolate& rInterpolate) -> const AreaLightsInterpolate& { return rInterpolate.areaLights; });
 
 	if (iTotalCapacity == 0)
 	{

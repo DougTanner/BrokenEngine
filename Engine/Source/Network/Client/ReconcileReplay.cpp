@@ -19,7 +19,7 @@ void ReconcileInjectPendingFullState(CoordWork& rWork)
 	{
 		return;
 	}
-	auto& rPending = *rFrames.pendingFullState;
+	engine::CoordFrames::PendingFullState& rPending = *rFrames.pendingFullState;
 	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
 	int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
 	rPending.pFrame->postRender.sharedCrc = rPending.pFrame->Crcs();
@@ -64,8 +64,8 @@ static void AdoptUnreachablePendingFullState(CoordWork& rWork)
 	ASSERT(rPending.pFrame != nullptr);
 	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
 
-	const int64_t iAdoptedTick = rPending.iTick;
-	const int64_t iAdoptedSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
+	int64_t iAdoptedTick = rPending.iTick;
+	int64_t iAdoptedSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
 	rPending.pFrame->postRender.sharedCrc = rPending.pFrame->Crcs();
 	rFrames.snapshots[iAdoptedSlot] = std::move(rPending.pFrame);
 
@@ -237,16 +237,16 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	}
 
 	iReplayStart = iRollbackTick + 1;
-	const int64_t iUncappedMaxConsecutive = ReconcileFindReplayRangeCoord(rWork, iReplayStart);
+	int64_t iUncappedMaxConsecutive = ReconcileFindReplayRangeCoord(rWork, iReplayStart);
 	if (eMode == ReplayMode::kPrimary && HasDuePendingFullState(rFrames, rInputs.iTargetTick) && rFrames.pendingFullState->iTick > iUncappedMaxConsecutive)
 	{
-		const int64_t iAdoptedTick = rFrames.pendingFullState->iTick;
+		int64_t iAdoptedTick = rFrames.pendingFullState->iTick;
 		AdoptUnreachablePendingFullState(rWork);
 		fTime = rScratch.replayStack[0]->interpolate.fCurrentTime;
 		iReplayStart = iAdoptedTick + 1;
 		return false;
 	}
-	const int64_t iMaxConsecutive = std::min(iUncappedMaxConsecutive, rInputs.iTargetTick);
+	int64_t iMaxConsecutive = std::min(iUncappedMaxConsecutive, rInputs.iTargetTick);
 
 	if (eMode == ReplayMode::kFallback && iMaxConsecutive < iReplayStart && !HasDuePendingFullState(rFrames, rInputs.iTargetTick))
 	{
@@ -413,7 +413,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		rWork.pFrames = &rFrames;
 		rWork.scratch.Reset();
 	}
-	const size_t iActiveCount = iSlot;
+	size_t iActiveCount = iSlot;
 	miActiveCount = static_cast<int64_t>(iActiveCount);
 
 	ReconcileDispatchResult result;
@@ -427,7 +427,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 	// Parallel per-coord reconciliation via the shared multithreading pool.
 	// Each worker touches only its own CoordFrames entry — no cross-coord writes.
 	std::span<CoordWork> activeWorks(mWorks.data(), iActiveCount);
-	const int64_t iCount = static_cast<int64_t>(iActiveCount);
+	int64_t iCount = static_cast<int64_t>(iActiveCount);
 	auto processRange = [&](int64_t iBegin, int64_t iEnd)
 	{
 		// Heap: ReconcileCoord may grow per-coord scratch (frames, replay buffers) on dispatch

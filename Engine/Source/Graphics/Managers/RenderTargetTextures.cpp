@@ -9,9 +9,6 @@
 namespace engine
 {
 
-using enum TextureFlags;
-using enum TextureLayout;
-
 void RenderTargetTextures::Create()
 {
 	CreateLightingTextures();
@@ -42,7 +39,7 @@ void RenderTargetTextures::CreateWaterDisplacementTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 	mWaterDisplacementNormalTexture.Create(
 	{
@@ -57,7 +54,7 @@ void RenderTargetTextures::CreateWaterDisplacementTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 }
 
@@ -82,7 +79,7 @@ void RenderTargetTextures::CreateShadowTextures()
 	LOG(kGraphics, kDebug, "iShadowTexture: {} x {}", iShadowTextureX, iShadowTextureY);
 	mShadowElevationTexture.Create(
 	{
-		.textureFlags = {kRenderPass},
+		.textureFlags = {TextureFlags::kRenderPass},
 		.name = "ShadowElevation",
 		.flags = 0,
 		.format = shaders::keElevationFormat,
@@ -96,7 +93,7 @@ void RenderTargetTextures::CreateShadowTextures()
 		.renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		.renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		.renderPassVkClearColorValue = {gpIslandTerrain->mfSeaFloorElevation, 0.0f, 0.0f, 1.0f},
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 		.renderPassDstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 	});
 	mShadowTexture.Create(
@@ -112,7 +109,7 @@ void RenderTargetTextures::CreateShadowTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kComputeReadWrite,
+		.eTextureLayout = TextureLayout::kComputeReadWrite,
 	});
 	mShadowBlurTexture.Create(
 	{
@@ -127,7 +124,7 @@ void RenderTargetTextures::CreateShadowTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 	mShadowBlurIntermediateTexture.Create(
 	{
@@ -142,7 +139,7 @@ void RenderTargetTextures::CreateShadowTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 	mShadowHistoryTexture.Create(
 	{
@@ -157,7 +154,7 @@ void RenderTargetTextures::CreateShadowTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 }
 
@@ -179,7 +176,7 @@ void RenderTargetTextures::CreateSmokeTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	},
 	[&](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
 	{
@@ -205,7 +202,7 @@ void RenderTargetTextures::CreateSmokeTextures()
 
 	TextureInfo smokeTextureInfo
 	{
-		.textureFlags = {kRenderPass},
+		.textureFlags = {TextureFlags::kRenderPass},
 		.name = "SmokeOne",
 		.flags = 0,
 		.format = shaders::keSmokeFormat,
@@ -219,7 +216,7 @@ void RenderTargetTextures::CreateSmokeTextures()
 		.renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
 		.renderPassInitialVkImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		.renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
 	mSmokeTextureOne.Create(smokeTextureInfo);
 	smokeTextureInfo.name = "SmokeTwo";
@@ -232,9 +229,9 @@ void RenderTargetTextures::CreateSmokeTextures()
 	VkImageSubresourceRange vkSmokeSubresource {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 	for (Texture* pSmokeTexture : {&mSmokeTextureOne, &mSmokeTextureTwo})
 	{
-		pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, kShaderReadOnly, kTransferDestination);
+		pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kTransferDestination);
 		vkCmdClearColorImage(oneShotCommandBuffer.mVkCommandBuffer, pSmokeTexture->mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &vkSmokeClearColor, 1, &vkSmokeSubresource);
-		pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, kTransferDestination, kShaderReadOnly);
+		pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kTransferDestination, TextureLayout::kShaderReadOnly);
 	}
 	oneShotCommandBuffer.Execute();
 }
@@ -243,7 +240,7 @@ void RenderTargetTextures::CreateWindTextures()
 {
 	TextureInfo windTextureInfo
 	{
-		.textureFlags = {kRenderPass},
+		.textureFlags = {TextureFlags::kRenderPass},
 		.name = "WindOne",
 		.flags = 0,
 		.format = shaders::keWindFormat,
@@ -257,13 +254,13 @@ void RenderTargetTextures::CreateWindTextures()
 		.renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
 		.renderPassInitialVkImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		.renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
 	mWindTextureOne.Create(windTextureInfo);
 
 	mWindTextureTwo.Create(TextureInfo
 	{
-		.textureFlags = {kRenderPass},
+		.textureFlags = {TextureFlags::kRenderPass},
 		.name = "WindTwo",
 		.flags = 0,
 		.format = shaders::keWindFormat,
@@ -277,7 +274,7 @@ void RenderTargetTextures::CreateWindTextures()
 		.renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
 		.renderPassInitialVkImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		.renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
 	// Wind ping-pong textures are (re)created with undefined contents. On a device-lost / settings recreate the wind
@@ -290,9 +287,9 @@ void RenderTargetTextures::CreateWindTextures()
 	VkImageSubresourceRange vkWindSubresource {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 	for (Texture* pWindTexture : {&mWindTextureOne, &mWindTextureTwo})
 	{
-		pWindTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, kShaderReadOnly, kTransferDestination);
+		pWindTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kTransferDestination);
 		vkCmdClearColorImage(oneShotCommandBuffer.mVkCommandBuffer, pWindTexture->mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &vkWindClearColor, 1, &vkWindSubresource);
-		pWindTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, kTransferDestination, kShaderReadOnly);
+		pWindTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kTransferDestination, TextureLayout::kShaderReadOnly);
 	}
 	oneShotCommandBuffer.Execute();
 }
@@ -302,7 +299,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 	auto [iObjectShadowsRenderTextureX, iObjectShadowsRenderTextureY] = TextureManager::DetailTextureSize(gObjectShadowsRenderMultiplier.Get());
 	mObjectShadowsTexture.Create(
 	{
-		.textureFlags = {kRenderPass},
+		.textureFlags = {TextureFlags::kRenderPass},
 		.name = "ObjectShadows",
 		.flags = 0,
 		.format = shaders::keShadowFormat,
@@ -316,7 +313,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		.renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		.renderPassVkClearColorValue = {1.0f, 0.0f, 0.0f, 0.0f},
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 		.renderPassDstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 	});
 
@@ -334,7 +331,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 	mObjectShadowsBlurIntermediateTexture.Create(
 	{
@@ -349,7 +346,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 }
 
@@ -359,7 +356,7 @@ void RenderTargetTextures::CreateTerrainTextures()
 	{
 		mLogTexture.Create(
 		{
-			.textureFlags = {kRenderPass},
+			.textureFlags = {TextureFlags::kRenderPass},
 			.name = "Log",
 			.flags = 0,
 			.format = VK_FORMAT_R8G8B8A8_UNORM,
@@ -373,14 +370,14 @@ void RenderTargetTextures::CreateTerrainTextures()
 			.renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			.renderPassVkClearColorValue = {0.0f, 0.0f, 0.0f, 1.0f},
-			.eTextureLayout = kShaderReadOnly,
+			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		});
 	}
 
 	auto [iTerrainElevationTextureX, iTerrainElevationTextureY] = TextureManager::DetailTextureSize(gTerrainElevationTextureMultiplier.Get());
 	mTerrainElevationTexture.Create(
 	{
-		.textureFlags = {kRenderPass},
+		.textureFlags = {TextureFlags::kRenderPass},
 		.name = "Elevation",
 		.flags = 0,
 		.format = shaders::keElevationFormat,
@@ -394,7 +391,7 @@ void RenderTargetTextures::CreateTerrainTextures()
 		.renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		.renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		.renderPassVkClearColorValue = {gpIslandTerrain->mfSeaFloorElevation, 0.0f, 0.0f, 1.0f},
-		.eTextureLayout = kShaderReadOnly,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 }
 

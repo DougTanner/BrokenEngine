@@ -92,18 +92,18 @@ void Buffer::UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const D
 	}
 
 	OneShotCommandBuffer oneShotCommandBuffer;
-	vkCmdCopyBuffer(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkBuffer, vkDeviceLocalBuffer, static_cast<uint32_t>(uploads.size()), pCopies);
+	vkCmdCopyBuffer(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.stagingVkBuffer, vkDeviceLocalBuffer, static_cast<uint32_t>(uploads.size()), pCopies);
 	oneShotCommandBuffer.Execute();
 }
 
 StagingBuffer::StagingBuffer(std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags)
 {
-	Buffer::CreateBuffer(name, vkDeviceSize, vkBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vkBuffer, vmaAllocation, &vmaAllocationInfo);
+	Buffer::CreateBuffer(name, vkDeviceSize, vkBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingVkBuffer, vmaAllocation, &vmaAllocationInfo);
 }
 
 StagingBuffer::~StagingBuffer()
 {
-	vmaDestroyBuffer(gpDeviceManager->mpAllocator, vkBuffer, vmaAllocation);
+	vmaDestroyBuffer(gpDeviceManager->mpAllocator, stagingVkBuffer, vmaAllocation);
 }
 
 void Buffer::RecordBarriers(VkCommandBuffer vkCommandBuffer, const BarrierInfo* pBarriers, int64_t iBarrierCount)
@@ -169,7 +169,7 @@ void Buffer::RecordBarriers(VkCommandBuffer vkCommandBuffer, const BarrierInfo* 
 			.dstAccessMask = dstAccessMask,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.buffer = pBarriers[i].vkBuffer,
+			.buffer = pBarriers[i].barrierVkBuffer,
 			.offset = 0,
 			.size = VK_WHOLE_SIZE,
 		});
@@ -279,7 +279,7 @@ void Buffer::Create(const BufferInfo& rInfo, const std::function<void(void*)>& r
 			.dstOffset = 0,
 			.size = mInfo.dataVkDeviceSize,
 		};
-		vkCmdCopyBuffer(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkBuffer, mDeviceLocalVkBuffer, 1, &vkBufferCopy);
+		vkCmdCopyBuffer(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.stagingVkBuffer, mDeviceLocalVkBuffer, 1, &vkBufferCopy);
 		oneShotCommandBuffer.Execute();
 	}
 }
