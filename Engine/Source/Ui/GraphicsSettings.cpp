@@ -109,6 +109,11 @@ bool IsValidGraphicsQualityLevel(uint8_t uiLevel)
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
 const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings)
 {
+	if (!std::ranges::contains(gSampleCount.mAllowed, static_cast<float>(rGraphicsSettings.eSampleCount)))
+	{
+		return "eSampleCount";
+	}
+
 	if (!gMaxAnisotropy.IsInRange(rGraphicsSettings.fMaxAnisotropy))
 	{
 		return "fMaxAnisotropy";

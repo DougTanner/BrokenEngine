@@ -508,9 +508,13 @@ void Graphics::Refresh()
 {
 	PollSetting<bool>(gMultisampling, "Multisampling", DestroyType::kSwapchain);
 
-	if (gpInstanceManager != nullptr && gSampleCount.Get<VkSampleCountFlagBits>() > gpInstanceManager->meMaxMultisampleCount)
+	if (gpInstanceManager != nullptr)
 	{
-		gSampleCount.Set<VkSampleCountFlagBits>(gpInstanceManager->meMaxMultisampleCount);
+		VkSampleCountFlagBits eSampleCount = gpInstanceManager->SelectSupportedSampleCount(gSampleCount.Get<VkSampleCountFlagBits>());
+		if (eSampleCount != gSampleCount.Get<VkSampleCountFlagBits>())
+		{
+			gSampleCount.Set<VkSampleCountFlagBits>(eSampleCount);
+		}
 	}
 
 	PollSetting<VkSampleCountFlagBits>(gSampleCount, "Sample count", DestroyType::kSwapchain);

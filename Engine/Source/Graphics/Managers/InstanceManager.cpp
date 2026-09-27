@@ -120,6 +120,19 @@ static VkSampleCountFlagBits SelectSampleCount(VkSampleCountFlags eVkSampleCount
 	return VK_SAMPLE_COUNT_1_BIT;
 }
 
+VkSampleCountFlagBits InstanceManager::SelectSupportedSampleCount(VkSampleCountFlagBits eRequested) const
+{
+	VkSampleCountFlags eSupported = mVkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & mVkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts;
+	if ((eSupported & eRequested) != 0)
+	{
+		return eRequested;
+	}
+
+	// Highest supported count above one that does not exceed the request; when there is none (only an unsupported
+	// request of 2), 4 is returned because the Vulkan required limits guarantee it.
+	return SelectSampleCount((eSupported & (eRequested | (eRequested - 1))) | VK_SAMPLE_COUNT_4_BIT);
+}
+
 // Stable storage for the VkLayerSettingEXT pValues pointers — Vulkan reads them at vkCreateInstance, after BuildValidationLayerSettings has returned, so they must outlive the helper's stack frame.
 [[maybe_unused]] static constexpr VkBool32 kbLayerSettingTrue = VK_TRUE;
 [[maybe_unused]] static constexpr VkBool32 kbLayerSettingFalse = VK_FALSE;
@@ -547,9 +560,11 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 #endif
 	meMaxMultisampleCount = SelectSampleCount(mVkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & mVkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts);
 	LOG(kGraphics, kInfo, "  Max multisample count: {}\n", static_cast<int64_t>(meMaxMultisampleCount));
-	if (gSampleCount.Get<VkSampleCountFlagBits>() > meMaxMultisampleCount)
+	ASSERT(meMaxMultisampleCount > VK_SAMPLE_COUNT_1_BIT);
+	VkSampleCountFlagBits eSampleCount = SelectSupportedSampleCount(gSampleCount.Get<VkSampleCountFlagBits>());
+	if (eSampleCount != gSampleCount.Get<VkSampleCountFlagBits>())
 	{
-		gSampleCount.Reset<VkSampleCountFlagBits>(meMaxMultisampleCount);
+		gSampleCount.Reset<VkSampleCountFlagBits>(eSampleCount);
 	}
 }
 

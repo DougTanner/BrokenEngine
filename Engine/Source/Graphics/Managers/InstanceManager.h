@@ -56,6 +56,8 @@ public:
 	VkColorSpaceKHR mFramebufferVkColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
 	VkFormat mDepthVkFormat = VK_FORMAT_UNDEFINED;
 
+	VkSampleCountFlagBits SelectSupportedSampleCount(VkSampleCountFlagBits eRequested) const;
+
 	std::vector<const char*> mValidationLayers;
 	VkDebugUtilsMessengerEXT mVkDebugUtilsMessengerEXT = nullptr;
 

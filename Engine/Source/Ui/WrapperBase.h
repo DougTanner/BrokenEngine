@@ -59,17 +59,26 @@ public:
 
 	template <typename T>
 	Wrapper(T value, const std::vector<T>& rAllowedValues)
-	: mfDefault(static_cast<float>(value))
+	: mAllowed([&rAllowedValues]
+	{
+		std::vector<float> allowed;
+		allowed.reserve(rAllowedValues.size());
+		for (const T& rValue : rAllowedValues)
+		{
+			allowed.push_back(static_cast<float>(rValue));
+		}
+
+		return allowed;
+	}())
+	, mfDefault(static_cast<float>(value))
 	, mfMin(0.0f)
 	, mfMax(1.0f)
 	, mfCurrent(mfDefault)
 	, mfPrevious(mfCurrent)
 	{
-		mAllowed.reserve(rAllowedValues.size());
-		for (const T& rValue : rAllowedValues)
+		for (const float& rfValue : mAllowed)
 		{
-			mAllowed.push_back(static_cast<float>(rValue));
-			mfMax = std::max(static_cast<float>(rValue), mfMax);
+			mfMax = std::max(rfValue, mfMax);
 		}
 
 		// Break for the same static-initialization reason as the float constructor above.
@@ -218,10 +227,10 @@ public:
 		}
 
 		// Intentional soft-fall: an off-grid value is legitimately reachable — a corrupt/hand-edited persisted
-		// setting (settings-file load) or a device-capability clamp (gSampleCount/gPresentMode) — so this never
-		// throws. Returns index 0; the sole return-consuming caller clamps it (TweaksScreenBase.cpp), and the
-		// graphics path re-clamps sample-count/present-mode against device support. DEBUG_BREAK is a debug-only
-		// hint for genuine internal misuse (no-op in release).
+		// gPresentMode or gUiTheme (settings-file load) — so this never throws. Returns index 0; the sole
+		// return-consuming caller clamps it (TweaksScreenBase.cpp), the graphics path re-clamps present mode against
+		// device support, and GetUiTheme() clamps the theme. DEBUG_BREAK is a debug-only hint for genuine internal
+		// misuse (no-op in release).
 		DEBUG_BREAK();
 		return 0;
 	}
@@ -230,6 +239,9 @@ public:
 	{
 		Set(mAllowed.at(iIndex));
 	}
+
+	// Discrete wrappers only; const because mfMax is derived from it at construction.
+	const std::vector<float> mAllowed;
 
 private:
 
@@ -249,7 +261,6 @@ private:
 
 	float mfCurrent = 0.0f;
 	float mfPrevious = 0.0f;
-	std::vector<float> mAllowed;
 };
 
 // Internal-only wrappers (not bound to any UI: not Tweaks, not GraphicsMenuScreen, not SoundMenuScreen).
