@@ -422,6 +422,8 @@ void BuildNavAcceleration(NavData& rNavData)
 	// --- Per-polygon AABB + explicit perimeter edges ---
 	rNavData.polygonMin.resize(iPolygonCount);
 	rNavData.polygonMax.resize(iPolygonCount);
+	rNavData.edgeA.reserve(iVertexCount);
+	rNavData.edgeB.reserve(iVertexCount);
 	for (int32_t iPoly = 0; iPoly < iPolygonCount; ++iPoly)
 	{
 		auto [iStart, iEnd] = PolygonRange(rNavData.polygonOffsets, iPoly, iVertexCount);

@@ -897,6 +897,7 @@ void GameBase::RefreshReplayActiveSet()
 	// Heap: vector clear/push_back, unordered_map insertion + make_unique<Frame>
 	ScopedSuppressAllocationTracking suppress;
 	mActiveCoords.clear();
+	mActiveCoords.reserve(gpReplay->mReplayReaders.size());
 	for (const auto& [rCoord, rpReader] : gpReplay->mReplayReaders)
 	{
 		mActiveCoords.push_back(rCoord);

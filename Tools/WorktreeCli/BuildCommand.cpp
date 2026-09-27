@@ -522,6 +522,7 @@ namespace toolcli
 		std::optional<EvaluatedCompileItems> EvaluateProjectCompileItems(const std::filesystem::path& rMsBuild, const std::filesystem::path& rProject, const std::vector<std::wstring>& rBuildArguments, RetainedLog& rLog)
 		{
 			std::vector<std::wstring> queryArguments = { rMsBuild.native(), rProject.native() };
+			queryArguments.reserve(queryArguments.size() + rBuildArguments.size() + 3);
 			queryArguments.insert(queryArguments.end(), rBuildArguments.begin(), rBuildArguments.end());
 			queryArguments.emplace_back(L"/getProperty:IntDir");
 			queryArguments.emplace_back(L"/getItem:ClCompile");
@@ -806,6 +807,7 @@ namespace toolcli
 
 		std::filesystem::path target = pArgumentValues[iIndex++];
 		std::vector<std::wstring> buildArguments;
+		buildArguments.reserve(static_cast<size_t>(iArgumentCount - iIndex));
 		for (; iIndex < iArgumentCount; ++iIndex)
 		{
 			buildArguments.emplace_back(pArgumentValues[iIndex]);

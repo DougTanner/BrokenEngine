@@ -734,6 +734,7 @@ void Replay::SaveLoadReplay()
 				// Replay owns each active generation until its reader reaches the recorded end. Rebuild directly from
 				// the successfully loaded readers so normal subscription/player pruning cannot erase an empty coord.
 				game::gpGame->mActiveCoords.clear();
+				game::gpGame->mActiveCoords.reserve(mReplayReaders.size());
 				for (const auto& [rCoord, rpReader] : mReplayReaders)
 				{
 					game::gpGame->mActiveCoords.push_back(rCoord);

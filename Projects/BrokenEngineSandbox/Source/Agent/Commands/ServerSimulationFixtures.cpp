@@ -618,6 +618,7 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 	// entries validate. Burned global ids on a mid-build throw are harmless (ids are monotonic; gaps are fine).
 	nlohmann::json globalIds = nlohmann::json::array();
 	std::vector<std::pair<engine::GridCoord, StatusChange>> built;
+	built.reserve(rChanges.size());
 	for (const nlohmann::json& rChange : rChanges)
 	{
 		built.push_back(BuildInjectedChange(rChange, globalIds));

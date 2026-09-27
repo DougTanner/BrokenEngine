@@ -197,6 +197,7 @@ void BakeOne(const std::filesystem::path& rIslandFolder)
 		throw std::runtime_error(std::format("\"{}\" \"routes\" must be a non-empty array of label strings (e.g. [\"1x1\", \"2x1\"]).", islandJsonFile.string()));
 	}
 	std::vector<const RouteSubdivision*> routes;
+	routes.reserve(rRoutesJson.size());
 	for (const nlohmann::json& rRouteJson : rRoutesJson)
 	{
 		if (!rRouteJson.is_string())
