@@ -74,7 +74,7 @@ Probe only surfaces the plan actually touches:
   and kilometer-scale coordinates.
 - Determinism and compatibility: client/server equivalence, floating-point
   or iteration order, CRC participation and `LogDifferences`, wire IDs,
-  `kiVersion`/pack layout, save/replay compatibility, and interpolation versus
+  `kiVersion`/pack layout, save/replay version bumps, and interpolation versus
   snapping.
 - Execution safety: Update/PostRender/Interpolate phase, dispatch ownership
   and shared writes, collection allocation/copy/spawn/transfer alignment,

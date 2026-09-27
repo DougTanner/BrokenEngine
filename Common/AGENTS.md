@@ -13,7 +13,7 @@ Focused implementation contracts live in Log (`Log/AGENTS.md`), Math (`Math/AGEN
 - Manifest integrity keeps asset-path identity separate from the CRC of the exact emitted chunk bytes. Changes to layout or digest semantics require regeneration of local packed data.
 - `Serialization.h` is the binary `Read`/`Write` surface, including `XMVECTOR` round-tripping through `XMFLOAT4`. Never hand-roll equivalent casts. Counts from saves, replays, network input, or pack chunks are untrusted: validate them with the provided count/capacity helpers before allocation or iteration, then let the owning boundary answer corrupt input: saves and replays abort the load, network answers per direction (`../Engine/Source/Network/AGENTS.md`), and `.pack` data halts (`../Engine/Source/File/AGENTS.md`). Those helpers only bound a count against how many bytes are left in the stream, so a `.pack` field with a fixed structural maximum must also be bounded against the matching `DataFile.h` `kiMax*` constant — otherwise a header count that fits the stream still overruns a fixed-size destination buffer.
 - `Crc.h` owns the repository's non-standard 64-bit CRC family and compile-time string helpers. Preserve its exact semantics wherever values feed deterministic state, manifests, or protocol identity.
-- `Flags<EnumType>` is the serializable and CRC-hashable bitfield wrapper for unsigned enum types. Prefer it to parallel booleans or raw integer masks.
+- `Flags<EnumType>` is the serializable and CRC-hashable bitfield wrapper for unsigned enum types.
 - Texture sizing uses `SizeInBytes` for one mip and `ComputeImageByteSize` for a complete mip chain. Do not duplicate the format/extent math in producers or consumers.
 
 ## Allocation-Free Scratch

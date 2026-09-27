@@ -131,8 +131,12 @@ Branches, the session label, and the receipt path are re-resolved by the
 landing worker or fixed; the path set and the `Attribution trailer` stay
 ordinary brief fields; the owner token never crosses the dispatch boundary —
 the landing worker claims the lock itself. A decline or non-answer leaves
-primary unchanged. `/save-plan` is the sole standing exception, and only when
-the change contains exactly the saved Plan file.
+primary unchanged. Two standing exceptions skip only the question, never the
+SmartGit launch or the summary: `/save-plan`, when the change contains exactly
+the saved Plan file; and an explicit user-authorized Plan rejection, when the
+change contains exactly the paths `Complete-NextPlan.ps1 -Reject` reported and
+the acceptance table has no non-PASS row. The authorizing user message fills
+the capsule's confirmation row.
 
 Confirmation binds the reviewed diff, not commit hashes. A clean identical
 rebase onto an advanced primary lands without re-asking, and needs no re-review

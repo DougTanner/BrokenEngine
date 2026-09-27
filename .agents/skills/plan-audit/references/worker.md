@@ -96,8 +96,9 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
     initially decisive check and expected result, with a named independent
     signal for any duplicate check. Done when each of those is verified.
 22. If evidence proves a criterion unverifiable in the available environment,
-    report a must-fix finding with an achievable replacement or a meaningful
-    user decision; do not defer it to an end-of-session waiver. Done when every
+    report a must-fix finding with an achievable replacement (for a path
+    nothing reaches today, the code reading the Change Workflow Run targeted
+    pre-review checks step prescribes) or a meaningful user decision; do not defer it to an end-of-session waiver. Done when every
     such criterion carries that finding.
 23. Route changed C++ to `/repo-code-review`, changed GLSL to `/glsl-review`,
     and a shared CPU/GLSL dual-language header to both. Do not route

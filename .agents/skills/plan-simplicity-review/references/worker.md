@@ -49,17 +49,18 @@ steps change product, user interface, tooling, or public interface behavior.
    measurements are unavailable; never invent precision. A merely hypothetical
    cost is not itself a problem. When the problem remains `hypothetical`, and
    no stronger `simplify` or whole-plan `plan-not-worth-executing` finding
-   applies, emit `speculative-hardening` with `user-judgment` regardless of
-   prevention cost or severity. Retain the cost comparison and present options
-   with a recommendation; severity alone is neither occurrence evidence nor
-   grounds for a clean `PASS`.
+   applies, emit `speculative-hardening` with `simplify`: drop the prevention,
+   keeping at most
+   the question 4 ASSERT; trust-boundary validation
+   (`.agents/references/cpp-conventions.md`) is never dropped; severity alone is
+   neither occurrence evidence nor grounds for a clean `PASS`.
 3. Simpler mechanism. For each applicable step, name the plainly simpler
    alternative when one exists: reuse of an existing mechanism, a narrower
    change, deleting the requirement, or fixing at the origin.
 4. ASSERT-and-defer floor. Weigh the minimal fallback every time — an ASSERT or
    clear failure at the point the rare condition would manifest, dealt with
-   later if it ever occurs. Honor the repository's no-useless-ASSERT rule (root
-   `AGENTS.md`, Directives): prefer making the condition impossible or
+   later if it ever occurs. Honor the repository's no-useless-ASSERT rule
+   (`.agents/references/cpp-conventions.md`): prefer making the condition impossible or
    recovering gracefully over an ASSERT that adds nothing.
 5. Configuration and extension surface. Report options, hooks, and formats with
    no current consumer.
@@ -137,8 +138,8 @@ steps change product, user interface, tooling, or public interface behavior.
   interviews the user.
 - Give every finding one disposition. Use `simplify` when the evidence supports
   a concrete simpler replacement. Use `user-judgment` when two or more viable
-  answers remain and the trade-off is genuinely the user's — accepting a rare
-  failure versus paying for the machinery that prevents it, or keeping a symptom
+  answers remain and the trade-off is genuinely the user's — accepting an `observed`
+  or `credible exposure` failure versus paying for the machinery that prevents it, or keeping a symptom
   patch versus paying for a much larger root-cause fix — and present the
   options, their costs, and a recommendation in plain language, so the manager
   can put it to the user (Tier 2) or feed `/external-grill-plan` (Tier 3)

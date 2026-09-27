@@ -32,6 +32,6 @@ A plan spanning areas goes to the area owning most of its named files; a tie sta
 
 An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
 
-The two scope sections are the control the finished change is measured against, so write each boundary precisely enough to enforce: the Review and resolve correctness step's review of each changed artifact type treats a changed region no `## In scope` clause covers, or one an `## Out of scope` line names, as unauthorized.
+The two scope sections are the control the finished change is measured against (`.agents/references/scope-authorization.md`), so write each boundary precisely enough to enforce.
 
 A document presenting options rather than a decision-complete implementation belongs in `../Investigations/` (see `../Investigations/AGENTS.md`) until the decision exists. Work blocked on another change expresses that as a `dependsOn` edge; work blocked on a decision is not a Plan yet.

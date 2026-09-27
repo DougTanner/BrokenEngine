@@ -215,7 +215,7 @@ Execution card:
 ### What does this plan do?
 <2-4 plain sentences>
 ### Why this is good for the codebase
-<2-4 plain sentences>
+<2-4 plain sentences: what prompted it, who uses the result, and how>
 - Goal: <result>
 - Out of scope: <boundary>
 - Tier trigger: <trigger or none>
@@ -230,9 +230,9 @@ under the bullet.
 
 The preparation fills `Roles` from the Change Workflow step and role
 assignments its brief supplies, citing the brief as the evidence and never
-reading the workflow itself. When the tier the preparation classifies differs
-from the tier those assignments assume, it records the mismatch among the
-unresolved decisions it returns and leaves the roles for main to reconcile.
+reading the workflow itself. When the classified tier differs from the tier
+those assignments assume, main rewrites the card's `Roles` field to the
+classified tier before the Plan review step.
 
 ### Implementation approval
 
@@ -251,12 +251,13 @@ on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
 without an approval question; on Claude Code, OpenCode, and every other host as
 rendered message text whose approval question is the last thing before the
 `Follow-up Plans created:` footer, after which the user's next message is the
-decision. An approval that leaves any listed alternative or decision unanswered
-does not authorize implementation: main halts, asks again for only the
-unanswered items with the same options and recommendation, and waits for the
-answer. A chosen alternative is a decision change: the run returns to
-preparation and Plan review and re-presents. Any revision is a new complete
-replacement presentation. When the approved presentation differs from the
+decision. An approval accepts the recommendation for every listed alternative
+or decision it leaves unanswered, except a recommendation to reject the Plan,
+which still needs an explicit answer. A chosen alternative returns the run to
+preparation and Plan review. When approval came with the choice, the redraft
+goes to implementation unless those reviews add a user decision, widen scope
+beyond the choice, or raise the tier; in that case, and when the choice came
+without approval, main presents only the difference. When the approved presentation differs from the
 execution card, main updates the card to the approved scope before the run
 continues.
 
@@ -290,9 +291,9 @@ deferral, unknown claim state, or work still to land — never prints that line.
   empty realized change, the run goes from preparation straight to this file's
   `### Implementation approval` route, at any tier, without reaching the Plan
   review step.
-- An affirmative response approves only the latest unchanged presentation. A
-  meaningful Plan, card, scope, invariant, acceptance, or decision change
-  requires a new complete presentation.
+- A Plan, card, scope, invariant, or acceptance change after approval, other
+  than the redraft `### Implementation approval` allows, requires a new
+  presentation of the difference.
 - Deferral uses
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Defer-NextPlan.ps1`
   and only an ordinary live claim. After final preparation has run, deferral

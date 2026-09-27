@@ -5,7 +5,7 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
 - Error handling at trust boundaries only: assume function parameters from within the codebase are valid — no defensive validation between our own functions. Do validate anything opaque to the current code unit: network input, file reads, OS/third-party API results.
 - No useless ASSERTs: an ASSERT that throws one line before the code would crash anyway adds false safety — remove it; prefer making the condition impossible in calling code, or recovering gracefully. `/repo-code-review` lists the preferred fixes in order, from best to last resort.
 - Log levels: `kVerbose` — per-frame / high-frequency. `kDebug` — one-time (startup, connect). `kInfo` — state transitions, important one-shots (default threshold). `kWarning` — investigate (timeouts, desync); may spam. `kError` — failures; always logged. Runtime-threshold and compile-floor mechanics: `Common/Log/AGENTS.md`.
-- Managers: Singletons via `gp*` globals (`gpGraphics`, `gpAudioManager`)
+- Managers: Singletons via `gp*` globals (`gpGraphics`, `gpAudioManager`); the constructor asserts its global is null and assigns `this`; never move that assignment out of the constructor or ahead of the null ASSERT.
 - DirectX Math: Prefer aligned versions (`Float4A` not `Float4`)
 	- XMVECTOR W invariant: Positions W=1.0; directions / velocities / normals / offsets W=0.0; color alpha defaults 1.0 (opaque)
 	- Function form, not operators: `XMVectorAdd`/`Subtract`/`Multiply`/`Divide`/`Scale`/`Negate` — never `vec + vec`, `f * vec`, `-vec`.
@@ -15,5 +15,6 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
 - Allocation tracking: Heap allocations in the main loop trigger `DEBUG_BREAK()`. When unavoidable, wrap with `ScopedSuppressAllocationTracking` + `// Heap:` comment. See `Engine/Source/Memory/AGENTS.md`
 - LOG formatting: logging in allocation-tracked Game/Engine code must remain allocation-free; /repo-code-review owns accepted formatting and wrapper details
 - Standard library / external headers: PCH-backed `#include`s go in `Common/ExternalHeaders.h`; PCH-less AgentTools use `Tools/ToolCommon/ToolCliCommon.h`. Rules and exceptions: `Common/AGENTS.md` and `Tools/ToolCommon/AGENTS.md`
-- Flags over booleans: Use `common::Flags<EnumType>` instead of multiple `bool` variables.
+- Flags over booleans: Use `common::Flags<EnumType>` instead of multiple `bool` variables or raw masks; put a new bit in an existing `Flags` member when one fits, serialized formats included.
+- Identity keys: key pending or transient state by what it concerns (global ID, cell coordinate, the awaited object), usually in a map; never by list position or UI element.
 - Multithreading: Use `common::gpMultithreading->Dispatch()` or `common::PersistentWorker` for data-parallel work.

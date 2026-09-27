@@ -116,8 +116,7 @@ persistence, creation initialization, transfer, hydration, or identity behavior
 as correctness contracts, not style.
 
 For other persisted or wire-visible layouts, trace version/identity updates,
-read/write order, bounds, CRC participation, compatibility intent, and every
-producer and consumer. Do not infer backward compatibility authority.
+read/write order, bounds, CRC participation, and every producer and consumer.
 
 ### Determinism, threading, and frame phases
 

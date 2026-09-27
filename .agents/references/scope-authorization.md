@@ -6,12 +6,14 @@ minimality, and diff-observable simplicity. It applies to Tier-2+ changes only.
 
 Authorization source: the approved plan's `## In scope` and `## Out of scope`
 sections, or the explicit user-instruction list for unplanned work, plus the
-execution card when one exists. Without it, report `Scope: not supplied` rather
+execution card when one exists, and scope added under the Change Workflow
+Leftovers rule. Without it, report `Scope: not supplied` rather
 than guessing.
 
 1. Authorization pass: map each changed region to the `## In scope` entry or
    user instruction that authorizes it, counting the mechanical necessities the
-   named change requires (includes, declarations). An unmapped region is an
+   named change requires (includes, declarations, documents the change makes
+   wrong). An unmapped region is an
    `unauthorized` finding; a region matching an `## Out of scope` entry is
    likewise `unauthorized`.
 2. Minimality pass over added bytes only: flag an unused option, a speculative

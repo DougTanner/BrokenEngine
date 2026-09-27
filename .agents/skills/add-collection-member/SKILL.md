@@ -27,7 +27,7 @@ The enclosing implementer's brief supplies the task-brief fields in
 `## Task brief` and its ownership snapshot. This checklist also consumes the
 target collection and member, the intended ownership and shared/client
 reachability, the known producers, consumers, lifecycle and integration sites,
-and the approved save/replay version and compatibility decision.
+and whether a save/replay version bump applies.
 
 ## Handoff
 
@@ -38,7 +38,7 @@ acceptance criteria in the `Runtime acceptance requests` form
 [`/implement-plan`](../implement-plan/SKILL.md) `## Handoff` declares, the
 tuple-position, carry-forward, initialization, transfer, hydration, and
 identity invariants under `Reviewer focus areas`, and a stale exemplar or
-unresolved CRC/version/compatibility decision under `Residuals`.
+unresolved CRC/version decision under `Residuals`.
 
 ## References
 
