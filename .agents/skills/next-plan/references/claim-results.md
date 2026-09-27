@@ -81,7 +81,7 @@ matching several validated executable Plans yields `plan-name-ambiguous`, whose
 `candidates` array.
 
 If an exact or resolved request differs from the Plan the session already
-holds, the `/v6` claim envelope returns
+holds, the `/v7` claim envelope returns
 `claim.plan-mismatch` with `status: blocked`, exit 2, and
 `nextAction: stop-report-to-user`. Its `conflict` object carries the normalized
 `requestedPlan` and `heldPlan`; WorktreeCli makes the comparison and the wrapper
