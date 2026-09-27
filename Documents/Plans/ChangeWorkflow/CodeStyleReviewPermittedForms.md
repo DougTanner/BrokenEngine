@@ -95,7 +95,7 @@ Recommended edits, each naming only the form the evidence above proves:
   positives belong to `Documents/Plans/ChangeWorkflow/CodeStyleReviewScannerFalsePositives.md`
 - Rule 6 sites a `kb*` toggle can express, such as the `common::ValidateVector`
   guards in `Frame/Collections/Missiles/MissilesUpdate.cpp`, which belong to
-  `Documents/Plans/Game/MissilesVectorValidationToggle.md`
+  `Documents/Investigations/ChangeWorkflow/StyleGuideWholeFileSweep.md`
 - Every other rule and every other worker.md step
 
 ## Risk tier and invariants

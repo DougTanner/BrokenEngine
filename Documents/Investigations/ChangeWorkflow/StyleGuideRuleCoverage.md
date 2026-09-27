@@ -34,11 +34,11 @@ hand-read list together cover 22 rules; 41 rules are on neither list.
 
 ## Coverage
 
-Routed-to paths:
-- Scanner kinds: [CodeStyleReviewScannerRuleKinds.md](../../Plans/ChangeWorkflow/CodeStyleReviewScannerRuleKinds.md)
-- Hand read: [CodeStyleReviewHandReadMandate.md](../../Plans/ChangeWorkflow/CodeStyleReviewHandReadMandate.md)
-- Repo review: [RepoCodeReviewStyleGuideContracts.md](../../Plans/ChangeWorkflow/RepoCodeReviewStyleGuideContracts.md)
-- Build warnings: [SandboxDebugProfileGuideWarningsAsErrors.md](../../Plans/Game/SandboxDebugProfileGuideWarningsAsErrors.md)
+Routed-to paths (Plans since landed):
+- Scanner kinds: `Documents/Plans/ChangeWorkflow/CodeStyleReviewScannerRuleKinds.md`
+- Hand read: `Documents/Plans/ChangeWorkflow/CodeStyleReviewHandReadMandate.md`
+- Repo review: `Documents/Plans/ChangeWorkflow/RepoCodeReviewStyleGuideContracts.md`
+- Build warnings: `Documents/Plans/Game/SandboxDebugProfileGuideWarningsAsErrors.md`
 
 | Rule | Subject | Current mechanisms | Status | Recommendation and reason | Routed to |
 |---|---|---|---|---|---|
@@ -118,17 +118,14 @@ Routed-to paths:
   indents them, and `.editorconfig` does not count as enforcement here.
 - Rule 59's `switch` example sits under rule 60 in the guide
   (`Documents/C++StyleGuide.txt:280-286`).
-- The routed Plans check only new lines. Sweep Plans for existing violations,
-  each depending on the Plan that adds its check:
-  scanner kinds and rule 18 —
-  [Engine](../../Plans/Engine/StyleGuideScannerRuleSweepEngine.md),
-  [Projects](../../Plans/Game/StyleGuideScannerRuleSweepProjects.md),
-  [Common, DataPacker, Tools](../../Plans/Engine/StyleGuideScannerRuleSweepCommonDataPackerTools.md);
-  hand read —
-  [Engine](../../Plans/Engine/StyleGuideHandReadRuleSweepEngine.md),
-  [Projects](../../Plans/Game/StyleGuideHandReadRuleSweepProjects.md),
-  [Common, DataPacker, Tools](../../Plans/Engine/StyleGuideHandReadRuleSweepCommonDataPackerTools.md);
-  repo review — [rules 9, 53, 60](../../Plans/Engine/StyleGuideRepoReviewRuleSweep.md).
+- The routed Plans check only new lines. Sweeps for existing violations,
+  each run after the Plan that adds its check:
+  scanner kinds and rule 18 (landed) —
+  `Documents/Plans/Engine/StyleGuideScannerRuleSweepEngine.md`,
+  `Documents/Plans/Game/StyleGuideScannerRuleSweepProjects.md`,
+  `Documents/Plans/Engine/StyleGuideScannerRuleSweepCommonDataPackerTools.md`;
+  hand read — [one-pass whole-file sweep](StyleGuideWholeFileSweep.md);
+  repo review (landed) — `Documents/Plans/Engine/StyleGuideRepoReviewRuleSweep.md`.
   The Build warnings Plan needs no sweep: it already fixes the existing sites
   its promoted warnings report.
 
