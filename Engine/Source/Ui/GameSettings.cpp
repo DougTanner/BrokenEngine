@@ -49,33 +49,51 @@ void SaveGameSettings()
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGameSettingsPath, gameSettings);
 }
 
+namespace
+{
+
+// Returns the first invalid field's name, or nullptr when every checked field is valid.
+const char* FindInvalidGameSetting(const GameSettings& rGameSettings)
+{
+	if (rGameSettings.iLanguage < 0 || rGameSettings.iLanguage >= kLanguageCount)
+	{
+		return "iLanguage";
+	}
+
+	if (!gUiFontScale.IsInRange(rGameSettings.fUiFontScale))
+	{
+		return "fUiFontScale";
+	}
+
+	if (!gUiOpacity.IsInRange(rGameSettings.fUiOpacity))
+	{
+		return "fUiOpacity";
+	}
+
+	return nullptr;
+}
+
+} // namespace
+
 void LoadGameSettings()
 {
 	GameSettings gameSettings {};
 
 	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcGameSettingsPath, gameSettings))
 	{
-		// The file is opaque input: an out-of-range index would read past the translation table's language extent.
-		geLanguage = (gameSettings.iLanguage >= 0 && gameSettings.iLanguage < kLanguageCount) ? static_cast<Language>(gameSettings.iLanguage) : Language::kEnglish;
-		// Wrapper::Set clamps to the wrapper range, but std::clamp passes a NaN through unchanged.
-		if (std::isfinite(gameSettings.fUiFontScale))
+		const char* pcInvalidField = FindInvalidGameSetting(gameSettings);
+		if (pcInvalidField != nullptr)
 		{
+			LOG(kLoading, kWarning, "{} rejected: invalid {}", kpcGameSettingsPath, pcInvalidField);
+		}
+		else
+		{
+			geLanguage = static_cast<Language>(gameSettings.iLanguage);
 			gUiFontScale.Set(gameSettings.fUiFontScale);
-		}
-		else
-		{
-			gUiFontScale.ResetToDefault();
-		}
-		if (std::isfinite(gameSettings.fUiOpacity))
-		{
 			gUiOpacity.Set(gameSettings.fUiOpacity);
+			gOpaqueUi.Set(gameSettings.uiOpaqueUi != 0);
+			gUiTheme.Set<UiTheme>(gameSettings.eUiTheme);
 		}
-		else
-		{
-			gUiOpacity.ResetToDefault();
-		}
-		gOpaqueUi.Set(gameSettings.uiOpaqueUi != 0);
-		gUiTheme.Set<UiTheme>(gameSettings.eUiTheme);
 	}
 }
 

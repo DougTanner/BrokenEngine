@@ -112,6 +112,12 @@ public:
 		return mfMax;
 	}
 
+	// A NaN fails both comparisons and an infinity lies past the finite bounds, so this also rejects non-finite values.
+	bool IsInRange(float fValue) const
+	{
+		return fValue >= mfMin && fValue <= mfMax;
+	}
+
 	float GetDefault() const
 	{
 		return mfDefault;

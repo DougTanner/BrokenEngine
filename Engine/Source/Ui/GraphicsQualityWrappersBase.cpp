@@ -43,7 +43,6 @@ constexpr LightingLevelValues kLightingLevels[kuiLevelCount]
 
 constexpr float kfSmokeSimulationPixels[kuiLevelCount] {0.75f, 1.0f, 1.5f};
 
-// A level wrapper's value is float-backed and reachable from persisted settings, so clamp before it indexes a table.
 size_t LevelIndex(const engine::Wrapper& rWrapper)
 {
 	return static_cast<size_t>(std::clamp(rWrapper.Get<int64_t>(), int64_t {0}, static_cast<int64_t>(kuiLevelCount) - 1));

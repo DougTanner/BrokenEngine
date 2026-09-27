@@ -25,7 +25,6 @@ Shared runtime settings, standard localization, player-facing menu helpers, the 
 
 - The renderer quality levels are engine-owned client-only wrappers. Each discrete level is the persisted source of truth. Water is consumed directly during per-frame rendering; the other levels drive derived renderer wrappers that are never persisted.
 - Apply functions write derived renderer wrappers through `Set` when a level changes and once after both successful and failed graphics-settings loads. `Graphics::Refresh` is the sole consumer polling those wrappers; apply functions never call `Changed<T>()`.
-- Values read from a settings file are opaque input, so clamp each level before indexing its table.
 
 ## Settings Persistence
 
@@ -33,8 +32,8 @@ Shared runtime settings, standard localization, player-facing menu helpers, the 
 - Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
 - `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
 - `GraphicsSettings.bin` version 15 persists Water quality. Lighting defaults on; version 14 files intentionally fail the current-format gate and reset with the other graphics settings.
-- Persisted graphics float settings accept only finite values. Loading a non-finite value resets only that wrapper to its default; finite values retain the wrapper's normal snapping and clamping.
-- `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language is stored as a fixed-width `int32_t` so the `Language` enum's underlying type never decides the file layout, and an index outside the enum falls back to English rather than indexing the translation table.
+- The loaders check every persisted language index, float, and quality level before applying any. A non-finite or out-of-range value rejects the whole file with one warning, and every setting it holds stays at its default, as when the file is missing. Accepted floats keep the wrapper's normal snapping.
+- `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language is stored as a fixed-width `int32_t` so the `Language` enum's underlying type never decides the file layout; an index outside the enum rejects the file.
 
 ## Shared Types
 

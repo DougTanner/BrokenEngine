@@ -43,16 +43,50 @@ void SaveSoundSettings()
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcSoundSettingsPath, soundSettings);
 }
 
+namespace
+{
+
+// Returns the first invalid field's name, or nullptr when every checked field is valid.
+const char* FindInvalidSoundSetting(const SoundSettings& rSoundSettings)
+{
+	if (!gMasterVolume.IsInRange(rSoundSettings.fMasterVolume))
+	{
+		return "fMasterVolume";
+	}
+
+	if (!gMusicVolume.IsInRange(rSoundSettings.fMusicVolume))
+	{
+		return "fMusicVolume";
+	}
+
+	if (!gSoundVolume.IsInRange(rSoundSettings.fSoundVolume))
+	{
+		return "fSoundVolume";
+	}
+
+	return nullptr;
+}
+
+} // namespace
+
 void LoadSoundSettings()
 {
 	SoundSettings soundSettings {};
 
 	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcSoundSettingsPath, soundSettings))
 	{
-		gMasterVolume.Set(soundSettings.fMasterVolume);
-		gMusicVolume.Set(soundSettings.fMusicVolume);
-		gSoundVolume.Set(soundSettings.fSoundVolume);
-		gMuteInBackground.Set(soundSettings.uiMuteInBackground != 0);
+		const char* pcInvalidField = FindInvalidSoundSetting(soundSettings);
+		if (pcInvalidField != nullptr)
+		{
+			LOG(kLoading, kWarning, "{} rejected: invalid {}", kpcSoundSettingsPath, pcInvalidField);
+		}
+		else
+		{
+			gMasterVolume.Set(soundSettings.fMasterVolume);
+			gMusicVolume.Set(soundSettings.fMusicVolume);
+			gSoundVolume.Set(soundSettings.fSoundVolume);
+			gMuteInBackground.Set(soundSettings.uiMuteInBackground != 0);
+		}
 	}
 
 	if constexpr (kbRecording)

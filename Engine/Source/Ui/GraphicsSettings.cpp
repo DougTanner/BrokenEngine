@@ -101,23 +101,76 @@ void SaveGraphicsSettings()
 namespace
 {
 
-void LoadFiniteGraphicsSetting(Wrapper& rSetting, float fValue)
+bool IsValidGraphicsQualityLevel(uint8_t uiLevel)
 {
-	if (std::isfinite(fValue))
-	{
-		rSetting.Set(fValue);
-	}
-	else
-	{
-		rSetting.ResetToDefault();
-	}
+	return uiLevel < static_cast<uint8_t>(GraphicsQualityLevel::kCount);
 }
 
-// The file is opaque input: an out-of-range byte would index past every quality-level table.
+// Returns the first invalid field's name, or nullptr when every checked field is valid.
+const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings)
+{
+	if (!gMaxAnisotropy.IsInRange(rGraphicsSettings.fMaxAnisotropy))
+	{
+		return "fMaxAnisotropy";
+	}
+
+	if (!gMinSampleShading.IsInRange(rGraphicsSettings.fMinSampleShading))
+	{
+		return "fMinSampleShading";
+	}
+
+	if (!gMipLodBias.IsInRange(rGraphicsSettings.fMipLodBias))
+	{
+		return "fMipLodBias";
+	}
+
+	if (!gSmokeSimulationArea.IsInRange(rGraphicsSettings.fSmokeSimulationArea))
+	{
+		return "fSmokeSimulationArea";
+	}
+
+	if (!gSunMoonMinimumAmbient.IsInRange(rGraphicsSettings.fMinimumAmbient))
+	{
+		return "fMinimumAmbient";
+	}
+
+	if (!gLightingUpdateCadence.IsInRange(rGraphicsSettings.fLightingUpdateCadence))
+	{
+		return "fLightingUpdateCadence";
+	}
+
+	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiWaterLevel))
+	{
+		return "uiWaterLevel";
+	}
+
+	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiTerrainShadowsLevel))
+	{
+		return "uiTerrainShadowsLevel";
+	}
+
+	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiObjectShadowsLevel))
+	{
+		return "uiObjectShadowsLevel";
+	}
+
+	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiLightingLevel))
+	{
+		return "uiLightingLevel";
+	}
+
+	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiSmokeDetailLevel))
+	{
+		return "uiSmokeDetailLevel";
+	}
+
+	return nullptr;
+}
+
 void LoadGraphicsQualityLevel(Wrapper& rLevel, uint8_t uiLevel)
 {
 	// Reset, not Set: loading is initialization, so no consumer should see this as a pending change.
-	rLevel.Reset<int64_t>(std::min<int64_t>(uiLevel, static_cast<int64_t>(GraphicsQualityLevel::kCount) - 1));
+	rLevel.Reset<int64_t>(uiLevel);
 }
 
 } // namespace
@@ -130,26 +183,29 @@ bool LoadGraphicsSettings()
 	bool bRead = ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcGraphicsSettingsPath, graphicsSettings);
 	if (bRead)
 	{
+		const char* pcInvalidField = FindInvalidGraphicsSetting(graphicsSettings);
+		if (pcInvalidField != nullptr)
+		{
+			LOG(kLoading, kWarning, "{} rejected: invalid {}", kpcGraphicsSettingsPath, pcInvalidField);
+			bRead = false;
+		}
+	}
+
+	if (bRead)
+	{
 		gFullscreen.Set(graphicsSettings.flags & GraphicsSettingsFlags::kFullscreen);
 		gPresentMode.Set<VkPresentModeKHR>(graphicsSettings.ePresentMode);
 		gMultisampling.Set(graphicsSettings.flags & GraphicsSettingsFlags::kMultisampling);
 		gSampleCount.Set<VkSampleCountFlagBits>(graphicsSettings.eSampleCount);
 		gAnisotropy.Set(graphicsSettings.flags & GraphicsSettingsFlags::kAnisotropy);
-		LoadFiniteGraphicsSetting(gMaxAnisotropy, graphicsSettings.fMaxAnisotropy);
+		gMaxAnisotropy.Set(graphicsSettings.fMaxAnisotropy);
 		gSampleShading.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSampleShading);
-		LoadFiniteGraphicsSetting(gMinSampleShading, graphicsSettings.fMinSampleShading);
-		LoadFiniteGraphicsSetting(gMipLodBias, graphicsSettings.fMipLodBias);
+		gMinSampleShading.Set(graphicsSettings.fMinSampleShading);
+		gMipLodBias.Set(graphicsSettings.fMipLodBias);
 		gSmokeEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmoke);
-		LoadFiniteGraphicsSetting(gSmokeSimulationArea, graphicsSettings.fSmokeSimulationArea);
-		LoadFiniteGraphicsSetting(gSunMoonMinimumAmbient, graphicsSettings.fMinimumAmbient);
-		if (std::isfinite(graphicsSettings.fLightingUpdateCadence))
-		{
-			gLightingUpdateCadence.Set(graphicsSettings.fLightingUpdateCadence);
-		}
-		else
-		{
-			gLightingUpdateCadence.ResetToDefault();
-		}
+		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
+		gSunMoonMinimumAmbient.Set(graphicsSettings.fMinimumAmbient);
+		gLightingUpdateCadence.Set(graphicsSettings.fLightingUpdateCadence);
 		gWindEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kWind);
 		gLightingEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kLighting);
 		LoadGraphicsQualityLevel(gWaterLevel, graphicsSettings.uiWaterLevel);
