@@ -56,7 +56,7 @@ Server-only. `Replay` owns writer and reader lifetime, the manifest that commits
 - Whether playback is running is one engine-owned flag on `GameBase`, not a query over the reader maps, because engine and game code on the tick path read it every update. Republish it after every live or pending reader-set change, including the clears on abort, retirement, and loop transition.
 - Recording and playback are mutually exclusive, counting a pending request flag as active. Every code path that sets a record-start or playback request refuses it, before changing anything, while the opposite mode is active or pending, using `Replay`'s active-or-pending queries. The `ASSERT`s where `Replay` consumes those requests catch a path that skips the check; they are not a recovery path.
 - A later generation for a coord activates only after the retiring reader's coord has been removed. Adjacent lifetimes may meet at the tick after the prior saved end, while overlap or a skipped activation aborts playback. Loop only once the last reader has retired.
-- Loop completion and abort both stop the current fixed-tick iteration before dispatch, then diverge: completion reloads the initial state, abort restores the pre-tick clock and resumes live simulation.
+- Loop completion and abort both stop the current fixed-tick iteration before dispatch, then diverge: completion reloads the initial state, abort keeps the current frames, restores the pre-tick clock, and resumes live simulation. Abort also runs the game state-replacement hook (game persistence, `../../../Projects/BrokenEngineSandbox/Source/Save/AGENTS.md` `## Replay Contract`).
 
 ## See Also
 

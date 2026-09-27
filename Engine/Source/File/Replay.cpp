@@ -298,10 +298,13 @@ void Replay::ClearReplayTransientState()
 
 void Replay::ClearReplayAbortState()
 {
-	// Keep the current frames, inputs, and active set intact so an aborted playback resumes live simulation.
+	// Live simulation resumes from the replayed frames, so relink clients and fleets to them as a load does. That also
+	// frees every subscription, so the next active-set rebuild retires every non-origin cell holding no Player until
+	// clients resubscribe.
 	ClearReplayTransientState();
 	game::gpServerSession->mpTransferManager->mTransfers.clear();
 	game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
+	game::OnStateReplaced();
 }
 
 void Replay::ResetStreams()
