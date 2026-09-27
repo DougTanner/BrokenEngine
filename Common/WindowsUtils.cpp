@@ -139,9 +139,9 @@ std::tuple<std::string, std::string> FileTimeString(const std::filesystem::file_
 	return std::make_tuple(std::string(pcDate), std::string(pcTime));
 }
 
-ExecutableResult RunExecutable(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine)
+std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine)
 {
-	// RAII so any throwing VERIFY_SUCCESS below unwinds without leaking the handle / attribute list. Pipe and
+	// RAII so each launch-failure early return below releases the handles / attribute list already acquired. Pipe and
 	// process handles use a nullptr sentinel, so unique_ptr<void> (which skips the deleter on nullptr) fits.
 	using ScopedHandle = std::unique_ptr<void, decltype(&CloseHandle)>;
 
@@ -154,19 +154,32 @@ ExecutableResult RunExecutable(const std::filesystem::path& rExecutableFile, std
 
 	HANDLE hStdInPipeRead = nullptr;
 	HANDLE hStdInPipeWrite = nullptr;
-	VERIFY_SUCCESS(CreatePipe(&hStdInPipeRead, &hStdInPipeWrite, &securityAttributes, 0));
+	if (!CreatePipe(&hStdInPipeRead, &hStdInPipeWrite, &securityAttributes, 0))
+	{
+		return std::nullopt;
+	}
 	ScopedHandle pStdInPipeRead(hStdInPipeRead, &CloseHandle);
 	ScopedHandle pStdInPipeWrite(hStdInPipeWrite, &CloseHandle);
 
 	HANDLE hStdOutPipeRead = nullptr;
 	HANDLE hStdOutPipeWrite = nullptr;
-	VERIFY_SUCCESS(CreatePipe(&hStdOutPipeRead, &hStdOutPipeWrite, &securityAttributes, 0));
+	if (!CreatePipe(&hStdOutPipeRead, &hStdOutPipeWrite, &securityAttributes, 0))
+	{
+		return std::nullopt;
+	}
 	ScopedHandle pStdOutPipeRead(hStdOutPipeRead, &CloseHandle);
 	ScopedHandle pStdOutPipeWrite(hStdOutPipeWrite, &CloseHandle);
 
 	// Strip inheritance from parent-side pipe ends; the attribute list below only applies to the child-side two.
-	VERIFY_SUCCESS(SetHandleInformation(hStdInPipeWrite, HANDLE_FLAG_INHERIT, 0));
-	VERIFY_SUCCESS(SetHandleInformation(hStdOutPipeRead, HANDLE_FLAG_INHERIT, 0));
+	if (!SetHandleInformation(hStdInPipeWrite, HANDLE_FLAG_INHERIT, 0))
+	{
+		return std::nullopt;
+	}
+
+	if (!SetHandleInformation(hStdOutPipeRead, HANDLE_FLAG_INHERIT, 0))
+	{
+		return std::nullopt;
+	}
 
 	// STARTUPINFOEX + PROC_THREAD_ATTRIBUTE_HANDLE_LIST whitelists exactly the two pipe ends the child needs.
 	// Without this, the child inherits every HANDLE_FLAG_INHERIT=1 handle in the parent (log files, random
@@ -177,14 +190,20 @@ ExecutableResult RunExecutable(const std::filesystem::path& rExecutableFile, std
 	auto attributeListBuffer = std::make_unique<uint8_t[]>(uiAttributeListSize);
 	LPPROC_THREAD_ATTRIBUTE_LIST pAttributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributeListBuffer.get());
 	_Analysis_assume_(pAttributeList != nullptr);
-	VERIFY_SUCCESS(InitializeProcThreadAttributeList(pAttributeList, 1, 0, &uiAttributeListSize));
+	if (!InitializeProcThreadAttributeList(pAttributeList, 1, 0, &uiAttributeListSize))
+	{
+		return std::nullopt;
+	}
 	// Tears down before attributeListBuffer frees (reverse declaration order) so the list outlives its backing.
 	ScopedLambda attributeListGuard([pAttributeList]()
 	{
 		DeleteProcThreadAttributeList(pAttributeList);
 	});
 	HANDLE inheritHandles[] = { hStdInPipeRead, hStdOutPipeWrite };
-	VERIFY_SUCCESS(UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, inheritHandles, sizeof(inheritHandles), nullptr, nullptr));
+	if (!UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, inheritHandles, sizeof(inheritHandles), nullptr, nullptr))
+	{
+		return std::nullopt;
+	}
 
 	STARTUPINFOEXW startupinfoex {};
 	startupinfoex.StartupInfo.cb = sizeof(STARTUPINFOEXW);
@@ -195,7 +214,10 @@ ExecutableResult RunExecutable(const std::filesystem::path& rExecutableFile, std
 	startupinfoex.lpAttributeList = pAttributeList;
 
 	PROCESS_INFORMATION processInformation {};
-	VERIFY_SUCCESS(CreateProcessW(rExecutableFile.native().c_str(), rCommandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, nullptr, nullptr, &startupinfoex.StartupInfo, &processInformation));
+	if (!CreateProcessW(rExecutableFile.native().c_str(), rCommandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, nullptr, nullptr, &startupinfoex.StartupInfo, &processInformation))
+	{
+		return std::nullopt;
+	}
 	ScopedHandle pProcess(processInformation.hProcess, &CloseHandle);
 	ScopedHandle pThread(processInformation.hThread, &CloseHandle);
 
@@ -217,7 +239,7 @@ ExecutableResult RunExecutable(const std::filesystem::path& rExecutableFile, std
 	DWORD uiExitCode = 0;
 	GetExitCodeProcess(processInformation.hProcess, &uiExitCode);
 
-	return {.mOutput = std::move(output), .miExitCode = static_cast<int64_t>(uiExitCode)};
+	return ExecutableResult {.mOutput = std::move(output), .miExitCode = static_cast<int64_t>(uiExitCode)};
 }
 
 ExecutableResult RunExecutableInNewConsole(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine)

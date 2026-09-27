@@ -107,22 +107,26 @@ std::filesystem::path ExportShader::RunVulkanTool(const std::filesystem::path& r
 {
 	LOG(kDefault, kVerbose, "{}: {}{}", common::gpThreadLocal->miThreadId.value_or(0), rExecutable, rParameters);
 
-	common::ExecutableResult result = common::RunExecutable(rExecutable, rParameters);
+	std::optional<common::ExecutableResult> result = common::RunExecutable(rExecutable, rParameters);
 
 	std::string toolName = rExecutable.filename().string();
+	if (!result)
+	{
+		throw std::runtime_error(std::format("{} could not be started", toolName));
+	}
 
 	// glslc fails silently on compile errors (empty stdout + success exit code), so the preprocess caller treats any
 	// stdout as fatal; glslangValidator / spirv-opt key on the exit code and only warn on non-empty stdout.
 	if (bThrowOnAnyOutput)
 	{
-		if (!result.mOutput.empty())
+		if (!result->mOutput.empty())
 		{
-			throw std::runtime_error(std::format("{} error: {}", toolName, result.mOutput));
+			throw std::runtime_error(std::format("{} error: {}", toolName, result->mOutput));
 		}
 	}
-	else if (result.miExitCode != 0)
+	else if (result->miExitCode != 0)
 	{
-		throw std::runtime_error(std::format("{} error: {}", toolName, result.mOutput));
+		throw std::runtime_error(std::format("{} error: {}", toolName, result->mOutput));
 	}
 
 	if (!std::filesystem::exists(rOutputFile))
@@ -130,9 +134,9 @@ std::filesystem::path ExportShader::RunVulkanTool(const std::filesystem::path& r
 		throw std::runtime_error(std::format("{} did not produce \"{}\"", toolName, rOutputFile.string()));
 	}
 
-	if (!bThrowOnAnyOutput && !result.mOutput.empty())
+	if (!bThrowOnAnyOutput && !result->mOutput.empty())
 	{
-		LOG(kDefault, kWarning, "{} output: {}", toolName, result.mOutput);
+		LOG(kDefault, kWarning, "{} output: {}", toolName, result->mOutput);
 	}
 
 	mIntermediateFiles.push_back(rOutputFile);

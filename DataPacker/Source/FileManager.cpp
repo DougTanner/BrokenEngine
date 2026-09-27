@@ -53,20 +53,17 @@ std::string TrimLine(std::string value)
 std::optional<std::filesystem::path> RunGit(const std::filesystem::path& rGit, const std::filesystem::path& rRoot, const wchar_t* pcArguments)
 {
 	std::wstring parameters = L" -C \"" + rRoot.native() + L"\" " + pcArguments;
-	common::ExecutableResult result;
-	try
-	{
-		result = common::RunExecutable(rGit, parameters);
-	}
-	catch (const std::exception&)
+	std::optional<common::ExecutableResult> result = common::RunExecutable(rGit, parameters);
+	if (!result)
 	{
 		return std::nullopt;
 	}
-	if (result.miExitCode != 0)
+
+	if (result->miExitCode != 0)
 	{
 		return std::nullopt;
 	}
-	std::string output = TrimLine(std::move(result.mOutput));
+	std::string output = TrimLine(std::move(result->mOutput));
 	if (output.empty())
 	{
 		return std::nullopt;
@@ -210,25 +207,21 @@ std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::
 	}
 
 	std::wstring parameters = L" -C \"" + rRepositoryRoot.native() + L"\" worktree list --porcelain -z";
-	common::ExecutableResult result {};
-	try
-	{
-		result = common::RunExecutable(*git, parameters);
-	}
-	catch (const std::exception&)
+	std::optional<common::ExecutableResult> result = common::RunExecutable(*git, parameters);
+	if (!result)
 	{
 		rReject();
 		LOG(kDefault, kWarning, "Git worktree discovery failed; output linking disabled");
 		return std::nullopt;
 	}
-	if (result.miExitCode != 0 || result.mOutput.rfind("worktree ", 0) != 0)
+	if (result->miExitCode != 0 || result->mOutput.rfind("worktree ", 0) != 0)
 	{
 		rReject();
 		LOG(kDefault, kWarning, "Malformed Git worktree metadata; output linking disabled");
 		return std::nullopt;
 	}
-	size_t uiEnd = result.mOutput.find('\0');
-	std::filesystem::path primaryRoot = PathFromUtf8(result.mOutput.substr(9, uiEnd - 9));
+	size_t uiEnd = result->mOutput.find('\0');
+	std::filesystem::path primaryRoot = PathFromUtf8(result->mOutput.substr(9, uiEnd - 9));
 	std::optional<std::filesystem::path> primaryCommon = RunGit(*git, primaryRoot, L"rev-parse --path-format=absolute --git-common-dir");
 	if (!primaryCommon || !PathEqual(*primaryCommon, *commonDirectory))
 	{

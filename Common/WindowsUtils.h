@@ -16,9 +16,9 @@ struct ExecutableResult
 	int64_t miExitCode = 0;
 };
 
-// DataPacker uses this for external tools; CreateProcessW mutates rCommandLine, and captured
-// stdout/stderr are combined in mOutput.
-ExecutableResult RunExecutable(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine);
+// CreateProcessW writes into rCommandLine, so it cannot be const. The result is empty when the child
+// process could not be started.
+std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine);
 
 // Gaea.Swarm.exe requires real console handles, so the child runs synchronously with
 // CREATE_NEW_CONSOLE; output is not captured and mOutput remains empty. CreateProcessW mutates
