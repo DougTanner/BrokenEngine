@@ -308,7 +308,7 @@ public:
 			LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch count is missing");
 			return;
 		}
-		// Trust boundary (replay header): bound the record count against the stream before allocating;
+		// Bound the replay header's record count against the stream before allocating;
 		// each record serializes an int64 tick plus at least the payload's own int64 count prefix.
 		common::ValidateDeserializedCount(iPostDispatchCount, 2 * sizeof(int64_t), headerStream, "DifferenceStreamReader post-dispatch records");
 
@@ -378,7 +378,7 @@ public:
 			LOG(kDefault, kWarning, "Recorded frames file is missing");
 			return;
 		}
-		// Trust boundary (replay .frames file): bound the difference count against the stream before
+		// Bound the replay .frames file's difference count against the stream before
 		// allocating; each record serializes at least an int64 tick plus one byte of difference.
 		common::ValidateDeserializedCount(mDifferenceCount, sizeof(int64_t) + 1, fileStream, "DifferenceStreamReader differences");
 
@@ -448,7 +448,7 @@ public:
 			return;
 		}
 		mReaderFlags.Set(ReaderFlags::kRecordsInitialChecksum, bRecordsInitialChecksum);
-		// Trust boundary (replay .checksums file): bound the checksum count against the stream before resize.
+		// Bound the replay .checksums file's checksum count against the stream before resize.
 		common::ValidateDeserializedCount(iChecksumCount, sizeof(common::crc_t), checksumStream, "DifferenceStreamReader checksums");
 		mChecksums.resize(iChecksumCount);
 		if (iChecksumCount > 0)

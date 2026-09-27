@@ -119,7 +119,7 @@ nlohmann::json BuildFleets()
 
 void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
-	// Trust boundary — validate optional params.
+	// Validate optional params.
 	if (rParams.contains("includeUnits") && !rParams.at("includeUnits").is_boolean())
 	{
 		throw std::runtime_error("describe_scene 'includeUnits' must be a bool");

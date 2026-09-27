@@ -113,6 +113,7 @@ Client::Client(const char* pServerAddress, uint16_t uiPort, int64_t iCoordSlots,
 		LOG(kNetwork, kWarning, "Client::Client enet_host_create failed");
 		return;
 	}
+	mpHost->checksum = enet_crc32;
 	// 1MB send/receive buffers to handle bursty packet traffic
 	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_SNDBUF, 1024 * 1024);
 	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_RCVBUF, 1024 * 1024);

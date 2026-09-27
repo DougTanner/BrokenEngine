@@ -18,7 +18,7 @@ namespace
 
 std::filesystem::path PathFromParam(const nlohmann::json& rValue)
 {
-	// Agent-supplied path is UTF-8 (trust boundary); .get<std::string>() throws on a non-string.
+	// Agent-supplied path is UTF-8; .get<std::string>() throws on a non-string.
 	std::string utf8 = rValue.get<std::string>();
 	return std::filesystem::path(reinterpret_cast<const char8_t*>(utf8.c_str()));
 }
@@ -382,8 +382,8 @@ void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlo
 }
 
 // resize: change the live client window/framebuffer size mid-session by driving the real HWND resize
-// (SetWindowPos -> synchronous WM_SIZE -> gWantedFramebufferExtent2D -> swapchain recreate). Client dims are a
-// trust boundary: validated to [320x180, 16384x16384] then rounded up to a multiple of 8 (mirrors SetupWindow).
+// (SetWindowPos -> synchronous WM_SIZE -> gWantedFramebufferExtent2D -> swapchain recreate). Client dims are
+// validated to [320x180, 16384x16384] then rounded up to a multiple of 8 (mirrors SetupWindow).
 // The swapchain additionally clamps to surface caps, so the applied extent may differ from the requested one.
 // Completes synchronously if already at the requested extent, else via the deferred-response mechanism once the
 // swapchain has recreated. Never mutates the persisted gFullscreen setting. Schema: {"width","height"}.
@@ -496,7 +496,7 @@ void CommandResize(const nlohmann::json& rParams, nlohmann::json& rResult)
 
 // fullscreen: toggle the live client between borderless windowed-fullscreen (WS_POPUP) and windowed
 // (WS_OVERLAPPEDWINDOW) mid-session by driving the engine's WantedFullscreen() -> main-loop reconciliation style-switch path
-// via an agent override. 'on' is a trust boundary: validated to a bool. Idempotent — an already-in-state request
+// via an agent override. 'on' is validated to a bool. Idempotent — an already-in-state request
 // answers synchronously. Never mutates the persisted gFullscreen setting; windowed restore returns to the launch
 // extent (a mid-run resize is not preserved). Schema: {"on"}; result: {"fullscreen","width","height"}.
 void CommandFullscreen(const nlohmann::json& rParams, nlohmann::json& rResult)
@@ -551,7 +551,7 @@ void CommandFullscreen(const nlohmann::json& rParams, nlohmann::json& rResult)
 }
 
 // window_state: minimize the live client window or restore it mid-session by driving ShowWindow on the real HWND.
-// 'minimized' is a trust boundary: validated to a bool. Idempotent — an already-in-state request answers synchronously.
+// 'minimized' is validated to a bool. Idempotent — an already-in-state request answers synchronously.
 // Minimize uses SW_MINIMIZE; restore uses SW_SHOWNOACTIVATE (a no-activate restore — never steal foreground focus, per
 // the agent-mode convention in Main.cpp). Never mutates the persisted gFullscreen setting or any .bin. This command
 // produces the minimized/recreate-deferred state that resize/fullscreen reject; captures temporarily restore it. Completes
@@ -660,7 +660,7 @@ void CommandDumpRenderTarget(const nlohmann::json& rParams, [[maybe_unused]] nlo
 		request.bRaw = rParams.at("raw").get<bool>();
 	}
 
-	// Trust-boundary validation now (unknown name / bad index / non-encodable format) so errors report synchronously.
+	// Validate now (unknown name / bad index / non-encodable format) so errors report synchronously.
 	engine::ValidateDumpRenderTargetRequest(request);
 
 	BeginCaptureAndDefer([request = std::move(request)](uint64_t uiCaptureToken) mutable
@@ -813,7 +813,7 @@ int32_t ParseKeyVk(const std::string& rName)
 	throw std::runtime_error("unknown key");
 }
 
-// Fill a bounded char buffer from a string param (trust boundary — .get<std::string>() throws on non-string).
+// Fill a bounded char buffer from a string param (.get<std::string>() throws on non-string).
 void CopyStringParam(char* pcDst, int64_t iDstSize, const std::string& rSource)
 {
 	int64_t i = 0;

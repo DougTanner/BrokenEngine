@@ -18,7 +18,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 // into the readback is complete regardless of the target's last-access scope.
 void DumpRenderTarget(int64_t iFramebufferIndex, const DumpRenderTargetRequest& rRequest);
 
-// Trust-boundary validation for a dump request (called from the agent handler during Drain): throws
+// Validation for a dump request (called from the agent handler during Drain): throws
 // std::runtime_error on an unknown name (message lists valid names) or an out-of-range index/channel.
 void ValidateDumpRenderTargetRequest(const DumpRenderTargetRequest& rRequest);
 

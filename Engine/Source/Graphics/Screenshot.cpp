@@ -232,7 +232,7 @@ constexpr const char* kpcValidDumpNames =
 	"ObjectShadows, ObjectShadowsBlur, ObjectShadowsBlurIntermediate, WaterDisplacement, WaterDisplacementNormal";
 
 // Resolve a dump name (+ indices) to a live RenderTargetTextures member. Throws std::runtime_error listing valid
-// names on an unknown name, or on an out-of-range index (both trust-boundary errors surfaced to the agent).
+// names on an unknown name, or on an out-of-range index (both surfaced to the agent).
 Texture* ResolveRenderTarget(const std::string& rName, int64_t iIndex, int64_t iChannel)
 {
 	RenderTargetTextures& r = gpTextureManager->mRenderTargetTextures;

@@ -57,7 +57,7 @@ bool IsWindowsReservedDeviceBasename(std::string_view utf8)
 	return basename.size() == 4 && (basename.starts_with("COM") || basename.starts_with("LPT")) && basename[3] >= '1' && basename[3] <= '9';
 }
 
-// Trust boundary: the agent-supplied save/load filename lands in the user's appdata directory. Reject anything
+// The agent-supplied save/load filename lands in the user's appdata directory. Reject anything
 // but a bare filename (no path separators, no "..") and Windows reserved device basenames.
 std::filesystem::path BareFilenameParam(const nlohmann::json& rValue)
 {
@@ -281,7 +281,7 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 
 } // namespace
 
-// Shared agent helpers validate external parameters at the trust boundary.
+// Shared agent helpers validate agent parameters and throw on a bad one.
 
 // Parse a [x,y] JSON array into a GridCoord; each element must be an integer that fits int32_t.
 engine::GridCoord CoordFromParam(const nlohmann::json& rParams, const char* pcKey)

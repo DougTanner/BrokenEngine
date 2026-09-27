@@ -36,14 +36,14 @@ std::istream& operator>>(std::istream& rStream, FrameInput& rInput)
 {
 	int64_t iStatusCount = 0;
 	common::Read(rStream, iStatusCount);
-	// Trust boundary (replay stream): bound the count against the stream before the resize — each
+	// Bound the count against the replay stream before the resize — each
 	// StatusChange serializes at least a type byte plus one payload byte.
 	common::ValidateDeserializedCount(iStatusCount, sizeof(uint8_t) + 1, rStream, "FrameInput statusChanges");
 	rInput.statusChanges.resize(iStatusCount);
 	for (StatusChange& rChange : rInput.statusChanges)
 	{
 		common::Read(rStream, rChange.eType);
-		// Trust boundary (replay stream): an unknown type tag seats the default variant alternative and reads
+		// An unknown type tag seats the default variant alternative and reads
 		// the wrong payload byte count, silently desyncing the rest of the stream — reject it.
 		if (!IsKnownStatusChangeType(rChange.eType))
 		{
@@ -51,12 +51,12 @@ std::istream& operator>>(std::istream& rStream, FrameInput& rInput)
 		}
 		rChange.data = DefaultDataForType(rChange.eType);
 		std::visit([&](auto& payload) { common::Read(rStream, payload); }, rChange.data);
-		// Trust boundary (replay stream): reject a payload the game cannot adopt before the replay reaches the simulation.
+		// Reject a payload the game cannot adopt before the replay reaches the simulation.
 		if (!IsAdoptableStatusChange(rChange))
 		{
 			throw std::ios_base::failure("FrameInput StatusChange payload");
 		}
-		// Trust boundary (replay stream): every legitimate spawn carries a real global ID; a zero ID would create an
+		// Every legitimate spawn carries a real global ID; a zero ID would create an
 		// unaddressable Player row.
 		if (rChange.eType == StatusChangeType::kSpawnPlayer && std::get<SpawnPlayerData>(rChange.data).iGlobalId == 0)
 		{

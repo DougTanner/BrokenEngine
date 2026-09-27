@@ -47,6 +47,7 @@ All lazy chunk data lives in one virtual-memory reservation laid out once at con
 Server-only. `Replay` owns writer and reader lifetime, the manifest that commits a recording, staged adoption of a playback, and the per-tick checksum comparison; `GameBase` constructs it and every user reaches it through `gpReplay`. Recording writes one stream set per active cell alongside recording-wide grid and metadata; playback validates the whole set before replacing live state, then resimulates and compares each tick against the recorded checksum.
 
 - Replay operations exist only when `kbDebugInput` enables their tick-time implementation; that gate sits inside this subsystem's replay entry points, and only the constant is game-defined.
+- Replays are a debug-only developer tool, so replay streams are exempt from trust-boundary validation: existing replay checks may stay, and no new ones are required.
 - A generation is one activation lifetime, identified in its stream files and inventory by coord and activation tick, while grid and metadata stay recording-wide.
 - The manifest is the commit marker: recording start invalidates it before replacing any component, and stop publishes it only after every generation and the game metadata succeed.
 - Missing retained terminal state for an evicted coord invalidates only that generation's files, without skipping the write attempts for other writers or metadata.

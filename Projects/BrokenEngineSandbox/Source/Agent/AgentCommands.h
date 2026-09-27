@@ -20,8 +20,8 @@ int32_t ClientGridCoordValue(const nlohmann::json& rValue, std::string_view comm
 
 // Client-only command dispatch (network fixtures, full-state fixture, scene query, desync probe, and grid-cell move). ExecuteAgentCommand
 // falls through to this under BT_CLIENT after engine::ExecuteClientAgentCommand and before the unknown-command throw;
-// returns true if handled. Defined in the client-vcxproj-only AgentCommandsClient.cpp. Throws on bad params (trust
-// boundary), caught by AgentCommandServer::Drain().
+// returns true if handled. Defined in the client-vcxproj-only AgentCommandsClient.cpp. Throws on bad params, caught
+// by AgentCommandServer::Drain().
 bool ExecuteAgentCommandClient(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult);
 
 #endif
@@ -30,7 +30,7 @@ bool ExecuteAgentCommandClient(std::string_view cmd, const nlohmann::json& rPara
 // Server-only command dispatch (status / pause / timescale / save / load / reset / replay_record / replay_play /
 // replay_drop_retained_end_frame / CPU query_profile).
 // ExecuteAgentCommand falls through to this under BT_SERVER before the unknown-command throw; returns true if
-// handled. Defined in the server-vcxproj-only AgentCommandsServer.cpp. Throws on bad params (trust boundary), caught
+// handled. Defined in the server-vcxproj-only AgentCommandsServer.cpp. Throws on bad params, caught
 // by AgentCommandServer::Drain().
 bool ExecuteAgentCommandServer(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult);
 #endif

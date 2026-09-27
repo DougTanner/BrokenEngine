@@ -2,7 +2,7 @@
 
 These are the C++ conventions every implementer and reviewer of C++ applies.
 
-- Error handling at trust boundaries only: assume function parameters from within the codebase are valid — no defensive validation between our own functions. Do validate anything opaque to the current code unit: network input, file reads, OS/third-party API results.
+- Error handling at trust boundaries only: assume function parameters from within the codebase are valid — no defensive validation between our own functions. Do validate anything opaque to the current code unit: network input, grid saves, and replays as the trust-policy bullet in root `AGENTS.md` `## Key Patterns` directs, every other file read, and OS/third-party API results.
 - Never fix a bad value automatically: when a check finds a value read from a network packet or a file non-finite, out of range, or otherwise invalid, reject the input — drop the packet or fail the load — and never clamp, substitute, or normalize the value. Reject through the owning boundary's failure path (`Common/AGENTS.md` `## Shared Data Contracts`).
 - No useless ASSERTs: an ASSERT that throws one line before the code would crash anyway adds false safety — remove it; prefer making the condition impossible in calling code, or recovering gracefully. `/repo-code-review` lists the preferred fixes in order, from best to last resort.
 - Log levels: `kVerbose` — per-frame / high-frequency. `kDebug` — one-time (startup, connect). `kInfo` — state transitions, important one-shots (default threshold). `kWarning` — investigate (timeouts, desync); may spam. `kError` — failures; always logged. Runtime-threshold and compile-floor mechanics: `Common/Log/AGENTS.md`.

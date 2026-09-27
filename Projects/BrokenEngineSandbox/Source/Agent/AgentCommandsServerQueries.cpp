@@ -14,7 +14,7 @@ namespace game
 namespace
 {
 
-// Frame query helpers validate external parameters at the trust boundary.
+// OptionalCount reads an agent parameter by key; a wrongly typed parameter or a negative count throws.
 
 int64_t OptionalCount(const nlohmann::json& rParams, const char* pcKey, int64_t iDefault)
 {
@@ -149,7 +149,7 @@ const Frame& QueryFrame(const nlohmann::json& rParams)
 		throw std::runtime_error("coord has no loaded frame");
 	}
 	// pCurrent is null for a just-activated coord until the first post-tick SwapFrames (never happens while paused);
-	// CurrentFrame would deref it. Coord is external input — trust-boundary check, not a useless ASSERT.
+	// CurrentFrame would deref it. Coord is agent input, so throw rather than ASSERT.
 	if (framesIt->second.pCurrent == nullptr)
 	{
 		throw std::runtime_error("coord frame not ready");

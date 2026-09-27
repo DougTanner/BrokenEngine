@@ -60,7 +60,7 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 }
 
 // Protocol constants
-inline constexpr uint32_t kuiProtocolVersion = 19;
+inline constexpr uint32_t kuiProtocolVersion = 20;
 inline constexpr uint8_t kuiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr uint16_t kuiDefaultPort = 27015;
 inline constexpr int64_t kiMaxResendFrames = 8;
@@ -147,7 +147,7 @@ inline constexpr int64_t kiMaxClientPacketsPerTick = 256;
 inline constexpr int64_t kiMaxClientInboundBytesPerTick = 64 * 1024;
 
 // Lifetime corrupt-data violation count that forces a disconnect. Never reset -- legitimate clients send no
-// corrupt data; tolerates rare in-flight UDP corruption.
+// corrupt data.
 inline constexpr int64_t kiCorruptViolationDisconnectCount = 4;
 
 // Outstanding too-fast (budget or counted per-type cap) violation count that forces a disconnect. A legitimate

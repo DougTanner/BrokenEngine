@@ -460,7 +460,7 @@ void Replay::SaveLoadReplay()
 				{
 					throw std::ios_base::failure("ReplayManifest initial tick");
 				}
-				// Trust boundary (replay manifest file): bound the record count before reserve.
+				// Bound the replay manifest's record count before reserve.
 				common::ValidateDeserializedCount(iCoordCount, 16, manifestStream, "ReplayManifest records");
 				if (iCoordCount <= 0)
 				{
@@ -1085,7 +1085,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					return abortReplay();
 				}
 
-				// Replay files are a trust boundary: transfers belong only to the post-dispatch channel, so a recorded
+				// Transfers belong only to the post-dispatch channel, so a recorded
 				// input carrying one would publish an entry a connected client applies against authoritative state.
 				if (std::ranges::any_of(rFrameInput.statusChanges, [](const game::StatusChange& rStatusChange)
 				{
@@ -1099,7 +1099,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				game::FrameInput postDispatchInput {};
 				if (rpReader->LoadPostDispatch(game::gpGame->TickCounter(), postDispatchInput))
 				{
-					// Replay files are a trust boundary: the generic channel cannot know StatusChange semantics, and a
+					// The generic channel cannot know StatusChange semantics, and a
 					// valid non-transfer entry would reach std::get<TransferData> in the spawn path.
 					if (postDispatchInput.statusChanges.empty() || !std::ranges::all_of(postDispatchInput.statusChanges, [](const game::StatusChange& rStatusChange)
 					{

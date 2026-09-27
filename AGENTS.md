@@ -62,3 +62,4 @@ Same source, two executables: client (graphics, audio, input) defines `BT_CLIENT
 
 - Live verification: invoke `/agent-harness` for all harness operations — launching and driving the client/server, sim setup, UI input, state queries, screenshots, logs, replay determinism checks.
 - C++ conventions: `.agents/references/cpp-conventions.md`.
+- Trust policy is set by data direction: the server fully validates every client-to-server record and every grid save, answering a bad value under the bad-value rule in `.agents/references/cpp-conventions.md`; server-to-client data travels under ENet's datagram checksum and the client trusts it; replays and the agent command channel are exempt developer tools. Owners: `Engine/Source/Network/AGENTS.md` `## Corrupt Input Policy`, `Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`, `Engine/Source/Agent/AGENTS.md` `## Architecture`.
