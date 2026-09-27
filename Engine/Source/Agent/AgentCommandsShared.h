@@ -17,4 +17,8 @@ bool ExecuteSharedAgentCommand(std::string_view cmd, const nlohmann::json& rPara
 nlohmann::json AgentCoordJson(GridCoord coord);
 nlohmann::json AgentLocalPositionJson(FXMVECTOR vecLocalPosition);
 
+// Read one grid-coordinate element; name prefixes the thrown message. Trust boundary: the whole signed-int32 domain
+// is a legal cell identity, so the only rejected values are non-integers and integers no GridCoord can hold.
+int32_t AgentGridCoordValue(const nlohmann::json& rValue, std::string_view name);
+
 } // namespace engine

@@ -464,9 +464,9 @@ std::pair<engine::GridCoord, StatusChange> BuildInjectedChange(const nlohmann::j
 	StatusChange change;
 	if (type == "SpawnPlayer")
 	{
-		int64_t iGlobalId = gpGame->GenerateGlobalId();
 		bool bIsFlagship = rChange.contains("isFlagship") && rChange.at("isFlagship").get<bool>();
 		engine::GridCoord fleetWantedCoord = rChange.contains("fleetWantedCoord") ? CoordFromParam(rChange, "fleetWantedCoord") : coord;
+		int64_t iGlobalId = gpGame->GenerateGlobalId();
 		SpawnPlayerData spawn {.iGlobalId = iGlobalId, .bIsFlagship = bIsFlagship, .fleetWantedCoord = fleetWantedCoord, .uiPendingFleetWantedCoordTicks = 0};
 		if (rChange.contains("pos"))
 		{

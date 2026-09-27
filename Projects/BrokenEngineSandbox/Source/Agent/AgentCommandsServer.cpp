@@ -283,7 +283,7 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 
 // Shared agent helpers validate external parameters at the trust boundary.
 
-// Parse a [x,y] JSON array into a GridCoord; .get<int32_t>() throws on a non-number.
+// Parse a [x,y] JSON array into a GridCoord; each element must be an integer that fits int32_t.
 engine::GridCoord CoordFromParam(const nlohmann::json& rParams, const char* pcKey)
 {
 	if (!rParams.contains(pcKey) || !rParams.at(pcKey).is_array() || rParams.at(pcKey).size() != 2)
@@ -291,7 +291,8 @@ engine::GridCoord CoordFromParam(const nlohmann::json& rParams, const char* pcKe
 		throw std::runtime_error(std::string("'") + pcKey + "' must be a [x,y] array");
 	}
 	const nlohmann::json& rCoord = rParams.at(pcKey);
-	return engine::GridCoord {rCoord.at(0).get<int32_t>(), rCoord.at(1).get<int32_t>()};
+	std::string name = std::format("'{}'", pcKey);
+	return engine::GridCoord {engine::AgentGridCoordValue(rCoord.at(0), name), engine::AgentGridCoordValue(rCoord.at(1), name)};
 }
 
 bool ExecuteAgentCommandServer(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)

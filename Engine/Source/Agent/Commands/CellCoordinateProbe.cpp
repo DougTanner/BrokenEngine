@@ -13,33 +13,6 @@ namespace engine
 namespace
 {
 
-// Trust boundary: the whole signed-int32 domain is a legal cell identity, so the only rejected integers are the
-// ones no GridCoord can hold.
-int32_t ProbeGridCoordValue(const nlohmann::json& rValue)
-{
-	if (!rValue.is_number_integer())
-	{
-		throw std::runtime_error("cell_coordinate_probe 'coord' must be an array of 2 integers");
-	}
-
-	if (rValue.is_number_unsigned())
-	{
-		uint64_t uiValue = rValue.get<uint64_t>();
-		if (uiValue > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
-		{
-			throw std::runtime_error("cell_coordinate_probe 'coord' values must fit in a signed 32-bit integer");
-		}
-		return static_cast<int32_t>(uiValue);
-	}
-
-	int64_t iValue = rValue.get<int64_t>();
-	if (iValue < static_cast<int64_t>(std::numeric_limits<int32_t>::min()) || iValue > static_cast<int64_t>(std::numeric_limits<int32_t>::max()))
-	{
-		throw std::runtime_error("cell_coordinate_probe 'coord' values must fit in a signed 32-bit integer");
-	}
-	return static_cast<int32_t>(iValue);
-}
-
 // How many of the terrain grid's kiElevationGridDim sample positions along one axis resolve to distinct floats;
 // fewer means neighbouring samples share a float at this coordinate. The positions increase monotonically, so
 // exact inequality against the predecessor — not an approximate comparison — finds every such collapse.
@@ -89,7 +62,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParams, nlohmann::json& r
 	{
 		throw std::runtime_error("cell_coordinate_probe 'coord' must be an array of 2 integers");
 	}
-	const GridCoord coord {ProbeGridCoordValue(rCoord.at(0)), ProbeGridCoordValue(rCoord.at(1))};
+	GridCoord coord {AgentGridCoordValue(rCoord.at(0), "cell_coordinate_probe 'coord'"), AgentGridCoordValue(rCoord.at(1), "cell_coordinate_probe 'coord'")};
 
 	if (gpIslandTerrain == nullptr)
 	{
