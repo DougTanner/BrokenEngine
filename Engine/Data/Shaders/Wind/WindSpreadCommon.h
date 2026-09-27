@@ -1,19 +1,19 @@
 // f2InputTexcoord: UV in the previous-frame wind texture's coord system (= previous-area UV).
 // f2WorldPosition: world position of this output texel (computed from current area + output UV).
 // Decoupling these two lets the wind world-area shift AND scale per frame between calls.
-vec2 WindSpread(GlobalLayout globalLayout, sampler2D windTextureSampler, sampler2D noiseTextureSampler, vec2 f2InputTexcoord, vec2 f2WorldPosition)
+// f2WindTextureSize: output texture extent in texels; both ping-pong textures share it, so it is also the input's extent.
+vec2 WindSpread(GlobalLayout globalLayout, sampler2D windTextureSampler, sampler2D noiseTextureSampler, vec2 f2InputTexcoord, vec2 f2WorldPosition, vec2 f2WindTextureSize)
 {
-	float fTexelSize = globalLayout.fWindTexelSize;
 	float fTimeScale = globalLayout.fWindTimeScale;
 
 	// Semi-Lagrangian advection: trace back along wind direction to find source
 	vec2 f2Wind = textureLod(windTextureSampler, f2InputTexcoord, 0.0f).rg;
 
 	// Neighbor reads (shared by vorticity and diffusion)
-	vec2 f2Right = textureLod(windTextureSampler, f2InputTexcoord + vec2(fTexelSize, 0.0f), 0.0f).rg;
-	vec2 f2Left  = textureLod(windTextureSampler, f2InputTexcoord - vec2(fTexelSize, 0.0f), 0.0f).rg;
-	vec2 f2Up    = textureLod(windTextureSampler, f2InputTexcoord + vec2(0.0f, fTexelSize), 0.0f).rg;
-	vec2 f2Down  = textureLod(windTextureSampler, f2InputTexcoord - vec2(0.0f, fTexelSize), 0.0f).rg;
+	vec2 f2Right = textureLodOffset(windTextureSampler, f2InputTexcoord, 0.0f, ivec2(1, 0)).rg;
+	vec2 f2Left  = textureLodOffset(windTextureSampler, f2InputTexcoord, 0.0f, ivec2(-1, 0)).rg;
+	vec2 f2Up    = textureLodOffset(windTextureSampler, f2InputTexcoord, 0.0f, ivec2(0, 1)).rg;
+	vec2 f2Down  = textureLodOffset(windTextureSampler, f2InputTexcoord, 0.0f, ivec2(0, -1)).rg;
 
 	// Magnitude-dependent behavior: weak wind is laminar, strong wind is turbulent
 	float fMag = length(f2Wind);
@@ -23,11 +23,10 @@ vec2 WindSpread(GlobalLayout globalLayout, sampler2D windTextureSampler, sampler
 
 	float fAdvectionScale = mix(globalLayout.fWindAdvectionScaleLow, globalLayout.fWindAdvectionScaleHigh, fMagFactor);
 	vec2 f2Displacement = vec2(f2Wind.x, -f2Wind.y) * fAdvectionScale * fSpread * fTimeScale;
-	float fMaxStep = fTexelSize * 3.0f;
-	float fDispLen = length(f2Displacement);
-	if (fDispLen > fMaxStep)
+	float fDispTexelLen = length(f2Displacement * f2WindTextureSize);
+	if (fDispTexelLen > 3.0f)
 	{
-		f2Displacement *= fMaxStep / fDispLen;
+		f2Displacement *= 3.0f / fDispTexelLen;
 	}
 	vec2 f2SourceUV = f2InputTexcoord - f2Displacement;
 	vec2 f2AdvectedWind = textureLod(windTextureSampler, f2SourceUV, 0.0f).rg;

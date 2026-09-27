@@ -96,7 +96,6 @@ struct GlobalLayout
 	float fWindThresholdHigh INIT;
 	float fWindToSmokeStrength INIT;
 	float fWindTimeScale INIT;
-	float fWindTexelSize INIT;
 	float fWindTime INIT;
 	float fWindSmokeRetention INIT;
 	float fWindToSmokePower INIT;

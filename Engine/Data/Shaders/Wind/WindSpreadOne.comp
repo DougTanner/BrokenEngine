@@ -62,7 +62,7 @@ void main()
 	vec2 f2Result = vec2(0.0f);
 	if (bInBounds)
 	{
-		f2Result = WindSpread(globalLayout, windTextureSampler, noiseTextureSampler, f2InputTexcoord, f2WorldPosition);
+		f2Result = WindSpread(globalLayout, windTextureSampler, noiseTextureSampler, f2InputTexcoord, f2WorldPosition, vec2(i2Size));
 		imageStore(outputImage, ivec2(uiX, uiY), vec4(f2Result, 0.0f, 1.0f));
 	}
 

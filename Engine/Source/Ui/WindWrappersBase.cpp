@@ -19,8 +19,8 @@ Wrapper gWindSwirlSpeedLow(5.0f, 0.0f, 10.0f);
 Wrapper gWindSwirlSpeedHigh(2.0f, 0.0f, 10.0f);
 Wrapper gWindVorticityConfinementLow(0.5f, 0.0f, 1.0f);
 Wrapper gWindVorticityConfinementHigh(4.0f, 0.0f, 4.0f);
-Wrapper gWindDecayLow(0.4f, 0.0f, 0.9f); // max < 1.0f load-bearing: keeps fDecayRate = 1 - mix(low, high, t) > 0 in WindSpreadCommon.h:70.
-Wrapper gWindDecayHigh(0.99f, 0.5f, 0.999f); // max < 1.0f load-bearing: keeps fDecayRate = 1 - mix(low, high, t) > 0 in WindSpreadCommon.h:70.
+Wrapper gWindDecayLow(0.4f, 0.0f, 0.9f); // max < 1.0f load-bearing: keeps fDecayRate = 1 - mix(low, high, t) > 0 in WindSpreadCommon.h:66.
+Wrapper gWindDecayHigh(0.99f, 0.5f, 0.999f); // max < 1.0f load-bearing: keeps fDecayRate = 1 - mix(low, high, t) > 0 in WindSpreadCommon.h:66.
 Wrapper gWindMomentumLow(0.75f, 0.0f, 1.0f);
 Wrapper gWindMomentumHigh(0.6f, 0.0f, 1.0f);
 Wrapper gWindDiffusionLow(100.0f, 0.0f, 100.0f);
