@@ -163,16 +163,41 @@ void HandleException(std::optional<const std::exception*> pException)
 	common::LogDumpBuffers(writer);
 }
 
+static bool DxDiagCallFailed(HRESULT hresult, std::string_view call)
+{
+	if (SUCCEEDED(hresult))
+	{
+		return false;
+	}
+
+	// Heap: HresultToString returns a std::string, and this thread participates in main-loop allocation tracking.
+	ScopedSuppressAllocationTracking suppress;
+	LOG(kDefault, kError, "Failed to read DxDiag: {} failed: {}", call, common::HresultToString(hresult).data());
+	return true;
+}
+
 void ReadDxDiag()
 {
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 
+	// Declared before the try so every ComPtr releases first and completion publishes once, after the last sDxDiag write.
+	common::ScopedLambda publishComplete([]()
+	{
+		sbDxDiagComplete.store(true, std::memory_order_release);
+	});
+
 	try
 	{
-		CHECK_HRESULT(CoInitialize(nullptr));
+		if (DxDiagCallFailed(CoInitialize(nullptr), "CoInitialize"))
+		{
+			return;
+		}
 
 		Microsoft::WRL::ComPtr<IDxDiagProvider> pIdxDiagProvider;
-		CHECK_HRESULT(CoCreateInstance(CLSID_DxDiagProvider, nullptr, CLSCTX_INPROC_SERVER, IID_IDxDiagProvider, reinterpret_cast<void**>(pIdxDiagProvider.GetAddressOf())));
+		if (DxDiagCallFailed(CoCreateInstance(CLSID_DxDiagProvider, nullptr, CLSCTX_INPROC_SERVER, IID_IDxDiagProvider, reinterpret_cast<void**>(pIdxDiagProvider.GetAddressOf())), "CoCreateInstance"))
+		{
+			return;
+		}
 
 		DXDIAG_INIT_PARAMS dxdiagInitParams
 		{
@@ -181,27 +206,45 @@ void ReadDxDiag()
 			.bAllowWHQLChecks = FALSE,
 			.pReserved = nullptr,
 		};
-		CHECK_HRESULT(pIdxDiagProvider->Initialize(&dxdiagInitParams));
+		if (DxDiagCallFailed(pIdxDiagProvider->Initialize(&dxdiagInitParams), "IDxDiagProvider::Initialize"))
+		{
+			return;
+		}
 
 		Microsoft::WRL::ComPtr<IDxDiagContainer> pRoot;
-		CHECK_HRESULT(pIdxDiagProvider->GetRootContainer(&pRoot));
+		if (DxDiagCallFailed(pIdxDiagProvider->GetRootContainer(&pRoot), "GetRootContainer"))
+		{
+			return;
+		}
 
 		Microsoft::WRL::ComPtr<IDxDiagContainer> pDisplayDevices;
-		CHECK_HRESULT(pRoot->GetChildContainer(L"DxDiag_DisplayDevices", &pDisplayDevices));
+		if (DxDiagCallFailed(pRoot->GetChildContainer(L"DxDiag_DisplayDevices", &pDisplayDevices), "GetChildContainer(DxDiag_DisplayDevices)"))
+		{
+			return;
+		}
 
 		DWORD uiChildCount = 0;
-		CHECK_HRESULT(pDisplayDevices->GetNumberOfChildContainers(&uiChildCount));
+		if (DxDiagCallFailed(pDisplayDevices->GetNumberOfChildContainers(&uiChildCount), "GetNumberOfChildContainers"))
+		{
+			return;
+		}
 		LOG(kDefault, kDebug, "DxDiag found {} children", uiChildCount);
 		for (DWORD i = 0; i < uiChildCount; ++i)
 		{
 			WCHAR pcChildName[256] {};
-			CHECK_HRESULT(pDisplayDevices->EnumChildContainerNames(i, pcChildName, 256));
+			if (DxDiagCallFailed(pDisplayDevices->EnumChildContainerNames(i, pcChildName, 256), "EnumChildContainerNames"))
+			{
+				return;
+			}
 			Microsoft::WRL::ComPtr<IDxDiagContainer> pChild;
-			CHECK_HRESULT(pDisplayDevices->GetChildContainer(pcChildName, &pChild));
+			if (DxDiagCallFailed(pDisplayDevices->GetChildContainer(pcChildName, &pChild), "GetChildContainer"))
+			{
+				return;
+			}
 
-			// Best-effort per-prop reads (GetNumberOfProps / EnumPropNames / GetProp / VariantClear): results deliberately
-			// unchecked. Each output is zero-initialized and used only under the VT_BSTR guard, so a failed read skips the
-			// prop safely; CHECK_HRESULT here would throw and abort the whole remaining best-effort DxDiag capture.
+			// Best-effort per-prop reads (GetNumberOfProps / EnumPropNames / GetProp / VariantClear) leave results
+			// unchecked; zero-initializing each output keeps a failed call harmless, and only a GetProp result of VT_BSTR is
+			// appended to the report.
 			DWORD uiPropCount = 0;
 			pChild->GetNumberOfProps(&uiPropCount);
 			LOG(kDefault, kDebug, "    {} props", uiPropCount);
@@ -232,12 +275,6 @@ void ReadDxDiag()
 	{
 		LOG(kDefault, kError, "Failed to read DxDiag: {}", rException.what());
 	}
-	catch (...)
-	{
-		LOG(kDefault, kError, "Failed to read DxDiag");
-	}
-
-	sbDxDiagComplete.store(true, std::memory_order_release);
 }
 
 } // namespace engine
