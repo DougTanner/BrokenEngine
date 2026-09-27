@@ -80,9 +80,6 @@ void RecordingStarted(Replay& rReplay)
 	if (Binding* pBinding = FindBinding(rReplay); pBinding != nullptr)
 	{
 		pBinding->capture = {};
-		// Heap: one reserve per recording start, inside Replay::SyncReplayTick's tracking suppression, so the
-		//   per-tick capture path below pushes without reallocating for a recording of the expected size
-		pBinding->capture.events.reserve(static_cast<size_t>(kiReservedEvents));
 	}
 }
 
@@ -288,13 +285,7 @@ void ObserveAcceptedTransfers(Replay& rReplay, int64_t iEventTick, std::span<con
 	// Event ticks arrive monotonically, so only the last entry can still be accumulating
 	if (rEvents.empty() || rEvents.back().iRecordingEventTick != iEventTick)
 	{
-		if (rEvents.size() == rEvents.capacity()) [[unlikely]]
-		{
-			LOG(kDefault, kError, "Replay transfer capture list under-sized Tick: {} Size: {} Capacity: {}", iEventTick, static_cast<int64_t>(rEvents.size()), static_cast<int64_t>(rEvents.capacity()));
-			DEBUG_BREAK();
-		}
-		// Heap: a push past the reserve is the under-sizing flagged above and still runs so no event is lost;
-		//   ServerTransferManager::HarvestTransfers' tracking suppression encloses this whole capture path
+		// Heap: a new event tick may reallocate the list, inside ServerTransferManager::HarvestTransfers' tracking suppression
 		rEvents.push_back({.iRecordingEventTick = iEventTick});
 	}
 	game::CountCapturedReplayTransfers(sortedTransfers, rEvents.back().transferCounts);

@@ -32,8 +32,6 @@ struct TransferCaptureEvent
 	game::ReplayTransferCaptureCounts transferCounts;
 };
 
-constexpr int64_t kiReservedEvents = 16;
-
 struct TransferCaptureSnapshot
 {
 	int64_t iFirstWriterInputTick = -1;
