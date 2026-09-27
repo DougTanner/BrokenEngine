@@ -1240,3 +1240,4 @@
 {"index":1238,"date":"2026-09-27","captureMode":"cpp-change","verbosity":0.03758902206,"structuralErosion":0.568388811591,"supported":557,"parsed":556}
 {"index":1239,"date":"2026-09-27","captureMode":"cpp-change","verbosity":0.037589674999,"structuralErosion":0.568338217908,"supported":557,"parsed":556}
 {"index":1240,"date":"2026-09-27","captureMode":"cpp-change","verbosity":0.037587716251,"structuralErosion":0.568248219776,"supported":557,"parsed":556}
+{"index":1241,"date":"2026-09-27","captureMode":"carry-forward","verbosity":0.037587716251,"structuralErosion":0.568248219776,"supported":557,"parsed":556}

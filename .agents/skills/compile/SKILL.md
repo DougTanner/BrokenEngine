@@ -32,7 +32,12 @@ Consumes the task-brief fields in
 [`subagent-reporting.md`](../../references/subagent-reporting.md) plus these
 skill-specific inputs:
 
-- the targets and configurations to build, and any selective `.cpp` file list;
+- the targets and configurations to build, and any selective `.cpp` file list.
+  Agents build DataPacker, WorktreeCli, and AgentHarness in Release only, and
+  the build script refuses any other configuration for them. Agent tooling
+  runs only the Release executables, since each Debug build is named
+  `<Project>.Debug.exe`. Those Debug configurations are for humans debugging
+  the tools, and DataPacker's Debug export is very slow;
 - the repository root, primary checkout, and baseline the caller explicitly
   supplied, or none;
 - whether the session's approved plan or acceptance table includes an

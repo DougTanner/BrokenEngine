@@ -71,7 +71,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      itself. Wrapper bootstrap does incremental-rebuild ThirdParty at every
      session start (see Bootstrap AgentTools), so a routine `/compile` normally
      finds it already current.
-   - DataPacker builds Release only. WorktreeCli still supplies the normal
+   - Build the Release-only targets that [`../SKILL.md`](../SKILL.md)
+     `## Inputs` names in Release. WorktreeCli still supplies the normal
      worktree-local target serialization.
 
 4. Clear any live target executable before building. Done when no target
@@ -128,9 +129,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
    - `-Target` — `ThirdParty`, `DataPacker`, `Client`, `Server`, `WorktreeCli`,
      or `AgentHarness`.
    - `-Configuration` — `Debug`, `Profile`, or `Release`; required for
-     ThirdParty, Client, and Server. DataPacker, WorktreeCli, and AgentHarness
-     are Release only, so omit it there; an explicit non-Release value on those
-     targets is a typed block.
+     ThirdParty, Client, and Server. Omit it for the Release-only targets
+     [`../SKILL.md`](../SKILL.md) `## Inputs` names; an explicit non-Release
+     value on those targets is a typed block.
    - `-Files` — selective compile, Client/Server only; see step 8.
    - `-DataBuildMode`, `-RunDataPacker`, `-AllowGaeaExport`,
      `-ForbidExpensiveExport`, `-AcceptDeletionOnlyException` — Client/Server
