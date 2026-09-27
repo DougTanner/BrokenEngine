@@ -13,7 +13,8 @@ struct TweaksSettings
 {
 	static constexpr int64_t kiVersion = 14;
 
-	bool bShowImGui = false;
+	// uint8_t, not bool: the file is opaque input and a non-0/1 byte read into a bool is an invalid object representation
+	uint8_t uiShowImGui = 0;
 	uint8_t uiPad[3] {};
 	float fSunAngle = 1.15f;
 	// Engine-owned layout POD, embedded by value: one array bound and one sizeof for the whole program.
@@ -31,7 +32,7 @@ void SaveTweaksSettings()
 	}
 
 	TweaksSettings settings {};
-	settings.bShowImGui = gpGame->mbShowImGui;
+	settings.uiShowImGui = static_cast<uint8_t>(gpGame->mbShowImGui);
 	settings.fSunAngle = engine::gSunAngleOverride.Get();
 	engine::gpImGuiManager->mpTweaksScreen->SaveState(settings.sectionState);
 
@@ -46,19 +47,13 @@ void LoadTweaksSettings()
 	}
 
 	TweaksSettings settings {};
-	if (engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, kpcTweaksSettingsPath, settings))
+	if (engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, kpcTweaksSettingsPath, settings)
+	 && settings.uiShowImGui <= 1 && settings.fSunAngle >= engine::gSunAngleOverride.GetMin()
+	 && settings.fSunAngle <= engine::gSunAngleOverride.GetMax())
 	{
-		gpGame->mbShowImGui = settings.bShowImGui;
+		gpGame->mbShowImGui = settings.uiShowImGui != 0;
 		engine::gpImGuiManager->mpTweaksScreen->LoadState(settings.sectionState);
-		// Wrapper::Set clamps to the wrapper range, but std::clamp passes a NaN through unchanged.
-		if (std::isfinite(settings.fSunAngle))
-		{
-			engine::gSunAngleOverride.Set(settings.fSunAngle);
-		}
-		else
-		{
-			engine::gSunAngleOverride.ResetToDefault();
-		}
+		engine::gSunAngleOverride.Set(settings.fSunAngle);
 	}
 	else
 	{
