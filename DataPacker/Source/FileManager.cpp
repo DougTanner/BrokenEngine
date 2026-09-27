@@ -1,4 +1,5 @@
 #include "FileManager.h"
+
 #include "DiagnosticReporter.h"
 
 namespace
@@ -59,11 +60,11 @@ std::optional<std::filesystem::path> RunGit(const std::filesystem::path& rGit, c
 		return std::nullopt;
 	}
 
-	if (result->miExitCode != 0)
+	if (result->iExitCode != 0)
 	{
 		return std::nullopt;
 	}
-	std::string output = TrimLine(std::move(result->mOutput));
+	std::string output = TrimLine(std::move(result->output));
 	if (output.empty())
 	{
 		return std::nullopt;
@@ -214,14 +215,14 @@ std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::
 		LOG(kDefault, kWarning, "Git worktree discovery failed; output linking disabled");
 		return std::nullopt;
 	}
-	if (result->miExitCode != 0 || result->mOutput.rfind("worktree ", 0) != 0)
+	if (result->iExitCode != 0 || result->output.rfind("worktree ", 0) != 0)
 	{
 		rReject();
 		LOG(kDefault, kWarning, "Malformed Git worktree metadata; output linking disabled");
 		return std::nullopt;
 	}
-	size_t uiEnd = result->mOutput.find('\0');
-	std::filesystem::path primaryRoot = PathFromUtf8(result->mOutput.substr(9, uiEnd - 9));
+	size_t uiEnd = result->output.find('\0');
+	std::filesystem::path primaryRoot = PathFromUtf8(result->output.substr(9, uiEnd - 9));
 	std::optional<std::filesystem::path> primaryCommon = RunGit(*git, primaryRoot, L"rev-parse --path-format=absolute --git-common-dir");
 	if (!primaryCommon || !PathEqual(*primaryCommon, *commonDirectory))
 	{
@@ -288,10 +289,10 @@ MaterializationInventory BuildMaterializationInventory(const std::filesystem::pa
 
 std::filesystem::path AcquireMaterializationStaging(const std::filesystem::path& rDestination)
 {
-	for (uint32_t uiAttempt = 0; uiAttempt <= 15; ++uiAttempt)
+	for (uint32_t i = 0; i <= 15; ++i)
 	{
 		std::filesystem::path staging = rDestination;
-		staging += std::format(".materializing.{}.{}", GetCurrentProcessId(), uiAttempt);
+		staging += std::format(".materializing.{}.{}", GetCurrentProcessId(), i);
 		std::error_code errorCode;
 		if (std::filesystem::create_directory(staging, errorCode))
 		{
@@ -383,11 +384,11 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 	{
 		return;
 	}
-	if (mDataOutput.meState == OutputRootState::kAbsent)
+	if (mDataOutput.eState == OutputRootState::kAbsent)
 	{
 		EstablishOutputDestinationParent(mOutputDirectory);
 		std::filesystem::create_directories(mOutputDirectory);
-		mDataOutput.meState = OutputRootState::kLocal;
+		mDataOutput.eState = OutputRootState::kLocal;
 	}
 	if (eMode == InitializationMode::kDataOnly)
 	{
@@ -425,30 +426,30 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 
 FileManager::EnsureLocalResult FileManager::InitializeWorktreeOutputs(InitializationMode eMode)
 {
-	mDataOutput.mDestination = mOutputDirectory;
+	mDataOutput.destination = mOutputDirectory;
 	std::array<OutputRootInfo*, 2> roots { &mDataOutput, &mAttributionOutput };
 	std::span<OutputRootInfo*> outputRoots(roots.data(), eMode == InitializationMode::kFull ? roots.size() : 1);
 	if (eMode == InitializationMode::kFull)
 	{
-		mAttributionOutput.mDestination = mOutputDirectory.parent_path() / "Attribution";
+		mAttributionOutput.destination = mOutputDirectory.parent_path() / "Attribution";
 	}
 	for (OutputRootInfo* pRoot : outputRoots)
 	{
-		std::filesystem::file_status status = std::filesystem::symlink_status(pRoot->mDestination);
-		pRoot->meState = status.type() == std::filesystem::file_type::not_found ? OutputRootState::kAbsent : OutputRootState::kLocal;
-		DWORD uiAttributes = GetFileAttributesW(pRoot->mDestination.native().c_str());
+		std::filesystem::file_status status = std::filesystem::symlink_status(pRoot->destination);
+		pRoot->eState = status.type() == std::filesystem::file_type::not_found ? OutputRootState::kAbsent : OutputRootState::kLocal;
+		DWORD uiAttributes = GetFileAttributesW(pRoot->destination.native().c_str());
 		if (uiAttributes != INVALID_FILE_ATTRIBUTES && (uiAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
 		{
-			pRoot->meState = OutputRootState::kUnvalidatedReparse;
+			pRoot->eState = OutputRootState::kUnvalidatedReparse;
 		}
 	}
 	auto RejectUnvalidatedReparse = [outputRoots]()
 	{
 		for (const OutputRootInfo* pRoot : outputRoots)
 		{
-			if (pRoot->meState == OutputRootState::kUnvalidatedReparse)
+			if (pRoot->eState == OutputRootState::kUnvalidatedReparse)
 			{
-				throw std::runtime_error(std::format("Cannot validate output reparse point: {}", pRoot->mDestination.string()));
+				throw std::runtime_error(std::format("Cannot validate output reparse point: {}", pRoot->destination.string()));
 			}
 		}
 	};
@@ -466,11 +467,11 @@ FileManager::EnsureLocalResult FileManager::InitializeWorktreeOutputs(Initializa
 		throw std::runtime_error(std::format("Primary ThirdParty source must be an ordinary non-reparse directory: {}", primaryThirdPartyDirectory.string()));
 	}
 	mThirdPartyDirectory = std::move(primaryThirdPartyDirectory);
-	mDataOutput.mSource = identity->primaryRoot / identity->expectedOutput.lexically_relative(repositoryRoot);
+	mDataOutput.source = identity->primaryRoot / identity->expectedOutput.lexically_relative(repositoryRoot);
 	if (eMode == InitializationMode::kFull)
 	{
 		std::filesystem::path expectedAttribution = identity->expectedOutput.parent_path() / "Attribution";
-		mAttributionOutput.mSource = identity->primaryRoot / expectedAttribution.lexically_relative(repositoryRoot);
+		mAttributionOutput.source = identity->primaryRoot / expectedAttribution.lexically_relative(repositoryRoot);
 	}
 	EnsureLocalResult eInitializationResult = EnsureLocalResult::kAlreadyLocal;
 	for (OutputRootInfo* pRoot : outputRoots)
@@ -490,32 +491,32 @@ FileManager::EnsureLocalResult FileManager::InitializeWorktreeOutputs(Initializa
 
 FileManager::EnsureLocalResult FileManager::ReconcileWorktreeOutput(OutputRootInfo& rRoot)
 {
-	EstablishOutputDestinationParent(rRoot.mDestination);
-	if (rRoot.meState == OutputRootState::kAbsent && IsReparsePoint(rRoot.mSource))
+	EstablishOutputDestinationParent(rRoot.destination);
+	if (rRoot.eState == OutputRootState::kAbsent && IsReparsePoint(rRoot.source))
 	{
-		throw std::runtime_error(std::format("Primary output source is a reparse point: {}", rRoot.mSource.string()));
+		throw std::runtime_error(std::format("Primary output source is a reparse point: {}", rRoot.source.string()));
 	}
-	if (rRoot.meState == OutputRootState::kUnvalidatedReparse)
+	if (rRoot.eState == OutputRootState::kUnvalidatedReparse)
 	{
-		if (!IsRecognizedLinkRaw(rRoot.mDestination, rRoot.mSource))
+		if (!IsRecognizedLinkRaw(rRoot.destination, rRoot.source))
 		{
-			throw std::runtime_error(std::format("Unexpected output reparse point: {}", rRoot.mDestination.string()));
+			throw std::runtime_error(std::format("Unexpected output reparse point: {}", rRoot.destination.string()));
 		}
-		rRoot.meState = OutputRootState::kRecognizedPrimaryLink;
+		rRoot.eState = OutputRootState::kRecognizedPrimaryLink;
 	}
-	if (rRoot.meState == OutputRootState::kAbsent && IsOrdinaryDirectory(rRoot.mSource))
+	if (rRoot.eState == OutputRootState::kAbsent && IsOrdinaryDirectory(rRoot.source))
 	{
-		if (CreateSymbolicLinkW(rRoot.mDestination.native().c_str(), rRoot.mSource.native().c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
+		if (CreateSymbolicLinkW(rRoot.destination.native().c_str(), rRoot.source.native().c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
 		{
-			rRoot.meState = OutputRootState::kRecognizedPrimaryLink;
-			LOG(kDefault, kDebug, "Linked worktree output \"{}\" to \"{}\"", rRoot.mDestination.string(), rRoot.mSource.string());
+			rRoot.eState = OutputRootState::kRecognizedPrimaryLink;
+			LOG(kDefault, kDebug, "Linked worktree output \"{}\" to \"{}\"", rRoot.destination.string(), rRoot.source.string());
 		}
 		else
 		{
 			DWORD uiError = GetLastError();
 			if (uiError != ERROR_PRIVILEGE_NOT_HELD && uiError != ERROR_INVALID_PARAMETER && uiError != ERROR_NOT_SUPPORTED)
 			{
-				throw std::runtime_error(std::format("CreateSymbolicLinkW failed for destination {} from source {} (Win32 {})", rRoot.mDestination.string(), rRoot.mSource.string(), uiError));
+				throw std::runtime_error(std::format("CreateSymbolicLinkW failed for destination {} from source {} (Win32 {})", rRoot.destination.string(), rRoot.source.string(), uiError));
 			}
 			return MaterializeOutput(rRoot);
 		}
@@ -530,13 +531,13 @@ FileManager::OutputRootInfo& FileManager::GetOutputRoot(OutputRoot eRoot)
 
 std::filesystem::path FileManager::GetAttributionDirectory() const
 {
-	return mAttributionOutput.mDestination;
+	return mAttributionOutput.destination;
 }
 
 FileManager::EnsureLocalResult FileManager::EnsureLocal(OutputRoot eRoot)
 {
 	OutputRootInfo& rRoot = GetOutputRoot(eRoot);
-	if (rRoot.meState == OutputRootState::kLocal)
+	if (rRoot.eState == OutputRootState::kLocal)
 	{
 		return EnsureLocalResult::kAlreadyLocal;
 	}
@@ -545,38 +546,38 @@ FileManager::EnsureLocalResult FileManager::EnsureLocal(OutputRoot eRoot)
 
 FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rRoot)
 {
-	EstablishOutputDestinationParent(rRoot.mDestination);
-	if (rRoot.meState == OutputRootState::kLocal)
+	EstablishOutputDestinationParent(rRoot.destination);
+	if (rRoot.eState == OutputRootState::kLocal)
 	{
 		return EnsureLocalResult::kAlreadyLocal;
 	}
-	if (!rRoot.mSource.empty() && IsReparsePoint(rRoot.mSource))
+	if (!rRoot.source.empty() && IsReparsePoint(rRoot.source))
 	{
-		throw std::runtime_error(std::format("Primary output source is a reparse point: {}", rRoot.mSource.string()));
+		throw std::runtime_error(std::format("Primary output source is a reparse point: {}", rRoot.source.string()));
 	}
-	if (rRoot.mSource.empty() || !IsOrdinaryDirectory(rRoot.mSource))
+	if (rRoot.source.empty() || !IsOrdinaryDirectory(rRoot.source))
 	{
-		std::filesystem::create_directories(rRoot.mDestination);
-		rRoot.meState = OutputRootState::kLocal;
+		std::filesystem::create_directories(rRoot.destination);
+		rRoot.eState = OutputRootState::kLocal;
 		return EnsureLocalResult::kMaterialized;
 	}
-	MaterializationInventory inventory = BuildMaterializationInventory(rRoot.mSource, rRoot.mDestination);
+	MaterializationInventory inventory = BuildMaterializationInventory(rRoot.source, rRoot.destination);
 	ULARGE_INTEGER available {};
-	if (!GetDiskFreeSpaceExW(rRoot.mDestination.root_path().native().c_str(), &available, nullptr, nullptr))
+	if (!GetDiskFreeSpaceExW(rRoot.destination.root_path().native().c_str(), &available, nullptr, nullptr))
 	{
 		DWORD uiError = GetLastError();
 		diagnostic::Record record
 		{
 			.eSeverity = diagnostic::Severity::kError,
 			.title = "Data Packer - std::exception",
-			.message = std::format("GetDiskFreeSpaceExW failed for \"{}\" (Win32 {})", rRoot.mDestination.string(), uiError),
+			.message = std::format("GetDiskFreeSpaceExW failed for \"{}\" (Win32 {})", rRoot.destination.string(), uiError),
 			.eButtons = diagnostic::ButtonContract::kOk,
 			.eIcon = diagnostic::ModalIcon::kNone,
 		};
 		diagnostic::Report(record);
 		return EnsureLocalResult::kFailed;
 	}
-	diagnostic::DiskSpaceDecision eDiskSpaceDecision = diagnostic::ReportMaterializationDiskSpace(inventory.uiAllocation, available.QuadPart, rRoot.mSource, rRoot.mDestination);
+	diagnostic::DiskSpaceDecision eDiskSpaceDecision = diagnostic::ReportMaterializationDiskSpace(inventory.uiAllocation, available.QuadPart, rRoot.source, rRoot.destination);
 	if (eDiskSpaceDecision == diagnostic::DiskSpaceDecision::kFailed)
 	{
 		return EnsureLocalResult::kFailed;
@@ -585,10 +586,10 @@ FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rR
 	{
 		return EnsureLocalResult::kCancelled;
 	}
-	std::filesystem::path staging = AcquireMaterializationStaging(rRoot.mDestination);
-	PublishMaterializedOutput(rRoot.mSource, rRoot.mDestination, inventory.files, inventory.order, staging, rRoot.meState == OutputRootState::kRecognizedPrimaryLink);
-	rRoot.meState = OutputRootState::kLocal;
-	LOG(kDefault, kDebug, "Materialized worktree output \"{}\" from \"{}\" ({} bytes)", rRoot.mDestination.string(), rRoot.mSource.string(), inventory.uiAllocation);
+	std::filesystem::path staging = AcquireMaterializationStaging(rRoot.destination);
+	PublishMaterializedOutput(rRoot.source, rRoot.destination, inventory.files, inventory.order, staging, rRoot.eState == OutputRootState::kRecognizedPrimaryLink);
+	rRoot.eState = OutputRootState::kLocal;
+	LOG(kDefault, kDebug, "Materialized worktree output \"{}\" from \"{}\" ({} bytes)", rRoot.destination.string(), rRoot.source.string(), inventory.uiAllocation);
 	return EnsureLocalResult::kMaterialized;
 }
 

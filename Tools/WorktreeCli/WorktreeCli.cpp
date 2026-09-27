@@ -1,9 +1,9 @@
 // WorktreeCli — repository build, lock, and plan coordination.
 
-#include "ToolCliCommon.h"
 #include "BuildCommand.h"
 #include "LandingLockCommands.h"
 #include "PlanScheduler.h"
+#include "ToolCliCommon.h"
 
 #include <iostream>
 #include <string_view>

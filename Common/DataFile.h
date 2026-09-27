@@ -339,7 +339,10 @@ struct ShaderHeader
 
 	// Chunk payload layout: [bindings ALIGN16] [setIndices ALIGN16] [attrs ALIGN16] [SPIR-V].
 	// Single source for the writer (ExportShader.cpp) and reader (PipelineManager.cpp) offset math.
-	static constexpr int64_t BindingsOffset() { return 0; }
+	static constexpr int64_t BindingsOffset()
+	{
+		return 0;
+	}
 	static constexpr int64_t SetIndicesOffset(int64_t iBindingCount)
 	{
 		return BindingsOffset() + RoundUp<int64_t, kiAlignmentBytes>(iBindingCount * static_cast<int64_t>(sizeof(VkDescriptorSetLayoutBinding)));

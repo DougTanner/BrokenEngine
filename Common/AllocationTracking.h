@@ -5,8 +5,15 @@ inline thread_local int64_t giAllocationTrackingSuppressed = 0;
 
 struct ScopedSuppressAllocationTracking
 {
-	ScopedSuppressAllocationTracking() { ++giAllocationTrackingSuppressed; }
-	~ScopedSuppressAllocationTracking() { --giAllocationTrackingSuppressed; }
+	ScopedSuppressAllocationTracking()
+	{
+		++giAllocationTrackingSuppressed;
+	}
+
+	~ScopedSuppressAllocationTracking()
+	{
+		--giAllocationTrackingSuppressed;
+	}
 };
 
 // Temporarily re-arms tracking inside an active ScopedSuppressAllocationTracking scope — e.g. across a
@@ -15,6 +22,13 @@ struct ScopedSuppressAllocationTracking
 // construction (back toward armed) and restores on destruction.
 struct ScopedResumeAllocationTracking
 {
-	ScopedResumeAllocationTracking() { --giAllocationTrackingSuppressed; }
-	~ScopedResumeAllocationTracking() { ++giAllocationTrackingSuppressed; }
+	ScopedResumeAllocationTracking()
+	{
+		--giAllocationTrackingSuppressed;
+	}
+
+	~ScopedResumeAllocationTracking()
+	{
+		++giAllocationTrackingSuppressed;
+	}
 };

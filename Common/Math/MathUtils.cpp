@@ -47,7 +47,7 @@ AreaVertices XM_CALLCONV CalculateArea(FXMVECTOR vecPosition, FXMVECTOR vecDirec
 	auto vecBottomLeft = XMVectorAdd(vecPosition, XMVectorAdd(vecBack, vecLeft));
 	auto vecBottomRight = XMVectorAdd(vecPosition, XMVectorAdd(vecBack, vecRight));
 
-	return AreaVertices {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight};
+	return AreaVertices {.vecTopLeft = vecTopLeft, .vecTopRight = vecTopRight, .vecBottomLeft = vecBottomLeft, .vecBottomRight = vecBottomRight};
 }
 
 XMVECTOR XM_CALLCONV RotateTowardsPercent(FXMVECTOR vecDirection, FXMVECTOR vecTowards, float fPercent)

@@ -79,7 +79,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 
 		// Build skin joint to node index mapping
 		skeletonData.skinJointToNode.resize(rSkin.joints.size());
-		for (int64_t i = 0; i < static_cast<int64_t>(rSkin.joints.size()); ++i)
+		for (size_t i = 0; i < rSkin.joints.size(); ++i)
 		{
 			skeletonData.skinJointToNode.at(i) = static_cast<uint16_t>(rSkin.joints[i]);
 		}
@@ -186,7 +186,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 		}
 
 		skeletonData.inverseBindMatrices.resize(rSkin.joints.size());
-		for (int64_t i = 0; i < static_cast<int64_t>(rSkin.joints.size()); ++i)
+		for (size_t i = 0; i < rSkin.joints.size(); ++i)
 		{
 			if (pfInverseBindMatrices != nullptr)
 			{
@@ -211,7 +211,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 
 	// Process ALL nodes
 	skeletonData.nodes.resize(rModel.nodes.size());
-	for (int64_t i = 0; i < static_cast<int64_t>(rModel.nodes.size()); ++i)
+	for (size_t i = 0; i < rModel.nodes.size(); ++i)
 	{
 		common::ModelNode& rNode = skeletonData.nodes.at(i);
 		const tinygltf::Node& rGltfNode = rModel.nodes[i];

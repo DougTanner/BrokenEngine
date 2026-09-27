@@ -99,7 +99,12 @@ ButtonResult Report(const Record& rRecord)
 		DWORD uiNoninteractiveLength = GetEnvironmentVariableW(L"BT_DATAPACKER_NONINTERACTIVE", pcNoninteractive, static_cast<DWORD>(std::size(pcNoninteractive)));
 		return uiNoninteractiveLength == 1 && pcNoninteractive[0] == L'1';
 	}();
-	if (sbNoninteractiveEnvironment || sbValidatedLinkedWorktree.load(std::memory_order_acquire))
+	if (sbNoninteractiveEnvironment)
+	{
+		return rRecord.eButtons == ButtonContract::kOk ? ButtonResult::kAcknowledged : ButtonResult::kCancelled;
+	}
+
+	if (sbValidatedLinkedWorktree.load(std::memory_order_acquire))
 	{
 		return rRecord.eButtons == ButtonContract::kOk ? ButtonResult::kAcknowledged : ButtonResult::kCancelled;
 	}

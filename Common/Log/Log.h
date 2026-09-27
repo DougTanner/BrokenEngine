@@ -1,7 +1,7 @@
 #pragma once
 
-#include "LogTypes.h"
 #include "LogFormatters.h"
+#include "LogTypes.h"
 #include "Threading/ThreadLocal.h"
 
 namespace common
@@ -21,12 +21,12 @@ struct LogBuffer
 {
 	static constexpr int64_t kiLineCount = LINE_COUNT;
 
-	std::atomic<int64_t> miWritePosition {0};
-	char mLines[kiLineCount][kiLogBufferSize] {}; // last byte always 0
+	std::atomic<int64_t> iWritePosition {0};
+	char pcLines[kiLineCount][kiLogBufferSize] {}; // last byte always 0
 
 	char* AcquireLine()
 	{
-		int64_t iPosition = miWritePosition.fetch_add(1, std::memory_order_relaxed);
+		int64_t iPosition = iWritePosition.fetch_add(1, std::memory_order_relaxed);
 		if constexpr (!WRAP)
 		{
 			if (iPosition >= kiLineCount)
@@ -34,7 +34,7 @@ struct LogBuffer
 				return nullptr;
 			}
 		}
-		return mLines[iPosition % kiLineCount];
+		return pcLines[iPosition % kiLineCount];
 	}
 
 	// Fills ppLines (caller capacity kiLineCount) with pointers to the most recent buffered lines in chronological
@@ -45,7 +45,7 @@ struct LogBuffer
 	_Ret_range_(0, LINE_COUNT)
 	int64_t Tail(_Out_writes_to_(LINE_COUNT, return) const char** ppLines, int64_t iMaxLines) const
 	{
-		int64_t iWritePos = miWritePosition.load(std::memory_order_relaxed);
+		int64_t iWritePos = iWritePosition.load(std::memory_order_relaxed);
 		int64_t iAvailable = std::min(iWritePos, kiLineCount);
 		int64_t iCount = std::min(iAvailable, iMaxLines);
 		int64_t iFilled = 0;
@@ -54,7 +54,7 @@ struct LogBuffer
 			int64_t iFirst = iWritePos - iCount;
 			for (int64_t i = 0; i < iCount; ++i)
 			{
-				const char* pLine = mLines[(iFirst + i) % kiLineCount];
+				const char* pLine = pcLines[(iFirst + i) % kiLineCount];
 				if (pLine[0] != '\0')
 				{
 					ppLines[iFilled++] = pLine;
@@ -66,7 +66,7 @@ struct LogBuffer
 			int64_t iFirst = iAvailable - iCount;
 			for (int64_t i = 0; i < iCount; ++i)
 			{
-				const char* pLine = mLines[iFirst + i];
+				const char* pLine = pcLines[iFirst + i];
 				if (pLine[0] != '\0')
 				{
 					ppLines[iFilled++] = pLine;
@@ -78,14 +78,14 @@ struct LogBuffer
 
 	void Dump(CrashFileWriter& rWriter) const
 	{
-		int64_t iWritePos = miWritePosition.load(std::memory_order_relaxed);
+		int64_t iWritePos = iWritePosition.load(std::memory_order_relaxed);
 		if constexpr (WRAP)
 		{
 			int64_t iCount = std::min(iWritePos, kiLineCount);
 			int64_t iStart = (iWritePos >= kiLineCount) ? (iWritePos % kiLineCount) : 0;
 			for (int64_t i = 0; i < iCount; ++i)
 			{
-				const char* pLine = mLines[(iStart + i) % kiLineCount];
+				const char* pLine = pcLines[(iStart + i) % kiLineCount];
 				if (pLine[0] != '\0')
 				{
 					rWriter.Write(pLine);
@@ -97,9 +97,9 @@ struct LogBuffer
 			int64_t iCount = std::min(iWritePos, kiLineCount);
 			for (int64_t i = 0; i < iCount; ++i)
 			{
-				if (mLines[i][0] != '\0')
+				if (pcLines[i][0] != '\0')
 				{
-					rWriter.Write(mLines[i]);
+					rWriter.Write(pcLines[i]);
 				}
 			}
 		}

@@ -13,6 +13,7 @@
 #include <limits>
 #include <optional>
 #include <regex>
+#include <span>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -107,9 +108,9 @@ namespace toolcli
 				wchar_t pTimestamp[32] {};
 				std::swprintf(pTimestamp, std::size(pTimestamp), L"%04u%02u%02uT%02u%02u%02u%03uZ", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
 				std::wstring baseName = ToLowerInvariant(std::wstring(targetStem)) + L"-" + pTimestamp + L"-" + std::to_wstring(::GetCurrentProcessId());
-				for (int iAttempt = 0; iAttempt < 16; ++iAttempt)
+				for (int i = 0; i < 16; ++i)
 				{
-					std::wstring name = iAttempt == 0 ? baseName + L".log" : baseName + L"-" + std::to_wstring(iAttempt) + L".log";
+					std::wstring name = i == 0 ? baseName + L".log" : baseName + L"-" + std::to_wstring(i) + L".log";
 					std::filesystem::path candidate = rDirectory / name;
 					std::filesystem::path extendedCandidate = ExtendedLengthPath(candidate);
 					HANDLE hRawFile = ::CreateFileW(extendedCandidate.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -132,24 +133,23 @@ namespace toolcli
 				return false;
 			}
 
-			void Write(const char* pData, size_t uiSize)
+			void Write(std::span<const char> data)
 			{
 				if (mbFailed)
 				{
 					return;
 				}
-				while (uiSize > 0)
+				while (!data.empty())
 				{
-					DWORD uiChunk = static_cast<DWORD>(std::min<size_t>(uiSize, 1u << 20));
+					DWORD uiChunk = static_cast<DWORD>(std::min<size_t>(data.size(), 1u << 20));
 					DWORD uiWritten = 0;
-					if (::WriteFile(mhFile.Get(), pData, uiChunk, &uiWritten, nullptr) == FALSE || uiWritten == 0)
+					if (::WriteFile(mhFile.Get(), data.data(), uiChunk, &uiWritten, nullptr) == FALSE || uiWritten == 0)
 					{
 						mbFailed = true;
 						FailBuildWindows("write retained build log");
 						return;
 					}
-					pData += uiWritten;
-					uiSize -= uiWritten;
+					data = data.subspan(uiWritten);
 					muiBytes += uiWritten;
 				}
 			}
@@ -185,9 +185,9 @@ namespace toolcli
 			{
 			}
 
-			void Consume(const char* pData, size_t uiSize)
+			void Consume(std::span<const char> data)
 			{
-				mCarry.append(pData, uiSize);
+				mCarry.append(data.data(), data.size());
 				size_t uiStart = 0;
 				for (size_t uiIndex = mCarry.find('\n', 0); uiIndex != std::string::npos; uiIndex = mCarry.find('\n', uiStart))
 				{
@@ -238,14 +238,14 @@ namespace toolcli
 			}
 
 		private:
-			static int ParseNumber(const std::csub_match& rMatch)
+			static int64_t ParseNumber(const std::csub_match& rMatch)
 			{
 				if (!rMatch.matched)
 				{
 					return 0;
 				}
 				int64_t iValue = std::strtoll(rMatch.first, nullptr, 10);
-				return iValue > 0 && iValue <= (std::numeric_limits<int>::max)() ? static_cast<int>(iValue) : 0;
+				return iValue > 0 && iValue <= (std::numeric_limits<int>::max)() ? iValue : 0;
 			}
 
 			void ParseLine(std::string_view line)
@@ -284,7 +284,7 @@ namespace toolcli
 				}
 			}
 
-			void AppendDiagnostic(std::string severity, std::string code, std::string file, int iLine, int iColumn, std::string project, std::string message, std::string_view raw)
+			void AppendDiagnostic(std::string severity, std::string code, std::string file, int64_t iLine, int64_t iColumn, std::string project, std::string message, std::string_view raw)
 			{
 				// MSBuild repeats each diagnostic in its end-of-build summary; keep one entry per identity.
 				std::string key = severity + '|' + code + '|' + file + '|' + std::to_string(iLine) + '|' + std::to_string(iColumn) + '|' + project + '|' + message;
@@ -329,8 +329,9 @@ namespace toolcli
 			options.failureSink = FailBuild;
 			options.outputSink = [&rLog, &rParser](const char* pData, size_t uiSize)
 			{
-				rLog.Write(pData, uiSize);
-				rParser.Consume(pData, uiSize);
+				std::span<const char> data(pData, uiSize);
+				rLog.Write(data);
+				rParser.Consume(data);
 			};
 			std::optional<ProcessResult> result = RunProcess(&rExecutable, rArguments, options);
 			rParser.Finish();
@@ -530,7 +531,7 @@ namespace toolcli
 			std::optional<ProcessResult> queryResult = RunBuildProcess(rMsBuild, queryArguments);
 			if (queryResult)
 			{
-				rLog.Write(queryResult->output.data(), queryResult->output.size());
+				rLog.Write(queryResult->output);
 			}
 			if (!queryResult || queryResult->uiExitCode != 0)
 			{

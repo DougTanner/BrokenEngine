@@ -12,8 +12,8 @@ std::tuple<std::string, std::string> FileTimeString(const std::filesystem::file_
 
 struct ExecutableResult
 {
-	std::string mOutput;
-	int64_t miExitCode = 0;
+	std::string output;
+	int64_t iExitCode = 0;
 };
 
 // CreateProcessW writes into rCommandLine, so it cannot be const. The result is empty when the child
@@ -21,7 +21,7 @@ struct ExecutableResult
 std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine);
 
 // Gaea.Swarm.exe requires real console handles, so the child runs synchronously with
-// CREATE_NEW_CONSOLE; output is not captured and mOutput remains empty. CreateProcessW mutates
+// CREATE_NEW_CONSOLE; output is not captured and `output` remains empty. CreateProcessW mutates
 // rCommandLine, so it must stay mutable.
 ExecutableResult RunExecutableInNewConsole(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine);
 

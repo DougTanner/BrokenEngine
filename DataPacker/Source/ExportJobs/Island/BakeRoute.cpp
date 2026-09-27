@@ -288,9 +288,9 @@ void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rR
 	}
 	common::ExecutableResult result = common::RunExecutableInNewConsole(rGaeaExecutable, commandLine);
 
-	if (result.miExitCode != 0)
+	if (result.iExitCode != 0)
 	{
-		throw std::runtime_error(std::format("Gaea.Swarm.exe exited with code {} for \"{}\". Use /gaea2-diagnose to examine the log file for failures.", result.miExitCode, rRouteDirectory.string()));
+		throw std::runtime_error(std::format("Gaea.Swarm.exe exited with code {} for \"{}\". Use /gaea2-diagnose to examine the log file for failures.", result.iExitCode, rRouteDirectory.string()));
 	}
 
 	for (const char* pcFile : kpcIntermediateFiles)

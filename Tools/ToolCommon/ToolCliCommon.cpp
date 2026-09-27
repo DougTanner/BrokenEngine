@@ -92,7 +92,12 @@ namespace toolcli
 			}
 		}
 
-		SECURITY_ATTRIBUTES pipeAttributes { sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
+		SECURITY_ATTRIBUTES pipeAttributes
+		{
+			.nLength = sizeof(SECURITY_ATTRIBUTES),
+			.lpSecurityDescriptor = nullptr,
+			.bInheritHandle = TRUE,
+		};
 		Handle hPipeRead;
 		Handle hPipeWrite;
 		if (rOptions.bCaptureOutput)

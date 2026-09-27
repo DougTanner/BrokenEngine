@@ -55,9 +55,9 @@ private:
 
 	struct OutputRootInfo
 	{
-		std::filesystem::path mSource;
-		std::filesystem::path mDestination;
-		OutputRootState meState = OutputRootState::kLocal;
+		std::filesystem::path source;
+		std::filesystem::path destination;
+		OutputRootState eState = OutputRootState::kLocal;
 	};
 
 	EnsureLocalResult InitializeWorktreeOutputs(InitializationMode eMode);

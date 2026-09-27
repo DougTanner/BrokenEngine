@@ -63,7 +63,7 @@ void WriteBinding(BindingTable& rTable, int64_t iBinding, uint32_t uiSet, VkDesc
 // Enumerates one SPIRV-Cross resource category, writing a descriptor binding per resource.
 // countFn maps the reflected type to a descriptor count (constant for buffers/samplers, array-derived for images).
 template <typename COUNT_FN>
-void CollectBindings(const spirv_cross::SmallVector<spirv_cross::Resource>& rResources, std::string_view label, VkDescriptorType vkDescriptorType, spirv_cross::Compiler& rCompiler, BindingTable& rTable, COUNT_FN&& countFn)
+void CollectBindings(const spirv_cross::SmallVector<spirv_cross::Resource>& rResources, std::string_view label, VkDescriptorType vkDescriptorType, const spirv_cross::Compiler& rCompiler, BindingTable& rTable, COUNT_FN&& countFn)
 {
 	if (rResources.empty())
 	{
@@ -117,14 +117,14 @@ std::filesystem::path ExportShader::RunVulkanTool(const std::filesystem::path& r
 	// stdout as fatal; glslangValidator / spirv-opt key on the exit code and only warn on non-empty stdout.
 	if (bThrowOnAnyOutput)
 	{
-		if (!result->mOutput.empty())
+		if (!result->output.empty())
 		{
-			throw std::runtime_error(std::format("{} error: {}", toolName, result->mOutput));
+			throw std::runtime_error(std::format("{} error: {}", toolName, result->output));
 		}
 	}
-	else if (result->miExitCode != 0)
+	else if (result->iExitCode != 0)
 	{
-		throw std::runtime_error(std::format("{} error: {}", toolName, result->mOutput));
+		throw std::runtime_error(std::format("{} error: {}", toolName, result->output));
 	}
 
 	if (!std::filesystem::exists(rOutputFile))
@@ -132,9 +132,9 @@ std::filesystem::path ExportShader::RunVulkanTool(const std::filesystem::path& r
 		throw std::runtime_error(std::format("{} did not produce \"{}\"", toolName, rOutputFile.string()));
 	}
 
-	if (!bThrowOnAnyOutput && !result->mOutput.empty())
+	if (!bThrowOnAnyOutput && !result->output.empty())
 	{
-		LOG(kDefault, kWarning, "{} output: {}", toolName, result->mOutput);
+		LOG(kDefault, kWarning, "{} output: {}", toolName, result->output);
 	}
 
 	mIntermediateFiles.push_back(rOutputFile);

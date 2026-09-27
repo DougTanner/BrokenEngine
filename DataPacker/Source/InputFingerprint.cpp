@@ -42,9 +42,9 @@ public:
 	Sha256Hasher(const Sha256Hasher& rToCopy) = delete;
 	Sha256Hasher& operator=(const Sha256Hasher& rToCopy) = delete;
 
-	void Update(const std::byte* pBytes, size_t uiBytes)
+	void Update(std::span<const std::byte> bytes)
 	{
-		if (uiBytes > 0 && BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(pBytes)), static_cast<ULONG>(uiBytes), 0) < 0)
+		if (!bytes.empty() && BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())), static_cast<ULONG>(bytes.size()), 0) < 0)
 		{
 			throw std::runtime_error("Unable to hash fingerprint data");
 		}
@@ -52,7 +52,7 @@ public:
 
 	void Update(std::string_view text)
 	{
-		Update(reinterpret_cast<const std::byte*>(text.data()), text.size());
+		Update(std::as_bytes(std::span(text)));
 	}
 
 	std::string Finish()
@@ -93,7 +93,7 @@ std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprin
 		size_t uiBytes = static_cast<size_t>(stream.gcount());
 		if (eMode == InputFingerprintMode::kRaw)
 		{
-			hasher.Update(buffer.data(), uiBytes);
+			hasher.Update(std::span(buffer).first(uiBytes));
 			continue;
 		}
 
@@ -125,7 +125,7 @@ std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprin
 				normalizedBuffer.at(uiNormalizedBytes++) = uiByte;
 			}
 		}
-		hasher.Update(normalizedBuffer.data(), uiNormalizedBytes);
+		hasher.Update(std::span(normalizedBuffer).first(uiNormalizedBytes));
 	}
 	if (!stream.eof())
 	{

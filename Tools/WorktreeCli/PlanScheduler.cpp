@@ -1,7 +1,7 @@
 #include "PlanScheduler.h"
-#include "PlanMetadata.h"
 
 #include "CoordinationStore.h"
+#include "PlanMetadata.h"
 #include "ToolCliCommon.h"
 
 #include <algorithm>
@@ -42,11 +42,11 @@ namespace toolcli
 		}
 
 
-		bool IsLowerHex(std::string_view text, size_t iLength)
+		bool IsLowerHex(std::string_view text, size_t uiLength)
 		{
-			return text.size() == iLength && std::all_of(text.begin(), text.end(), [](char value)
+			return text.size() == uiLength && std::all_of(text.begin(), text.end(), [](char cValue)
 			{
-				return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f');
+				return (cValue >= '0' && cValue <= '9') || (cValue >= 'a' && cValue <= 'f');
 			});
 		}
 
@@ -89,34 +89,34 @@ namespace toolcli
 					rArguments.bLintOnly = true;
 					continue;
 				}
-				std::wstring* destination = nullptr;
+				std::wstring* pDestination = nullptr;
 				if (option == L"--repo")
 				{
-					destination = &rArguments.repository;
+					pDestination = &rArguments.repository;
 				}
 				else if (option == L"--worktree")
 				{
-					destination = &rArguments.worktree;
+					pDestination = &rArguments.worktree;
 				}
 				else if (option == L"--primary-worktree")
 				{
-					destination = &rArguments.primaryWorktree;
+					pDestination = &rArguments.primaryWorktree;
 				}
 				else if (option == L"--branch")
 				{
-					destination = &rArguments.branch;
+					pDestination = &rArguments.branch;
 				}
 				else if (option == L"--owner")
 				{
-					destination = &rArguments.owner;
+					pDestination = &rArguments.owner;
 				}
 				else if (option == L"--session")
 				{
-					destination = &rArguments.session;
+					pDestination = &rArguments.session;
 				}
 				else if (option == L"--plan")
 				{
-					destination = &rArguments.plan;
+					pDestination = &rArguments.plan;
 				}
 				else
 				{
@@ -126,7 +126,7 @@ namespace toolcli
 				{
 					return false;
 				}
-				*destination = pValues[i];
+				*pDestination = pValues[i];
 			}
 			return true;
 		}
@@ -158,9 +158,9 @@ namespace toolcli
 
 		bool IsCanonicalPositiveDecimal(std::wstring_view rValue)
 		{
-			return !rValue.empty() && rValue.size() <= 10 && rValue.front() >= L'1' && rValue.front() <= L'9' && std::all_of(rValue.begin() + 1, rValue.end(), [](wchar_t value)
+			return !rValue.empty() && rValue.size() <= 10 && rValue.front() >= L'1' && rValue.front() <= L'9' && std::all_of(rValue.begin() + 1, rValue.end(), [](wchar_t cValue)
 			{
-				return value >= L'0' && value <= L'9';
+				return cValue >= L'0' && cValue <= L'9';
 			});
 		}
 
@@ -197,8 +197,8 @@ namespace toolcli
 				{
 					continue;
 				}
-				DWORD attributes = ::GetFileAttributesW(ExtendedLengthPath(temporaryPath).c_str());
-				if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0 || (attributes & FILE_ATTRIBUTE_HIDDEN) == 0 || (attributes & FILE_ATTRIBUTE_TEMPORARY) == 0)
+				DWORD uiAttributes = ::GetFileAttributesW(ExtendedLengthPath(temporaryPath).c_str());
+				if (uiAttributes == INVALID_FILE_ATTRIBUTES || (uiAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0 || (uiAttributes & FILE_ATTRIBUTE_HIDDEN) == 0 || (uiAttributes & FILE_ATTRIBUTE_TEMPORARY) == 0)
 				{
 					continue;
 				}
@@ -241,19 +241,39 @@ namespace toolcli
 			try
 			{
 				// An exact field count rejects every schema-v1 record, which is how the pre-cutover claims are collected.
-				if (!rClaim.is_object() || rClaim.size() != 9 || !rClaim.contains("schemaVersion") || !rClaim["schemaVersion"].is_number_integer() || rClaim["schemaVersion"].get<int>() != 2)
+				if (!rClaim.is_object())
+				{
+					return false;
+				}
+				if (rClaim.size() != 9)
+				{
+					return false;
+				}
+				if (!rClaim.contains("schemaVersion"))
+				{
+					return false;
+				}
+				if (!rClaim["schemaVersion"].is_number_integer())
+				{
+					return false;
+				}
+				if (rClaim["schemaVersion"].get<int>() != 2)
 				{
 					return false;
 				}
 				std::map<std::string, std::string> fields;
-				for (const char* field : { "repository", "plan", "owner", "session", "worktree", "branch", "claimedAt", "expiresAt" })
+				for (const char* pField : { "repository", "plan", "owner", "session", "worktree", "branch", "claimedAt", "expiresAt" })
 				{
-					if (!ReadRequiredString(rClaim, field, fields.try_emplace(field).first->second))
+					if (!ReadRequiredString(rClaim, pField, fields.try_emplace(pField).first->second))
 					{
 						return false;
 					}
 				}
-				if (fields.at("repository") != WideToUtf8(repository) || fields.at("plan") != WideToUtf8(plan))
+				if (fields.at("repository") != WideToUtf8(repository))
+				{
+					return false;
+				}
+				if (fields.at("plan") != WideToUtf8(plan))
 				{
 					return false;
 				}
@@ -567,35 +587,35 @@ namespace toolcli
 				}
 			}
 			nlohmann::json output = { { "operation", "validate" }, { "status", diagnostics.empty() ? "valid" : "invalid" }, { "code", diagnostics.empty() ? "ok" : "invalid-plans" }, { "message", diagnostics.empty() ? "plan metadata is valid" : "some plans are excluded from selection" }, { "diagnostics", diagnostics }, { "notices", nlohmann::json::array() }, { "healedClaims", healed }, { "plans", nlohmann::json::array() } };
-			for (const auto& [path, plan] : plans)
+			for (const auto& [rPath, rPlan] : plans)
 			{
-				if (!plan.bValid || (!requestedPlan.empty() && path != requestedPlan))
+				if (!rPlan.bValid || (!requestedPlan.empty() && rPath != requestedPlan))
 				{
 					continue;
 				}
-				for (const std::wstring& dependency : plan.dependencies)
+				for (const std::wstring& rDependency : rPlan.dependencies)
 				{
-					if (plans.find(dependency) == plans.end())
+					if (plans.find(rDependency) == plans.end())
 					{
-						output["notices"].push_back({ { "plan", WideToUtf8(path) }, { "code", "stale-dependency" }, { "dependency", WideToUtf8(dependency) } });
+						output["notices"].push_back({ { "plan", WideToUtf8(rPath) }, { "code", "stale-dependency" }, { "dependency", WideToUtf8(rDependency) } });
 					}
 				}
 			}
 			std::vector<const Plan*> outputPlans;
-			for (const auto& [path, plan] : plans)
+			for (const auto& [rPath, rPlan] : plans)
 			{
-				if (plan.bValid && (requestedPlan.empty() || path == requestedPlan))
+				if (rPlan.bValid && (requestedPlan.empty() || rPath == requestedPlan))
 				{
-					outputPlans.push_back(&plan);
+					outputPlans.push_back(&rPlan);
 				}
 			}
 			std::sort(outputPlans.begin(), outputPlans.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc > pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
 			for (const Plan* pPlan : outputPlans)
 			{
 				nlohmann::json dependencies = nlohmann::json::array();
-				for (const std::wstring& dependency : pPlan->dependencies)
+				for (const std::wstring& rDependency : pPlan->dependencies)
 				{
-					dependencies.push_back(WideToUtf8(dependency));
+					dependencies.push_back(WideToUtf8(rDependency));
 				}
 				output["plans"].push_back({ { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", dependencies } });
 			}
@@ -635,11 +655,11 @@ namespace toolcli
 			}
 			MarkCycles(primaryPlans, diagnostics);
 			std::vector<const Plan*> rows;
-			for (const auto& [path, plan] : sessionPlans)
+			for (const auto& [rPath, rPlan] : sessionPlans)
 			{
-				if (plan.bValid)
+				if (rPlan.bValid)
 				{
-					rows.push_back(&plan);
+					rows.push_back(&rPlan);
 				}
 			}
 			std::sort(rows.begin(), rows.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc > pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
@@ -653,9 +673,9 @@ namespace toolcli
 			for (const Plan* pPlan : rows)
 			{
 				nlohmann::json dependencies = nlohmann::json::array();
-				for (const std::wstring& dependency : pPlan->dependencies)
+				for (const std::wstring& rDependency : pPlan->dependencies)
 				{
-					dependencies.push_back(WideToUtf8(dependency));
+					dependencies.push_back(WideToUtf8(rDependency));
 				}
 				nlohmann::json row = { { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", dependencies } };
 				Claim claim;
@@ -680,26 +700,26 @@ namespace toolcli
 				else if (IsBlockedByDependencies(*pPlan, sessionPlans) || IsBlockedByDependencies(primary->second, primaryPlans))
 				{
 					std::vector<std::wstring> blocking;
-					for (const std::wstring& dependency : pPlan->dependencies)
+					for (const std::wstring& rDependency : pPlan->dependencies)
 					{
-						if (sessionPlans.find(dependency) != sessionPlans.end())
+						if (sessionPlans.find(rDependency) != sessionPlans.end())
 						{
-							blocking.push_back(dependency);
+							blocking.push_back(rDependency);
 						}
 					}
-					for (const std::wstring& dependency : primary->second.dependencies)
+					for (const std::wstring& rDependency : primary->second.dependencies)
 					{
-						if (primaryPlans.find(dependency) != primaryPlans.end() && std::find(blocking.begin(), blocking.end(), dependency) == blocking.end())
+						if (primaryPlans.find(rDependency) != primaryPlans.end() && std::find(blocking.begin(), blocking.end(), rDependency) == blocking.end())
 						{
-							blocking.push_back(dependency);
+							blocking.push_back(rDependency);
 						}
 					}
 					std::sort(blocking.begin(), blocking.end(), Utf8PathLess);
 					row["state"] = "blocked";
 					row["blockedBy"] = nlohmann::json::array();
-					for (const std::wstring& dependency : blocking)
+					for (const std::wstring& rDependency : blocking)
 					{
-						row["blockedBy"].push_back(WideToUtf8(dependency));
+						row["blockedBy"].push_back(WideToUtf8(rDependency));
 					}
 				}
 				else
@@ -795,17 +815,17 @@ namespace toolcli
 				return kiExitOk;
 			}
 			std::vector<Plan*> candidates;
-			for (auto& [path, plan] : sessionPlans)
+			for (auto& [rPath, rPlan] : sessionPlans)
 			{
-				if (!plan.bValid || IsBlockedByDependencies(plan, sessionPlans))
+				if (!rPlan.bValid || IsBlockedByDependencies(rPlan, sessionPlans))
 				{
 					continue;
 				}
-				if (!requestedPlan.empty() && path != requestedPlan)
+				if (!requestedPlan.empty() && rPath != requestedPlan)
 				{
 					continue;
 				}
-				auto primary = plans.find(path);
+				auto primary = plans.find(rPath);
 				if (primary == plans.end() || !primary->second.bValid)
 				{
 					continue; // absent or demoted at the primary tip: a peer landing already completed or rejected it
@@ -814,7 +834,7 @@ namespace toolcli
 				{
 					continue; // a prerequisite landed at the primary tip after this session's baseline
 				}
-				candidates.push_back(&plan);
+				candidates.push_back(&rPlan);
 			}
 			std::sort(candidates.begin(), candidates.end(), [](const Plan* pLeft, const Plan* pRight) { return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc > pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path); });
 			for (const Plan* pPlan : candidates)
@@ -948,9 +968,9 @@ namespace toolcli
 			size_t uiLineEnd = rPlan.bytes.find('\n');
 			size_t uiSuffixStart = uiLineEnd == std::string::npos ? rPlan.bytes.size() : (uiLineEnd > 0 && rPlan.bytes[uiLineEnd - 1] == '\r' ? uiLineEnd - 1 : uiLineEnd);
 			nlohmann::json metadata = { { "createdUtc", rPlan.createdUtc }, { "dependsOn", nlohmann::json::array() } };
-			for (const std::wstring& dependency : dependencies)
+			for (const std::wstring& rDependency : dependencies)
 			{
-				metadata["dependsOn"].push_back(WideToUtf8(dependency));
+				metadata["dependsOn"].push_back(WideToUtf8(rDependency));
 			}
 			rBytes = std::string(kMarkerPrefix) + metadata.dump() + std::string(kMarkerSuffix) + rPlan.bytes.substr(uiSuffixStart);
 			return true;
@@ -1019,30 +1039,30 @@ namespace toolcli
 				std::string after;
 			};
 			std::vector<ChildRewrite> rewrites;
-			for (const auto& [path, plan] : plans)
+			for (const auto& [rPath, rPlan] : plans)
 			{
-				if (path == target)
+				if (rPath == target)
 				{
 					continue;
 				}
-				if (plan.diagnostic == "missing")
+				if (rPlan.diagnostic == "missing")
 				{
 					continue;
 				}
-				if (!plan.bDependenciesKnown)
+				if (!rPlan.bDependenciesKnown)
 				{
 					return Failure("child-invalid", kiExitStateConflict);
 				}
-				if (std::find(plan.dependencies.begin(), plan.dependencies.end(), target) == plan.dependencies.end())
+				if (std::find(rPlan.dependencies.begin(), rPlan.dependencies.end(), target) == rPlan.dependencies.end())
 				{
 					continue;
 				}
-				if (!plan.bValid)
+				if (!rPlan.bValid)
 				{
 					return Failure("child-invalid", kiExitStateConflict);
 				}
-				ChildRewrite rewrite { .path = path, .before = plan.bytes, .after = {} };
-				if (!RenderDependencies(plan, target, rewrite.after))
+				ChildRewrite rewrite { .path = rPath, .before = rPlan.bytes, .after = {} };
+				if (!RenderDependencies(rPlan, target, rewrite.after))
 				{
 					return Failure("child-invalid", kiExitStateConflict);
 				}

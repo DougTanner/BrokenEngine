@@ -40,13 +40,37 @@ namespace toolcli
 	bool NormalizePlanPath(std::wstring_view value, std::wstring& rPath)
 	{
 		std::filesystem::path path(value);
-		if (value.empty() || value.find(L'\\') != std::wstring::npos || path.has_root_name() || path.has_root_directory() || value.rfind(L"Documents/Plans/", 0) != 0 || value.size() <= std::wstring_view(L"Documents/Plans/").size() || !value.ends_with(L".md"))
+		if (value.empty())
 		{
 			return false;
 		}
-		for (const std::filesystem::path& part : path)
+		if (value.find(L'\\') != std::wstring::npos)
 		{
-			if (part == L"." || part == L"..")
+			return false;
+		}
+		if (path.has_root_name())
+		{
+			return false;
+		}
+		if (path.has_root_directory())
+		{
+			return false;
+		}
+		if (value.rfind(L"Documents/Plans/", 0) != 0)
+		{
+			return false;
+		}
+		if (value.size() <= std::wstring_view(L"Documents/Plans/").size())
+		{
+			return false;
+		}
+		if (!value.ends_with(L".md"))
+		{
+			return false;
+		}
+		for (const std::filesystem::path& rPart : path)
+		{
+			if (rPart == L"." || rPart == L"..")
 			{
 				return false;
 			}
@@ -97,10 +121,10 @@ namespace toolcli
 				{
 					std::vector<std::wstring> dependencies;
 					bool bComplete = true;
-					for (const nlohmann::json& dependency : metadata["dependsOn"])
+					for (const nlohmann::json& rDependency : metadata["dependsOn"])
 					{
 						std::wstring path;
-						if (!dependency.is_string() || !NormalizePlanPath(Utf8ToWide(dependency.get<std::string>()), path))
+						if (!rDependency.is_string() || !NormalizePlanPath(Utf8ToWide(rDependency.get<std::string>()), path))
 						{
 							bComplete = false;
 							break;
@@ -282,9 +306,9 @@ namespace toolcli
 
 	bool IsBlockedByDependencies(const Plan& rPlan, const std::map<std::wstring, Plan>& rPlans)
 	{
-		for (const std::wstring& dependency : rPlan.dependencies)
+		for (const std::wstring& rDependency : rPlan.dependencies)
 		{
-			auto found = rPlans.find(dependency);
+			auto found = rPlans.find(rDependency);
 			if (found != rPlans.end())
 			{
 				return true;
@@ -297,25 +321,26 @@ namespace toolcli
 	{
 		std::map<std::wstring, int> colors;
 		std::vector<std::wstring> stack;
-		std::function<void(const std::wstring&)> visit = [&](const std::wstring& path)
+		std::function<void(std::wstring_view)> visit = [&](std::wstring_view path)
 		{
-			colors.insert_or_assign(path, 1); stack.push_back(path);
-			for (const std::wstring& dependency : rPlans.at(path).dependencies)
+			std::wstring ownedPath(path);
+			colors.insert_or_assign(ownedPath, 1); stack.push_back(ownedPath);
+			for (const std::wstring& rDependency : rPlans.at(ownedPath).dependencies)
 			{
-				auto found = rPlans.find(dependency);
+				auto found = rPlans.find(rDependency);
 				if (found == rPlans.end() || !found->second.bValid)
 				{
 					continue;
 				}
-				auto color = colors.find(dependency);
+				auto color = colors.find(rDependency);
 				int iDependencyColor = color == colors.end() ? 0 : color->second;
 				if (iDependencyColor == 0)
 				{
-					visit(dependency);
+					visit(rDependency);
 				}
 				else if (iDependencyColor == 1)
 				{
-					for (auto it = std::find(stack.begin(), stack.end(), dependency); it != stack.end(); ++it)
+					for (auto it = std::find(stack.begin(), stack.end(), rDependency); it != stack.end(); ++it)
 					{
 						rPlans.at(*it).bValid = false;
 						rPlans.at(*it).diagnostic = "dependency cycle";
@@ -323,30 +348,30 @@ namespace toolcli
 					}
 				}
 			}
-			stack.pop_back(); colors.insert_or_assign(path, 2);
+			stack.pop_back(); colors.insert_or_assign(ownedPath, 2);
 		};
-		for (const auto& [path, plan] : rPlans)
+		for (const auto& [rPath, rPlan] : rPlans)
 		{
-			auto color = colors.find(path);
-			if (plan.bValid && (color == colors.end() || color->second == 0))
+			auto color = colors.find(rPath);
+			if (rPlan.bValid && (color == colors.end() || color->second == 0))
 			{
-				visit(path);
+				visit(rPath);
 			}
 		}
 		bool bChanged = true;
 		while (bChanged)
 		{
 			bChanged = false;
-			for (auto& [path, plan] : rPlans) if (plan.bValid)
+			for (auto& [rPath, rPlan] : rPlans) if (rPlan.bValid)
 			{
-				for (const std::wstring& dependency : plan.dependencies)
+				for (const std::wstring& rDependency : rPlan.dependencies)
 				{
-					auto found = rPlans.find(dependency);
+					auto found = rPlans.find(rDependency);
 					if (found != rPlans.end() && !found->second.bValid)
 					{
-						plan.bValid = false;
-						plan.diagnostic = "dependency is excluded from selection";
-						rDiagnostics.push_back({ { "plan", WideToUtf8(path) }, { "code", "dependency-excluded" }, { "message", plan.diagnostic } });
+						rPlan.bValid = false;
+						rPlan.diagnostic = "dependency is excluded from selection";
+						rDiagnostics.push_back({ { "plan", WideToUtf8(rPath) }, { "code", "dependency-excluded" }, { "message", rPlan.diagnostic } });
 						bChanged = true;
 						break;
 					}

@@ -151,7 +151,7 @@ void LogFilteredChannelDiagnostics(const tinygltf::Model& rGltfModel)
 {
 	LOG(kDefault, kWarning, "WARNING: All animation channels were filtered out!");
 	LOG(kDefault, kWarning, "  Node count: {}", rGltfModel.nodes.size());
-	int iCount = 0;
+	int64_t iCount = 0;
 	for (const tinygltf::Animation& rAnim : rGltfModel.animations)
 	{
 		for (const tinygltf::AnimationChannel& rChannel : rAnim.channels)
@@ -605,7 +605,7 @@ void ExportScene::LoadVerticesAndOptimizeMeshes(tinygltf::Model& rGltfModel, boo
 	{
 		int iNodeIndex = rScene.nodes.at(i);
 		const tinygltf::Node& rNode = rGltfModel.nodes.at(iNodeIndex);
-		Parent parent {nullptr, XMMatrixIdentity(), -1};
+		Parent parent {.pParent = nullptr, .matNode = XMMatrixIdentity(), .iNodeIndex = -1};
 		LoadVertices(&parent, iNodeIndex, rNode, rGltfModel, loadContext);
 	}
 	if (rMaterials.size() > rGltfModel.materials.size())
@@ -704,9 +704,9 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 	LOG(kDefault, kDebug, "f3Min: {} f3Max: {}", f3Min, f3Max);
 
 	LOG(kDefault, kDebug, "Joints:");
-	for (const auto& [rFJointId, rICount] : jointsMap)
+	for (const auto& [rfJointId, riCount] : jointsMap)
 	{
-		LOG(kDefault, kVerbose, "  {}: {}", rFJointId, rICount);
+		LOG(kDefault, kVerbose, "  {}: {}", rfJointId, riCount);
 	}
 
 	std::vector<uint32_t> indices32;
@@ -949,10 +949,10 @@ void ExportScene::WriteAnimationSection(tinygltf::Model& rGltfModel, const std::
 	{
 		LOG(kDefault, kDebug, "  Skin 0 has {} joints", rGltfModel.skins.at(0).joints.size());
 	}
-	int iTotalChannels = 0;
+	int64_t iTotalChannels = 0;
 	for (const tinygltf::Animation& rAnim : rGltfModel.animations)
 	{
-		iTotalChannels += static_cast<int>(rAnim.channels.size());
+		iTotalChannels += static_cast<int64_t>(rAnim.channels.size());
 	}
 	LOG(kDefault, kDebug, "  Total animation channels in glTF: {}", iTotalChannels);
 

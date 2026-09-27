@@ -17,8 +17,15 @@ public:
 	Multithreading(Threads eThread, int64_t iWorkerCount, int64_t iWorkbufferSize);
 	~Multithreading();
 
-	int64_t WorkerCount() const { return static_cast<int64_t>(mWorkers.size()); }
-	bool IsMainThread() const { return std::this_thread::get_id() == mMainThreadId; }
+	int64_t WorkerCount() const
+	{
+		return static_cast<int64_t>(mWorkers.size());
+	}
+
+	bool IsMainThread() const
+	{
+		return std::this_thread::get_id() == mMainThreadId;
+	}
 
 	template <typename FUNC>
 	void Dispatch(int64_t iCount, FUNC& processRange)
@@ -54,7 +61,7 @@ public:
 
 			int64_t iStart = iPos;
 			int64_t iEnd = iPos + iThreadItems;
-			mWorkers[i]->Wake([&processRange, iStart, iEnd, iLogTickCounter, iLogIndent]()
+			mWorkers.at(i)->Wake([&processRange, iStart, iEnd, iLogTickCounter, iLogIndent]()
 			{
 				// Propagate the caller's tick/indent so worker logs tag under the dispatching scope
 				LogTickScope logTickScope(iLogTickCounter);

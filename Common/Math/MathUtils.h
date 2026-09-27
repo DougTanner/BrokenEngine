@@ -37,8 +37,14 @@ inline void XM_CALLCONV ValidateVector(FXMVECTOR vec)
 		&& std::isfinite(XMVectorGetY(vec))
 		&& std::isfinite(XMVectorGetZ(vec))
 		&& std::isfinite(XMVectorGetW(vec)));
-	if constexpr (IS_POSITION) { ASSERT(XMVectorGetW(vec) == 1.0f); }
-	else                       { ASSERT(XMVectorGetW(vec) == 0.0f); }
+	if constexpr (IS_POSITION)
+	{
+		ASSERT(XMVectorGetW(vec) == 1.0f);
+	}
+	else
+	{
+		ASSERT(XMVectorGetW(vec) == 0.0f);
+	}
 }
 
 // Converts 0xRRGGBBAA to normalized RGBA components.

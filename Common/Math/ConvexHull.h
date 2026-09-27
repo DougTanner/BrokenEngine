@@ -37,7 +37,7 @@ inline ConvexHull2D BuildWorldHull(const XMFLOAT2* pLocalVertices, int32_t iLoca
 		f2Max.y = std::max(f2Max.y, fWorldY);
 	}
 
-	return {rOutVertices, iLocalCount, f2Min, f2Max};
+	return {.pVertices = rOutVertices, .iVertexCount = iLocalCount, .f2AabbMin = f2Min, .f2AabbMax = f2Max};
 }
 
 // Broadphase: do the two hulls' precomputed AABBs overlap? Strict < so edge-touching AABBs count as
@@ -59,9 +59,9 @@ inline bool ConvexHullsOverlap(const ConvexHull2D& rA, const ConvexHull2D& rB)
 		return false;
 	}
 
-	for (int32_t iPoly = 0; iPoly < 2; ++iPoly)
+	for (int32_t k = 0; k < 2; ++k)
 	{
-		const ConvexHull2D& rEdgeHull = (iPoly == 0) ? rA : rB;
+		const ConvexHull2D& rEdgeHull = (k == 0) ? rA : rB;
 		for (int32_t i = 0; i < rEdgeHull.iVertexCount; ++i)
 		{
 			const XMFLOAT2& rV0 = rEdgeHull.pVertices[i];

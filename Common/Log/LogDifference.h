@@ -8,8 +8,17 @@ inline thread_local const char* gpLogDifferenceContext = "";
 struct ScopedLogDifferenceContext
 {
 	const char* pcPrevious = nullptr;
-	ScopedLogDifferenceContext(const char* pcContext) : pcPrevious(gpLogDifferenceContext) { gpLogDifferenceContext = pcContext; }
-	~ScopedLogDifferenceContext() { gpLogDifferenceContext = pcPrevious; }
+
+	ScopedLogDifferenceContext(const char* pcContext)
+	: pcPrevious(gpLogDifferenceContext)
+	{
+		gpLogDifferenceContext = pcContext;
+	}
+
+	~ScopedLogDifferenceContext()
+	{
+		gpLogDifferenceContext = pcPrevious;
+	}
 
 	ScopedLogDifferenceContext(const ScopedLogDifferenceContext&) = delete;
 	ScopedLogDifferenceContext& operator=(const ScopedLogDifferenceContext&) = delete;

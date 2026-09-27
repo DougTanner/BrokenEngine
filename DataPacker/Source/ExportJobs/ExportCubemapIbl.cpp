@@ -72,7 +72,7 @@ void WriteFingerprintMetadata(const std::filesystem::path& rMetadataPath, std::s
 	VERIFY_SUCCESS(MoveFileExW(temporaryPath.native().c_str(), rMetadataPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
 }
 
-bool IsOutputCurrent(const std::filesystem::path& rOutputPath, const std::filesystem::path& rMetadataPath, std::string_view fingerprint, const std::filesystem::path* pLegacyInputs, size_t uiLegacyInputCount)
+bool IsOutputCurrent(const std::filesystem::path& rOutputPath, const std::filesystem::path& rMetadataPath, std::string_view fingerprint, std::span<const std::filesystem::path> legacyInputs)
 {
 	if (std::filesystem::exists(GetDirtyMarkerPath(rMetadataPath)))
 	{
@@ -92,9 +92,9 @@ bool IsOutputCurrent(const std::filesystem::path& rOutputPath, const std::filesy
 	}
 
 	std::filesystem::file_time_type outputTime = std::filesystem::last_write_time(rOutputPath);
-	for (size_t i = 0; i < uiLegacyInputCount; ++i)
+	for (const std::filesystem::path& rLegacyInput : legacyInputs)
 	{
-		if (std::filesystem::last_write_time(pLegacyInputs[i]) > outputTime)
+		if (std::filesystem::last_write_time(rLegacyInput) > outputTime)
 		{
 			return false;
 		}
@@ -300,7 +300,7 @@ bool GenerateIrradianceCubemaps()
 					std::string fingerprint = GetCubemapFingerprint("irradiance", rDirectoryEntry.path());
 					std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
 					std::filesystem::path legacyInput = rDirectoryEntry.path();
-					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, &legacyInput, 1))
+					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, std::span(&legacyInput, 1)))
 					{
 						continue;
 					}
@@ -459,7 +459,7 @@ static bool ProcessKtxCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext
 					std::string fingerprint = GetCubemapFingerprint("prefiltered", rDirectoryEntry.path());
 					std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
 					std::filesystem::path legacyInput = rDirectoryEntry.path();
-					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, &legacyInput, 1))
+					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, std::span(&legacyInput, 1)))
 					{
 						continue;
 					}
@@ -565,7 +565,7 @@ static bool ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClC
 					}
 					std::string fingerprint = GetFaceCubemapFingerprint("prefiltered", rDirectoryEntry.path(), pFaceNames);
 					std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, iInputRoot);
-					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, legacyInputs, std::size(legacyInputs)))
+					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, legacyInputs))
 					{
 						continue;
 					}

@@ -70,9 +70,20 @@ public:
 		miCount = iCount;
 	}
 
-	int64_t Size() const { return miCount; }
-	T* Data() { return mpData; }
-	const T* Data() const { return mpData; }
+	int64_t Size() const
+	{
+		return miCount;
+	}
+
+	T* Data()
+	{
+		return mpData;
+	}
+
+	const T* Data() const
+	{
+		return mpData;
+	}
 
 	T& operator[](int64_t iIndex)
 	{

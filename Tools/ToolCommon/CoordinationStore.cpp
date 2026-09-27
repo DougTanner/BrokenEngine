@@ -109,7 +109,19 @@ namespace toolcli::coordination
 		char cSuffix = 0;
 		int iRead = std::sscanf(rValue.c_str(), "%hu-%hu-%huT%hu:%hu:%hu.%hu%c", &time.wYear, &time.wMonth, &time.wDay, &time.wHour, &time.wMinute, &time.wSecond, &time.wMilliseconds, &cSuffix);
 		FILETIME fileTime {};
-		if (iRead != 8 || cSuffix != 'Z' || rValue.size() != 24 || ::SystemTimeToFileTime(&time, &fileTime) == FALSE)
+		if (iRead != 8)
+		{
+			return false;
+		}
+		if (cSuffix != 'Z')
+		{
+			return false;
+		}
+		if (rValue.size() != 24)
+		{
+			return false;
+		}
+		if (::SystemTimeToFileTime(&time, &fileTime) == FALSE)
 		{
 			return false;
 		}
@@ -189,7 +201,11 @@ namespace toolcli::coordination
 		std::filesystem::path path = std::filesystem::canonical(ExtendedLengthPath(value), error);
 		// canonical() strips the extended-length prefix from its result, so re-apply it for the remaining OS calls.
 		std::filesystem::path osPath = ExtendedLengthPath(path);
-		if (error || !std::filesystem::is_directory(osPath, error))
+		if (error)
+		{
+			return std::nullopt;
+		}
+		if (!std::filesystem::is_directory(osPath, error))
 		{
 			return std::nullopt;
 		}
@@ -395,13 +411,13 @@ namespace toolcli::coordination
 		uint64_t uiClaimedTicks = 0;
 		uint64_t uiHeartbeatTicks = 0;
 		const std::optional<int64_t> claimantPid = rMetadata.contains("claimantPid") ? JsonInt64(rMetadata["claimantPid"]) : std::nullopt;
-		return rMetadata.contains("schemaVersion") && JsonIntegerEquals(rMetadata["schemaVersion"], iExpectedSchemaVersion) &&
-			rMetadata.contains("domain") && rMetadata["domain"].is_string() && rMetadata["domain"].get<std::string>() == WideToUtf8(rLocator.domain) &&
-			rMetadata.contains("logicalKey") && rMetadata["logicalKey"].is_string() && rMetadata["logicalKey"].get<std::string>() == WideToUtf8(rLocator.logicalKey) &&
-			claimantPid && *claimantPid >= 0 && *claimantPid <= UINT32_MAX &&
-			ParseUtcTimestamp(rMetadata["claimedAt"].get<std::string>(), uiClaimedTicks) &&
-			ParseUtcTimestamp(rMetadata["heartbeatAt"].get<std::string>(), uiHeartbeatTicks) &&
-			uiClaimedTicks <= uiHeartbeatTicks;
+		return rMetadata.contains("schemaVersion") && JsonIntegerEquals(rMetadata["schemaVersion"], iExpectedSchemaVersion)
+		    && rMetadata.contains("domain") && rMetadata["domain"].is_string()
+		    && rMetadata["domain"].get<std::string>() == WideToUtf8(rLocator.domain) && rMetadata.contains("logicalKey")
+		    && rMetadata["logicalKey"].is_string() && rMetadata["logicalKey"].get<std::string>() == WideToUtf8(rLocator.logicalKey)
+		    && claimantPid && *claimantPid >= 0 && *claimantPid <= UINT32_MAX
+		    && ParseUtcTimestamp(rMetadata["claimedAt"].get<std::string>(), uiClaimedTicks)
+		    && ParseUtcTimestamp(rMetadata["heartbeatAt"].get<std::string>(), uiHeartbeatTicks) && uiClaimedTicks <= uiHeartbeatTicks;
 	}
 
 	nlohmann::json NewMetadata(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree)

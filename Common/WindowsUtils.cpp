@@ -239,7 +239,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	DWORD uiExitCode = 0;
 	GetExitCodeProcess(processInformation.hProcess, &uiExitCode);
 
-	return ExecutableResult {.mOutput = std::move(output), .miExitCode = static_cast<int64_t>(uiExitCode)};
+	return ExecutableResult {.output = std::move(output), .iExitCode = static_cast<int64_t>(uiExitCode)};
 }
 
 ExecutableResult RunExecutableInNewConsole(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine)
@@ -264,7 +264,7 @@ ExecutableResult RunExecutableInNewConsole(const std::filesystem::path& rExecuta
 	CloseHandle(processInformation.hThread);
 	CloseHandle(processInformation.hProcess);
 
-	return {.mOutput = std::string {}, .miExitCode = static_cast<int64_t>(uiExitCode)};
+	return {.output = std::string {}, .iExitCode = static_cast<int64_t>(uiExitCode)};
 }
 
 } // namespace common

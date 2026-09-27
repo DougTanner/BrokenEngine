@@ -78,15 +78,15 @@ struct CrashFileWriter
 {
 	// Deny-none sharing: a reader already holding the crash report open must not block this handle's creation.
 	explicit CrashFileWriter(const wchar_t* pcPath)
-	: Handle(CreateFileW(pcPath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr))
+	: handle(CreateFileW(pcPath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr))
 	{
 	}
 
 	~CrashFileWriter()
 	{
-		if (Handle != INVALID_HANDLE_VALUE)
+		if (handle != INVALID_HANDLE_VALUE)
 		{
-			CloseHandle(Handle);
+			CloseHandle(handle);
 		}
 	}
 
@@ -95,17 +95,17 @@ struct CrashFileWriter
 
 	void Write(std::string_view text)
 	{
-		if (Handle == INVALID_HANDLE_VALUE)
+		if (handle == INVALID_HANDLE_VALUE)
 		{
 			return;
 		}
 
 		DWORD uiWritten = 0;
 		// Result deliberately ignored: nothing on the crash path may recover or log a failed write.
-		WriteFile(Handle, text.data(), static_cast<DWORD>(text.size()), &uiWritten, nullptr);
+		WriteFile(handle, text.data(), static_cast<DWORD>(text.size()), &uiWritten, nullptr);
 	}
 
-	HANDLE Handle = INVALID_HANDLE_VALUE;
+	HANDLE handle = INVALID_HANDLE_VALUE;
 };
 
 } // namespace common

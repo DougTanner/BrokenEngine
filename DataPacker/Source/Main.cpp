@@ -4,11 +4,11 @@
 #include "Attribution.h"
 #include "ExportJobs/ExportAudio.h"
 #include "ExportJobs/ExportCubemapIbl.h"
-#include "ExportJobs/ExportScene.h"
 #include "ExportJobs/ExportIsland.h"
 #include "ExportJobs/ExportJob.h"
 #include "ExportJobs/ExportModel.h"
 #include "ExportJobs/ExportRaw.h"
+#include "ExportJobs/ExportScene.h"
 #include "ExportJobs/ExportShader.h"
 #include "ExportJobs/ExportTexture.h"
 #include "ExportJobs/Island/BakeIslandIntermediates.h"
@@ -24,8 +24,8 @@ struct DataTypeEntry
 
 struct DataPackerRunSummary
 {
-	int64_t miExportedJobs = 0;
-	int64_t miFailedJobs = 0;
+	int64_t iExportedJobs = 0;
+	int64_t iFailedJobs = 0;
 };
 
 // Source of truth for the data-type enum, display names, and per-type CRC header
@@ -33,13 +33,13 @@ struct DataPackerRunSummary
 // enum and is consumed by the runtime via `kpcDataTypeNames[kDataType...]`.
 static constexpr DataTypeEntry kDataTypes[] =
 {
-	{"Audio",   "Audio",   "Audio.h"},
-	{"Scene",   "Scene",   "Scene.h"},
-	{"Islands", "Islands", "Islands.h"},
-	{"Model",   "Model",   "Model.h"},
-	{"Shader",  "Shader",  "Shader.h"},
-	{"Texture", "Texture", "Texture.h"},
-	{"Raw",     "Raw",     "Raw.h"},
+	{.enumSuffix = "Audio",   .displayName = "Audio",   .headerFile = "Audio.h"},
+	{.enumSuffix = "Scene",   .displayName = "Scene",   .headerFile = "Scene.h"},
+	{.enumSuffix = "Islands", .displayName = "Islands", .headerFile = "Islands.h"},
+	{.enumSuffix = "Model",   .displayName = "Model",   .headerFile = "Model.h"},
+	{.enumSuffix = "Shader",  .displayName = "Shader",  .headerFile = "Shader.h"},
+	{.enumSuffix = "Texture", .displayName = "Texture", .headerFile = "Texture.h"},
+	{.enumSuffix = "Raw",     .displayName = "Raw",     .headerFile = "Raw.h"},
 };
 static constexpr size_t kDataTypeCount = std::size(kDataTypes);
 
@@ -426,10 +426,10 @@ static void SortAndCheckDuplicateExportJobs(std::vector<std::unique_ptr<T>>& rEx
 	// manifest CRC and generated constant from the relative path, so duplicates make runtime lookup
 	// ambiguous. Lowered-path sorting puts duplicates adjacent for this check and removes tied keys for
 	// deterministic order. This validates path uniqueness, not CRC collisions between distinct paths.
-	for (size_t uiJob = 1; uiJob < rExportJobs.size(); ++uiJob)
+	for (size_t i = 1; i < rExportJobs.size(); ++i)
 	{
-		const T& rPrevious = *rExportJobs.at(uiJob - 1);
-		const T& rCurrent = *rExportJobs.at(uiJob);
+		const T& rPrevious = *rExportJobs.at(i - 1);
+		const T& rCurrent = *rExportJobs.at(i);
 		if (common::ToLower(rPrevious.mRelativeFile) == common::ToLower(rCurrent.mRelativeFile))
 		{
 			throw std::runtime_error(std::format("\"{}\" export has a duplicate asset: \"{}\" and \"{}\" resolve to the same relative path across input roots \"{}\" and \"{}\". Rename or remove one so each chunk keeps a unique manifest key.", T::kName, rPrevious.mInputPath.string(), rCurrent.mInputPath.string(), gpFileManager->mpInputDirectories[0].string(), gpFileManager->mpInputDirectories[1].string()));
@@ -453,7 +453,7 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 
 	std::vector<diagnostic::ExportFailure> failures;
 	failures.reserve(rExportJobs.size() + 1);
-	for (std::unique_ptr<T>& rpExportJob : rExportJobs)
+	for (const std::unique_ptr<T>& rpExportJob : rExportJobs)
 	{
 		try
 		{
@@ -473,12 +473,12 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 
 			if (rpExportJob->mbDirty)
 			{
-				++rRunSummary.miExportedJobs;
+				++rRunSummary.iExportedJobs;
 			}
 		}
 		catch (const std::exception& rException)
 		{
-			++rRunSummary.miFailedJobs;
+			++rRunSummary.iFailedJobs;
 			failures.push_back({.assetPath = rpExportJob->mInputPath, .message = rException.what()});
 		}
 	}
@@ -510,7 +510,7 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const 
 
 	SortAndCheckDuplicateExportJobs(rExportJobs);
 
-	for (std::unique_ptr<T>& rpExportJob : rExportJobs)
+	for (const std::unique_ptr<T>& rpExportJob : rExportJobs)
 	{
 		rpExportJob->mFuture = std::async(std::launch::async, common::ThreadLocal::Entry(&T::RunExport, 4 * 1'024, rpExportJob->miId, false), rpExportJob.get());
 	}
@@ -801,13 +801,13 @@ static bool RunCommand(int argc, char* argv[])
 		{
 			// Clean jobs are the expected case, so only exports and failures get a line inside the block.
 			ScopedLogIndent scopedLogIndent;
-			if (runSummary.miExportedJobs > 0)
+			if (runSummary.iExportedJobs > 0)
 			{
-				LOG(kDefault, kInfo, "Exported: {}", runSummary.miExportedJobs);
+				LOG(kDefault, kInfo, "Exported: {}", runSummary.iExportedJobs);
 			}
-			if (runSummary.miFailedJobs > 0)
+			if (runSummary.iFailedJobs > 0)
 			{
-				LOG(kDefault, kInfo, "Failed: {}", runSummary.miFailedJobs);
+				LOG(kDefault, kInfo, "Failed: {}", runSummary.iFailedJobs);
 			}
 		}
 		int64_t iElapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - startTime).count();

@@ -193,17 +193,45 @@ public:
 		miOwningDepth = mBuffer.miDepth;
 	}
 
-	~ScopedWorkbufferArena() { mBuffer.Pop(miOwningDepth); }
+	~ScopedWorkbufferArena()
+	{
+		mBuffer.Pop(miOwningDepth);
+	}
 
 	ScopedWorkbufferArena(const ScopedWorkbufferArena&) = delete;
 	ScopedWorkbufferArena& operator=(const ScopedWorkbufferArena&) = delete;
 
-	void Append(std::string_view text)              { mBuffer.Append(text); }
-	void Append(std::wstring_view text)             { mBuffer.Append(text); }
-	void Append(int64_t iValue)                     { mBuffer.Append(iValue); }
-	void AppendFloat(float fValue, int iPrecision)  { mBuffer.AppendFloat(fValue, iPrecision); }
-	template<typename T> void PushBack(const T& rValue) { mBuffer.PushBack(rValue); }
-	std::string_view View() const                   { return mBuffer.View(); }
+	void Append(std::string_view text)
+	{
+		mBuffer.Append(text);
+	}
+
+	void Append(std::wstring_view text)
+	{
+		mBuffer.Append(text);
+	}
+
+	void Append(int64_t iValue)
+	{
+		mBuffer.Append(iValue);
+	}
+
+	void AppendFloat(float fValue, int iPrecision)
+	{
+		mBuffer.AppendFloat(fValue, iPrecision);
+	}
+
+	template<typename T>
+	void PushBack(const T& rValue)
+	{
+		mBuffer.PushBack(rValue);
+	}
+
+	std::string_view View() const
+	{
+		return mBuffer.View();
+	}
+
 	template <typename T>
 	const T* Data() const
 	{
@@ -219,9 +247,22 @@ public:
 	{
 		return mBuffer.Count<T>();
 	}
-	template<typename T> std::span<const T> Span() const { return mBuffer.Span<T>(); }
-	template<typename T> std::span<T> Span()             { return mBuffer.Span<T>(); }
-	void ShrinkLastPushBuffer(int64_t iActualSize)  { mBuffer.ShrinkLastPushBuffer(iActualSize); }
+	template<typename T>
+	std::span<const T> Span() const
+	{
+		return mBuffer.Span<T>();
+	}
+
+	template<typename T>
+	std::span<T> Span()
+	{
+		return mBuffer.Span<T>();
+	}
+
+	void ShrinkLastPushBuffer(int64_t iActualSize)
+	{
+		mBuffer.ShrinkLastPushBuffer(iActualSize);
+	}
 
 private:
 
@@ -265,8 +306,15 @@ public:
 		return ScopedWorkbufferAllocation<U>(rBuffer, pData);
 	}
 
-	operator T() const { return mpData; }
-	T operator->() const { return mpData; }
+	operator T() const
+	{
+		return mpData;
+	}
+
+	T operator->() const
+	{
+		return mpData;
+	}
 
 private:
 

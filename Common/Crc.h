@@ -18,7 +18,10 @@ struct FixedString
 		}
 	}
 
-	constexpr operator const char*() const { return data; }
+	constexpr operator const char*() const
+	{
+		return data;
+	}
 };
 
 // Generates decimal suffixes for compile-time CRC arrays; input must be nonnegative.
@@ -119,20 +122,20 @@ inline crc_t XM_CALLCONV Crc(FXMVECTOR vecIn)
 template<int64_t SIZE>
 struct ConstexprCrcArray
 {
-	int64_t miCount = SIZE;
-	crc_t mArray[SIZE];
+	int64_t iCount = SIZE;
+	crc_t array[SIZE];
 
 	consteval ConstexprCrcArray(std::string_view prefix, std::string_view suffix)
 	{
 		for (int64_t i = 0; i < SIZE; ++i)
 		{
-			mArray[i] = CrcConsteval(std::string(prefix) + IntToString(i) + std::string(suffix));
+			array[i] = CrcConsteval(std::string(prefix) + IntToString(i) + std::string(suffix));
 		}
 	}
 
 	crc_t operator[](int64_t i) const
 	{
-		return mArray[i];
+		return array[i];
 	}
 };
 

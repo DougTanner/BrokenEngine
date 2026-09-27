@@ -13,6 +13,7 @@
 #include <exception>
 #include <iostream>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -244,22 +245,21 @@ namespace toolcli
 			}
 		}
 
-		SocketOperationResult SendAll(SOCKET socket, const char* pData, size_t uiLength, int64_t iTimeoutMilliseconds, std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
+		SocketOperationResult SendAll(SOCKET socket, std::span<const char> data, int64_t iTimeoutMilliseconds, std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
 		{
-			size_t uiSent = 0;
 			std::chrono::steady_clock::time_point operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
-			while (uiSent < uiLength)
+			while (!data.empty())
 			{
 				SocketOperationResult eWaitResult = WaitForSocketReadiness(socket, true, operationDeadline, owner, rNextHeartbeatDue);
 				if (eWaitResult != SocketOperationResult::kSuccess)
 				{
 					return eWaitResult;
 				}
-				int iChunk = ::send(socket, pData + uiSent, static_cast<int>(uiLength - uiSent), 0);
+				int iChunk = ::send(socket, data.data(), static_cast<int>(data.size()), 0);
 				int iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
 				if (iChunk > 0)
 				{
-					uiSent += static_cast<size_t>(iChunk);
+					data = data.subspan(static_cast<size_t>(iChunk));
 					operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
 					if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, operationDeadline))
 					{
@@ -281,22 +281,21 @@ namespace toolcli
 			return SocketOperationResult::kSuccess;
 		}
 
-		SocketOperationResult ReceiveAll(SOCKET socket, char* pData, size_t uiLength, int64_t iTimeoutMilliseconds, std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
+		SocketOperationResult ReceiveAll(SOCKET socket, std::span<char> data, int64_t iTimeoutMilliseconds, std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
 		{
-			size_t uiReceived = 0;
 			std::chrono::steady_clock::time_point operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
-			while (uiReceived < uiLength)
+			while (!data.empty())
 			{
 				SocketOperationResult eWaitResult = WaitForSocketReadiness(socket, false, operationDeadline, owner, rNextHeartbeatDue);
 				if (eWaitResult != SocketOperationResult::kSuccess)
 				{
 					return eWaitResult;
 				}
-				int iChunk = ::recv(socket, pData + uiReceived, static_cast<int>(uiLength - uiReceived), 0);
+				int iChunk = ::recv(socket, data.data(), static_cast<int>(data.size()), 0);
 				int iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
 				if (iChunk > 0)
 				{
-					uiReceived += static_cast<size_t>(iChunk);
+					data = data.subspan(static_cast<size_t>(iChunk));
 					operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
 					if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, operationDeadline))
 					{
@@ -578,10 +577,10 @@ namespace toolcli
 				static_cast<unsigned char>((uiPayloadLength >> 16) & 0xffu),
 				static_cast<unsigned char>((uiPayloadLength >> 24) & 0xffu),
 			};
-			SocketOperationResult eSendResult = SendAll(rSocket.Get(), reinterpret_cast<const char*>(pLengthPrefix), sizeof(pLengthPrefix), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
+			SocketOperationResult eSendResult = SendAll(rSocket.Get(), std::span<const char>(reinterpret_cast<const char*>(pLengthPrefix), sizeof(pLengthPrefix)), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 			if (eSendResult == SocketOperationResult::kSuccess)
 			{
-				eSendResult = SendAll(rSocket.Get(), request.data(), request.size(), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
+				eSendResult = SendAll(rSocket.Get(), std::span<const char>(request), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 			}
 			if (eSendResult != SocketOperationResult::kSuccess)
 			{
@@ -590,7 +589,7 @@ namespace toolcli
 			}
 
 			unsigned char pResponseLengthPrefix[4] {};
-			SocketOperationResult eReceiveResult = ReceiveAll(rSocket.Get(), reinterpret_cast<char*>(pResponseLengthPrefix), sizeof(pResponseLengthPrefix), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
+			SocketOperationResult eReceiveResult = ReceiveAll(rSocket.Get(), std::span<char>(reinterpret_cast<char*>(pResponseLengthPrefix), sizeof(pResponseLengthPrefix)), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 			if (eReceiveResult != SocketOperationResult::kSuccess)
 			{
 				FailSocketOperation(eReceiveResult, "no response (timed out or peer closed)");
@@ -607,7 +606,7 @@ namespace toolcli
 			}
 
 			std::string response(uiResponseLength, '\0');
-			eReceiveResult = ReceiveAll(rSocket.Get(), response.data(), uiResponseLength, rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
+			eReceiveResult = ReceiveAll(rSocket.Get(), std::span<char>(response.data(), uiResponseLength), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 			if (eReceiveResult != SocketOperationResult::kSuccess)
 			{
 				FailSocketOperation(eReceiveResult, "incomplete response (timed out or peer closed)");

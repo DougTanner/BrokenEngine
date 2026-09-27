@@ -1,8 +1,8 @@
 #include "LandingLockCommands.h"
 
-#include "ToolCliCommon.h"
 #include "CoordinationStore.h"
 #include "LandingLockLifecycle.h"
+#include "ToolCliCommon.h"
 
 #include <algorithm>
 #include <chrono>
@@ -205,7 +205,19 @@ namespace toolcli
 		{
 			uint64_t uiNow = CurrentUtcTicks();
 			std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, uiNow) : std::nullopt;
-			if (!lease || lease->owner != WideToUtf8(expectedOwner) || uiNow < lease->uiExpiresTicks || !landing::AllRegisteredWorktreesClear(rLocator))
+			if (!lease)
+			{
+				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
+			}
+			if (lease->owner != WideToUtf8(expectedOwner))
+			{
+				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
+			}
+			if (uiNow < lease->uiExpiresTicks)
+			{
+				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
+			}
+			if (!landing::AllRegisteredWorktreesClear(rLocator))
 			{
 				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 			}
@@ -232,7 +244,15 @@ namespace toolcli
 
 		int HandleReleaseOrSteal(const Locator& rLocator, const nlohmann::json& rMetadata, bool bExists, LandingReleaseOperation eOperation, std::wstring_view owner, std::wstring_view expectedOwner)
 		{
-			if (!bExists || (eOperation == LandingReleaseOperation::kRelease && !HasOwner(rMetadata, owner)) || (eOperation == LandingReleaseOperation::kSteal && !HasOwner(rMetadata, expectedOwner)))
+			if (!bExists)
+			{
+				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
+			}
+			if (eOperation == LandingReleaseOperation::kRelease && !HasOwner(rMetadata, owner))
+			{
+				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
+			}
+			if (eOperation == LandingReleaseOperation::kSteal && !HasOwner(rMetadata, expectedOwner))
 			{
 				return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 			}
