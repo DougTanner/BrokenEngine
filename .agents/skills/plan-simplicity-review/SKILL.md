@@ -33,7 +33,8 @@ fire skips it.
 New code means a new tracked file, function, class, system, script, guard or
 recovery path, or configuration surface absent at the session baseline —
 including an addition inside an existing file. Non-documentation behavior means
-C++, shaders, scripts, or the skill behavior the Trigger section below defines.
+C++, shaders, scripts, or the skill behavior defined in
+`### Trigger: when a skill edit is behavior` below.
 
 Dispatch it once per `../../references/subagent-reporting.md`
 `## Delegated execution context`, in parallel with

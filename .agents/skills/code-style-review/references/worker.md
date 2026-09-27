@@ -119,16 +119,23 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
     block comment or raw string opened on an earlier line. Rule 29 needs the
     base class, which is off the line, so look it up.
     - These kinds' permitted forms are off the line, so reject a row that is
-      one: rule 5, ownership handed straight to a RAII owner; rule 11, a macro
-      argument or a function type; rule 17, a container that is not a
-      `std::vector`; rule 22, an enum body or a function body, which is not an
-      initializer list; rule 25, a namespace-scope `constexpr` variable in a
-      `.cpp` file, since rule 25 governs only function scope and header global
-      scope; rule 26, an enum declared in the file's own header — the file
-      itself when it is a header, or for a `.cpp` the header declaring the
-      functions or class it defines; rule 27, a literal with both digits and no
-      suffix whose destination or other operand is double; rule 36, a class
-      type with a constructor, or an out-parameter filled on the next line;
+      one: rule 5, ownership handed straight to a RAII owner; rule 6, a
+      preprocessor guard `if constexpr` cannot replace — around an `#include`,
+      a namespace-scope declaration, or code naming a symbol declared only in
+      that configuration — or a `kb*` definition block in `Pch.h`; rule 11, a
+      macro argument or a function type; rule 17, a container that is not a
+      `std::vector`, or an integer type the value's consumer requires, such as
+      a serialized field type or an API parameter type; rule 22, an enum body
+      or a function body, which is not an initializer list; rule 25, a
+      namespace-scope `constexpr` variable in a `.cpp` file, since rule 25
+      governs only function scope and header global scope; rule 26, an enum
+      declared in the file's own header — the file itself when it is a header,
+      or for a `.cpp` the header declaring the functions or class it defines;
+      rule 27, a literal with both digits and no suffix whose destination or
+      other operand is double; rule 36, a class type with a constructor, an
+      out-parameter filled on the next line, or a static member whose
+      initializer names types the header only forward-declares; rule 39, a
+      `(void)name;` discard of a lambda capture held only for lifetime;
       rule 40, a local, member, cast, or template argument rather than a
       parameter, a parameter type an external callback signature fixes, or a
       `const char*` or `const wchar_t*` parameter that a caller can pass as

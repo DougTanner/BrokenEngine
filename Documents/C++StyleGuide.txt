@@ -90,6 +90,8 @@ Use the following rules for C++ code
 	c) It is an iterator
 	d) It is a structured binding: auto [it, bInserted] = map.try_emplace(key, value);
 	e) It is a lambda expression assigned directly to the variable: auto callback = []() {};
+	f) It is a generic lambda parameter: [](const auto& rSource) {};
+	g) It is an explicit object (this auto&&) or abbreviated-template (auto&&) parameter, and the deduced return type, of a function returning a std::tie member list: auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.a, rSelf.b); }
 
 IMPORTANT do not use auto in range-based for loops
 
