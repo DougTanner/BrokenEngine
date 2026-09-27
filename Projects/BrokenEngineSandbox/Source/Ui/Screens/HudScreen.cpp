@@ -2,11 +2,12 @@
 
 #if defined(BT_CLIENT)
 
+#include "Ui/MenuUtils.h"
+
 #include "Fleet.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Game.h"
-#include "Ui/MenuUtils.h"
 
 namespace
 {
@@ -106,8 +107,7 @@ void HudScreen::Render()
 	// kWarning clears both the compile floor (keLogLevelDefault, kDebug) and the runtime default threshold (kInfo).
 	if (bForceOpen && !mbPreviousForceOpen)
 	{
-		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) frames: {}",
-			pcWantReason, gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y, iSubscribedFrameCount);
+		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) frames: {}", pcWantReason, gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y, iSubscribedFrameCount);
 	}
 	mbPreviousForceOpen = bForceOpen;
 
@@ -269,9 +269,8 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		// Update spawn into fleet toggle based on member count
 		gpGame->mFleetSelection.mSpawnIntoFleetToggle.Update(std::ssize(pFleet->members));
 
-		for (int64_t i = 0; i < std::ssize(pFleet->members); ++i)
+		for (int64_t i = 0; const FleetMember& rMember : pFleet->members)
 		{
-			const FleetMember& rMember = pFleet->members.at(static_cast<size_t>(i));
 			bool bSelected = rMember.globalPlayerId.IsValid() && rMember.globalPlayerId == gpGame->FocusedMemberGlobalId();
 
 			// Find coord for display
@@ -312,6 +311,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 				ImGui::PopStyleColor();
 			}
 			ImGui::PopID();
+			++i;
 		}
 
 		// Add player button at bottom of list

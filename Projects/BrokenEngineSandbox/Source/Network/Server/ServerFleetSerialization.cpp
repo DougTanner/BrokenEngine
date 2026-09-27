@@ -88,7 +88,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	// Trust boundary (save / replay file): bound the member count against the cap and stream before resize.
 	common::ValidateDeserializedCountCapacity(iMemberCount, static_cast<int64_t>(kuiMaxFleetMembers), sizeof(int64_t) + sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
 	rFleet.members.resize(static_cast<size_t>(iMemberCount));
-	for (int64_t k = 0; k < iMemberCount; ++k)
+	for (FleetMember& rMember : rFleet.members)
 	{
 		int64_t iGlobalPlayerId = 0;
 		common::Read(rFileStream, iGlobalPlayerId);
@@ -105,7 +105,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		int32_t iCoordY = 0;
 		common::Read(rFileStream, iCoordX);
 		common::Read(rFileStream, iCoordY);
-		rFleet.members.at(static_cast<size_t>(k)) = FleetMember {engine::global_id_t {iGlobalPlayerId}, flags, engine::GridCoord {iCoordX, iCoordY}};
+		rMember = FleetMember {.globalPlayerId = engine::global_id_t {iGlobalPlayerId}, .flags = flags, .coord = engine::GridCoord {iCoordX, iCoordY}};
 	}
 	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, so each member ID
 	// must be valid and unique within its fleet, and the flagship must name a member ({} only for an empty fleet).
@@ -187,9 +187,9 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 		// (each fleet serializes at least its 16-byte GUID).
 		common::ValidateDeserializedCountCapacity(iFleetCount, kiMaxFleetsPerClient, 2 * sizeof(uint64_t), rFileStream, "ReadFleetData fleets");
 		std::vector<Fleet> fleets(static_cast<size_t>(iFleetCount));
-		for (int64_t j = 0; j < iFleetCount; ++j)
+		for (Fleet& rFleet : fleets)
 		{
-			ReadFleet(rFileStream, fleets.at(static_cast<size_t>(j)));
+			ReadFleet(rFileStream, rFleet);
 		}
 		if (!rFleets.try_emplace(guid, std::move(fleets)).second)
 		{

@@ -9,7 +9,7 @@
 namespace game
 {
 
-void ParsePlayerEvents(std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutEventsArena)
+void ParsePlayerEvents(const std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutEventsArena)
 {
 	for (const auto& [uiPacketType, rPayload] : rRawPackets)
 	{
@@ -19,14 +19,14 @@ void ParsePlayerEvents(std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rR
 		{
 			GameMessages::AssignPlayerMessage message {};
 			engine::NetworkMessages::Read(rPayload, message);
-			rOutEventsArena.PushBack(ReceivedPlayerEvent{PlayerEventType::kAssigned, engine::global_id_t {message.iGlobalPlayerId}, message.coord});
+			rOutEventsArena.PushBack(ReceivedPlayerEvent{.eType = PlayerEventType::kAssigned, .globalPlayerId = engine::global_id_t {message.iGlobalPlayerId}, .coord = message.coord});
 		}
 		else if (eType == GamePacketType::kServerPlayerState)
 		{
 			GameMessages::PlayerStateMessage message {};
 			engine::NetworkMessages::Read(rPayload, message);
 			const GameMessages::PlayerStateDescriptor& rDescriptor = GameMessages::GetPlayerStateDescriptor(static_cast<PlayerStateWireType>(message.uiWireType));
-			rOutEventsArena.PushBack(ReceivedPlayerEvent{rDescriptor.eEventType, engine::global_id_t {message.iGlobalPlayerId}, message.coord});
+			rOutEventsArena.PushBack(ReceivedPlayerEvent{.eType = rDescriptor.eEventType, .globalPlayerId = engine::global_id_t {message.iGlobalPlayerId}, .coord = message.coord});
 		}
 	}
 }

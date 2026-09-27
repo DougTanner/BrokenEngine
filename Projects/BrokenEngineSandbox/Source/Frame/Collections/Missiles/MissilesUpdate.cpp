@@ -161,7 +161,10 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 					common::ValidateVector<false>(vecVelocity);
 #endif
 				}
-				if (uiRandom == 1) { fDeltaRotation += fDeltaAnglePercentExtra * (-fDeltaAngleJitter + fDeltaAngleJitter * common::Random<2.0f>(rFrame.postRender.randomEngine)); }
+				if (uiRandom == 1)
+				{
+					fDeltaRotation += fDeltaAnglePercentExtra * (-fDeltaAngleJitter + fDeltaAngleJitter * common::Random<2.0f>(rFrame.postRender.randomEngine));
+				}
 			}
 
 			// Generate new random exhaust length every frame
@@ -274,7 +277,22 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		if ((rCurrent.pFlags[i] & kExploding) || (rCurrent.pFlags[i] & kFalling) || rCurrent.pfTimes[i] >= kfMissileLifetime || rCurrent.puiRegistryTargets[i].IsValid())
+		if (rCurrent.pFlags[i] & kExploding)
+		{
+			continue;
+		}
+
+		if (rCurrent.pFlags[i] & kFalling)
+		{
+			continue;
+		}
+
+		if (rCurrent.pfTimes[i] >= kfMissileLifetime)
+		{
+			continue;
+		}
+
+		if (rCurrent.puiRegistryTargets[i].IsValid())
 		{
 			continue;
 		}
@@ -376,7 +394,12 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if ((rCurrentPostRender.pFlags[i] & kExploding) || (rCurrentPostRender.pFlags[i] & kSilentDespawn)) [[unlikely]]
+		if (rCurrentPostRender.pFlags[i] & kExploding) [[unlikely]]
+		{
+			continue;
+		}
+
+		if (rCurrentPostRender.pFlags[i] & kSilentDespawn) [[unlikely]]
 		{
 			continue;
 		}

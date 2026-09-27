@@ -1,9 +1,9 @@
-#include "Game.h"
+#include "Network/Client/ClientReconciler.h"
 
 #include "Network/Client/ReconcileReplay.h"
 
-#include "Network/Client/ClientReconciler.h"
 #include "Frame/Collections/Players/Players.h"
+#include "Game.h"
 
 namespace game
 {
@@ -25,7 +25,7 @@ static bool FindMatchingPlayerInCoord(std::span<const engine::CoordWork> works, 
 		const Frame* pDestFrame = nullptr;
 		if (rDestScratch.iReplayStackCount > 0)
 		{
-			pDestFrame = rDestScratch.replayStack[rDestScratch.iReplayStackCount - 1];
+			pDestFrame = rDestScratch.replayStack.at(static_cast<size_t>(rDestScratch.iReplayStackCount - 1));
 		}
 		else if ((rDestScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath) && rDestScratch.outputLayout.iHead >= 0)
 		{
@@ -69,7 +69,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 			// replayStack[0] is the confirmed frame; scan from index 1 onwards
 			for (int64_t i = 1; i < rScratch.iReplayStackCount; ++i)
 			{
-				const Frame& rFrame = *rScratch.replayStack[i];
+				const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
 				for (const TransferRequest& rRequest : rFrame.postRender.transferRequests)
 				{
 					if (rRequest.eType != StatusChangeType::kTransferPlayer)
@@ -87,12 +87,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 
 					if (std::abs(rRequest.iDeltaX) > 1 || std::abs(rRequest.iDeltaY) > 1) [[unlikely]]
 					{
-						LOG(kDefault, kError,
-							"ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalPlayerId: {}",
-							rFrame.interpolate.iTick,
-							rWork.coord.x, rWork.coord.y,
-							static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY),
-							clientState.clientGlobalPlayerId);
+						LOG(kDefault, kError, "ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalPlayerId: {}", rFrame.interpolate.iTick, rWork.coord.x, rWork.coord.y, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), clientState.clientGlobalPlayerId);
 						DEBUG_BREAK();
 					}
 					// Checked exactly like the server's transfer destination, so a cell at a numeric coordinate edge

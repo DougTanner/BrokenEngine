@@ -1,8 +1,8 @@
 #include "Frame.h"
 
 #include "Frame/FrameCollections.h"
-#include "Profile/ProfileManager.h"
 #include "Frame/Collections/Players/Players.h"
+#include "Profile/ProfileManager.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/SmokeWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
@@ -682,8 +682,7 @@ bool FrameInterpolate::LogDifferences(const FrameInterpolate& rOther) const
 {
 	common::ScopedLogDifferenceContext context("FrameInterpolate");
 	bool bEqual = true;
-	bEqual &= static_cast<const engine::FrameInterpolateBase&>(*this).LogDifferences(
-		static_cast<const engine::FrameInterpolateBase&>(rOther));
+	bEqual &= static_cast<const engine::FrameInterpolateBase&>(*this).LogDifferences(static_cast<const engine::FrameInterpolateBase&>(rOther));
 	bEqual &= common::LogDifference<"fSpawnTimer">(fSpawnTimer, rOther.fSpawnTimer);
 	bEqual &= common::LogDifference<"gameFlags">(gameFlags, rOther.gameFlags);
 	bEqual &= pPlayers->LogDifferences(*rOther.pPlayers);
@@ -748,8 +747,7 @@ bool FramePostRender::LogDifferences(const FramePostRender& rOther) const
 {
 	common::ScopedLogDifferenceContext context("FramePostRender");
 	bool bEqual = true;
-	bEqual &= static_cast<const engine::FramePostRenderBase&>(*this).LogDifferences(
-		static_cast<const engine::FramePostRenderBase&>(rOther));
+	bEqual &= static_cast<const engine::FramePostRenderBase&>(*this).LogDifferences(static_cast<const engine::FramePostRenderBase&>(rOther));
 	bEqual &= common::LogDifference<"enemyAlignment">(enemyAlignment, rOther.enemyAlignment);
 	bEqual &= common::LogDifference<"playerAlignment">(playerAlignment, rOther.playerAlignment);
 	bEqual &= pPlayers->LogDifferences(*rOther.pPlayers);
@@ -800,8 +798,7 @@ bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBou
 	// The payload leaves here already expressed in the destination cell's local frame: one cell width per
 	// transferred axis. Every downstream consumer — network transfer, SpawnTransfer, replay reconcile —
 	// forwards the position unchanged, so this is the single conversion point.
-	rRequest.data.vecPosition = XMVectorSubtract(rRequest.data.vecPosition,
-		XMVectorSet(static_cast<float>(rRequest.iDeltaX) * engine::kfCellWidth, static_cast<float>(rRequest.iDeltaY) * engine::kfCellHeight, 0.0f, 0.0f));
+	rRequest.data.vecPosition = XMVectorSubtract(rRequest.data.vecPosition, XMVectorSet(static_cast<float>(rRequest.iDeltaX) * engine::kfCellWidth, static_cast<float>(rRequest.iDeltaY) * engine::kfCellHeight, 0.0f, 0.0f));
 
 	// Heap realloc warning: capacity exceeded during a shared per-tick burst. Producers are
 	// unbounded, so investigate entities re-flagging kTransfer across iterations or an

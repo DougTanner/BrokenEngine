@@ -1,7 +1,8 @@
 #include "TweaksScreen.h"
 
-#include "Ui/LightingWrappers.h"
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
+
+#include "Ui/LightingWrappers.h"
 
 #if defined(BT_CLIENT)
 

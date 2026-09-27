@@ -1,17 +1,15 @@
 #pragma once
 
 #include "Frame/Alignments.h"
-#include "Frame/Collections/Collection.h"
-
-namespace engine { struct FrameStaticData; }
 #include "Frame/GridCoord.h"
+#include "Frame/Collections/Collection.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/AreaLights/AreaLights.h"
-#endif
-#if defined(BT_CLIENT)
 #include "Frame/Collections/SmokeTrails/SmokeTrails.h"
 #include "Frame/Collections/Sounds/Sounds.h"
 #endif
+
+namespace engine { struct FrameStaticData; }
 
 namespace game
 {

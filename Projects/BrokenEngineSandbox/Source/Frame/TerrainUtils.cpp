@@ -26,7 +26,7 @@ AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::FrameStaticData& rS
 	float fGradientSq = fNx * fNx + fNy * fNy;
 
 	float fLocalSteerRate = kfSteerRate;
-	XMVECTOR vecDesired = XMVectorZero();
+	XMVECTOR vecDesiredDirection = XMVectorZero();
 
 	if (fGradientSq > kfMinGradientSq)
 	{
@@ -40,7 +40,7 @@ AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::FrameStaticData& rS
 		float fElevationError = fElevationAi - kfPreferredElevation;
 		XMVECTOR vecCorrection = XMVectorScale(XMVectorSet(fNx, fNy, 0.0f, 0.0f), fElevationError * kfElevationCorrectionStrength);
 
-		vecDesired = XMVector3Normalize(XMVectorAdd(vecContour, vecCorrection));
+		vecDesiredDirection = XMVector3Normalize(XMVectorAdd(vecContour, vecCorrection));
 
 		// Mountain look-ahead: steer faster when high terrain ahead
 		XMVECTOR vecAhead = XMVectorAdd(vecPosition, XMVectorScale(vecDirection, kfLookAheadDistance));
@@ -53,18 +53,18 @@ AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::FrameStaticData& rS
 	else
 	{
 		// Over open ocean: head toward island center
-		vecDesired = XMVector3Normalize(XMVectorSubtract(vecFrameCenter, vecPosition));
+		vecDesiredDirection = XMVector3Normalize(XMVectorSubtract(vecFrameCenter, vecPosition));
 	}
 
 	// Return to island if very far from center
 	if (common::Distance(vecPosition, vecFrameCenter) > kfReturnToIslandDistance)
 	{
-		vecDesired = XMVector3Normalize(XMVectorSubtract(vecFrameCenter, vecPosition));
+		vecDesiredDirection = XMVector3Normalize(XMVectorSubtract(vecFrameCenter, vecPosition));
 		fLocalSteerRate = kfSteerRate * kfUrgentSteerMultiplier;
 	}
 
 	// Smooth steering via exponential interpolation
-	XMVECTOR vecAiDirection = XMVector3Normalize(XMVectorLerp(vecDirection, vecDesired, common::ExponentialInterpolant(fLocalSteerRate, fDeltaTime)));
+	XMVECTOR vecAiDirection = XMVector3Normalize(XMVectorLerp(vecDirection, vecDesiredDirection, common::ExponentialInterpolant(fLocalSteerRate, fDeltaTime)));
 
 	return {vecAiDirection};
 }

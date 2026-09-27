@@ -2,10 +2,11 @@
 
 #if defined(BT_CLIENT)
 
-#include "Game.h"
+#include "Ui/GraphicsSettingsWrappersBase.h"
+
 #include "Frame/Frame.h"
 #include "Frame/Collections/Players/Players.h"
-#include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Game.h"
 
 namespace game
 {
@@ -27,7 +28,12 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 
 	// Main menu, or no fleet found for this client — use the canonical menu pose so we don't strand
 	// the camera at whatever stale gameplay position last set mVecPosition.
-	if ((rGameInterpolate.gameFlags & GameFlags::kMainMenu) || !gpGame->ClientPlayerId().IsValid())
+	if (rGameInterpolate.gameFlags & GameFlags::kMainMenu)
+	{
+		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 0.0f)));
+	}
+
+	if (!gpGame->ClientPlayerId().IsValid())
 	{
 		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 0.0f)));
 	}
@@ -60,8 +66,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		if (bHasCoord)
 		{
 			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(coord).postRender.pPlayers;
-			LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}",
-				gpGame->ClientPlayerId(), coord.x, coord.y, rPlayers.iCount, rGameInterpolate.pPlayers->iCount);
+			LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}", gpGame->ClientPlayerId(), coord.x, coord.y, rPlayers.iCount, rGameInterpolate.pPlayers->iCount);
 			for (int64_t i = 0; i < rPlayers.iCount; ++i)
 			{
 				LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalPlayerId: {}", i, rPlayers.pGlobalPlayerIds[i]);

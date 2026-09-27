@@ -2,15 +2,15 @@
 
 #if defined(BT_CLIENT)
 
-#include "Agent/AgentCommands.h"
 #include "Agent/AgentCommandServer.h"
 #include "Agent/Commands/ClientNetworkFixtures.h"
-
-#include "Game.h"
 #include "Network/Client/Client.h"
-#include "Network/Client/ClientSession.h"
 #include "Network/Client/ClientSessionRuntime.h"
 #include "Network/NetworkMessages.h"
+
+#include "Agent/AgentCommands.h"
+#include "Game.h"
+#include "Network/Client/ClientSession.h"
 
 namespace game
 {
@@ -18,9 +18,7 @@ namespace game
 namespace
 {
 
-#if defined(BT_DEBUG)
 std::weak_ptr<int> sCancelledFixture;
-#endif // BT_DEBUG
 
 engine::Client& RequireFixtureClient(std::string_view command)
 {
@@ -181,7 +179,6 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 	{
 		throw std::runtime_error("client_cancelled_subscription_fixture requires kbDebugInput build");
 	}
-#if defined(BT_DEBUG)
 	else
 	{
 		ScopedSuppressAllocationTracking suppress;
@@ -354,7 +351,7 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			{
 				throw std::runtime_error("client_cancelled_subscription_fixture observed an unexpected slot state");
 			}
-		if (eState != engine::CoordSubscriptionState::kUnsubscribing)
+			if (eState != engine::CoordSubscriptionState::kUnsubscribing)
 			{
 				throw std::runtime_error("client_cancelled_subscription_fixture observed an unexpected slot state");
 			}
@@ -365,15 +362,12 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			return std::nullopt;
 		});
 	}
-#endif
 }
 
 void DetachClientSubscriptionFixtures([[maybe_unused]] ClientSession& rSession)
 {
 	engine::ClientNetworkFixtures::Detach();
-#if defined(BT_DEBUG)
 	sCancelledFixture.reset();
-#endif // BT_DEBUG
 }
 
 } // namespace game

@@ -33,9 +33,8 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 {
 	for (auto& [rGuid, rFleetVec] : rFleets)
 	{
-		for (int64_t iFleet = 0; iFleet < std::ssize(rFleetVec); ++iFleet)
+		for (Fleet& rFleet : rFleetVec)
 		{
-			Fleet& rFleet = rFleetVec.at(static_cast<size_t>(iFleet));
 			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
 			if (!rFleet.flagshipGlobalPlayerId.IsValid() || flagshipIt == rFleet.members.end())
 			{
@@ -140,9 +139,8 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 
 		// Send fleet wanted coord to all alive members
 		int64_t iMembersUpdated = 0;
-		for (int64_t i = 0; i < std::ssize(rFleet.members); ++i)
+		for (const FleetMember& rMember : rFleet.members)
 		{
-			const FleetMember& rMember = rFleet.members.at(i);
 			if (rMember.flags & FleetMemberFlags::kIsDead)
 			{
 				continue;

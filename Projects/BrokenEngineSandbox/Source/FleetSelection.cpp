@@ -77,7 +77,12 @@ const Fleet* FleetSelection::FocusedFleet() const
 void FleetSelection::SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerId)
 {
 	const Fleet* pFleet = FocusedFleet();
-	if (pFleet == nullptr || !memberGlobalPlayerId.IsValid())
+	if (pFleet == nullptr)
+	{
+		return;
+	}
+
+	if (!memberGlobalPlayerId.IsValid())
 	{
 		return;
 	}

@@ -2,11 +2,12 @@
 
 #if defined(BT_CLIENT)
 
-#include "Game.h"
 #include "LaunchOptions.h"
 #include "Network/Client/Client.h"
-#include "Network/Client/ClientSession.h"
 #include "Network/Client/ClientSessionRuntime.h"
+
+#include "Game.h"
+#include "Network/Client/ClientSession.h"
 
 namespace game
 {

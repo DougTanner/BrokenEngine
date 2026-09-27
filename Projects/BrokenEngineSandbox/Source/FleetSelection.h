@@ -2,8 +2,9 @@
 
 #if defined(BT_CLIENT)
 
-#include "Fleet.h"
 #include "Ui/NetworkUiControl.h"
+
+#include "Fleet.h"
 
 namespace game
 {

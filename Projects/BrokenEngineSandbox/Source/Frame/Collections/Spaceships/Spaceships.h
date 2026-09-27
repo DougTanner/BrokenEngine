@@ -1,14 +1,14 @@
 #pragma once
 
 #include "Frame/Alignments.h"
-#include "Frame/Collections/Collection.h"
-
-namespace engine { struct FrameStaticData; }
 #include "Frame/GridCoord.h"
+#include "Frame/Collections/Collection.h"
 #include "Frame/Collections/Pushers/Pushers.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
+
+namespace engine { struct FrameStaticData; }
 
 namespace game
 {

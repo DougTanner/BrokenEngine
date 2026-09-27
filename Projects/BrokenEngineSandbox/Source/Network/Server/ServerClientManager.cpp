@@ -2,12 +2,13 @@
 
 #include "Network/Server/ServerClientManager.h"
 
+#include "Network/Server/ServerTransferManager.h"
+
 #include "Frame/Collections/Players/Players.h"
 #include "Game.h"
 #include "Network/PlayerEvents.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
-#include "Network/Server/ServerTransferManager.h"
 
 namespace game
 {
@@ -29,7 +30,7 @@ void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::C
 	});
 	if (!bAlreadyQueued)
 	{
-		mClientsWaitingForSpawn.push_back({iClientId, rClientGuid, rFleetGuid, memberGlobalPlayerId});
+		mClientsWaitingForSpawn.push_back({.iClientId = iClientId, .clientGuid = rClientGuid, .fleetGuid = rFleetGuid, .memberGlobalPlayerId = memberGlobalPlayerId});
 	}
 }
 
@@ -84,13 +85,11 @@ void ServerClientManager::NewClients()
 void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConnection& rClient)
 {
 	// Diagnostic: dump connecting GUID, server-side fleet roster, and per-coord player GUIDs so we can see whether reconnect should re-link
-	LOG(kNetwork, kInfo, "ServerClientManager::NewClients Connecting Client: {} Guid: ({},{}) Empty: {}",
-		rClient.iClientId, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow, rClient.clientGuid.IsEmpty());
+	LOG(kNetwork, kInfo, "ServerClientManager::NewClients Connecting Client: {} Guid: ({},{}) Empty: {}", rClient.iClientId, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow, rClient.clientGuid.IsEmpty());
 	LOG(kNetwork, kInfo, "  FleetGuids: {}", gpServerSession->mpFleetManager->mFleets.size());
 	for (const auto& [rExistingGuid, rExistingFleets] : gpServerSession->mpFleetManager->mFleets)
 	{
-		LOG(kNetwork, kInfo, "    Guid: ({},{}) FleetCount: {} Match: {}",
-			rExistingGuid.uiHigh, rExistingGuid.uiLow, rExistingFleets.size(), rExistingGuid == rClient.clientGuid);
+		LOG(kNetwork, kInfo, "    Guid: ({},{}) FleetCount: {} Match: {}", rExistingGuid.uiHigh, rExistingGuid.uiLow, rExistingFleets.size(), rExistingGuid == rClient.clientGuid);
 	}
 	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
 	{
@@ -102,9 +101,7 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 		LOG(kNetwork, kInfo, "  Coord: ({},{}) PlayerCount: {}", rCoord.x, rCoord.y, rPlayers.iCount);
 		for (int64_t i = 0; i < rPlayers.iCount; ++i)
 		{
-			LOG(kNetwork, kInfo, "    Global: {} Guid: ({},{}) Match: {}",
-				rPlayers.pGlobalPlayerIds[i].iValue, rPlayers.pClientGuids[i].uiHigh, rPlayers.pClientGuids[i].uiLow,
-				rPlayers.pClientGuids[i] == rClient.clientGuid);
+			LOG(kNetwork, kInfo, "    Global: {} Guid: ({},{}) Match: {}", rPlayers.pGlobalPlayerIds[i].iValue, rPlayers.pClientGuids[i].uiHigh, rPlayers.pClientGuids[i].uiLow, rPlayers.pClientGuids[i] == rClient.clientGuid);
 		}
 	}
 }

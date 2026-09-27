@@ -2,20 +2,20 @@
 
 #include "Network/Server/ServerSession.h"
 
+#include "File/Replay.h"
 #include "Network/NetworkCursor.h"
+#include "Network/Server/ServerBroadcaster.h"
+#include "Network/Server/ServerTransferManager.h"
 
 #include "Agent/Commands/ServerSimulationFixtures.h"
-#include "File/Replay.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/ServerCellStats.h"
 #include "Game.h"
 #include "Network/GamePacketType.h"
 #include "Network/PlayerEvents.h"
-#include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerFleetSerialization.h"
-#include "Network/Server/ServerTransferManager.h"
 
 namespace game
 {
@@ -116,12 +116,12 @@ void ServerSession::ParseReceivedGamePackets()
 					globalId.iValue = engine::ReadInt64(pCursor);
 					bool bUseMissiles = ReadBoolByte(pCursor);
 					float fNavigationDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
-					mpBroadcaster->QueueUpdatePlayerRequest({rPacket.iClientId, globalId, bUseMissiles, fNavigationDelay});
+					mpBroadcaster->QueueUpdatePlayerRequest({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .fNavigationDelay = fNavigationDelay});
 					break;
 				}
 				case GamePacketType::kClientCreateFleetRequest:
 				{
-					mpFleetManager->QueueCreateRequest({rPacket.iClientId});
+					mpFleetManager->QueueCreateRequest({.iClientId = rPacket.iClientId});
 					break;
 				}
 				case GamePacketType::kClientDeleteFleetRequest:
@@ -131,7 +131,7 @@ void ServerSession::ParseReceivedGamePackets()
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					mpFleetManager->QueueDeleteRequest({rPacket.iClientId, fleetGuid});
+					mpFleetManager->QueueDeleteRequest({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid});
 					break;
 				}
 				case GamePacketType::kClientSpawnIntoFleetRequest:
@@ -141,7 +141,7 @@ void ServerSession::ParseReceivedGamePackets()
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					mpFleetManager->QueueSpawnIntoRequest({rPacket.iClientId, fleetGuid});
+					mpFleetManager->QueueSpawnIntoRequest({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid});
 					break;
 				}
 				case GamePacketType::kClientRespawnInFleetRequest:
@@ -152,7 +152,7 @@ void ServerSession::ParseReceivedGamePackets()
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
 					engine::global_id_t memberGlobalPlayerId {engine::ReadInt64(pCursor)};
-					mpFleetManager->QueueRespawnRequest({rPacket.iClientId, fleetGuid, memberGlobalPlayerId});
+					mpFleetManager->QueueRespawnRequest({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .memberGlobalPlayerId = memberGlobalPlayerId});
 					break;
 				}
 				case GamePacketType::kClientFleetNavigationDelay:

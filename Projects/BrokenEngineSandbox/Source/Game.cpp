@@ -1,12 +1,13 @@
 #include "Game.h"
 
-#include "Agent/Commands/ClientPacketFaultFixture.h"
 #include "File/Replay.h"
-#include "Frame/Collections/Players/Players.h"
 #include "Input/Input.h"
-#include "Network/GamePacketType.h"
 #include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerTransferManager.h"
+
+#include "Agent/Commands/ClientPacketFaultFixture.h"
+#include "Frame/Collections/Players/Players.h"
+#include "Network/GamePacketType.h"
 #include "Ui/Localization.h"
 
 namespace game

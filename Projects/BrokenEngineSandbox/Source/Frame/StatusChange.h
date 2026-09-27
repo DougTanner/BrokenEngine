@@ -94,21 +94,7 @@ struct TransferData
 {
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(
-			rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity,
-			rSelf.alignment,
-			rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex,
-			rSelf.fAcceleration,
-			rSelf.fNextBlasterFireTime, rSelf.fNextSecondarySpawnTime, rSelf.fShieldCooldown, rSelf.fShieldDownSoundCooldown,
-			rSelf.fAnimationTime, rSelf.uiPlayerFlags,
-			rSelf.fNextBlasterSpawnTime,
-			rSelf.fNavigationDelay,
-			rSelf.fDeltaRotationDelay, rSelf.fTime, rSelf.fNextJitter,
-			rSelf.fDeltaRotation, rSelf.fDeltaRotationMax, rSelf.fPitch,
-			rSelf.globalPlayerId,
-			rSelf.fleetWantedCoord,
-			rSelf.uiPendingFleetWantedCoordTicks,
-			rSelf.uiPendingWeaponModeTicks);
+		return std::tie(rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity, rSelf.alignment, rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex, rSelf.fAcceleration, rSelf.fNextBlasterFireTime, rSelf.fNextSecondarySpawnTime, rSelf.fShieldCooldown, rSelf.fShieldDownSoundCooldown, rSelf.fAnimationTime, rSelf.uiPlayerFlags, rSelf.fNextBlasterSpawnTime, rSelf.fNavigationDelay, rSelf.fDeltaRotationDelay, rSelf.fTime, rSelf.fNextJitter, rSelf.fDeltaRotation, rSelf.fDeltaRotationMax, rSelf.fPitch, rSelf.globalPlayerId, rSelf.fleetWantedCoord, rSelf.uiPendingFleetWantedCoordTicks, rSelf.uiPendingWeaponModeTicks);
 	}
 
 	bool operator==(const TransferData& rOther) const

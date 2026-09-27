@@ -2,6 +2,7 @@
 
 #include "Network/NetworkProtocol.h"
 #include "Network/NetworkSerialization.h"
+
 #include "Network/GamePacketType.h"
 
 namespace game

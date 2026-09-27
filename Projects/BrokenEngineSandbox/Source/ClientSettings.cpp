@@ -2,8 +2,9 @@
 
 #if defined(BT_CLIENT)
 
-#include "Game.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+
+#include "Game.h"
 #include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 
 namespace game

@@ -4,13 +4,13 @@
 #include "Data/Texture.h"
 #include "Frame/FrameStaticData.h"
 #include "Frame/HealthDamage.h"
-#include "Profile/ProfileManager.h"
-#include "Ui/WrapperBase.h"
-#include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Collection.h"
+#include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Pushers/Pushers.h"
+#include "Profile/ProfileManager.h"
+#include "Ui/WrapperBase.h"
 
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
@@ -398,19 +398,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 		};
 		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{
-			LOG(kDefault, kError,
-				"Spaceship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}",
-				rFrame.interpolate.iTick,
-				rStaticData.coord.x, rStaticData.coord.y,
-				i,
-				common::WbV2(vecPosition, 1),
-				common::WbV2(rCurrentPostRender.pVecVelocities[i], 1),
-				static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY),
-				common::Wb(rCurrentPostRender.pfHealths[i], 1),
-				rCurrentPostRender.pAlignments[i],
-				rCurrentInterpolate.iCount,
-				rFrame.postRender.transferRequests.size(),
-				rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Spaceship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coord.x, rStaticData.coord.y, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		PushTransferRequest(rFrame.postRender, request);

@@ -297,15 +297,14 @@ void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::
 		return;
 	}
 
-	for (int64_t iFleet = 0; iFleet < std::ssize(fleetIt->second); ++iFleet)
+	for (Fleet& rFleet : fleetIt->second)
 	{
-		Fleet& rFleet = fleetIt->second.at(static_cast<size_t>(iFleet));
-		for (int64_t j = 0; j < std::ssize(rFleet.members); ++j)
+		for (FleetMember& rMember : rFleet.members)
 		{
-			if (rFleet.members.at(j).globalPlayerId == globalId && !(rFleet.members.at(j).flags & FleetMemberFlags::kIsDead))
+			if (rMember.globalPlayerId == globalId && !(rMember.flags & FleetMemberFlags::kIsDead))
 			{
-				rFleet.members.at(j).flags.Set(FleetMemberFlags::kIsDead);
-				rFleet.members.at(j).fRespawnTimer = kfRespawnDelay;
+				rMember.flags.Set(FleetMemberFlags::kIsDead);
+				rMember.fRespawnTimer = kfRespawnDelay;
 
 				if (globalId == rFleet.flagshipGlobalPlayerId)
 				{
@@ -363,7 +362,7 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 			LOG(kNetwork, kWarning, "ServerFleetManager::OnPlayerSpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kuiMaxFleetMembers);
 			return;
 		}
-		rFleet.members.push_back(FleetMember {globalPlayerId, {}, engine::kOriginCoord});
+		rFleet.members.push_back(FleetMember {.globalPlayerId = globalPlayerId, .coord = engine::kOriginCoord});
 	}
 
 	// Queue flagship update if this member is or becomes the Flagship
@@ -390,9 +389,8 @@ void ServerFleetManager::OnPlayerTransferred(const engine::ClientGuid& rGuid, en
 		return;
 	}
 
-	for (int64_t iFleet = 0; iFleet < std::ssize(fleetIt->second); ++iFleet)
+	for (Fleet& rFleet : fleetIt->second)
 	{
-		Fleet& rFleet = fleetIt->second.at(static_cast<size_t>(iFleet));
 		for (FleetMember& rMember : rFleet.members)
 		{
 			if (rMember.globalPlayerId == globalPlayerId)
@@ -545,12 +543,10 @@ void ServerFleetManager::DetectDisconnectedPlayerDeaths()
 			continue;
 		}
 
-		for (int64_t iFleet = 0; iFleet < std::ssize(rFleets); ++iFleet)
+		for (Fleet& rFleet : rFleets)
 		{
-			Fleet& rFleet = rFleets.at(static_cast<size_t>(iFleet));
-			for (int64_t j = 0; j < std::ssize(rFleet.members); ++j)
+			for (FleetMember& rMember : rFleet.members)
 			{
-				FleetMember& rMember = rFleet.members.at(j);
 				if (rMember.flags & FleetMemberFlags::kIsDead)
 				{
 					continue;

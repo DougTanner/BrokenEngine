@@ -91,7 +91,7 @@ struct FleetSyncMessage
 	{
 		int64_t iExpectedSize = rWorkbuffer.Count<uint8_t>() + kiFleetCountSize;
 		int64_t iFleetCount = std::ssize(rFleets);
-		engine::NetworkMessages::MessageWriter writer {rWorkbuffer};
+		engine::NetworkMessages::MessageWriter writer(rWorkbuffer);
 		writer.BoundedCount(iFleetCount, kiFleetHeaderSize, 0);
 		for (const Fleet& rFleet : rFleets)
 		{
@@ -116,20 +116,18 @@ struct FleetSyncMessage
 	// reader validity nor the flagship relation; the server's fleet invariant provides that relation.
 	static void ReadPayload(const std::vector<uint8_t>& rPayload, std::vector<Fleet>& rOutFleets)
 	{
-		engine::NetworkMessages::MessageReader reader {std::span<const uint8_t>(rPayload.data(), rPayload.size())};
+		engine::NetworkMessages::MessageReader reader(std::span<const uint8_t>(rPayload.data(), rPayload.size()));
 		int64_t iFleetCount = 0;
 		reader.BoundedCount(iFleetCount, kiFleetHeaderSize, 0);
 
 		rOutFleets.resize(static_cast<size_t>(iFleetCount));
-		for (int64_t i = 0; i < iFleetCount; ++i)
+		for (Fleet& rFleet : rOutFleets)
 		{
-			Fleet& rFleet = rOutFleets[static_cast<size_t>(i)];
 			int64_t iMemberCount = 0;
 			VisitFleetHeader(reader, rFleet, iMemberCount);
 			rFleet.members.resize(static_cast<size_t>(iMemberCount));
-			for (int64_t j = 0; j < iMemberCount; ++j)
+			for (FleetMember& rMember : rFleet.members)
 			{
-				FleetMember& rMember = rFleet.members[static_cast<size_t>(j)];
 				uint8_t uiFlags = 0;
 				VisitFleetMember(reader, rMember, uiFlags);
 				rMember.flags.meFlags = static_cast<FleetMemberFlags>(uiFlags);

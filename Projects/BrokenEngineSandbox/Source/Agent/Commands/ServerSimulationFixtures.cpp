@@ -4,15 +4,16 @@
 
 #if defined(BT_SERVER)
 
-#include "Agent/AgentCommandsServerQueries.h"
 #include "Agent/Commands/ReplayFixtures.h"
 #include "File/Replay.h"
+#include "Ui/WrapperBase.h"
+
+#include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Game.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/Server/ServerTransferManager.h"
 #include "Profile/ProfileManager.h"
-#include "Ui/WrapperBase.h"
 
 namespace game
 {
@@ -228,8 +229,8 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 			throw std::runtime_error("'stage' must be invalidation|grid|transfer_capture|coordinate_writer|fullframes_record|metadata|inventory|final_manifest");
 		}
 
-		if ((eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kManifestInvalidation ||
-			eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kGrid) == engine::gpReplay->IsRecording())
+		if ((eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kManifestInvalidation
+		  || eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kGrid) == engine::gpReplay->IsRecording())
 		{
 			throw std::runtime_error(engine::gpReplay->IsRecording() ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
 		}

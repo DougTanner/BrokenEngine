@@ -2,10 +2,11 @@
 
 #if defined(BT_SERVER)
 
-#include "Agent/Commands/ServerFaultFixtures.h"
-#include "Agent/AgentCommandsServerQueries.h"
-#include "Agent/Commands/ServerSimulationFixtures.h"
 #include "File/Replay.h"
+
+#include "Agent/AgentCommandsServerQueries.h"
+#include "Agent/Commands/ServerFaultFixtures.h"
+#include "Agent/Commands/ServerSimulationFixtures.h"
 #include "Game.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"

@@ -3,23 +3,20 @@
 
 #include "Missiles.h"
 
-#include "Frame/FrameStaticData.h"
 #include "Data/Audio.h"
+#include "Frame/FrameStaticData.h"
 #include "Frame/HealthDamage.h"
+#include "Frame/Collections/Collection.h"
+#include "Frame/Collections/Explosions/Explosions.h"
 #include "Profile/ProfileManager.h"
 #include "Ui/ParticleWrappers.h"
 #if defined(BT_CLIENT)
-#include "Ui/WrapperBase.h"
+#include "Data/Scene.h"
+#include "Data/Texture.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/SmokeWrappers.h"
 #include "Ui/SoundWrappers.h"
-#endif
-#include "Frame/Collections/Collection.h"
-#include "Frame/Collections/Explosions/Explosions.h"
-
-#if defined(BT_CLIENT)
-#include "Data/Scene.h"
-#include "Data/Texture.h"
+#include "Ui/WrapperBase.h"
 #endif
 
 namespace engine
@@ -157,7 +154,12 @@ void MissilesInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 	rMissiles.puiAreaLights[iIndex] = {};
 	rMissiles.puiSmokeTrails[iIndex] = {};
 	rPostRender.puiSounds[iIndex] = {};
-	if ((rPostRender.pFlags[iIndex] & kFalling) || (rPostRender.pFlags[iIndex] & kSilentDespawn))
+	if (rPostRender.pFlags[iIndex] & kFalling)
+	{
+		return;
+	}
+
+	if (rPostRender.pFlags[iIndex] & kSilentDespawn)
 	{
 		return;
 	}
@@ -465,7 +467,12 @@ void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, float fDeltaT
 {
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	if ((rCurrentPostRender.pFlags[i] & kExploding) || (rCurrentPostRender.pFlags[i] & kFalling))
+	if (rCurrentPostRender.pFlags[i] & kExploding)
+	{
+		return;
+	}
+
+	if (rCurrentPostRender.pFlags[i] & kFalling)
 	{
 		return;
 	}

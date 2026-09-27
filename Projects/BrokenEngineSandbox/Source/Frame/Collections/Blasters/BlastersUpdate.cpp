@@ -3,20 +3,17 @@
 
 #include "Blasters.h"
 
+#include "Data/Audio.h"
 #include "Frame/FrameStaticData.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 #if defined(BT_CLIENT)
+#include "Data/Texture.h"
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Frame/Collections/Puffs/Puffs.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/SmokeWrappers.h"
 #include "Ui/SoundWrappers.h"
-#endif
-
-#include "Data/Audio.h"
-#if defined(BT_CLIENT)
-#include "Data/Texture.h"
 #endif
 
 namespace game

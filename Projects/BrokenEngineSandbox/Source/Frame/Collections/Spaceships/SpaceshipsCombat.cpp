@@ -207,7 +207,12 @@ void SpaceshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame,
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		// Skip already exploding or transferring spaceships
-		if ((rCurrentPostRender.pFlags[i] & kExploding) || (rCurrentPostRender.pFlags[i] & kTransfer))
+		if (rCurrentPostRender.pFlags[i] & kExploding)
+		{
+			continue;
+		}
+
+		if (rCurrentPostRender.pFlags[i] & kTransfer)
 		{
 			continue;
 		}

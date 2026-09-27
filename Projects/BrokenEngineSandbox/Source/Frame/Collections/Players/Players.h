@@ -3,12 +3,12 @@
 #include "Frame/Alignments.h"
 #include "Frame/GridCoord.h"
 #include "Frame/Collections/Collection.h"
-
-namespace engine { struct FrameStaticData; }
 #if defined(BT_CLIENT)
 #include "Frame/Collections/HexShields/HexShields.h"
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
+
+namespace engine { struct FrameStaticData; }
 
 
 namespace game
@@ -96,16 +96,12 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections,
-			rSelf.pfDestroyedTimes, rSelf.pfAnimationTimes, rSelf.puiPushers);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.pfAnimationTimes, rSelf.puiPushers);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pfRotationAccelerationXs, rSelf.pfRotationAccelerationYs,
-			rSelf.pWindTrails,
-			rSelf.pHexShields, rSelf.pfShieldRotations, rSelf.pfShieldShrinks,
-			rSelf.pHexShieldDirections, rSelf.pHexShieldVertIntensities, rSelf.pHexShieldFragIntensities);
+		return std::tie(rSelf.pfRotationAccelerationXs, rSelf.pfRotationAccelerationYs, rSelf.pWindTrails, rSelf.pHexShields, rSelf.pfShieldRotations, rSelf.pfShieldShrinks, rSelf.pHexShieldDirections, rSelf.pHexShieldVertIntensities, rSelf.pHexShieldFragIntensities);
 	}
 #endif // BT_CLIENT
 	auto Members(this auto&& rSelf)
@@ -128,8 +124,7 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 	// CRC-only subset: excludes pfAnimationTimes (client-only update) and puiPushers (local collection index)
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections,
-			rSelf.pfDestroyedTimes);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes);
 	}
 
 	// Render
@@ -299,20 +294,7 @@ public:
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiIds, rSelf.pFlags, rSelf.pAlignments,
-			rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes,
-			rSelf.pVecVelocities, rSelf.pVecWantedDirections,
-			rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns,
-			rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns,
-			rSelf.pVecAiDirections,
-			rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods,
-			rSelf.pfFrameChangeTimers,
-			rSelf.pVecIslandDestinations,
-			rSelf.pClientGuids, rSelf.pGlobalPlayerIds,
-			rSelf.pfNavigationDelays,
-			rSelf.pFleetWantedCoords,
-			rSelf.puiPendingFleetWantedCoordTicks,
-			rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.puiIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoords, rSelf.puiPendingFleetWantedCoordTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -336,19 +318,7 @@ public:
 	// CRC-only subset: excludes pClientGuids and pGlobalPlayerIds which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiIds, rSelf.pFlags, rSelf.pAlignments,
-			rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes,
-			rSelf.pVecVelocities, rSelf.pVecWantedDirections,
-			rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns,
-			rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns,
-			rSelf.pVecAiDirections,
-			rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods,
-			rSelf.pfFrameChangeTimers,
-			rSelf.pVecIslandDestinations,
-			rSelf.pfNavigationDelays,
-			rSelf.pFleetWantedCoords,
-			rSelf.puiPendingFleetWantedCoordTicks,
-			rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.puiIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoords, rSelf.puiPendingFleetWantedCoordTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 
 	// Utility

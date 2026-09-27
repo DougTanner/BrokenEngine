@@ -10,8 +10,9 @@
 #include "Save/GameSaveLoad.h"
 #endif
 #if defined(BT_CLIENT)
-#include "Network/Client/ClientSession.h"
 #include "Ui/NetworkUiControl.h"
+
+#include "Network/Client/ClientSession.h"
 #endif
 
 namespace game

@@ -401,7 +401,12 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 			continue;
 		}
 
-		if (rCurrentPostRender.pfNextSecondarySpawnTimes[i] >= 0.0f || (rCurrentPostRender.pFlags[i] & kExploding))
+		if (rCurrentPostRender.pfNextSecondarySpawnTimes[i] >= 0.0f)
+		{
+			continue;
+		}
+
+		if (rCurrentPostRender.pFlags[i] & kExploding)
 		{
 			continue;
 		}

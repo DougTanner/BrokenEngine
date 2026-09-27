@@ -1,10 +1,10 @@
 #include "SpawnTransfer.h"
 
+#include "Frame/HealthDamage.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
-#include "Frame/HealthDamage.h"
 #include "Ui/WindDepositsWrappers.h"
 
 namespace game
@@ -15,7 +15,8 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 	switch (eType)
 	{
 		case StatusChangeType::kTransferSpaceship:
-			SpaceshipsPostRender::Spawn(rFrame, {
+			SpaceshipsPostRender::Spawn(rFrame,
+			{
 				.vecPosition = rData.vecPosition,
 				.vecDirection = rData.vecDirection,
 				.vecVelocity = rData.vecVelocity,
@@ -28,7 +29,8 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 			break;
 
 		case StatusChangeType::kTransferBlaster:
-			BlastersPostRender::Spawn(rFrame, {
+			BlastersPostRender::Spawn(rFrame,
+			{
 				.vecPosition = rData.vecPosition,
 				.vecVelocity = rData.vecVelocity,
 				.uiTypeIndex = rData.uiTypeIndex,
@@ -52,7 +54,8 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				missileFlags.Set(MissileFlags::kTargetPlayer);
 			}
 
-			MissilesPostRender::Spawn(rFrame, {
+			MissilesPostRender::Spawn(rFrame,
+			{
 				.vecPosition = rData.vecPosition,
 				.vecDirection = rData.vecDirection,
 				.vecVelocity = rData.vecVelocity,
@@ -73,7 +76,8 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 		}
 
 		case StatusChangeType::kTransferPlayer:
-			PlayersPostRender::Spawn(rFrame, {
+			PlayersPostRender::Spawn(rFrame,
+			{
 				.vecPosition = rData.vecPosition,
 				.vecDirection = rData.vecDirection,
 				.vecVelocity = rData.vecVelocity,
