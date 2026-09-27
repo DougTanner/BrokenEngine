@@ -44,6 +44,7 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'hack'; Pattern = '(?://|/\*|^\s*\*).*\bHACK\b' }
 	@{ Kind = 'style-rule-2'; Pattern = '^\s*(?:[A-Za-z_]\w*(?:::[A-Za-z_]\w*)?(?:<[^{};]*>)?\s+)+(?:[*&]\s*)?[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\{\s*$'; Except = '(?://|/\*|\*/|["''])|^\s*(?:class|struct|union|enum|namespace|return|if|else|for|while|switch|try|catch|do)\b' }
 	@{ Kind = 'style-rule-15'; Pattern = '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
+	@{ Kind = 'style-rule-18'; Pattern = '^\s*const\s+(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*[={(]'; Except = '^\s*const\s+[^=({;<]*(?:<[^;]*>)?[^=({;<]*[&*]' }
 	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|\btypename(?:\.\.\.)?\s+[A-Z]*[a-z])' }
 	@{ Kind = 'style-rule-27'; Pattern = '\b\d+\.(?:\d+(?:[eE][-+]?\d+)?)?(?:[^\w.]|$)|\b\d+\.f\b|(?:^|[^\w.])\.\d+(?:f|\b)' }
 	@{ Kind = 'style-rule-28'; Pattern = '\bNULL\b' }
