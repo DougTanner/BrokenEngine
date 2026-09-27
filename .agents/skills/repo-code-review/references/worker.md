@@ -79,5 +79,7 @@ reach.
   accessor or pass-through.
 - Repository patterns — new `bool` members or parameters, and new
   standard-library or third-party includes.
+- Style guide contracts — a changed `throw`, `catch`, or exception type,
+  repeated `std::vector` appends, or a `std::memcpy`.
 - Completeness and duplication — incomplete integration and substantial new
   near-copies.

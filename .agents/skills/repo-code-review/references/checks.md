@@ -18,6 +18,7 @@ the checks below say what to compare and what to flag.
 - [Integration, layering, and build affinity](#integration-layering-and-build-affinity)
 - [Public state and forwarding APIs](#public-state-and-forwarding-apis)
 - [Repository patterns](#repository-patterns)
+- [Style guide contracts](#style-guide-contracts)
 - [Completeness and duplication](#completeness-and-duplication)
 
 ### General logic and ownership
@@ -184,6 +185,22 @@ ordering. Do not apply this check to semantic codecs or serialization adapters.
   `ProfileManagerBase`) or its game type when the object is reachable through
   its `gp*` global (the conventions reference). This is a hard flag, not a
   suggestion.
+
+### Style guide contracts
+
+Rules 9, 53 and 60 of `Documents/C++StyleGuide.txt` state correctness or
+cost contracts that need producer, consumer, and type tracing.
+
+- Rule 9: flag a new `throw` that a changed path catches and recovers from
+  as normal control flow, and a new exception type that adds no data or
+  behavior and only renames or categorizes a failure. A throw that follows
+  the owning subsystem's established failure channel (see Trust boundaries
+  and failure channels) is not flagged.
+- Rule 53: flag two or more `push_back`/`emplace_back` calls on one
+  `std::vector`, in sequence or in a loop whose count is known, without a
+  preceding `reserve`.
+- Rule 60: flag a `std::memcpy` whose size is taken from the source alone
+  where the destination can be smaller.
 
 ### Completeness and duplication
 

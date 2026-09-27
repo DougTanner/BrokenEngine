@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-27T13:29:12.263Z","dependsOn":["Documents/Plans/ChangeWorkflow/RepoCodeReviewStyleGuideContracts.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-09-27T13:29:12.263Z","dependsOn":[]} -->
 # Cleanup: fix existing code that breaks style guide rules 9, 53 and 60, the /repo-code-review style guide contracts
 
 ## Context
