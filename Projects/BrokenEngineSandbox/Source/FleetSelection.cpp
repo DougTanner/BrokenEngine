@@ -16,7 +16,7 @@ void FleetSelection::AutoSelectFirstAliveMember()
 	{
 		for (int64_t i = 0; i < std::ssize(pFleet->members); ++i)
 		{
-			if (pFleet->members.at(static_cast<size_t>(i)).bAlive)
+			if (!(pFleet->members.at(static_cast<size_t>(i)).flags & FleetMemberFlags::kIsDead))
 			{
 				SelectPlayerInFleet(pFleet->members.at(static_cast<size_t>(i)).globalPlayerId);
 				return;
@@ -92,7 +92,7 @@ void FleetSelection::SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerI
 
 	// Update mClientGridCoord to match selected player's coord
 	const FleetMember& rMember = *memberIt;
-	if (rMember.bAlive)
+	if (!(rMember.flags & FleetMemberFlags::kIsDead))
 	{
 		for (int64_t i = 0; i < std::ssize(gpGame->mClientPlayerIds); ++i)
 		{
@@ -162,7 +162,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 				for (int64_t j = 0; j < std::ssize(rFleet.members); ++j)
 				{
 					const FleetMember& rMember = rFleet.members.at(static_cast<size_t>(j));
-					if (rMember.globalPlayerId == gpGame->mRememberedFocusedShipId && rMember.bAlive)
+					if (rMember.globalPlayerId == gpGame->mRememberedFocusedShipId && !(rMember.flags & FleetMemberFlags::kIsDead))
 					{
 						mFocusedMemberGlobalId = rMember.globalPlayerId;
 						break;
@@ -226,12 +226,12 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 
 		// If focused member is dead, auto-fallback to first alive member
 		auto focusedIt = std::ranges::find(pFleet->members, mFocusedMemberGlobalId, &FleetMember::globalPlayerId);
-		if (mFocusedMemberGlobalId.IsValid() && focusedIt != pFleet->members.end() && !focusedIt->bAlive)
+		if (mFocusedMemberGlobalId.IsValid() && focusedIt != pFleet->members.end() && (focusedIt->flags & FleetMemberFlags::kIsDead))
 		{
 			mFocusedMemberGlobalId = {};
 			for (int64_t i = 0; i < std::ssize(pFleet->members); ++i)
 			{
-				if (pFleet->members.at(static_cast<size_t>(i)).bAlive)
+				if (!(pFleet->members.at(static_cast<size_t>(i)).flags & FleetMemberFlags::kIsDead))
 				{
 					mFocusedMemberGlobalId = pFleet->members.at(static_cast<size_t>(i)).globalPlayerId;
 					break;

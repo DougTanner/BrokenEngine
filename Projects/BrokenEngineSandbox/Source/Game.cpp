@@ -80,7 +80,7 @@ engine::global_id_t Game::ClientPlayerId() const
 	{
 		engine::global_id_t focusedMemberGlobalId = mFleetSelection.FocusedMemberGlobalId();
 		auto memberIt = std::ranges::find(pFleet->members, focusedMemberGlobalId, &FleetMember::globalPlayerId);
-		if (focusedMemberGlobalId.IsValid() && memberIt != pFleet->members.end() && memberIt->bAlive)
+		if (focusedMemberGlobalId.IsValid() && memberIt != pFleet->members.end() && !(memberIt->flags & FleetMemberFlags::kIsDead))
 		{
 			return memberIt->globalPlayerId;
 		}

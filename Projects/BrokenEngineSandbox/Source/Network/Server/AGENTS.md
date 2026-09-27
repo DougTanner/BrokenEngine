@@ -11,6 +11,7 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 - A fleet's position within its client's list shifts on delete, so requests and queued work that outlive a poll carry the generated fleet identifier and re-resolve it at consumption.
 - A fleet member is identified by its ship's global ID, which a respawn keeps; stored member references — the flagship, a respawn request, a queued spawn, and client focus — carry that ID, never a list position.
 - Entities being re-attached are sorted by global ID before rebuilding client ownership; because a respawn keeps its ID, that order is each member's first-spawn order.
+- A dead fleet member respawns automatically after a countdown that drains only while its owner is connected.
 - The [game Agent](../../Agent/AGENTS.md#contracts) owns the session-bound fixture slot and its clearing semantics; teardown detaches it before destroying the runtime.
 
 ## Timing and Paused Availability

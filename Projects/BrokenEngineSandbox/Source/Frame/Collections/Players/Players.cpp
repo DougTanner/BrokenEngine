@@ -263,37 +263,17 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			continue;
 		}
 
-		if (rStatusChange.eType == StatusChangeType::kSpawnPlayer || rStatusChange.eType == StatusChangeType::kRespawnPlayer)
+		if (rStatusChange.eType == StatusChangeType::kSpawnPlayer)
 		{
-			engine::global_id_t globalPlayerId {};
-			// Empty unless the spawn request carries an owning client: agent-injected and respawn rows are born unowned.
-			engine::ClientGuid spawnClientGuid {};
+			const SpawnPlayerData& rSpawnData = std::get<SpawnPlayerData>(rStatusChange.data);
 			PlayerFlags_t spawnFlags {PlayerFlags::kBlasterSpawnLeft};
-			engine::GridCoord spawnFleetWantedCoord {};
-			uint8_t uiSpawnPendingFleetTicks = 0;
-			// kRespawnPlayer carries no payload, so it keeps SpawnPlayerData's own default offsets.
-			float fSpawnOffsetX = SpawnPlayerData{}.fSpawnOffsetX;
-			float fSpawnOffsetY = SpawnPlayerData{}.fSpawnOffsetY;
-			// kRespawnPlayer is reserved and unissued; only kSpawnPlayer extracts SpawnPlayerData, so this branch
-			// leaves globalPlayerId zero. Zero IDs are invisible to ServerBroadcaster and FleetNavigationController
-			// re-resolution, excluding fleet updates and weapon toggles; usable player spawns require a real global ID.
-			if (rStatusChange.eType == StatusChangeType::kSpawnPlayer)
+			if (rSpawnData.bIsFlagship)
 			{
-				const SpawnPlayerData& rSpawnData = std::get<SpawnPlayerData>(rStatusChange.data);
-				globalPlayerId.iValue = rSpawnData.iGlobalId;
-				spawnClientGuid = rSpawnData.clientGuid;
-				if (rSpawnData.bIsFlagship)
-				{
-					spawnFlags.Set(kIsFlagship);
-				}
-				spawnFleetWantedCoord = rSpawnData.fleetWantedCoord;
-				uiSpawnPendingFleetTicks = rSpawnData.uiPendingFleetWantedCoordTicks;
-				fSpawnOffsetX = rSpawnData.fSpawnOffsetX;
-				fSpawnOffsetY = rSpawnData.fSpawnOffsetY;
+				spawnFlags.Set(kIsFlagship);
 			}
 
 			// The cell's local frame is centered on the origin, so the spawn offset is the local position.
-			XMVECTOR vecSpawnPosition = XMVectorSet(fSpawnOffsetX, fSpawnOffsetY, engine::gBaseHeight.Get(), 1.0f);
+			XMVECTOR vecSpawnPosition = XMVectorSet(rSpawnData.fSpawnOffsetX, rSpawnData.fSpawnOffsetY, engine::gBaseHeight.Get(), 1.0f);
 
 			// These offsets arrive from outside the simulation (network or harness), so refuse one outside this
 			// cell here.
@@ -310,10 +290,11 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 				.alignment = rFrame.postRender.playerAlignment,
 				.flags = spawnFlags,
 				.fArrivalGracePeriod = kfArrivalGracePeriod,
-				.globalPlayerId = globalPlayerId,
-				.clientGuid = spawnClientGuid,
-				.fleetWantedCoord = spawnFleetWantedCoord,
-				.uiPendingFleetWantedCoordTicks = uiSpawnPendingFleetTicks,
+				.globalPlayerId = {rSpawnData.iGlobalId},
+				// Empty unless the spawn request carries an owning client: agent-injected rows are born unowned.
+				.clientGuid = rSpawnData.clientGuid,
+				.fleetWantedCoord = rSpawnData.fleetWantedCoord,
+				.uiPendingFleetWantedCoordTicks = rSpawnData.uiPendingFleetWantedCoordTicks,
 			});
 		}
 	}

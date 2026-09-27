@@ -286,7 +286,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			}
 
 			ImGui::PushID(static_cast<int>(i));
-			if (rMember.bAlive)
+			if (!(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				char pcLabel[64];
 				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoord.x, memberCoord.y, rMember.globalPlayerId.iValue);

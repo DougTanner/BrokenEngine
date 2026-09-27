@@ -43,7 +43,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			}
 
 			const FleetMember& rFlagship = *flagshipIt;
-			if (!rFlagship.bAlive)
+			if (rFlagship.flags & FleetMemberFlags::kIsDead)
 			{
 				continue;
 			}
@@ -143,7 +143,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 		for (int64_t i = 0; i < std::ssize(rFleet.members); ++i)
 		{
 			const FleetMember& rMember = rFleet.members.at(i);
-			if (!rMember.bAlive)
+			if (rMember.flags & FleetMemberFlags::kIsDead)
 			{
 				continue;
 			}
@@ -204,7 +204,7 @@ void FleetNavigationController::ShiftFlagshipAfterDeath(const engine::ClientGuid
 	for (int64_t k = 1; k < std::ssize(rFleet.members); ++k)
 	{
 		int64_t iCandidate = (iFlagshipPosition + k) % std::ssize(rFleet.members);
-		if (rFleet.members.at(static_cast<size_t>(iCandidate)).bAlive)
+		if (!(rFleet.members.at(static_cast<size_t>(iCandidate)).flags & FleetMemberFlags::kIsDead))
 		{
 			iNewFlagship = iCandidate;
 			break;

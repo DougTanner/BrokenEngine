@@ -110,6 +110,8 @@ private:
 	// Position of rFleetGuid within one client's fleet vector; -1 when absent. Delete needs the position, not just the fleet.
 	int64_t FindFleetIndexByGuid(const std::vector<Fleet>& rFleets, const FleetGuid& rFleetGuid) const;
 
+	// Drains each dead member's respawn countdown for connected owners and queues its respawn on expiry.
+	void TickRespawnTimers();
 	void RefreshFleetMembers(Fleet& rFleet, std::span<const engine::OwnedEntity> ownedPlayers);
 	void ResetFleetForLoad(Fleet& rFleet, const engine::ClientGuid& rClientGuid);
 

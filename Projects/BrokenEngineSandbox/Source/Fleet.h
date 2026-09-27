@@ -22,11 +22,19 @@ constexpr int64_t kiMaxFleetsPerClient = 16;
 // Per-fleet member cap — parity with Frame.cpp's kiMaxFleetSize (16); bounds Fleet::members against a spamming client.
 constexpr size_t kuiMaxFleetMembers = 16;
 
+enum class FleetMemberFlags : uint8_t
+{
+	kIsDead = 1 << 0,
+};
+using FleetMemberFlags_t = common::Flags<FleetMemberFlags>;
+
 struct FleetMember
 {
 	engine::global_id_t globalPlayerId {};
-	bool bAlive = true;
+	FleetMemberFlags_t flags {};
 	engine::GridCoord coord {};
+	// Server-only automatic respawn countdown in seconds; read only while kIsDead is set, never saved or sent.
+	float fRespawnTimer = 0.0f;
 };
 
 struct Fleet

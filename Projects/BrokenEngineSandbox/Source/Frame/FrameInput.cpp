@@ -56,6 +56,12 @@ std::istream& operator>>(std::istream& rStream, FrameInput& rInput)
 		{
 			throw std::ios_base::failure("FrameInput StatusChange payload");
 		}
+		// Trust boundary (replay stream): every legitimate spawn carries a real global ID; a zero ID would create an
+		// unaddressable Player row.
+		if (rChange.eType == StatusChangeType::kSpawnPlayer && std::get<SpawnPlayerData>(rChange.data).iGlobalId == 0)
+		{
+			throw std::ios_base::failure("FrameInput SpawnPlayer global ID");
+		}
 	}
 
 	return rStream;

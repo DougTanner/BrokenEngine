@@ -10,7 +10,6 @@ namespace game
 enum class StatusChangeType : uint8_t
 {
 	kSpawnPlayer,
-	kRespawnPlayer,
 	kTransferPlayer,
 	kTransferSpaceship,
 	kTransferBlaster,
@@ -41,7 +40,6 @@ inline const char* StatusChangeTypeName(StatusChangeType eType)
 	switch (eType)
 	{
 		case StatusChangeType::kSpawnPlayer:       return "SpawnPlayer";
-		case StatusChangeType::kRespawnPlayer:     return "RespawnPlayer";
 		case StatusChangeType::kTransferPlayer:    return "TransferPlayer";
 		case StatusChangeType::kTransferSpaceship: return "TransferSpaceship";
 		case StatusChangeType::kTransferBlaster:   return "TransferBlaster";
@@ -170,7 +168,7 @@ struct TransferData
 
 using StatusChangeData = std::variant<
 	SpawnPlayerData,           // kSpawnPlayer
-	TransferData,              // kTransfer* (all 4 types) and kRespawnPlayer (empty TransferData)
+	TransferData,              // kTransfer* (all 4 types)
 	DestroyPlayerData,         // kDestroyPlayer
 	UpdatePlayerData,          // kUpdatePlayer
 	UpdateFleetData    // kUpdateFleet

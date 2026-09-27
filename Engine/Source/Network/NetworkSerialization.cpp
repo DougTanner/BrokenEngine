@@ -140,7 +140,6 @@ static int64_t StatusChangeItemWireSize(game::StatusChangeType eType)
 	switch (eType)
 	{
 		case game::StatusChangeType::kSpawnPlayer:       return kiI64 + kiU8 + kiCoord + kiU8 + 2 * kiF32;
-		case game::StatusChangeType::kRespawnPlayer:     return 0;
 		case game::StatusChangeType::kTransferBlaster:   return 2 * kiVec4 + kiU8 + kiU32;
 		case game::StatusChangeType::kTransferSpaceship: return 3 * kiVec4 + kiU32 + 3 * kiF32;
 		case game::StatusChangeType::kTransferMissile:   return 3 * kiVec4 + kiU32 + 7 * kiF32;
@@ -182,8 +181,6 @@ static void SerializeGroup(uint8_t*& pCursor, game::StatusChangeType eType, cons
 				WriteFloat(pCursor, rSpawn.fSpawnOffsetY);
 				break;
 			}
-			case game::StatusChangeType::kRespawnPlayer:
-				break;
 			case game::StatusChangeType::kTransferBlaster:
 				SerializeBlasterTransfer(pCursor, std::get<game::TransferData>(rData));
 				break;
@@ -344,8 +341,6 @@ int64_t DeserializeStatusChangeBatch(const void* pSource, int64_t iSourceSize, g
 					rSpawn.fSpawnOffsetY = ReadFloat(cursor.pCursor);
 					break;
 				}
-				case game::StatusChangeType::kRespawnPlayer:
-					break;
 				case game::StatusChangeType::kTransferBlaster:
 					DeserializeBlasterTransfer(cursor.pCursor, std::get<game::TransferData>(rChange.data));
 					break;

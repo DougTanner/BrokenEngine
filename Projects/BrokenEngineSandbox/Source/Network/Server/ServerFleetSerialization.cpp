@@ -45,8 +45,7 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	for (const FleetMember& rMember : rFleet.members)
 	{
 		common::Write(rFileStream, rMember.globalPlayerId.iValue);
-		uint8_t uiAlive = rMember.bAlive ? 1 : 0;
-		common::Write(rFileStream, uiAlive);
+		rMember.flags.Write(rFileStream);
 		common::Write(rFileStream, rMember.coord.x);
 		common::Write(rFileStream, rMember.coord.y);
 	}
@@ -88,13 +87,13 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	{
 		int64_t iGlobalPlayerId = 0;
 		common::Read(rFileStream, iGlobalPlayerId);
-		uint8_t uiAlive = 0;
-		common::Read(rFileStream, uiAlive);
+		FleetMemberFlags_t flags {};
+		flags.Read(rFileStream);
 		int32_t iCoordX = 0;
 		int32_t iCoordY = 0;
 		common::Read(rFileStream, iCoordX);
 		common::Read(rFileStream, iCoordY);
-		rFleet.members.at(static_cast<size_t>(k)) = FleetMember {engine::global_id_t {iGlobalPlayerId}, uiAlive != 0, engine::GridCoord {iCoordX, iCoordY}};
+		rFleet.members.at(static_cast<size_t>(k)) = FleetMember {engine::global_id_t {iGlobalPlayerId}, flags, engine::GridCoord {iCoordX, iCoordY}};
 	}
 	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, so each member ID
 	// must be valid and unique within its fleet, and the flagship must name a member ({} only for an empty fleet).

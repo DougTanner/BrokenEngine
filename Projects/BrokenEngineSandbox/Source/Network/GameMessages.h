@@ -92,11 +92,11 @@ struct FleetSyncMessage
 		rVisitor.Field(rFleet.fNavigationDelay);
 	}
 
-	template <typename TVisitor, typename TFleetMember, typename TAlive>
-	static void VisitFleetMember(TVisitor& rVisitor, TFleetMember& rMember, TAlive& rAlive)
+	template <typename TVisitor, typename TFleetMember, typename TFlags>
+	static void VisitFleetMember(TVisitor& rVisitor, TFleetMember& rMember, TFlags& rFlags)
 	{
 		rVisitor.Field(rMember.globalPlayerId.iValue);
-		rVisitor.Field(rAlive);
+		rVisitor.Field(rFlags);
 	}
 
 	static void WritePayload(common::Workbuffer& rWorkbuffer, const std::vector<Fleet>& rFleets)
@@ -115,8 +115,8 @@ struct FleetSyncMessage
 			for (const FleetMember& rMember : rFleet.members)
 			{
 				int64_t iMemberStart = rWorkbuffer.Count<uint8_t>();
-				uint8_t uiAlive = static_cast<uint8_t>(rMember.bAlive ? 1 : 0);
-				VisitFleetMember(writer, rMember, uiAlive);
+				uint8_t uiFlags = std::to_underlying(rMember.flags.meFlags);
+				VisitFleetMember(writer, rMember, uiFlags);
 				ASSERT(rWorkbuffer.Count<uint8_t>() == iMemberStart + kiFleetMemberSize);
 				iExpectedSize += kiFleetMemberSize;
 			}
@@ -152,9 +152,9 @@ struct FleetSyncMessage
 			for (int64_t j = 0; j < iMemberCount; ++j)
 			{
 				FleetMember& rMember = rFleet.members[static_cast<size_t>(j)];
-				uint8_t uiAlive = 0;
-				VisitFleetMember(reader, rMember, uiAlive);
-				rMember.bAlive = uiAlive != 0;
+				uint8_t uiFlags = 0;
+				VisitFleetMember(reader, rMember, uiFlags);
+				rMember.flags.meFlags = static_cast<FleetMemberFlags>(uiFlags);
 				if (!reader.IsValid())
 				{
 					engine::NetworkMessages::ThrowCorruptStream("FleetSyncMessage::ReadPayload");
