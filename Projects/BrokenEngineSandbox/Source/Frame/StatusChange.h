@@ -178,11 +178,11 @@ inline StatusChangeData DefaultDataForType(StatusChangeType eType)
 {
 	switch (eType)
 	{
-		case StatusChangeType::kSpawnPlayer:      return SpawnPlayerData{};
-		case StatusChangeType::kDestroyPlayer:    return DestroyPlayerData{};
-		case StatusChangeType::kUpdatePlayer:      return UpdatePlayerData{};
-		case StatusChangeType::kUpdateFleet:       return UpdateFleetData{};
-		default:                                      return TransferData{};
+		case StatusChangeType::kSpawnPlayer:      return SpawnPlayerData {};
+		case StatusChangeType::kDestroyPlayer:    return DestroyPlayerData {};
+		case StatusChangeType::kUpdatePlayer:      return UpdatePlayerData {};
+		case StatusChangeType::kUpdateFleet:       return UpdateFleetData {};
+		default:                                      return TransferData {};
 	}
 }
 

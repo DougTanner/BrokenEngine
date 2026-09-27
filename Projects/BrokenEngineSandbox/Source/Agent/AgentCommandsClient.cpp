@@ -69,7 +69,7 @@ void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohmann::json
 		throw std::runtime_error("set_client_grid_coord 'coord' must be an array of 2 integers");
 	}
 
-	const engine::GridCoord coord {ClientGridCoordValue(rCoord.at(0), "set_client_grid_coord"), ClientGridCoordValue(rCoord.at(1), "set_client_grid_coord")};
+	engine::GridCoord coord {ClientGridCoordValue(rCoord.at(0), "set_client_grid_coord"), ClientGridCoordValue(rCoord.at(1), "set_client_grid_coord")};
 
 	// Before player assignment the subscription policy falls back to origin, so the requested cell would be dropped.
 	if (gpGame == nullptr)

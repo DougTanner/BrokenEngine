@@ -14,8 +14,8 @@ struct AssignPlayerMessage
 	int64_t iGlobalPlayerId = 0;
 	engine::GridCoord coord {};
 
-	template <typename TVisitor>
-	static void Visit(TVisitor& rVisitor, AssignPlayerMessage& rMessage)
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, AssignPlayerMessage& rMessage)
 	{
 		rVisitor.Field(rMessage.iGlobalPlayerId);
 		rVisitor.Field(rMessage.coord);
@@ -31,8 +31,8 @@ struct PlayerStateMessage
 	int64_t iGlobalPlayerId = 0;
 	engine::GridCoord coord {};
 
-	template <typename TVisitor>
-	static void Visit(TVisitor& rVisitor, PlayerStateMessage& rMessage)
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, PlayerStateMessage& rMessage)
 	{
 		rVisitor.Field(rMessage.uiWireType);
 		rVisitor.Field(rMessage.iGlobalPlayerId);
@@ -70,8 +70,8 @@ struct FleetSyncMessage
 	static_assert(kiFleetHeaderSize == 36);
 	static_assert(kiFleetMemberSize == 9);
 
-	template <typename TVisitor, typename TFleet>
-	static void VisitFleetHeader(TVisitor& rVisitor, TFleet& rFleet, int64_t& riMemberCount)
+	template <typename TVISITOR, typename TFLEET>
+	static void VisitFleetHeader(TVISITOR& rVisitor, TFLEET& rFleet, int64_t& riMemberCount)
 	{
 		rVisitor.Field(rFleet.guid.uiHigh);
 		rVisitor.Field(rFleet.guid.uiLow);
@@ -80,8 +80,8 @@ struct FleetSyncMessage
 		rVisitor.Field(rFleet.fNavigationDelay);
 	}
 
-	template <typename TVisitor, typename TFleetMember, typename TFlags>
-	static void VisitFleetMember(TVisitor& rVisitor, TFleetMember& rMember, TFlags& rFlags)
+	template <typename TVISITOR, typename TFLEETMEMBER, typename TFLAGS>
+	static void VisitFleetMember(TVISITOR& rVisitor, TFLEETMEMBER& rMember, TFLAGS& rFlags)
 	{
 		rVisitor.Field(rMember.globalPlayerId.iValue);
 		rVisitor.Field(rFlags);
@@ -90,7 +90,7 @@ struct FleetSyncMessage
 	static void WritePayload(common::Workbuffer& rWorkbuffer, const std::vector<Fleet>& rFleets)
 	{
 		int64_t iExpectedSize = rWorkbuffer.Count<uint8_t>() + kiFleetCountSize;
-		const int64_t iFleetCount = std::ssize(rFleets);
+		int64_t iFleetCount = std::ssize(rFleets);
 		engine::NetworkMessages::MessageWriter writer {rWorkbuffer};
 		writer.BoundedCount(iFleetCount, kiFleetHeaderSize, 0);
 		for (const Fleet& rFleet : rFleets)

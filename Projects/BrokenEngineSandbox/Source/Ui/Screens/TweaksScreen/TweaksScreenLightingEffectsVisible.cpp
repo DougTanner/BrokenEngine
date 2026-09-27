@@ -56,7 +56,7 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsVisibleRegistrar
 
 void TweaksScreen::RenderLightingEffectsVisibleTab()
 {
-	const int64_t iSection = engine::giTweakSectionLighting;
+	int64_t iSection = engine::giTweakSectionLighting;
 
 	if (ImGui::BeginTable("LightingEffectsVisibleColumns", 2))
 	{

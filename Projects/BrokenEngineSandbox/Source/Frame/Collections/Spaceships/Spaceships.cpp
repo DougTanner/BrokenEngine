@@ -371,7 +371,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{

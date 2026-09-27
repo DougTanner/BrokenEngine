@@ -11,7 +11,7 @@ namespace game
 // rResult the response "result" to populate. Throw on bad params, caught by
 // AgentCommandServer::Drain(). nlohmann::json / engine::GridCoord arrive via the game Pch. CoordFromParam is shared
 // with the injection group in AgentCommandsServer.cpp.
-engine::GridCoord CoordFromParam(const nlohmann::json& rParams, const char* pcKey = "coord");
+engine::GridCoord CoordFromParam(const nlohmann::json& rParams, std::string_view key = "coord");
 void CommandQueryFrame(const nlohmann::json& rParams, nlohmann::json& rResult);
 void CommandQueryPlayers(const nlohmann::json& rParams, nlohmann::json& rResult);
 void CommandQueryCollection(const nlohmann::json& rParams, nlohmann::json& rResult);

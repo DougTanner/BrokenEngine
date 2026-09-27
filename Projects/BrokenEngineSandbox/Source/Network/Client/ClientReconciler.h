@@ -35,7 +35,7 @@ private:
 	ConfirmedClientState mConfirmedClientState;
 	engine::ReconcileDispatcher mDispatcher;
 	float mfLastLoggedVisualErrorDelta = 0.0f;
-	int64_t miLastVisualErrorLogTick = -1000;
+	int64_t miLastVisualErrorLogTick = -1'000;
 };
 
 } // namespace game

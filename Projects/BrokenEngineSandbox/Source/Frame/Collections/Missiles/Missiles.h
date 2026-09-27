@@ -173,7 +173,7 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
 		XMVECTOR vecStoredDirection = DirectX::XMVectorZero();
 		engine::registry_id_t uiTarget;
-		float fAcceleration;
+		float fAcceleration = 0.0f;
 		MissileFlags_t flags;
 		engine::alignment_t alignment {};
 		float fDeltaRotationDelay = 0.0f;

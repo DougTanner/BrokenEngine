@@ -18,7 +18,7 @@ namespace
 // Distinct exactly-representable value per (row, column), so a column swapped with its neighbour cannot match.
 constexpr float MissileSharedRowScalar(int64_t i, int64_t iSeed, int64_t iColumn)
 {
-	return static_cast<float>(iSeed * 100000 + i * 10 + iColumn);
+	return static_cast<float>(iSeed * 100'000 + i * 10 + iColumn);
 }
 
 constexpr MissileFlags_t MissileSharedRowFlags(int64_t i, int64_t iSeed)
@@ -33,7 +33,7 @@ constexpr engine::alignment_t MissileSharedRowAlignment(int64_t i, int64_t iSeed
 
 constexpr engine::registry_id_t MissileSharedRowTarget(int64_t i, int64_t iSeed)
 {
-	return engine::registry_id_t {engine::uuid_t {iSeed * 100000 + i + 1}};
+	return engine::registry_id_t {engine::uuid_t {iSeed * 100'000 + i + 1}};
 }
 
 XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn)
@@ -116,7 +116,7 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		nlohmann::json steps = nlohmann::json::array();
 
 		// Runs one production SharedCollectionRead into dest and records the capacity metadata and buffer-reuse decision.
-		auto RunRead = [&](const char* pcLabel, int64_t iCapacity, int64_t iCount, int64_t iSeed)
+		auto RunRead = [&](std::string_view label, int64_t iCapacity, int64_t iCount, int64_t iSeed)
 		{
 			std::stringstream stream(std::ios::in | std::ios::out | std::ios::binary);
 			BuildStream(iCapacity, iCount, iSeed, stream);
@@ -125,7 +125,7 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 			engine::SharedCollectionRead(stream, destination);
 
 			nlohmann::json step;
-			step["label"] = pcLabel;
+			step["label"] = label;
 			step["logicalCapacity"] = destination.iCapacity;
 			step["physicalCapacity"] = destination.iPhysicalLayoutCapacity;
 			step["reused"] = (pBefore != nullptr && destination.pData.get() == pBefore);

@@ -18,9 +18,9 @@ static_assert(std::is_trivially_copyable_v<FleetGuid>, "FleetGuid must stay triv
 static_assert(std::is_standard_layout_v<FleetGuid>, "FleetGuid must stay standard-layout — BT_OFFSETOF above is only well-defined for standard-layout types");
 
 // DoS ceiling on per-client fleet count — well above any real use; bounds mFleets against a spamming client.
-constexpr int64_t kiMaxFleetsPerClient = 16;
+inline constexpr int64_t kiMaxFleetsPerClient = 16;
 // Per-fleet member cap — parity with Frame.cpp's kiMaxFleetSize (16); bounds Fleet::members against a spamming client.
-constexpr size_t kuiMaxFleetMembers = 16;
+inline constexpr size_t kuiMaxFleetMembers = 16;
 
 enum class FleetMemberFlags : uint8_t
 {

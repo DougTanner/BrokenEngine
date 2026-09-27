@@ -242,8 +242,8 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 					timer["aStarCount"] = rawRecord.iAuxiliaryCount;
 
 					engine::RawCpuTimerEventRecord eventRecord = gpProfileManager->GetRawCpuTimerEvent(i);
-					const bool bEventAvailable = eventRecord.flags & engine::RawCpuTimerEventFlags::kAvailable;
-					const bool bEventOverrun = eventRecord.flags & engine::RawCpuTimerEventFlags::kOverrun;
+					bool bEventAvailable = eventRecord.flags & engine::RawCpuTimerEventFlags::kAvailable;
+					bool bEventOverrun = eventRecord.flags & engine::RawCpuTimerEventFlags::kOverrun;
 					timer["activationEvent"] = {
 						{"available", bEventAvailable},
 						{"eventSequence", eventRecord.uiEventSequence},
@@ -284,14 +284,17 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 // Shared agent helpers validate agent parameters and throw on a bad one.
 
 // Parse a [x,y] JSON array into a GridCoord; each element must be an integer that fits int32_t.
-engine::GridCoord CoordFromParam(const nlohmann::json& rParams, const char* pcKey)
+engine::GridCoord CoordFromParam(const nlohmann::json& rParams, std::string_view key)
 {
-	if (!rParams.contains(pcKey) || !rParams.at(pcKey).is_array() || rParams.at(pcKey).size() != 2)
+	if (!rParams.contains(key) || !rParams.at(std::string(key)).is_array() || rParams.at(std::string(key)).size() != 2)
 	{
-		throw std::runtime_error(std::string("'") + pcKey + "' must be a [x,y] array");
+		std::string message("'");
+		message.append(key);
+		message.append("' must be a [x,y] array");
+		throw std::runtime_error(message);
 	}
-	const nlohmann::json& rCoord = rParams.at(pcKey);
-	std::string name = std::format("'{}'", pcKey);
+	const nlohmann::json& rCoord = rParams.at(std::string(key));
+	std::string name = std::format("'{}'", key);
 	return engine::GridCoord {engine::AgentGridCoordValue(rCoord.at(0), name), engine::AgentGridCoordValue(rCoord.at(1), name)};
 }
 

@@ -48,7 +48,7 @@ const engine::TweaksSliderMapRegistrar gSmokeDepositsRegistrar
 
 void TweaksScreen::RenderSmokeDepositsTab()
 {
-	const int64_t iSection = engine::giTweakSectionSmoke;
+	int64_t iSection = engine::giTweakSectionSmoke;
 
 	if (ImGui::BeginTable("SmokeDepositsColumns", 3))
 	{

@@ -46,7 +46,7 @@ const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 
 void TweaksScreen::RenderSoundEffects()
 {
-	const int64_t iSection = engine::giTweakSectionSound;
+	int64_t iSection = engine::giTweakSectionSound;
 
 	if (ImGui::BeginTable("SoundEffectsColumns", 2))
 	{

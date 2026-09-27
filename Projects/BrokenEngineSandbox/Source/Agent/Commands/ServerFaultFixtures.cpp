@@ -27,7 +27,7 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json
 		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
 	}
 
-	const std::string caseName = rParams.at("case").get<std::string>();
+	std::string caseName = rParams.at("case").get<std::string>();
 	if (caseName != "server_only" && caseName != "undersized" && caseName != "oversized" && caseName != "over_cap")
 	{
 		throw std::runtime_error("game_packet_fault_fixture 'case' must be server_only|undersized|oversized|over_cap");
@@ -140,7 +140,7 @@ void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::js
 		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
 	}
 
-	const std::string caseName = rParams.at("case").get<std::string>();
+	std::string caseName = rParams.at("case").get<std::string>();
 	if (caseName != "truncated" && caseName != "size_mismatch")
 	{
 		throw std::runtime_error("engine_packet_fault_fixture 'case' must be truncated|size_mismatch");
@@ -171,7 +171,7 @@ void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::js
 	// shared reader throws and the dispatch catch records "corrupt payload"; "size_mismatch" carries a readable
 	// entry plus one trailing byte, so the reader succeeds and the handler's exact-size cross-check records
 	// "ackstream size" locally. The two are mutually exclusive, so one packet is counted exactly once.
-	const int64_t iSize = caseName == "truncated" ? 10 : 38;
+	int64_t iSize = caseName == "truncated" ? 10 : 38;
 	std::vector<uint8_t> packet(static_cast<size_t>(iSize), 0);
 	packet.at(0) = static_cast<uint8_t>(engine::PacketType::kClientAckStream);
 	packet.at(1) = 1;
@@ -233,19 +233,19 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 			throw std::runtime_error("server_pre_handshake_ack_fixture requires byte-count headroom");
 		}
 
-		const int64_t iClientId = pClient->iClientId;
+		int64_t iClientId = pClient->iClientId;
 		ENetPeer* const pPeer = pClient->pPeer;
-		const bool bHandshakeComplete = pClient->bHandshakeComplete;
+		bool bHandshakeComplete = pClient->bHandshakeComplete;
 		int64_t iCorruptViolations = pClient->iCorruptViolations;
 		int64_t iRateViolations = pClient->iRateViolations;
-		const int64_t iPacketCount = pClient->iTickPacketCount;
-		const int64_t iByteCount = pClient->iTickByteCount;
-		const uint8_t uiPacketType = static_cast<uint8_t>(engine::PacketType::kClientAckStream);
-		const uint16_t uiTypeCount = pClient->tickTypeCounts[uiPacketType];
-		const int64_t iClientTimestampNs = pClient->iClientTimestampNs;
-		const int64_t iConsecutiveZeroAdvanceAcks = pClient->iConsecutiveZeroAdvanceAcks;
-		const bool bFloorStalled = pClient->bFloorStalled;
-		const int64_t iPeakConsecutiveStallAcks = pClient->iPeakConsecutiveStallAcks;
+		int64_t iPacketCount = pClient->iTickPacketCount;
+		int64_t iByteCount = pClient->iTickByteCount;
+		static constexpr uint8_t kuiPacketType = static_cast<uint8_t>(engine::PacketType::kClientAckStream);
+		uint16_t uiTypeCount = pClient->tickTypeCounts[kuiPacketType];
+		int64_t iClientTimestampNs = pClient->iClientTimestampNs;
+		int64_t iConsecutiveZeroAdvanceAcks = pClient->iConsecutiveZeroAdvanceAcks;
+		bool bFloorStalled = pClient->bFloorStalled;
+		int64_t iPeakConsecutiveStallAcks = pClient->iPeakConsecutiveStallAcks;
 		std::vector<engine::AckState> ackStates;
 		ackStates.reserve(pClient->slots.size());
 		for (const engine::ClientConnection::SlotState& rSlot : pClient->slots)
@@ -257,8 +257,8 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		engine::NetworkMessages::ClientAckStreamMessage message {};
 		engine::NetworkMessages::Write(rWorkbuffer, message);
-		const std::span<const uint8_t> packetData(reinterpret_cast<const uint8_t*>(rWorkbuffer.View().data()), rWorkbuffer.View().size());
-		const int64_t iPacketSize = static_cast<int64_t>(packetData.size());
+		std::span<const uint8_t> packetData(reinterpret_cast<const uint8_t*>(rWorkbuffer.View().data()), rWorkbuffer.View().size());
+		int64_t iPacketSize = static_cast<int64_t>(packetData.size());
 		if (iPacketSize != engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize)
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture failed to serialize the fixed ACK layout");
@@ -295,14 +295,14 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 			                  && rAfter.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh && rAfter.uiEpoch == rBefore.uiEpoch;
 		}
 
-		const bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1
-		                             && pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;
-		const bool bHandshakeRestored = bHandshakeComplete && pClient->bHandshakeComplete;
-		const bool bTypeCountUnchanged = pClient->tickTypeCounts[uiPacketType] == uiTypeCount;
-		const bool bAckStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcks
-		                             && pClient->bFloorStalled == bFloorStalled
-		                             && pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcks;
-		const bool bTimestampUnchanged = pClient->iClientTimestampNs == iClientTimestampNs;
+		bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1
+		                       && pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;
+		bool bHandshakeRestored = bHandshakeComplete && pClient->bHandshakeComplete;
+		bool bTypeCountUnchanged = pClient->tickTypeCounts[kuiPacketType] == uiTypeCount;
+		bool bAckStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcks
+		                       && pClient->bFloorStalled == bFloorStalled
+		                       && pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcks;
+		bool bTimestampUnchanged = pClient->iClientTimestampNs == iClientTimestampNs;
 		bool bContractViolationsUnchanged = pClient->iCorruptViolations == iCorruptViolations && pClient->iRateViolations == iRateViolations;
 		if (!bAdmissionAdvanced)
 		{
@@ -334,7 +334,7 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		}
 
 		rResult["clientId"] = iClientId;
-		rResult["type"] = uiPacketType;
+		rResult["type"] = kuiPacketType;
 		rResult["size"] = iPacketSize;
 		rResult["packetCountBefore"] = iPacketCount;
 		rResult["packetCountAfter"] = pClient->iTickPacketCount;

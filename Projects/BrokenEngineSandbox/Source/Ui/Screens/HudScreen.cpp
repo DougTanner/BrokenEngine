@@ -65,7 +65,7 @@ void HudScreen::Render()
 			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(coord).postRender.pPlayers;
 			for (int64_t i = 0; i < rPlayers.iCount && !bFoundAny; ++i)
 			{
-				const engine::global_id_t globalPlayerId = rPlayers.pGlobalPlayerIds[i];
+				engine::global_id_t globalPlayerId = rPlayers.pGlobalPlayerIds[i];
 				for (const FleetMember& rMember : pFleet->members)
 				{
 					if (rMember.globalPlayerId == globalPlayerId)
@@ -100,7 +100,7 @@ void HudScreen::Render()
 	{
 		mfTimeWantingForceOpen = 0.0f;
 	}
-	const bool bForceOpen = (mfTimeWantingForceOpen >= kfForceOpenGracePeriodSeconds);
+	bool bForceOpen = (mfTimeWantingForceOpen >= kfForceOpenGracePeriodSeconds);
 
 	// Durable log on rising edge of the genuine auto-un-hide trigger — fires once per recovery event.
 	// kWarning clears both the compile floor (keLogLevelDefault, kDebug) and the runtime default threshold (kInfo).
@@ -120,11 +120,11 @@ void HudScreen::Render()
 			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoord).postRender.pPlayers);
 		}
 	}
-	const bool bRightHasContent = oPlayerIndex.has_value();
+	bool bRightHasContent = oPlayerIndex.has_value();
 
 	// Mouse proximity to either anchor opens both panels (strict sync for the mouse path).
-	const ImVec2 vLeftAnchor(rIo.DisplaySize.x * kfHudEdgeMarginFraction, rIo.DisplaySize.y * kfHudPanelTopFraction);
-	const ImVec2 vRightAnchor(rIo.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rIo.DisplaySize.y * kfHudPanelTopFraction);
+	ImVec2 vLeftAnchor(rIo.DisplaySize.x * kfHudEdgeMarginFraction, rIo.DisplaySize.y * kfHudPanelTopFraction);
+	ImVec2 vRightAnchor(rIo.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rIo.DisplaySize.y * kfHudPanelTopFraction);
 
 	// Hover activation zone is a fixed-extent strip (PanelWidth x max-height fraction at the anchor), decoupled from the
 	// panels' content-driven live size so hover behavior is unchanged even as the panels visually shrink. Measure
@@ -135,15 +135,15 @@ void HudScreen::Render()
 		engine::ScopedMenuFont menuFont;
 		vHoverExtent = ImVec2(PanelWidth(), rIo.DisplaySize.y * kfHudPanelMaxHeightFraction);
 	}
-	const float fMouseLeft = engine::ComputeMouseOpennessTarget(vHoverExtent, vLeftAnchor, 0.0f);
-	const float fMouseRight = engine::ComputeMouseOpennessTarget(vHoverExtent, vRightAnchor, 1.0f);
-	const float fMouseTarget = std::max(fMouseLeft, fMouseRight);
+	float fMouseLeft = engine::ComputeMouseOpennessTarget(vHoverExtent, vLeftAnchor, 0.0f);
+	float fMouseRight = engine::ComputeMouseOpennessTarget(vHoverExtent, vRightAnchor, 1.0f);
+	float fMouseTarget = std::max(fMouseLeft, fMouseRight);
 
 	// Final shared targets. When right has content: both panels see max(force, mouse) — strict sync.
 	// When right has no content: left can still auto-un-hide (force only), right stays hidden.
-	const float fForceTarget = bForceOpen ? 1.0f : 0.0f;
-	const float fLeftTarget = bRightHasContent ? std::max(fForceTarget, fMouseTarget) : fForceTarget;
-	const float fRightTarget = bRightHasContent ? std::max(fForceTarget, fMouseTarget) : 0.0f;
+	float fForceTarget = bForceOpen ? 1.0f : 0.0f;
+	float fLeftTarget = bRightHasContent ? std::max(fForceTarget, fMouseTarget) : fForceTarget;
+	float fRightTarget = bRightHasContent ? std::max(fForceTarget, fMouseTarget) : 0.0f;
 
 	RenderFleetPanel(fLeftTarget);
 	RenderFocusedPlayerPanel(fRightTarget);
@@ -157,13 +157,13 @@ float HudScreen::PanelWidth()
 	const ImGuiStyle& rStyle = ImGui::GetStyle();
 
 	// Member-row template: content-spanning Selectable rows.
-	const float fMemberRowWidth = ImGui::CalcTextSize("Ship 88 (-888,-888) #8888888888").x;
+	float fMemberRowWidth = ImGui::CalcTextSize("Ship 88 (-888,-888) #8888888888").x;
 
 	// Nav-row template: [<] 88/88 [>] [+] [-]. Padding-dominated — at low gUiFontScale text shrinks but the per-button
 	// FramePadding and per-joint ItemSpacing don't, so measure them explicitly: 4 buttons × 2 edges (8× FramePadding.x),
 	// 4 SameLine joints (4× ItemSpacing.x). Otherwise the row can exceed the text-only width and clip trailing buttons.
-	const float fNavTextWidth = ImGui::CalcTextSize("[<]88/88[>][+][-]").x;
-	const float fNavRowWidth = fNavTextWidth + 8.0f * rStyle.FramePadding.x + 4.0f * rStyle.ItemSpacing.x;
+	float fNavTextWidth = ImGui::CalcTextSize("[<]88/88[>][+][-]").x;
+	float fNavRowWidth = fNavTextWidth + 8.0f * rStyle.FramePadding.x + 4.0f * rStyle.ItemSpacing.x;
 
 	// ScrollbarSize added unconditionally (not gated on list length) so the width stays frame-to-frame stable when a
 	// vertical scrollbar appears on long fleet lists — otherwise it would clip the exact-fit member rows.
@@ -175,14 +175,14 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGuiIO& rIo = ImGui::GetIO();
 	engine::ScopedMenuScale menuScale;
 
-	const ImVec2 vAnchor(rIo.DisplaySize.x * kfHudEdgeMarginFraction, rIo.DisplaySize.y * kfHudPanelTopFraction);
-	const float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFleetSlide, vAnchor, -1.0f, fTarget);
+	ImVec2 vAnchor(rIo.DisplaySize.x * kfHudEdgeMarginFraction, rIo.DisplaySize.y * kfHudPanelTopFraction);
+	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFleetSlide, vAnchor, -1.0f, fTarget);
 	ImGuiWindowFlags eFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize;
 	engine::ScopedMenuFont menuFont;
 	// Content-driven height: auto-resize to the fleet list, capped at kfHudPanelMaxHeightFraction (long lists scroll). Width
 	// pinned to PanelWidth() via the matching min/max constraint x.
-	const float fPanelWidth = PanelWidth();
-	const float fMaxHeight = rIo.DisplaySize.y * kfHudPanelMaxHeightFraction;
+	float fPanelWidth = PanelWidth();
+	float fMaxHeight = rIo.DisplaySize.y * kfHudPanelMaxHeightFraction;
 	ImGui::SetNextWindowSize(ImVec2(fPanelWidth, 0.0f), ImGuiCond_Always);
 	ImGui::SetNextWindowSizeConstraints(ImVec2(fPanelWidth, 0.0f), ImVec2(fPanelWidth, fMaxHeight));
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
@@ -379,13 +379,13 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 		}
 	}
 
-	const ImVec2 vAnchor(rIo.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rIo.DisplaySize.y * kfHudPanelTopFraction);
-	const float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedPlayerSlide, vAnchor, 1.0f, fTarget);
+	ImVec2 vAnchor(rIo.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rIo.DisplaySize.y * kfHudPanelTopFraction);
+	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedPlayerSlide, vAnchor, 1.0f, fTarget);
 	ImGuiWindowFlags eFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	engine::ScopedMenuFont menuFont;
 	// Match the left FleetPanel's size exactly (symmetry): same PanelWidth(), height forced to the left panel's live height
 	// captured earlier this frame (RenderFleetPanel runs first). First frame (vLastSize.y still zero): fall back to the cap.
-	const float fLeftHeight = (mFleetSlide.vLastSize.y > 0.0f) ? mFleetSlide.vLastSize.y : (rIo.DisplaySize.y * kfHudPanelMaxHeightFraction);
+	float fLeftHeight = (mFleetSlide.vLastSize.y > 0.0f) ? mFleetSlide.vLastSize.y : (rIo.DisplaySize.y * kfHudPanelMaxHeightFraction);
 	ImGui::SetNextWindowSize(ImVec2(PanelWidth(), fLeftHeight), ImGuiCond_Always);
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(0.0f, 0.0f));
 	ImGui::Begin("FocusedPlayerPanel", nullptr, eFlags);
@@ -405,10 +405,10 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 
 		const char* pLabel = bUseMissiles ? "Missiles" : "Blasters";
 		const ImGuiStyle& rStyle = ImGui::GetStyle();
-		const ImVec2 vLabelSize = ImGui::CalcTextSize(pLabel);
-		const ImVec2 vButtonSize(vLabelSize.x + 2.0f * rStyle.FramePadding.x, vLabelSize.y + 2.0f * rStyle.FramePadding.y);
-		const ImVec2 vAvailable = ImGui::GetContentRegionAvail();
-		const ImVec2 vCursor = ImGui::GetCursorPos();
+		ImVec2 vLabelSize = ImGui::CalcTextSize(pLabel);
+		ImVec2 vButtonSize(vLabelSize.x + 2.0f * rStyle.FramePadding.x, vLabelSize.y + 2.0f * rStyle.FramePadding.y);
+		ImVec2 vAvailable = ImGui::GetContentRegionAvail();
+		ImVec2 vCursor = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(vCursor.x + std::max(0.0f, 0.5f * (vAvailable.x - vButtonSize.x)), vCursor.y + std::max(0.0f, 0.5f * (vAvailable.y - vButtonSize.y))));
 
 		ImGui::BeginDisabled(gpGame->mWeaponModeToggle.IsPending());

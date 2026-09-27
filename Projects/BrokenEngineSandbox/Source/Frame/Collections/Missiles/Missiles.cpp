@@ -335,7 +335,7 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{

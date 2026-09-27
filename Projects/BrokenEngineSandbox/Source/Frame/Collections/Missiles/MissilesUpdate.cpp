@@ -252,7 +252,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	// both spans off the workbuffer, which a per-missile span would overrun on a worker thread; each chunk folds its
 	// subscriptions into the shared counts before the next one starts, so chunked ascending order assigns exactly
 	// what one whole-collection batch assigns.
-	constexpr int64_t kiAcquireChunk = 64;
+	static constexpr int64_t kiAcquireChunk = 64;
 	int64_t piAcquireRows[kiAcquireChunk] {};
 	engine::RegistryResult pAcquireResults[kiAcquireChunk] {};
 	int64_t iAcquireCount = 0;

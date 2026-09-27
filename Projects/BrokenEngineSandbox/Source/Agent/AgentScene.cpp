@@ -152,7 +152,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 			{
 				throw std::runtime_error("describe_scene 'unitTypes' must be an array of strings");
 			}
-			const std::string unitType = rUnitType.get<std::string>();
+			std::string unitType = rUnitType.get<std::string>();
 			if (unitType == "player")
 			{
 				bIncludePlayers = true;
@@ -233,7 +233,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		// Unit positions are local to this cell, while the visible area and the screen projection are in the
 		// camera cell's frame, so every row rebases once before the cull and the projection and reports the
 		// unrebased local value.
-		const engine::RenderBasis basis = engine::MakeRenderBasis(rCoord, engine::gpCamera->mBasisCoord);
+		engine::RenderBasis basis = engine::MakeRenderBasis(rCoord, engine::gpCamera->mBasisCoord);
 
 		iPlayerTotal += rFrame.postRender.pPlayers->iCount;
 		iSpaceshipTotal += rFrame.postRender.pSpaceships->iCount;

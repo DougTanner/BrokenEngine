@@ -46,7 +46,7 @@ void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rPar
 		{
 			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
-		const std::string caseName = rParams.at("case").get<std::string>();
+		std::string caseName = rParams.at("case").get<std::string>();
 		if (caseName != "engine_envelope")
 		{
 			throw std::runtime_error("client_packet_fault_fixture 'case' must be engine_envelope");

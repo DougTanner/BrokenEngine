@@ -133,10 +133,10 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}
 
-	const int64_t iTick = pCurrentFrame->interpolate.iTick;
-	const engine::GridCoord coord = gpGame->mClientGridCoord;
-	const common::crc_t uiExpectedCrc = pCurrentFrame->postRender.sharedCrc;
-	const common::crc_t uiActualCrc = uiExpectedCrc ^ static_cast<common::crc_t>(1);
+	int64_t iTick = pCurrentFrame->interpolate.iTick;
+	engine::GridCoord coord = gpGame->mClientGridCoord;
+	common::crc_t uiExpectedCrc = pCurrentFrame->postRender.sharedCrc;
+	common::crc_t uiActualCrc = uiExpectedCrc ^ static_cast<common::crc_t>(1);
 
 	for (int64_t i = 0; i < iDesyncReportCount; ++i)
 	{

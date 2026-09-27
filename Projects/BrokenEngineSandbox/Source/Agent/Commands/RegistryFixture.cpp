@@ -41,14 +41,14 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 
 		// The consumer alignment collides with the source alignment and with nothing else, so a consumer bound
 		// to the neutral alignment must be refused every candidate.
-		constexpr engine::alignment_t kConsumerAlignment {1u};
-		constexpr engine::alignment_t kSourceAlignment {2u};
-		constexpr engine::alignment_t kNeutralAlignment {3u};
+		static constexpr engine::alignment_t kConsumerAlignment {1u};
+		static constexpr engine::alignment_t kSourceAlignment {2u};
+		static constexpr engine::alignment_t kNeutralAlignment {3u};
 		engine::Alignments alignments;
 		alignments.AddAlignment(kConsumerAlignment, kSourceAlignment, engine::AlignmentFlags::kEnemies);
 
 		// Three sources directly ahead of the consumers at strictly increasing angle, roughly 100 m away.
-		constexpr int64_t kiSourceCount = 3;
+		static constexpr int64_t kiSourceCount = 3;
 		const engine::registry_id_t puiSourceIds[kiSourceCount] = {MakeRegistryId(1), MakeRegistryId(2), MakeRegistryId(3)};
 		const XMVECTOR pVecSourceCurrent[kiSourceCount] =
 		{
@@ -67,11 +67,11 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		const int64_t piSourceRowsWithoutThird[2] = {0, 1};
 
 		// One consumer column: rows 0-2 already subscribe (id 1 twice, id 2 once, id 3 never), rows 3-5 acquire.
-		constexpr int64_t kiConsumerCount = 6;
-		constexpr int64_t kiAcquireCount = 3;
+		static constexpr int64_t kiConsumerCount = 6;
+		static constexpr int64_t kiAcquireCount = 3;
 		engine::registry_id_t puiConsumerTargets[kiConsumerCount] = {MakeRegistryId(1), MakeRegistryId(1), MakeRegistryId(2), {}, {}, {}};
-		const XMVECTOR vecConsumerOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-		const XMVECTOR vecConsumerDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+		XMVECTOR vecConsumerOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+		XMVECTOR vecConsumerDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		XMVECTOR pVecConsumerOrigins[kiConsumerCount] = {};
 		XMVECTOR pVecConsumerDirections[kiConsumerCount] = {};
 		engine::alignment_t pConsumerAlignments[kiConsumerCount] = {};
@@ -87,8 +87,8 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		const int64_t piAcquireRows[kiAcquireCount] = {3, 4, 5};
 		const int64_t piFirstAcquireRow[1] = {3};
 
-		constexpr float kfRadius = 200.0f;
-		constexpr float kfShortRadius = 50.0f;
+		static constexpr float kfRadius = 200.0f;
+		static constexpr float kfShortRadius = 50.0f;
 
 		// Registry-internal scratch, one fixed block large enough for every window below so nothing here
 		// allocates. Each window relays its eligible rows into the front of the block and rebinds them there,
@@ -102,7 +102,7 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 			{
 				iEligibleRows += static_cast<int64_t>(rLayer.rows.size());
 			}
-			const int64_t iScratchBytes = engine::RegistryScratchBytes(iEligibleRows);
+			int64_t iScratchBytes = engine::RegistryScratchBytes(iEligibleRows);
 			if (iScratchBytes > static_cast<int64_t>(sizeof(pScratch)))
 			{
 				throw std::runtime_error("registry_fixture scratch buffer too small");
@@ -163,7 +163,7 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 			engine::RegistryQueryContext context = BuildContext(std::span<engine::RegistrySourceLayer>(&sourceLayer, 1), std::span<const engine::RegistrySubscriptionLayer>(&subscriptionLayer, 1));
 			engine::AcquireRegistryTargets(context, batch, kfShortRadius);
 		}
-		const bool bRadiusRejected = AllAcquiredInvalid();
+		bool bRadiusRejected = AllAcquiredInvalid();
 
 		// Alignment rejection: the neutral consumer alignment collides with nothing, so range alone is not enough.
 		SeedAcquireRows();
@@ -173,7 +173,7 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 			engine::RegistryQueryContext context = BuildContext(std::span<engine::RegistrySourceLayer>(&sourceLayer, 1), std::span<const engine::RegistrySubscriptionLayer>(&subscriptionLayer, 1));
 			engine::AcquireRegistryTargets(context, neutralBatch, kfRadius);
 		}
-		const bool bAlignmentRejected = AllAcquiredInvalid();
+		bool bAlignmentRejected = AllAcquiredInvalid();
 
 		// Ranking and radius acceptance. Starting counts are id 1: 2, id 2: 1, id 3: 0, so the fixed policy opens
 		// on the least-subscribed id 3, then splits the next shot to id 2 on the smaller angle, then back to id 3.
@@ -183,8 +183,8 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		}
 		rResult["rankingDistribution"] = nlohmann::json::array(
 			{puiConsumerTargets[3].ToUuid().Value(), puiConsumerTargets[4].ToUuid().Value(), puiConsumerTargets[5].ToUuid().Value()});
-		const bool bRankingCorrect = puiConsumerTargets[3] == MakeRegistryId(3) && puiConsumerTargets[4] == MakeRegistryId(2)
-		                           && puiConsumerTargets[5] == MakeRegistryId(3);
+		bool bRankingCorrect = puiConsumerTargets[3] == MakeRegistryId(3) && puiConsumerTargets[4] == MakeRegistryId(2)
+		                     && puiConsumerTargets[5] == MakeRegistryId(3);
 
 		// Permuting the source rows and rebuilding the context resolves every handle to the same row.
 		const engine::registry_id_t puiPermutedIds[kiSourceCount] = {puiSourceIds[2], puiSourceIds[0], puiSourceIds[1]};
@@ -228,14 +228,14 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 			engine::AcquireRegistryTargets(context, reacquireBatch, kfRadius);
 		}
 		rResult["reacquiredId"] = puiConsumerTargets[3].ToUuid().Value();
-		const bool bReacquireCorrect = puiConsumerTargets[3] == MakeRegistryId(1);
+		bool bReacquireCorrect = puiConsumerTargets[3] == MakeRegistryId(1);
 
 		// Counts use uint16_t storage, so prove that 256 existing subscriptions remain representable and that
 		// ranking still prefers the less-subscribed source. Releasing one source-A handle must clear that handle
 		// and decrement only source A to 255 while the context is live.
-		constexpr int64_t kiHighSourceCount = 2;
-		constexpr int64_t kiHighExistingSubscriptionCount = 257;
-		constexpr int64_t kiHighConsumerCount = kiHighExistingSubscriptionCount + 1;
+		static constexpr int64_t kiHighSourceCount = 2;
+		static constexpr int64_t kiHighExistingSubscriptionCount = 257;
+		static constexpr int64_t kiHighConsumerCount = kiHighExistingSubscriptionCount + 1;
 		const engine::registry_id_t puiHighSourceIds[kiHighSourceCount] = {MakeRegistryId(21), MakeRegistryId(22)};
 		const XMVECTOR pVecHighSourcePositions[kiHighSourceCount] =
 		{
@@ -309,7 +309,7 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		// Exact tie: three candidates share one position, so the lowest layer and row must win.
 		const engine::registry_id_t puiTieIdsA[2] = {MakeRegistryId(11), MakeRegistryId(12)};
 		const engine::registry_id_t puiTieIdsB[1] = {MakeRegistryId(13)};
-		const XMVECTOR vecTiePosition = XMVectorSet(100.0f, 0.0f, 0.0f, 1.0f);
+		XMVECTOR vecTiePosition = XMVectorSet(100.0f, 0.0f, 0.0f, 1.0f);
 		const XMVECTOR pVecTieCurrentA[2] = {vecTiePosition, vecTiePosition};
 		const XMVECTOR pVecTieCurrentB[1] = {vecTiePosition};
 		const engine::alignment_t pTieAlignments[2] = {kSourceAlignment, kSourceAlignment};
@@ -342,11 +342,11 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 			engine::AcquireRegistryTargets(context, tieBatch, kfRadius);
 		}
 		rResult["tieWinnerId"] = puiTieTarget[0].ToUuid().Value();
-		const bool bTieCorrect = puiTieTarget[0] == MakeRegistryId(11);
+		bool bTieCorrect = puiTieTarget[0] == MakeRegistryId(11);
 
 		// Ownership layers: one natively typed, one bound through RegistryIdBytes over a foreign id type, and one
 		// with no global-id column at all.
-		constexpr int64_t kiOwnerCount = 4;
+		static constexpr int64_t kiOwnerCount = 4;
 		const engine::registry_id_t puiOwnerIds[kiOwnerCount] = {MakeRegistryId(41), MakeRegistryId(42), MakeRegistryId(43), MakeRegistryId(44)};
 		const registry_fixture_owner_t puiForeignOwnerIds[kiOwnerCount] =
 		{
@@ -374,9 +374,9 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 		anonymousLayer.iCount = kiOwnerCount;
 
 		rResult["ownershipRowCount"] = engine::CountRegistryRows(ownerLayer);
-		const bool bOwnershipCountCorrect = engine::CountRegistryRows(ownerLayer) == kiOwnerCount;
+		bool bOwnershipCountCorrect = engine::CountRegistryRows(ownerLayer) == kiOwnerCount;
 
-		constexpr engine::global_id_t kMissingGlobalId {999};
+		static constexpr engine::global_id_t kMissingGlobalId {999};
 		bool bForeignLookupMatches = true;
 		for (int64_t i = 0; i < kiOwnerCount; ++i)
 		{
@@ -384,21 +384,21 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParams, [[ma
 			                     && engine::RegistryUuidByGlobalId(foreignLayer, pOwnerGlobalIds[i]) == puiOwnerIds[i].ToUuid()
 			                     && engine::RegistryUuidByGlobalId(foreignLayer, pOwnerGlobalIds[i]) == engine::RegistryUuidByGlobalId(ownerLayer, pOwnerGlobalIds[i]);
 		}
-		const bool bUuidLookupHit = engine::RegistryUuidByGlobalId(ownerLayer, pOwnerGlobalIds[2]) == puiOwnerIds[2].ToUuid();
-		const bool bUuidLookupMiss = engine::RegistryUuidByGlobalId(ownerLayer, kMissingGlobalId) == engine::uuid_t {};
-		const bool bUuidLookupWithoutGlobalIds = engine::RegistryUuidByGlobalId(anonymousLayer, pOwnerGlobalIds[2]) == engine::uuid_t {};
+		bool bUuidLookupHit = engine::RegistryUuidByGlobalId(ownerLayer, pOwnerGlobalIds[2]) == puiOwnerIds[2].ToUuid();
+		bool bUuidLookupMiss = engine::RegistryUuidByGlobalId(ownerLayer, kMissingGlobalId) == engine::uuid_t {};
+		bool bUuidLookupWithoutGlobalIds = engine::RegistryUuidByGlobalId(anonymousLayer, pOwnerGlobalIds[2]) == engine::uuid_t {};
 
 		// The registry's only write: exactly the matched row changes, and a miss changes nothing.
-		const engine::ClientGuid assignedGuid {0x1122334455667788ULL, 0x99aabbccddeeff00ULL};
-		const engine::ClientGuid rejectedGuid {0x0123456789abcdefULL, 0xfedcba9876543210ULL};
-		const bool bAssignHitReturnedTrue = engine::AssignRegistryClientGuid(ownerLayer, pOwnerGlobalIds[1], assignedGuid);
-		bool bAssignHitIsolated = pOwnerClientGuids[1] == assignedGuid;
+		static constexpr engine::ClientGuid kAssignedGuid {0x1122334455667788ULL, 0x99aabbccddeeff00ULL};
+		static constexpr engine::ClientGuid kRejectedGuid {0x0123456789abcdefULL, 0xfedcba9876543210ULL};
+		bool bAssignHitReturnedTrue = engine::AssignRegistryClientGuid(ownerLayer, pOwnerGlobalIds[1], kAssignedGuid);
+		bool bAssignHitIsolated = pOwnerClientGuids[1] == kAssignedGuid;
 		for (int64_t i = 0; i < kiOwnerCount; ++i)
 		{
 			bAssignHitIsolated = bAssignHitIsolated && (i == 1 || pOwnerClientGuids[i].IsEmpty());
 		}
-		const bool bAssignMissReturnedFalse = !engine::AssignRegistryClientGuid(ownerLayer, kMissingGlobalId, rejectedGuid);
-		bool bAssignMissChangedNothing = pOwnerClientGuids[1] == assignedGuid;
+		bool bAssignMissReturnedFalse = !engine::AssignRegistryClientGuid(ownerLayer, kMissingGlobalId, kRejectedGuid);
+		bool bAssignMissChangedNothing = pOwnerClientGuids[1] == kAssignedGuid;
 		for (int64_t i = 0; i < kiOwnerCount; ++i)
 		{
 			bAssignMissChangedNothing = bAssignMissChangedNothing && (i == 1 || pOwnerClientGuids[i].IsEmpty());

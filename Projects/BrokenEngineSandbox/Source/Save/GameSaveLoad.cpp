@@ -18,7 +18,8 @@ namespace game
 
 bool WriteReplayMeta(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename)
 {
-	ReplayMeta meta {
+	ReplayMeta meta
+	{
 		.clientGridCoord = game::gpGame->mClientGridCoord,
 		.iClientPlayerIdValue = game::gpGame->ClientPlayerId().iValue,
 		.fPreviousClientArmor = game::gpGame->PreviousClientArmor(),
@@ -73,8 +74,8 @@ bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 		return false;
 	}
 
-	const int64_t iLoadedTick = game::gpGame->TickCounter();
-	const float fLoadedTime = game::gpGame->CurrentTime();
+	int64_t iLoadedTick = game::gpGame->TickCounter();
+	float fLoadedTime = game::gpGame->CurrentTime();
 	game::gpGame->Reset();
 	// Reset clears the clock; restore the saved values before client resynchronization.
 	game::gpGame->SetTickCounter(iLoadedTick);

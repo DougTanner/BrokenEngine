@@ -260,9 +260,9 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			throw std::runtime_error("client_cancelled_subscription_fixture requires a clean unsubscribed slot");
 		}
 
-		const std::vector<engine::GridCoord> desiredBefore = rRuntime.mDesiredCoords;
-		const std::unordered_map<engine::GridCoord, std::chrono::steady_clock::time_point> stickyBefore = rRuntime.mUnwantedTimestamps;
-		const std::vector<engine::GridCoord> queueBefore = rRuntime.mSubscriptionQueue;
+		std::vector<engine::GridCoord> desiredBefore = rRuntime.mDesiredCoords;
+		std::unordered_map<engine::GridCoord, std::chrono::steady_clock::time_point> stickyBefore = rRuntime.mUnwantedTimestamps;
+		std::vector<engine::GridCoord> queueBefore = rRuntime.mSubscriptionQueue;
 		engine::ClientCoordSlot& rSlot = rClient.mCoordSlots.at(iSlot);
 		rClient.mSubscribeRequests.Add(coord);
 		uint16_t uiRetainedEpoch = rSlot.ackState.uiEpoch;
@@ -368,9 +368,8 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 #endif
 }
 
-void DetachClientSubscriptionFixtures(ClientSession& rSession)
+void DetachClientSubscriptionFixtures([[maybe_unused]] ClientSession& rSession)
 {
-	(void)rSession;
 	engine::ClientNetworkFixtures::Detach();
 #if defined(BT_DEBUG)
 	sCancelledFixture.reset();

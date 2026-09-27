@@ -45,8 +45,8 @@ bool IsCoordActive(engine::GridCoord coord)
 
 bool AreAdjacent(engine::GridCoord source, engine::GridCoord destination)
 {
-	const int64_t iDeltaX = static_cast<int64_t>(destination.x) - source.x;
-	const int64_t iDeltaY = static_cast<int64_t>(destination.y) - source.y;
+	int64_t iDeltaX = static_cast<int64_t>(destination.x) - source.x;
+	int64_t iDeltaY = static_cast<int64_t>(destination.y) - source.y;
 	return (iDeltaX != 0 || iDeltaY != 0) && std::abs(iDeltaX) <= 1 && std::abs(iDeltaY) <= 1;
 }
 
@@ -128,7 +128,7 @@ void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& rParams
 	}
 	else
 	{
-		const engine::ReplayFixtures::TransferCaptureSnapshot captureInfo = engine::ReplayFixtures::CaptureSnapshot(*engine::gpReplay);
+		engine::ReplayFixtures::TransferCaptureSnapshot captureInfo = engine::ReplayFixtures::CaptureSnapshot(*engine::gpReplay);
 		rResult["firstWriterInputTick"] = captureInfo.iFirstWriterInputTick;
 		rResult["writerInputCount"] = captureInfo.iWriterInputCount;
 
@@ -189,7 +189,7 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 			throw std::runtime_error("replay_inject_persistence_failure requires string 'stage'");
 		}
 
-		const std::string stage = rParams.at("stage").get<std::string>();
+		std::string stage = rParams.at("stage").get<std::string>();
 		engine::ReplayFixtures::PersistenceFailurePoint eFailurePoint = engine::ReplayFixtures::PersistenceFailurePoint::kNone;
 		if (stage == "invalidation")
 		{
@@ -234,8 +234,8 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 			throw std::runtime_error(engine::gpReplay->IsRecording() ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
 		}
 
-		const bool bRequiresCoord = eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kCoordinateWriter
-		                         || eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kFullFramesRecord;
+		bool bRequiresCoord = eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kCoordinateWriter
+		                   || eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kFullFramesRecord;
 		if (bRequiresCoord != rParams.contains("coord"))
 		{
 			throw std::runtime_error(bRequiresCoord ? "selected stage requires 'coord'" : "'coord' is only valid for coordinate_writer or fullframes_record");
@@ -271,8 +271,8 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 		{
 			throw std::runtime_error("cannot queue replay transfer fixture during replay playback");
 		}
-		const bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused)
-		                        && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !engine::gpReplay->IsRecording();
+		bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused) && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay)
+		                  && !engine::gpReplay->IsRecording();
 		if (!engine::gpReplay->IsRecording() && !bPendingStart)
 		{
 			throw std::runtime_error("replay_transfer_fixture requires active recording or a paused pending recording start");
@@ -299,7 +299,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			throw std::runtime_error("replay_transfer_fixture pauseAfterWriterInput is already armed");
 		}
 
-		const std::string type = rParams.at("type").get<std::string>();
+		std::string type = rParams.at("type").get<std::string>();
 		StatusChangeType eType {};
 		if (type == "player")
 		{
@@ -322,8 +322,8 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			throw std::runtime_error("'type' must be player|spaceship|blaster|missile");
 		}
 
-		const engine::GridCoord source = CoordFromParam(rParams, "source");
-		const engine::GridCoord destination = CoordFromParam(rParams, "destination");
+		engine::GridCoord source = CoordFromParam(rParams, "source");
+		engine::GridCoord destination = CoordFromParam(rParams, "destination");
 		if (!AreAdjacent(source, destination))
 		{
 			throw std::runtime_error("'source' and 'destination' must be distinct adjacent coords");
@@ -332,7 +332,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 		{
 			throw std::runtime_error("'source' is not active");
 		}
-		const auto sourceIt = gpGame->mCoordFrames.find(source);
+		auto sourceIt = gpGame->mCoordFrames.find(source);
 		if (sourceIt == gpGame->mCoordFrames.end())
 		{
 			throw std::runtime_error("'source' frame is not ready");
@@ -367,7 +367,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			XMStoreFloat4A(&f4Area, engine::LocalFrameArea());
 			// Blasters are destroyed by point-terrain contact, so place this debug fixture in a terrain-clear
 			// cell and verify the first fixed-tick movement remains clear too.
-			constexpr int64_t kiTerrainGridDim = 20;
+			static constexpr int64_t kiTerrainGridDim = 20;
 			float fPitchX = (f4Area.z - f4Area.x) / static_cast<float>(kiTerrainGridDim);
 			float fPitchY = (f4Area.y - f4Area.w) / static_cast<float>(kiTerrainGridDim);
 			bool bFoundTerrainClearPosition = false;
@@ -648,7 +648,7 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 			// so another tick cannot move the floor or observe a partially committed transaction.
 			std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
 			iQueuedAtTick = gpGame->TickCounter();
-			constexpr int64_t kiMinimumSampleTickOffset = engine::kiTickRate + 1;
+			static constexpr int64_t kiMinimumSampleTickOffset = engine::kiTickRate + 1;
 			if (iQueuedAtTick > std::numeric_limits<int64_t>::max() - kiMinimumSampleTickOffset)
 			{
 				throw std::runtime_error("navQueryActivation tick range exhausted");
@@ -696,7 +696,7 @@ void CommandSpawnPlayers(const nlohmann::json& rParams, nlohmann::json& rResult)
 	}
 	int64_t iCount = rParams.at("count").get<int64_t>();
 	// Spawn changes are allocated up front, before any tick runs.
-	constexpr int64_t kiMaxSpawnCount = 256; // matches the query window default limit
+	static constexpr int64_t kiMaxSpawnCount = 256; // matches the query window default limit
 	if (iCount < 0)
 	{
 		throw std::runtime_error("'count' must be in [0, 256]");
@@ -745,7 +745,7 @@ void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json&
 			throw std::runtime_error("inject_outward_transfer requires exactly {\"coord\":[x,y],\"delta\":[dx,dy]}");
 		}
 
-		const engine::GridCoord coord = CoordFromParam(rParams);
+		engine::GridCoord coord = CoordFromParam(rParams);
 		if (!rParams.contains("delta"))
 		{
 			throw std::runtime_error("inject_outward_transfer requires exactly {\"coord\":[x,y],\"delta\":[dx,dy]}");
@@ -767,8 +767,8 @@ void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json&
 		{
 			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
 		}
-		const int64_t iDeltaX = rDelta.at(0).get<int64_t>();
-		const int64_t iDeltaY = rDelta.at(1).get<int64_t>();
+		int64_t iDeltaX = rDelta.at(0).get<int64_t>();
+		int64_t iDeltaY = rDelta.at(1).get<int64_t>();
 		if (std::abs(iDeltaX) > 1)
 		{
 			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
@@ -789,7 +789,7 @@ void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json&
 		// keeps the crossing off an exact multiple of the step, so the departing position overshoots the edge
 		// instead of landing on it, and the cell-width subtraction PrepareTransferRequest applies leaves the
 		// destination-local position strictly inside the destination cell.
-		constexpr float kfCoastMargin = (16.0f - 0.5f) * kfPlayerMaxSpeed * engine::kfDeltaTime;
+		static constexpr float kfCoastMargin = (16.0f - 0.5f) * kfPlayerMaxSpeed * engine::kfDeltaTime;
 		// Midpoint of the requested edge: the half-extent pulled inward on each non-zero axis, the cell centre
 		// on a zero-delta one.
 		float fPositionX = (iDeltaX > 0) ? f4Area.z - kfCoastMargin : (iDeltaX < 0) ? f4Area.x + kfCoastMargin : (f4Area.x + f4Area.z) * 0.5f;
@@ -1041,11 +1041,11 @@ void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, Repla
 	{
 		switch (rTransfer.eType)
 		{
-		case StatusChangeType::kTransferPlayer: ++rCounts.iPlayerCount; break;
-		case StatusChangeType::kTransferSpaceship: ++rCounts.iSpaceshipCount; break;
-		case StatusChangeType::kTransferBlaster: ++rCounts.iBlasterCount; break;
-		case StatusChangeType::kTransferMissile: ++rCounts.iMissileCount; break;
-		default: DEBUG_BREAK(); break;
+			case StatusChangeType::kTransferPlayer: ++rCounts.iPlayerCount; break;
+			case StatusChangeType::kTransferSpaceship: ++rCounts.iSpaceshipCount; break;
+			case StatusChangeType::kTransferBlaster: ++rCounts.iBlasterCount; break;
+			case StatusChangeType::kTransferMissile: ++rCounts.iMissileCount; break;
+			default: DEBUG_BREAK(); break;
 		}
 	}
 }

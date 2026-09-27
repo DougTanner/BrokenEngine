@@ -118,7 +118,7 @@ void FrameInterpolate::Register()
 	PlayersInterpolate::Register();
 
 	// Collections
-	engine::ForEachRegister(GameInterpolateTypes{});
+	engine::ForEachRegister(GameInterpolateTypes {});
 }
 
 #if defined(BT_CLIENT)
@@ -131,7 +131,7 @@ void FrameInterpolate::GraphicsResources()
 	PlayersInterpolate::GraphicsResources();
 
 	// Collections
-	engine::ForEachGraphicsResources(GameInterpolateTypes{});
+	engine::ForEachGraphicsResources(GameInterpolateTypes {});
 }
 #endif // BT_CLIENT
 
@@ -177,7 +177,7 @@ void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame
 	PlayersInterpolate::Update(rCurrent, rPreviousFrame);
 
 	// Collections
-	engine::ForEachInterpolateUpdate(GameInterpolateTypes{}, rCurrent, rPreviousFrame);
+	engine::ForEachInterpolateUpdate(GameInterpolateTypes {}, rCurrent, rPreviousFrame);
 }
 
 void FramePostRender::AllocateAndCopy(FramePostRender& __restrict rCurrent, const FramePostRender& __restrict rPrevious)
@@ -212,7 +212,7 @@ void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict r
 	PlayersPostRender::ProcessUpdateStatusChanges(rFrame, rFrameInput, rStaticData);
 
 	// Collections
-	engine::ForEachPostRenderUpdate(GamePostRenderTypes{}, rFrame, rPreviousFrame, rStaticData);
+	engine::ForEachPostRenderUpdate(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
 void FramePostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
@@ -224,7 +224,7 @@ void FramePostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 	PlayersPostRender::Transfer(rFrame, rStaticData);
 
 	// Collections
-	engine::ForEachPostRenderTransfer(GamePostRenderTypes{}, rFrame, rStaticData);
+	engine::ForEachPostRenderTransfer(GamePostRenderTypes {}, rFrame, rStaticData);
 }
 
 void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
@@ -238,20 +238,20 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	PlayersPostRender::Destroy(rFrame, rStaticData);
 
 	// Collections
-	engine::ForEachPostRenderDestroy(GamePostRenderTypes{}, rFrame, rStaticData);
+	engine::ForEachPostRenderDestroy(GamePostRenderTypes {}, rFrame, rStaticData);
 }
 
 static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData)
 {
 	FrameInterpolate& rInterpolate = rFrame.interpolate;
 
-	constexpr int64_t kiGridDim = 20;
-	constexpr int64_t kiMaxFleetSize = 16;
-	constexpr float kfTerrainClearance = kfSpaceshipRadius * 2.0f;
-	constexpr float kfMinPlayerDistance = 120.0f;
-	constexpr float kfDesiredAnchorDistance = 150.0f;
-	constexpr float kfChevronStagger = kfSpaceshipRadius * 2.0f;
-	constexpr float kfShipSideSpacing = kfSpaceshipRadius * 3.0f;
+	static constexpr int64_t kiGridDim = 20;
+	static constexpr int64_t kiMaxFleetSize = 16;
+	static constexpr float kfTerrainClearance = kfSpaceshipRadius * 2.0f;
+	static constexpr float kfMinPlayerDistance = 120.0f;
+	static constexpr float kfDesiredAnchorDistance = 150.0f;
+	static constexpr float kfChevronStagger = kfSpaceshipRadius * 2.0f;
+	static constexpr float kfShipSideSpacing = kfSpaceshipRadius * 3.0f;
 
 	// Count non-exploding players, use first as spawn center
 	int64_t iSpawnCount = 0;
@@ -432,7 +432,7 @@ void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 	PlayersPostRender::Spawn(rFrame, rFrameInput, rStaticData);
 
 	// Collections
-	engine::ForEachPostRenderSpawn(GamePostRenderTypes{}, rFrame, rStaticData);
+	engine::ForEachPostRenderSpawn(GamePostRenderTypes {}, rFrame, rStaticData);
 
 	FrameInterpolate& rInterpolate = rFrame.interpolate;
 	if (rFrame.interpolate.gameFlags & GameFlags::kMainMenu)
@@ -459,7 +459,7 @@ void FramePostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 	PlayersPostRender::PreCollision(rFrame, rPreviousFrame, rStaticData);
 
 	// Collections
-	engine::ForEachPostRenderPreCollision(GamePostRenderTypes{}, rFrame, rPreviousFrame, rStaticData);
+	engine::ForEachPostRenderPreCollision(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
 void FramePostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
@@ -473,7 +473,7 @@ void FramePostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 	PlayersPostRender::PostCollision(rFrame, rPreviousFrame, rStaticData);
 
 	// Collections
-	engine::ForEachPostRenderPostCollision(GamePostRenderTypes{}, rFrame, rPreviousFrame, rStaticData);
+	engine::ForEachPostRenderPostCollision(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	engine::Collision::Clear();
 }
@@ -486,7 +486,7 @@ void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	FramePostRenderBase::AreaDamage(rFrame, rPreviousFrame, rStaticData);
 
 	// Collections
-	engine::ForEachPostRenderAreaDamage(GamePostRenderTypes{}, rFrame, rPreviousFrame, rStaticData);
+	engine::ForEachPostRenderAreaDamage(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	engine::AreaDamage::Clear();
 }
@@ -514,11 +514,11 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 	// Reserve all window storage together. PushBuffer may grow the workbuffer, so no pointer is published until
 	// the combined reservation has returned. The source rows, registry scratch, padding, and layer descriptor
 	// then remain in one allocation for the context's lifetime.
-	const int64_t iAscendingCount = std::max(iSpaceshipCount, iSubscriberCount);
-	const int64_t iAscendingBytes = iAscendingCount * static_cast<int64_t>(sizeof(int64_t));
-	const int64_t iScratchBytes = engine::RegistryScratchBytes(iEligibleCount);
-	const int64_t iLayerOffset = common::RoundUp(iAscendingBytes + iScratchBytes, static_cast<int64_t>(16));
-	const int64_t iTotalBytes = iLayerOffset + static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
+	int64_t iAscendingCount = std::max(iSpaceshipCount, iSubscriberCount);
+	int64_t iAscendingBytes = iAscendingCount * static_cast<int64_t>(sizeof(int64_t));
+	int64_t iScratchBytes = engine::RegistryScratchBytes(iEligibleCount);
+	int64_t iLayerOffset = common::RoundUp(iAscendingBytes + iScratchBytes, static_cast<int64_t>(16));
+	int64_t iTotalBytes = iLayerOffset + static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
 	auto pBuffer = rWorkbuffer.PushBuffer<std::byte*>(iTotalBytes);
 	std::byte* pBufferBytes = static_cast<std::byte*>(pBuffer);
 	int64_t* pAscendingRows = reinterpret_cast<int64_t*>(pBufferBytes);
@@ -604,7 +604,7 @@ void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_
 	PlayersInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
 
 	// Collections
-	engine::ForEachBeginRender(GameInterpolateTypes{}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
+	engine::ForEachBeginRender(GameInterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
 
 	// Population counters: one sum over the cells this transaction renders, published once so a render with no
 	// renderable cell reads zero.
@@ -641,7 +641,7 @@ void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpola
 	PlayersInterpolate::Render(rFrameInterpolate, iCommandBuffer);
 
 	// Collections
-	engine::ForEachInterpolateRender(GameInterpolateTypes{}, rFrameInterpolate, iCommandBuffer);
+	engine::ForEachInterpolateRender(GameInterpolateTypes {}, rFrameInterpolate, iCommandBuffer);
 }
 
 void FrameInterpolate::EndRender(int64_t iCommandBuffer)
@@ -653,7 +653,7 @@ void FrameInterpolate::EndRender(int64_t iCommandBuffer)
 	PlayersInterpolate::EndRender(iCommandBuffer);
 
 	// Collections
-	engine::ForEachEndRender(GameInterpolateTypes{}, iCommandBuffer);
+	engine::ForEachEndRender(GameInterpolateTypes {}, iCommandBuffer);
 }
 
 void FrameInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coord)

@@ -12,8 +12,6 @@
 namespace game
 {
 
-using enum engine::UiState;
-
 // Camera shake
 static constexpr float kfCameraShakeAdd = 0.25f;
 static constexpr float kfCameraShakeMax = 1.0f;
@@ -51,7 +49,7 @@ Game::Game()
 	{
 		CreateNewFrame(GameFlags::kGame);
 	}
-	meUiState = kNone;
+	meUiState = engine::UiState::kNone;
 #else
 	CreateNewFrame(GameFlags::kMainMenu);
 	mGameFlags.Set(engine::GameFlags::kMainMenu);
@@ -492,7 +490,7 @@ bool Game::ShouldUseCrosshair()
 	{
 		return false;
 	}
-	return pTail->interpolate.gameFlags & GameFlags::kGame && meUiState == kNone;
+	return pTail->interpolate.gameFlags & GameFlags::kGame && meUiState == engine::UiState::kNone;
 }
 
 bool Game::ShouldShowInGameUi()
@@ -681,7 +679,7 @@ void Game::CaptureClientStateIfChanged()
 		newShipId = mFleetSelection.FocusedMemberGlobalId();
 	}
 
-	const float fNewCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget;
+	float fNewCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget;
 
 	if (newFleetGuid == mRememberedFleetGuid && newShipId == mRememberedFocusedShipId
 	 && fNewCameraEyeHeightTarget == mfRememberedCameraEyeHeightTarget)

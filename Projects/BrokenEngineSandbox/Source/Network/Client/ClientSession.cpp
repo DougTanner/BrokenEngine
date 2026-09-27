@@ -191,9 +191,9 @@ void ClientSession::ConnectToServer(std::string_view serverAddress)
 	mpRuntime->Connect(serverAddress, engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots);
 }
 
-void ClientSession::OnConnectionRejected(const char* pcReason)
+void ClientSession::OnConnectionRejected(std::string_view reason)
 {
-	std::snprintf(gpGame->mModalMessage, sizeof(gpGame->mModalMessage), "%s", pcReason);
+	std::snprintf(gpGame->mModalMessage, sizeof(gpGame->mModalMessage), "%.*s", static_cast<int>(reason.size()), reason.data());
 	gpGame->meUiState = engine::UiState::kModal;
 }
 

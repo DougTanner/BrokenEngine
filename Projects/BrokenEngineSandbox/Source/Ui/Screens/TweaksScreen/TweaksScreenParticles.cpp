@@ -62,7 +62,7 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 
 void TweaksScreen::RenderParticlesSection()
 {
-	const int64_t iSection = giTweakSectionParticles;
+	int64_t iSection = giTweakSectionParticles;
 
 	if (ImGui::BeginTabBar("ParticlesTabs"))
 	{

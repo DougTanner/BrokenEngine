@@ -35,7 +35,7 @@ const engine::TweaksSliderMapRegistrar gWindDepositsRegistrar
 
 void TweaksScreen::RenderWindDepositsTab()
 {
-	const int64_t iSection = engine::giTweakSectionWind;
+	int64_t iSection = engine::giTweakSectionWind;
 
 	WrapperSeparatorText("Player");
 	WrapperSlider("Player Deposit Width", iSection);

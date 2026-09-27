@@ -244,7 +244,7 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{

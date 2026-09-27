@@ -151,7 +151,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 		return;
 	}
 
-	const engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{

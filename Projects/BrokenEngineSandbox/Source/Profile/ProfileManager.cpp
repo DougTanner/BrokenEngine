@@ -29,7 +29,7 @@ void ProfileManager::OnRawCpuTimersLatched(int64_t iSampleTick)
 {
 	if constexpr (kbProfiling)
 	{
-		const engine::RawCpuTimerRecord rawRecord = GetRawCpuTimer(kCpuTimerPostRenderUpdateNavQuery);
+		engine::RawCpuTimerRecord rawRecord = GetRawCpuTimer(kCpuTimerPostRenderUpdateNavQuery);
 		if (rawRecord.iInvocationCount == 8)
 		{
 			PublishRawCpuTimerEvent(kCpuTimerPostRenderUpdateNavQuery, iSampleTick);

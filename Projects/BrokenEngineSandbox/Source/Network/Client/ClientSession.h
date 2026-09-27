@@ -82,7 +82,7 @@ public:
 private:
 	friend class engine::ClientSessionRuntime;
 
-	void OnConnectionRejected(const char* pcReason);
+	void OnConnectionRejected(std::string_view reason);
 	void OnConnectionFailed();
 	void OnConnectionAccepted();
 	void PollDesyncState();

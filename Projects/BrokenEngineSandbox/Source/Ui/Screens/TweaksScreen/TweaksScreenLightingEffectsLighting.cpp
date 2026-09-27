@@ -59,7 +59,7 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsLightingRegistrar
 
 void TweaksScreen::RenderLightingEffectsLightingTab()
 {
-	const int64_t iSection = engine::giTweakSectionLighting;
+	int64_t iSection = engine::giTweakSectionLighting;
 
 	if (ImGui::BeginTable("LightingEffectsLightingColumns", 2))
 	{

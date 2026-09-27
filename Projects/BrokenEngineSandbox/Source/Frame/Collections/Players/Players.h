@@ -202,7 +202,7 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 
 	// Collision layer (set each frame in PreCollision)
 	// thread_local: parallel per-Frame tick via Dispatch
-	static thread_local int64_t siCollisionLayerIndex;
+	static inline thread_local int64_t siCollisionLayerIndex = 0;
 
 	// Allocate and copy
 	static void AllocateAndCopy(PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious);

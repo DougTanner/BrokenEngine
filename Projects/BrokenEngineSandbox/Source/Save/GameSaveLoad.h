@@ -29,7 +29,7 @@ public:
 
 private:
 
-	static constexpr std::chrono::seconds kAutosaveInterval = 3600s;
+	static constexpr std::chrono::seconds kAutosaveInterval = 3'600s;
 	common::Timer mAutosaveTimer;
 };
 

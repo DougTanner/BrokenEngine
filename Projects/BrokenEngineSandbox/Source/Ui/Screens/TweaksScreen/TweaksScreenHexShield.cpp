@@ -30,7 +30,7 @@ const engine::TweaksSliderMapRegistrar gHexShieldRegistrar
 
 void TweaksScreen::RenderHexShieldSection()
 {
-	const int64_t iSection = giTweakSectionHexShield;
+	int64_t iSection = giTweakSectionHexShield;
 
 	WrapperSeparatorText("Edge");
 	WrapperSlider("Grow", iSection);

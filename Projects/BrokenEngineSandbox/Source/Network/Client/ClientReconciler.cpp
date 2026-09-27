@@ -141,7 +141,7 @@ void ClientReconciler::Reset()
 	mConfirmedClientState = {};
 	mDispatcher.Reset();
 	mfLastLoggedVisualErrorDelta = 0.0f;
-	miLastVisualErrorLogTick = -1000;
+	miLastVisualErrorLogTick = -1'000;
 }
 
 #endif // BT_CLIENT

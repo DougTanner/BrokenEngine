@@ -616,9 +616,9 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 			// Copy direction arrays (per-slot smoothstep tail so fade-out eases to zero)
 			for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 			{
-				const float fFragIntensity = rCurrent.pHexShieldFragIntensities[i].data[j];
-				const float fFade = std::clamp(fFragIntensity / kfHexShieldFadeThreshold, 0.0f, 1.0f);
-				const float fSmoothFade = fFade * fFade * (3.0f - 2.0f * fFade);
+				float fFragIntensity = rCurrent.pHexShieldFragIntensities[i].data[j];
+				float fFade = std::clamp(fFragIntensity / kfHexShieldFadeThreshold, 0.0f, 1.0f);
+				float fSmoothFade = fFade * fFade * (3.0f - 2.0f * fFade);
 				syncData.pf4Directions[j] = rCurrent.pHexShieldDirections[i].data[j];
 				syncData.pfVertIntensities[j] = rCurrent.pHexShieldVertIntensities[i].data[j] * fSmoothFade;
 				syncData.pfFragIntensities[j] = fFragIntensity * fSmoothFade;
@@ -632,8 +632,6 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 }
 
 // PlayersPostRender::PreCollision builds player collision layers.
-
-thread_local int64_t PlayersPostRender::siCollisionLayerIndex = 0;
 
 // Player collision arrays
 // thread_local: parallel per-Frame tick via Dispatch

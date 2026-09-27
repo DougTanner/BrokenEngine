@@ -22,8 +22,7 @@ struct BlastersType
 	uint8_t uiPointLightTypeIndex = 0xFF; // 0xFF = use area light
 };
 
-struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>,
-                             public engine::TypeRegistry<BlastersType>
+struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, public engine::TypeRegistry<BlastersType>
 {
 	static constexpr int64_t kiVersion = 1;
 	static constexpr char kName[] = "Blasters";
@@ -126,7 +125,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 	{
 		XMVECTOR vecPosition = DirectX::XMVectorZero();
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
-		uint8_t uiTypeIndex;
+		uint8_t uiTypeIndex = 0;
 		BlasterFlags_t flags {};
 		engine::alignment_t alignment {};
 		float fWindTrailIntensity = 0.0f;

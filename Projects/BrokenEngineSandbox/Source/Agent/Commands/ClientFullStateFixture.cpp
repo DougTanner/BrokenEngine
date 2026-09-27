@@ -159,8 +159,8 @@ void ExerciseMatchingTick(engine::GridCoord coord, nlohmann::json& rResult, bool
 	}
 
 	engine::CoordFrames& rFrames = coordIt->second;
-	const int64_t iPendingTick = rFrames.pendingFullState->iTick;
-	const int64_t iDeferTargetTick = gpGame->TickCounter();
+	int64_t iPendingTick = rFrames.pendingFullState->iTick;
+	int64_t iDeferTargetTick = gpGame->TickCounter();
 	if (iPendingTick <= iDeferTargetTick)
 	{
 		throw std::runtime_error("client_full_state_fixture requires a pending full state ahead of client tick");
@@ -183,7 +183,7 @@ void ExerciseMatchingTick(engine::GridCoord coord, nlohmann::json& rResult, bool
 		}
 	}
 
-	const float fPendingTime = rFrames.pendingFullState->pFrame->interpolate.fCurrentTime;
+	float fPendingTime = rFrames.pendingFullState->pFrame->interpolate.fCurrentTime;
 	rbClockForced = true;
 	gpGame->SetTickCounter(iPendingTick);
 	gpGame->SetCurrentTime(fPendingTime);
@@ -237,7 +237,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		throw std::runtime_error("client_full_state_fixture requires only string 'action'");
 	}
 
-	const std::string action = rParams.at("action").get<std::string>();
+	std::string action = rParams.at("action").get<std::string>();
 	if (action == "clear")
 	{
 		ClearFixture();
@@ -268,7 +268,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 			throw std::runtime_error("client_full_state_fixture is already stalled");
 		}
 
-		const engine::GridCoord coord = gpGame->mClientGridCoord;
+		engine::GridCoord coord = gpGame->mClientGridCoord;
 		bool bActive = std::ranges::any_of(gpClientSession->mpRuntime->mpClient->mCoordSlots, [coord](const engine::ClientCoordSlot& rSlot)
 		{
 			return rSlot.eState == engine::CoordSubscriptionState::kActive && rSlot.coord == coord;
@@ -340,7 +340,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 
 	try
 	{
-		const engine::GridCoord coord = sFixture.coord;
+		engine::GridCoord coord = sFixture.coord;
 		auto coordIt = gpGame->mCoordFrames.find(coord);
 		if (coordIt == gpGame->mCoordFrames.end())
 		{
@@ -352,8 +352,8 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		}
 
 		engine::CoordFrames& rFrames = coordIt->second;
-		const int64_t iPendingTick = rFrames.pendingFullState->iTick;
-		const int64_t iDeferTargetTick = gpGame->TickCounter();
+		int64_t iPendingTick = rFrames.pendingFullState->iTick;
+		int64_t iDeferTargetTick = gpGame->TickCounter();
 		if (iPendingTick <= iDeferTargetTick)
 		{
 			throw std::runtime_error("client_full_state_fixture requires a pending full state ahead of client tick");
@@ -368,23 +368,23 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 			throw std::runtime_error("future pending full state was not deferred");
 		}
 
-		const int64_t iConfirmedBeforeGap = rFrames.iConfirmedTick;
+		int64_t iConfirmedBeforeGap = rFrames.iConfirmedTick;
 		auto eraseBegin = rFrames.serverUpdates.upper_bound(iConfirmedBeforeGap);
 		auto eraseEnd = rFrames.serverUpdates.upper_bound(iPendingTick);
-		const int64_t iRemovedUpdateCount = std::distance(eraseBegin, eraseEnd);
+		int64_t iRemovedUpdateCount = std::distance(eraseBegin, eraseEnd);
 		rFrames.serverUpdates.erase(eraseBegin, eraseEnd);
 		int64_t iUncappedConsecutiveEndpoint = iConfirmedBeforeGap;
 		while (rFrames.serverUpdates.contains(iUncappedConsecutiveEndpoint + 1))
 		{
 			++iUncappedConsecutiveEndpoint;
 		}
-		const bool bDirectAdoptionRequired = iPendingTick > iUncappedConsecutiveEndpoint;
+		bool bDirectAdoptionRequired = iPendingTick > iUncappedConsecutiveEndpoint;
 		if (!bDirectAdoptionRequired)
 		{
 			throw std::runtime_error("client_full_state_fixture failed to create an update gap before pending full state");
 		}
 
-		const float fPendingTime = rFrames.pendingFullState->pFrame->interpolate.fCurrentTime;
+		float fPendingTime = rFrames.pendingFullState->pFrame->interpolate.fCurrentTime;
 		gpGame->SetTickCounter(iPendingTick);
 		gpGame->SetCurrentTime(fPendingTime);
 		gpGame->mTimeStep.ClearAccumulator();

@@ -1,3 +1,3 @@
 #pragma once
 
-constexpr int64_t kiGameVersion = 13;
+inline constexpr int64_t kiGameVersion = 13;

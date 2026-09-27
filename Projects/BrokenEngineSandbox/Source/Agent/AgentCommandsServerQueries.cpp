@@ -16,16 +16,19 @@ namespace
 
 // OptionalCount reads an agent parameter by key; a wrongly typed parameter or a negative count throws.
 
-int64_t OptionalCount(const nlohmann::json& rParams, const char* pcKey, int64_t iDefault)
+int64_t OptionalCount(const nlohmann::json& rParams, std::string_view key, int64_t iDefault)
 {
-	if (!rParams.contains(pcKey))
+	if (!rParams.contains(key))
 	{
 		return iDefault;
 	}
-	int64_t iCount = rParams.at(pcKey).get<int64_t>();
+	int64_t iCount = rParams.at(std::string(key)).get<int64_t>();
 	if (iCount < 0)
 	{
-		throw std::runtime_error(std::string("'") + pcKey + "' must be a non-negative integer");
+		std::string message("'");
+		message.append(key);
+		message.append("' must be a non-negative integer");
+		throw std::runtime_error(message);
 	}
 	return iCount;
 }

@@ -98,7 +98,7 @@ void ServerSession::ParseReceivedGamePackets()
 		// Every client-sendable game contract row has min == max (GamePacketType.h), so this gate settles each admitted
 		// payload's size exactly and the cases below add no per-case size check; only residual value checks a row
 		// cannot express — navigation-delay range and Boolean bytes — stay, and they throw to drop the packet.
-		const engine::ClientPacketContract contract = NetworkSessionContract::GetClientPacketContract(eType);
+		engine::ClientPacketContract contract = NetworkSessionContract::GetClientPacketContract(eType);
 		if (!engine::gpServer->AdmitGamePacket(rPacket, contract))
 		{
 			continue;
