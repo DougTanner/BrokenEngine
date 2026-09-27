@@ -48,11 +48,7 @@ int32_t FrameCountParameter(const nlohmann::json& rParameters, const char* pcCom
 	}
 
 	int64_t iFrames = rFrames.get<int64_t>();
-	if (iFrames < 0)
-	{
-		return 0;
-	}
-	if (iFrames > iMax)
+	if (iFrames < 0 || iFrames > iMax)
 	{
 		throw std::runtime_error(integerError + " in [0," + std::to_string(iMax) + "]");
 	}
@@ -234,7 +230,12 @@ void CommandScreenshot(const nlohmann::json& rParams, [[maybe_unused]] nlohmann:
 	}
 	if (rParams.contains("quality"))
 	{
-		request.iQuality = std::clamp<int64_t>(rParams.at("quality").get<int64_t>(), 1, 100);
+		int64_t iQuality = rParams.at("quality").get<int64_t>();
+		if (iQuality < 1 || iQuality > 100)
+		{
+			throw std::runtime_error("screenshot 'quality' must be an integer in [1,100]");
+		}
+		request.iQuality = iQuality;
 	}
 
 	BeginCaptureAndDefer([request = std::move(request)](uint64_t uiCaptureToken) mutable

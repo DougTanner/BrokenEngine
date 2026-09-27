@@ -18,7 +18,16 @@ namespace
 
 int64_t OptionalCount(const nlohmann::json& rParams, const char* pcKey, int64_t iDefault)
 {
-	return rParams.contains(pcKey) ? rParams.at(pcKey).get<int64_t>() : iDefault;
+	if (!rParams.contains(pcKey))
+	{
+		return iDefault;
+	}
+	int64_t iCount = rParams.at(pcKey).get<int64_t>();
+	if (iCount < 0)
+	{
+		throw std::runtime_error(std::string("'") + pcKey + "' must be a non-negative integer");
+	}
+	return iCount;
 }
 
 nlohmann::json Vec3ToJson(XMVECTOR vec)
@@ -26,12 +35,11 @@ nlohmann::json Vec3ToJson(XMVECTOR vec)
 	return nlohmann::json::array({XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec)});
 }
 
-// Clamp an offset/limit window against a collection's live count → [iBegin, iEnd).
+// Bound a non-negative offset/limit window to the collection's live count → [iBegin, iEnd).
 void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t& riBegin, int64_t& riEnd)
 {
-	riBegin = std::clamp<int64_t>(iOffset, 0, iTotal);
-	int64_t iPageLimit = std::max<int64_t>(iLimit, 0);
-	riEnd = iPageLimit >= iTotal - riBegin ? iTotal : riBegin + iPageLimit;
+	riBegin = std::min(iOffset, iTotal);
+	riEnd = iLimit >= iTotal - riBegin ? iTotal : riBegin + iLimit;
 }
 
 // Minimum+cheap field set per collection: index, local/dir, health, alignment, id — wherever the member exists.

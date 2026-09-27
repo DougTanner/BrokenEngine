@@ -133,7 +133,11 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		throw std::runtime_error("describe_scene 'unitTypes' must be an array of strings");
 	}
 	bool bIncludeUnits = !rParams.contains("includeUnits") || rParams.at("includeUnits").get<bool>();
-	int64_t iMaxUnits = std::max<int64_t>(0, rParams.contains("maxUnits") ? rParams.at("maxUnits").get<int64_t>() : 200);
+	int64_t iMaxUnits = rParams.contains("maxUnits") ? rParams.at("maxUnits").get<int64_t>() : 200;
+	if (iMaxUnits < 0)
+	{
+		throw std::runtime_error("describe_scene 'maxUnits' must be a non-negative integer");
+	}
 
 	// Absent 'unitTypes' means every type; a present list (including an empty one) selects exactly what it names.
 	bool bHasUnitTypes = rParams.contains("unitTypes");
