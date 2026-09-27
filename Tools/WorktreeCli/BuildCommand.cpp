@@ -29,7 +29,7 @@ namespace toolcli
 		// Backtracking in the diagnostic regexes is superlinear; pathological MSVC template
 		// diagnostics can span tens of KB on one line, so oversized lines skip parsing (the
 		// retained log still holds them verbatim).
-		constexpr size_t kuiMaxDiagnosticLineLength = 4096;
+		constexpr size_t kuiMaxDiagnosticLineLength = 4'096;
 
 		// The build command's public contract is exactly one of these objects on stdout.
 		constexpr std::string_view kBuildResultSchema = "broken-engine-build-result/v1";
@@ -92,7 +92,7 @@ namespace toolcli
 		class RetainedLog
 		{
 		public:
-			bool Open(const std::filesystem::path& rDirectory, const std::wstring& rTargetStem)
+			bool Open(const std::filesystem::path& rDirectory, std::wstring_view targetStem)
 			{
 				std::error_code error;
 				std::filesystem::create_directories(rDirectory, error);
@@ -106,16 +106,16 @@ namespace toolcli
 				::GetSystemTime(&time);
 				wchar_t pTimestamp[32] {};
 				std::swprintf(pTimestamp, std::size(pTimestamp), L"%04u%02u%02uT%02u%02u%02u%03uZ", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
-				std::wstring baseName = ToLowerInvariant(rTargetStem) + L"-" + pTimestamp + L"-" + std::to_wstring(::GetCurrentProcessId());
+				std::wstring baseName = ToLowerInvariant(std::wstring(targetStem)) + L"-" + pTimestamp + L"-" + std::to_wstring(::GetCurrentProcessId());
 				for (int iAttempt = 0; iAttempt < 16; ++iAttempt)
 				{
 					std::wstring name = iAttempt == 0 ? baseName + L".log" : baseName + L"-" + std::to_wstring(iAttempt) + L".log";
 					std::filesystem::path candidate = rDirectory / name;
-					const std::filesystem::path extendedCandidate = ExtendedLengthPath(candidate);
-					const HANDLE hRawFile = ::CreateFileW(extendedCandidate.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+					std::filesystem::path extendedCandidate = ExtendedLengthPath(candidate);
+					HANDLE hRawFile = ::CreateFileW(extendedCandidate.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
 					if (hRawFile == INVALID_HANDLE_VALUE)
 					{
-						const DWORD uiError = ::GetLastError();
+						DWORD uiError = ::GetLastError();
 						if (uiError != ERROR_FILE_EXISTS)
 						{
 							FailBuild("create retained build log failed (Windows error " + std::to_string(uiError) + ")");
@@ -434,13 +434,13 @@ namespace toolcli
 			std::wstring lockName = ToLowerInvariant(rTarget.stem().native()) + L".lock";
 			rLockPath = lockDirectory / lockName;
 			int64_t iWaitSeconds = GetBuildLockWaitSeconds();
-			const std::chrono::steady_clock::time_point waitStart = std::chrono::steady_clock::now();
-			const std::chrono::steady_clock::time_point deadline = waitStart + std::chrono::seconds(iWaitSeconds);
-			const std::filesystem::path extendedLockPath = ExtendedLengthPath(rLockPath);
+			std::chrono::steady_clock::time_point waitStart = std::chrono::steady_clock::now();
+			std::chrono::steady_clock::time_point deadline = waitStart + std::chrono::seconds(iWaitSeconds);
+			std::filesystem::path extendedLockPath = ExtendedLengthPath(rLockPath);
 			while (true)
 			{
-				const HANDLE hRawLock = ::CreateFileW(extendedLockPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, nullptr);
-				const DWORD uiError = hRawLock == INVALID_HANDLE_VALUE ? ::GetLastError() : ERROR_SUCCESS;
+				HANDLE hRawLock = ::CreateFileW(extendedLockPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, nullptr);
+				DWORD uiError = hRawLock == INVALID_HANDLE_VALUE ? ::GetLastError() : ERROR_SUCCESS;
 				Handle hLock(hRawLock);
 				riWaitedSeconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - waitStart).count();
 				if (hLock.IsValid())
@@ -458,7 +458,7 @@ namespace toolcli
 					FailBuild("acquire build lock failed (Windows error " + std::to_string(uiError) + ")");
 					return std::nullopt;
 				}
-				const std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
+				std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
 				if (currentTime >= deadline)
 				{
 					rpDisposition = "timeout";
@@ -466,12 +466,12 @@ namespace toolcli
 					return std::nullopt;
 				}
 				std::wcerr << L"WorktreeCli: waiting for build lock on " << rTarget.stem().native() << L" (" << riWaitedSeconds << L"s elapsed)\n";
-				const std::chrono::steady_clock::time_point sleepTime = std::chrono::steady_clock::now();
+				std::chrono::steady_clock::time_point sleepTime = std::chrono::steady_clock::now();
 				if (sleepTime >= deadline)
 				{
 					continue;
 				}
-				const std::chrono::steady_clock::duration remaining = deadline - sleepTime;
+				std::chrono::steady_clock::duration remaining = deadline - sleepTime;
 				std::this_thread::sleep_for((std::min)(remaining, std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::seconds(5))));
 			}
 		}
@@ -642,10 +642,10 @@ namespace toolcli
 					FailBuild("evaluated object path escapes IntDir");
 					return false;
 				}
-				const std::filesystem::path extendedObjectPath = ExtendedLengthPath(it->second.object);
+				std::filesystem::path extendedObjectPath = ExtendedLengthPath(it->second.object);
 				if (::DeleteFileW(extendedObjectPath.c_str()) == FALSE)
 				{
-					const DWORD uiError = ::GetLastError();
+					DWORD uiError = ::GetLastError();
 					if (uiError != ERROR_FILE_NOT_FOUND && uiError != ERROR_PATH_NOT_FOUND)
 					{
 						FailBuild("delete selected object failed (Windows error " + std::to_string(uiError) + ")");
@@ -860,7 +860,7 @@ namespace toolcli
 			.rWorktreeRoot = *worktreeRoot,
 			.rMsBuild = *msbuildPath,
 		};
-		const int iExecutionExitCode = RunBuildExecution(state);
+		int iExecutionExitCode = RunBuildExecution(state);
 		return EmitBuildResult(result, iExecutionExitCode, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 	}
 

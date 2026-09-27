@@ -45,7 +45,7 @@ struct LoadVerticesContext
 	std::vector<Material>& rMaterials;
 	std::vector<MaterialNodeInfo>& rMaterialNodeInfos;
 	MaterialNodeMap& rMaterialNodeMap;
-	bool bHasSkeleton;
+	bool bHasSkeleton = false;
 };
 
 void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& rNode, const tinygltf::Model& rModel, LoadVerticesContext& rContext);

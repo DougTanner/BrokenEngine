@@ -43,11 +43,11 @@ static constexpr DataTypeEntry kDataTypes[] =
 };
 static constexpr size_t kDataTypeCount = std::size(kDataTypes);
 
-static bool WriteIfChanged(const std::string& rContent, const std::filesystem::path& rPath, const char* logName)
+static bool WriteIfChanged(const std::string& rContent, const std::filesystem::path& rPath, std::string_view logName)
 {
 	if (!common::ContentsEqual(rContent, rPath))
 	{
-		const FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
+		FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
 		if (eResult == FileManager::EnsureLocalResult::kCancelled || eResult == FileManager::EnsureLocalResult::kFailed)
 		{
 			return false;
@@ -122,7 +122,7 @@ static bool IsFileLockedError(const std::error_code& rError)
 // already published, leaving a torn publish. Returns false when the user cancels the export at the retry prompt.
 static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rManifestFile, const std::filesystem::path& rTemporaryPackFile, const std::filesystem::path& rPackFile)
 {
-	const std::string lockedFailure = std::format("\"{}\" is locked by a running BrokenEngineSandbox client or server.", rPackFile.string());
+	std::string lockedFailure = std::format("\"{}\" is locked by a running BrokenEngineSandbox client or server.", rPackFile.string());
 
 	bool bManifestPublished = false;
 	// Empty means no prompt is pending; otherwise it is the sentence describing why publishing failed
@@ -200,7 +200,7 @@ static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManife
 static std::optional<uint64_t> GetReadableFileSize(const std::filesystem::path& rPath)
 {
 	std::error_code fileSizeError;
-	const uintmax_t uiFileSizeValue = std::filesystem::file_size(rPath, fileSizeError);
+	uintmax_t uiFileSizeValue = std::filesystem::file_size(rPath, fileSizeError);
 	if (fileSizeError)
 	{
 		return std::nullopt;
@@ -226,14 +226,14 @@ static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManife
 		return false;
 	}
 
-	const uint64_t uiManifestFileSize = optionalManifestFileSize.value();
+	uint64_t uiManifestFileSize = optionalManifestFileSize.value();
 	if (uiManifestFileSize < kuiChunkTableOffset)
 	{
 		return false;
 	}
 
-	const uint64_t uiManifestTableBytes = uiManifestFileSize - kuiChunkTableOffset;
-	const uint64_t uiMaxChunks = uiManifestTableBytes / static_cast<uint64_t>(sizeof(common::ChunkLocation));
+	uint64_t uiManifestTableBytes = uiManifestFileSize - kuiChunkTableOffset;
+	uint64_t uiMaxChunks = uiManifestTableBytes / static_cast<uint64_t>(sizeof(common::ChunkLocation));
 	if (iManifestChunkCount < 0)
 	{
 		return false;
@@ -251,7 +251,7 @@ static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManife
 		return false;
 	}
 
-	const uint64_t uiChunkTableBytes = static_cast<uint64_t>(iManifestChunkCount) * sizeof(common::ChunkLocation);
+	uint64_t uiChunkTableBytes = static_cast<uint64_t>(iManifestChunkCount) * sizeof(common::ChunkLocation);
 
 	try
 	{
@@ -282,7 +282,7 @@ static bool LoadPublishedManifest(const std::filesystem::path& rManifestFile, in
 	common::DataHeader dataHeader {};
 	std::fstream manifestFileStream(rManifestFile, std::ios::in | std::ios::binary);
 	manifestFileStream.read(reinterpret_cast<char*>(&dataHeader), sizeof(dataHeader));
-	const bool bDirty = !manifestFileStream || dataHeader.iMagic != common::DataHeader::kiMagic || dataHeader.iVersion != common::DataHeader::kiVersion;
+	bool bDirty = !manifestFileStream || dataHeader.iMagic != common::DataHeader::kiMagic || dataHeader.iVersion != common::DataHeader::kiVersion;
 	riManifestChunkCount = dataHeader.iChunkCount;
 	return !bDirty && LoadPublishedManifestChunkTable(rManifestFile, manifestFileStream, riManifestChunkCount, rManifestChunkLocations);
 }
@@ -326,8 +326,8 @@ static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, 
 			return false;
 		}
 
-		const uint64_t uiChunkEnd = rChunkLocation.uiOffset + rChunkLocation.uiSize;
-		const uint64_t uiPadding = (kuiAlignmentBytes - (uiChunkEnd % kuiAlignmentBytes)) % kuiAlignmentBytes;
+		uint64_t uiChunkEnd = rChunkLocation.uiOffset + rChunkLocation.uiSize;
+		uint64_t uiPadding = (kuiAlignmentBytes - (uiChunkEnd % kuiAlignmentBytes)) % kuiAlignmentBytes;
 		if (uiChunkEnd > std::numeric_limits<uint64_t>::max() - uiPadding)
 		{
 			return false;
@@ -440,7 +440,6 @@ static void SortAndCheckDuplicateExportJobs(std::vector<std::unique_ptr<T>>& rEx
 template <IsExportJob T>
 static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rTemporaryPackFile, std::vector<std::unique_ptr<T>>& rExportJobs, DataPackerRunSummary& rRunSummary)
 {
-	// Open temporary manifest file and write header
 	std::fstream temporaryManifestFileStream(rTemporaryManifestFile, std::ios::out | std::ios::binary);
 
 	common::DataHeader dataHeader {};
@@ -450,7 +449,6 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 	temporaryManifestFileStream.write(reinterpret_cast<char*>(&dataHeader), sizeof(dataHeader));
 	common::AlignOutputStream(temporaryManifestFileStream);
 
-	// Open temporary pack file
 	std::fstream temporaryPackFileStream(rTemporaryPackFile, std::ios::out | std::ios::binary);
 
 	std::vector<diagnostic::ExportFailure> failures;
@@ -501,7 +499,7 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 template <IsExportJob T>
 static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const std::filesystem::path& rManifestFile, const std::filesystem::path& rPackFile, const std::filesystem::path& rHeaderFile, std::vector<std::unique_ptr<T>>& rExportJobs, DataPackerRunSummary& rRunSummary)
 {
-	const FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
+	FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
 	if (eResult == FileManager::EnsureLocalResult::kCancelled || eResult == FileManager::EnsureLocalResult::kFailed)
 	{
 		return std::unexpected(eResult);
@@ -512,10 +510,9 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const 
 
 	SortAndCheckDuplicateExportJobs(rExportJobs);
 
-	// Run the jobs
 	for (std::unique_ptr<T>& rpExportJob : rExportJobs)
 	{
-		rpExportJob->mFuture = std::async(std::launch::async, common::ThreadLocal::Entry(&T::RunExport, 4 * 1024, rpExportJob->miId, false), rpExportJob.get());
+		rpExportJob->mFuture = std::async(std::launch::async, common::ThreadLocal::Entry(&T::RunExport, 4 * 1'024, rpExportJob->miId, false), rpExportJob.get());
 	}
 
 	// Stage beside the finals, never in the cache: the cache lives under LocalAppData and can be on another
@@ -575,7 +572,6 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const 
 
 		if (!PublishManifestAndPack(temporaryManifestFile, rManifestFile, temporaryPackFile, rPackFile))
 		{
-			// Cancelled at the publish prompt: discard the temporaries and fail this export type
 			std::filesystem::remove(temporaryManifestFile);
 			std::filesystem::remove(temporaryPackFile);
 			bFailed = true;
@@ -628,7 +624,7 @@ std::expected<bool, FileManager::EnsureLocalResult> RunExportJobs(DataPackerRunS
 	return RunDirtyExport(manifestFile, packFile, headerFile, exportJobs, rRunSummary);
 }
 
-template <typename... Ts>
+template <typename... TS>
 static std::expected<bool, FileManager::EnsureLocalResult> RunAllMainExports(DataPackerRunSummary& rRunSummary)
 {
 	// Contained export failures still run later types; terminal materialization results stop the fold.
@@ -639,7 +635,7 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunAllMainExports(Dat
 		{
 			return;
 		}
-		std::expected<bool, FileManager::EnsureLocalResult> exportResult = RunExportJobs<Ts>(rRunSummary);
+		std::expected<bool, FileManager::EnsureLocalResult> exportResult = RunExportJobs<TS>(rRunSummary);
 		if (!exportResult)
 		{
 			result = std::unexpected(exportResult.error());
@@ -763,7 +759,6 @@ bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 		return false;
 	}
 
-	// Copy license files from ThirdParty directories to Attribution directory in output
 	if (!attribution::CopyThirdPartyLicenses())
 	{
 		return false;
@@ -782,7 +777,7 @@ bool MaterializeData(char* argv[])
 		pFileManager.reset();
 		return false;
 	}
-	const FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
+	FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
 	return eResult != FileManager::EnsureLocalResult::kCancelled && eResult != FileManager::EnsureLocalResult::kFailed;
 }
 
@@ -799,9 +794,9 @@ static bool RunCommand(int argc, char* argv[])
 		return MaterializeData(argv);
 	}
 
-	const std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+	std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 	DataPackerRunSummary runSummary;
-	const auto logSummary = [&runSummary, startTime](bool bSuccess)
+	auto logSummary = [&runSummary, startTime](bool bSuccess)
 	{
 		{
 			// Clean jobs are the expected case, so only exports and failures get a line inside the block.
@@ -815,13 +810,13 @@ static bool RunCommand(int argc, char* argv[])
 				LOG(kDefault, kInfo, "Failed: {}", runSummary.miFailedJobs);
 			}
 		}
-		const int64_t iElapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - startTime).count();
+		int64_t iElapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - startTime).count();
 		LOG(kDefault, kInfo, "Time: {}s ({})", iElapsedSeconds, bSuccess ? "Success" : "Failed");
 	};
 
 	try
 	{
-		const bool bSuccess = MainThread(argc, argv, runSummary);
+		bool bSuccess = MainThread(argc, argv, runSummary);
 		logSummary(bSuccess);
 		return bSuccess;
 	}
@@ -841,7 +836,7 @@ static bool RunCommandWithExceptionHandling(int argc, char* argv[])
 	}
 	catch (const std::exception& rException)
 	{
-		const std::string message = rException.what()[0] == '\0' ? "Empty std::exception message escaped DataPacker" : rException.what();
+		std::string message = rException.what()[0] == '\0' ? "Empty std::exception message escaped DataPacker" : rException.what();
 		diagnostic::Record record
 		{
 			.eSeverity = diagnostic::Severity::kError,
@@ -869,11 +864,10 @@ static bool RunCommandWithExceptionHandling(int argc, char* argv[])
 
 static int ProcessMain(int argc, char* argv[])
 {
-	// Prevent multiple instances from running simultaneously
 	HANDLE hMutex = CreateMutex(nullptr, TRUE, "BrokenEngineDataPacker");
 	if (hMutex == nullptr)
 	{
-		const DWORD uiError = GetLastError();
+		DWORD uiError = GetLastError();
 		diagnostic::Record record
 		{
 			.eSeverity = diagnostic::Severity::kError,
@@ -902,10 +896,10 @@ static int ProcessMain(int argc, char* argv[])
 		bOwnsMutex = false;
 		std::printf("DataPacker is already running, waiting...\n");
 		// Windows mutex waits by the owning thread acquire recursively; every acquisition requires a matching release.
-		const DWORD uiWaitResult = WaitForSingleObject(hMutex, INFINITE);
+		DWORD uiWaitResult = WaitForSingleObject(hMutex, INFINITE);
 		if (uiWaitResult == WAIT_FAILED)
 		{
-			const DWORD uiError = GetLastError();
+			DWORD uiError = GetLastError();
 			diagnostic::Record record
 			{
 				.eSeverity = diagnostic::Severity::kError,

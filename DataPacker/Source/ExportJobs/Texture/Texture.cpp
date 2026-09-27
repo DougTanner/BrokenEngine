@@ -106,19 +106,19 @@ void Texture::LoadUint16Raw(const std::filesystem::path& rPath)
 		throw std::runtime_error("Uint16 raw texture dimensions are invalid");
 	}
 
-	const uintmax_t uiWidth = static_cast<uintmax_t>(miWidth);
-	const uintmax_t uiHeight = static_cast<uintmax_t>(miHeight);
+	uintmax_t uiWidth = static_cast<uintmax_t>(miWidth);
+	uintmax_t uiHeight = static_cast<uintmax_t>(miHeight);
 	static constexpr uintmax_t kuiBytesPerPixel = sizeof(uint16_t);
 	if (uiWidth > std::numeric_limits<uintmax_t>::max() / uiHeight)
 	{
 		throw std::runtime_error("Uint16 raw texture dimensions overflow");
 	}
-	const uintmax_t uiPixelCount = uiWidth * uiHeight;
+	uintmax_t uiPixelCount = uiWidth * uiHeight;
 	if (uiPixelCount > std::numeric_limits<uintmax_t>::max() / kuiBytesPerPixel)
 	{
 		throw std::runtime_error("Uint16 raw texture byte count overflow");
 	}
-	const uintmax_t uiExpectedBytes = uiPixelCount * kuiBytesPerPixel;
+	uintmax_t uiExpectedBytes = uiPixelCount * kuiBytesPerPixel;
 
 	// Headerless: the file length is the only shape check available. Checked before the read because
 	// ReadEntireFile sizes its allocation from the on-disk length.
@@ -153,11 +153,11 @@ void Texture::LoadUint16Raw(const std::filesystem::path& rPath)
 
 // OpenEXR reports every failure through a result code, so a discarded result publishes an
 // incompletely decoded image that looks valid downstream.
-static void CheckExrResult(exr_result_t exrResult, const std::filesystem::path& rPath, const char* pcCall)
+static void CheckExrResult(exr_result_t exrResult, const std::filesystem::path& rPath, std::string_view call)
 {
 	if (exrResult != EXR_ERR_SUCCESS)
 	{
-		throw std::runtime_error(std::format("{} failed for EXR \"{}\": {}", pcCall, rPath.string(), exr_get_default_error_message(exrResult)));
+		throw std::runtime_error(std::format("{} failed for EXR \"{}\": {}", call, rPath.string(), exr_get_default_error_message(exrResult)));
 	}
 }
 
@@ -356,10 +356,8 @@ void Texture::Downsize(int64_t iLevels)
 {
 	ASSERT(mData.size() == 1);
 
-	// Generate mipmaps in float format to downsample
 	MakeMipmaps(VK_FORMAT_R32_SFLOAT, iLevels + 1);
 
-	// Verify even dimensions at each level before erasing
 	for (int64_t i = 0; i < iLevels; ++i)
 	{
 		ASSERT((miWidth >> i) % 2 == 0);
@@ -400,9 +398,9 @@ void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int
 	bc7Parameters.m_max_partitions = kuiBc7MaxPartitions;
 	bc7Parameters.m_uber_level = kuiBc7UberLevel;
 
-	const int64_t iBlockColumns = (iWidth + 3) / 4;
-	const int64_t iBlockRows = (iHeight + 3) / 4;
-	const int64_t iBytesPerBlock = vkFormat == VK_FORMAT_BC4_UNORM_BLOCK ? 8 : 16;
+	int64_t iBlockColumns = (iWidth + 3) / 4;
+	int64_t iBlockRows = (iHeight + 3) / 4;
+	int64_t iBytesPerBlock = vkFormat == VK_FORMAT_BC4_UNORM_BLOCK ? 8 : 16;
 	std::atomic<bool> bHasAlpha(false);
 	auto encodeBlockRows = [&](int64_t iStart, int64_t iEnd)
 	{
@@ -576,8 +574,8 @@ void Texture::Export(std::vector<std::byte>& rData, VkFormat vkFormat, TextureOp
 
 void Texture::SaveJpegSidecar(const std::filesystem::path& rPath, int iQuality, TextureOptions_t options)
 {
-	const bool bGrayscale = options & TextureOptions::kGrayscale;
-	const bool bAutoNormalize = options & TextureOptions::kAutoNormalize;
+	bool bGrayscale = options & TextureOptions::kGrayscale;
+	bool bAutoNormalize = options & TextureOptions::kAutoNormalize;
 	ASSERT(!mData.empty());
 	const std::vector<float>& rPixels = mData.at(0);
 	int64_t iPixelCount = miWidth * miHeight;

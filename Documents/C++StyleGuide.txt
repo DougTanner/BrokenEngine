@@ -137,7 +137,7 @@ IMPORTANT do not use auto in range-based for loops
 
 26. Avoid overuse of "using enum", try to only use on enums in direct header: using enum MenuFlags;
 
-27. Floating point constants should always have the decimal and first digit, even if it's 0, and should have 'f' appended: float fValue = 1.0f;
+27. Floating point constants should always have the decimal and first digit, even if it's 0. Only float constants have 'f' appended; double constants never do: float fValue = 1.0f; double fSeconds = 1.0;
 
 28. Use nullptr instead of NULL: IXAudio2SourceVoice* pVoice = nullptr;
 

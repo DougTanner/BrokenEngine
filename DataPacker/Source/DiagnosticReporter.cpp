@@ -81,7 +81,7 @@ void MarkValidatedLinkedWorktree()
 
 ButtonResult Report(const Record& rRecord)
 {
-	const std::string text = BuildModalText(rRecord);
+	std::string text = BuildModalText(rRecord);
 	if (rRecord.eSeverity == Severity::kError)
 	{
 		LOG(kDefault, kError, "{}: {}", rRecord.title, text);
@@ -118,16 +118,16 @@ ButtonResult Report(const Record& rRecord)
 			uiFlags |= MB_ICONWARNING;
 			break;
 	}
-	const std::wstring title = Utf8ToWide(NormalizeUtf8(rRecord.title));
-	const std::wstring message = Utf8ToWide(text);
-	const int iResult = MessageBoxW(nullptr, message.c_str(), title.c_str(), uiFlags);
+	std::wstring title = Utf8ToWide(NormalizeUtf8(rRecord.title));
+	std::wstring message = Utf8ToWide(text);
+	int iResult = MessageBoxW(nullptr, message.c_str(), title.c_str(), uiFlags);
 	return rRecord.eButtons == ButtonContract::kOk || iResult == IDOK ? ButtonResult::kAcknowledged : ButtonResult::kCancelled;
 }
 
 DiskSpaceDecision ReportMaterializationDiskSpace(uint64_t uiAllocation, uint64_t uiAvailable, const std::filesystem::path& rSource, const std::filesystem::path& rDestination)
 {
-	const uint64_t uiReserve = (std::max)(1ull << 30, (uiAllocation * 5 + 99) / 100);
-	const uint64_t uiRequired = uiAllocation + uiReserve;
+	uint64_t uiReserve = (std::max)(1ull << 30, (uiAllocation * 5 + 99) / 100);
+	uint64_t uiRequired = uiAllocation + uiReserve;
 	if (uiRequired > uiAvailable)
 	{
 		Record record
@@ -142,8 +142,8 @@ DiskSpaceDecision ReportMaterializationDiskSpace(uint64_t uiAllocation, uint64_t
 		return DiskSpaceDecision::kFailed;
 	}
 
-	const uint64_t uiProjected = uiAvailable - uiAllocation;
-	const uint64_t uiWarning = 10ull << 30;
+	uint64_t uiProjected = uiAvailable - uiAllocation;
+	uint64_t uiWarning = 10ull << 30;
 	if (uiProjected < uiWarning)
 	{
 		Record record

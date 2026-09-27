@@ -3,10 +3,10 @@
 // Tuning knobs for SubdivideBeachBand. Bundled so the function signature stays short.
 struct SubdivisionConfig
 {
-	float fBandMinMeters;     // Triangles whose Z-range overlaps [fBandMinMeters, fBandMaxMeters] are candidates
-	float fBandMaxMeters;
-	float fMaxEdgeMeters;     // In-band triangles subdivide until longest XY edge <= this
-	int32_t iMaxDepth;        // Safety cap on recursive subdivision depth
+	float fBandMinMeters = 0.0f;  // Triangles whose Z-range overlaps [fBandMinMeters, fBandMaxMeters] are candidates
+	float fBandMaxMeters = 0.0f;
+	float fMaxEdgeMeters = 0.0f;  // In-band triangles subdivide until longest XY edge <= this
+	int32_t iMaxDepth = 0;        // Safety cap on recursive subdivision depth
 };
 
 // After Gaea Mesher load, recursively midpoint-split triangles overlapping the beach-Z band until the

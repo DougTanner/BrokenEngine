@@ -277,9 +277,9 @@ private:
 	{
 	}
 
-	Workbuffer* mpBuffer;
+	Workbuffer* mpBuffer = nullptr;
 	T mpData;
-	int64_t miOwningDepth;
+	int64_t miOwningDepth = 0;
 
 	friend class Workbuffer;
 	template<typename> friend class ScopedWorkbufferAllocation;
@@ -304,8 +304,8 @@ struct Wb
 	Wb(float fValue, int iPrecision)
 	: fValue(fValue), iPrecision(iPrecision) {}
 
-	float fValue;
-	int   iPrecision;
+	float fValue = 0.0f;
+	int   iPrecision = 0;
 };
 
 // 2D XMVECTOR formatted as "(x,y)" with shared precision.
@@ -315,7 +315,7 @@ struct WbV2
 	: vec(vec), iPrecision(iPrecision) {}
 
 	DirectX::XMVECTOR vec;
-	int               iPrecision;
+	int               iPrecision = 0;
 };
 
 // 3D XMVECTOR formatted as "(x,y,z)" with shared precision.
@@ -325,7 +325,7 @@ struct WbV3
 	: vec(vec), iPrecision(iPrecision) {}
 
 	DirectX::XMVECTOR vec;
-	int               iPrecision;
+	int               iPrecision = 0;
 };
 
 // 4D XMVECTOR formatted as "(x,y,z,w)" with shared precision.
@@ -335,7 +335,7 @@ struct WbV4
 	: vec(vec), iPrecision(iPrecision) {}
 
 	DirectX::XMVECTOR vec;
-	int               iPrecision;
+	int               iPrecision = 0;
 };
 
 } // namespace common

@@ -138,13 +138,13 @@ static std::vector<std::string> BuildDependencyRootPrefixes()
 	return rootPrefixes;
 }
 
-static const std::string* FindMatchingDependencyRoot(const std::vector<std::string>& rRootPrefixes, const std::string& rLowerContent, size_t uiOffset)
+static const std::string* FindMatchingDependencyRoot(const std::vector<std::string>& rRootPrefixes, std::string_view lowerContent, size_t uiOffset)
 {
 	for (const std::string& rRootPrefix : rRootPrefixes)
 	{
 		std::string lowerPrefix = common::ToLower(rRootPrefix);
-		if (uiOffset + lowerPrefix.size() <= rLowerContent.size() && rLowerContent.compare(uiOffset, lowerPrefix.size(), lowerPrefix) == 0
-		 && (uiOffset + lowerPrefix.size() == rLowerContent.size() || rLowerContent[uiOffset + lowerPrefix.size()] == '\\' || rLowerContent[uiOffset + lowerPrefix.size()] == '/'))
+		if (uiOffset + lowerPrefix.size() <= lowerContent.size() && lowerContent.compare(uiOffset, lowerPrefix.size(), lowerPrefix) == 0
+		 && (uiOffset + lowerPrefix.size() == lowerContent.size() || lowerContent[uiOffset + lowerPrefix.size()] == '\\' || lowerContent[uiOffset + lowerPrefix.size()] == '/'))
 		{
 			return &rRootPrefix;
 		}
@@ -152,34 +152,34 @@ static const std::string* FindMatchingDependencyRoot(const std::vector<std::stri
 	return nullptr;
 }
 
-static std::vector<std::filesystem::path> ParseRootDelimitedDependencies(const std::filesystem::path& rDependencyFilePath, const std::string& rContent, const std::vector<std::string>& rRootPrefixes, const std::string& rLowerContent)
+static std::vector<std::filesystem::path> ParseRootDelimitedDependencies(const std::filesystem::path& rDependencyFilePath, std::string_view content, const std::vector<std::string>& rRootPrefixes, std::string_view lowerContent)
 {
 	std::vector<std::filesystem::path> dependencies;
 	size_t uiDependencyStart = 0;
-	while (uiDependencyStart < rContent.size())
+	while (uiDependencyStart < content.size())
 	{
-		if (FindMatchingDependencyRoot(rRootPrefixes, rLowerContent, uiDependencyStart) == nullptr)
+		if (FindMatchingDependencyRoot(rRootPrefixes, lowerContent, uiDependencyStart) == nullptr)
 		{
-			throw std::runtime_error(std::format("Shader dependency file \"{}\" contains an ambiguous or outside-root entry near \"{}\"", rDependencyFilePath.string(), rContent.substr(uiDependencyStart)));
+			throw std::runtime_error(std::format("Shader dependency file \"{}\" contains an ambiguous or outside-root entry near \"{}\"", rDependencyFilePath.string(), content.substr(uiDependencyStart)));
 		}
 
-		size_t uiDependencyEnd = rContent.size();
-		for (size_t uiSpace = rContent.find(' ', uiDependencyStart); uiSpace != std::string::npos; uiSpace = rContent.find(' ', uiSpace + 1))
+		size_t uiDependencyEnd = content.size();
+		for (size_t uiSpace = content.find(' ', uiDependencyStart); uiSpace != std::string_view::npos; uiSpace = content.find(' ', uiSpace + 1))
 		{
-			if (FindMatchingDependencyRoot(rRootPrefixes, rLowerContent, uiSpace + 1) != nullptr)
+			if (FindMatchingDependencyRoot(rRootPrefixes, lowerContent, uiSpace + 1) != nullptr)
 			{
 				uiDependencyEnd = uiSpace;
 				break;
 			}
 		}
 
-		std::filesystem::path dependency(rContent.substr(uiDependencyStart, uiDependencyEnd - uiDependencyStart));
+		std::filesystem::path dependency(content.substr(uiDependencyStart, uiDependencyEnd - uiDependencyStart));
 		if (!IsDependencyInInputRoot(dependency))
 		{
 			throw std::runtime_error(std::format("Shader dependency \"{}\" is ambiguous, missing, or outside DataPacker input roots", dependency.string()));
 		}
 		dependencies.push_back(std::move(dependency));
-		uiDependencyStart = uiDependencyEnd == rContent.size() ? rContent.size() : uiDependencyEnd + 1;
+		uiDependencyStart = uiDependencyEnd == content.size() ? content.size() : uiDependencyEnd + 1;
 	}
 	return dependencies;
 }

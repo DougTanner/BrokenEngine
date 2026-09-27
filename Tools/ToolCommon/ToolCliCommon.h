@@ -19,9 +19,9 @@
 
 namespace toolcli
 {
-	constexpr int kiExitOk = 0;
-	constexpr int kiExitStateConflict = 2;
-	constexpr int kiExitFailure = 1;
+	inline constexpr int kiExitOk = 0;
+	inline constexpr int kiExitStateConflict = 2;
+	inline constexpr int kiExitFailure = 1;
 
 	class Handle
 	{

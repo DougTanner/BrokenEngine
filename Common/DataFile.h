@@ -28,11 +28,11 @@ inline constexpr float kfUnderwaterMaskThresholdMeters = -2.5f;
 inline void AlignOutputStream(std::fstream& rFileStream)
 {
 	static constexpr char kpcPadding[kiAlignmentBytes] {};
-	const std::streamoff iPos = rFileStream.tellp();
+	std::streamoff iPos = rFileStream.tellp();
 	ASSERT(iPos >= 0);
 	// Double modulo yields the correct [0, kiAlignmentBytes) padding count and collapses the
 	// already-aligned case to 0 without relying on a < kiAlignmentBytes branch guard.
-	const int64_t iBytesToAlign = (kiAlignmentBytes - (static_cast<int64_t>(iPos) % kiAlignmentBytes)) % kiAlignmentBytes;
+	int64_t iBytesToAlign = (kiAlignmentBytes - (static_cast<int64_t>(iPos) % kiAlignmentBytes)) % kiAlignmentBytes;
 	if (iBytesToAlign > 0)
 	{
 		rFileStream.write(&kpcPadding[0], iBytesToAlign);
@@ -109,13 +109,12 @@ struct SceneHeader
 	{
 		return RoundUp<int64_t, kiAlignmentBytes>(iTextureCount * static_cast<int64_t>(sizeof(crc_t)));
 	}
-	// Offset where the MaterialShaderData array begins (end of the texture+indexStarts scene-arrays prefix).
 	static constexpr int64_t MaterialDataOffset(int64_t iTextureCount, int64_t iMaterialCount)
 	{
 		return IndexStartsOffset(iTextureCount) + RoundUp<int64_t, kiAlignmentBytes>(iMaterialCount * static_cast<int64_t>(sizeof(uint32_t)));
 	}
-	// Offset where the appended animation section begins. Defined out-of-line below — references the
-	// MaterialShaderData size, whose struct is declared later in this header.
+	// Defined out-of-line below because it references MaterialShaderData's size, whose struct is declared
+	// later in this header.
 	static constexpr int64_t AnimationSectionOffset(int64_t iTextureCount, int64_t iMaterialCount);
 };
 static_assert(sizeof(SceneHeader) == 24, "SceneHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportScene::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
@@ -125,7 +124,7 @@ static_assert(BT_OFFSETOF(SceneHeader, modelCrc) == 16, "SceneHeader padding no 
 struct AnimationKeyframe
 {
 	float fTime = 0.0f;
-	XMFLOAT4 f4Value {};       // Translation (xyz,0), Rotation (quat), or Scale (xyz,1)
+	XMFLOAT4 f4Value {};       // Translation (xyz,0), Rotation (quat), or Scale (xyz,0)
 };
 static_assert(sizeof(AnimationKeyframe) == 20, "AnimationKeyframe layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
 static_assert(BT_OFFSETOF(AnimationKeyframe, f4Value) == 4, "AnimationKeyframe padding changed — keyframe stride no longer matches writer/reader");
@@ -134,7 +133,7 @@ static_assert(BT_OFFSETOF(AnimationKeyframe, f4Value) == 4, "AnimationKeyframe p
 struct AnimationKeyframeCubic
 {
 	float fTime = 0.0f;
-	XMFLOAT4 f4Value {};       // Translation (xyz,0), Rotation (quat), or Scale (xyz,1)
+	XMFLOAT4 f4Value {};       // Translation (xyz,0), Rotation (quat), or Scale (xyz,0)
 	XMFLOAT4 f4InTangent {};   // Incoming tangent
 	XMFLOAT4 f4OutTangent {};  // Outgoing tangent
 };
@@ -160,7 +159,6 @@ struct AnimationChannel
 };
 static_assert(sizeof(AnimationChannel) == 12, "AnimationChannel layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
 
-// Animation clip
 struct AnimationClip
 {
 	static constexpr int64_t kiMaxNameLength = 64;
@@ -231,10 +229,8 @@ struct JointMatrix
 	XMFLOAT4 rows[3] {};
 };
 
-// Joint matrix storage constants
-inline constexpr int64_t kiInitialJointMatrixCapacity = 8192;  // Room for multiple skinned model instances
+inline constexpr int64_t kiInitialJointMatrixCapacity = 8'192;  // Room for multiple skinned model instances
 
-// Animation header for pack file
 struct AnimationHeader
 {
 	static constexpr int64_t kiMaxAnimations = 64;
@@ -320,8 +316,7 @@ struct ModelHeader
 		return RoundUp<int64_t, 4>(iIndexCount * iIndexElementSize);
 	}
 
-	// A model mesh stores 16-bit indices when its vertex count fits a uint16, else 32-bit. Single
-	// source for the `.MODEL` writer/reader (ExportScene/ExportModel) and the runtime index-type
+	// Single source for the `.MODEL` writer/reader (ExportScene/ExportModel) and the runtime index-type
 	// recovery (BufferManager) — all three must agree on the same threshold.
 	static constexpr bool UsesU16Indices(int64_t iVertexCount)
 	{

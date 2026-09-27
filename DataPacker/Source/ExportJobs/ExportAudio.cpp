@@ -9,7 +9,6 @@ std::optional<common::ChunkFlags_t> ExportAudio::Handles(const std::filesystem::
 
 void ExportAudio::Export()
 {
-	// Load and parse WAV file using DirectXTK
 	std::unique_ptr<uint8_t[]> waveData;
 	const WAVEFORMATEX* pWaveformatex = nullptr;
 	const uint8_t* pAudioData = nullptr;
@@ -38,7 +37,7 @@ void ExportAudio::Export()
 		for (size_t i = 0; i < uiSampleCount; ++i)
 		{
 			// Divisor matches the output multiplier so a defect-free 16-bit file round-trips bit-exactly
-			fSamples[i] = static_cast<float>(piSamples[i]) / 32767.0f;
+			fSamples[i] = static_cast<float>(piSamples[i]) / 32'767.0f;
 		}
 	}
 	else if (pWaveformatex->wFormatTag == WAVE_FORMAT_IEEE_FLOAT && pWaveformatex->wBitsPerSample == 32)
@@ -68,7 +67,7 @@ void ExportAudio::Export()
 	audiorepair::RepairAudio(fSamples, pWaveformatex->nChannels, pWaveformatex->nSamplesPerSec, mRelativeFile, bLoop, bAllowDeclip, !bMusic);
 
 	// Resample to the pack-time rate so source rate == mastering rate at runtime (XAudio2 SRC bypass).
-	// Runs after RepairAudio (per plan): repair analysis/fades ran at the source rate and their effect
+	// Runs after RepairAudio: repair analysis/fades ran at the source rate and their effect
 	// scales naturally through resampling; loop assets resample whole-buffer (seam no longer sample-exact).
 	audiorepair::Resample(fSamples, pWaveformatex->nChannels, pWaveformatex->nSamplesPerSec, audiorepair::kiAudioExportSampleRate, mRelativeFile);
 
@@ -78,14 +77,13 @@ void ExportAudio::Export()
 	std::vector<int16_t> pcmSamples(fSamples.size());
 	for (size_t i = 0; i < fSamples.size(); ++i)
 	{
-		pcmSamples[i] = static_cast<int16_t>(std::clamp(std::lround(fSamples[i] * 32767.0f), -32768L, 32767L));
+		pcmSamples[i] = static_cast<int16_t>(std::clamp(std::lround(fSamples[i] * 32'767.0f), -32'768L, 32'767L));
 	}
 
 	// Allocate header and data for chunk (only store audio data, not WAV headers)
 	int64_t iPcmDataSize = pcmSamples.size() * sizeof(int16_t);
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(iPcmDataSize);
 
-	// Populate WAVEFORMATEX with PCM audio format information
 	pHeader->audioHeader.waveFormat.wFormatTag = WAVE_FORMAT_PCM;
 	pHeader->audioHeader.waveFormat.nChannels = pWaveformatex->nChannels;
 	pHeader->audioHeader.waveFormat.nSamplesPerSec = static_cast<DWORD>(audiorepair::kiAudioExportSampleRate); // resampled above
@@ -94,6 +92,5 @@ void ExportAudio::Export()
 	pHeader->audioHeader.waveFormat.wBitsPerSample = 16;
 	pHeader->audioHeader.waveFormat.cbSize = 0;
 
-	// Copy PCM data directly
 	std::memcpy(dataSpan.data(), pcmSamples.data(), iPcmDataSize);
 }

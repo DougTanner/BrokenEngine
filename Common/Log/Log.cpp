@@ -176,15 +176,15 @@ void LogWrite(char* pLogBuffer)
 	}
 }
 
-void LogWriteRingBuffers(const char* pLogBuffer, int64_t iLength, LogCategory eCategory)
+void LogWriteRingBuffers(std::string_view logBuffer, LogCategory eCategory)
 {
-	auto copyToLine = [pLogBuffer, iLength](char* pLine)
+	auto copyToLine = [logBuffer](char* pLine)
 	{
 		if (pLine == nullptr)
 		{
 			return;
 		}
-		std::memcpy(pLine, pLogBuffer, iLength);
+		std::memcpy(pLine, logBuffer.data(), logBuffer.size());
 	};
 
 	copyToLine(gLogRingBuffers[static_cast<int64_t>(eCategory)].AcquireLine());

@@ -24,7 +24,7 @@ namespace toolcli::landing
 	};
 
 	bool IsValidLeaseDuration(int64_t iLeaseSeconds);
-	nlohmann::json NewLandingMetadata(const coordination::Locator& rLocator, const std::wstring& rOwner, const std::wstring& rSession, const std::wstring& rWorktree, int64_t iLeaseSeconds);
+	nlohmann::json NewLandingMetadata(const coordination::Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds);
 	std::optional<LandingLease> ValidateLandingLease(const nlohmann::json& rMetadata, const coordination::Locator& rLocator, uint64_t uiCurrentTicks);
 	nlohmann::json LandingStatus(const nlohmann::json& rMetadata, const coordination::Locator& rLocator);
 	bool AllRegisteredWorktreesClear(const coordination::Locator& rLocator);

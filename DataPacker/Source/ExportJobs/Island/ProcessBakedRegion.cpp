@@ -18,20 +18,20 @@ constexpr float kfEdgeTaperMaxMeters = 25.0f;
 // stages and input to every later crop / downsample / dimension stage.
 struct CropRect
 {
-	int64_t iX;
-	int64_t iY;
-	int64_t iWidth;
-	int64_t iHeight;
+	int64_t iX = 0;
+	int64_t iY = 0;
+	int64_t iWidth = 0;
+	int64_t iHeight = 0;
 };
 
 // Auto-crop bbox of pixels above the sea-floor cut line, in full-bake pixel coords. iMaxX < 0 marks
 // an empty bbox (the region produced no terrain) — the caller turns that into a configuration error.
 struct RegionBbox
 {
-	int64_t iMinX;
-	int64_t iMinY;
-	int64_t iMaxX;
-	int64_t iMaxY;
+	int64_t iMinX = 0;
+	int64_t iMinY = 0;
+	int64_t iMaxX = 0;
+	int64_t iMaxY = 0;
 };
 
 // Expand bbox span [iLo, iHi] symmetrically to a multiple of kiCropAlignment, clamped to
@@ -206,13 +206,13 @@ void CropAndWriteAmbientOcclusion(const std::filesystem::path& rLeafIntermediate
 void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const WorldDimensions& rDimensions, int64_t iTexturePixels, const CropRect& rCrop, const RegionBounds& rRegion, const std::filesystem::path& rLeafDir)
 {
 	int64_t iDiscardedTriangles = 0;
-	const double dPixelsToMeters = static_cast<double>(rDimensions.fFootprintMeters) / static_cast<double>(iTexturePixels);
-	const float fCropMinXMeters = static_cast<float>(static_cast<double>(rCrop.iX)                          * dPixelsToMeters - 0.5 * rDimensions.fFootprintMeters);
-	const float fCropMaxXMeters = static_cast<float>(static_cast<double>(rCrop.iX + rCrop.iWidth)           * dPixelsToMeters - 0.5 * rDimensions.fFootprintMeters);
-	const float fCropMaxYMeters = static_cast<float>(0.5 * rDimensions.fFootprintMeters - static_cast<double>(rCrop.iY)               * dPixelsToMeters);
-	const float fCropMinYMeters = static_cast<float>(0.5 * rDimensions.fFootprintMeters - static_cast<double>(rCrop.iY + rCrop.iHeight) * dPixelsToMeters);
-	const float fCropCenterXMeters = 0.5f * (fCropMinXMeters + fCropMaxXMeters);
-	const float fCropCenterYMeters = 0.5f * (fCropMinYMeters + fCropMaxYMeters);
+	double dPixelsToMeters = static_cast<double>(rDimensions.fFootprintMeters) / static_cast<double>(iTexturePixels);
+	float fCropMinXMeters = static_cast<float>(static_cast<double>(rCrop.iX)                          * dPixelsToMeters - 0.5 * rDimensions.fFootprintMeters);
+	float fCropMaxXMeters = static_cast<float>(static_cast<double>(rCrop.iX + rCrop.iWidth)           * dPixelsToMeters - 0.5 * rDimensions.fFootprintMeters);
+	float fCropMaxYMeters = static_cast<float>(0.5 * rDimensions.fFootprintMeters - static_cast<double>(rCrop.iY)               * dPixelsToMeters);
+	float fCropMinYMeters = static_cast<float>(0.5 * rDimensions.fFootprintMeters - static_cast<double>(rCrop.iY + rCrop.iHeight) * dPixelsToMeters);
+	float fCropCenterXMeters = 0.5f * (fCropMinXMeters + fCropMaxXMeters);
+	float fCropCenterYMeters = 0.5f * (fCropMinYMeters + fCropMaxYMeters);
 
 	auto VertexOutside = [&rMeshPositions, fCropMinXMeters, fCropMaxXMeters, fCropMinYMeters, fCropMaxYMeters](uint32_t iV) -> bool
 	{
@@ -248,7 +248,7 @@ void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<uint32_t>
 	// Compact + cache-optimize the vertex buffer: meshopt_optimizeVertexFetch reorders surviving
 	// vertices into index-access order (GPU fetch efficiency) and drops orphans left by the crop,
 	// rewriting rMeshIndices in place. Positions are bare float XYZ triples (12-byte stride).
-	const size_t uiOldVertexCount = rMeshPositions.size() / 3;
+	size_t uiOldVertexCount = rMeshPositions.size() / 3;
 	std::vector<float> packedPositions(rMeshPositions.size());
 	size_t uiNewVertexCount = meshopt_optimizeVertexFetch(packedPositions.data(), rMeshIndices.data(), rMeshIndices.size(), rMeshPositions.data(), uiOldVertexCount, sizeof(float) * 3);
 	packedPositions.resize(uiNewVertexCount * 3);

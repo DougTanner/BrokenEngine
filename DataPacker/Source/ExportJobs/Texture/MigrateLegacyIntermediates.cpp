@@ -9,7 +9,7 @@
 // TextureIntermediateSuffix helper so the inverse can't drift from the forward map.
 static VkFormat IntermediateFormatFromExtension(const std::filesystem::path& rPath)
 {
-	const std::string sExtension = rPath.extension().string();
+	std::string sExtension = rPath.extension().string();
 	if (sExtension == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK))
 	{
 		return VK_FORMAT_BC4_UNORM_BLOCK;
@@ -124,7 +124,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 		return;
 	}
 
-	const uintmax_t uiFileSize = std::filesystem::file_size(rPath);
+	uintmax_t uiFileSize = std::filesystem::file_size(rPath);
 	if (uiFileSize > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max()))
 	{
 		return;
@@ -154,14 +154,14 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 		return;
 	}
 
-	auto tMigrateStart = std::chrono::steady_clock::now();
+	std::chrono::steady_clock::time_point tMigrateStart = std::chrono::steady_clock::now();
 	int64_t iSizeBefore = iFileSize;
 
 	int64_t iWidth = header.iWidth;
 	int64_t iHeight = header.iHeight;
 	int64_t iMipMaps = header.iMipCount;
 
-	if (iWidth <= 0 || iHeight <= 0 || iMipMaps <= 0 || iWidth > 32768 || iHeight > 32768 || iMipMaps > 32)
+	if (iWidth <= 0 || iHeight <= 0 || iMipMaps <= 0 || iWidth > 32'768 || iHeight > 32'768 || iMipMaps > 32)
 	{
 		return;
 	}
@@ -183,9 +183,9 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	{
 		return;
 	}
-	const uintmax_t uiExpectedRawSize = static_cast<uintmax_t>(iExpectedRawSize);
-	const uintmax_t uiCompressedPayloadBound = static_cast<uintmax_t>(compressBound(static_cast<uLong>(iExpectedRawSize)));
-	const uintmax_t uiPayloadSize = static_cast<uintmax_t>(iPayloadSize);
+	uintmax_t uiExpectedRawSize = static_cast<uintmax_t>(iExpectedRawSize);
+	uintmax_t uiCompressedPayloadBound = static_cast<uintmax_t>(compressBound(static_cast<uLong>(iExpectedRawSize)));
+	uintmax_t uiPayloadSize = static_cast<uintmax_t>(iPayloadSize);
 	if (uiPayloadSize != uiExpectedRawSize && uiPayloadSize > uiCompressedPayloadBound)
 	{
 		return;
@@ -239,7 +239,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 		fileStreamOut.close();
 		VERIFY_SUCCESS(fileStreamOut.good());
 
-		auto tMigrateEnd = std::chrono::steady_clock::now();
+		std::chrono::steady_clock::time_point tMigrateEnd = std::chrono::steady_clock::now();
 		double fMigrateSeconds = std::chrono::duration<double>(tMigrateEnd - tMigrateStart).count();
 		int64_t iSizeAfter = std::filesystem::file_size(rPath);
 		LOG(kDefault, kInfo, "Migrated R16 (zlib + magic): \"{}\" ({} -> {} bytes raw; {} -> {} bytes on-disk; {:.2f}s)", rPath.string(), iExpectedRawSize, static_cast<int64_t>(compressed.size()), iSizeBefore, iSizeAfter, fMigrateSeconds);
@@ -255,7 +255,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 		texture.Save(rPath, vkFormat, {});
 	}
 
-	auto tMigrateEnd = std::chrono::steady_clock::now();
+	std::chrono::steady_clock::time_point tMigrateEnd = std::chrono::steady_clock::now();
 	double fMigrateSeconds = std::chrono::duration<double>(tMigrateEnd - tMigrateStart).count();
 	int64_t iSizeAfter = std::filesystem::file_size(rPath);
 	LOG(kDefault, kInfo, "Migrated BCn (decode + direct re-encode + magic): \"{}\" ({}x{}; {} -> {} bytes on-disk; {:.2f}s)", rPath.string(), iWidth, iHeight, iSizeBefore, iSizeAfter, fMigrateSeconds);

@@ -105,7 +105,6 @@ std::vector<std::filesystem::directory_entry> EnumerateLibraryFiles(const std::f
 
 std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<std::filesystem::directory_entry>& rFiles)
 {
-	// Priority 1: Look for primary license files (LICENSE, LICENSE.md, LICENSE.txt)
 	bool bFoundLicense = false;
 	std::filesystem::path primaryLicenseFile;
 	for (std::string_view priority : { "license", "license.md", "license.txt" })
@@ -125,13 +124,11 @@ std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<std::fil
 		}
 	}
 
-	// If primary license found, copy it and skip fallback search
 	if (bFoundLicense)
 	{
 		return { primaryLicenseFile };
 	}
 
-	// Fallback: Search for alternative license/attribution files (copying, readme, manual.md)
 	std::vector<std::filesystem::path> licenseFiles;
 	for (const std::filesystem::directory_entry& rFileEntry : rFiles)
 	{
@@ -212,7 +209,7 @@ bool CopyThirdPartyLicenses()
 	{
 		return true;
 	}
-	const FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kAttribution);
+	FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kAttribution);
 	if (eResult == FileManager::EnsureLocalResult::kCancelled || eResult == FileManager::EnsureLocalResult::kFailed)
 	{
 		return false;

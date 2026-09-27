@@ -80,7 +80,7 @@ std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprin
 {
 	Sha256Hasher hasher;
 	std::fstream stream(rPath, std::ios::in | std::ios::binary);
-	std::vector<std::byte> buffer(64 * 1024);
+	std::vector<std::byte> buffer(64 * 1'024);
 	std::vector<std::byte> normalizedBuffer;
 	if (eMode == InputFingerprintMode::kTextCrLf)
 	{
@@ -140,15 +140,15 @@ std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprin
 
 constexpr const char* kpcPersistentFingerprintMagic = "DataPackerInputFingerprint";
 constexpr int64_t kiPersistentFingerprintVersion = 2;
-constexpr uintmax_t kuiMaximumPersistentFingerprintBytes = 4 * 1024;
+constexpr uintmax_t kuiMaximumPersistentFingerprintBytes = 4 * 1'024;
 
 constexpr const char* kpcFingerprintCacheMagic = "DataPackerFingerprintCache";
 constexpr int64_t kiFingerprintCacheVersion = 1;
-constexpr uintmax_t kuiMaximumFingerprintCacheBytes = 64 * 1024 * 1024;
+constexpr uintmax_t kuiMaximumFingerprintCacheBytes = 64 * 1'024 * 1'024;
 
-bool IsSha256(const std::string& rFingerprint)
+bool IsSha256(std::string_view fingerprint)
 {
-	return rFingerprint.size() == 64 && std::ranges::all_of(rFingerprint, [](char cCharacter)
+	return fingerprint.size() == 64 && std::ranges::all_of(fingerprint, [](char cCharacter)
 	{
 		return (cCharacter >= '0' && cCharacter <= '9') || (cCharacter >= 'a' && cCharacter <= 'f');
 	});
@@ -230,7 +230,7 @@ void InputFingerprintCache::Save()
 	{
 		sortedEntries.push_back(&rEntry);
 	}
-	std::ranges::sort(sortedEntries, [](const auto* pLeft, const auto* pRight)
+	std::ranges::sort(sortedEntries, [](const std::pair<const std::string, CachedFingerprint>* pLeft, const std::pair<const std::string, CachedFingerprint>* pRight)
 	{
 		return pLeft->first < pRight->first;
 	});

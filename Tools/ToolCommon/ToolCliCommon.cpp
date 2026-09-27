@@ -14,7 +14,7 @@ namespace toolcli
 
 		void ReportProcessFailure(const RunProcessOptions& rOptions, std::string_view operation)
 		{
-			const DWORD uiError = ::GetLastError();
+			DWORD uiError = ::GetLastError();
 			if (rOptions.failureSink)
 			{
 				rOptions.failureSink(std::string(operation) + " failed (Windows error " + std::to_string(uiError) + ")");
@@ -121,7 +121,7 @@ namespace toolcli
 		startupInfo.hStdError = rOptions.bCaptureOutput && rOptions.bMergeStdError ? hPipeWrite.Get() : ::GetStdHandle(STD_ERROR_HANDLE);
 		PROCESS_INFORMATION processInformation {};
 		std::wstring commandLine = BuildCommandLine(rArguments);
-		const DWORD uiCreationFlags = (rOptions.bNoWindow ? CREATE_NO_WINDOW : 0) | (rOptions.bKillOnJobClose ? CREATE_SUSPENDED : 0);
+		DWORD uiCreationFlags = (rOptions.bNoWindow ? CREATE_NO_WINDOW : 0) | (rOptions.bKillOnJobClose ? CREATE_SUSPENDED : 0);
 		if (::CreateProcessW(pExecutable != nullptr ? pExecutable->c_str() : nullptr, commandLine.data(), nullptr, nullptr, TRUE, uiCreationFlags, nullptr, nullptr, &startupInfo, &processInformation) == FALSE)
 		{
 			ReportProcessFailure(rOptions, "launch process");
@@ -150,7 +150,7 @@ namespace toolcli
 		ProcessResult result;
 		if (rOptions.bCaptureOutput)
 		{
-			char pBuffer[65536] {};
+			char pBuffer[65'536] {};
 			DWORD uiRead = 0;
 			// A zero-byte write by the child completes ReadFile with TRUE/0; only a broken pipe is EOF.
 			while (::ReadFile(hPipeRead.Get(), pBuffer, sizeof(pBuffer), &uiRead, nullptr) != FALSE)
@@ -168,7 +168,7 @@ namespace toolcli
 					result.output.append(pBuffer, uiRead);
 				}
 			}
-			const DWORD uiReadError = ::GetLastError();
+			DWORD uiReadError = ::GetLastError();
 			if (uiReadError != ERROR_BROKEN_PIPE)
 			{
 				ReportProcessFailure(rOptions, "read process output");

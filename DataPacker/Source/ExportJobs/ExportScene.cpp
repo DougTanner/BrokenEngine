@@ -151,7 +151,6 @@ void LogFilteredChannelDiagnostics(const tinygltf::Model& rGltfModel)
 {
 	LOG(kDefault, kWarning, "WARNING: All animation channels were filtered out!");
 	LOG(kDefault, kWarning, "  Node count: {}", rGltfModel.nodes.size());
-	// Log first few animation channel targets
 	int iCount = 0;
 	for (const tinygltf::Animation& rAnim : rGltfModel.animations)
 	{
@@ -387,7 +386,6 @@ tinygltf::Model ExportScene::LoadGltfModel()
 
 	std::string error;
 	std::string warning;
-	// Load glTF model from file (binary or ASCII)
 	tinygltf::TinyGLTF gltfContext;
 	bool bFileLoaded = bBinary ? gltfContext.LoadBinaryFromFile(&gltfModel, &error, &warning, filename.c_str()) : gltfContext.LoadASCIIFromFile(&gltfModel, &error, &warning, filename.c_str());
 	if (!bFileLoaded)
@@ -543,11 +541,11 @@ void ExportScene::ProcessTextures(tinygltf::Model& rGltfModel)
 	}
 
 	// Sweep texture intermediates orphaned by a texture being removed, renumbered, or re-formatted in the
-	// source glTF. Each is a "<scene>.Texture<imageIndex>.<BCn>" sibling of the source file; the recursive
-	// ExportTexture scan (Main.cpp) claims any .BCn_UNORM_BLOCK file, so a stale leftover would ship as a
-	// live texture chunk that no longer matches the scene. textureAttempts is exactly the current unique
-	// write set (same directory, full filename incl. format), so any matching sibling not in it is orphaned. Runs
-	// whenever PreExport runs, which a source texture edit reliably triggers via the glTF mtime (CheckDirty).
+	// source glTF; the recursive ExportTexture scan (Main.cpp) claims any .BCn_UNORM_BLOCK file, so a stale
+	// leftover would ship as a live texture chunk that no longer matches the scene. textureAttempts is exactly
+	// the current unique write set (same directory, full filename incl. format), so any matching sibling not
+	// in it is orphaned. Runs whenever PreExport runs, which a source texture edit reliably triggers via the
+	// glTF mtime (CheckDirty).
 	std::unordered_set<std::string> currentIntermediateNames;
 	for (const TextureAttempt& rAttempt : textureAttempts)
 	{
@@ -581,7 +579,7 @@ bool ExportScene::SetupSkeletonAndMaterials(tinygltf::Model& rGltfModel)
 	// SceneAnimationLoader filtering (node-based); the test must match what WriteAnimationSection emits, or
 	// vertices stay unbaked with no skeleton section to interpret them. When neither holds the model is
 	// static and bHasSkeleton stays false (load-bearing for the static-model vertex transform in
-	// LoadVertices). DetermineAnimationPath now only selects the log label.
+	// LoadVertices). DetermineAnimationPath's result here only selects the log label.
 	bool bHasSkeleton = !rGltfModel.skins.empty() || HasSurvivingAnimationClip(rGltfModel);
 	if (bHasSkeleton)
 	{
@@ -615,7 +613,6 @@ void ExportScene::LoadVerticesAndOptimizeMeshes(tinygltf::Model& rGltfModel, boo
 		LOG(kDefault, kDebug, "  Split {} materials into {} to handle primitives from different mesh nodes or deformation modes", rGltfModel.materials.size(), rMaterials.size());
 	}
 
-	// Optimize triangle order per material for GPU vertex cache and overdraw
 	for (int64_t i = 0; i < static_cast<int64_t>(rMaterials.size()); ++i)
 	{
 		std::vector<uint32_t>& rIndexBuffer = rMaterials.at(i).indexBuffer;
@@ -668,7 +665,6 @@ void ExportScene::BuildMaterialInfos(tinygltf::Model& rGltfModel, bool bHasSkele
 			XMMATRIX matAncestorWorld = ComputeNodeWorldTransform(iAncestorNodeIndex, rGltfModel, nodeParentMap);
 
 			rMaterialInfos.at(i).iParentNodeIndex = static_cast<int16_t>(iAncestorNodeIndex);
-			// Compute relative transform: meshBindWorld * inverse(nodeBindWorld)
 			// In row-major: v * relativeTransform * nodeAnimated = v_animated
 			XMMATRIX matRelative = rInfo.matMeshWorld * XMMatrixInverse(nullptr, matAncestorWorld);
 			XMStoreFloat4x4(&rMaterialInfos.at(i).f4x4RelativeTransform, matRelative);
@@ -678,7 +674,6 @@ void ExportScene::BuildMaterialInfos(tinygltf::Model& rGltfModel, bool bHasSkele
 
 	for (int64_t i = 0; i < static_cast<int64_t>(rMaterials.size()); ++i)
 	{
-		// Use original material index for split materials
 		int iOrigMat = rMaterialNodeInfos.at(i).iOriginalMaterialIndex >= 0 ? rMaterialNodeInfos.at(i).iOriginalMaterialIndex : static_cast<int>(i);
 		tinygltf::Material& rTinygltfMaterial = rGltfModel.materials.at(iOrigMat);
 		LOG(kDefault, kVerbose, "  {}: \"{}\"{}; {} {} {} {} {} textures, {} indices{}", i, rTinygltfMaterial.name, (iOrigMat != i ? std::format(" (split from {})", iOrigMat) : ""), rTinygltfMaterial.pbrMetallicRoughness.baseColorTexture.index, rTinygltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, rTinygltfMaterial.normalTexture.index, rTinygltfMaterial.occlusionTexture.index, rTinygltfMaterial.emissiveTexture.index, rMaterials.at(i).indexBuffer.size(), (rMaterialInfos.at(i).flags & common::MaterialFlags::kSkinned) ? " (skinned)" : "");
@@ -722,7 +717,6 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 		indices32.insert(indices32.end(), rMaterials.at(i).indexBuffer.begin(), rMaterials.at(i).indexBuffer.end());
 	}
 
-	// Reorder vertices for sequential access and remap indices
 	std::vector<common::ModelVertex> optimizedVertices(rVertices.size());
 	meshopt_optimizeVertexFetch(optimizedVertices.data(), indices32.data(), indices32.size(), rVertices.data(), rVertices.size(), sizeof(common::ModelVertex));
 	rVertices = std::move(optimizedVertices);
@@ -769,7 +763,7 @@ void ExportScene::MainExport(tinygltf::Model& rGltfModel)
 	std::filesystem::path modelPath(mInputPath);
 	modelPath += ".MODEL";
 	size_t uiMaterialCount = 0;
-	const uintmax_t uiModelFileSize = SourceFileSize(modelPath, kpcContext);
+	uintmax_t uiModelFileSize = SourceFileSize(modelPath, kpcContext);
 	std::fstream materialCountFileStream(modelPath, std::ios::in | std::ios::binary);
 	if (!materialCountFileStream)
 	{
@@ -782,17 +776,17 @@ void ExportScene::MainExport(tinygltf::Model& rGltfModel)
 	{
 		throw std::runtime_error("ExportScene model material count is invalid");
 	}
-	const uintmax_t uiMaterialIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(uint32_t), kpcContext);
-	const uintmax_t uiMaterialInfoBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialInfo), kpcContext);
-	const uintmax_t uiMaterialBytes = AddSourceBytes(uiMaterialIndexBytes, uiMaterialInfoBytes, kpcContext);
+	uintmax_t uiMaterialIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(uint32_t), kpcContext);
+	uintmax_t uiMaterialInfoBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialInfo), kpcContext);
+	uintmax_t uiMaterialBytes = AddSourceBytes(uiMaterialIndexBytes, uiMaterialInfoBytes, kpcContext);
 	RequireSourceExtent(uiModelFileSize, sizeof(uiMaterialCount), uiMaterialBytes, kpcContext);
 
-	const int64_t iTextureCount = static_cast<int64_t>(rGltfModel.textures.size());
-	const int64_t iMaterialCount = static_cast<int64_t>(uiMaterialCount);
-	const int64_t iSceneArraysSize = common::SceneHeader::MaterialDataOffset(iTextureCount, iMaterialCount);
-	const uintmax_t uiMaterialShaderDataBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialShaderData), kpcContext);
-	const int64_t iDataSize = iSceneArraysSize + static_cast<int64_t>(uiMaterialShaderDataBytes);
-	const uintmax_t uiMaximumDataSize = static_cast<uintmax_t>(std::numeric_limits<int64_t>::max())
+	int64_t iTextureCount = static_cast<int64_t>(rGltfModel.textures.size());
+	int64_t iMaterialCount = static_cast<int64_t>(uiMaterialCount);
+	int64_t iSceneArraysSize = common::SceneHeader::MaterialDataOffset(iTextureCount, iMaterialCount);
+	uintmax_t uiMaterialShaderDataBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialShaderData), kpcContext);
+	int64_t iDataSize = iSceneArraysSize + static_cast<int64_t>(uiMaterialShaderDataBytes);
+	uintmax_t uiMaximumDataSize = static_cast<uintmax_t>(std::numeric_limits<int64_t>::max())
 		- static_cast<uintmax_t>(common::kiChunkDataOffset)
 		- static_cast<uintmax_t>(common::kiAlignmentBytes - 1);
 	if (static_cast<uintmax_t>(iDataSize) > uiMaximumDataSize)
@@ -820,7 +814,6 @@ void ExportScene::MainExport(tinygltf::Model& rGltfModel)
 
 	LOG(kDefault, kDebug, "Materials: {} (original), {} (after splitting)", rGltfModel.materials.size(), uiMaterialCount);
 
-	// Compute and store the model CRC in the header
 	pHeader->sceneHeader.modelCrc = common::Crc(mRelativeFile + ".MODEL");
 
 	std::vector<common::MaterialInfo> materialInfos(uiMaterialCount);
@@ -830,7 +823,6 @@ void ExportScene::MainExport(tinygltf::Model& rGltfModel)
 
 	FillMaterialShaderDatas(rGltfModel, materialInfos, pMaterialShaderDatas);
 
-	// Check if model has animations (skeletal or node-based)
 	if (rGltfModel.animations.size() > 0)
 	{
 		WriteAnimationSection(rGltfModel, materialInfos, pHeader);
@@ -839,7 +831,7 @@ void ExportScene::MainExport(tinygltf::Model& rGltfModel)
 
 void ExportScene::ReadMaterialInfosFromModel(const std::filesystem::path& rModelPath, size_t uiMaterialCount, uint32_t* puiIndexStarts, std::vector<common::MaterialInfo>& rMaterialInfos)
 {
-	const uintmax_t uiFileSize = SourceFileSize(rModelPath, kpcContext);
+	uintmax_t uiFileSize = SourceFileSize(rModelPath, kpcContext);
 	std::fstream fileStream(rModelPath, std::ios::in | std::ios::binary);
 	if (!fileStream)
 	{
@@ -852,14 +844,13 @@ void ExportScene::ReadMaterialInfosFromModel(const std::filesystem::path& rModel
 	{
 		throw std::runtime_error("ExportScene model material count changed while reading");
 	}
-	const uintmax_t uiMaterialIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(uint32_t), kpcContext);
-	const uintmax_t uiMaterialInfoBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialInfo), kpcContext);
+	uintmax_t uiMaterialIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(uint32_t), kpcContext);
+	uintmax_t uiMaterialInfoBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialInfo), kpcContext);
 	uintmax_t uiFileOffset = sizeof(uiMaterialCount);
 	RequireSourceExtent(uiFileSize, uiFileOffset, uiMaterialIndexBytes, kpcContext);
 	ReadSourceBytes(fileStream, reinterpret_cast<char*>(puiIndexStarts), uiMaterialIndexBytes, kpcContext);
 	uiFileOffset = AddSourceBytes(uiFileOffset, uiMaterialIndexBytes, kpcContext);
 
-	// Read per-material skinning info for animation header
 	RequireSourceExtent(uiFileSize, uiFileOffset, uiMaterialInfoBytes, kpcContext);
 	ReadSourceBytes(fileStream, reinterpret_cast<char*>(rMaterialInfos.data()), uiMaterialInfoBytes, kpcContext);
 
@@ -870,7 +861,6 @@ void ExportScene::FillMaterialShaderDatas(tinygltf::Model& rGltfModel, const std
 {
 	for (size_t iMaterialIndex = 0; iMaterialIndex < rMaterialInfos.size(); ++iMaterialIndex)
 	{
-		// Use original material index for split materials
 		int iOrigMat = rMaterialInfos.at(iMaterialIndex).iOriginalMaterialIndex >= 0 ? rMaterialInfos.at(iMaterialIndex).iOriginalMaterialIndex : static_cast<int>(iMaterialIndex);
 		const tinygltf::Material& rMaterial = rGltfModel.materials.at(iOrigMat);
 		LOG(kDefault, kVerbose, "  {}: {}{}", iMaterialIndex, rMaterial.name, (iOrigMat != static_cast<int>(iMaterialIndex) ? std::format(" (split from {})", iOrigMat) : ""));
@@ -888,7 +878,7 @@ void ExportScene::FillMaterialShaderDatas(tinygltf::Model& rGltfModel, const std
 
 		if (rMaterial.values.find("baseColorFactor") != rMaterial.values.end())
 		{
-			const auto& rColorFactor = rMaterial.values.at("baseColorFactor").ColorFactor();
+			const tinygltf::ColorValue& rColorFactor = rMaterial.values.at("baseColorFactor").ColorFactor();
 			materialShaderData.f4BaseColorFactor = XMFLOAT4(static_cast<float>(rColorFactor[0]), static_cast<float>(rColorFactor[1]), static_cast<float>(rColorFactor[2]), static_cast<float>(rColorFactor[3]));
 		}
 
@@ -916,7 +906,6 @@ void ExportScene::FillMaterialShaderDatas(tinygltf::Model& rGltfModel, const std
 			materialShaderData.fRoughnessFactor = static_cast<float>(rMaterial.values.at("roughnessFactor").Factor());
 		}
 
-		// Common texture extraction
 		if (rMaterial.additionalValues.find("normalTexture") != rMaterial.additionalValues.end())
 		{
 			materialShaderData.uiNormalTextureIndex = static_cast<uint8_t>(rMaterial.additionalValues.at("normalTexture").TextureIndex());
@@ -955,7 +944,6 @@ void ExportScene::FillMaterialShaderDatas(tinygltf::Model& rGltfModel, const std
 
 void ExportScene::WriteAnimationSection(tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, common::ChunkHeader* pHeader)
 {
-	// Log animation overview
 	LOG(kDefault, kDebug, "Animation export: {} skins, {} animations", rGltfModel.skins.size(), rGltfModel.animations.size());
 	if (rGltfModel.skins.size() > 0)
 	{
@@ -976,7 +964,6 @@ void ExportScene::WriteAnimationSection(tinygltf::Model& rGltfModel, const std::
 
 	LOG(kDefault, kDebug, "  {} nodes in skeleton, {} skin joints", skeletonData.skeleton.uiNodeCount, skeletonData.skeleton.uiSkinJointCount);
 
-	// Load animations
 	std::vector<common::AnimationClip> animations;
 	std::vector<common::AnimationChannel> channels;
 	std::vector<common::AnimationKeyframe> keyframes;
@@ -1001,7 +988,6 @@ void ExportScene::WriteAnimationSection(tinygltf::Model& rGltfModel, const std::
 		LOG(kDefault, kVerbose, "    \"{}\": {} channels, {:.2f}s duration", rAnim.pcName, rAnim.uiChannelCount, rAnim.fDuration);
 	}
 
-	// Build animation header (now small - just counts + skeleton counts)
 	common::AnimationHeader animHeader {};
 	animHeader.uiAnimationCount = static_cast<uint32_t>(animations.size());
 	animHeader.uiChannelCount = static_cast<uint32_t>(channels.size());
@@ -1019,7 +1005,6 @@ void ExportScene::WriteAnimationSection(tinygltf::Model& rGltfModel, const std::
 		}
 	}
 
-	// Compute animation data size with variable-length arrays
 	int64_t iSkinJointToNodeSize = common::RoundUp<int64_t, common::kiAnimationSectionAlignment>(static_cast<int64_t>(skeletonData.skinJointToNode.size()) * static_cast<int64_t>(sizeof(uint16_t)));
 	int64_t iAnimDataSize = sizeof(common::AnimationHeader)
 		+ skeletonData.nodes.size() * sizeof(common::ModelNode)

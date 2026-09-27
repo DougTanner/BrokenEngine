@@ -18,7 +18,7 @@ std::optional<std::string> ReadFingerprintMetadata(const std::filesystem::path& 
 	stream.read(reinterpret_cast<char*>(&iMagic), sizeof(iMagic));
 	stream.read(reinterpret_cast<char*>(&iVersion), sizeof(iVersion));
 	stream.read(reinterpret_cast<char*>(&iFingerprintCharacters), sizeof(iFingerprintCharacters));
-	if (!stream || iMagic != kiFingerprintMetadataMagic || iVersion != kiFingerprintMetadataVersion || iFingerprintCharacters <= 0 || iFingerprintCharacters > 1024 * 1024)
+	if (!stream || iMagic != kiFingerprintMetadataMagic || iVersion != kiFingerprintMetadataVersion || iFingerprintCharacters <= 0 || iFingerprintCharacters > 1'024 * 1'024)
 	{
 		return std::nullopt;
 	}
@@ -155,20 +155,17 @@ std::tuple<common::ChunkHeader*, std::span<std::byte>> ExportJob::AllocateHeader
 	return std::make_tuple(reinterpret_cast<common::ChunkHeader*>(mHeaderAndData.data()), std::span(&mHeaderAndData.at(iDataOffset), mHeaderAndData.size() - iDataOffset));
 }
 
-bool ExportJob::CheckDirty(const std::filesystem::path& rPackFile)
+bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFile)
 {
 	// The pack is not inspected per job: RunExportJobs compares the published pack's timestamp against
 	// every clean job's .meta fingerprint, so an export killed before the pack rename stays dirty there.
-	(void)rPackFile;
 
-	// Clean export?
 	if (gpFileManager->mbCleanExport)
 	{
 		mbDirty = true;
 		return mbDirty;
 	}
 
-	// Does the chunk file exist?
 	if (!std::filesystem::exists(mChunkFile))
 	{
 		LOG(kDefault, kDebug, "Chunk file \"{}\" does not exist", mChunkFile.string());
@@ -176,7 +173,6 @@ bool ExportJob::CheckDirty(const std::filesystem::path& rPackFile)
 		return mbDirty;
 	}
 
-	// Verify chunk file magic and version
 	if (std::filesystem::file_size(mChunkFile) < sizeof(kiMagic) + sizeof(int64_t) + common::kiChunkDataOffset)
 	{
 		LOG(kDefault, kWarning, "Chunk file \"{}\" is truncated", mChunkFile.string());
@@ -214,7 +210,6 @@ std::vector<std::byte>& ExportJob::RunExport()
 	ScopedLogIndent scopedLogIndentOuter;
 	ScopedLogIndent scopedLogIndentInner;
 
-	// Load cached chunk file
 	if (!mbDirty)
 	{
 		int64_t iChunkFileSize = std::filesystem::file_size(mChunkFile);
@@ -275,7 +270,6 @@ std::vector<std::byte>& ExportJob::RunExport()
 	// or derived-metadata failure leaves the job unambiguously dirty.
 	std::filesystem::remove(mCacheMetadataFile);
 
-	// Write chunk file with magic and version
 	std::fstream fileStream(mChunkFile, std::ios::out | std::ios::binary);
 	int64_t piMagicAndVersion[2] = { kiMagic, GetVersion() };
 	fileStream.write(reinterpret_cast<char*>(piMagicAndVersion), sizeof(piMagicAndVersion));

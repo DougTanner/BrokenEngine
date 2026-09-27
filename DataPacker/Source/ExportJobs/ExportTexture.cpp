@@ -3,8 +3,6 @@
 #include "FileManager.h"
 #include "Texture/Texture.h"
 
-using enum common::ChunkFlags;
-
 std::optional<common::ChunkFlags_t> ExportTexture::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {
 	if (HasCubemapTag(rDirectoryEntry.path()))
@@ -33,19 +31,19 @@ void ExportTexture::Export()
 	// filename (the [BC4]/[BC5]/[BC7] encode tags). Matching against extension()/filename() — not
 	// the full path — keeps a parent directory whose name happens to contain a token (e.g. a folder
 	// named "Foo.ktx") from misrouting every file beneath it.
-	const std::wstring extension = mInputPath.extension().native();
-	const std::wstring filename = mInputPath.filename().native();
+	std::wstring extension = mInputPath.extension().native();
+	std::wstring filename = mInputPath.filename().native();
 
 	// Narrow copy of the extension for matching the canonical texture-intermediate suffixes
 	// (TextureIntermediateSuffix returns narrow const char*) so this consumer can't drift from the
 	// producers; the [BC4]/[BC5]/[BC7] encode-tag checks and the .ktx test below stay on the wide
 	// strings. The suffixes are ASCII, so the narrow comparison is exact.
-	const std::string narrowExtension = mInputPath.extension().string();
+	std::string narrowExtension = mInputPath.extension().string();
 
 	// bRawTexture covers only the explicit-extension formats (the already-encoded intermediates that
 	// pass straight through). A [BC4]-tagged source resolves the BC4 format below but must still take
 	// the encode path, so it is deliberately excluded here.
-	const bool bRawTexture = narrowExtension == TextureIntermediateSuffix(VK_FORMAT_R16_UNORM) || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK) || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK) || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK) || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
+	bool bRawTexture = narrowExtension == TextureIntermediateSuffix(VK_FORMAT_R16_UNORM) || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK) || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK) || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK) || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
 
 	VkFormat vkFormat = VK_FORMAT_R8G8B8A8_UNORM;
 	if (narrowExtension == TextureIntermediateSuffix(VK_FORMAT_R16_UNORM))
@@ -64,7 +62,7 @@ void ExportTexture::Export()
 	{
 		vkFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 	}
-	else if (mChunkFlags & kCubemap || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK) || filename.find(L"[BC7]") != std::wstring::npos)
+	else if (mChunkFlags & common::ChunkFlags::kCubemap || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK) || filename.find(L"[BC7]") != std::wstring::npos)
 	{
 		vkFormat = VK_FORMAT_BC7_UNORM_BLOCK;
 	}
@@ -79,7 +77,7 @@ void ExportTexture::Export()
 	{
 		ProcessRawTexture(vkFormat);
 	}
-	else if (mChunkFlags & kCubemap)
+	else if (mChunkFlags & common::ChunkFlags::kCubemap)
 	{
 		ProcessLiveCubemap(vkFormat);
 	}
@@ -93,14 +91,14 @@ void ExportTexture::ProcessKtxCubemap()
 {
 	gli::texture texture = LoadGliFromPath(mInputPath);
 	ASSERT(!texture.empty() && texture.target() == gli::TARGET_CUBE);
-	ASSERT(mChunkFlags & kCubemap);
+	ASSERT(mChunkFlags & common::ChunkFlags::kCubemap);
 
 	gli::texture_cube textureCube(texture);
 	ASSERT(textureCube.format() == gli::FORMAT_RGBA16_SFLOAT_PACK16);
 
 	int64_t iUncompressedSize = static_cast<int64_t>(textureCube.size());
 	std::vector<std::byte> compressed = Lz4Compress(static_cast<const std::byte*>(textureCube.data()), iUncompressedSize);
-	mChunkFlags.Set(kLz4Compressed);
+	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
 	pHeader->iUncompressedSize = iUncompressedSize;
@@ -114,7 +112,7 @@ void ExportTexture::ProcessKtxCubemap()
 void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 {
 	std::vector<std::byte> fileBytes = common::ReadEntireFile(mInputPath);
-	const int64_t iFileSize = static_cast<int64_t>(fileBytes.size());
+	int64_t iFileSize = static_cast<int64_t>(fileBytes.size());
 	TextureIntermediateHeader header = ReadTextureIntermediateHeader(fileBytes.data(), iFileSize);
 	int64_t iWidth = header.iWidth;
 	int64_t iHeight = header.iHeight;
@@ -131,7 +129,7 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 	// 16384 / 15 match TextureUploadManager::ValidateTextureDimensions' fixed pack ceilings. Runtime also
 	// validates the actual mip chain and selected device capabilities; these bounds keep every zlib-path mip
 	// chain inside uLongf.
-	if (iWidth <= 0 || iHeight <= 0 || iMipMaps <= 0 || iWidth > 16384 || iHeight > 16384 || iMipMaps > 15)
+	if (iWidth <= 0 || iHeight <= 0 || iMipMaps <= 0 || iWidth > 16'384 || iHeight > 16'384 || iMipMaps > 15)
 	{
 		throw std::runtime_error(std::format("Texture intermediate \"{}\" declares invalid dimensions {}x{} with {} mips.", mInputPath.string(), iWidth, iHeight, iMipMaps));
 	}
@@ -146,7 +144,7 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 	//   * .R16G16B16A16_SFLOAT cubemap intermediates from Generate{Irradiance,PreFiltered}Cubemaps are
 	//     raw half-float pixels with 6 cube faces packed in — LZ4-compress directly, using the on-disk
 	//     payload size (already 6 faces) instead of the 2D-only ComputeUncompressedTextureSize math.
-	const bool bRawHalfFloat = vkFormat == VK_FORMAT_R16G16B16A16_SFLOAT;
+	bool bRawHalfFloat = vkFormat == VK_FORMAT_R16G16B16A16_SFLOAT;
 	int64_t iUncompressedSize = bRawHalfFloat
 		? static_cast<int64_t>(data.size())
 		: ComputeUncompressedTextureSize(vkFormat, iWidth, iHeight, iMipMaps);
@@ -182,7 +180,7 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 	const std::vector<std::byte>& rRawBytes = bRawHalfFloat ? data : inflated;
 
 	std::vector<std::byte> compressed = Lz4Compress(rRawBytes.data(), static_cast<int64_t>(rRawBytes.size()));
-	mChunkFlags.Set(kLz4Compressed);
+	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
 	pHeader->iUncompressedSize = iUncompressedSize;
@@ -227,7 +225,7 @@ void ExportTexture::ProcessLiveCubemap(VkFormat vkFormat)
 
 	int64_t iUncompressedSize = static_cast<int64_t>(data.size());
 	std::vector<std::byte> compressed = Lz4Compress(data.data(), iUncompressedSize);
-	mChunkFlags.Set(kLz4Compressed);
+	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
 	pHeader->iUncompressedSize = iUncompressedSize;
@@ -324,7 +322,7 @@ void ExportTexture::ProcessRegularTexture(VkFormat vkFormat)
 
 	int64_t iUncompressedSize = static_cast<int64_t>(data.size());
 	std::vector<std::byte> compressed = Lz4Compress(data.data(), iUncompressedSize);
-	mChunkFlags.Set(kLz4Compressed);
+	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
 	pHeader->iUncompressedSize = iUncompressedSize;

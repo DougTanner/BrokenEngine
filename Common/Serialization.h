@@ -17,9 +17,9 @@ inline constexpr int64_t kiMaxDeserializedBytes = 256 << 20; // 268,435,456 byte
 // save/replay file stream and the network istringstream are. Restores the get position.
 inline int64_t StreamBytesRemaining(std::istream& rStream)
 {
-	const std::streampos posCurrent = rStream.tellg();
+	std::streampos posCurrent = rStream.tellg();
 	rStream.seekg(0, std::ios::end);
-	const std::streampos posEnd = rStream.tellg();
+	std::streampos posEnd = rStream.tellg();
 	rStream.seekg(posCurrent);
 	return static_cast<int64_t>(posEnd - posCurrent);
 }

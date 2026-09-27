@@ -16,14 +16,14 @@
 // floor is per-island at -(Level × elevationMeters), so for Level 0.1 + elevationMeters 100 m
 // the cut line lives at -9 m, keeping the entire above-water landmass plus a halo of shallow
 // water around the coastline.
-constexpr float kfCropEpsilonAboveSeaFloorMeters = 1.0f;
+inline constexpr float kfCropEpsilonAboveSeaFloorMeters = 1.0f;
 
 // Minimum max downsampled terrain height (engine-meters above beach) for a leaf to be exported.
 // Leaves peaking below this are very low / underwater nubs; ProcessBakedRegion deletes them so they
 // produce no kIsland chunk (and no orphan texture chunks). The shipping islands separate cleanly at
 // this value (nothing peaks in [4.44, 7.02) m anywhere; next-lowest kept leaf peaks ~7.02 m). Bump
 // kiSplitVersion when changed.
-constexpr float kfMinIslandMaxHeightMeters = 7.0f;
+inline constexpr float kfMinIslandMaxHeightMeters = 7.0f;
 
 // Crop dimensions must satisfy BC block alignment (4) AND Vulkan transfer-queue granularity
 // (block-relative for compressed formats; 16 blocks). The elevation path (downsampled by
@@ -31,14 +31,14 @@ constexpr float kfMinIslandMaxHeightMeters = 7.0f;
 // so this is 64. iTexturePixels must be a multiple of this; the auto-crop expands each chunk's bbox
 // to a multiple of it, borrowing neighbour pixels across a split seam when the region edge isn't
 // aligned, so per-chunk split spans need not themselves be aligned.
-constexpr int64_t kiBcBlockSize = 4;
-constexpr int64_t kiTransferGranularityBlocks = 16;
-constexpr int64_t kiCropAlignment = (kiBcBlockSize > kiElevationDivisor ? kiBcBlockSize : kiElevationDivisor) * kiTransferGranularityBlocks;
+inline constexpr int64_t kiBcBlockSize = 4;
+inline constexpr int64_t kiTransferGranularityBlocks = 16;
+inline constexpr int64_t kiCropAlignment = (kiBcBlockSize > kiElevationDivisor ? kiBcBlockSize : kiElevationDivisor) * kiTransferGranularityBlocks;
 
 // Single source of truth for required Island.json keys. Drives both the strict-presence check in
 // BakeOne and the varsJson strip pass in BakeRoute (remaining keys forward to Gaea as graph
 // variables). Adding a new DataPacker-owned key means appending here only.
-constexpr const char* kpcRequiredIslandJsonKeys[] = {"archetype", "seed", "widthMeters", "elevationMeters", "texturePixels", "routes"};
+inline constexpr const char* kpcRequiredIslandJsonKeys[] = {"archetype", "seed", "widthMeters", "elevationMeters", "texturePixels", "routes"};
 
 // Route subdivision descriptor. `pcLabel` is BOTH the Island.json "routes" value AND the per-route
 // sub-folder name; `iGaeaChoice` is the 0-based Gaea Route node input-port index; `iColumns` /
@@ -46,10 +46,10 @@ constexpr const char* kpcRequiredIslandJsonKeys[] = {"archetype", "seed", "width
 // table in BakeIslandIntermediates.cpp for the full routing semantics.
 struct RouteSubdivision
 {
-	const char* pcLabel;
-	int32_t iGaeaChoice;
-	int64_t iColumns;
-	int64_t iRows;
+	const char* pcLabel = nullptr;
+	int32_t iGaeaChoice = 0;
+	int64_t iColumns = 0;
+	int64_t iRows = 0;
 };
 
 // Per-island bake context: everything constant for one Island.json across all of its routes.
@@ -63,18 +63,18 @@ struct IslandBakeContext
 	const std::filesystem::path& rIslandJsonFile;
 	const nlohmann::json& rIslandJson;
 	const WorldDimensions& rDimensions;
-	int32_t iSeed;
-	int64_t iTexturePixels;
+	int32_t iSeed = 0;
+	int64_t iTexturePixels = 0;
 	std::optional<int64_t> oiMeshResolution;
 };
 
 // Per-region bounds passed to ProcessBakedRegion. Half-open ranges in full-bake pixel coords.
 struct RegionBounds
 {
-	int64_t iStartX;
-	int64_t iEndX;
-	int64_t iStartY;
-	int64_t iEndY;
+	int64_t iStartX = 0;
+	int64_t iEndX = 0;
+	int64_t iStartY = 0;
+	int64_t iEndY = 0;
 };
 
 // Per-region output target. The source leaf preserves the authored BC intermediates and provides
@@ -91,7 +91,7 @@ struct BakeOutput
 {
 	const std::vector<float>& rFullElevationMeters;
 	const std::vector<uint16_t>& rFullAmbientOcclusion;
-	float fBeachOffsetMeters;
+	float fBeachOffsetMeters = 0.0f;
 };
 
 // Crops one chunk region out of the full Gaea bake and writes the chunk's per-region geometry into

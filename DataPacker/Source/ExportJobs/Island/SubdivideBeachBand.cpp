@@ -186,10 +186,10 @@ struct BeachSubdivider
 
 	std::vector<float>& meshPositions;
 	std::vector<uint32_t>& meshIndices;
-	float fBandMinZ;
-	float fBandMaxZ;
-	float fMaxEdge;
-	int32_t iMaxDepth;
+	float fBandMinZ = 0.0f;
+	float fBandMaxZ = 0.0f;
+	float fMaxEdge = 0.0f;
+	int32_t iMaxDepth = 0;
 	int64_t& riDepthCapHits;
 
 	std::unordered_map<uint64_t, uint32_t> edgeMidpoints;

@@ -4,8 +4,6 @@
 
 constexpr bool kbOptimizeShaders = true;
 
-using enum common::ChunkFlags;
-
 namespace
 {
 
@@ -42,8 +40,8 @@ namespace
 // All four members refer to caller-owned storage; riBindingCount is mutated as bindings land.
 struct BindingTable
 {
-	VkDescriptorSetLayoutBinding* pBindings;
-	uint32_t* pSetIndices;
+	VkDescriptorSetLayoutBinding* pBindings = nullptr;
+	uint32_t* pSetIndices = nullptr;
 	int64_t& riBindingCount;
 	common::ChunkFlags_t chunkFlags;
 };
@@ -57,7 +55,7 @@ void WriteBinding(BindingTable& rTable, int64_t iBinding, uint32_t uiSet, VkDesc
 	rVkDescriptorSetLayoutBinding.binding = static_cast<uint32_t>(iBinding);
 	rVkDescriptorSetLayoutBinding.descriptorType = vkDescriptorType;
 	rVkDescriptorSetLayoutBinding.descriptorCount = static_cast<uint32_t>(iDescriptorCount);
-	rVkDescriptorSetLayoutBinding.stageFlags = rTable.chunkFlags & kCompute ? VK_SHADER_STAGE_COMPUTE_BIT : (rTable.chunkFlags & kFragment ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_VERTEX_BIT);
+	rVkDescriptorSetLayoutBinding.stageFlags = rTable.chunkFlags & common::ChunkFlags::kCompute ? VK_SHADER_STAGE_COMPUTE_BIT : (rTable.chunkFlags & common::ChunkFlags::kFragment ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_VERTEX_BIT);
 	rVkDescriptorSetLayoutBinding.pImmutableSamplers = nullptr;
 	rTable.pSetIndices[iBinding] = uiSet;
 }
@@ -65,14 +63,14 @@ void WriteBinding(BindingTable& rTable, int64_t iBinding, uint32_t uiSet, VkDesc
 // Enumerates one SPIRV-Cross resource category, writing a descriptor binding per resource.
 // countFn maps the reflected type to a descriptor count (constant for buffers/samplers, array-derived for images).
 template <typename COUNT_FN>
-void CollectBindings(const spirv_cross::SmallVector<spirv_cross::Resource>& rResources, const char* pcLabel, VkDescriptorType vkDescriptorType, spirv_cross::Compiler& rCompiler, BindingTable& rTable, COUNT_FN&& countFn)
+void CollectBindings(const spirv_cross::SmallVector<spirv_cross::Resource>& rResources, std::string_view label, VkDescriptorType vkDescriptorType, spirv_cross::Compiler& rCompiler, BindingTable& rTable, COUNT_FN&& countFn)
 {
 	if (rResources.empty())
 	{
 		return;
 	}
 
-	LOG(kDefault, kVerbose, "{}", pcLabel);
+	LOG(kDefault, kVerbose, "{}", label);
 	for (const spirv_cross::Resource& rResource : rResources)
 	{
 		int64_t iBinding = rCompiler.get_decoration(rResource.id, spv::DecorationBinding);
@@ -213,7 +211,6 @@ std::filesystem::path ExportShader::CompileShader(const std::filesystem::path& r
 	std::wstring commandLineParameters = L"";
 	if constexpr (kbOptimizeShaders)
 	{
-		// Optimization is enabled by default
 		commandLineParameters += L" -g0"; // Strip debug info
 	}
 	else
@@ -231,7 +228,6 @@ std::filesystem::path ExportShader::CompileShader(const std::filesystem::path& r
 
 std::filesystem::path ExportShader::OptimizeShader(const std::filesystem::path& rSpirvFile)
 {
-	// Run spirv-opt on the compiled SPIR-V
 	std::filesystem::path spirvOptExecutable(GetVulkanSdkBinariesDirectory());
 	spirvOptExecutable.append("spirv-opt.exe");
 
@@ -251,11 +247,9 @@ std::filesystem::path ExportShader::OptimizeShader(const std::filesystem::path& 
 
 void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile)
 {
-	// Read SPIR-V into temporary buffer for reflection
 	std::vector<std::byte> spirvData = common::ReadEntireFile(rSpirvFile);
 	int64_t iSpirvFileBytes = static_cast<int64_t>(spirvData.size());
 
-	// Reflect into local stack arrays
 	VkDescriptorSetLayoutBinding tempBindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 	uint32_t tempSetIndices[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 	VkVertexInputAttributeDescription tempAttrs[common::ShaderHeader::kiMaxVertexInputAttributeDescriptions] {};
@@ -273,7 +267,7 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 	{
 		sortedStageInputs.emplace_back(spirvCrossCompiler.get_decoration(rResource.id, spv::DecorationLocation), &rResource);
 	}
-	std::sort(sortedStageInputs.begin(), sortedStageInputs.end(), [](const auto& rLhs, const auto& rRhs) { return rLhs.first < rRhs.first; });
+	std::sort(sortedStageInputs.begin(), sortedStageInputs.end(), [](const std::pair<int64_t, const spirv_cross::Resource*>& rLhs, const std::pair<int64_t, const spirv_cross::Resource*>& rRhs) { return rLhs.first < rRhs.first; });
 
 	for (const auto& [iLocation, pResource] : sortedStageInputs)
 	{
@@ -283,7 +277,7 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 		ASSERT(iLocation < common::ShaderHeader::kiMaxVertexInputAttributeDescriptions);
 		// Format mapping below assumes 32-bit float inputs (SPIRV-Cross Half/Double are distinct basetypes) — an int attribute would be silently mis-typed.
 		// Vertex stage only: fragment interpolants are legitimately flat int/uint and never feed VkVertexInputAttributeDescription
-		ASSERT(rSpirvType.basetype == spirv_cross::SPIRType::Float || !(mChunkFlags & kVertex));
+		ASSERT(rSpirvType.basetype == spirv_cross::SPIRType::Float || !(mChunkFlags & common::ChunkFlags::kVertex));
 		VkVertexInputAttributeDescription& rVkVertexInputAttributeDescription = tempAttrs[iLocation];
 		rVkVertexInputAttributeDescription.location = static_cast<uint32_t>(iLocation);
 		rVkVertexInputAttributeDescription.binding = 0;
@@ -328,12 +322,10 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 	pHeader->shaderHeader.iVertexInputAttributeDescriptions = iAttrCount;
 	pHeader->shaderHeader.iVertexInputStride = iVertexInputStride;
 
-	// Copy arrays to data span
 	std::memcpy(dataSpan.data(), tempBindings, iBindingCount * sizeof(VkDescriptorSetLayoutBinding));
 	std::memcpy(dataSpan.data() + common::ShaderHeader::SetIndicesOffset(iBindingCount), tempSetIndices, iBindingCount * sizeof(uint32_t));
 	std::memcpy(dataSpan.data() + common::ShaderHeader::AttributesOffset(iBindingCount), tempAttrs, iAttrCount * sizeof(VkVertexInputAttributeDescription));
 
-	// Copy SPIR-V after arrays
 	std::memcpy(dataSpan.data() + common::ShaderHeader::SpirvOffset(iBindingCount, iAttrCount), spirvData.data(), iSpirvFileBytes);
 
 	ASSERT(*reinterpret_cast<uint32_t*>(dataSpan.data() + common::ShaderHeader::SpirvOffset(iBindingCount, iAttrCount)) == common::ShaderHeader::kuiSpirvMagic);

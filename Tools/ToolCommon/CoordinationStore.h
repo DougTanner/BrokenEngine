@@ -44,10 +44,10 @@ namespace toolcli::coordination
 	uint64_t CurrentUtcTicks();
 	std::string FormatUtcTimestamp(uint64_t uiTicks);
 	std::optional<std::string> HashSha256(std::string_view value);
-	std::optional<std::wstring> CanonicalizeDirectoryPath(const std::wstring& rValue);
-	std::optional<std::wstring> NormalizeRelativeKey(const std::wstring& rValue);
-	std::optional<std::wstring> NormalizeRepositoryRelativeKey(const std::wstring& rValue);
-	std::optional<Locator> MakeLocator(const std::wstring& rDomain, const std::wstring& rLogicalKey);
+	std::optional<std::wstring> CanonicalizeDirectoryPath(std::wstring_view value);
+	std::optional<std::wstring> NormalizeRelativeKey(std::wstring_view value);
+	std::optional<std::wstring> NormalizeRepositoryRelativeKey(std::wstring_view value);
+	std::optional<Locator> MakeLocator(std::wstring_view domain, std::wstring_view logicalKey);
 	bool EnsureParentDirectory(const std::filesystem::path& rPath);
 	bool ReadMetadata(const std::filesystem::path& rPath, nlohmann::json& rMetadata);
 	// Durable byte replacement for small coordination artifacts, including paths beyond MAX_PATH.
@@ -58,9 +58,9 @@ namespace toolcli::coordination
 	bool WriteBytesAtomic(const std::filesystem::path& rPath, std::string_view contents);
 	bool WriteMetadataAtomic(const std::filesystem::path& rPath, const nlohmann::json& rMetadata);
 	void PrintMetadata(const nlohmann::json& rMetadata);
-	bool HasOwner(const nlohmann::json& rMetadata, const std::wstring& rOwner);
+	bool HasOwner(const nlohmann::json& rMetadata, std::wstring_view owner);
 	bool JsonIntegerEquals(const nlohmann::json& rValue, int64_t iExpected);
 	std::optional<int64_t> JsonInt64(const nlohmann::json& rValue);
 	bool ValidateMetadataEnvelope(const nlohmann::json& rMetadata, const Locator& rLocator, int64_t iExpectedSchemaVersion);
-	nlohmann::json NewMetadata(const Locator& rLocator, const std::wstring& rOwner, const std::wstring& rSession, const std::wstring& rWorktree);
+	nlohmann::json NewMetadata(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree);
 }

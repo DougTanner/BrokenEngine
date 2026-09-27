@@ -216,8 +216,8 @@ inline SinCos DeterministicSinCos(float fRadians)
 	return result;
 }
 
-template<typename... Args>
-inline std::pair<XMVECTOR, XMVECTOR> XM_CALLCONV ComputeAabb(FXMVECTOR vecFirst, Args... vecRest)
+template<typename... ARGS>
+inline std::pair<XMVECTOR, XMVECTOR> XM_CALLCONV ComputeAabb(FXMVECTOR vecFirst, ARGS... vecRest)
 {
 	XMVECTOR vecMin = vecFirst;
 	XMVECTOR vecMax = vecFirst;

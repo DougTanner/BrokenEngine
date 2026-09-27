@@ -5,9 +5,6 @@ namespace common
 
 using crc_t = uint64_t;
 
-// Compile-time string wrapper for use as non-type template parameter (C++20 NTTP)
-// Enables passing string literals directly as template arguments
-// Template parameter: N - Size of the string including null terminator
 template<size_t N>
 struct FixedString
 {
@@ -82,8 +79,6 @@ constexpr crc_t Crc(std::string_view pData)
 #pragma warning(suppress: 26497) // consteval is stricter than constexpr
 consteval crc_t CrcConsteval(std::string_view pData)
 {
-	// Forward to the constexpr Crc: a single mixing-loop definition that consteval still forces to
-	// evaluate at compile time. Keeps the two paths byte-identical by construction.
 	return Crc(pData);
 }
 static_assert(Crc("test") == CrcConsteval("test"), "CRC functions must produce identical results");
@@ -97,8 +92,7 @@ inline crc_t Crc(const T* pValues, int64_t iCount)
 	return Crc(std::string_view(reinterpret_cast<const char*>(pValues), iCount * sizeof(T)));
 }
 
-// Concept to exclude string-like types from template Crc
-// Prevents ambiguous overload resolution by excluding types convertible to string_view
+// NotStringLike keeps this overload from competing with the string_view overload's implicit conversions.
 template<typename T>
 concept NotStringLike = !std::is_convertible_v<T, std::string_view>;
 
@@ -122,21 +116,17 @@ inline crc_t XM_CALLCONV Crc(FXMVECTOR vecIn)
 	return Crc(f4Temp);
 }
 
-// Compile-time generation of CRC hash arrays with sequential numbering
-// Generates array of CRCs for strings like "prefix0suffix", "prefix1suffix", etc.
-// Used for creating lookup tables of related asset names
-// Template parameter: SIZE - Number of elements in the array
 template<int64_t SIZE>
 struct ConstexprCrcArray
 {
 	int64_t miCount = SIZE;
 	crc_t mArray[SIZE];
 
-	consteval ConstexprCrcArray(const char* pcPrefix, const char* pcSuffix)
+	consteval ConstexprCrcArray(std::string_view prefix, std::string_view suffix)
 	{
 		for (int64_t i = 0; i < SIZE; ++i)
 		{
-			mArray[i] = CrcConsteval(std::string(pcPrefix) + IntToString(i) + std::string(pcSuffix));
+			mArray[i] = CrcConsteval(std::string(prefix) + IntToString(i) + std::string(suffix));
 		}
 	}
 

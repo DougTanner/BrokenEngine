@@ -7,7 +7,7 @@ inline thread_local const char* gpLogDifferenceContext = "";
 
 struct ScopedLogDifferenceContext
 {
-	const char* pcPrevious;
+	const char* pcPrevious = nullptr;
 	ScopedLogDifferenceContext(const char* pcContext) : pcPrevious(gpLogDifferenceContext) { gpLogDifferenceContext = pcContext; }
 	~ScopedLogDifferenceContext() { gpLogDifferenceContext = pcPrevious; }
 
@@ -93,7 +93,7 @@ inline bool LogDifference(int64_t iIndex, const T& rOne, const T& rTwo)
 }
 
 // XMVECTOR overloads (declared here, defined in LogDifference.cpp)
-bool XM_CALLCONV LogDifference_Vec(const char* pcName, FXMVECTOR rOne, FXMVECTOR rTwo);
-bool XM_CALLCONV LogDifference_Vec(const char* pcName, int64_t iIndex, FXMVECTOR rOne, FXMVECTOR rTwo);
+bool XM_CALLCONV LogDifference_Vec(std::string_view name, FXMVECTOR rOne, FXMVECTOR rTwo);
+bool XM_CALLCONV LogDifference_Vec(std::string_view name, int64_t iIndex, FXMVECTOR rOne, FXMVECTOR rTwo);
 
 } // namespace common

@@ -77,10 +77,10 @@ std::string ReadTextFile(const std::filesystem::path& rFile)
 	return std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
 }
 
-void WriteTextFile(const std::filesystem::path& rFile, const std::string& rText)
+void WriteTextFile(const std::filesystem::path& rFile, std::string_view text)
 {
 	std::ofstream stream(rFile, std::ios::binary | std::ios::trunc);
-	stream.write(rText.data(), static_cast<std::streamsize>(rText.size()));
+	stream.write(text.data(), static_cast<std::streamsize>(text.size()));
 	stream.close();
 	VERIFY_SUCCESS(stream.good());
 }
@@ -112,7 +112,7 @@ std::string SplitFingerprint(const RouteSubdivision& rRoute)
 // metadata matches the content fingerprints of Island.json / the archetype and the route identity.
 // The post-Gaea split is checked separately
 // by AreLeavesDirty so a split-only change never trips this.
-bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, const std::string& rExpectedFingerprint)
+bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, std::string_view expectedFingerprint)
 {
 	for (const char* pcFile : kpcIntermediateFiles)
 	{
@@ -131,20 +131,20 @@ bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, const 
 	{
 		return true;
 	}
-	return ReadTextFile(versionFile) != rExpectedFingerprint;
+	return ReadTextFile(versionFile) != expectedFingerprint;
 }
 
 // True if any chunk leaf's derived split outputs are missing or stale — forces a re-split from the
 // (assumed fresh) raw Gaea output, NOT a Gaea re-export. Checks the split-version sentinel (catches
 // a kRouteSubdivisions columns/rows or ProcessBakedRegion change) and every leaf's per-region files.
-bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rCacheRouteDirectory, int64_t iLeafCount, const std::string& rExpectedFingerprint)
+bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rCacheRouteDirectory, int64_t iLeafCount, std::string_view expectedFingerprint)
 {
 	std::filesystem::path splitVersionFile = rCacheRouteDirectory / kpcSplitVersionFile;
 	if (!std::filesystem::exists(splitVersionFile))
 	{
 		return true;
 	}
-	if (ReadTextFile(splitVersionFile) != rExpectedFingerprint)
+	if (ReadTextFile(splitVersionFile) != expectedFingerprint)
 	{
 		return true;
 	}

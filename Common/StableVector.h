@@ -19,7 +19,7 @@ public:
 	// iReservedCount is the element ceiling; the reservation covers that many elements' bytes rounded up to the
 	// 64 KiB allocation granularity, so the base address is 64 KiB aligned and every element inside keeps T's alignment.
 	explicit StableVector(int64_t iReservedCount)
-	: miReservedBytes(common::RoundUp<int64_t, 64 * 1024>(iReservedCount * static_cast<int64_t>(sizeof(T))))
+	: miReservedBytes(common::RoundUp<int64_t, 64 * 1'024>(iReservedCount * static_cast<int64_t>(sizeof(T))))
 	{
 	}
 

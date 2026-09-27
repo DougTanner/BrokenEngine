@@ -23,11 +23,11 @@ namespace toolcli
 {
 	namespace
 	{
-		constexpr uint32_t kuiMaxRequestBytes = 1u * 1024u * 1024u;
-		constexpr uint32_t kuiMaxResponseBytes = 16u * 1024u * 1024u;
+		constexpr uint32_t kuiMaxRequestBytes = 1u * 1'024u * 1'024u;
+		constexpr uint32_t kuiMaxResponseBytes = 16u * 1'024u * 1'024u;
 		constexpr int64_t kiConnectAttemptTimeoutMilliseconds = 500; // per connect try; retried until the --timeout-ms deadline
 		constexpr int64_t kiConnectRetrySleepMilliseconds = 150; // brief pause between connect tries
-		constexpr int64_t kiDefaultResponseTimeoutMilliseconds = 15000;
+		constexpr int64_t kiDefaultResponseTimeoutMilliseconds = 15'000;
 		constexpr int64_t kiHeartbeatIntervalMilliseconds = 60'000;
 		constexpr int64_t kiReadinessWaitCapMilliseconds = 30'000;
 
@@ -121,7 +121,7 @@ namespace toolcli
 
 		bool ReadAllStandardInput(std::string& rInput)
 		{
-			char pBuffer[4096] {};
+			char pBuffer[4'096] {};
 			size_t uiRead = 0;
 			while ((uiRead = std::fread(pBuffer, 1, sizeof(pBuffer), stdin)) > 0)
 			{
@@ -140,7 +140,7 @@ namespace toolcli
 			return true;
 		}
 
-		bool RefreshHeartbeatIfDue(const std::wstring& rOwner, std::chrono::steady_clock::time_point& rNextHeartbeatDue, std::optional<std::chrono::steady_clock::time_point> operationDeadline = std::nullopt)
+		bool RefreshHeartbeatIfDue(std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue, std::optional<std::chrono::steady_clock::time_point> operationDeadline = std::nullopt)
 		{
 			if (std::chrono::steady_clock::now() < rNextHeartbeatDue)
 			{
@@ -148,13 +148,13 @@ namespace toolcli
 			}
 			if (operationDeadline)
 			{
-				const int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(*operationDeadline - std::chrono::steady_clock::now()).count();
-				if (!RefreshHarnessHeartbeat(rOwner, iRemainingMilliseconds > 0 ? iRemainingMilliseconds : 0))
+				int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(*operationDeadline - std::chrono::steady_clock::now()).count();
+				if (!RefreshHarnessHeartbeat(owner, iRemainingMilliseconds > 0 ? iRemainingMilliseconds : 0))
 				{
 					return false;
 				}
 			}
-			else if (!RefreshHarnessHeartbeat(rOwner))
+			else if (!RefreshHarnessHeartbeat(owner))
 			{
 				return false;
 			}
@@ -162,31 +162,31 @@ namespace toolcli
 			return true;
 		}
 
-		SocketOperationResult CheckDeadlineAndRefreshHeartbeatAfterNoProgress(const std::chrono::steady_clock::time_point& rOperationDeadline, const std::wstring& rOwner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
+		SocketOperationResult CheckDeadlineAndRefreshHeartbeatAfterNoProgress(const std::chrono::steady_clock::time_point& rOperationDeadline, std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
 		{
 			if (std::chrono::steady_clock::now() >= rOperationDeadline)
 			{
 				return SocketOperationResult::kTransportFailure;
 			}
-			if (!RefreshHeartbeatIfDue(rOwner, rNextHeartbeatDue, rOperationDeadline))
+			if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, rOperationDeadline))
 			{
 				return SocketOperationResult::kOwnershipLoss;
 			}
 			return SocketOperationResult::kSuccess;
 		}
 
-		SocketOperationResult WaitForSocketReadiness(SOCKET socket, bool bWrite, const std::chrono::steady_clock::time_point& rOperationDeadline, const std::wstring& rOwner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
+		SocketOperationResult WaitForSocketReadiness(SOCKET socket, bool bWrite, const std::chrono::steady_clock::time_point& rOperationDeadline, std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
 		{
 			for (;;)
 			{
-				const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 				if (now >= rOperationDeadline)
 				{
 					return SocketOperationResult::kTransportFailure;
 				}
 				if (now >= rNextHeartbeatDue)
 				{
-					if (!RefreshHeartbeatIfDue(rOwner, rNextHeartbeatDue, rOperationDeadline))
+					if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, rOperationDeadline))
 					{
 						return SocketOperationResult::kOwnershipLoss;
 					}
@@ -194,7 +194,7 @@ namespace toolcli
 				}
 
 				std::chrono::milliseconds waitDuration = std::chrono::duration_cast<std::chrono::milliseconds>(rOperationDeadline - now);
-				const std::chrono::milliseconds heartbeatDuration = std::chrono::duration_cast<std::chrono::milliseconds>(rNextHeartbeatDue - now);
+				std::chrono::milliseconds heartbeatDuration = std::chrono::duration_cast<std::chrono::milliseconds>(rNextHeartbeatDue - now);
 				if (heartbeatDuration < waitDuration)
 				{
 					waitDuration = heartbeatDuration;
@@ -217,23 +217,23 @@ namespace toolcli
 					FD_SET(socket, &readSet);
 				}
 				timeval timeout {};
-				timeout.tv_sec = static_cast<long>(waitDuration.count() / 1000);
-				timeout.tv_usec = static_cast<long>((waitDuration.count() % 1000) * 1000);
-				const int iReady = ::select(0, bWrite ? nullptr : &readSet, bWrite ? &writeSet : nullptr, nullptr, &timeout);
+				timeout.tv_sec = static_cast<long>(waitDuration.count() / 1'000);
+				timeout.tv_usec = static_cast<long>((waitDuration.count() % 1'000) * 1'000);
+				int iReady = ::select(0, bWrite ? nullptr : &readSet, bWrite ? &writeSet : nullptr, nullptr, &timeout);
 				if (iReady == SOCKET_ERROR)
 				{
 					return SocketOperationResult::kReadinessFailure;
 				}
 				if (iReady > 0)
 				{
-					const std::chrono::steady_clock::time_point readyTime = std::chrono::steady_clock::now();
+					std::chrono::steady_clock::time_point readyTime = std::chrono::steady_clock::now();
 					if (readyTime >= rOperationDeadline)
 					{
 						return SocketOperationResult::kTransportFailure;
 					}
 					if (readyTime >= rNextHeartbeatDue)
 					{
-						if (!RefreshHeartbeatIfDue(rOwner, rNextHeartbeatDue, rOperationDeadline))
+						if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, rOperationDeadline))
 						{
 							return SocketOperationResult::kOwnershipLoss;
 						}
@@ -244,30 +244,30 @@ namespace toolcli
 			}
 		}
 
-		SocketOperationResult SendAll(SOCKET socket, const char* pData, size_t uiLength, int64_t iTimeoutMilliseconds, const std::wstring& rOwner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
+		SocketOperationResult SendAll(SOCKET socket, const char* pData, size_t uiLength, int64_t iTimeoutMilliseconds, std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
 		{
 			size_t uiSent = 0;
 			std::chrono::steady_clock::time_point operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
 			while (uiSent < uiLength)
 			{
-				SocketOperationResult eWaitResult = WaitForSocketReadiness(socket, true, operationDeadline, rOwner, rNextHeartbeatDue);
+				SocketOperationResult eWaitResult = WaitForSocketReadiness(socket, true, operationDeadline, owner, rNextHeartbeatDue);
 				if (eWaitResult != SocketOperationResult::kSuccess)
 				{
 					return eWaitResult;
 				}
-				const int iChunk = ::send(socket, pData + uiSent, static_cast<int>(uiLength - uiSent), 0);
-				const int iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
+				int iChunk = ::send(socket, pData + uiSent, static_cast<int>(uiLength - uiSent), 0);
+				int iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
 				if (iChunk > 0)
 				{
 					uiSent += static_cast<size_t>(iChunk);
 					operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
-					if (!RefreshHeartbeatIfDue(rOwner, rNextHeartbeatDue, operationDeadline))
+					if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, operationDeadline))
 					{
 						return SocketOperationResult::kOwnershipLoss;
 					}
 					continue;
 				}
-				SocketOperationResult ePostOperationResult = CheckDeadlineAndRefreshHeartbeatAfterNoProgress(operationDeadline, rOwner, rNextHeartbeatDue);
+				SocketOperationResult ePostOperationResult = CheckDeadlineAndRefreshHeartbeatAfterNoProgress(operationDeadline, owner, rNextHeartbeatDue);
 				if (ePostOperationResult != SocketOperationResult::kSuccess)
 				{
 					return ePostOperationResult;
@@ -281,30 +281,30 @@ namespace toolcli
 			return SocketOperationResult::kSuccess;
 		}
 
-		SocketOperationResult ReceiveAll(SOCKET socket, char* pData, size_t uiLength, int64_t iTimeoutMilliseconds, const std::wstring& rOwner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
+		SocketOperationResult ReceiveAll(SOCKET socket, char* pData, size_t uiLength, int64_t iTimeoutMilliseconds, std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
 		{
 			size_t uiReceived = 0;
 			std::chrono::steady_clock::time_point operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
 			while (uiReceived < uiLength)
 			{
-				SocketOperationResult eWaitResult = WaitForSocketReadiness(socket, false, operationDeadline, rOwner, rNextHeartbeatDue);
+				SocketOperationResult eWaitResult = WaitForSocketReadiness(socket, false, operationDeadline, owner, rNextHeartbeatDue);
 				if (eWaitResult != SocketOperationResult::kSuccess)
 				{
 					return eWaitResult;
 				}
-				const int iChunk = ::recv(socket, pData + uiReceived, static_cast<int>(uiLength - uiReceived), 0);
-				const int iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
+				int iChunk = ::recv(socket, pData + uiReceived, static_cast<int>(uiLength - uiReceived), 0);
+				int iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
 				if (iChunk > 0)
 				{
 					uiReceived += static_cast<size_t>(iChunk);
 					operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
-					if (!RefreshHeartbeatIfDue(rOwner, rNextHeartbeatDue, operationDeadline))
+					if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, operationDeadline))
 					{
 						return SocketOperationResult::kOwnershipLoss;
 					}
 					continue;
 				}
-				SocketOperationResult ePostOperationResult = CheckDeadlineAndRefreshHeartbeatAfterNoProgress(operationDeadline, rOwner, rNextHeartbeatDue);
+				SocketOperationResult ePostOperationResult = CheckDeadlineAndRefreshHeartbeatAfterNoProgress(operationDeadline, owner, rNextHeartbeatDue);
 				if (ePostOperationResult != SocketOperationResult::kSuccess)
 				{
 					return ePostOperationResult;
@@ -356,8 +356,8 @@ namespace toolcli
 				FD_ZERO(&errorSet);
 				FD_SET(socket, &errorSet);
 				timeval timeout {};
-				timeout.tv_sec = static_cast<long>(iTimeoutMilliseconds / 1000);
-				timeout.tv_usec = static_cast<long>((iTimeoutMilliseconds % 1000) * 1000);
+				timeout.tv_sec = static_cast<long>(iTimeoutMilliseconds / 1'000);
+				timeout.tv_usec = static_cast<long>((iTimeoutMilliseconds % 1'000) * 1'000);
 				int iReady = ::select(0, nullptr, &writeSet, &errorSet, &timeout);
 				if (iReady <= 0 || FD_ISSET(socket, &errorSet))
 				{
@@ -441,13 +441,13 @@ namespace toolcli
 				}
 			}
 
-			if (rArguments.iPort <= 0 || rArguments.iPort > 65535)
+			if (rArguments.iPort <= 0 || rArguments.iPort > 65'535)
 			{
 				Fail("--port must be in the range 1..65535");
 				PrintUsage(std::cerr);
 				return false;
 			}
-			if (rArguments.iTimeoutMilliseconds <= 0 || rArguments.iTimeoutMilliseconds > 600000)
+			if (rArguments.iTimeoutMilliseconds <= 0 || rArguments.iTimeoutMilliseconds > 600'000)
 			{
 				Fail("--timeout-ms must be in the range 1..600000");
 				PrintUsage(std::cerr);
@@ -468,7 +468,7 @@ namespace toolcli
 			return true;
 		}
 
-		std::optional<std::string> ExchangeFramedSocketCommand(ScopedSocket& rSocket, const SocketCommandArguments& rArguments, const std::string& rRequest, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
+		std::optional<std::string> ExchangeFramedSocketCommand(ScopedSocket& rSocket, const SocketCommandArguments& rArguments, std::string_view request, std::chrono::steady_clock::time_point& rNextHeartbeatDue)
 		{
 			sockaddr_in address {};
 			address.sin_family = AF_INET;
@@ -479,8 +479,8 @@ namespace toolcli
 			// bound (freshly launched) is tolerated. Each try gets its own short timeout, and a failed non-blocking
 			// connect leaves the socket unusable, so it is closed and recreated every attempt. A dead port therefore
 			// consumes the full budget by design.
-			const std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
-			const std::chrono::steady_clock::time_point deadline = startTime + std::chrono::milliseconds(rArguments.iTimeoutMilliseconds);
+			std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+			std::chrono::steady_clock::time_point deadline = startTime + std::chrono::milliseconds(rArguments.iTimeoutMilliseconds);
 			bool bConnected = false;
 			bool bSocketCreateFailed = false;
 			bool bHeartbeatFailed = false;
@@ -505,7 +505,7 @@ namespace toolcli
 					break;
 				}
 				// A whole attempt timeout can outlast the remaining budget, so the last attempt is shortened to it.
-				const std::chrono::milliseconds remainingBeforeConnect = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+				std::chrono::milliseconds remainingBeforeConnect = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
 				if (remainingBeforeConnect.count() <= 0)
 				{
 					break;
@@ -531,12 +531,12 @@ namespace toolcli
 					break;
 				}
 				std::chrono::milliseconds retrySleep(kiConnectRetrySleepMilliseconds);
-				const std::chrono::milliseconds heartbeatSleep = std::chrono::duration_cast<std::chrono::milliseconds>(rNextHeartbeatDue - std::chrono::steady_clock::now());
+				std::chrono::milliseconds heartbeatSleep = std::chrono::duration_cast<std::chrono::milliseconds>(rNextHeartbeatDue - std::chrono::steady_clock::now());
 				if (heartbeatSleep < retrySleep)
 				{
 					retrySleep = heartbeatSleep;
 				}
-				const std::chrono::milliseconds remainingBeforeSleep = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+				std::chrono::milliseconds remainingBeforeSleep = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
 				if (remainingBeforeSleep < retrySleep)
 				{
 					retrySleep = remainingBeforeSleep;
@@ -570,7 +570,7 @@ namespace toolcli
 				return std::nullopt;
 			}
 
-			uint32_t uiPayloadLength = static_cast<uint32_t>(rRequest.size());
+			uint32_t uiPayloadLength = static_cast<uint32_t>(request.size());
 			unsigned char pLengthPrefix[4] =
 			{
 				static_cast<unsigned char>(uiPayloadLength & 0xffu),
@@ -581,7 +581,7 @@ namespace toolcli
 			SocketOperationResult eSendResult = SendAll(rSocket.Get(), reinterpret_cast<const char*>(pLengthPrefix), sizeof(pLengthPrefix), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 			if (eSendResult == SocketOperationResult::kSuccess)
 			{
-				eSendResult = SendAll(rSocket.Get(), rRequest.data(), rRequest.size(), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
+				eSendResult = SendAll(rSocket.Get(), request.data(), request.size(), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 			}
 			if (eSendResult != SocketOperationResult::kSuccess)
 			{
@@ -616,12 +616,12 @@ namespace toolcli
 			return response;
 		}
 
-		int PrintResponseAndInterpretExitCode(const std::string& rResponse)
+		int PrintResponseAndInterpretExitCode(std::string_view response)
 		{
-			std::cout << rResponse << '\n';
+			std::cout << response << '\n';
 			try
 			{
-				nlohmann::json parsed = nlohmann::json::parse(rResponse);
+				nlohmann::json parsed = nlohmann::json::parse(response);
 				if (parsed.contains("ok") && parsed["ok"].is_boolean())
 				{
 					return parsed["ok"].get<bool>() ? kiExitOk : kiExitStateConflict;

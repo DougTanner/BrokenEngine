@@ -313,7 +313,6 @@ bool GenerateIrradianceCubemaps()
 					uint32_t uiPixelsPerFace = uiFaceSize * uiFaceSize;
 					uint32_t uiTotalPixels = uiPixelsPerFace * 6;
 
-					// Create CMFT source image and populate with float data
 					cmft::Image srcImage;
 					cmft::Image dstImage;
 					cmft::imageCreate(srcImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
@@ -330,7 +329,6 @@ bool GenerateIrradianceCubemaps()
 					static constexpr uint32_t kuiIrradianceFaceSize = 128;
 					cmft::imageIrradianceFilterSh(dstImage, kuiIrradianceFaceSize, srcImage);
 
-					// Convert RGBA32F result back to RGBA16F
 					uint32_t uiIrradiancePixelsPerFace = kuiIrradianceFaceSize * kuiIrradianceFaceSize;
 					uint32_t uiIrradianceTotalPixels = uiIrradiancePixelsPerFace * 6;
 					std::vector<uint16_t> halfData(uiIrradianceTotalPixels * 4);
@@ -382,18 +380,16 @@ bool GenerateIrradianceCubemaps()
 	return ReportIblFailures("irradiance", failures);
 }
 
-static constexpr uint32_t kuiPreFilteredFaceSize = 1024;
+static constexpr uint32_t kuiPreFilteredFaceSize = 1'024;
 static constexpr uint8_t kuiPreFilteredMipCount = 11; // log2(1024) + 1
 
 // Packs a CMFT radiance-filtered cubemap into face-major / mip-minor half-floats (matching the engine's
 // TextureUploadManager iteration order) and writes the [width][height][mipcount][pixels] intermediate.
 static void WriteFilteredCubemap(cmft::Image& rDstImage, const std::filesystem::path& rOutputPath)
 {
-	// Get per-face/per-mip byte offsets in CMFT output
 	uint32_t offsets[CUBE_FACE_NUM][MAX_MIP_NUM] {};
 	cmft::imageGetMipOffsets(offsets, rDstImage);
 
-	// Calculate total half-float pixel count across all faces and mips
 	uint32_t uiTotalHalfFloats = 0;
 	uint32_t uiMipSize = kuiPreFilteredFaceSize;
 	for (uint8_t uiMip = 0; uiMip < kuiPreFilteredMipCount; ++uiMip, uiMipSize /= 2)
@@ -405,7 +401,6 @@ static void WriteFilteredCubemap(cmft::Image& rDstImage, const std::filesystem::
 	std::vector<uint16_t> halfData(uiTotalHalfFloats);
 	uint32_t uiHalfOffset = 0;
 
-	// Write in face-major/mip-minor order to match engine's TextureUploadManager iteration order
 	for (int64_t iFace = 0; iFace < 6; ++iFace)
 	{
 		uiMipSize = kuiPreFilteredFaceSize;
@@ -530,7 +525,6 @@ static bool ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClC
 					continue;
 				}
 
-				// Check for face files
 				bool bHasJpgFaces = std::filesystem::exists(rDirectoryEntry.path() / "posx.jpg");
 				bool bHasPngFaces = std::filesystem::exists(rDirectoryEntry.path() / "px.png");
 				if (!bHasJpgFaces && !bHasPngFaces)
@@ -538,7 +532,6 @@ static bool ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClC
 					continue;
 				}
 
-				// Output path is placed alongside the directory
 				std::filesystem::path outputPath = rDirectoryEntry.path().parent_path() / rDirectoryEntry.path().filename();
 				outputPath += kPrefilteredOutputStem;
 				outputPath += TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT);
@@ -633,7 +626,7 @@ bool GeneratePreFilteredCubemaps()
 	std::vector<diagnostic::ExportFailure> failures;
 	bool bDiscoveryComplete = true;
 	cmft::ClContext* pClContext = nullptr;
-	const bool bClLoaded = cmft::clLoad() != 0;
+	bool bClLoaded = cmft::clLoad() != 0;
 	{
 		common::ScopedLambda openClCleanup([&]()
 		{

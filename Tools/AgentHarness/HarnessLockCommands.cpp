@@ -21,9 +21,9 @@ namespace toolcli
 		using coordination::ValidateMetadataEnvelope;
 		using coordination::WriteMetadataAtomic;
 
-		std::optional<Locator> MakeHarnessLocator(const std::wstring& rKey)
+		std::optional<Locator> MakeHarnessLocator(std::wstring_view key)
 		{
-			std::optional<std::wstring> logicalKey = coordination::NormalizeRelativeKey(rKey);
+			std::optional<std::wstring> logicalKey = coordination::NormalizeRelativeKey(key);
 			if (!logicalKey)
 			{
 				Fail("invalid harness lock key");
@@ -254,7 +254,7 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	bool RefreshHarnessHeartbeat(const std::wstring& rOwner, int64_t iMaximumWaitMilliseconds)
+	bool RefreshHarnessHeartbeat(std::wstring_view owner, int64_t iMaximumWaitMilliseconds)
 	{
 		std::optional<Locator> locator = MakeHarnessLocator(L"default");
 		if (!locator)
@@ -269,7 +269,7 @@ namespace toolcli
 			return false;
 		}
 		nlohmann::json metadata;
-		if (!ReadMetadata(locator->path, metadata) || !ValidateMetadataEnvelope(metadata, *locator, coordination::kiSchemaVersion) || !HasOwner(metadata, rOwner))
+		if (!ReadMetadata(locator->path, metadata) || !ValidateMetadataEnvelope(metadata, *locator, coordination::kiSchemaVersion) || !HasOwner(metadata, owner))
 		{
 			return false;
 		}

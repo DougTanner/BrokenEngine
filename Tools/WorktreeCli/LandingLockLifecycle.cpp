@@ -26,9 +26,9 @@ namespace toolcli::landing
 		return iLeaseSeconds >= kiMinimumLeaseSeconds && iLeaseSeconds <= kiMaximumLeaseSeconds;
 	}
 
-	nlohmann::json NewLandingMetadata(const Locator& rLocator, const std::wstring& rOwner, const std::wstring& rSession, const std::wstring& rWorktree, int64_t iLeaseSeconds)
+	nlohmann::json NewLandingMetadata(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds)
 	{
-		nlohmann::json metadata = NewMetadata(rLocator, rOwner, rSession, rWorktree);
+		nlohmann::json metadata = NewMetadata(rLocator, owner, session, worktree);
 		metadata["schemaVersion"] = kiLandingLeaseSchemaVersion;
 		metadata["leaseDurationSeconds"] = iLeaseSeconds;
 		uint64_t uiHeartbeatTicks = 0;
@@ -97,7 +97,7 @@ namespace toolcli::landing
 				status[pField] = rMetadata[pField];
 			}
 		}
-		const uint64_t uiCurrentTicks = CurrentUtcTicks();
+		uint64_t uiCurrentTicks = CurrentUtcTicks();
 		std::optional<LandingLease> lease = ValidateLandingLease(rMetadata, rLocator, uiCurrentTicks);
 		if (lease)
 		{
@@ -174,7 +174,7 @@ namespace toolcli::landing
 				gitDirectoryText->pop_back();
 			}
 			std::filesystem::path gitDirectory = Utf8ToWide(*gitDirectoryText);
-			const std::filesystem::path extendedGitDirectory = ExtendedLengthPath(gitDirectory);
+			std::filesystem::path extendedGitDirectory = ExtendedLengthPath(gitDirectory);
 			if (!std::filesystem::is_directory(extendedGitDirectory, error) || error)
 			{
 				return false;

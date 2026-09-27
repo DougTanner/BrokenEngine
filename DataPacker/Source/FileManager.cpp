@@ -19,9 +19,9 @@ struct SymbolicLinkReparseDataBuffer
 	WCHAR cPathBuffer[1];
 };
 
-std::filesystem::path PathFromUtf8(const std::string& rValue)
+std::filesystem::path PathFromUtf8(std::string_view utf8Value)
 {
-	const std::u8string value(reinterpret_cast<const char8_t*>(rValue.data()), rValue.size());
+	std::u8string value(reinterpret_cast<const char8_t*>(utf8Value.data()), utf8Value.size());
 	return std::filesystem::path(value);
 }
 
@@ -104,7 +104,7 @@ std::filesystem::path GetRepositoryRootFromExecutable()
 	}
 
 	std::filesystem::path executablePath(std::wstring(executableBuffer.data(), uiLength));
-	const std::wstring executableName = executablePath.filename().native();
+	std::wstring executableName = executablePath.filename().native();
 	if (CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.exe", -1, TRUE) != CSTR_EQUAL
 	 && CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.Debug.exe", -1, TRUE) != CSTR_EQUAL)
 	{
@@ -188,8 +188,8 @@ struct LinkedWorktreeIdentity
 	std::filesystem::path expectedOutput;
 };
 
-template <typename TReject>
-std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::filesystem::path& rRepositoryRoot, std::string_view projectName, const std::filesystem::path& rOutputDirectory, const TReject& rReject)
+template <typename TREJECT>
+std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::filesystem::path& rRepositoryRoot, std::string_view projectName, const std::filesystem::path& rOutputDirectory, const TREJECT& rReject)
 {
 	std::optional<std::filesystem::path> git = FindExecutableOnPath(L"git.exe");
 	if (!git)
@@ -356,7 +356,7 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 
 	if (argvSpan.size() == 1)
 	{
-		const std::filesystem::path repositoryRoot = GetRepositoryRootFromExecutable();
+		std::filesystem::path repositoryRoot = GetRepositoryRootFromExecutable();
 		mpInputDirectories[0] = repositoryRoot / "Engine" / "Data";
 		mpInputDirectories[1] = repositoryRoot / "Projects" / "BrokenEngineSandbox" / "Data";
 		mOutputDirectory = repositoryRoot / "Projects" / "BrokenEngineSandbox" / "Platforms" / "VisualStudio2026" / "Output" / "Data";
@@ -376,7 +376,6 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 	mThirdPartyDirectory = mpInputDirectories[0].parent_path().parent_path() / "ThirdParty";
 	VERIFY_SUCCESS(std::filesystem::exists(mThirdPartyDirectory));
 
-	// Extract project name from project data directory
 	mProjectName = mpInputDirectories[1].parent_path().filename().string();
 	mOutputDirectory = std::filesystem::absolute(mOutputDirectory).lexically_normal();
 	reInitializationResult = InitializeWorktreeOutputs(eMode);
@@ -396,14 +395,13 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 		return;
 	}
 
-	// Input data directories
 	LOG(kDefault, kDebug, "Engine data directory: \"{}\"", mpInputDirectories[0].string());
 	LOG(kDefault, kDebug, "Game data directory: \"{}\"", mpInputDirectories[1].string());
 	LOG(kDefault, kDebug, "Project name: \"{}\"", mProjectName);
 
-	// Persistent cache directory. Deliberately NOT %TEMP%: Windows Disk Cleanup / Storage Sense reap
-	// %LOCALAPPDATA%\Temp by last-access age, which deleted multi-hour Gaea bake payloads while the
-	// always-read .meta sidecars survived — leaving a cache that looked warm and was empty.
+	// Persistent cache directory. Deliberately NOT %TEMP%: Windows Disk Cleanup / Storage Sense can reap
+	// %LOCALAPPDATA%\Temp files by last-access age, which would delete long-lived Gaea bake payloads even
+	// while their always-read .meta sidecars stay fresh, producing a cache that looks warm but is empty.
 	PWSTR pWideChar = nullptr;
 	HRESULT hresult = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
 	std::filesystem::path localAppData = SUCCEEDED(hresult) && pWideChar != nullptr ? std::filesystem::path(pWideChar) : std::filesystem::path {};
@@ -471,13 +469,13 @@ FileManager::EnsureLocalResult FileManager::InitializeWorktreeOutputs(Initializa
 	mDataOutput.mSource = identity->primaryRoot / identity->expectedOutput.lexically_relative(repositoryRoot);
 	if (eMode == InitializationMode::kFull)
 	{
-		const std::filesystem::path expectedAttribution = identity->expectedOutput.parent_path() / "Attribution";
+		std::filesystem::path expectedAttribution = identity->expectedOutput.parent_path() / "Attribution";
 		mAttributionOutput.mSource = identity->primaryRoot / expectedAttribution.lexically_relative(repositoryRoot);
 	}
 	EnsureLocalResult eInitializationResult = EnsureLocalResult::kAlreadyLocal;
 	for (OutputRootInfo* pRoot : outputRoots)
 	{
-		const EnsureLocalResult eResult = ReconcileWorktreeOutput(*pRoot);
+		EnsureLocalResult eResult = ReconcileWorktreeOutput(*pRoot);
 		if (eResult == EnsureLocalResult::kCancelled || eResult == EnsureLocalResult::kFailed)
 		{
 			return eResult;
@@ -566,7 +564,7 @@ FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rR
 	ULARGE_INTEGER available {};
 	if (!GetDiskFreeSpaceExW(rRoot.mDestination.root_path().native().c_str(), &available, nullptr, nullptr))
 	{
-		const DWORD uiError = GetLastError();
+		DWORD uiError = GetLastError();
 		diagnostic::Record record
 		{
 			.eSeverity = diagnostic::Severity::kError,

@@ -30,12 +30,12 @@ namespace toolcli::coordination
 	{
 		rbContentionObserved = false;
 		rFailureReason = FailureReasonFor(ERROR_SUCCESS);
-		const std::chrono::milliseconds maximumWait = std::chrono::milliseconds((std::max)(static_cast<int64_t>(0), iMaximumWaitMilliseconds));
+		std::chrono::milliseconds maximumWait = std::chrono::milliseconds((std::max)(static_cast<int64_t>(0), iMaximumWaitMilliseconds));
 		if (maximumWait == std::chrono::milliseconds::zero())
 		{
 			return;
 		}
-		const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now() + maximumWait;
+		std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now() + maximumWait;
 		std::optional<std::chrono::steady_clock::time_point> deniedRunStart;
 		do
 		{
@@ -44,7 +44,7 @@ namespace toolcli::coordination
 			{
 				return;
 			}
-			const DWORD uiLastError = ::GetLastError();
+			DWORD uiLastError = ::GetLastError();
 			rFailureReason = FailureReasonFor(uiLastError);
 			// ERROR_ACCESS_DENIED covers the delete-pending window while a releasing holder unlinks the guard file.
 			if (uiLastError != ERROR_SHARING_VIOLATION && uiLastError != ERROR_LOCK_VIOLATION && uiLastError != ERROR_ACCESS_DENIED)
@@ -52,7 +52,7 @@ namespace toolcli::coordination
 				return;
 			}
 			rbContentionObserved = rbContentionObserved || uiLastError == ERROR_SHARING_VIOLATION || uiLastError == ERROR_LOCK_VIOLATION;
-			const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 			// The denied-access budget covers the current consecutive run only: a sharing or lock violation proves a live holder rather than a stuck delete-pending window, so the next denied observation starts a fresh budget.
 			if (uiLastError == ERROR_ACCESS_DENIED)
 			{
@@ -69,7 +69,7 @@ namespace toolcli::coordination
 			{
 				deniedRunStart.reset();
 			}
-			const std::chrono::milliseconds remainingWait = (std::max)(std::chrono::milliseconds::zero(), std::chrono::duration_cast<std::chrono::milliseconds>(endTime - now));
+			std::chrono::milliseconds remainingWait = (std::max)(std::chrono::milliseconds::zero(), std::chrono::duration_cast<std::chrono::milliseconds>(endTime - now));
 			if (remainingWait == std::chrono::milliseconds::zero())
 			{
 				return;
@@ -183,12 +183,12 @@ namespace toolcli::coordination
 		return result;
 	}
 
-	std::optional<std::wstring> CanonicalizeDirectoryPath(const std::wstring& rValue)
+	std::optional<std::wstring> CanonicalizeDirectoryPath(std::wstring_view value)
 	{
 		std::error_code error;
-		std::filesystem::path path = std::filesystem::canonical(ExtendedLengthPath(rValue), error);
+		std::filesystem::path path = std::filesystem::canonical(ExtendedLengthPath(value), error);
 		// canonical() strips the extended-length prefix from its result, so re-apply it for the remaining OS calls.
-		const std::filesystem::path osPath = ExtendedLengthPath(path);
+		std::filesystem::path osPath = ExtendedLengthPath(path);
 		if (error || !std::filesystem::is_directory(osPath, error))
 		{
 			return std::nullopt;
@@ -226,10 +226,10 @@ namespace toolcli::coordination
 		return finalPath.empty() ? std::nullopt : std::optional<std::wstring>(std::move(finalPath));
 	}
 
-	std::optional<std::wstring> NormalizeRelativeKey(const std::wstring& rValue)
+	std::optional<std::wstring> NormalizeRelativeKey(std::wstring_view value)
 	{
-		const std::filesystem::path path(rValue);
-		if (rValue.empty() || path.is_absolute())
+		std::filesystem::path path(value);
+		if (value.empty() || path.is_absolute())
 		{
 			return std::nullopt;
 		}
@@ -251,10 +251,10 @@ namespace toolcli::coordination
 		return result.empty() ? std::nullopt : std::optional<std::wstring>(std::move(result));
 	}
 
-	std::optional<std::wstring> NormalizeRepositoryRelativeKey(const std::wstring& rValue)
+	std::optional<std::wstring> NormalizeRepositoryRelativeKey(std::wstring_view value)
 	{
-		const std::filesystem::path path(rValue);
-		if (rValue.empty() || path.has_root_name() || path.has_root_directory())
+		std::filesystem::path path(value);
+		if (value.empty() || path.has_root_name() || path.has_root_directory())
 		{
 			return std::nullopt;
 		}
@@ -265,12 +265,12 @@ namespace toolcli::coordination
 				return std::nullopt;
 			}
 		}
-		return NormalizeRelativeKey(rValue);
+		return NormalizeRelativeKey(value);
 	}
 
-	std::optional<Locator> MakeLocator(const std::wstring& rDomain, const std::wstring& rLogicalKey)
+	std::optional<Locator> MakeLocator(std::wstring_view domain, std::wstring_view logicalKey)
 	{
-		std::optional<std::string> hash = HashSha256(WideToUtf8(rLogicalKey));
+		std::optional<std::string> hash = HashSha256(WideToUtf8(logicalKey));
 		std::filesystem::path localApplicationData = GetLocalApplicationDataPath();
 		if (!hash || localApplicationData.empty())
 		{
@@ -278,9 +278,9 @@ namespace toolcli::coordination
 		}
 		return Locator
 		{
-			.domain = rDomain,
-			.logicalKey = rLogicalKey,
-			.path = localApplicationData / L"BrokenEngineLocks" / rDomain / Utf8ToWide(*hash + ".lock"),
+			.domain = std::wstring(domain),
+			.logicalKey = std::wstring(logicalKey),
+			.path = localApplicationData / L"BrokenEngineLocks" / domain / Utf8ToWide(*hash + ".lock"),
 		};
 	}
 
@@ -327,7 +327,7 @@ namespace toolcli::coordination
 			return false;
 		}
 		DWORD uiWritten = 0;
-		const bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE && uiWritten == contents.size() && ::FlushFileBuffers(hFile.Get()) != FALSE;
+		bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE && uiWritten == contents.size() && ::FlushFileBuffers(hFile.Get()) != FALSE;
 		hFile.Reset();
 		if (!bSucceeded)
 		{
@@ -359,9 +359,9 @@ namespace toolcli::coordination
 		std::cout << rMetadata.dump(2) << '\n';
 	}
 
-	bool HasOwner(const nlohmann::json& rMetadata, const std::wstring& rOwner)
+	bool HasOwner(const nlohmann::json& rMetadata, std::wstring_view owner)
 	{
-		return rMetadata.contains("owner") && rMetadata["owner"].is_string() && rMetadata["owner"].get<std::string>() == WideToUtf8(rOwner);
+		return rMetadata.contains("owner") && rMetadata["owner"].is_string() && rMetadata["owner"].get<std::string>() == WideToUtf8(owner);
 	}
 
 	bool JsonIntegerEquals(const nlohmann::json& rValue, int64_t iExpected)
@@ -377,7 +377,7 @@ namespace toolcli::coordination
 	{
 		if (rValue.is_number_unsigned())
 		{
-			const uint64_t uiValue = rValue.get<uint64_t>();
+			uint64_t uiValue = rValue.get<uint64_t>();
 			return uiValue <= static_cast<uint64_t>(INT64_MAX) ? std::optional<int64_t>(static_cast<int64_t>(uiValue)) : std::nullopt;
 		}
 		return rValue.is_number_integer() ? std::optional<int64_t>(rValue.get<int64_t>()) : std::nullopt;
@@ -404,16 +404,16 @@ namespace toolcli::coordination
 			uiClaimedTicks <= uiHeartbeatTicks;
 	}
 
-	nlohmann::json NewMetadata(const Locator& rLocator, const std::wstring& rOwner, const std::wstring& rSession, const std::wstring& rWorktree)
+	nlohmann::json NewMetadata(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree)
 	{
-		const std::string timestamp = CurrentUtcTimestamp();
+		std::string timestamp = CurrentUtcTimestamp();
 		return {
 			{ "schemaVersion", kiSchemaVersion },
 			{ "domain", WideToUtf8(rLocator.domain) },
 			{ "logicalKey", WideToUtf8(rLocator.logicalKey) },
-			{ "owner", WideToUtf8(rOwner) },
-			{ "session", WideToUtf8(rSession) },
-			{ "worktree", WideToUtf8(rWorktree) },
+			{ "owner", WideToUtf8(owner) },
+			{ "session", WideToUtf8(session) },
+			{ "worktree", WideToUtf8(worktree) },
 			{ "claimantPid", ::GetCurrentProcessId() },
 			{ "claimedAt", timestamp },
 			{ "heartbeatAt", timestamp },

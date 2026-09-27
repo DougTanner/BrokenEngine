@@ -6,8 +6,8 @@
 
 namespace toolcli
 {
-	constexpr std::string_view kMarkerPrefix = "<!-- broken-engine-plan/v1 ";
-	constexpr std::string_view kMarkerSuffix = " -->";
+	inline constexpr std::string_view kMarkerPrefix = "<!-- broken-engine-plan/v1 ";
+	inline constexpr std::string_view kMarkerSuffix = " -->";
 
 	struct Plan
 	{
@@ -22,12 +22,12 @@ namespace toolcli
 		std::string diagnostic;
 	};
 
-	bool Utf8PathLess(const std::wstring& rLeft, const std::wstring& rRight);
+	bool Utf8PathLess(std::wstring_view left, std::wstring_view right);
 	bool ParseCanonicalUtcTimestamp(const std::string& rValue, uint64_t& rTicks);
 	bool ReadBytes(const std::filesystem::path& rPath, std::string& rBytes);
-	bool NormalizePlanPath(const std::wstring& rValue, std::wstring& rPath);
+	bool NormalizePlanPath(std::wstring_view value, std::wstring& rPath);
 	bool BuildPlans(const std::filesystem::path& rWorktree, std::map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
-	bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, const std::wstring& rCommit, std::map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
+	bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_view commit, std::map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
 	bool IsBlockedByDependencies(const Plan& rPlan, const std::map<std::wstring, Plan>& rPlans);
 	void MarkCycles(std::map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
 }

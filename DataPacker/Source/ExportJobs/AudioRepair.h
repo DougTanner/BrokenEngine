@@ -7,7 +7,7 @@ namespace audiorepair
 // rate holds at runtime, letting XAudio2 bypass its per-voice SRC. The engine pins its mastering
 // voice to the same value — see kiMasteringSampleRate in Engine/Source/Audio/AudioUtility.h
 // (kept in lockstep). Changing this requires an ExportAudio::kiVersion bump to force re-export.
-inline constexpr int64_t kiAudioExportSampleRate = 48000;
+inline constexpr int64_t kiAudioExportSampleRate = 48'000;
 
 // Policy toggles. Music/ assets are loudness-mastered — flat-topping there is intentional limiting,
 // so declip defaults off for them. Flipping either toggle requires an ExportAudio::kiVersion bump

@@ -31,7 +31,7 @@ public:
 
 protected:
 
-	virtual void Emit(const char* pcText) = 0;
+	virtual void Emit(std::string_view text) = 0;
 
 	void OnSymInit([[maybe_unused]] LPCSTR searchPath, [[maybe_unused]] DWORD symOptions, [[maybe_unused]] LPCSTR userName) override
 	{
@@ -50,7 +50,7 @@ protected:
 			return;
 		}
 
-		char pcLine[2048] {};
+		char pcLine[2'048] {};
 		if (rEntry.lineNumber > 0)
 		{
 			_snprintf_s(pcLine, std::size(pcLine), _TRUNCATE, "%s | %lu | %s", rEntry.name, rEntry.lineNumber, rEntry.lineFileName);
@@ -72,7 +72,7 @@ protected:
 			return;
 		}
 
-		char pcLine[1024] {};
+		char pcLine[1'024] {};
 		_snprintf_s(pcLine, std::size(pcLine), _TRUNCATE, "DbgHelp error: %s | %lu | 0x%llX", funcName, lastError, addr);
 		Emit(pcLine);
 	}
@@ -92,11 +92,11 @@ public:
 
 protected:
 
-	void Emit(const char* pcText) override
+	void Emit(std::string_view text) override
 	{
 		// Fault-path emit: relies on Log()'s thread_local fallback buffer (GetLogFallbackBuffer) for race-freedom on
 		// ThreadLocal-less faulting threads, and stays allocation-free. Do not reintroduce a shared static there.
-		LOG(kDefault, kError, "{}", pcText);
+		LOG(kDefault, kError, "{}", text);
 	}
 };
 
@@ -111,9 +111,9 @@ public:
 
 protected:
 
-	void Emit(const char* pcText) override
+	void Emit(std::string_view text) override
 	{
-		mpWriter->Write(pcText);
+		mpWriter->Write(text);
 		mpWriter->Write("\n");
 	}
 

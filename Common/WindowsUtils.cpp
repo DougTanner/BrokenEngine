@@ -109,8 +109,8 @@ std::tuple<std::string, std::string> FileTimeString(const std::filesystem::file_
 	// file_time_type's clock has no standard layout/epoch relationship to FILETIME — aliasing one through the
 	// other is UB that only works by MSVC-STL coincidence. Convert through system_clock (leap-second-naive, like
 	// FileTimeToSystemTime) and rebuild the FILETIME from its 100ns tick count since the 1601 epoch.
-	const std::chrono::system_clock::time_point systemClockTime = std::chrono::clock_cast<std::chrono::system_clock>(rFileTime);
-	const uint64_t uiHundredNsSince1601 = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>>(systemClockTime.time_since_epoch()).count() + 116'444'736'000'000'000);
+	std::chrono::system_clock::time_point systemClockTime = std::chrono::clock_cast<std::chrono::system_clock>(rFileTime);
+	uint64_t uiHundredNsSince1601 = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>>(systemClockTime.time_since_epoch()).count() + 116'444'736'000'000'000);
 	const FILETIME filetime
 	{
 		.dwLowDateTime = static_cast<DWORD>(uiHundredNsSince1601 & 0xFFFFFFFF),
@@ -227,7 +227,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	pStdInPipeRead.reset();
 
 	std::string output;
-	char pcPipeOutput[1024] {};
+	char pcPipeOutput[1'024] {};
 	DWORD uiBytesRead = 0;
 	while (ReadFile(hStdOutPipeRead, pcPipeOutput, static_cast<DWORD>(sizeof(pcPipeOutput) - 1), &uiBytesRead, nullptr) == TRUE)
 	{

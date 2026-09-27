@@ -52,11 +52,11 @@ constexpr RouteSubdivision kRouteSubdivisions[] =
 	{"4x4", 9, 4, 4},
 };
 
-const RouteSubdivision& LookupRouteSubdivision(const std::string& rLabel, const std::filesystem::path& rIslandJsonFile)
+const RouteSubdivision& LookupRouteSubdivision(std::string_view label, const std::filesystem::path& rIslandJsonFile)
 {
 	for (const RouteSubdivision& rRoute : kRouteSubdivisions)
 	{
-		if (rLabel == rRoute.pcLabel)
+		if (label == rRoute.pcLabel)
 		{
 			return rRoute;
 		}
@@ -71,7 +71,7 @@ const RouteSubdivision& LookupRouteSubdivision(const std::string& rLabel, const 
 		}
 		validLabels += rRoute.pcLabel;
 	}
-	throw std::runtime_error(std::format("\"{}\" lists unknown route \"{}\". Valid routes: {}.", rIslandJsonFile.string(), rLabel, validLabels));
+	throw std::runtime_error(std::format("\"{}\" lists unknown route \"{}\". Valid routes: {}.", rIslandJsonFile.string(), label, validLabels));
 }
 
 std::filesystem::path ResolveTerrain(const std::filesystem::path& rIslandFolder, const nlohmann::json& rIslandJson)

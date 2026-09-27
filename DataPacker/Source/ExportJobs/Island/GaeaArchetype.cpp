@@ -14,7 +14,7 @@ constexpr const char* kpcGaeaEnvVar = "GAEA2_PATH";
 // beach offset (engine-Z 0 == beach; sea floor sits at -(Level × elevationMeters)).
 constexpr float kfGaeaSeaLevelDefault = 0.1f;
 
-void WriteFileBytes(const std::filesystem::path& rFile, const std::string& rBytes)
+void WriteFileBytes(const std::filesystem::path& rFile, std::string_view bytes)
 {
 	// Atomic replace: partial write on crash leaves a stray .tmp, not a half-written archetype.
 	// PID suffix so concurrent crashes from peer DataPacker processes leave distinct orphan
@@ -23,7 +23,7 @@ void WriteFileBytes(const std::filesystem::path& rFile, const std::string& rByte
 	tempFile += L"." + std::to_wstring(GetCurrentProcessId()) + L".tmp";
 	{
 		std::ofstream stream(tempFile, std::ios::binary);
-		stream.write(rBytes.data(), rBytes.size());
+		stream.write(bytes.data(), bytes.size());
 		stream.close();
 		VERIFY_SUCCESS(stream.good());
 	}

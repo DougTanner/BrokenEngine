@@ -42,9 +42,9 @@ namespace toolcli
 		}
 
 
-		bool IsLowerHex(const std::string& rValue, size_t iLength)
+		bool IsLowerHex(std::string_view text, size_t iLength)
 		{
-			return rValue.size() == iLength && std::all_of(rValue.begin(), rValue.end(), [](char value)
+			return text.size() == iLength && std::all_of(text.begin(), text.end(), [](char value)
 			{
 				return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f');
 			});
@@ -67,9 +67,9 @@ namespace toolcli
 			std::cout << value.dump() << '\n';
 		}
 
-		int Failure(const std::string& rCode, int iExitCode = kiExitFailure)
+		int Failure(std::string_view code, int iExitCode = kiExitFailure)
 		{
-			PrintResult({ { "status", "error" }, { "code", rCode } }, 2);
+			PrintResult({ { "status", "error" }, { "code", code } }, 2);
 			return iExitCode;
 		}
 
@@ -78,7 +78,7 @@ namespace toolcli
 		{
 			for (int i = iStart; i < iCount; ++i)
 			{
-				const std::wstring_view option = pValues[i];
+				std::wstring_view option = pValues[i];
 				if (option == L"--user-authorized-rejection")
 				{
 					rArguments.bUserAuthorizedRejection = true;
@@ -134,12 +134,12 @@ namespace toolcli
 		bool IsPathBelow(const std::filesystem::path& rChild, const std::filesystem::path& rParent)
 		{
 			std::error_code error;
-			const std::filesystem::path child = std::filesystem::weakly_canonical(ExtendedLengthPath(rChild), error);
+			std::filesystem::path child = std::filesystem::weakly_canonical(ExtendedLengthPath(rChild), error);
 			if (error)
 			{
 				return false;
 			}
-			const std::filesystem::path parent = std::filesystem::weakly_canonical(ExtendedLengthPath(rParent), error);
+			std::filesystem::path parent = std::filesystem::weakly_canonical(ExtendedLengthPath(rParent), error);
 			if (error)
 			{
 				return false;
@@ -164,15 +164,15 @@ namespace toolcli
 			});
 		}
 
-		bool RemovePlanAtomicTemporarySiblings(const std::filesystem::path& rWorktree, const std::wstring& rPlanPath)
+		bool RemovePlanAtomicTemporarySiblings(const std::filesystem::path& rWorktree, std::wstring_view planRelativePath)
 		{
-			const std::filesystem::path planPath = rWorktree / rPlanPath;
+			std::filesystem::path planPath = rWorktree / planRelativePath;
 			if (!IsPathBelow(planPath, rWorktree))
 			{
 				return false;
 			}
-			const std::filesystem::path parent = planPath.parent_path();
-			const std::wstring prefix = planPath.filename().wstring() + L".tmp.";
+			std::filesystem::path parent = planPath.parent_path();
+			std::wstring prefix = planPath.filename().wstring() + L".tmp.";
 			std::error_code error;
 			for (std::filesystem::directory_iterator it(ExtendedLengthPath(parent), error), end; !error && it != end; it.increment(error))
 			{
@@ -181,13 +181,13 @@ namespace toolcli
 				{
 					continue;
 				}
-				const std::wstring_view suffix(filename.data() + prefix.size(), filename.size() - prefix.size());
-				const size_t uiSeparator = suffix.find(L'.');
+				std::wstring_view suffix(filename.data() + prefix.size(), filename.size() - prefix.size());
+				size_t uiSeparator = suffix.find(L'.');
 				if (uiSeparator == std::wstring_view::npos || suffix.find(L'.', uiSeparator + 1) != std::wstring_view::npos || !IsCanonicalPositiveDecimal(suffix.substr(0, uiSeparator)) || !IsCanonicalPositiveDecimal(suffix.substr(uiSeparator + 1)))
 				{
 					continue;
 				}
-				const std::filesystem::path temporaryPath = parent / filename;
+				std::filesystem::path temporaryPath = parent / filename;
 				if (!IsPathBelow(temporaryPath, rWorktree))
 				{
 					continue;
@@ -197,7 +197,7 @@ namespace toolcli
 				{
 					continue;
 				}
-				const DWORD attributes = ::GetFileAttributesW(ExtendedLengthPath(temporaryPath).c_str());
+				DWORD attributes = ::GetFileAttributesW(ExtendedLengthPath(temporaryPath).c_str());
 				if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0 || (attributes & FILE_ATTRIBUTE_HIDDEN) == 0 || (attributes & FILE_ATTRIBUTE_TEMPORARY) == 0)
 				{
 					continue;
@@ -211,14 +211,14 @@ namespace toolcli
 		}
 
 
-		std::optional<std::filesystem::path> SchedulerRoot(const std::wstring& rRepository)
+		std::optional<std::filesystem::path> SchedulerRoot(std::wstring_view repository)
 		{
-			const std::filesystem::path localApplicationData = GetLocalApplicationDataPath();
+			std::filesystem::path localApplicationData = GetLocalApplicationDataPath();
 			if (localApplicationData.empty())
 			{
 				return std::nullopt;
 			}
-			const std::optional<std::string> hash = coordination::HashSha256(WideToUtf8(rRepository));
+			const std::optional<std::string> hash = coordination::HashSha256(WideToUtf8(repository));
 			if (!hash)
 			{
 				return std::nullopt;
@@ -226,9 +226,9 @@ namespace toolcli
 			return localApplicationData / L"BrokenEngineLocks" / L"plan-scheduler" / Utf8ToWide(*hash);
 		}
 
-		std::optional<std::filesystem::path> ClaimPath(const std::filesystem::path& rRoot, const std::wstring& rPlan)
+		std::optional<std::filesystem::path> ClaimPath(const std::filesystem::path& rRoot, std::wstring_view plan)
 		{
-			const std::optional<std::string> hash = coordination::HashSha256(WideToUtf8(rPlan));
+			const std::optional<std::string> hash = coordination::HashSha256(WideToUtf8(plan));
 			if (!hash)
 			{
 				return std::nullopt;
@@ -236,7 +236,7 @@ namespace toolcli
 			return rRoot / L"claims" / Utf8ToWide(*hash + ".json");
 		}
 
-		bool ValidateClaim(const nlohmann::json& rClaim, const std::wstring& rRepository, const std::wstring& rPlan)
+		bool ValidateClaim(const nlohmann::json& rClaim, std::wstring_view repository, std::wstring_view plan)
 		{
 			try
 			{
@@ -253,7 +253,7 @@ namespace toolcli
 						return false;
 					}
 				}
-				if (fields.at("repository") != WideToUtf8(rRepository) || fields.at("plan") != WideToUtf8(rPlan))
+				if (fields.at("repository") != WideToUtf8(repository) || fields.at("plan") != WideToUtf8(plan))
 				{
 					return false;
 				}
@@ -292,9 +292,9 @@ namespace toolcli
 			return coordination::ParseUtcTimestamp(rClaim.json["expiresAt"].get<std::string>(), uiExpiry) && uiExpiry > coordination::CurrentUtcTicks();
 		}
 
-		bool HealClaims(const std::filesystem::path& rRoot, const std::wstring& rRepository, const std::map<std::wstring, Plan>& rPrimaryPlans, nlohmann::json& rHealed)
+		bool HealClaims(const std::filesystem::path& rRoot, std::wstring_view repository, const std::map<std::wstring, Plan>& rPrimaryPlans, nlohmann::json& rHealed)
 		{
-			const std::filesystem::path claims = rRoot / L"claims";
+			std::filesystem::path claims = rRoot / L"claims";
 			std::error_code error;
 			for (std::filesystem::directory_iterator it(ExtendedLengthPath(claims), error), end; !error && it != end; it.increment(error))
 			{
@@ -304,7 +304,7 @@ namespace toolcli
 				}
 				Claim claim;
 				std::wstring path;
-				bool bRemove = !ReadClaim(it->path(), claim) || !claim.json.contains("plan") || !claim.json["plan"].is_string() || !NormalizePlanPath(Utf8ToWide(claim.json["plan"].get<std::string>()), path) || !ValidateClaim(claim.json, rRepository, path);
+				bool bRemove = !ReadClaim(it->path(), claim) || !claim.json.contains("plan") || !claim.json["plan"].is_string() || !NormalizePlanPath(Utf8ToWide(claim.json["plan"].get<std::string>()), path) || !ValidateClaim(claim.json, repository, path);
 				if (!bRemove)
 				{
 					const std::optional<std::filesystem::path> claimPath = ClaimPath(rRoot, path);
@@ -322,7 +322,7 @@ namespace toolcli
 				// rule is what lets the landing script delete its own claim best-effort: a missed delete heals here.
 				if (!bRemove)
 				{
-					const auto primary = rPrimaryPlans.find(path);
+					auto primary = rPrimaryPlans.find(path);
 					if (primary == rPrimaryPlans.end() || !primary->second.bValid)
 					{
 						bRemove = true;
@@ -367,9 +367,9 @@ namespace toolcli
 			return branch;
 		}
 
-		std::optional<std::string> ResolvePrimaryBranch(const std::wstring& rRepository)
+		std::optional<std::string> ResolvePrimaryBranch(std::wstring_view repository)
 		{
-			std::optional<std::string> branch = RunGit({ L"--git-dir", rRepository, L"symbolic-ref", L"--quiet", L"--short", L"HEAD" });
+			std::optional<std::string> branch = RunGit({ L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"--short", L"HEAD" });
 			if (!branch)
 			{
 				return std::nullopt;
@@ -382,9 +382,9 @@ namespace toolcli
 			return branch;
 		}
 
-		std::optional<std::string> ResolvePrimaryReference(const std::wstring& rRepository)
+		std::optional<std::string> ResolvePrimaryReference(std::wstring_view repository)
 		{
-			std::optional<std::string> reference = RunGit({ L"--git-dir", rRepository, L"symbolic-ref", L"--quiet", L"HEAD" });
+			std::optional<std::string> reference = RunGit({ L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"HEAD" });
 			if (!reference)
 			{
 				return std::nullopt;
@@ -397,9 +397,9 @@ namespace toolcli
 			return reference;
 		}
 
-		std::optional<std::string> ResolveCommit(const std::filesystem::path& rWorktree, const std::wstring& rRevision)
+		std::optional<std::string> ResolveCommit(const std::filesystem::path& rWorktree, std::wstring_view revision)
 		{
-			std::optional<std::string> commit = RunGit({ L"-C", rWorktree.wstring(), L"rev-parse", L"--verify", rRevision + L"^{commit}" });
+			std::optional<std::string> commit = RunGit({ L"-C", rWorktree.wstring(), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}" });
 			if (!commit)
 			{
 				return std::nullopt;
@@ -408,9 +408,9 @@ namespace toolcli
 			return IsLowerHex(*commit, 40) ? commit : std::nullopt;
 		}
 
-		std::optional<std::string> ResolveRepositoryCommit(const std::wstring& rRepository, const std::wstring& rRevision)
+		std::optional<std::string> ResolveRepositoryCommit(std::wstring_view repository, std::wstring_view revision)
 		{
-			std::optional<std::string> commit = RunGit({ L"--git-dir", rRepository, L"rev-parse", L"--verify", rRevision + L"^{commit}" });
+			std::optional<std::string> commit = RunGit({ L"--git-dir", std::wstring(repository), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}" });
 			if (!commit)
 			{
 				return std::nullopt;
@@ -421,10 +421,10 @@ namespace toolcli
 
 		// Healing classifies against the primary tip rather than the caller's tree, so a session that has already
 		// deleted its own terminal target never heals its own live claim.
-		bool BuildPrimaryTipPlans(const std::wstring& rRepository, const std::filesystem::path& rWorktree, std::map<std::wstring, Plan>& rPlans)
+		bool BuildPrimaryTipPlans(std::wstring_view repository, const std::filesystem::path& rWorktree, std::map<std::wstring, Plan>& rPlans)
 		{
-			const std::optional<std::string> reference = ResolvePrimaryReference(rRepository);
-			const std::optional<std::string> tip = reference ? ResolveRepositoryCommit(rRepository, Utf8ToWide(*reference)) : std::nullopt;
+			const std::optional<std::string> reference = ResolvePrimaryReference(repository);
+			const std::optional<std::string> tip = reference ? ResolveRepositoryCommit(repository, Utf8ToWide(*reference)) : std::nullopt;
 			if (!tip)
 			{
 				return false;
@@ -452,7 +452,7 @@ namespace toolcli
 			{
 				return false;
 			}
-			const std::optional<std::wstring> commonDirectory = ResolveGitCommonDirectory(*worktree);
+			std::optional<std::wstring> commonDirectory = ResolveGitCommonDirectory(*worktree);
 			if (!commonDirectory)
 			{
 				return false;
@@ -474,7 +474,7 @@ namespace toolcli
 		// One claim per session, discovered by owner/session identity rather than by plan membership: a session whose
 		// tree no longer carries its claimed plan still owns the claim, and gating discovery on a plan map would let it
 		// escape and mint a duplicate.  Any scan ambiguity fails closed for the same reason.
-		bool FindSessionClaim(const std::filesystem::path& rRoot, const std::wstring& rRepository, const Arguments& rArguments, std::wstring& rPlanPath, Claim& rClaim, bool& rbFound)
+		bool FindSessionClaim(const std::filesystem::path& rRoot, std::wstring_view repository, const Arguments& rArguments, std::wstring& rPlanPath, Claim& rClaim, bool& rbFound)
 		{
 			rbFound = false;
 			std::error_code error;
@@ -486,7 +486,7 @@ namespace toolcli
 				}
 				Claim claim;
 				std::wstring path;
-				if (!ReadClaim(it->path(), claim) || !claim.json.contains("plan") || !claim.json["plan"].is_string() || !NormalizePlanPath(Utf8ToWide(claim.json["plan"].get<std::string>()), path) || !ValidateClaim(claim.json, rRepository, path) || !ClaimIsLive(claim))
+				if (!ReadClaim(it->path(), claim) || !claim.json.contains("plan") || !claim.json["plan"].is_string() || !NormalizePlanPath(Utf8ToWide(claim.json["plan"].get<std::string>()), path) || !ValidateClaim(claim.json, repository, path) || !ClaimIsLive(claim))
 				{
 					continue;
 				}
@@ -502,9 +502,9 @@ namespace toolcli
 			return !error || error == std::errc::no_such_file_or_directory;
 		}
 
-		void PrintClaim(const std::string& rCode, const std::wstring& rPlanPath, const nlohmann::json& rClaim)
+		void PrintClaim(std::string_view code, std::wstring_view planPath, const nlohmann::json& rClaim)
 		{
-			PrintResult({ { "status", "ok" }, { "code", rCode }, { "plan", WideToUtf8(rPlanPath) }, { "owner", rClaim["owner"] }, { "session", rClaim["session"] }, { "worktree", rClaim["worktree"] }, { "branch", rClaim["branch"] }, { "claimedAt", rClaim["claimedAt"] }, { "expiresAt", rClaim["expiresAt"] } }, 2);
+			PrintResult({ { "status", "ok" }, { "code", code }, { "plan", WideToUtf8(planPath) }, { "owner", rClaim["owner"] }, { "session", rClaim["session"] }, { "worktree", rClaim["worktree"] }, { "branch", rClaim["branch"] }, { "claimedAt", rClaim["claimedAt"] }, { "expiresAt", rClaim["expiresAt"] } }, 2);
 		}
 
 		int RunValidate(const Arguments& rArguments)
@@ -539,7 +539,7 @@ namespace toolcli
 				{
 					return Failure("local-app-data-unavailable");
 				}
-				const std::filesystem::path guardPath = *schedulerRoot / L"scheduler.guard";
+				std::filesystem::path guardPath = *schedulerRoot / L"scheduler.guard";
 				if (!coordination::EnsureParentDirectory(guardPath))
 				{
 					return Failure("storage-failed");
@@ -664,12 +664,12 @@ namespace toolcli
 				{
 					return Failure("local-app-data-unavailable");
 				}
-				const bool bClaimed = ReadClaim(*claimPath, claim) && ValidateClaim(claim.json, repo, pPlan->path) && ClaimIsLive(claim) && coordination::CanonicalizeDirectoryPath(Utf8ToWide(claim.json["worktree"].get<std::string>())).has_value();
+				bool bClaimed = ReadClaim(*claimPath, claim) && ValidateClaim(claim.json, repo, pPlan->path) && ClaimIsLive(claim) && coordination::CanonicalizeDirectoryPath(Utf8ToWide(claim.json["worktree"].get<std::string>())).has_value();
 				if (bClaimed)
 				{
 					row["claim"] = { { "session", claim.json["session"] }, { "worktree", claim.json["worktree"] }, { "expiresAt", claim.json["expiresAt"] } };
 				}
-				const auto primary = primaryPlans.find(pPlan->path);
+				auto primary = primaryPlans.find(pPlan->path);
 				if (primary == primaryPlans.end() || !primary->second.bValid)
 				{
 					// Excluded from selection for a reason that is not a dependency edge: a peer landing already removed
@@ -725,7 +725,7 @@ namespace toolcli
 				return Failure("local-app-data-unavailable");
 			}
 			const std::filesystem::path& root = *schedulerRoot;
-			const std::filesystem::path guardPath = root / L"scheduler.guard";
+			std::filesystem::path guardPath = root / L"scheduler.guard";
 			if (!coordination::EnsureParentDirectory(guardPath))
 			{
 				return Failure("storage-failed");
@@ -740,7 +740,7 @@ namespace toolcli
 			}
 			const std::optional<std::wstring> primaryWorktree = coordination::CanonicalizeDirectoryPath(rArguments.primaryWorktree);
 			const std::optional<std::string> worktreeBranch = ResolveGitBranch(worktree);
-			const std::optional<std::string> primaryBranch = ResolvePrimaryBranch(repo);
+			std::optional<std::string> primaryBranch = ResolvePrimaryBranch(repo);
 			if (!primaryWorktree || ResolveGitCommonDirectory(*primaryWorktree) != std::optional<std::wstring>(repo) || !worktreeBranch || *worktreeBranch != WideToUtf8(rArguments.branch) || !primaryBranch || ResolveGitBranch(*primaryWorktree) != primaryBranch)
 			{
 				return Failure("git-identity-mismatch");
@@ -805,7 +805,7 @@ namespace toolcli
 				{
 					continue;
 				}
-				const auto primary = plans.find(path);
+				auto primary = plans.find(path);
 				if (primary == plans.end() || !primary->second.bValid)
 				{
 					continue; // absent or demoted at the primary tip: a peer landing already completed or rejected it
@@ -829,7 +829,7 @@ namespace toolcli
 				{
 					continue; // claimed by another session, or an unhealable record
 				}
-				const uint64_t uiClaimedAt = coordination::CurrentUtcTicks();
+				uint64_t uiClaimedAt = coordination::CurrentUtcTicks();
 				nlohmann::json claim = { { "schemaVersion", 2 }, { "repository", WideToUtf8(repo) }, { "plan", WideToUtf8(pPlan->path) }, { "owner", WideToUtf8(rArguments.owner) }, { "session", WideToUtf8(rArguments.session) }, { "worktree", WideToUtf8(worktree.wstring()) }, { "branch", WideToUtf8(rArguments.branch) }, { "claimedAt", coordination::FormatUtcTimestamp(uiClaimedAt) }, { "expiresAt", coordination::FormatUtcTimestamp(uiClaimedAt + kClaimLifetimeTicks) } };
 				if (!coordination::EnsureParentDirectory(*claimPath) || !coordination::WriteMetadataAtomic(*claimPath, claim))
 				{
@@ -855,7 +855,7 @@ namespace toolcli
 				return Failure("local-app-data-unavailable");
 			}
 			const std::filesystem::path& root = *schedulerRoot;
-			const std::filesystem::path guardPath = root / L"scheduler.guard";
+			std::filesystem::path guardPath = root / L"scheduler.guard";
 			if (!coordination::EnsureParentDirectory(guardPath))
 			{
 				return Failure("storage-failed");
@@ -905,7 +905,7 @@ namespace toolcli
 				return Failure("local-app-data-unavailable");
 			}
 			const std::filesystem::path& root = *schedulerRoot;
-			const std::filesystem::path guardPath = root / L"scheduler.guard";
+			std::filesystem::path guardPath = root / L"scheduler.guard";
 			if (!coordination::EnsureParentDirectory(guardPath))
 			{
 				return Failure("storage-failed");
@@ -936,17 +936,17 @@ namespace toolcli
 			return kiExitOk;
 		}
 
-		bool RenderDependencies(const Plan& rPlan, const std::wstring& rRemoved, std::string& rBytes)
+		bool RenderDependencies(const Plan& rPlan, std::wstring_view removed, std::string& rBytes)
 		{
 			std::vector<std::wstring> dependencies = rPlan.dependencies;
-			auto found = std::find(dependencies.begin(), dependencies.end(), rRemoved);
+			auto found = std::find(dependencies.begin(), dependencies.end(), removed);
 			if (found == dependencies.end())
 			{
 				return false;
 			}
 			dependencies.erase(found);
-			const size_t uiLineEnd = rPlan.bytes.find('\n');
-			const size_t uiSuffixStart = uiLineEnd == std::string::npos ? rPlan.bytes.size() : (uiLineEnd > 0 && rPlan.bytes[uiLineEnd - 1] == '\r' ? uiLineEnd - 1 : uiLineEnd);
+			size_t uiLineEnd = rPlan.bytes.find('\n');
+			size_t uiSuffixStart = uiLineEnd == std::string::npos ? rPlan.bytes.size() : (uiLineEnd > 0 && rPlan.bytes[uiLineEnd - 1] == '\r' ? uiLineEnd - 1 : uiLineEnd);
 			nlohmann::json metadata = { { "createdUtc", rPlan.createdUtc }, { "dependsOn", nlohmann::json::array() } };
 			for (const std::wstring& dependency : dependencies)
 			{
@@ -959,9 +959,9 @@ namespace toolcli
 		// Terminal preparation owns exactly two edits: drop the target from every direct dependency child's byte-zero
 		// marker, and delete the target Plan file.  Both are idempotent by construction — a child whose marker no longer
 		// lists the target is not selected, and an absent target is skipped — so a rerun reports only what it changed.
-		int RunTerminal(const std::wstring& rOperation, const Arguments& rArguments)
+		int RunTerminal(std::wstring_view operation, const Arguments& rArguments)
 		{
-			const bool bReject = rOperation == L"reject";
+			bool bReject = operation == L"reject";
 			if (bReject && !rArguments.bUserAuthorizedRejection)
 			{
 				return Failure("authorization-required");
@@ -977,7 +977,7 @@ namespace toolcli
 				return Failure("local-app-data-unavailable");
 			}
 			const std::filesystem::path& root = *schedulerRoot;
-			const std::filesystem::path guardPath = root / L"scheduler.guard";
+			std::filesystem::path guardPath = root / L"scheduler.guard";
 			if (!coordination::EnsureParentDirectory(guardPath))
 			{
 				return Failure("storage-failed");
@@ -1048,9 +1048,9 @@ namespace toolcli
 				}
 				rewrites.push_back(std::move(rewrite));
 			}
-			const std::filesystem::path targetDiskPath = worktree / target;
+			std::filesystem::path targetDiskPath = worktree / target;
 			std::error_code targetError;
-			const bool bTargetPresent = std::filesystem::exists(ExtendedLengthPath(targetDiskPath), targetError);
+			bool bTargetPresent = std::filesystem::exists(ExtendedLengthPath(targetDiskPath), targetError);
 			if (targetError)
 			{
 				return Failure("target-read-failed");
@@ -1131,7 +1131,7 @@ namespace toolcli
 		{
 			return Failure("usage");
 		}
-		const std::wstring operation = ToLowerInvariant(pArgumentValues[2]);
+		std::wstring operation = ToLowerInvariant(pArgumentValues[2]);
 		Arguments arguments {};
 		if (!ParseArguments(iArgumentCount, pArgumentValues, 3, arguments))
 		{

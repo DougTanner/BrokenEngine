@@ -9,7 +9,7 @@
 #include <codeanalysis/warnings.h>
 #pragma warning(push, 0)
 #pragma warning(disable: ALL_CODE_ANALYSIS_WARNINGS)
-#ifdef __clang__
+#if defined(__clang__)
 	#pragma clang diagnostic push
 	#pragma clang diagnostic ignored "-Weverything"
 #endif
@@ -133,7 +133,7 @@ using namespace std::chrono_literals;
 #include <wrl/client.h>
 #include <shellapi.h>
 
-static_assert(VER_PRODUCTBUILD > 10011 || (VER_PRODUCTBUILD == 10011 && VER_PRODUCTBUILD_QFE >= 16384), "Update the Windows SDK");
+static_assert(VER_PRODUCTBUILD > 10'011 || (VER_PRODUCTBUILD == 10'011 && VER_PRODUCTBUILD_QFE >= 16'384), "Update the Windows SDK");
 
 // Make sure this is the first DirectXMath include location (can be included from other windows headers automatically)
 #if defined(DIRECTX_MATH_VERSION)
@@ -180,7 +180,7 @@ inline constexpr float kfEpsilon = 1.192092896e-7f; // g_XMEpsilon
 // DirectXMath's own XMISNAN/XMISINF macros. Owned by ExternalHeaders.h by design.
 inline constexpr bool XmIsNan(float fValue)
 {
-	const uint32_t uiBits = std::bit_cast<uint32_t>(fValue);
+	uint32_t uiBits = std::bit_cast<uint32_t>(fValue);
 	return (uiBits & 0x7F800000u) == 0x7F800000u && (uiBits & 0x007FFFFFu) != 0u;
 }
 
@@ -216,7 +216,7 @@ inline constexpr bool XmIsInf(float fValue)
 
 	#pragma warning(push, 0)
 	#pragma warning(disable: ALL_CODE_ANALYSIS_WARNINGS)
-	#ifdef __clang__
+	#if defined(__clang__)
 		#pragma clang diagnostic push
 		#pragma clang diagnostic ignored "-Weverything"
 	#endif
@@ -233,7 +233,7 @@ inline constexpr bool XmIsInf(float fValue)
 		#define IMGUI_ENABLE_TEST_ENGINE
 		#include "imgui_internal.h"
 	#endif
-	#ifdef __clang__
+	#if defined(__clang__)
 		#pragma clang diagnostic pop
 	#endif
 	#pragma warning(pop)
@@ -383,7 +383,7 @@ inline constexpr bool XmIsInf(float fValue)
 #endif
 
 // Re-enable warnings after external headers
-#ifdef __clang__
+#if defined(__clang__)
 	#pragma clang diagnostic pop
 #endif
 #pragma warning(pop)

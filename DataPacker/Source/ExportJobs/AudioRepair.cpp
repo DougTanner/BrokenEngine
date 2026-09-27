@@ -507,8 +507,8 @@ void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceR
 	// downsampling widens the kernel to band-limit before decimation; upsampling leaves it at the
 	// input Nyquist. ~32 taps per output sample at unity rate (16 sinc zero-crossings each side).
 	// Per-output weight-sum normalization pins DC gain to 1 and absorbs edge-clamp asymmetry.
-	constexpr int64_t kiZeroCrossings = 16;
-	constexpr double kdKaiserBeta = 9.0; // ~ -90 dB stopband
+	static constexpr int64_t kiZeroCrossings = 16;
+	static constexpr double kdKaiserBeta = 9.0; // ~ -90 dB stopband
 	double dCutoff = std::min(1.0, 1.0 / dStep); // == min(1, target/source)
 	double dHalfWidth = static_cast<double>(kiZeroCrossings) / dCutoff; // support half-width, in input frames
 	double dInverseI0Beta = 1.0 / BesselI0(kdKaiserBeta);

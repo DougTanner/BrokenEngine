@@ -28,9 +28,9 @@ inline thread_local ThreadLocal* gpThreadLocal = nullptr;
 
 // Note: "4096 - sizeof(DWORD)" is max length for OutputDebugString()
 //       But some Vulkan validation messages can overflow that
-inline constexpr int64_t kiLogBufferSize = 32 * 1024;
+inline constexpr int64_t kiLogBufferSize = 32 * 1'024;
 // One page; covers the largest bounded single workbuffer-routed log argument (a MAX_PATH path/wstring, under 1 KiB).
-inline constexpr int64_t kiMinWorkbufferSize = 4 * 1024;
+inline constexpr int64_t kiMinWorkbufferSize = 4 * 1'024;
 
 // Exactly one ThreadLocal per thread; it owns gpThreadLocal for its lifetime.
 class ThreadLocal

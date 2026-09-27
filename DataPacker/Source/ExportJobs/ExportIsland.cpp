@@ -521,8 +521,8 @@ std::string ExportIsland::GetInputFingerprint() const
 {
 	std::filesystem::path cacheLeafDirectory = GetIslandCachePath(mInputPath);
 	std::filesystem::path cacheRouteDirectory = cacheLeafDirectory.parent_path();
-	constexpr const char* kpcLeafInputs[] = {"AmbientOcclusion.r16", "BakedDimensions.json", "Elevation.r32", "MeshProcessed.bin"};
-	constexpr const char* kpcRouteInputs[] = {"Color.png", "Flow.png", "Normals.exr", "Rock.png", "Sand.png", "Snow.png"};
+	static constexpr const char* kpcLeafInputs[] = {"AmbientOcclusion.r16", "BakedDimensions.json", "Elevation.r32", "MeshProcessed.bin"};
+	static constexpr const char* kpcRouteInputs[] = {"Color.png", "Flow.png", "Normals.exr", "Rock.png", "Sand.png", "Snow.png"};
 	nlohmann::json fingerprint;
 	for (const char* pcFile : kpcLeafInputs)
 	{
@@ -554,8 +554,8 @@ std::string ExportIsland::GetTextureFingerprint() const
 	// and every crop rect comes from the dimensions JSON, so either one changing must re-encode.
 	// MeshProcessed.bin is deliberately absent — the mesh reaches the chunk payload alone, so a mesh-only
 	// rebake re-packs the chunk without rewriting the tracked textures.
-	constexpr const char* kpcLeafInputs[] = {"AmbientOcclusion.r16", "BakedDimensions.json", "Elevation.r32"};
-	constexpr const char* kpcRouteInputs[] = {"Color.png", "Flow.png", "Normals.exr", "Rock.png", "Sand.png", "Snow.png"};
+	static constexpr const char* kpcLeafInputs[] = {"AmbientOcclusion.r16", "BakedDimensions.json", "Elevation.r32"};
+	static constexpr const char* kpcRouteInputs[] = {"Color.png", "Flow.png", "Normals.exr", "Rock.png", "Sand.png", "Snow.png"};
 	nlohmann::json fingerprint;
 	fingerprint["textureVersion"] = kiTextureVersion;
 	for (const char* pcFile : kpcLeafInputs)
@@ -571,7 +571,7 @@ std::string ExportIsland::GetTextureFingerprint() const
 
 bool ExportIsland::AreTextureOutputsPresent() const
 {
-	constexpr const char* kpcOutputs[] = {kpcIslandAmbientOcclusion, kpcIslandColor, kpcIslandMasks, kpcIslandNormals};
+	static constexpr const char* kpcOutputs[] = {kpcIslandAmbientOcclusion, kpcIslandColor, kpcIslandMasks, kpcIslandNormals};
 	for (const char* pcOutput : kpcOutputs)
 	{
 		if (!std::filesystem::exists(mInputPath / pcOutput))

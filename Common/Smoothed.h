@@ -7,7 +7,7 @@ class InTheLastSecond
 {
 public:
 
-	static constexpr int64_t kiCapacity = 1024;
+	static constexpr int64_t kiCapacity = 1'024;
 
 	void Set(int64_t count = 1);
 	int64_t Get();

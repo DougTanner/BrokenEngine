@@ -107,7 +107,7 @@ struct LogBuffer
 };
 
 inline constexpr int64_t kiRingBufferLineCount = 128;
-inline constexpr int64_t kiGlobalBufferLineCount = 1024;
+inline constexpr int64_t kiGlobalBufferLineCount = 1'024;
 inline constexpr int64_t kiAgentBufferLineCount = 512; // Wrapping cross-category ring for the agent get_logs default. Half of the global buffer's line count so the added static footprint stays bounded (kiAgentBufferLineCount * kiLogBufferSize = 16 MiB).
 
 using LogRingBuffer = LogBuffer<kiRingBufferLineCount, true>;
@@ -132,7 +132,7 @@ void EnableLogFile(const std::filesystem::path& rPath);
 void LogIndent(int64_t iIndent);
 char* LogPrefix(char* pLogBuffer, char* pEnd);
 void LogWrite(char* pLogBuffer);
-void LogWriteRingBuffers(const char* pLogBuffer, int64_t iLength, LogCategory eCategory);
+void LogWriteRingBuffers(std::string_view logBuffer, LogCategory eCategory);
 void LogDumpBuffers(CrashFileWriter& rWriter);
 
 // Single per-thread fallback buffer for threads without a ThreadLocal (early startup; OS / driver / COM / gamepad
@@ -155,7 +155,7 @@ void Log(LogCategory eCategory, std::format_string<const TUV&...> format, const 
 
 	if (eCategory == LogCategory::kTemp)
 	{
-		constexpr const char kpcTempPrefix[] = "kTemp: ";
+		static constexpr const char kpcTempPrefix[] = "kTemp: ";
 		int64_t iTempLength = std::min(static_cast<int64_t>(sizeof(kpcTempPrefix) - 1), pEnd - pWrite);
 		std::memcpy(pWrite, kpcTempPrefix, iTempLength);
 		pWrite += iTempLength;
@@ -167,7 +167,7 @@ void Log(LogCategory eCategory, std::format_string<const TUV&...> format, const 
 	*(pWrite++) = '\n';
 	*(pWrite++) = 0;
 
-	LogWriteRingBuffers(pLogBuffer, pWrite - pLogBuffer, eCategory);
+	LogWriteRingBuffers(std::string_view(pLogBuffer, static_cast<size_t>(pWrite - pLogBuffer)), eCategory);
 	LogWrite(pLogBuffer);
 }
 

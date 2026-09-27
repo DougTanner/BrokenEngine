@@ -20,7 +20,7 @@ public:
 	{
 		ScopedSuppressAllocationTracking suppress;
 
-		char pcBuffer[2048] {};
+		char pcBuffer[2'048] {};
 		std::format_to_n_result<char*> result = std::format_to_n(pcBuffer, sizeof(pcBuffer) - 2, format, parameters...);
 		if (result.size > static_cast<int64_t>(sizeof(pcBuffer) - 2))
 		{

@@ -3,7 +3,6 @@
 namespace common
 {
 
-// Helper function to get content from either a file path or string
 template<typename T>
 inline std::pair<bool, std::string> GetFileOrStringContent(const T& rSource)
 {
@@ -24,7 +23,7 @@ inline std::pair<bool, std::string> GetFileOrStringContent(const T& rSource)
 
 		std::fstream fileStream(rSource, std::ios::in | std::ios::binary);
 		fileStream.read(fileContents.data(), uiFileSize);
-		const bool bReadOk = static_cast<bool>(fileStream) && static_cast<size_t>(fileStream.gcount()) == uiFileSize;
+		bool bReadOk = static_cast<bool>(fileStream) && static_cast<size_t>(fileStream.gcount()) == uiFileSize;
 		fileStream.close();
 
 		if (!bReadOk)
@@ -40,7 +39,6 @@ inline std::pair<bool, std::string> GetFileOrStringContent(const T& rSource)
 	}
 }
 
-// Template function to compare file contents, supporting both file paths and std::string
 template<typename T1, typename T2>
 inline bool ContentsEqual(const T1& rOne, const T2& rTwo)
 {
@@ -95,7 +93,7 @@ struct CrashFileWriter
 	CrashFileWriter(const CrashFileWriter&) = delete;
 	CrashFileWriter& operator=(const CrashFileWriter&) = delete;
 
-	void Write(const char* pcText)
+	void Write(std::string_view text)
 	{
 		if (Handle == INVALID_HANDLE_VALUE)
 		{
@@ -104,7 +102,7 @@ struct CrashFileWriter
 
 		DWORD uiWritten = 0;
 		// Result deliberately ignored: nothing on the crash path may recover or log a failed write.
-		WriteFile(Handle, pcText, static_cast<DWORD>(std::strlen(pcText)), &uiWritten, nullptr);
+		WriteFile(Handle, text.data(), static_cast<DWORD>(text.size()), &uiWritten, nullptr);
 	}
 
 	HANDLE Handle = INVALID_HANDLE_VALUE;
