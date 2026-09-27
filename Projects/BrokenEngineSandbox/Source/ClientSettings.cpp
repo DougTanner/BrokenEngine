@@ -97,6 +97,12 @@ void LoadClientState()
 		return;
 	}
 
+	if (!std::isfinite(settings.fCameraEyeHeightTarget) || settings.fCameraEyeHeightTarget < engine::kfMinEyeHeight || settings.fCameraEyeHeightTarget > engine::Camera::kfEyeHeightMax)
+	{
+		LOG(kDefault, kWarning, "LoadClientState rejected {}: camera eye-height target {} is outside [{}, {}]", kpcClientStatePath, settings.fCameraEyeHeightTarget, engine::kfMinEyeHeight, engine::Camera::kfEyeHeightMax);
+		return;
+	}
+
 	gpGame->mRememberedFleetGuid = settings.fleetGuid;
 	gpGame->mRememberedFocusedShipId = engine::global_id_t {settings.iFocusedShipId};
 	gpGame->mfRememberedCameraEyeHeightTarget = settings.fCameraEyeHeightTarget;

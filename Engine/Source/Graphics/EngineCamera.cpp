@@ -12,11 +12,6 @@ namespace engine
 // Mouse-wheel zoom: per-frame scroll delta nudges target height; current eases toward target
 constexpr float kfEyeHeightPerWheelTick = 0.1f;
 constexpr float kfEyeBlendDuration = 0.35f;
-#if defined(BT_RELEASE)
-constexpr float kfEyeHeightMax = Camera::kfEyeHeightMaxRelease; // Shipping: gameplay zoom-out ceiling
-#else
-constexpr float kfEyeHeightMax = 2000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
-#endif
 
 constexpr float kfCameraPositionBlend = 8.0f;
 constexpr float kfJumpDistanceThreshold = 50.0f;

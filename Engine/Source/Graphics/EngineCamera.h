@@ -81,10 +81,15 @@ public:
 	// Camera-height zoom-factor fade endpoint (2x default eye height = fully zoomed out). Single-sources the water
 	// (WaterUniforms) and lighting (LightingUniforms) LerpAtHeight calls -- both reference this constant.
 	static constexpr float kfWaveFadeEndHeight = 2.0f * kfCameraEyeHeightDefault;
-	// Release zoom-out ceiling (dev builds zoom further; see EngineCamera.cpp). NOT a texel reference: the shadow/lighting
+	// Release zoom-out ceiling (dev builds zoom further; see kfEyeHeightMax). NOT a texel reference: the shadow/lighting
 	// texel grids hold a constant on-screen pixel size at any height (the texels coarsen with zoom instead of cropping
 	// coverage), so this is purely the gameplay limit on how far the camera can pull back.
 	static constexpr float kfEyeHeightMaxRelease = 600.0f;
+#if defined(BT_RELEASE)
+	static constexpr float kfEyeHeightMax = kfEyeHeightMaxRelease; // Shipping: gameplay zoom-out ceiling
+#else
+	static constexpr float kfEyeHeightMax = 2000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
+#endif
 	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
 	// than the wanted on-screen pixel size. Because their texel-height references never fall below live eye height,
 	// this margin keeps the raw live-frustum footprints inside their textures throughout zoom transitions. At settled
