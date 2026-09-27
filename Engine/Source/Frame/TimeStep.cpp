@@ -86,7 +86,7 @@ bool TimeStep::DecreaseTimeScale(bool bAllowSlowMo)
 		mbTimeScaleChanged = true;
 		return true;
 	}
-	else if (bAllowSlowMo)
+	else if (bAllowSlowMo && miTimeDivide < kiMaxTimeDivide)
 	{
 		miTimeDivide *= 2;
 		LOG(kDefault, kDebug, "Time ratio: 1/{}x", miTimeDivide);

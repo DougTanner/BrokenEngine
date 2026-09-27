@@ -321,8 +321,8 @@ void BuildCellNavData(NavData& rNavData, const std::vector<IslandPlacement>& rPl
 		const auto islandIt = gpIslandTerrain->mIslands.find(rPlacement.islandCrc);
 		if (islandIt == gpIslandTerrain->mIslands.end())
 		{
-			// Save and replay grids arrive with unvalidated placement CRCs by design; terminating here is
-			// the intended detection.
+			// ReadGridSave rejects a save or replay placement CRC with no loaded template and generation only
+			// emits loaded ones, so reaching this is an internal invariant break.
 			LOG(kNavData, kError, "BuildCellNavData: placement islandCrc={} has no loaded island template", rPlacement.islandCrc);
 			throw std::out_of_range("placement islandCrc has no loaded island template");
 		}

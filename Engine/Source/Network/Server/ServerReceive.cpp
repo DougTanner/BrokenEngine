@@ -47,7 +47,7 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 	// counted twice.
 	if (static_cast<int64_t>(packetData.size()) != NetworkMessages::ClientAckStreamMessage::GetSize(message.uiSlotCount))
 	{
-		RecordContractViolation(iClientId, "ackstream size", packetData[0], static_cast<int64_t>(packetData.size()));
+		RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "ackstream size", packetData[0], static_cast<int64_t>(packetData.size()));
 		return;
 	}
 
@@ -155,6 +155,11 @@ void Server::ClientDesyncReport(std::span<const uint8_t> packetData, int64_t iCl
 
 	NetworkMessages::ClientDesyncReportMessage message {};
 	NetworkMessages::Read(packetData, message);
+	// Before the cooldown, so a corrupt report does not consume it.
+	if (message.iTick < 0)
+	{
+		NetworkMessages::ThrowCorruptStream("Server::ClientDesyncReport");
+	}
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	if (now < pClient->desyncReportDeadline)
@@ -183,6 +188,11 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPe
 
 	NetworkMessages::ClientDebugFrameRequestMessage message {};
 	NetworkMessages::Read(packetData, message);
+	// Before the cooldown, so a corrupt request does not consume it.
+	if (message.iTick < 0)
+	{
+		NetworkMessages::ThrowCorruptStream("Server::ClientDebugFrameRequest");
+	}
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	if (now < pClient->debugFrameRequestDeadline)

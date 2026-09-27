@@ -140,6 +140,7 @@ public:
 		kDesyncDebugMode          = 1 << 4,
 		kLoadNotificationReceived = 1 << 5,
 		kSkipNextJitterInterval   = 1 << 6,
+		kServerDebugInput         = 1 << 7, // the accepting server takes debug-control requests (its kbDebugInput)
 	};
 
 	ENetPeer* mpServerPeer = nullptr;

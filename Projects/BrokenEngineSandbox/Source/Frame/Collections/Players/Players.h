@@ -214,7 +214,14 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 		return fTime >= 0.0f && fTime <= kfBlasterFireInterval;
 	}
 
+	// Navigation delays in seconds match the HUD slider's [0, 60] range. Written as one range test so NaN and both infinities fail it too.
+	static bool IsNavigationDelayInRange(float fDelay)
+	{
+		return fDelay >= 0.0f && fDelay <= 60.0f;
+	}
+
 	// Reject an out-of-range countdown as a corrupt stream: NaN or +inf never fires, and a large negative value never finishes the burst loop.
+	// Reject an out-of-range navigation delay too, since the client echoes it back in its update-player request.
 	static void PostRead(const PlayersPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -222,6 +229,10 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 			if (!IsBlasterFireTimeInRange(rCurrent.pfNextBlasterFireTimes[i]))
 			{
 				throw std::ios_base::failure("PlayersPostRender pfNextBlasterFireTimes");
+			}
+			if (!IsNavigationDelayInRange(rCurrent.pfNavigationDelays[i]))
+			{
+				throw std::ios_base::failure("PlayersPostRender pfNavigationDelays");
 			}
 		}
 	}

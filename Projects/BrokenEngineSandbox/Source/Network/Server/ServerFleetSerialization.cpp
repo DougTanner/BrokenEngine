@@ -2,6 +2,7 @@
 
 #include "Network/Server/ServerFleetSerialization.h"
 
+#include "Frame/Collections/Players/Players.h"
 #include "Network/GamePacketType.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
@@ -69,17 +70,21 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	rFleet.wantedCoord = engine::GridCoord {iWantedX, iWantedY};
 	common::Read(rFileStream, rFleet.uiPendingFleetWantedCoordTicks);
 	common::Read(rFileStream, rFleet.fNavigationDelay);
-	// Trust boundary (save / replay file): mirror the wire-path clamp (ValidateNavigationDelay). A non-finite
-	// fleet delay poisons FleetNavigationController (fFrameChangeTimer resets to this, then > 0.0f gates the
-	// fire): +Inf freezes fleet nav forever, NaN fire-storms every tick; it also feeds a common::Random bound.
-	// Clamp neutralizes both; non-finite substitutes the Fleet default (60.0f).
-	rFleet.fNavigationDelay = std::isfinite(rFleet.fNavigationDelay) ? std::clamp(rFleet.fNavigationDelay, 0.0f, 60.0f) : 60.0f;
+	// Trust boundary (save / replay file): the wire admits only [0, 60], so reject any other fleet delay. It
+	// resets fFrameChangeTimer, whose > 0.0f test gates the fire: +Inf freezes fleet nav forever and NaN fires
+	// every tick; it also feeds a common::Random bound.
+	if (!PlayersPostRender::IsNavigationDelayInRange(rFleet.fNavigationDelay))
+	{
+		throw std::ios_base::failure("Fleet navigation delay");
+	}
 	common::Read(rFileStream, rFleet.fFrameChangeTimer);
 	// Trust boundary (save / replay file): finite-check only — fFrameChangeTimer legitimately goes/stays
-	// negative in cardinal mode (FleetNavigationController fires without resetting), so a range clamp would
-	// corrupt valid data. Only +Inf is dangerous: fFrameChangeTimer > 0.0f gates the flagship fire, so a
-	// saved +Inf freezes fleet nav forever. Substitute the Fleet default (0.0f); NaN already self-heals.
-	rFleet.fFrameChangeTimer = std::isfinite(rFleet.fFrameChangeTimer) ? rFleet.fFrameChangeTimer : 0.0f;
+	// negative in cardinal mode (FleetNavigationController fires without resetting), so a range test would
+	// reject valid data. A saved +Inf would freeze fleet nav forever.
+	if (!std::isfinite(rFleet.fFrameChangeTimer))
+	{
+		throw std::ios_base::failure("Fleet frame change timer");
+	}
 	// Trust boundary (save / replay file): bound the member count against the cap and stream before resize.
 	common::ValidateDeserializedCountCapacity(iMemberCount, static_cast<int64_t>(kuiMaxFleetMembers), sizeof(int64_t) + sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
 	rFleet.members.resize(static_cast<size_t>(iMemberCount));
@@ -89,6 +94,13 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		common::Read(rFileStream, iGlobalPlayerId);
 		FleetMemberFlags_t flags {};
 		flags.Read(rFileStream);
+		// Trust boundary (save / replay file): kIsDead is the only member flag.
+		FleetMemberFlags_t unknownFlags = flags;
+		unknownFlags.Clear(FleetMemberFlags::kIsDead);
+		if (!unknownFlags.Empty())
+		{
+			throw std::ios_base::failure("Fleet member flags");
+		}
 		int32_t iCoordX = 0;
 		int32_t iCoordY = 0;
 		common::Read(rFileStream, iCoordX);

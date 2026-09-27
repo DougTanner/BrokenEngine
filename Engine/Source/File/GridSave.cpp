@@ -115,6 +115,24 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			engine::CoordFrames& rSub = itFrames->second;
 			rSub.staticData.Read(fileStream, /*bIncludeNavData=*/false);
 			rSub.staticData.coord = coord;
+			// Trust boundary (save file): generation places only loaded templates with centers inside the cell's base
+			// area. The center tests are range tests, so NaN and both infinities fail them too.
+			for (const IslandPlacement& rPlacement : rSub.staticData.islands)
+			{
+				if (!gpIslandTerrain->mIslands.contains(rPlacement.islandCrc))
+				{
+					throw std::ios_base::failure("island placement template");
+				}
+				if (!(rPlacement.f2WorldPos.x >= kfBaseAreaMinX && rPlacement.f2WorldPos.x <= kfBaseAreaMaxX)
+				 || !(rPlacement.f2WorldPos.y >= kfBaseAreaMinY && rPlacement.f2WorldPos.y <= kfBaseAreaMaxY))
+				{
+					throw std::ios_base::failure("island placement center");
+				}
+				if (!std::isfinite(rPlacement.fRotation))
+				{
+					throw std::ios_base::failure("island placement rotation");
+				}
+			}
 			auto pFrame = std::make_unique<game::Frame>();
 			fileStream >> *pFrame;
 			rSub.pCurrent = std::move(pFrame);

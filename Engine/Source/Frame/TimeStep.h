@@ -50,8 +50,14 @@ public:
 	static constexpr int64_t kiMaxTicksPerFrame = 12;  // Threshold for the server's auto-reduction
 	static constexpr int64_t kiMaxAccumulatorTicks = 4;  // Max backlog (in ticks)
 
-	// Decrease time scale (halve multiplier if > 1, else double divider if bAllowSlowMo)
-	// Returns true if time scale was changed, updates debug text
+	// Slowest slow motion (1/32). The server's per-update client packet and byte budgets span one scheduled
+	// update, which slow motion lengthens: at 1/32 an update holds ~32 honest acks and a stall too short to
+	// open the server's stall grace ~128, under both budgets; at 1/64 a 3 s hiccup can already cross the byte
+	// budget and strike an honest client.
+	static constexpr int64_t kiMaxTimeDivide = 32;
+
+	// Decrease time scale (halve multiplier if > 1, else double divider if bAllowSlowMo and below kiMaxTimeDivide)
+	// Returns true if time scale was changed (false at the 1/kiMaxTimeDivide limit), updates debug text
 	bool DecreaseTimeScale(bool bAllowSlowMo = true);
 
 	// Increase time scale (halve divider if > 1, else double multiplier), updates debug text

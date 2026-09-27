@@ -433,6 +433,10 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerConnectionResponseMessage message {};
 	NetworkMessages::Read(packetData, message);
+	if (message.uiDebugInput > 1)
+	{
+		NetworkMessages::ThrowCorruptStream("Client::ServerConnectionResponse");
+	}
 
 	bool bAccepted = message.uiAccepted != 0;
 
@@ -444,6 +448,10 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 		}
 		muiCommittedLoadGeneration = message.uiLoadGeneration;
 		mStateFlags.Set(ClientStateFlags::kConnectionAccepted);
+		if (message.uiDebugInput == 1)
+		{
+			mStateFlags.Set(ClientStateFlags::kServerDebugInput);
+		}
 
 		if (message.bHasGuid)
 		{

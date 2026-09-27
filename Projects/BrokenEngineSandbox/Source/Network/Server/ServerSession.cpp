@@ -66,12 +66,26 @@ void ServerSession::PrepareTick()
 	}
 }
 
-// Clamp a wire-supplied navigation delay before it enters server-authoritative sim state.
-// Range [0.0f, 60.0f] matches the UI slider (HudScreen.cpp); NaN/Inf substitute the Fleet::fNavigationDelay default (60.0f)
-// so a hostile non-finite value can't freeze fleet navigation (every fFrameChangeTimer <= 0 comparison against NaN is false).
-static float ValidateNavigationDelay(float fDelay)
+// Reject a wire-supplied navigation delay outside [0, 60] before it enters server-authoritative sim state:
+// the delay resets the navigation timers, and a non-finite one would freeze them or fire them every tick.
+static float AdmitNavigationDelay(float fDelay)
 {
-	return std::isfinite(fDelay) ? std::clamp(fDelay, 0.0f, 60.0f) : 60.0f;
+	if (!PlayersPostRender::IsNavigationDelayInRange(fDelay))
+	{
+		engine::NetworkMessages::ThrowCorruptStream("ServerSession navigation delay");
+	}
+	return fDelay;
+}
+
+// Reject a wire-supplied Boolean byte other than 0 or 1.
+static bool ReadBoolByte(const uint8_t*& pCursor)
+{
+	uint8_t uiValue = engine::ReadUint8(pCursor);
+	if (uiValue > 1)
+	{
+		engine::NetworkMessages::ThrowCorruptStream("ServerSession Boolean byte");
+	}
+	return uiValue != 0;
 }
 
 void ServerSession::ParseReceivedGamePackets()
@@ -82,8 +96,8 @@ void ServerSession::ParseReceivedGamePackets()
 
 		// Contract gate (trust boundary): validate every game-range packet once before dispatch (drop -> count -> escalate).
 		// Every client-sendable game contract row has min == max (GamePacketType.h), so this gate settles each admitted
-		// payload's size exactly and the cases below add no per-case size check; only residual semantic validation
-		// a row cannot express — the ValidateNavigationDelay clamp — stays.
+		// payload's size exactly and the cases below add no per-case size check; only residual value checks a row
+		// cannot express — navigation-delay range and Boolean bytes — stay, and they throw to drop the packet.
 		const engine::ClientPacketContract contract = NetworkSessionContract::GetClientPacketContract(eType);
 		if (!engine::gpServer->AdmitGamePacket(rPacket, contract))
 		{
@@ -100,8 +114,8 @@ void ServerSession::ParseReceivedGamePackets()
 					const uint8_t* pCursor = rPacket.payload.data();
 					engine::global_id_t globalId {};
 					globalId.iValue = engine::ReadInt64(pCursor);
-					bool bUseMissiles = engine::ReadUint8(pCursor) != 0;
-					float fNavigationDelay = ValidateNavigationDelay(engine::ReadFloat(pCursor));
+					bool bUseMissiles = ReadBoolByte(pCursor);
+					float fNavigationDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
 					mpBroadcaster->QueueUpdatePlayerRequest({rPacket.iClientId, globalId, bUseMissiles, fNavigationDelay});
 					break;
 				}
@@ -148,7 +162,7 @@ void ServerSession::ParseReceivedGamePackets()
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					float fDelay = ValidateNavigationDelay(engine::ReadFloat(pCursor));
+					float fDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
 					const engine::ClientConnection* pClient = engine::gpServer->FindClient(rPacket.iClientId);
 					if (pClient != nullptr)
 					{
@@ -210,7 +224,7 @@ void ServerSession::ParseReceivedGamePackets()
 				{
 					// 1B paused (type byte already stripped)
 					const uint8_t* pCursor = rPacket.payload.data();
-					bool bPaused = engine::ReadUint8(pCursor) != 0;
+					bool bPaused = ReadBoolByte(pCursor);
 					gpGame->mGameFlags.Set(engine::GameFlags::kPaused, bPaused);
 					LOG(kDefault, kDebug, "Server paused: {}", bPaused);
 					break;
@@ -219,8 +233,7 @@ void ServerSession::ParseReceivedGamePackets()
 				{
 					// 1B direction (type byte already stripped); 0 = slower, 1 = faster
 					const uint8_t* pCursor = rPacket.payload.data();
-					uint8_t uiDirection = engine::ReadUint8(pCursor);
-					StepTimescale(uiDirection != 0);
+					StepTimescale(ReadBoolByte(pCursor));
 					break;
 				}
 				default:

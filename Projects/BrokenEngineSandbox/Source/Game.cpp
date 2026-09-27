@@ -580,7 +580,11 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		bool bReturnPressed = rInputPoll.KeyboardPressed(VK_RETURN);
 		bool bCycleMenuIslandPressed = rInputPoll.KeyboardPressed('E');
 
-		if (engine::gpClient != nullptr)
+		// A server built without kbDebugInput strikes every debug-control request as corrupt data, so send
+		// them only to a server whose accepted connection response said it takes them.
+		bool bServerTakesDebugControl = engine::gpClient != nullptr && (engine::gpClient->mStateFlags & engine::Client::ClientStateFlags::kServerDebugInput);
+
+		if (bServerTakesDebugControl)
 		{
 			if (rMenuInput.flags & engine::MenuInputFlags::kQuicksave)
 			{
@@ -606,14 +610,14 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 
 		if (rMenuInput.flags & engine::MenuInputFlags::kSlowTime)
 		{
-			if (engine::gpClient != nullptr)
+			if (bServerTakesDebugControl)
 			{
 				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>(0));
 			}
 		}
 		else if (rMenuInput.flags & engine::MenuInputFlags::kSpeedUpTime)
 		{
-			if (engine::gpClient != nullptr)
+			if (bServerTakesDebugControl)
 			{
 				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>(1));
 			}
@@ -622,7 +626,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		// GameBase already flipped the local pause state, so this reports the state the client just entered.
 		if (rMenuInput.flags & engine::MenuInputFlags::kTogglePauseFrame)
 		{
-			if (engine::gpClient != nullptr)
+			if (bServerTakesDebugControl)
 			{
 				engine::gpClient->SendSimplePacket(GamePacketType::kClientPauseRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>((mGameFlags & engine::GameFlags::kPaused) ? 1 : 0));
 			}

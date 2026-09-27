@@ -70,11 +70,11 @@ void MultiRead(std::istream& rStream, int64_t iCount, TTuple&& members)
 }
 
 template <typename TStruct>
-void NormalizeAfterRead(std::istream& rStream, TStruct& rStruct)
+void ValidateAfterRead(std::istream& rStream, TStruct& rStruct)
 {
 	if constexpr (requires { TStruct::PostRead(rStruct); })
 	{
-		// A failed MultiRead leaves member storage partial; only normalize a complete read.
+		// A failed MultiRead leaves member storage partial; only validate a complete read.
 		if (rStream.good())
 		{
 			TStruct::PostRead(rStruct);
@@ -96,7 +96,7 @@ void AllocateAndRead(TStruct& rStruct, std::istream& rStream, TTuple&& members)
 	}
 
 	MultiRead(rStream, rStruct.iCount, std::forward<TTuple>(members));
-	NormalizeAfterRead(rStream, rStruct);
+	ValidateAfterRead(rStream, rStruct);
 }
 
 // Collection configuration flags
@@ -440,7 +440,7 @@ inline std::istream& SharedCollectionRead(std::istream& rStream, TStruct& rCurre
 		MultiRead(rStream, rCurrent.iCount, rCurrent.Members());
 	}
 
-	NormalizeAfterRead(rStream, rCurrent);
+	ValidateAfterRead(rStream, rCurrent);
 
 	return rStream;
 }

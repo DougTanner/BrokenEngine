@@ -70,8 +70,10 @@ struct ClientConnection
 	std::chrono::steady_clock::time_point debugFrameRequestDeadline {};
 
 	// Client->server contract enforcement (see NetworkProtocol.h / Server::RecordContractViolation)
-	int64_t iContractViolations = 0;            // lifetime, never reset
-	int64_t iTickPacketCount = 0;               // reset per update window (Server::Poll, kUpdateStart only)
+	int64_t iCorruptViolations = 0;             // lifetime, never reset
+	int64_t iRateViolations = 0;                // too-fast strikes still outstanding after decay
+	std::chrono::steady_clock::time_point rateViolationDecayStart {}; // start of the rate decay interval in progress
+	int64_t iTickPacketCount = 0;              // reset per update window (Server::Poll, kUpdateStart only)
 	int64_t iTickByteCount = 0;                 // reset per update window (Server::Poll, kUpdateStart only)
 	uint16_t tickTypeCounts[256] {}; // per-type count this update window, indexed by raw type byte; reset in Poll (kUpdateStart only)
 
@@ -164,6 +166,13 @@ enum class ServerPollMode : uint8_t
 	kTickBoundary,
 };
 
+// Which violation count a client->server contract violation charges: corrupt data, or messages sent too fast.
+enum class ContractViolationKind : uint8_t
+{
+	kCorrupt,
+	kRate,
+};
+
 class Server
 {
 public:
@@ -197,9 +206,10 @@ public:
 	bool AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPacketContract& rContract);
 	void RecordGamePacketHandlerThrow(const ReceivedGamePacket& rPacket);
 
-	// Records a client->server contract violation; escalates to disconnect at kiContractViolationDisconnectCount.
+	// Records a client->server contract violation against eKind's count; escalates to disconnect at
+	// kiCorruptViolationDisconnectCount corrupt or kiRateViolationDisconnectCount outstanding rate violations.
 	// Callers MUST NOT touch their ClientConnection* afterward -- the client may have been removed.
-	void RecordContractViolation(int64_t iClientId, const char* pcReason, uint8_t uiPacketType, int64_t iSize);
+	void RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, const char* pcReason, uint8_t uiPacketType, int64_t iSize);
 
 	// Wire dispatch entry point for one received packet. Public so a harness fixture can inject a
 	// deliberately malformed packet through the real admission, dispatch, and violation path.
@@ -245,6 +255,10 @@ private:
 
 	ENetHost* mpHost = nullptr;
 	int64_t miNextClientId = 1;
+
+	// Budget stall grace (see Server::Poll): gate 2 records no violation before mBudgetGraceDeadline.
+	std::chrono::steady_clock::time_point mPreviousPollEnd {};
+	std::chrono::steady_clock::time_point mBudgetGraceDeadline {};
 	uint8_t muiLoadGeneration = 0;
 
 	// Per-coord ring buffers for re-sends

@@ -342,11 +342,16 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		// Reserve the trailing label's width — AlwaysAutoResize windows default the item width to the full content
 		// width, which would push the label past the clip edge
 		ImGui::SetNextItemWidth(-(ImGui::CalcTextSize("Nav Delay").x + ImGui::GetStyle().ItemInnerSpacing.x));
-		// AlwaysClamp keeps Ctrl+Click typed input in range, so the server never clamps a release back to an equal value
-		ImGui::SliderFloat("Nav Delay", &sfNavigationDelayEditValue, 0.0f, 60.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+		// Ctrl+Click typed input can be non-finite or out of range and the server rejects such a delay, so the
+		// release below reverts it instead of clamping it; checking only on release leaves the text box alone while typing
+		ImGui::SliderFloat("Nav Delay", &sfNavigationDelayEditValue, 0.0f, 60.0f, "%.3f");
 		sbNavigationDelaySliderWasActive = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
+			if (!PlayersPostRender::IsNavigationDelayInRange(sfNavigationDelayEditValue))
+			{
+				sfNavigationDelayEditValue = pFleet->fNavigationDelay;
+			}
 			// An unchanged release would get back an equal FleetSync, which never clears pending
 			if (gpClientSession != nullptr && sfNavigationDelayEditValue != pFleet->fNavigationDelay)
 			{

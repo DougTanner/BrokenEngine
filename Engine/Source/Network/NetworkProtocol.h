@@ -60,7 +60,7 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 }
 
 // Protocol constants
-inline constexpr uint32_t kuiProtocolVersion = 18;
+inline constexpr uint32_t kuiProtocolVersion = 19;
 inline constexpr uint8_t kuiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr uint16_t kuiDefaultPort = 27015;
 inline constexpr int64_t kiMaxResendFrames = 8;
@@ -146,9 +146,18 @@ inline constexpr int64_t kiMaxClientPacketsPerTick = 256;
 // parse work at ~2 MiB/s/client.
 inline constexpr int64_t kiMaxClientInboundBytesPerTick = 64 * 1024;
 
-// Lifetime contract-violation count that forces a disconnect. Never reset -- legitimate clients produce
-// zero violations; tolerates rare in-flight UDP corruption.
-inline constexpr int64_t kiContractViolationDisconnectCount = 32;
+// Lifetime corrupt-data violation count that forces a disconnect. Never reset -- legitimate clients send no
+// corrupt data; tolerates rare in-flight UDP corruption.
+inline constexpr int64_t kiCorruptViolationDisconnectCount = 4;
+
+// Outstanding too-fast (budget or counted per-type cap) violation count that forces a disconnect. A legitimate
+// client's automatic traffic produces none at any allowed timescale (Server::Poll stall grace, TimeStep::kiMaxTimeDivide);
+// the margin absorbs debug-key presses past a per-type cap on a Debug server, the one honest source, and an
+// unforeseen honest burst.
+inline constexpr int64_t kiRateViolationDisconnectCount = 8;
+
+// One too-fast violation is forgiven per interval, so only a sustained flood accumulates to the limit.
+inline constexpr std::chrono::seconds kRateViolationDecayInterval {60};
 
 // Per-client-packet contract row. Sizes are the full packet including the type byte.
 struct ClientPacketContract

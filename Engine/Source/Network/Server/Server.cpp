@@ -16,6 +16,16 @@ static_assert(NetworkMessages::ClientAckStreamMessage::kiMaxSlotCount == Network
 static_assert(kiMaxAckStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaxEnetCoordSlots),
 	"kiMaxAckStreamPacketSize must match the ack-stream wire layout sized by kiMaxEnetCoordSlots");
 
+namespace
+{
+
+// Both the unscheduled poll gap that opens the budget stall grace and the grace length, each on top of the
+// scheduled update interval. Every stall long enough to queue a budget-crossing ack backlog (~4.6 s at 1:1)
+// exceeds it, and ordinary running never reaches it.
+constexpr std::chrono::seconds kBudgetStallGrace = 1s;
+
+} // namespace
+
 Server::Server(uint16_t uiPort)
 {
 	ASSERT(gpServer == nullptr);
@@ -101,6 +111,19 @@ void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 		}
 	}
 
+	// Budget stall grace: the acks a legitimate client queued while the server did not poll all drain into
+	// one budget window, so after an unscheduled stall gate 2 drops over-budget packets without recording a
+	// violation until the deadline. The scheduled interval is added to the threshold because the gap before
+	// the tick-boundary poll contains WaitForTick's scheduled sleep, which slow motion lengthens, and to the
+	// length because a burst drained here can first cross the budget at the tick-boundary poll one interval later.
+	// The gap runs from the previous poll's end, so draining a flood cannot open a window.
+	std::chrono::steady_clock::time_point pollStart = std::chrono::steady_clock::now();
+	std::chrono::microseconds scheduledInterval {rTimeState.iExpectedUpdateIntervalMicroseconds};
+	if (pollStart - mPreviousPollEnd > kBudgetStallGrace + scheduledInterval)
+	{
+		mBudgetGraceDeadline = pollStart + kBudgetStallGrace + scheduledInterval;
+	}
+
 	ENetEvent event {};
 	while (enet_host_service(mpHost, &event, 0) > 0)
 	{
@@ -128,6 +151,8 @@ void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 			Receive(rPacket.data, rPacket.pPeer);
 		});
 	}
+
+	mPreviousPollEnd = std::chrono::steady_clock::now();
 }
 
 void Server::DispatchIncoming(ENetEvent& rEvent, bool bFastForward)
@@ -210,12 +235,12 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 
 	// Gate 2: per-update (~ per-tick) global packet/byte budget -- applies to every type including game-range, except a handshaken client's subscribe/unsubscribe.
 	// The budget window spans both of an update's polls (Server::Poll resets it only at kUpdateStart).
-	// Record a violation only on the FIRST crossing of each budget within the update window; all further
-	// over-budget packets that update drop silently. A sustained hostile flood still escalates (~1 violation per
-	// update -> disconnect within ~32 updates ~= 1 s at 32 Hz), while a one-off multi-second stall burst (>=288
-	// queued acks after a ~9 s server stall, or a NetworkSimulation fast-forward flush draining the delayed
-	// queue) costs a legitimate client at most 2 lifetime violations (packet + byte). RecordContractViolation may
-	// invalidate pClient, so the first-crossing record is the last touch of the client and returns immediately.
+	// Record a rate violation only on the FIRST crossing of each budget within the update window; all further
+	// over-budget packets that update drop silently. A sustained hostile flood still escalates (1-2 violations per
+	// update -> disconnect within ~8 updates ~= 0.25 s at 32 Hz). A stall-recovery ack burst lands inside the
+	// grace window Server::Poll opens after an unscheduled stall, where a crossing still drops but records
+	// nothing, so it costs a legitimate client no violation. RecordContractViolation may invalidate pClient, so
+	// the first-crossing record is the last touch of the client and returns immediately.
 	// A handshaken client's subscribe and unsubscribe skip this gate: they are reliable with no client retry, so a
 	// stall burst of acks must not silently drop one, and gates 3-5 still bound them by fixed size and a
 	// violation-counted per-type cap. Pre-handshake ones stay budgeted because gate 4 drops them before gate 5 counts.
@@ -226,9 +251,9 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		++pClient->iTickPacketCount;
 		if (pClient->iTickPacketCount > kiMaxClientPacketsPerTick)
 		{
-			if (bPacketWasUnderBudget)
+			if (bPacketWasUnderBudget && std::chrono::steady_clock::now() >= mBudgetGraceDeadline)
 			{
-				RecordContractViolation(iClientId, "tick budget", packetData[0], static_cast<int64_t>(packetData.size()));
+				RecordContractViolation(iClientId, ContractViolationKind::kRate, "tick budget", packetData[0], static_cast<int64_t>(packetData.size()));
 			}
 			return;
 		}
@@ -237,9 +262,9 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		pClient->iTickByteCount += static_cast<int64_t>(packetData.size());
 		if (pClient->iTickByteCount > kiMaxClientInboundBytesPerTick)
 		{
-			if (bByteWasUnderBudget)
+			if (bByteWasUnderBudget && std::chrono::steady_clock::now() >= mBudgetGraceDeadline)
 			{
-				RecordContractViolation(iClientId, "tick budget", packetData[0], static_cast<int64_t>(packetData.size()));
+				RecordContractViolation(iClientId, ContractViolationKind::kRate, "tick budget", packetData[0], static_cast<int64_t>(packetData.size()));
 			}
 			return;
 		}
@@ -255,12 +280,12 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		// or size outside [min, max].
 		if (contract.iMaxSize == 0)
 		{
-			RecordContractViolation(iClientId, "not client-sendable", packetData[0], static_cast<int64_t>(packetData.size()));
+			RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "not client-sendable", packetData[0], static_cast<int64_t>(packetData.size()));
 			return;
 		}
 		if (static_cast<int64_t>(packetData.size()) < contract.iMinSize || static_cast<int64_t>(packetData.size()) > contract.iMaxSize)
 		{
-			RecordContractViolation(iClientId, "size out of range", packetData[0], static_cast<int64_t>(packetData.size()));
+			RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "size out of range", packetData[0], static_cast<int64_t>(packetData.size()));
 			return;
 		}
 
@@ -277,7 +302,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		{
 			if (contract.bOverCapCountsViolation)
 			{
-				RecordContractViolation(iClientId, "per-type cap", packetData[0], static_cast<int64_t>(packetData.size()));
+				RecordContractViolation(iClientId, ContractViolationKind::kRate, "per-type cap", packetData[0], static_cast<int64_t>(packetData.size()));
 			}
 			return;
 		}
@@ -330,9 +355,9 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		// std::ios_base::failure (a local .at()/bad_alloc lands here too) before any client state is
 		// mutated, because handlers land parsed values in locals first. This catch is the single recorder
 		// for such a packet -- the readers themselves count nothing: drop the packet whole and charge one
-		// contract violation, which tears down the peer only once the violation threshold is reached.
+		// corrupt-data violation, which tears down the peer only once the corrupt-data limit is reached.
 		LOG(kNetwork, kDebug, "Server::Receive dropped corrupt packet (type {}) Client: {}: {}", static_cast<uint8_t>(eType), iClientId, rException.what());
-		RecordContractViolation(iClientId, "corrupt payload", packetData[0], static_cast<int64_t>(packetData.size()));
+		RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "corrupt payload", packetData[0], static_cast<int64_t>(packetData.size()));
 	}
 }
 
@@ -522,7 +547,7 @@ ClientConnection* Server::FindHandshakenClient(int64_t iClientId)
 	return (pClient != nullptr && pClient->bHandshakeComplete) ? pClient : nullptr;
 }
 
-void Server::RecordContractViolation(int64_t iClientId, const char* pcReason, uint8_t uiPacketType, int64_t iSize)
+void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, const char* pcReason, uint8_t uiPacketType, int64_t iSize)
 {
 	ClientConnection* pClient = FindClient(iClientId);
 	if (pClient == nullptr)
@@ -530,18 +555,40 @@ void Server::RecordContractViolation(int64_t iClientId, const char* pcReason, ui
 		return;
 	}
 
-	++pClient->iContractViolations;
-
-	// Log only on the first violation and at disconnect -- exactly two kWarning lines per hostile client,
-	// no per-packet spam, no cooldown state.
-	if (pClient->iContractViolations == 1)
+	bool bCorrupt = eKind == ContractViolationKind::kCorrupt;
+	if (!bCorrupt)
 	{
-		LOG(kNetwork, kWarning, "Server::RecordContractViolation First Client: {} Reason: {} Type: {} Size: {}", iClientId, pcReason, uiPacketType, iSize);
+		// Lazy decay: forgive one rate violation per whole interval elapsed since the decay start. A count the
+		// elapsed intervals cover (including the first strike, from the epoch default) restarts the decay now.
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		int64_t iDecayed = (now - pClient->rateViolationDecayStart) / kRateViolationDecayInterval;
+		if (iDecayed >= pClient->iRateViolations)
+		{
+			pClient->iRateViolations = 0;
+			pClient->rateViolationDecayStart = now;
+		}
+		else
+		{
+			pClient->iRateViolations -= iDecayed;
+			pClient->rateViolationDecayStart += iDecayed * kRateViolationDecayInterval;
+		}
 	}
 
-	if (pClient->iContractViolations >= kiContractViolationDisconnectCount)
+	int64_t& riViolations = bCorrupt ? pClient->iCorruptViolations : pClient->iRateViolations;
+	int64_t iDisconnectCount = bCorrupt ? kiCorruptViolationDisconnectCount : kiRateViolationDisconnectCount;
+	const char* pcKind = bCorrupt ? "corrupt" : "rate";
+	++riViolations;
+
+	// Log only when a kind's count reaches 1 and at disconnect -- at most one First line per kind (per rate decay
+	// back to zero) plus one Disconnecting line per hostile client, no per-packet spam, no cooldown state.
+	if (riViolations == 1)
 	{
-		LOG(kNetwork, kWarning, "Server::RecordContractViolation Disconnecting Client: {} Violations: {} Reason: {} Type: {} Size: {}", iClientId, pClient->iContractViolations, pcReason, uiPacketType, iSize);
+		LOG(kNetwork, kWarning, "Server::RecordContractViolation First Client: {} Kind: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, pcReason, uiPacketType, iSize);
+	}
+
+	if (riViolations >= iDisconnectCount)
+	{
+		LOG(kNetwork, kWarning, "Server::RecordContractViolation Disconnecting Client: {} Kind: {} Violations: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, riViolations, pcReason, uiPacketType, iSize);
 
 		// Capture peer/GUID before the client record is removed below.
 		ENetPeer* pPeer = pClient->pPeer;
@@ -573,12 +620,12 @@ bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPack
 	{
 		// Sentinel: not client-sendable (server->client, unknown, or debug-control on a non-debug server).
 		// RecordContractViolation may remove the client — do not touch pClient afterward.
-		RecordContractViolation(rPacket.iClientId, "game type not client-sendable", rPacket.uiPacketType, iFullSize);
+		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game type not client-sendable", rPacket.uiPacketType, iFullSize);
 		return false;
 	}
 	if (iFullSize < rContract.iMinSize || iFullSize > rContract.iMaxSize)
 	{
-		RecordContractViolation(rPacket.iClientId, "game packet size out of range", rPacket.uiPacketType, iFullSize);
+		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game packet size out of range", rPacket.uiPacketType, iFullSize);
 		return false;
 	}
 	// Per-type per-tick cap. tickTypeCounts is reset once per update by the engine (both of the update's polls
@@ -588,7 +635,7 @@ bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPack
 	{
 		if (rContract.bOverCapCountsViolation)
 		{
-			RecordContractViolation(rPacket.iClientId, "game packet per-tick cap exceeded", rPacket.uiPacketType, iFullSize);
+			RecordContractViolation(rPacket.iClientId, ContractViolationKind::kRate, "game packet per-tick cap exceeded", rPacket.uiPacketType, iFullSize);
 		}
 		return false; // drop
 	}
@@ -598,8 +645,8 @@ bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPack
 
 void Server::RecordGamePacketHandlerThrow(const ReceivedGamePacket& rPacket)
 {
-	// Count the throw as a contract violation (drop -> count -> escalate). Do not touch any client pointer afterward.
-	RecordContractViolation(rPacket.iClientId, "game packet handler threw", rPacket.uiPacketType, static_cast<int64_t>(rPacket.payload.size()) + 1);
+	// Count the throw as a corrupt-data violation (drop -> count -> escalate). Do not touch any client pointer afterward.
+	RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game packet handler threw", rPacket.uiPacketType, static_cast<int64_t>(rPacket.payload.size()) + 1);
 }
 
 } // namespace engine

@@ -431,15 +431,15 @@ int64_t PlayerUuidFromParam(const nlohmann::json& rChange)
 	return rChange.at("playerUuid").get<int64_t>();
 }
 
-// Mirrors the wire clamp: non-finite → 60, then clamp to [0,60].
+// Rejects a delay the wire would reject, so an injected player never holds an out-of-range delay.
 float NavigationDelayFromParam(const nlohmann::json& rChange)
 {
 	float fDelay = rChange.contains("navigationDelay") ? rChange.at("navigationDelay").get<float>() : 60.0f;
-	if (!std::isfinite(fDelay))
+	if (!PlayersPostRender::IsNavigationDelayInRange(fDelay))
 	{
-		fDelay = 60.0f;
+		throw std::runtime_error("'navigationDelay' must be finite and within [0,60]");
 	}
-	return std::clamp(fDelay, 0.0f, 60.0f);
+	return fDelay;
 }
 
 // Build one injectable StatusChange from a change entry, minting a global id at inject-time for SpawnPlayer

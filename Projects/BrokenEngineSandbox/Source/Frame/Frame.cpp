@@ -16,11 +16,7 @@ constexpr float kfSpaceshipSpawnInterval = 0.5f;
 
 static float AdmitSpawnTimer(float fSpawnTimer)
 {
-	if (!std::isfinite(fSpawnTimer))
-	{
-		return 0.0f;
-	}
-	if (fSpawnTimer >= kfSpaceshipSpawnInterval)
+	if (!std::isfinite(fSpawnTimer) || fSpawnTimer >= kfSpaceshipSpawnInterval)
 	{
 		throw std::ios_base::failure("FrameInterpolate fSpawnTimer");
 	}

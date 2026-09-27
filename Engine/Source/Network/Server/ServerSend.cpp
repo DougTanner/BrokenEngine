@@ -97,6 +97,7 @@ void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char*
 	NetworkMessages::ServerConnectionResponseMessage message {
 		.uiLoadGeneration = muiLoadGeneration,
 		.uiAccepted = bAccepted ? 1u : 0u,
+		.uiDebugInput = kbDebugInput ? 1u : 0u,
 		.guid = (pGuid != nullptr) ? *pGuid : ClientGuid {},
 		.bHasGuid = bAccepted && pGuid != nullptr,
 		.rejectionMessage = (!bAccepted && pMessage != nullptr) ? pMessage : "",

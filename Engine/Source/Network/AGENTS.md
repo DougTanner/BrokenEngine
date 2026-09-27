@@ -17,7 +17,7 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 ## Corrupt Input Policy
 
 - Corrupt network data is a failure of the declared wire layout or of a bounded payload codec, or an invalid semantic value or relationship that must hold before the payload is adopted, such as a non-finite vertex or an invalid topology or index relationship. A structurally valid packet rejected for protocol state or timing — stale or reordered traffic, epoch or slot reuse, subscription state, pre-handshake arrival, a rate limit, a protocol/version mismatch, or an ordinary resync — is not corruption and keeps its own outcome.
-- Readers signal corruption one way: they throw `std::ios_base::failure` where they detect it rather than returning a sentinel, and the policy lives at the dispatch catches — the one exception being the server's ack-stream cross-check, which records its own violation locally.
+- Readers signal corruption one way: they throw `std::ios_base::failure` where they detect it rather than returning a sentinel or repairing the value ([C++ conventions](../../../.agents/references/cpp-conventions.md)), and the policy lives at the dispatch catches — the one exception being the server's ack-stream cross-check, which records its own violation locally.
 - The two directions answer that signal asymmetrically. Corrupt data from its own server is fatal to the client: the dispatch `ASSERT`s, so the process ends through crash reporting. Corrupt data from a client is hostile but survivable to the server: its catches drop the packet before any mutation and count one violation through `RecordContractViolation` (`Server/AGENTS.md`), so no client can end the host.
 
 ## Timing and Polling

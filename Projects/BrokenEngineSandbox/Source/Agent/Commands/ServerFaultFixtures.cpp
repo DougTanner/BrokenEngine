@@ -236,7 +236,8 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		const int64_t iClientId = pClient->iClientId;
 		ENetPeer* const pPeer = pClient->pPeer;
 		const bool bHandshakeComplete = pClient->bHandshakeComplete;
-		const int64_t iContractViolations = pClient->iContractViolations;
+		int64_t iCorruptViolations = pClient->iCorruptViolations;
+		int64_t iRateViolations = pClient->iRateViolations;
 		const int64_t iPacketCount = pClient->iTickPacketCount;
 		const int64_t iByteCount = pClient->iTickByteCount;
 		const uint8_t uiPacketType = static_cast<uint8_t>(engine::PacketType::kClientAckStream);
@@ -302,7 +303,7 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		                             && pClient->bFloorStalled == bFloorStalled
 		                             && pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcks;
 		const bool bTimestampUnchanged = pClient->iClientTimestampNs == iClientTimestampNs;
-		const bool bContractViolationsUnchanged = pClient->iContractViolations == iContractViolations;
+		bool bContractViolationsUnchanged = pClient->iCorruptViolations == iCorruptViolations && pClient->iRateViolations == iRateViolations;
 		if (!bAdmissionAdvanced)
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");

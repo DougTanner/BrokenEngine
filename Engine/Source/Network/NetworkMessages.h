@@ -73,14 +73,14 @@ public:
 		}
 	}
 
-	void ConnectionResponseTail(const uint8_t& uiAccepted, const ClientGuid& rGuid, const bool& bHasGuid, const std::string_view& rRejectionMessage) const
+	void ConnectionResponseTail(const uint8_t& uiAccepted, const uint8_t& uiDebugInput, const ClientGuid& rGuid, const bool& bHasGuid, const std::string_view& rRejectionMessage) const
 	{
-		if (uiAccepted != 0 && bHasGuid)
+		if (uiAccepted != 0)
 		{
-			Field(rGuid.uiHigh);
-			Field(rGuid.uiLow);
+			Field(uiDebugInput);
+			OptionalGuid(rGuid, bHasGuid);
 		}
-		else if (uiAccepted == 0)
+		else
 		{
 			mrWorkbuffer.Append(rRejectionMessage);
 		}
@@ -195,7 +195,7 @@ public:
 		bHasGuid = mbValid;
 	}
 
-	void ConnectionResponseTail(uint8_t& uiAccepted, ClientGuid& rGuid, bool& bHasGuid, std::string_view& rRejectionMessage)
+	void ConnectionResponseTail(uint8_t& uiAccepted, uint8_t& uiDebugInput, ClientGuid& rGuid, bool& bHasGuid, std::string_view& rRejectionMessage)
 	{
 		bHasGuid = false;
 		rRejectionMessage = {};
@@ -206,6 +206,7 @@ public:
 
 		if (uiAccepted != 0)
 		{
+			Field(uiDebugInput);
 			OptionalGuid(rGuid, bHasGuid);
 			return;
 		}
@@ -289,7 +290,7 @@ public:
 	void Payload(PacketPayload&) { }
 	void NullTerminatedString(std::string_view&) { }
 	void OptionalGuid(ClientGuid&, bool&) { }
-	void ConnectionResponseTail(uint8_t&, ClientGuid&, bool&, std::string_view&) { }
+	void ConnectionResponseTail(uint8_t&, uint8_t&, ClientGuid&, bool&, std::string_view&) { }
 	void Invalidate() { mbValid = false; }
 
 private:
@@ -466,10 +467,13 @@ struct ServerConnectionResponseMessage
 {
 	static constexpr PacketType keType = PacketType::kServerConnectionResponse;
 	static constexpr int64_t kiMinSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t);
-	static constexpr int64_t kiAcceptedGuidSize = kiMinSize + kiGuidSize;
+	static constexpr int64_t kiAcceptedGuidSize = kiMinSize + sizeof(uint8_t) + kiGuidSize;
 
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiAccepted = 0;
+	// Server kbDebugInput (0 or 1): whether it accepts debug-control requests. Accepted tail only, so a
+	// protocol-mismatch rejection keeps its message where an older peer reads it.
+	uint8_t uiDebugInput = 0;
 	ClientGuid guid {};
 	bool bHasGuid = false;
 	std::string_view rejectionMessage;
@@ -480,7 +484,7 @@ struct ServerConnectionResponseMessage
 		rVisitor.Type(keType);
 		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.uiAccepted);
-		rVisitor.ConnectionResponseTail(rMessage.uiAccepted, rMessage.guid, rMessage.bHasGuid, rMessage.rejectionMessage);
+		rVisitor.ConnectionResponseTail(rMessage.uiAccepted, rMessage.uiDebugInput, rMessage.guid, rMessage.bHasGuid, rMessage.rejectionMessage);
 	}
 };
 
