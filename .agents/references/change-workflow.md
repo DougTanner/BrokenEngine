@@ -94,6 +94,7 @@ Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then `/verify-ex
 - fresh `reviewer` runs `/plan-simplicity-review` on the same plan snapshot — every tier, when the plan adds new code or changes non-documentation behavior (both defined in that skill's `## When to use`); when unsure whether a plan triggers it, dispatch it.
 - `implementer` owns `/external-grill-plan` repository evidence and short written decision summaries, updated round by round — Tier 3 only.
 - main runs `/verify-external-claims`, dispatching one `locator` as its evidence worker — Tier 2+, for the external claims a `/plan-audit` handoff raises, and at Tier 3 also for the claims a grill round raises.
+- fresh `implementer` carrying a continuation capsule from the preparation writes the Plan review findings main accepts into the plan snapshot; main does not write those findings into the snapshot itself — Tier 1-2 with a plan snapshot, after main accepts a finding; Tier 3 follows `.agents/skills/next-plan/references/tier3-workflow.md` `## Plan review`.
 
 Main reports a blocker if the `reviewer` role is unavailable for `/plan-audit`. At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
 
