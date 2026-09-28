@@ -34,12 +34,12 @@ $script:CppClasses = @('cpp', 'dual-language-header')
 # step 17 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 10
 # adjudicates. The order is the order a line is attributed: a line reports the first kind that matches
 # it. An entry's Except clears a match that is one of the rule's permitted forms. The style-rule-61,
-# style-rule-22, style-rule-59 and style-rule-62 kinds are not in this table: each needs another head-side
-# line too, so Test-Rule61Line, Test-Rule22Line and Test-Rule59Line decide theirs, in that order, before the
-# table, and Test-Rule62Line decides its kind after the table, so it hides no table kind; style-rule-14 is
-# the table's last entry for the same reason. That worker's step 7 hand-read list and these style-rule-<n>
-# kinds together make the review's style mandate, and a rule is on both when each covers a different form,
-# so update step 7 when a kind changes.
+# style-rule-22, style-rule-59, style-rule-62 and style-rule-51 kinds are not in this table: each needs another
+# head-side line too, so Test-Rule61Line, Test-Rule22Line and Test-Rule59Line decide theirs, in that order,
+# before the table, and Test-Rule62Line then Test-Rule51Line decide theirs after the table, so they hide no
+# table kind; style-rule-14 is the table's last entry for the same reason. That worker's step 7 hand-read
+# list and these style-rule-<n> kinds together make the review's style mandate, and a rule is on both when
+# each covers a different form, so update step 7 when a kind changes.
 $script:ScalarType = '(?:(?:unsigned|signed)\s+)?(?:bool|char|wchar_t|short|int|long(?:\s+long)?|float|double)|unsigned|u?int(?:8|16|32|64)_t|size_t|u?intptr_t|ptrdiff_t'
 $script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)|unsigned|u?int(?:8|16|32|64)_t|ptrdiff_t'
 # The prose-prone kinds share style-rule-2's comment-and-string alternative, so a line holding a comment
@@ -301,6 +301,24 @@ function Test-Rule62Line([string] $Path, [int] $Line, [string] $Text) {
 	return $body.Count -eq 3 -and $body[0] -ceq '{' -and $body[1] -cmatch '^(?:return\b[^;]*|continue|break)\s*;$' -and $body[2] -ceq '}'
 }
 
+function Test-Rule51Line([string] $Path, [int] $Line, [string] $Text) {
+	# A line breaks rule 51 when it leaves a parenthesis open outside comments and literals and ends in `,` or
+	# `(`, so a call's or declaration's arguments wrap, unless the next non-blank head-side line starts with the
+	# `{` rule 2 puts on the next line for a lambda or struct literal argument.
+	if ($Text.Trim() -cmatch '^(?:#|/\*|\*)') { return $false }
+	$code = (($Text -replace '"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''', '""') -replace '//.*$', '').Trim()
+	if ($code -cnotmatch '[,(]$') { return $false }
+	# Counted by length rather than a pipeline, whose one-match result has no Count under strict mode.
+	if ($code.Length - $code.Replace('(', '').Length -le $code.Length - $code.Replace(')', '').Length) { return $false }
+	$lines = Get-NewSideLine $Path
+	for ($number = $Line + 1; $number -le $lines.Count; $number++) {
+		$next = $lines[$number - 1].Trim()
+		if ($next.Length -eq 0) { continue }
+		return -not $next.StartsWith('{')
+	}
+	return $false
+}
+
 function Test-CandidatePattern([string] $Text) {
 	foreach ($pattern in $script:ScannedPatterns) {
 		if ($Text -cnotmatch $pattern.Pattern) { continue }
@@ -342,6 +360,7 @@ try {
 		elseif (Test-Rule59Line $line.Path $line.Line $line.Text) { 'style-rule-59' }
 		else { Test-CandidatePattern $line.Text }
 		if ($null -eq $kind -and (Test-Rule62Line $line.Path $line.Line $line.Text)) { $kind = 'style-rule-62' }
+		if ($null -eq $kind -and (Test-Rule51Line $line.Path $line.Line $line.Text)) { $kind = 'style-rule-51' }
 		if ($null -eq $kind) { continue }
 		$text = $line.Text.Trim()
 		if ($text.Length -gt $script:MaximumTextLength) { $text = $text.Substring(0, $script:MaximumTextLength) }
@@ -362,6 +381,7 @@ try {
 	$counts['style-rule-22'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-22' }).Count
 	$counts['style-rule-59'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-59' }).Count
 	$counts['style-rule-62'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-62' }).Count
+	$counts['style-rule-51'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-51' }).Count
 	$result.counts = $counts
 	$emitted = [Collections.Generic.List[object]]::new()
 	foreach ($hit in ($sorted | Select-Object -First $script:MaximumHits)) { $emitted.Add($hit) }

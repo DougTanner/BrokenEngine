@@ -140,8 +140,11 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
       parameter, a parameter type an external callback signature fixes, or a
       `const char*` or `const wchar_t*` parameter that a caller can pass as
       null, or whose value reaches an API that needs null termination; rule 44,
-      storage that is not an aligned type; rule 54, a non-handle `Vk` struct
-      type, or a local rather than a member; rule 55, an index-and-count enum.
+      storage that is not an aligned type; rule 51, a lambda or
+      struct/initializer-list literal argument whose `{}` goes on the next line
+      per rule 2, with the other arguments and a lambda's header on the call
+      line; rule 54, a non-handle `Vk` struct type, or a local rather than a
+      member; rule 55, an index-and-count enum.
     - The rows carry their own rule number, so this step covers whatever kinds
       the run emits; step 7's hand read supplies the other hand-read rules'
       findings.
