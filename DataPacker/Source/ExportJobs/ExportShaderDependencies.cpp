@@ -1,5 +1,4 @@
 #include "ExportShader.h"
-
 #include "FileManager.h"
 
 namespace

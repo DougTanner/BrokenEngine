@@ -193,11 +193,8 @@ function Get-MarkdownLinkFailure([string] $Path, [ref] $LinkCount) {
 	$failures = [Collections.Generic.List[object]]::new()
 	$directory = if ($Path.Contains('/')) { $Path.Substring(0, $Path.LastIndexOf('/')) } else { '' }
 	$number = 0
-	$fenced = $false
-	foreach ($line in ((Get-HeadText $Path) -split "`r`n|`n|`r")) {
+	foreach ($line in ((Get-AgentMarkdownSearchText ((Get-HeadText $Path) -replace "`r`n?", "`n")) -split "`n")) {
 		$number++
-		if ($line -match '^\s*(?:```|~~~)') { $fenced = -not $fenced; continue }
-		if ($fenced) { continue }
 		foreach ($match in [regex]::Matches($line, $script:LinkPattern)) {
 			$target = $match.Groups[1].Value.Trim('<', '>')
 			# Only repository-relative targets are checkable here; a scheme names an external resource.
@@ -259,17 +256,18 @@ function Invoke-ValidateSkillCheck([object] $Inventory) {
 	# the package name on both sides of every changed path — a rename out of a package can break the
 	# package it left — instead of from the `skill` class, which covers SKILL.md alone. Get-ChangedPath is
 	# not reusable here: it drops deletions, and a deleted bundled file is exactly a case to catch.
-	$sweepPath = '.agents/skills/external-skill-creator/scripts/Validate-Skill.ps1'
+	$sweepPaths = @('.agents/skills/external-skill-creator/scripts/Validate-Skill.ps1', '.agents/scripts/AgentScriptCommon.psm1')
 	$names = [Collections.Generic.List[string]]::new()
 	$sweep = $false
 	foreach ($entry in $Inventory.entries) {
-		if ($entry.path -ceq $sweepPath -or $entry.oldPath -ceq $sweepPath) { $sweep = $true }
+		if ($sweepPaths -ccontains $entry.path -or $sweepPaths -ccontains $entry.oldPath) { $sweep = $true }
 		foreach ($side in @($entry.path, $entry.oldPath)) {
 			$name = Get-SkillPackageName $side
 			if ($null -ne $name -and -not $names.Contains($name)) { $names.Add($name) }
 		}
 	}
-	# A change to the validator itself can change every package's verdict, so it sweeps the whole tree.
+	# A change to the validator or to the shared module it imports can change every package's verdict, so
+	# it sweeps the whole tree.
 	if ($sweep) {
 		foreach ($name in (Get-HeadSkillPackageName)) { if (-not $names.Contains($name)) { $names.Add($name) } }
 	}

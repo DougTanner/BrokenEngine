@@ -2,9 +2,10 @@
 
 #if defined(BT_CLIENT)
 
-#include "Profile/ProfileManager.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
+
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {
@@ -25,8 +26,10 @@ void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 	siRendered = 0;
 	siTotalCount = 0;
 
-	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const PointLightsInterpolate& { return rInterpolate.pointLights; });
+	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const PointLightsInterpolate&
+	{
+		return rInterpolate.pointLights;
+	});
 
 	if (iTotalCapacity == 0)
 	{

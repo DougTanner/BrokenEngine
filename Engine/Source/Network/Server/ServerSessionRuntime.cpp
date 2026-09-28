@@ -4,12 +4,12 @@
 
 #if defined(BT_SERVER)
 
-#include "Network/NetworkDiscoveryResponder.h"
 #include "Network/Server/Server.h"
-
-#include "Game.h"
 #include "Network/Server/ServerBroadcaster.h"
+#include "Network/NetworkDiscoveryResponder.h"
+
 #include "Network/Server/ServerSession.h"
+#include "Game.h"
 
 namespace engine
 {

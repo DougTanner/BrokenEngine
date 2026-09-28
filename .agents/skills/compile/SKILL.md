@@ -55,7 +55,9 @@ skill-specific inputs:
   itself —
   [references/runtime-data-mode.md](references/runtime-data-mode.md)
   `## Mode selection` and `## Local generation` own which authorizations are
-  valid;
+  valid, and a change hitting any `## Mode selection` Local trigger makes
+  Local mandatory, so request the Local generation authorization at plan
+  approval, before the first BrokenEngineSandbox build;
 - whether an approved plan explicitly requires PREfast verification —
   [references/prefast-mode.md](references/prefast-mode.md)
   `## Authorization and when to use`.

@@ -1,8 +1,8 @@
 #include "ExportIsland.h"
 
-#include "FileManager.h"
 #include "Island/BakeIslandIntermediates.h"
 #include "Texture/Texture.h"
+#include "FileManager.h"
 
 // Compile-time guard: each island texture-intermediate filename constant (ExportIsland.h) must end
 // with the canonical suffix for the VkFormat its Save call / CRC build pairs it with, so the constant

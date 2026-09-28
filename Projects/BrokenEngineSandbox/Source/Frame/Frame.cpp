@@ -1,7 +1,7 @@
 #include "Frame.h"
 
-#include "Frame/FrameCollections.h"
 #include "Frame/Collections/Players/Players.h"
+#include "Frame/FrameCollections.h"
 #include "Profile/ProfileManager.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/SmokeWrappers.h"

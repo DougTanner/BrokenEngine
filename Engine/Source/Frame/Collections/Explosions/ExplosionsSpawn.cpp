@@ -1,6 +1,5 @@
-#include "Explosions.h"
-
 #include "Ui/WrapperBase.h"
+#include "Explosions.h"
 
 #if defined(BT_CLIENT)
 #include "Data/Texture.h"

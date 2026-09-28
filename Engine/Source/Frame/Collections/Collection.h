@@ -302,9 +302,7 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 		bool bEqual = true;
 		if constexpr (FLAGS & CollectionFlags::kIdToIndex)
 		{
-			bEqual &= common::LogDifference<"idToIndexMap.size">(
-				static_cast<int64_t>(this->idToIndexMap.size()),
-				static_cast<int64_t>(rOther.idToIndexMap.size()));
+			bEqual &= common::LogDifference<"idToIndexMap.size">(static_cast<int64_t>(this->idToIndexMap.size()), static_cast<int64_t>(rOther.idToIndexMap.size()));
 		}
 		bEqual &= common::LogDifference<"iCount">(iCount, rOther.iCount);
 		bEqual &= common::LogDifference<"iCapacity">(iCapacity, rOther.iCapacity);

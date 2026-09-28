@@ -17,6 +17,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$sharedScripts = Join-Path $PSScriptRoot '..\..\..\scripts'
+if (-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentScriptCommon.psm1'))) {
+	$sharedScripts = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'
+}
+Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force
 $scriptBoundParameters = @($PSBoundParameters.Keys)
 
 function Write-SetupError
@@ -261,100 +266,6 @@ function ConvertFrom-FoldedScalar
 	return $builder.ToString()
 }
 
-function Get-MarkdownSearchText
-{
-	param([string] $Body)
-
-	$characters = $Body.ToCharArray()
-	$inFence = $false
-	$fenceCharacter = [char] 0
-	$fenceLength = 0
-	$offset = 0
-	while ($offset -lt $Body.Length)
-	{
-		$newline = $Body.IndexOf("`n", $offset)
-		$lineEnd = if ($newline -lt 0) { $Body.Length } else { $newline }
-		$line = $Body.Substring($offset, $lineEnd - $offset)
-		$maskLine = $inFence
-		if ($inFence)
-		{
-			$closingPattern = '^ {0,3}{0}{{{1},}}[ \t]*$' -f [regex]::Escape([string] $fenceCharacter), $fenceLength
-			if ($line -match $closingPattern)
-			{
-				$inFence = $false
-			}
-		}
-		else
-		{
-			$fenceMatch = [regex]::Match($line, '^ {0,3}(?<fence>`{3,}|~{3,})')
-			if ($fenceMatch.Success)
-			{
-				$fence = $fenceMatch.Groups['fence'].Value
-				$fenceCharacter = $fence[0]
-				$fenceLength = $fence.Length
-				$inFence = $true
-				$maskLine = $true
-			}
-		}
-		if ($maskLine)
-		{
-			for ($i = $offset; $i -lt $lineEnd; $i++)
-			{
-				$characters[$i] = ' '
-			}
-		}
-		$offset = if ($newline -lt 0) { $Body.Length } else { $newline + 1 }
-	}
-
-	for ($i = 0; $i -lt $characters.Length; $i++)
-	{
-		if ($characters[$i] -ne '`')
-		{
-			continue
-		}
-		$openingStart = $i
-		while ($i -lt $characters.Length -and $characters[$i] -eq '`')
-		{
-			$i++
-		}
-		$openingLength = $i - $openingStart
-		$closingStart = -1
-		for ($candidate = $i; $candidate -lt $characters.Length; $candidate++)
-		{
-			if ($characters[$candidate] -ne '`')
-			{
-				continue
-			}
-			$runStart = $candidate
-			while ($candidate -lt $characters.Length -and $characters[$candidate] -eq '`')
-			{
-				$candidate++
-			}
-			if ($candidate - $runStart -eq $openingLength)
-			{
-				$closingStart = $runStart
-				break
-			}
-			$candidate--
-		}
-		if ($closingStart -lt 0)
-		{
-			$i--
-			continue
-		}
-		$closingEnd = $closingStart + $openingLength
-		for ($masked = $openingStart; $masked -lt $closingEnd; $masked++)
-		{
-			if ($characters[$masked] -ne "`n")
-			{
-				$characters[$masked] = ' '
-			}
-		}
-		$i = $closingEnd - 1
-	}
-	return [string]::new($characters)
-}
-
 function ConvertFrom-MarkdownDestination
 {
 	param([string] $Value)
@@ -384,7 +295,7 @@ function Get-MarkdownDestinations
 {
 	param([string] $Body)
 
-	$searchBody = Get-MarkdownSearchText $Body
+	$searchBody = Get-AgentMarkdownSearchText $Body
 	$destinations = [System.Collections.Generic.List[object]]::new()
 	$inlineStartPattern = '!?\[[^\]\r\n]*\]\('
 	foreach ($match in [regex]::Matches($searchBody, $inlineStartPattern))

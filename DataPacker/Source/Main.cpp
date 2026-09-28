@@ -1,7 +1,6 @@
-#include "DiagnosticReporter.h"
-#include "FileManager.h"
-
-#include "Attribution.h"
+#include "ExportJobs/Island/BakeIslandIntermediates.h"
+#include "ExportJobs/Texture/MigrateLegacyIntermediates.h"
+#include "ExportJobs/Texture/Texture.h"
 #include "ExportJobs/ExportAudio.h"
 #include "ExportJobs/ExportCubemapIbl.h"
 #include "ExportJobs/ExportIsland.h"
@@ -11,9 +10,9 @@
 #include "ExportJobs/ExportScene.h"
 #include "ExportJobs/ExportShader.h"
 #include "ExportJobs/ExportTexture.h"
-#include "ExportJobs/Island/BakeIslandIntermediates.h"
-#include "ExportJobs/Texture/MigrateLegacyIntermediates.h"
-#include "ExportJobs/Texture/Texture.h"
+#include "Attribution.h"
+#include "DiagnosticReporter.h"
+#include "FileManager.h"
 
 struct DataTypeEntry
 {

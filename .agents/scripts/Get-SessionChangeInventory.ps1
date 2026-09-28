@@ -9,6 +9,7 @@ param(
 	[Parameter(Mandatory)][string] $Baseline,
 	[string] $Head,
 	[string[]] $IncludeUntracked,
+	[string[]] $PathPrefix,
 	[switch] $Regions,
 	[switch] $Landing,
 	[switch] $EmitTargets,
@@ -487,6 +488,14 @@ function Get-InventoryUntrackedEntry([string[]] $Listed, [ref] $UnlistedCount) {
 	return $entries
 }
 
+function Test-InventoryPathInScope([string] $Path, [string[]] $Prefixes) {
+	# A prefix names a whole path segment, so Engine/Source/Frame never matches Engine/Source/FrameX.
+	foreach ($prefix in $Prefixes) {
+		if ([string]::Equals($Path, $prefix, [StringComparison]::Ordinal) -or $Path.StartsWith($prefix + '/', [StringComparison]::Ordinal)) { return $true }
+	}
+	return $false
+}
+
 function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $UntrackedEntries) {
 	$arguments = @('-c', 'core.quotepath=false', 'diff', '-U0', '-M', '--no-color', '--no-ext-diff', '--no-textconv') + (Get-InventoryDiffArgument $BaselineSha $HeadSha) + @('--')
 	$lines = @((Invoke-InventoryGit $arguments).Stdout -split "`n")
@@ -700,8 +709,10 @@ function Write-SessionTargets([object[]] $Entries) {
 try {
 	$modes = @(@($Regions.IsPresent, $Landing.IsPresent, $EmitTargets.IsPresent) | Where-Object { $_ })
 	$manifestConflict = $EmitManifest -and ($modes.Count -gt 0 -or $PSBoundParameters.ContainsKey('Head') -or $PSBoundParameters.ContainsKey('IncludeUntracked'))
-	if ($modes.Count -gt 1 -or $manifestConflict) {
-		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
+	# Those three modes never read the filtered entries or regions, so they would silently ignore the filter.
+	$prefixConflict = $PSBoundParameters.ContainsKey('PathPrefix') -and ($Landing -or $EmitTargets -or $EmitManifest)
+	if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict) {
+		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' $message
 	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
@@ -763,6 +774,13 @@ try {
 		if ($normalized.StartsWith('./')) { $normalized = $normalized.Substring(2) }
 		$listed.Add($normalized)
 	}
+	$prefixes = [Collections.Generic.List[string]]::new()
+	foreach ($prefix in @(@($PathPrefix) -split ',')) {
+		$normalized = $prefix.Replace('\', '/').Trim()
+		if ($normalized.StartsWith('./')) { $normalized = $normalized.Substring(2) }
+		$normalized = $normalized.TrimEnd('/')
+		if ($normalized.Length -gt 0) { $prefixes.Add($normalized) }
+	}
 
 	$binaryPaths = Get-InventoryBinaryPath $baselineSha $headSha
 	$entries = [Collections.Generic.List[object]]::new()
@@ -791,8 +809,15 @@ try {
 	# Counts and triggers always describe the complete inventory, never the truncated emission.
 	$result.counts = Get-InventoryCount ([object[]] $sorted.ToArray()) $unlistedUntracked
 	$result.triggers = Get-RoutingTrigger ([object[]] $sorted.ToArray())
+	# A -PathPrefix filter narrows the emitted entries and regions and their full counts, so truncated
+	# reports shedding inside the requested scope only.
+	$scoped = $sorted
+	if ($prefixes.Count -gt 0) {
+		$scoped = [Collections.Generic.List[object]]::new()
+		foreach ($entry in $sorted) { if (Test-InventoryPathInScope $entry.Path $prefixes) { $scoped.Add($entry) } }
+	}
 	$emittedEntries = [Collections.Generic.List[object]]::new()
-	foreach ($entry in ($sorted | Select-Object -First $script:MaximumEntries)) {
+	foreach ($entry in ($scoped | Select-Object -First $script:MaximumEntries)) {
 		$emittedEntries.Add([ordered]@{
 			status = $entry.Status
 			path = $entry.Path
@@ -804,6 +829,11 @@ try {
 	}
 	$fullRegions = [Collections.Generic.List[object]]::new()
 	if ($Regions) { $fullRegions = Get-RegionTable $baselineSha $headSha ([object[]] $untrackedEntries) }
+	if ($prefixes.Count -gt 0) {
+		$allRegions = $fullRegions
+		$fullRegions = [Collections.Generic.List[object]]::new()
+		foreach ($region in $allRegions) { if (Test-InventoryPathInScope $region.path $prefixes) { $fullRegions.Add($region) } }
+	}
 	$emittedRegions = [Collections.Generic.List[object]]::new()
 	foreach ($region in ($fullRegions | Select-Object -First $script:MaximumRegions)) { $emittedRegions.Add($region) }
 	$landingTruncation = $null
@@ -814,7 +844,7 @@ try {
 	}
 
 	$truncation = [ordered]@{
-		entries = [ordered]@{ full = $sorted.Count; emitted = $emittedEntries.Count }
+		entries = [ordered]@{ full = $scoped.Count; emitted = $emittedEntries.Count }
 		regions = [ordered]@{ full = $fullRegions.Count; emitted = $emittedRegions.Count }
 		landing = $landingTruncation
 		outputBytes = 0

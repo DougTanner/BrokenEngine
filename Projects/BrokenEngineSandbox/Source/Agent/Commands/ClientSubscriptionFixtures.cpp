@@ -2,15 +2,15 @@
 
 #if defined(BT_CLIENT)
 
-#include "Agent/AgentCommandServer.h"
 #include "Agent/Commands/ClientNetworkFixtures.h"
+#include "Agent/AgentCommandServer.h"
 #include "Network/Client/Client.h"
 #include "Network/Client/ClientSessionRuntime.h"
 #include "Network/NetworkMessages.h"
 
 #include "Agent/AgentCommands.h"
-#include "Game.h"
 #include "Network/Client/ClientSession.h"
+#include "Game.h"
 
 namespace game
 {

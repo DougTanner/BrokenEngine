@@ -1,8 +1,5 @@
 // AgentHarness — loopback client/server command transport and harness lock owner.
 
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include "HarnessLockCommands.h"
 #include "ToolCliCommon.h"
 
@@ -17,6 +14,8 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 
 #pragma comment(lib, "ws2_32.lib")
 

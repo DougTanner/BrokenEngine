@@ -289,56 +289,32 @@ void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::
 
 void DynamicPipelines::CreatePipelineSmokeAxisAligned(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, crc, name,
-		data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc,
-		gpTextureManager->mRenderTargetTextures.mSmokeTextureOne,
-		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc},
-		&gpBufferManager->mSmokeOccupancyVkBuffers[0], iBufferSize);
+	CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, crc, name, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc}, &gpBufferManager->mSmokeOccupancyVkBuffers[0], iBufferSize);
 }
 
 void DynamicPipelines::CreatePipelineSmoke(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	CreateDepositPipeline(kDynamicPipelineSmoke, crc, name,
-		data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc,
-		gpTextureManager->mRenderTargetTextures.mSmokeTextureOne,
-		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture},
-		&gpBufferManager->mSmokeOccupancyVkBuffers[0], iBufferSize);
+	CreateDepositPipeline(kDynamicPipelineSmoke, crc, name, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture}, &gpBufferManager->mSmokeOccupancyVkBuffers[0], iBufferSize);
 }
 
 void DynamicPipelines::CreatePipelineWindDepositA(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	CreateDepositPipeline(kDynamicPipelineWindDepositA, crc, name,
-		data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc,
-		gpTextureManager->mRenderTargetTextures.mWindTextureOne,
-		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc},
-		&gpBufferManager->mWindOccupancyVkBuffers[0], iBufferSize);
+	CreateDepositPipeline(kDynamicPipelineWindDepositA, crc, name, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[0], iBufferSize);
 }
 
 void DynamicPipelines::CreatePipelineWindDepositB(common::crc_t crc, std::string_view name)
 {
-	CreateDepositPipeline(kDynamicPipelineWindDepositB, crc, name,
-		data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc,
-		gpTextureManager->mRenderTargetTextures.mWindTextureTwo,
-		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc},
-		&gpBufferManager->mWindOccupancyVkBuffers[1], 0);
+	CreateDepositPipeline(kDynamicPipelineWindDepositB, crc, name, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[1], 0);
 }
 
 void DynamicPipelines::CreatePipelineWindDepositAxisAlignedA(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedA, crc, name,
-		data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc,
-		gpTextureManager->mRenderTargetTextures.mWindTextureOne,
-		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc},
-		&gpBufferManager->mWindOccupancyVkBuffers[0], iBufferSize);
+	CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedA, crc, name, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[0], iBufferSize);
 }
 
 void DynamicPipelines::CreatePipelineWindDepositAxisAlignedB(common::crc_t crc, std::string_view name)
 {
-	CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedB, crc, name,
-		data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc,
-		gpTextureManager->mRenderTargetTextures.mWindTextureTwo,
-		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc},
-		&gpBufferManager->mWindOccupancyVkBuffers[1], 0);
+	CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedB, crc, name, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[1], 0);
 }
 
 void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_view name, int64_t iBufferSize)

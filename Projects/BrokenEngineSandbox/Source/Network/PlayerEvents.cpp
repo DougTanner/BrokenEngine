@@ -2,9 +2,9 @@
 
 #include "Network/PlayerEvents.h"
 
+#include "Network/GamePacketType.h"
 #include "Fleet.h"
 #include "Game.h"
-#include "Network/GamePacketType.h"
 
 namespace game
 {

@@ -70,9 +70,7 @@ struct PointLightsInterpolate : public Collection<PointLightsInterpolate, Collec
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pfRotations,
-		                rSelf.pfVisibleAreas, rSelf.pfVisibleIntensities, rSelf.pfLightingAreas, rSelf.pfLightingIntensities,
-		                rSelf.puiControllerTypeIndices, rSelf.pfStartTimes, rSelf.pfBaseRotations);
+		return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pfRotations, rSelf.pfVisibleAreas, rSelf.pfVisibleIntensities, rSelf.pfLightingAreas, rSelf.pfLightingIntensities, rSelf.puiControllerTypeIndices, rSelf.pfStartTimes, rSelf.pfBaseRotations);
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{

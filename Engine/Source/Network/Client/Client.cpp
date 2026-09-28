@@ -283,8 +283,10 @@ void Client::DispatchIncoming(ENetEvent& rEvent, bool bFastForward)
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
 		static constexpr NetworkSimulationConfig kSimConfig = GetNetworkSimulationConfig(keNetworkSimulation);
-		NetworkSimulation::DispatchOrEnqueue(mDelayedPackets, mNetworkSimState, kSimConfig, bFastForward, rEvent,
-			[this](ENetEvent& rInner) { Receive(rInner); });
+		NetworkSimulation::DispatchOrEnqueue(mDelayedPackets, mNetworkSimState, kSimConfig, bFastForward, rEvent, [this](ENetEvent& rInner)
+		{
+			Receive(rInner);
+		});
 	}
 	else
 	{

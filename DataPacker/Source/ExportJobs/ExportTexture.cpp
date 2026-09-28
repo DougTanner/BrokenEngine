@@ -1,7 +1,7 @@
 #include "ExportTexture.h"
 
-#include "FileManager.h"
 #include "Texture/Texture.h"
+#include "FileManager.h"
 
 std::optional<common::ChunkFlags_t> ExportTexture::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {

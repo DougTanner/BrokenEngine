@@ -1,7 +1,6 @@
-#include "NavBuild.h"
-
 #include "Frame/IslandChainPlacement.h"
 #include "Frame/IslandTerrain.h"
+#include "NavBuild.h"
 #include "NavBuildInternal.h"
 
 namespace engine

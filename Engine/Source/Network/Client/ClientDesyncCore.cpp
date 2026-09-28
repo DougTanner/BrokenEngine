@@ -6,8 +6,8 @@
 
 #include "Network/Client/ReconcileReplay.h"
 
-#include "Game.h"
 #include "Network/Client/ClientSession.h"
+#include "Game.h"
 
 namespace engine
 {

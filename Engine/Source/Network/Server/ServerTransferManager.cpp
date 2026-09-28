@@ -4,14 +4,15 @@
 
 #if defined(BT_SERVER)
 
-#include "Agent/Commands/ServerSimulationFixtures.h"
 #include "File/Replay.h"
+
+#include "Agent/Commands/ServerSimulationFixtures.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
-#include "Game.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
+#include "Game.h"
 #include "SpawnTransfer.h"
 
 namespace engine

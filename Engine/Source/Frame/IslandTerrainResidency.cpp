@@ -1,9 +1,8 @@
 #if defined(BT_CLIENT)
 
-#include "IslandTerrain.h"
-
-#include "Graphics/Islands.h"
 #include "Graphics/Managers/TextureManager.h"
+#include "Graphics/Islands.h"
+#include "IslandTerrain.h"
 
 namespace engine
 {
@@ -70,24 +69,23 @@ namespace
 		ASSERT(rTemplate.mpHeightmapHalf != nullptr);
 		// Heap: Texture::Create allocates GPU resources and uses a OneShotCommandBuffer.
 		ScopedSuppressAllocationTracking suppress;
-		rTemplate.mElevationTexture.Create(
-			TextureInfo
-			{
-				.name = name,
-				.format = shaders::keElevationFormat,
-				.extent = {static_cast<uint32_t>(rTemplate.miHeightmapWidth), static_cast<uint32_t>(rTemplate.miHeightmapHeight), 1u},
-				.mipLevels = 1u,
-				.arrayLayers = 1u,
-				.samples = VK_SAMPLE_COUNT_1_BIT,
-				.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-				.viewType = VK_IMAGE_VIEW_TYPE_2D,
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.eTextureLayout = TextureLayout::kShaderReadOnly,
-			},
-			[&rTemplate](void* pData, int64_t iPosition, int64_t iSize)
-			{
-				std::memcpy(pData, reinterpret_cast<const std::byte*>(rTemplate.mpHeightmapHalf) + iPosition, static_cast<size_t>(iSize));
-			});
+		rTemplate.mElevationTexture.Create(TextureInfo
+		{
+			.name = name,
+			.format = shaders::keElevationFormat,
+			.extent = {static_cast<uint32_t>(rTemplate.miHeightmapWidth), static_cast<uint32_t>(rTemplate.miHeightmapHeight), 1u},
+			.mipLevels = 1u,
+			.arrayLayers = 1u,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.eTextureLayout = TextureLayout::kShaderReadOnly,
+		},
+		[&rTemplate](void* pData, int64_t iPosition, int64_t iSize)
+		{
+			std::memcpy(pData, reinterpret_cast<const std::byte*>(rTemplate.mpHeightmapHalf) + iPosition, static_cast<size_t>(iSize));
+		});
 	}
 }
 

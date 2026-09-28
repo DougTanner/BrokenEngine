@@ -2,9 +2,9 @@
 
 #if defined(BT_CLIENT)
 
-#include "TweaksSliderMap.h"
-#include "Ui/WaterWrappersBase.h"
 #include "Graphics/Managers/TextureManager.h"
+#include "Ui/WaterWrappersBase.h"
+#include "TweaksSliderMap.h"
 
 namespace engine
 {

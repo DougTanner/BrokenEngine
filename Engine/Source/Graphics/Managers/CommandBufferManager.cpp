@@ -4,6 +4,7 @@
 
 #include "CommandBufferRecordGlobal.h"
 #include "CommandBufferRecordMain.h"
+
 #include "Profile/ProfileManager.h"
 
 namespace engine

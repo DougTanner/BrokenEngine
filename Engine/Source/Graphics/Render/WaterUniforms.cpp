@@ -1,10 +1,9 @@
 #if defined(BT_CLIENT)
 
-#include "Render.h"
-
 #include "Graphics/EngineCamera.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/WaterWrappersBase.h"
+#include "Render.h"
 
 namespace engine
 {

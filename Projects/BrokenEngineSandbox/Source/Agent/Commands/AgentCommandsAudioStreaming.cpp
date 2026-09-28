@@ -2,8 +2,8 @@
 
 #if defined(BT_CLIENT)
 
-#include "Agent/AgentCommandServer.h"
 #include "Agent/Commands/AudioStreamingFixture.h"
+#include "Agent/AgentCommandServer.h"
 
 #if defined(BT_DEBUG)
 #include "Data/Audio.h"

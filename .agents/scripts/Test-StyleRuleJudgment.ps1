@@ -14,8 +14,8 @@
 #
 # Two modes. -CasesPath measures the questions against a labelled corpus: each case carries `id`, `code` (an
 # array of lines, every one marked `+ `), and `expected` (the `rule<n>` keys that should fire), and the result
-# adds per-rule hit counts. -RepositoryRoot with -Baseline (optional -Head and -IncludeUntracked, as
-# Find-SessionCandidates.ps1 takes them) is the session mode: it finds every changed C++ function or class
+# adds per-rule hit counts. -RepositoryRoot with -Baseline (optional -Head, -IncludeUntracked, and -PathPrefix,
+# as Find-SessionCandidates.ps1 takes them) is the session mode: it finds every changed C++ function or class
 # body between baseline and head from Get-SessionChangeInventory.ps1's regions, judges each, and reports
 # `path`, `line`, `endLine`, and `flagged` per block in path then line order. The result is advisory: a
 # result other than `ok` leaves the review worker's hand read unchanged.
@@ -26,6 +26,7 @@ param(
 	[string] $Baseline,
 	[string] $Head,
 	[switch] $IncludeUntracked,
+	[string[]] $PathPrefix,
 	[string] $OutputPath,
 	[double] $BlockThreshold = 0.7,
 	[double] $Rule3Threshold = 0.9,
@@ -127,6 +128,7 @@ function Get-InventoryDocument() {
 		$untracked = @($run.Stdout -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
 		if ($untracked.Count -gt 0) { $arguments += @('-IncludeUntracked', ($untracked -join ',')) }
 	}
+	if ($PathPrefix) { $arguments += @('-PathPrefix', ($PathPrefix -join ',')) }
 	$shell = [Environment]::ProcessPath
 	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
 	$run = Invoke-AgentProcess $shell $arguments $script:Root

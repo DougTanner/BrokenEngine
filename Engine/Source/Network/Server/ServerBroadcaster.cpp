@@ -4,12 +4,13 @@
 
 #if defined(BT_SERVER)
 
+#include "Network/Server/ServerTransferManager.h"
+
 #include "Agent/Commands/ServerSimulationFixtures.h"
-#include "Game.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
-#include "Network/Server/ServerTransferManager.h"
+#include "Game.h"
 
 namespace engine
 {

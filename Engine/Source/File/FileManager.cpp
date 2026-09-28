@@ -1,7 +1,6 @@
 #include "FileManager.h"
 
 #include "LaunchOptions.h"
-
 #include "PackChunks.h"
 
 #include "Game.h"

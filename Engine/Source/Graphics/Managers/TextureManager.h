@@ -3,7 +3,6 @@
 #if defined(BT_CLIENT)
 
 #include "Data/Texture.h"
-
 #include "RenderTargetTextures.h"
 #include "TextureCache.h"
 #include "TextureDescriptors.h"

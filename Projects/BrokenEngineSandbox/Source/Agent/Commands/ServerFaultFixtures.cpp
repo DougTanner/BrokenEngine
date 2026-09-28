@@ -2,8 +2,8 @@
 
 #if defined(BT_SERVER)
 
-#include "Game.h"
 #include "Network/Server/ServerClientManager.h"
+#include "Game.h"
 
 namespace game
 {

@@ -5,10 +5,11 @@
 #include "Agent/AgentCommandsClientGeneric.h"
 
 #include "Agent/Commands/PresentationContinuityProbe.h"
-#include "Game.h"
-#include "Profile/ProfileManager.h"
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 #include "Ui/WrapperBase.h"
+
+#include "Profile/ProfileManager.h"
+#include "Game.h"
 
 namespace engine
 {

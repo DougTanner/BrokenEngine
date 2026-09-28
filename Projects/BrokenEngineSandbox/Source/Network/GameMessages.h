@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Fleet.h"
 #include "Network/PlayerEvents.h"
+#include "Fleet.h"
 
 namespace game::GameMessages
 {

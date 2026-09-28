@@ -9,10 +9,10 @@
 #include "GameBase.h"
 
 #include "Agent/Commands/ServerSimulationFixtures.h"
-#include "Game.h"
 #include "Network/Server/ServerFleetSerialization.h"
 #include "Network/Server/ServerSession.h"
 #include "Profile/ProfileManager.h"
+#include "Game.h"
 
 namespace game
 {

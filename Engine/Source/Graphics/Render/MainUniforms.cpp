@@ -1,13 +1,13 @@
 #if defined(BT_CLIENT)
 
-#include "Render.h"
-
-#include "Game.h"
 #include "Graphics/Debug/DebugRender.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/HexShieldWrappersBase.h"
 #include "Ui/WaterWrappersBase.h"
 #include "Ui/WrapperBase.h"
+#include "Render.h"
+
+#include "Game.h"
 
 namespace engine
 {

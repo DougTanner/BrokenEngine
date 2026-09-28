@@ -2,8 +2,8 @@
 
 #if defined(BT_CLIENT)
 
-#include "StreamingVoice.h"
 #include "AudioManager.h"
+#include "StreamingVoice.h"
 #if defined(BT_DEBUG)
 #include "Agent/Commands/AudioStreamingFixture.h"
 #endif

@@ -1,14 +1,13 @@
 #if defined(BT_CLIENT)
 
-#include "Players.h"
-
 #include "Data/Scene.h"
-#include "Game.h"
+#include "Graphics/Debug/DebugRender.h"
+#include "Ui/WrapperBase.h"
 
 #include "Frame/Collections/Spaceships/Spaceships.h"
-#include "Graphics/Debug/DebugRender.h"
 #include "Profile/ProfileManager.h"
-#include "Ui/WrapperBase.h"
+#include "Game.h"
+#include "Players.h"
 
 namespace game
 {

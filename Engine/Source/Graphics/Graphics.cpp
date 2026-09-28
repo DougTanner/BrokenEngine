@@ -2,14 +2,15 @@
 
 #include "Graphics.h"
 
-#include "Game.h"
-#include "Profile/ProfileManager.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WaterWrappersBase.h"
 #include "Ui/WrapperBase.h"
+
+#include "Profile/ProfileManager.h"
+#include "Game.h"
 
 namespace engine
 {

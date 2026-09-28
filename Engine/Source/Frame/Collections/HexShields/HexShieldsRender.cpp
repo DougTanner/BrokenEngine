@@ -2,8 +2,9 @@
 
 #if defined(BT_CLIENT)
 
-#include "Profile/ProfileManager.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {
@@ -25,8 +26,10 @@ void HexShieldsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 	siRendered = 0;
 	siTotalCount = 0;
 
-	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const HexShieldsInterpolate& { return rInterpolate.hexShields; });
+	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const HexShieldsInterpolate&
+	{
+		return rInterpolate.hexShields;
+	});
 
 	if (iTotalCapacity == 0)
 	{

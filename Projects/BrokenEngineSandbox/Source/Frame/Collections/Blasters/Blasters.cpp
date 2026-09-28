@@ -217,17 +217,16 @@ void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
-	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender,
-		[&](int64_t i)
-		{
-			return rCurrentPostRender.pFlags[i] & kDestroy;
-		},
-		[&](int64_t i)
-		{
-			RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
+	{
+		return rCurrentPostRender.pFlags[i] & kDestroy;
+	},
+	[&](int64_t i)
+	{
+		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
 
-			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-		});
+		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+	});
 }
 
 bool BlastersInterpolate::LogDifferences(const BlastersInterpolate& rOther) const

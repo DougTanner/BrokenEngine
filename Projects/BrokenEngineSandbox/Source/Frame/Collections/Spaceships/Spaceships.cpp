@@ -2,16 +2,16 @@
 
 #include "Data/Audio.h"
 #include "Data/Texture.h"
-#include "Frame/FrameStaticData.h"
-#include "Frame/HealthDamage.h"
-#include "Frame/Collections/Collection.h"
-#include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Explosions/Explosions.h"
-#include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Pushers/Pushers.h"
-#include "Profile/ProfileManager.h"
+#include "Frame/Collections/Collection.h"
+#include "Frame/FrameStaticData.h"
 #include "Ui/WrapperBase.h"
 
+#include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/Collections/Players/Players.h"
+#include "Frame/HealthDamage.h"
+#include "Profile/ProfileManager.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)
@@ -414,17 +414,16 @@ void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
-	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender,
-		[&](int64_t i)
-		{
-			return (rCurrentPostRender.pFlags[i] & kExploding) && !(rCurrentInterpolate.pfDestroyedTimes[i] > 0.0f);
-		},
-		[&](int64_t i)
-		{
-			RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, false);
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
+	{
+		return (rCurrentPostRender.pFlags[i] & kExploding) && !(rCurrentInterpolate.pfDestroyedTimes[i] > 0.0f);
+	},
+	[&](int64_t i)
+	{
+		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, false);
 
-			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-		});
+		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+	});
 }
 
 void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)

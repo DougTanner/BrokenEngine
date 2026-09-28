@@ -129,27 +129,26 @@ void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rF
 	// Get controller type and base type
 	const ControllerType& rController = PointLightsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
 
-	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition,
-		[&rInterpolate, &rPostRender]()
-		{
-			GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-		},
-		[&rInterpolate, &rPostRender, &rFrame]()
-		{
-			auto [uiSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
-			rPostRender.puiIds[uiSpawnIndex] = newId;
-			return uiSpawnIndex;
-		},
-		[&rInterpolate, &rController, fRotation](int64_t iSpawnIndex)
-		{
-			rInterpolate.puiTypeIndices[iSpawnIndex] = rController.uiBaseTypeIndex;
-			rInterpolate.pfVisibleAreas[iSpawnIndex] = rController.keyframes[0].fVisibleArea * (rController.ppVisibleAreaScales[0] != nullptr ? rController.ppVisibleAreaScales[0]->Get() : 1.0f);
-			rInterpolate.pfVisibleIntensities[iSpawnIndex] = rController.keyframes[0].fVisibleIntensity * (rController.ppVisibleIntensityScales[0] != nullptr ? rController.ppVisibleIntensityScales[0]->Get() : 1.0f);
-			rInterpolate.pfLightingAreas[iSpawnIndex] = rController.keyframes[0].fLightingArea * (rController.ppLightingAreaScales[0] != nullptr ? rController.ppLightingAreaScales[0]->Get() : 1.0f);
-			rInterpolate.pfLightingIntensities[iSpawnIndex] = rController.keyframes[0].fLightingIntensity * (rController.ppLightingIntensityScales[0] != nullptr ? rController.ppLightingIntensityScales[0]->Get() : 1.0f);
-			rInterpolate.pfRotations[iSpawnIndex] = fRotation + rController.keyframes[0].fRotation;
-			rInterpolate.pfBaseRotations[iSpawnIndex] = fRotation;
-		});
+	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	{
+		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
+	},
+	[&rInterpolate, &rPostRender, &rFrame]()
+	{
+		auto [uiSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
+		rPostRender.puiIds[uiSpawnIndex] = newId;
+		return uiSpawnIndex;
+	},
+	[&rInterpolate, &rController, fRotation](int64_t iSpawnIndex)
+	{
+		rInterpolate.puiTypeIndices[iSpawnIndex] = rController.uiBaseTypeIndex;
+		rInterpolate.pfVisibleAreas[iSpawnIndex] = rController.keyframes[0].fVisibleArea * (rController.ppVisibleAreaScales[0] != nullptr ? rController.ppVisibleAreaScales[0]->Get() : 1.0f);
+		rInterpolate.pfVisibleIntensities[iSpawnIndex] = rController.keyframes[0].fVisibleIntensity * (rController.ppVisibleIntensityScales[0] != nullptr ? rController.ppVisibleIntensityScales[0]->Get() : 1.0f);
+		rInterpolate.pfLightingAreas[iSpawnIndex] = rController.keyframes[0].fLightingArea * (rController.ppLightingAreaScales[0] != nullptr ? rController.ppLightingAreaScales[0]->Get() : 1.0f);
+		rInterpolate.pfLightingIntensities[iSpawnIndex] = rController.keyframes[0].fLightingIntensity * (rController.ppLightingIntensityScales[0] != nullptr ? rController.ppLightingIntensityScales[0]->Get() : 1.0f);
+		rInterpolate.pfRotations[iSpawnIndex] = fRotation + rController.keyframes[0].fRotation;
+		rInterpolate.pfBaseRotations[iSpawnIndex] = fRotation;
+	});
 }
 
 } // namespace engine

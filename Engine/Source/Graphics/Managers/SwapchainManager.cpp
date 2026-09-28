@@ -2,8 +2,9 @@
 
 #include "SwapchainManager.h"
 
-#include "Profile/ProfileManager.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {

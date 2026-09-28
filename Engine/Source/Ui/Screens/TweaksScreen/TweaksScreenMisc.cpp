@@ -2,8 +2,8 @@
 
 #if defined(BT_CLIENT)
 
-#include "TweaksSliderMap.h"
 #include "Ui/MiscWrappersBase.h"
+#include "TweaksSliderMap.h"
 
 namespace engine
 {

@@ -1,9 +1,8 @@
 #if defined(BT_CLIENT)
 
-#include "RenderTargetTextures.h"
-
-#include "TextureManager.h"
 #include "Ui/LightingWrappersBase.h"
+#include "RenderTargetTextures.h"
+#include "TextureManager.h"
 
 namespace engine
 {

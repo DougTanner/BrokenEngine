@@ -11,10 +11,8 @@ namespace engine
 
 // NetworkProtocol.h cannot include NetworkManager.h; tie the codec's maximum ack message to the real
 // slot ceiling here so a transport slot change trips this assertion.
-static_assert(NetworkMessages::ClientAckStreamMessage::kiMaxSlotCount == NetworkManager::kiMaxEnetCoordSlots,
-	"ack-stream codec cardinality must match the transport slot ceiling");
-static_assert(kiMaxAckStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaxEnetCoordSlots),
-	"kiMaxAckStreamPacketSize must match the ack-stream wire layout sized by kiMaxEnetCoordSlots");
+static_assert(NetworkMessages::ClientAckStreamMessage::kiMaxSlotCount == NetworkManager::kiMaxEnetCoordSlots, "ack-stream codec cardinality must match the transport slot ceiling");
+static_assert(kiMaxAckStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaxEnetCoordSlots), "kiMaxAckStreamPacketSize must match the ack-stream wire layout sized by kiMaxEnetCoordSlots");
 
 namespace
 {

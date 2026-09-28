@@ -5,8 +5,8 @@
 #include "Frame/GridCoord.h"
 #include "Network/Client/ClientDesyncCore.h"
 
-#include "Fleet.h"
 #include "Network/Client/ClientReconciler.h"
+#include "Fleet.h"
 
 namespace engine
 {

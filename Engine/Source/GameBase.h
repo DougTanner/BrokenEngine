@@ -1,8 +1,9 @@
 #pragma once
 
+#include "Frame/FrameStaticData.h"
+
 // game::FrameInput is the mapped type of mFrameInputs below, so the complete definition is required here.
 #include "Frame/FrameInput.h"
-#include "Frame/FrameStaticData.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/Frame.h"

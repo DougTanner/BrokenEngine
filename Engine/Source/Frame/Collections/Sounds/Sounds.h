@@ -50,8 +50,7 @@ struct SoundsInterpolate : public Collection<SoundsInterpolate, CollectionFlags:
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiCrcs, rSelf.pfVolumes, rSelf.pfPitches,
-		                rSelf.pfFadeOutTimes, rSelf.pVecPositions, rSelf.pVecVelocities);
+		return std::tie(rSelf.puiCrcs, rSelf.pfVolumes, rSelf.pfPitches, rSelf.pfFadeOutTimes, rSelf.pVecPositions, rSelf.pVecVelocities);
 	}
 
 };

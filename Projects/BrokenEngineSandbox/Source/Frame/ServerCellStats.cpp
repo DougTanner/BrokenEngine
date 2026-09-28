@@ -8,8 +8,8 @@
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
-#include "Game.h"
 #include "Profile/ProfileManager.h"
+#include "Game.h"
 
 namespace game
 {

@@ -1,5 +1,4 @@
 #include "BakeIslandIntermediatesInternal.h"
-
 #include "FileManager.h"
 #include "GaeaArchetype.h"
 #include "SubdivideBeachBand.h"

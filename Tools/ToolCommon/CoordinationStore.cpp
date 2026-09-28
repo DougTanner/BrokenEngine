@@ -2,9 +2,8 @@
 
 #include "ToolCliCommon.h"
 
-#include <bcrypt.h>
-
 #include <algorithm>
+#include <bcrypt.h>
 #include <chrono>
 #include <cstdio>
 #include <fstream>

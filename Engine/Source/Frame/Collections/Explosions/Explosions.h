@@ -227,19 +227,12 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(
-		    rSelf.puiTypeIndices, rSelf.pFlags, rSelf.pfStartTimes,
-		    rSelf.pVecPositions, rSelf.pVecDirections,
-		    rSelf.pfTimePercents,
-		    rSelf.piTrailCounts, rSelf.pfTrailTimes);
+		return std::tie(rSelf.puiTypeIndices, rSelf.pFlags, rSelf.pfStartTimes, rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfTimePercents, rSelf.piTrailCounts, rSelf.pfTrailTimes);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(
-		    rSelf.pTrails,
-		    rSelf.pfTrailIntensities, rSelf.pVecTrailStartPositions,
-		    rSelf.pVecTrailEndPositions);
+		return std::tie(rSelf.pTrails, rSelf.pfTrailIntensities, rSelf.pVecTrailStartPositions, rSelf.pVecTrailEndPositions);
 	}
 #endif // BT_CLIENT
 	auto Members(this auto&& rSelf)

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Frame/Alignments.h"
 #include "Frame/Collections/CollectionId.h"
+#include "Frame/Alignments.h"
 #include "Network/NetworkProtocol.h" // ClientGuid
 
 namespace engine

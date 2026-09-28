@@ -1,7 +1,6 @@
 ---
-name: typesafe-ai
-license: MIT
-description: >
+name: external-typesafe-ai
+description: >-
   Build AI-powered software with TypeSafe: small units of AI intelligence you
   can use like programming primitives. Its System One models, including Jev,
   turn natural language and application state into typed judgments and

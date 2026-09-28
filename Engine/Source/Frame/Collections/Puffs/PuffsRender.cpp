@@ -2,8 +2,9 @@
 
 #if defined(BT_CLIENT)
 
-#include "Profile/ProfileManager.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {
@@ -22,8 +23,10 @@ void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, cons
 	siRendered = 0;
 	siTotalCount = 0;
 
-	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const PuffsInterpolate& { return rInterpolate.puffs; });
+	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const PuffsInterpolate&
+	{
+		return rInterpolate.puffs;
+	});
 
 	if (iTotalCapacity == 0)
 	{

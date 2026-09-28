@@ -60,10 +60,7 @@ struct HexShieldsInterpolate : public Collection<HexShieldsInterpolate, Collecti
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pf4Transforms, rSelf.pf4TransformNormals,
-		                rSelf.puiTypeIndices,
-		                rSelf.pf4Directions, rSelf.pfVertIntensities, rSelf.pfFragIntensities,
-		                rSelf.pfLightingIntensities, rSelf.pfSizes, rSelf.pfColorMixes);
+		return std::tie(rSelf.pVecPositions, rSelf.pf4Transforms, rSelf.pf4TransformNormals, rSelf.puiTypeIndices, rSelf.pf4Directions, rSelf.pfVertIntensities, rSelf.pfFragIntensities, rSelf.pfLightingIntensities, rSelf.pfSizes, rSelf.pfColorMixes);
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{

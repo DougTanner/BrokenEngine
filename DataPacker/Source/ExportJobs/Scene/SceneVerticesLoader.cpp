@@ -48,11 +48,7 @@ XMMATRIX NodeLocalMatrix(const tinygltf::Node& rNode)
 	{
 		// glTF stores matrices in column-major order, DirectXMath uses row-major
 		// Loading column-major data as row-major puts translation into row 3, which is correct for DirectXMath
-		return XMMATRIX(
-			static_cast<float>(rNode.matrix[0]), static_cast<float>(rNode.matrix[1]), static_cast<float>(rNode.matrix[2]), static_cast<float>(rNode.matrix[3]),
-			static_cast<float>(rNode.matrix[4]), static_cast<float>(rNode.matrix[5]), static_cast<float>(rNode.matrix[6]), static_cast<float>(rNode.matrix[7]),
-			static_cast<float>(rNode.matrix[8]), static_cast<float>(rNode.matrix[9]), static_cast<float>(rNode.matrix[10]), static_cast<float>(rNode.matrix[11]),
-			static_cast<float>(rNode.matrix[12]), static_cast<float>(rNode.matrix[13]), static_cast<float>(rNode.matrix[14]), static_cast<float>(rNode.matrix[15]));
+		return XMMATRIX(static_cast<float>(rNode.matrix[0]), static_cast<float>(rNode.matrix[1]), static_cast<float>(rNode.matrix[2]), static_cast<float>(rNode.matrix[3]), static_cast<float>(rNode.matrix[4]), static_cast<float>(rNode.matrix[5]), static_cast<float>(rNode.matrix[6]), static_cast<float>(rNode.matrix[7]), static_cast<float>(rNode.matrix[8]), static_cast<float>(rNode.matrix[9]), static_cast<float>(rNode.matrix[10]), static_cast<float>(rNode.matrix[11]), static_cast<float>(rNode.matrix[12]), static_cast<float>(rNode.matrix[13]), static_cast<float>(rNode.matrix[14]), static_cast<float>(rNode.matrix[15]));
 	}
 
 	return XMMatrixIdentity();
@@ -174,18 +170,10 @@ void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<uint
 			}
 
 			rVertex.fJoint = static_cast<float>(puiJoints[j * iJointsStride]);
-			rVertex.f4Joint0 = XMFLOAT4(
-				static_cast<float>(puiJoints[j * iJointsStride + 0]),
-				static_cast<float>(puiJoints[j * iJointsStride + 1]),
-				static_cast<float>(puiJoints[j * iJointsStride + 2]),
-				static_cast<float>(puiJoints[j * iJointsStride + 3]));
+			rVertex.f4Joint0 = XMFLOAT4(static_cast<float>(puiJoints[j * iJointsStride + 0]), static_cast<float>(puiJoints[j * iJointsStride + 1]), static_cast<float>(puiJoints[j * iJointsStride + 2]), static_cast<float>(puiJoints[j * iJointsStride + 3]));
 			if (pfWeights != nullptr)
 			{
-				rVertex.f4Weight0 = XMFLOAT4(
-					pfWeights[j * iWeightsStride + 0],
-					pfWeights[j * iWeightsStride + 1],
-					pfWeights[j * iWeightsStride + 2],
-					pfWeights[j * iWeightsStride + 3]);
+				rVertex.f4Weight0 = XMFLOAT4(pfWeights[j * iWeightsStride + 0], pfWeights[j * iWeightsStride + 1], pfWeights[j * iWeightsStride + 2], pfWeights[j * iWeightsStride + 3]);
 			}
 		}
 		else

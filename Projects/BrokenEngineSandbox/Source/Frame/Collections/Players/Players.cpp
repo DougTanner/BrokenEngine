@@ -1,13 +1,13 @@
 #include "Players.h"
 
 #include "Data/Texture.h"
-#include "Frame/FrameStaticData.h"
-#include "Frame/HealthDamage.h"
-#include "Frame/TerrainUtils.h"
-#include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/Collections/Pushers/Pushers.h"
+#include "Frame/FrameStaticData.h"
 
+#include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/HealthDamage.h"
+#include "Frame/TerrainUtils.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)
@@ -226,16 +226,15 @@ void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[may
 	}
 
 	// Remove dead players (reverse iteration for swap-and-pop safety)
-	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender,
-		[&](int64_t i)
-		{
-			return (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
-		},
-		[&](int64_t i)
-		{
-			engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
-			engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.puiIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-		});
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
+	{
+		return (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
+	},
+	[&](int64_t i)
+	{
+		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
+		engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.puiIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+	});
 }
 
 static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::FrameStaticData& rStaticData)

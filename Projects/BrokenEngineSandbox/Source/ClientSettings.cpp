@@ -4,8 +4,8 @@
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
-#include "Game.h"
 #include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+#include "Game.h"
 
 namespace game
 {

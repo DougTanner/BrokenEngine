@@ -5,6 +5,7 @@
 #include "Server/ServerDisplay.h"
 
 #include "Network/Server/Server.h"
+
 #include "Profile/ProfileManager.h"
 
 // Direct include, deliberately outside the Engine.h aggregation: this is the one game header the display reads,
@@ -427,11 +428,7 @@ static void PaintProfilePanel(HDC hdcBuffer, int iLeft, int iTop, [[maybe_unused
 
 	// FPS header
 	char pcLine[256] {};
-	int iLineLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "FPS: %lld  Potential: %lld",
-		gpProfileManager->mFullUpdatesInTheLastSecond.Get(),
-		gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() > 0
-			? 1'000'000 / gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average()
-			: static_cast<int64_t>(0)), static_cast<int>(sizeof(pcLine)) - 1);
+	int iLineLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "FPS: %lld  Potential: %lld", gpProfileManager->mFullUpdatesInTheLastSecond.Get(), gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() > 0 ? 1'000'000 / gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() : static_cast<int64_t>(0)), static_cast<int>(sizeof(pcLine)) - 1);
 	SetTextColor(hdcBuffer, RGB(100, 180, 255));
 	TextOutA(hdcBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, iLineLength);
 	sProfileText += pcLine;

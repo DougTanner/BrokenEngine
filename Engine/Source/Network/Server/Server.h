@@ -3,8 +3,8 @@
 #if defined(BT_SERVER)
 
 #include "Frame/GridCoord.h"
-#include "Network/NetworkCursor.h"
 #include "Network/Server/ServerTypes.h"
+#include "Network/NetworkCursor.h"
 
 namespace engine
 {

@@ -6,14 +6,14 @@
 
 #include "Agent/Commands/ReplayFixtures.h"
 #include "File/Replay.h"
+#include "Network/Server/ServerTransferManager.h"
 #include "Ui/WrapperBase.h"
 
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Players/Players.h"
-#include "Game.h"
 #include "Network/Server/ServerSession.h"
-#include "Network/Server/ServerTransferManager.h"
 #include "Profile/ProfileManager.h"
+#include "Game.h"
 
 namespace game
 {

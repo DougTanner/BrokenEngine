@@ -2,8 +2,8 @@
 
 #if defined(BT_CLIENT)
 
-#include "TweaksSliderMap.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "TweaksSliderMap.h"
 
 namespace engine
 {
@@ -53,26 +53,16 @@ common::Flags<TweakSectionFlags> TweaksScreenBase::AllSectionFlags()
 
 void RegisterEngineTweakSections()
 {
-	TweaksScreenBase::RegisterSection(giTweakSectionPbr, {.displayName = "Pbr", .stableKey = "Pbr",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderPbrSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionTerrain, {.displayName = "Terrain", .stableKey = "Terrain",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderTerrainSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionWater, {.displayName = "Water", .stableKey = "Water",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderWaterSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionLighting, {.displayName = "Lighting", .stableKey = "Lighting",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderLightingSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionShadow, {.displayName = "Shadow", .stableKey = "Shadow",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderShadowSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionSunMoon, {.displayName = "Sun/Moon", .stableKey = "SunMoon",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderSunMoonSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionMisc, {.displayName = "Misc", .stableKey = "Misc",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderMiscSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionSound, {.displayName = "Sound", .stableKey = "Sound",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderSoundSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionSmoke, {.displayName = "Smoke", .stableKey = "Smoke",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderSmokeSection(); }});
-	TweaksScreenBase::RegisterSection(giTweakSectionWind, {.displayName = "Wind", .stableKey = "Wind",
-		.pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderWindSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionPbr, {.displayName = "Pbr", .stableKey = "Pbr", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderPbrSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionTerrain, {.displayName = "Terrain", .stableKey = "Terrain", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderTerrainSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionWater, {.displayName = "Water", .stableKey = "Water", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderWaterSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionLighting, {.displayName = "Lighting", .stableKey = "Lighting", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderLightingSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionShadow, {.displayName = "Shadow", .stableKey = "Shadow", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderShadowSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionSunMoon, {.displayName = "Sun/Moon", .stableKey = "SunMoon", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderSunMoonSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionMisc, {.displayName = "Misc", .stableKey = "Misc", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderMiscSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionSound, {.displayName = "Sound", .stableKey = "Sound", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderSoundSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionSmoke, {.displayName = "Smoke", .stableKey = "Smoke", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderSmokeSection(); }});
+	TweaksScreenBase::RegisterSection(giTweakSectionWind, {.displayName = "Wind", .stableKey = "Wind", .pfnRender = [](TweaksScreenBase& rScreen) { rScreen.RenderWindSection(); }});
 }
 
 TweaksScreenBase::TweaksScreenBase()

@@ -4,10 +4,11 @@
 #include "Missiles.h"
 
 #include "Data/Audio.h"
-#include "Frame/FrameStaticData.h"
-#include "Frame/HealthDamage.h"
-#include "Frame/Collections/Collection.h"
 #include "Frame/Collections/Explosions/Explosions.h"
+#include "Frame/Collections/Collection.h"
+#include "Frame/FrameStaticData.h"
+
+#include "Frame/HealthDamage.h"
 #include "Profile/ProfileManager.h"
 #include "Ui/ParticleWrappers.h"
 #if defined(BT_CLIENT)
@@ -384,20 +385,19 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender,
-		[&](int64_t i)
-		{
-			bool bSilentDespawn = rCurrentPostRender.pFlags[i] & kSilentDespawn;
-			bool bExplosionFinished = (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
-			return bSilentDespawn || bExplosionFinished;
-		},
-		[&](int64_t i)
-		{
-			// Owned effects and the registry handle may already be released by Fall() or Explode()
-			RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
+	{
+		bool bSilentDespawn = rCurrentPostRender.pFlags[i] & kSilentDespawn;
+		bool bExplosionFinished = (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
+		return bSilentDespawn || bExplosionFinished;
+	},
+	[&](int64_t i)
+	{
+		// Owned effects and the registry handle may already be released by Fall() or Explode()
+		RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 
-			engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-		});
+		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+	});
 }
 
 bool MissilesPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)

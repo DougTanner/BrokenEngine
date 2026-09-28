@@ -58,22 +58,21 @@ void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rF
 	// Get controller type
 	const WindRadialControllerType& rController = WindRadialsInterpolate::GetControllerType(uiControllerTypeIndex);
 
-	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition,
-		[&rInterpolate, &rPostRender]()
-		{
-			GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-		},
-		[&rInterpolate, &rPostRender]()
-		{
-			return AddElement(rInterpolate, rPostRender);
-		},
-		[&rInterpolate, &rController, fBaseIntensity, fBaseSize](int64_t iSpawnIndex)
-		{
-			rInterpolate.pfIntensities[iSpawnIndex] = fBaseIntensity * rController.keyframes[0].fIntensity;
-			rInterpolate.pfSizes[iSpawnIndex] = fBaseSize * rController.keyframes[0].fSize;
-			rInterpolate.pfBaseIntensities[iSpawnIndex] = fBaseIntensity;
-			rInterpolate.pfBaseSizes[iSpawnIndex] = fBaseSize;
-		});
+	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	{
+		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
+	},
+	[&rInterpolate, &rPostRender]()
+	{
+		return AddElement(rInterpolate, rPostRender);
+	},
+	[&rInterpolate, &rController, fBaseIntensity, fBaseSize](int64_t iSpawnIndex)
+	{
+		rInterpolate.pfIntensities[iSpawnIndex] = fBaseIntensity * rController.keyframes[0].fIntensity;
+		rInterpolate.pfSizes[iSpawnIndex] = fBaseSize * rController.keyframes[0].fSize;
+		rInterpolate.pfBaseIntensities[iSpawnIndex] = fBaseIntensity;
+		rInterpolate.pfBaseSizes[iSpawnIndex] = fBaseSize;
+	});
 }
 
 } // namespace engine

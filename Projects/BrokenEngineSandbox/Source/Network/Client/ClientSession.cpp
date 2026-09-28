@@ -3,11 +3,11 @@
 #include "Agent/Commands/ClientFullStateFixture.h"
 #include "Agent/Commands/ClientPacketFaultFixture.h"
 #include "Agent/Commands/ClientSubscriptionFixtures.h"
-#include "Fleet.h"
-#include "Game.h"
 #include "Network/GamePacketType.h"
 #include "Network/PlayerEvents.h"
 #include "Profile/ProfileManager.h"
+#include "Fleet.h"
+#include "Game.h"
 
 namespace game
 {

@@ -1,8 +1,8 @@
 #include "NavQuery.h"
 
+#include "Ui/WrapperBase.h"
 #include "NavBuild.h"
 #include "NavBuildInternal.h"
-#include "Ui/WrapperBase.h"
 
 namespace engine
 {

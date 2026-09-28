@@ -18,10 +18,10 @@ scanner-extracted name list as its state.
 
 ## The decision today
 
-`.agents/skills/code-style-review/references/worker.md:67-76` (step 7)
+`.agents/skills/code-style-review/references/worker.md:74-116` (step 7)
 hand-reads rules 3, 14, 16 (including its vector `.at()` clause), 21, 49, 51,
 56, 62, and the "always write `std::`" half of 41 across every changed range,
-because the scanner emits no candidates for them. Step 6 (`worker.md:36-66`)
+because the scanner emits no candidates for them. Step 6 (`worker.md:43-73`)
 runs the judgment script as an advisory: it asks rule 49 (rule 3 is also
 asked and ignored) at a 0.7 threshold, over block text whose
 session-changed lines carry a `+ ` mark, and its flags are extra step-10
@@ -155,7 +155,7 @@ for the user.
 ## What still needs a full model
 
 Every fix, and the meaning-preservation decision the auto-fix requires
-(`references/worker.md:113-116`). Jev does not replace the judgment on a
+(`references/worker.md:184-187`). Jev does not replace the judgment on a
 flagged block: the worker still reads a flagged function against the guide
 before it fixes or routes anything, and it also hand-reads every range
 (decision 5), so the shape is "Jev orders the list the worker

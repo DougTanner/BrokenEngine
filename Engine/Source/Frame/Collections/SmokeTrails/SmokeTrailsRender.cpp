@@ -2,9 +2,10 @@
 
 #if defined(BT_CLIENT)
 
-#include "Profile/ProfileManager.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/SmokeWrappersBase.h"
+
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {
@@ -23,8 +24,10 @@ void SmokeTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 	siRendered = 0;
 	siTotalCount = 0;
 
-	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords,
-		[](const game::FrameInterpolate& rInterpolate) -> const SmokeTrailsInterpolate& { return rInterpolate.smokeTrails; });
+	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const SmokeTrailsInterpolate&
+	{
+		return rInterpolate.smokeTrails;
+	});
 
 	if (iTotalCapacity == 0)
 	{

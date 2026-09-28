@@ -1,11 +1,11 @@
 #pragma once
 
+#include "CoordinationStore.h"
+#include "ToolCliCommon.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
-
-#include "CoordinationStore.h"
-#include "ToolCliCommon.h"
 
 namespace toolcli::landing
 {

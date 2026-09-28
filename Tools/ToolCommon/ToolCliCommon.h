@@ -1,7 +1,5 @@
 #pragma once
 
-#include <windows.h>
-
 #include <exception>
 #include <filesystem>
 #include <functional>
@@ -9,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <windows.h>
 
 // nlohmann::json (vendored under tinygltf). The warning-suppression pragma travels with the header,
 // mirroring Common/ExternalHeaders.h for the PCH-backed builds.

@@ -3,9 +3,9 @@
 #include "Network/Server/ServerFleetSerialization.h"
 
 #include "Frame/Collections/Players/Players.h"
-#include "Network/GamePacketType.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
+#include "Network/GamePacketType.h"
 
 namespace game
 {

@@ -7,8 +7,8 @@
 // for the two cross-TU bake functions. NOT part of the public API (BakeIslandIntermediates.h);
 // constants used by only one TU stay file-local in that TU.
 
-#include "BakeIslandIntermediates.h"
 #include "ExportJobs/ExportIsland.h"
+#include "BakeIslandIntermediates.h"
 
 // Auto-crop epsilon, measured in meters ABOVE THE SEA FLOOR (NOT above the beach line). A pixel
 // is retained in the bbox when its elevation is strictly greater than `seaFloor + epsilon` —

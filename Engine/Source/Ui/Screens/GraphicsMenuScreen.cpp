@@ -2,7 +2,6 @@
 
 #if defined(BT_CLIENT)
 
-#include "Game.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
@@ -10,6 +9,8 @@
 #include "Ui/LocalizationBase.h"
 #include "Ui/MenuUtils.h"
 #include "Ui/SunMoonWrappersBase.h"
+
+#include "Game.h"
 
 namespace engine
 {

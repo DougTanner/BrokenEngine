@@ -1,9 +1,10 @@
 #include "FrameBase.h"
 
-#include "Frame/Frame.h"
 #include "Frame/FrameStaticData.h"
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavBuild.h"
+
+#include "Frame/Frame.h"
 
 namespace engine
 {

@@ -5,12 +5,12 @@
 
 #if defined(BT_CLIENT)
 
+#include "File/FileManager.h"
 #include "StaticVoices.h"
 #include "StreamingVoices.h"
 
-#include "File/FileManager.h"
-#include "Game.h"
 #include "Profile/ProfileManager.h"
+#include "Game.h"
 
 namespace engine
 {

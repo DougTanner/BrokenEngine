@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Frame/Collections/Collection.h"
 #include "Frame/Alignments.h"
 #include "Frame/GridCoord.h"
-#include "Frame/Collections/Collection.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/AreaLights/AreaLights.h"
 #include "Frame/Collections/SmokeTrails/SmokeTrails.h"

@@ -3,7 +3,8 @@
 # directories, and optionally DevEnvDir. Read-only: it launches no writing command and
 # emits nothing but stdout JSON and stderr diagnostics.
 #
-# dataBuildMode is derived from path rules alone. The semantic Local triggers
+# dataBuildMode is derived from path rules alone, except that a modified DataPacker .h/.cpp
+# whose baseline and current token text match is not a trigger. The semantic Local triggers
 # (generated-header logic, exporter versions/fingerprints, compression, chunk layout,
 # pack/manifest contracts), the "may affect generated or serialized bytes" catch-all,
 # Local-generation authorization, and the deletion-only exception all remain agent
@@ -141,6 +142,43 @@ function Get-ContextTrigger([string] $Path) {
 	return $null
 }
 
+# Directives, comments, and string/character literals stay verbatim (backslash-newline continues a
+# directive or // comment); the pp-number alternative precedes the character literal so a digit
+# separator such as 1'000 never opens one. Raw string literals are not handled; DataPacker has none.
+$script:TokenPattern = [regex]::new(
+	'(?<v>^[ \t]*#(?:\\\r?\n|[^\r\n])*(?:\r?\n)?)' +
+	'|(?<v>//(?:\\\r?\n|[^\r\n])*(?:\r?\n)?)' +
+	'|(?<v>/\*[\s\S]*?\*/)' +
+	'|(?<c>\.?\d(?:''?[\w.]|[eEpP][+-])*)' +
+	'|(?<v>"(?:\\[\s\S]|[^"\\\r\n])*")' +
+	'|(?<v>''(?:\\[\s\S]|[^''\\\r\n])*'')' +
+	'|(?<c>\w+|[\s\S])',
+	[Text.RegularExpressions.RegexOptions]::Multiline)
+
+function Get-ContextTokenText([string] $Text) {
+	# In code segments each whitespace run becomes one space, dropped beside ( ) [ ] { } , ; a comment,
+	# a directive, or the file edge, none of which can join a neighbor into a longer token. Otherwise a
+	# run beside a string or character literal stays, because it separates an encoding prefix or suffix.
+	$segments = [Collections.Generic.List[string]]::new()
+	$code = [Text.StringBuilder]::new()
+	$flush = {
+		param([string] $Next)
+		$normalized = [regex]::Replace($code.ToString(), '\s+', ' ')
+		$normalized = [regex]::Replace($normalized, ' ?([()\[\]{},;]) ?', '$1')
+		$previous = if ($segments.Count -gt 0) { $segments[$segments.Count - 1] } else { '' }
+		if ($previous -notmatch '^["'']') { $normalized = $normalized.TrimStart() }
+		if ($Next -notmatch '^["'']') { $normalized = $normalized.TrimEnd() }
+		if ($normalized.Length -gt 0) { $segments.Add($normalized) }
+		[void] $code.Clear()
+	}
+	foreach ($match in $script:TokenPattern.Matches($Text)) {
+		if ($match.Groups['v'].Success) { & $flush $match.Value; $segments.Add($match.Value) }
+		else { [void] $code.Append($match.Value) }
+	}
+	& $flush ''
+	return $segments -join "`0"
+}
+
 function Get-ContextRecommendedTargets([string[]] $Paths) {
 	# A changed path under one of the shared roots recommends both executables; any other path
 	# contributes nothing, so this stays advisory and the worker still fixes the final list.
@@ -238,7 +276,23 @@ try {
 	$triggerMatches = [Collections.Generic.List[object]]::new()
 	foreach ($path in $changed) {
 		$trigger = Get-ContextTrigger $path
-		if ($null -ne $trigger) { $triggerMatches.Add([pscustomobject][ordered]@{ path = $path; trigger = $trigger }) }
+		if ($null -eq $trigger) { continue }
+		if ($trigger -ceq 'DataPacker/**' -and ($path.EndsWith('.h', [StringComparison]::OrdinalIgnoreCase) -or $path.EndsWith('.cpp', [StringComparison]::OrdinalIgnoreCase))) {
+			# A baseline blob plus a working file is a modification; a token-identical one is not a
+			# trigger. Any read or decode failure keeps the path a trigger.
+			try {
+				$workingFile = Join-Path $root $path
+				$baselineBlob = Invoke-ContextGit @('-C', $root, 'cat-file', 'blob', "$($resolvedBaseline):$path")
+				if ($baselineBlob.ExitCode -eq 0 -and (Test-Path -LiteralPath $workingFile -PathType Leaf)) {
+					$workingText = [IO.File]::ReadAllText($workingFile, [Text.UTF8Encoding]::new($false, $true))
+					if ([string]::Equals((Get-ContextTokenText $baselineBlob.Stdout), (Get-ContextTokenText $workingText), [StringComparison]::Ordinal)) { continue }
+				}
+			}
+			catch {
+				[Console]::Error.WriteLine("compile-context: token comparison failed for '$path'; keeping it a trigger: $($_.Exception.Message)")
+			}
+		}
+		$triggerMatches.Add([pscustomobject][ordered]@{ path = $path; trigger = $trigger })
 	}
 
 	# Deletion-only evidence: baseline diff status 'D' only. Rename sides (R*), additions, and

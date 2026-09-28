@@ -2,9 +2,10 @@
 
 #if defined(BT_CLIENT)
 
-#include "AudioUtility.h"
-#include "Game.h"
 #include "Ui/SoundSettingsWrappersBase.h"
+#include "AudioUtility.h"
+
+#include "Game.h"
 
 namespace engine
 {

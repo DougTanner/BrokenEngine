@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Frame/Alignments.h"
 #include "Frame/Collections/Collection.h"
+#include "Frame/Alignments.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/AreaLights/AreaLights.h"
 #include "Frame/Collections/PointLights/PointLights.h"

@@ -2,9 +2,10 @@
 
 #if defined(BT_CLIENT)
 
-#include "Game.h"
 #include "Ui/LocalizationBase.h"
 #include "Ui/MenuUtils.h"
+
+#include "Game.h"
 
 namespace engine
 {

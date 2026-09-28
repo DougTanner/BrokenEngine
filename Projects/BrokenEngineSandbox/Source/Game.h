@@ -1,7 +1,8 @@
 #pragma once
 
-#include "ClientSettings.h"
 #include "Data/Audio.h"
+
+#include "ClientSettings.h"
 #include "Fleet.h"
 #include "FleetSelection.h"
 

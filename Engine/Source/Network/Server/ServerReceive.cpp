@@ -4,7 +4,6 @@
 
 #include "Network/Server/Server.h"
 #include "Network/Server/ServerSessionRuntime.h"
-
 #include "Network/NetworkCursor.h"
 
 #include "Game.h"
@@ -120,8 +119,7 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 		{
 			if (pClient->iPeakConsecutiveStallAcks >= kiFloorStallLogThreshold)
 			{
-				LOG(kNetwork, kVerbose, "Server::ClientAckStream FloorStallResolved Client: {} PeakStalledAcks: {} Slots: {}",
-					iClientId, pClient->iPeakConsecutiveStallAcks, message.uiSlotCount);
+				LOG(kNetwork, kVerbose, "Server::ClientAckStream FloorStallResolved Client: {} PeakStalledAcks: {} Slots: {}", iClientId, pClient->iPeakConsecutiveStallAcks, message.uiSlotCount);
 			}
 			pClient->bFloorStalled = false;
 			pClient->iPeakConsecutiveStallAcks = 0;

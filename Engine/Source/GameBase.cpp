@@ -12,8 +12,9 @@
 #endif
 #include "Frame/FrameBase.h"
 #include "Input/Input.h"
-#include "Profile/ProfileManager.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {
@@ -468,8 +469,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 			CoordFrames& rFrames = mCoordFrames.at(rCoord);
 			if (rFrames.pCurrent == nullptr || rFrames.pNext == nullptr)
 			{
-				LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}",
-					rCoord.x, rCoord.y, rFrames.pCurrent != nullptr, rFrames.pNext != nullptr);
+				LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}", rCoord.x, rCoord.y, rFrames.pCurrent != nullptr, rFrames.pNext != nullptr);
 				continue;
 			}
 			mActiveFrameRefs.push_back({

@@ -5,9 +5,10 @@
 
 #if defined(BT_CLIENT)
 
-#include "Game.h"
 #include "Frame/FrameStaticData.h"
 #include "Network/NetworkCursor.h"
+
+#include "Game.h"
 
 namespace engine
 {

@@ -3,8 +3,8 @@
 #include "Network/Server/FleetNavigationController.h"
 
 #include "Frame/Collections/Players/Players.h"
-#include "Game.h"
 #include "Network/PlayerEvents.h"
+#include "Game.h"
 
 namespace game
 {

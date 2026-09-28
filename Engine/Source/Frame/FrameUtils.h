@@ -335,8 +335,7 @@ void ForEachPostRenderSpawn(TypeList<TS...>, game::Frame& __restrict rFrame, con
 template<typename TUPLE_CURRENT, typename TUPLE_PREVIOUS, size_t... INDICES>
 void AllocateAndCopyCollections(TUPLE_CURRENT&& current, TUPLE_PREVIOUS&& previous, std::index_sequence<INDICES...>)
 {
-	(std::remove_reference_t<std::tuple_element_t<INDICES, std::remove_cvref_t<TUPLE_CURRENT>>>::AllocateAndCopy(
-		std::get<INDICES>(current), std::get<INDICES>(previous)), ...);
+	(std::remove_reference_t<std::tuple_element_t<INDICES, std::remove_cvref_t<TUPLE_CURRENT>>>::AllocateAndCopy(std::get<INDICES>(current), std::get<INDICES>(previous)), ...);
 }
 
 // LogDifferences helper using tuple and index sequence; left-to-right, never short-circuits (every collection logs)

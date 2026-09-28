@@ -3,6 +3,7 @@
 #include "CommandBufferRecordGlobal.h"
 
 #include "CommandBufferManager.h"
+
 #include "Profile/ProfileManager.h"
 
 namespace engine

@@ -1,8 +1,8 @@
 #include "ExportCubemapIbl.h"
 
+#include "Texture/Texture.h"
 #include "DiagnosticReporter.h"
 #include "FileManager.h"
-#include "Texture/Texture.h"
 
 namespace
 {

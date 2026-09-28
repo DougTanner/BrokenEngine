@@ -4,9 +4,9 @@
 
 #include "Ui/MenuUtils.h"
 
-#include "Fleet.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
+#include "Fleet.h"
 #include "Game.h"
 
 namespace

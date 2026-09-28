@@ -30,6 +30,9 @@ plus the session's residue removed and semantic candidates routed to the caller.
 - `Baseline` — the full 40-character session baseline SHA and the absolute
   repository toplevel, required for a session-changed scope, plus any untracked
   paths the review must cover.
+- `Paths` — repository-relative path prefixes restricting a session-changed
+  scope, each matching that path or anything below it; absent to review the
+  whole session.
 - `Jev` — `skip`, supplied only after the user says "skip jev"; the worker then
   never runs the judgment script. Absent otherwise.
 

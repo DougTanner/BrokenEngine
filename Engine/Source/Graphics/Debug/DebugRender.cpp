@@ -63,11 +63,7 @@ void DebugRender::Box(const XMFLOAT3A& f3Position, const XMFLOAT3A& f3Scale, con
 	{
 		if (!sbEnabled) { return; }
 		// Row-major 3x4: scale on diagonal, translation in w
-		AddLayout(kiBox,
-			{f3Scale.x, 0.0f, 0.0f, f3Position.x},
-			{0.0f, f3Scale.y, 0.0f, f3Position.y},
-			{0.0f, 0.0f, f3Scale.z, f3Position.z},
-			f4Color);
+		AddLayout(kiBox, {f3Scale.x, 0.0f, 0.0f, f3Position.x}, {0.0f, f3Scale.y, 0.0f, f3Position.y}, {0.0f, 0.0f, f3Scale.z, f3Position.z}, f4Color);
 	}
 }
 
@@ -76,11 +72,7 @@ void DebugRender::Sphere(const XMFLOAT3A& f3Center, float fRadius, const XMFLOAT
 	if constexpr (kbDebugRender)
 	{
 		if (!sbEnabled) { return; }
-		AddLayout(kiSphere,
-			{fRadius, 0.0f, 0.0f, f3Center.x},
-			{0.0f, fRadius, 0.0f, f3Center.y},
-			{0.0f, 0.0f, fRadius, f3Center.z},
-			f4Color);
+		AddLayout(kiSphere, {fRadius, 0.0f, 0.0f, f3Center.x}, {0.0f, fRadius, 0.0f, f3Center.y}, {0.0f, 0.0f, fRadius, f3Center.z}, f4Color);
 	}
 }
 
@@ -89,11 +81,7 @@ void DebugRender::Circle(const XMFLOAT3A& f3Center, float fRadius, const XMFLOAT
 	if constexpr (kbDebugRender)
 	{
 		if (!sbEnabled) { return; }
-		AddLayout(kiCircle,
-			{fRadius, 0.0f, 0.0f, f3Center.x},
-			{0.0f, fRadius, 0.0f, f3Center.y},
-			{0.0f, 0.0f, fRadius, f3Center.z},
-			f4Color);
+		AddLayout(kiCircle, {fRadius, 0.0f, 0.0f, f3Center.x}, {0.0f, fRadius, 0.0f, f3Center.y}, {0.0f, 0.0f, fRadius, f3Center.z}, f4Color);
 	}
 }
 
@@ -108,11 +96,7 @@ void DebugRender::Line(const XMFLOAT3A& f3Start, const XMFLOAT3A& f3End, const X
 		float fDy = f3End.y - f3Start.y;
 		float fDz = f3End.z - f3Start.z;
 
-		AddLayout(kiLine,
-			{fDx, 0.0f, 0.0f, f3Start.x},
-			{fDy, 0.0f, 0.0f, f3Start.y},
-			{fDz, 0.0f, 0.0f, f3Start.z},
-			f4Color);
+		AddLayout(kiLine, {fDx, 0.0f, 0.0f, f3Start.x}, {fDy, 0.0f, 0.0f, f3Start.y}, {fDz, 0.0f, 0.0f, f3Start.z}, f4Color);
 	}
 }
 

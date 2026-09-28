@@ -184,6 +184,18 @@ try {
 			}
 			else {
 				$gameDataDirectory = Join-Path $root 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data'
+				# Shared Client builds compare this stamp with their own shader trees. The old stamp goes before
+				# the export, and a failed delete aborts here, so data exported from sources the stamp does not
+				# describe is never vouched for. It sits beside Data, not inside it, to keep the Data inventory.
+				$shaderStampPath = Join-Path (Split-Path -Parent $gameDataDirectory) 'SharedDataShaderStamp.txt'
+				if (Test-Path -LiteralPath $shaderStampPath -PathType Leaf) { [IO.File]::Delete($shaderStampPath) }
+				# Best-effort like the DataPacker prebuild snapshots: a failure leaves the data unstamped.
+				$shaderPreTrees = $null
+				try {
+					$shaderPreTrees = @(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:Engine/Data/Shaders', 'HEAD:Projects/BrokenEngineSandbox/Data/Shaders'))
+					$shaderPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders'))
+				}
+				catch { Write-Warning "Could not snapshot the primary shader sources, so the Shared-data shader stamp will not be written: $($_.Exception.Message)"; $shaderPreTrees = $null }
 				$hadNoninteractive = Test-Path Env:BT_DATAPACKER_NONINTERACTIVE
 				$previousNoninteractive = [Environment]::GetEnvironmentVariable('BT_DATAPACKER_NONINTERACTIVE', 'Process')
 				try {
@@ -198,6 +210,19 @@ try {
 				}
 				if ($dataPackerExitCode -ne 0) { throw "The primary DataPacker run failed with exit code $dataPackerExitCode, so '$gameDataDirectory' may be incomplete. Fix the offending asset in the primary checkout outside an agent session (or run DataPacker there directly), then retry." }
 				$refreshedDataDirectory = $gameDataDirectory
+				# The mutex excludes peer bootstraps but not a landing or user edit during the export, so the
+				# stamp is written only when the shader trees were clean and unchanged across it.
+				if ($null -ne $shaderPreTrees) {
+					try {
+						$shaderPostTrees = @(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:Engine/Data/Shaders', 'HEAD:Projects/BrokenEngineSandbox/Data/Shaders'))
+						$shaderPostDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders'))
+						if (($shaderPreTrees -join "`n") -cne ($shaderPostTrees -join "`n") -or $shaderPreDirty.Count -ne 0 -or $shaderPostDirty.Count -ne 0) {
+							Write-Warning "Primary shader sources were uncommitted or changed during the data refresh, so the Shared-data shader stamp was not written; Shared Client builds will block until a clean refresh."
+						}
+						else { [IO.File]::WriteAllText($shaderStampPath, ($shaderPreTrees -join "`n") + "`n") }
+					}
+					catch { Write-Warning "Could not write the Shared-data shader stamp, so Shared Client builds will block until a clean refresh: $($_.Exception.Message)" }
+				}
 			}
 		}
 		Write-Host ''

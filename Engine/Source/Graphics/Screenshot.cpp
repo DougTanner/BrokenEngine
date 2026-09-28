@@ -142,8 +142,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 				int64_t iNewWidth = rRequest.iMaxWidth;
 				int64_t iNewHeight = std::max<int64_t>(1, (iHeight * iNewWidth) / iWidth);
 				resized.resize(static_cast<size_t>(iNewWidth * iNewHeight));
-				stbir_resize_uint8_srgb(reinterpret_cast<const unsigned char*>(puiAbgr), static_cast<int>(iWidth), static_cast<int>(iHeight), 0,
-					reinterpret_cast<unsigned char*>(resized.data()), static_cast<int>(iNewWidth), static_cast<int>(iNewHeight), 0, STBIR_4CHANNEL);
+				stbir_resize_uint8_srgb(reinterpret_cast<const unsigned char*>(puiAbgr), static_cast<int>(iWidth), static_cast<int>(iHeight), 0, reinterpret_cast<unsigned char*>(resized.data()), static_cast<int>(iNewWidth), static_cast<int>(iNewHeight), 0, STBIR_4CHANNEL);
 				pPixels = resized.data();
 				iWidth = iNewWidth;
 				iHeight = iNewHeight;

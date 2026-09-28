@@ -183,20 +183,28 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
 46. Do not use Est (estimate) functions in "DirectX Math", they may have different behaviour on different architectures: Use XMVectorReciprocal(), not XMVectorReciprocalEst()
 
-47. Header include order (groups separated by blank line):
-	a) Corresponding .h file (always first)
-	b) engine:: includes
-	c) game:: includes
-	External C++/platform headers and common:: headers go in Pch.h
-	Within each group: sorted alphabetically, fewer subdirectories first
+47. Header include order (groups separated by exactly one blank line, no blank line inside a group):
+	a) Corresponding .h file (always first; only a leading "Pch.h" include precedes it)
+	b) engine:: includes: headers resolving under Engine/, Common/, DataPacker/ or Tools/, and generated Data/ pack headers
+	c) game:: includes: headers resolving under Projects/
+	d) External C++/platform headers, only in projects without a precompiled header (Tools/); elsewhere external and common:: headers go in Pch.h
+	Within each group, compare paths one folder level at a time: at each level folders sort before files, then alphabetically (case-insensitive)
+	Includes inside an #if block that is not a whole-file guard keep their hand order
+	.agents/scripts/Test-IncludeOrder.ps1 checks this rule and fixes it with -Fix
 
 	#include "Player.h"
 
 	#include "Graphics/Managers/BufferManager.h"
 	#include "Graphics/Managers/PipelineManager.h"
-
-	#include "Frame/Frame.h"
+	#include "Graphics/GraphicsUtils.h"
 	#include "Input/Input.h"
+
+	#include "Agent/Commands/ServerFaultFixtures.h"
+	#include "Agent/Commands/ServerSimulationFixtures.h"
+	#include "Agent/AgentCommandsServerQueries.h"
+	#include "Network/Server/ServerFleetManager.h"
+	#include "Network/Server/ServerSession.h"
+	#include "Game.h"
 
 48. Don't add extra curly brackets for scope to force close std::fstream, instead use .close() when no longer needed: fileStream.close();
 

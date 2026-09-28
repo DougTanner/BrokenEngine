@@ -1,10 +1,9 @@
 #if defined(BT_CLIENT)
 
-#include "Spaceships.h"
-
 #include "Data/Scene.h"
 
 #include "Profile/ProfileManager.h"
+#include "Spaceships.h"
 
 namespace game
 {

@@ -4,8 +4,9 @@
 
 #if defined(BT_CLIENT)
 
-#include "Frame/Frame.h"
 #include "Frame/FrameBase.h"
+
+#include "Frame/Frame.h"
 #include "Frame/FrameInput.h"
 #include "Frame/StatusChange.h"
 #include "SpawnTransfer.h"
@@ -390,9 +391,7 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 		rFrames.snapshots[iSlot]->interpolate.frameFlags.Clear(engine::FrameFlags::kRecalculated);
 	}
 
-	rFrames.iSnapshotCount = std::min(
-		iStartCount + rScratch.iReplayWriteCount,
-		static_cast<int64_t>(engine::kiNetworkBufferSize));
+	rFrames.iSnapshotCount = std::min(iStartCount + rScratch.iReplayWriteCount, static_cast<int64_t>(engine::kiNetworkBufferSize));
 }
 
 } // namespace engine

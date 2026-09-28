@@ -1,7 +1,6 @@
 #include "PackChunks.h"
 
 #include "Profile/ProfileManager.h"
-
 #include "Game.h"
 
 #if defined(BT_CLIENT)

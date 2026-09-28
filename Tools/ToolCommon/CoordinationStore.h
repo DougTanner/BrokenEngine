@@ -1,12 +1,12 @@
 #pragma once
 
+#include "ToolCliCommon.h"
+
 #include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
-
-#include "ToolCliCommon.h"
 
 namespace toolcli::coordination
 {

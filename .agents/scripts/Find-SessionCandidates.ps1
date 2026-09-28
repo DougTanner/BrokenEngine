@@ -11,6 +11,7 @@ param(
 	[Parameter(Mandatory, ParameterSetName = 'Session')][string] $Baseline,
 	[Parameter(ParameterSetName = 'Session')][string] $Head,
 	[Parameter(ParameterSetName = 'Session')][switch] $IncludeUntracked,
+	[Parameter(ParameterSetName = 'Session')][string[]] $PathPrefix,
 	[Parameter(Mandatory, ParameterSetName = 'WholeFile')][string[]] $Path
 )
 
@@ -45,6 +46,10 @@ $script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)
 # The prose-prone kinds share style-rule-2's comment-and-string alternative, so a line holding a comment
 # or a quote character is never reported for them.
 $script:CommentOrQuote = '(?://|/\*|\*/|["''])'
+# The prefix walks the line past string and character literals, treating a quote directly after a digit as a
+# digit separator, and stops at a comment, so a kind whose pattern starts with it reports only a match in code
+# before any comment.
+$script:CodePrefix = '^(?:[^"''/]|/(?![/*])|(?<=\d)''|''(?:\\.|[^''\\])*''|"(?:\\.|[^"\\])*")*?'
 $script:CandidatePatterns = @(
 	@{ Kind = 'log'; Pattern = '\bLOG\s*\(' }
 	@{ Kind = 'printf'; Pattern = '\bprintf\s*\(' }
@@ -54,16 +59,16 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'fixme'; Pattern = '(?://|/\*|^\s*\*).*\bFIXME\b' }
 	@{ Kind = 'hack'; Pattern = '(?://|/\*|^\s*\*).*\bHACK\b' }
 	@{ Kind = 'style-rule-2'; Pattern = '^\s*(?:[A-Za-z_]\w*(?:::[A-Za-z_]\w*)?(?:<[^{};]*>)?\s+)+(?:[*&]\s*)?[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\{\s*$'; Except = '(?://|/\*|\*/|["''])|^\s*(?:class|struct|union|enum|namespace|return|if|else|for|while|switch|try|catch|do)\b' }
-	@{ Kind = 'style-rule-15'; Pattern = '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
+	@{ Kind = 'style-rule-15'; Pattern = $script:CodePrefix + '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
 	@{ Kind = 'style-rule-18'; Pattern = '^\s*const\s+(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*[={(]'; Except = '^\s*const\s+[^=({;<]*(?:<[^;]*>)?[^=({;<]*[&*]' }
 	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|\btypename(?:\.\.\.)?\s+[A-Z]*[a-z])' }
-	@{ Kind = 'style-rule-27'; Pattern = '\b\d+\.(?:\d+(?:[eE][-+]?\d+)?)?(?:[^\w.]|$)|\b\d+\.f\b|(?:^|[^\w.])\.\d+(?:f|\b)' }
-	@{ Kind = 'style-rule-28'; Pattern = '\bNULL\b' }
+	@{ Kind = 'style-rule-27'; Pattern = $script:CodePrefix + '(?:\b\d+\.(?:\d+(?:[eE][-+]?\d+)?)?(?:[^\w.]|$)|\b\d+\.f\b|(?<![\w.])\.\d+(?:f|\b))' }
+	@{ Kind = 'style-rule-28'; Pattern = $script:CodePrefix + '\bNULL\b' }
 	@{ Kind = 'style-rule-29'; Pattern = '\bvirtual\b.*\)\s*(?:const\s*)?(?:noexcept\s*)?;'; Except = '\boverride\b|\bfinal\b' }
 	@{ Kind = 'style-rule-32'; Pattern = '\bstd::map\s*<' }
 	@{ Kind = 'style-rule-41'; Pattern = '\busing\s+namespace\s+[\w:]+\s*;'; Except = 'using\s+namespace\s+DirectX\s*;' }
-	@{ Kind = 'style-rule-50'; Pattern = '\b(?:if|while)\s*\((?:.*(?:&&|\|\||\())?\s*!?\s*(?:[\w.>-]*(?:->|\.))?[gms]?p[A-Z]\w*\s*(?:\)|&&|\|\|)' }
-	@{ Kind = 'style-rule-52'; Pattern = '\w\{\}' }
+	@{ Kind = 'style-rule-50'; Pattern = '\b(?:if|while)\s*\((?:.*(?:&&|\|\||\())?\s*!?\s*(?<!\bsizeof\s*\(\s*)(?:[\w.>-]*(?:->|\.))?[gms]?p[A-Z]\w*\s*(?:\)|&&|\|\|)' }
+	@{ Kind = 'style-rule-52'; Pattern = $script:CodePrefix + '\w\{\}' }
 	@{ Kind = 'style-rule-57'; Pattern = '\b\w+(?:Impl|Internal)\s*\(' }
 	@{ Kind = 'style-rule-58'; Pattern = '^\s*#\s*ifn?def\b' }
 	@{ Kind = 'style-rule-1'; Pattern = '^ +\S'; Except = '^ +\*' }
@@ -77,13 +82,11 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'style-rule-17'; Pattern = '\b(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*\s*[={][^;]*\.size\s*\(\s*\)|\bfor\s*\(\s*(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*[^;]*;[^;]*\.size\s*\(\s*\)' }
 	@{ Kind = 'style-rule-20'; Pattern = '^\s*(?:(?:static|inline|constexpr|const|thread_local|mutable)\s+)*(?:' + $script:ScalarType + ')\s+[A-Za-z_]\w*\s*\{' }
 	@{ Kind = 'style-rule-23'; Pattern = '\btypedef\b'; Except = $script:CommentOrQuote }
-	@{ Kind = 'style-rule-25'; Pattern = '\bconstexpr\b'; Except = '\b(?:static|inline)\b|\bif\s+constexpr\b|\bconstexpr\s+[^=;{]*[\w)*&>]\s*\(' }
+	@{ Kind = 'style-rule-25'; Pattern = $script:CodePrefix + '\bconstexpr\b'; Except = '\b(?:static|inline)\b|\bif\s+constexpr\b|\bconstexpr\s+[^=;{]*[\w)*&>]\s*\(' }
 	@{ Kind = 'style-rule-26'; Pattern = '\busing\s+enum\b' }
 	@{ Kind = 'style-rule-30'; Pattern = '>\s+>' }
 	@{ Kind = 'style-rule-33'; Pattern = '\b(?:CHAR_BIT|MB_LEN_MAX|S?CHAR_MIN|S?CHAR_MAX|UCHAR_MAX|SHRT_MIN|SHRT_MAX|USHRT_MAX|INT_MIN|INT_MAX|UINT_MAX|LONG_MIN|LONG_MAX|ULONG_MAX|LLONG_MIN|LLONG_MAX|ULLONG_MAX)\b' }
-	# The prefix walks the line past string literals, character literals and comments, treating a quote
-	# directly after a digit as a digit separator, so only a literal in code is reported.
-	@{ Kind = 'style-rule-34'; Pattern = '^(?:[^"''/]|/(?![/*])|(?<=\d)''|''(?:\\.|[^''\\])*''|"(?:\\.|[^"\\])*")*?(?<![\w.''])\d{4,}(?![\d''])'; Except = '^\s*#\s*(?:pragma|line)\b|^\s*\*(?:\s|/|$)' }
+	@{ Kind = 'style-rule-34'; Pattern = $script:CodePrefix + '(?<![\w.''])\d{4,}(?![\d''])'; Except = '^\s*#\s*(?:pragma|line)\b|^\s*\*(?:\s|/|$)' }
 	@{ Kind = 'style-rule-35'; Pattern = '\b(?:(?:CreateDirectory|RemoveDirectory|DeleteFile|GetFileAttributes(?:Ex)?|SetFileAttributes|PathFileExists|FindFirstFile(?:Ex)?|FindNextFile)[AW]?|FindClose|_w?mkdir|_w?rmdir|_w?unlink|_w?access(?:_s)?|_w?stat(?:32|64|i64)?|_w?findfirst(?:32|64)?|_w?findnext(?:32|64)?|mkdir|rmdir|unlink|opendir|readdir)\s*\('; Except = $script:CommentOrQuote }
 	@{ Kind = 'style-rule-36'; Pattern = '^\s*(?:(?:static|inline|thread_local|volatile|mutable)\s+)*(?:const\s+)?(?:(?:' + $script:ScalarType + ')(?:\s*\*+\s*|\s+)|(?!(?:return|delete|co_return|throw|goto|case|else|do)\b)[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*+\s*)(?:const\s+)?[A-Za-z_]\w*\s*;' }
 	@{ Kind = 'style-rule-37'; Pattern = '\bstd::get\s*<\s*\d+\s*>\s*\(|\bstd::tie\s*\(' }
@@ -154,6 +157,7 @@ function Get-InventoryDocument() {
 		$untracked = @((Invoke-CandidateGit @('ls-files', '--others', '--exclude-standard', '-z')) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
 		if ($untracked.Count -gt 0) { $arguments += @('-IncludeUntracked', ($untracked -join ',')) }
 	}
+	if ($PathPrefix) { $arguments += @('-PathPrefix', ($PathPrefix -join ',')) }
 	$shell = [Environment]::ProcessPath
 	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
 	$run = Invoke-AgentProcess $shell $arguments $script:Root
@@ -203,34 +207,58 @@ function Get-FileLine([string[]] $Paths) {
 	return $scanned
 }
 
-function Test-Rule61Line([string] $Path, [int] $Line, [string] $Text) {
-	# An `if` (an `else if` counts as its `if`) or `else` line breaks rule 61 when a statement follows the
-	# condition on the same line, or when the next non-blank head-side line is neither `{` nor a `&&`/`||`
-	# continuation of the condition. A trailing `{` is a brace, not a statement.
-	if ($Text -cnotmatch '^\s*(?:else\s+)?if\b|^\s*else\b') { return $false }
-	$code = $Text -replace '//.*$', ''
-	$rest = ''
-	if ($code -cmatch '^\s*(?:else\s+)?if\b') {
-		$depth = 0
-		for ($index = $code.IndexOf('('); $index -ge 0 -and $index -lt $code.Length; $index++) {
-			if ($code[$index] -eq '(') { $depth++ }
+function Get-IfCondition([string] $Path, [int] $Line) {
+	# Walks an `if` condition from the first `(` of head-side line $Line over later head-side lines until its
+	# parentheses close, outside comments and literals. Returns $null when that line has no `(` or the file
+	# ends first; otherwise the closing line's number, its code after the closing `)` with literals masked, and
+	# whether the condition has a `||` at depth one.
+	$lines = Get-NewSideLine $Path
+	$depth = 0
+	$opened = $false
+	$hasOr = $false
+	$number = $Line
+	while ($true) {
+		if ($number -gt $lines.Count) { return $null }
+		$code = ($lines[$number - 1] -replace '"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''', '""') -replace '//.*$', ''
+		$index = if ($opened) { 0 } else { $code.IndexOf('(') }
+		for (; $index -ge 0 -and $index -lt $code.Length; $index++) {
+			if ($code[$index] -eq '(') { $depth++; $opened = $true }
 			elseif ($code[$index] -eq ')') {
 				$depth--
-				if ($depth -eq 0) { $rest = $code.Substring($index + 1); break }
+				if ($depth -eq 0) { break }
 			}
+			elseif ($depth -eq 1 -and $code[$index] -eq '|' -and $index + 1 -lt $code.Length -and $code[$index + 1] -eq '|') { $hasOr = $true; $index++ }
 		}
+		if (-not $opened) { return $null }
+		if ($depth -eq 0) { return [pscustomobject] @{ Line = $number; Rest = $code.Substring($index + 1); HasOr = $hasOr } }
+		$number++
+	}
+}
+
+function Test-Rule61Line([string] $Path, [int] $Line, [string] $Text) {
+	# An `if` (an `else if` counts as its `if`) or `else` line breaks rule 61 when a statement follows the
+	# condition's closing `)`, which may be on a later head-side line, or follows the `else`, or when the next
+	# non-blank head-side line after that is not `{`. A trailing `{` is a brace, and a leading
+	# `[[likely]]`/`[[unlikely]]` is an attribute, not a statement.
+	if ($Text -cnotmatch '^\s*(?:else\s+)?if\b|^\s*else\b') { return $false }
+	$number = $Line
+	if ($Text -cmatch '^\s*(?:else\s+)?if\b') {
+		$condition = Get-IfCondition $Path $Line
+		if ($null -eq $condition) { return $false }
+		$rest = $condition.Rest
+		$number = $condition.Line
 	}
 	else {
-		$rest = $code -replace '^\s*else\b', ''
+		$rest = ($Text -replace '//.*$', '') -replace '^\s*else\b', ''
 	}
-	$rest = $rest.Trim()
+	$rest = $rest.Trim() -creplace '^\[\[(?:likely|unlikely)\]\]\s*', ''
 	if ($rest.StartsWith('{')) { return $false }
 	if ($rest.Length -gt 0) { return $true }
 	$lines = Get-NewSideLine $Path
-	for ($number = $Line + 1; $number -le $lines.Count; $number++) {
+	for ($number++; $number -le $lines.Count; $number++) {
 		$next = $lines[$number - 1].Trim()
 		if ($next.Length -eq 0) { continue }
-		return -not ($next.StartsWith('{') -or $next.StartsWith('&&') -or $next.StartsWith('||'))
+		return -not $next.StartsWith('{')
 	}
 	return $false
 }
@@ -269,32 +297,11 @@ function Test-Rule62Line([string] $Path, [int] $Line, [string] $Text) {
 	# over later head-side lines until its parentheses close, has a `||` at depth one outside comments and
 	# literals, and its braced body is one `return`, `continue` or `break` statement.
 	if ($Text -cnotmatch '^\s*(?:else\s+)?if\b') { return $false }
+	$condition = Get-IfCondition $Path $Line
+	if ($null -eq $condition -or -not $condition.HasOr -or $condition.Rest.Trim().Length -gt 0) { return $false }
 	$lines = Get-NewSideLine $Path
-	$depth = 0
-	$opened = $false
-	$hasOr = $false
-	$number = $Line
-	while ($true) {
-		if ($number -gt $lines.Count) { return $false }
-		$code = ($lines[$number - 1] -replace '"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''', '""') -replace '//.*$', ''
-		$index = if ($opened) { 0 } else { $code.IndexOf('(') }
-		for (; $index -ge 0 -and $index -lt $code.Length; $index++) {
-			if ($code[$index] -eq '(') { $depth++; $opened = $true }
-			elseif ($code[$index] -eq ')') {
-				$depth--
-				if ($depth -eq 0) { break }
-			}
-			elseif ($depth -eq 1 -and $code[$index] -eq '|' -and $index + 1 -lt $code.Length -and $code[$index + 1] -eq '|') { $hasOr = $true; $index++ }
-		}
-		if (-not $opened) { return $false }
-		if ($depth -eq 0) {
-			if (-not $hasOr -or $code.Substring($index + 1).Trim().Length -gt 0) { return $false }
-			break
-		}
-		$number++
-	}
 	$body = [Collections.Generic.List[string]]::new()
-	for ($number++; $number -le $lines.Count -and $body.Count -lt 3; $number++) {
+	for ($number = $condition.Line + 1; $number -le $lines.Count -and $body.Count -lt 3; $number++) {
 		$next = ($lines[$number - 1] -replace '//.*$', '').Trim()
 		if ($next.Length -gt 0) { $body.Add($next) }
 	}
@@ -304,12 +311,18 @@ function Test-Rule62Line([string] $Path, [int] $Line, [string] $Text) {
 function Test-Rule51Line([string] $Path, [int] $Line, [string] $Text) {
 	# A line breaks rule 51 when it leaves a parenthesis open outside comments and literals and ends in `,` or
 	# `(`, so a call's or declaration's arguments wrap, unless the next non-blank head-side line starts with the
-	# `{` rule 2 puts on the next line for a lambda or struct literal argument.
+	# `{` rule 2 puts on the next line for a lambda or struct literal argument. A line-ending `(` counts only after
+	# a word character, `>`, `]`, `)` or an operator-function name, and not after `return`, since a `(` after
+	# another operator, `=`, `(` or `,` groups an expression rather than opening an argument list.
 	if ($Text.Trim() -cmatch '^(?:#|/\*|\*)') { return $false }
 	$code = (($Text -replace '"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''', '""') -replace '//.*$', '').Trim()
 	if ($code -cnotmatch '[,(]$') { return $false }
 	# Counted by length rather than a pipeline, whose one-match result has no Count under strict mode.
 	if ($code.Length - $code.Replace('(', '').Length -le $code.Length - $code.Replace(')', '').Length) { return $false }
+	if ($code.EndsWith('(')) {
+		$before = $code.Substring(0, $code.Length - 1).TrimEnd()
+		if (($before -cnotmatch '[\w>\])]$' -and $before -cnotmatch '\boperator\s*\S+$') -or $before -cmatch '\breturn$') { return $false }
+	}
 	$lines = Get-NewSideLine $Path
 	for ($number = $Line + 1; $number -le $lines.Count; $number++) {
 		$next = $lines[$number - 1].Trim()
@@ -319,10 +332,13 @@ function Test-Rule51Line([string] $Path, [int] $Line, [string] $Text) {
 	return $false
 }
 
-function Test-CandidatePattern([string] $Text) {
+function Test-CandidatePattern([string] $Path, [string] $Text) {
 	foreach ($pattern in $script:ScannedPatterns) {
 		if ($Text -cnotmatch $pattern.Pattern) { continue }
 		if ($pattern.ContainsKey('Except') -and $Text -cmatch $pattern.Except) { continue }
+		# Rule 25 governs function scope and header global scope, so a column-0 constexpr in a .cpp file is a
+		# permitted namespace-scope form.
+		if ($pattern.Kind -ceq 'style-rule-25' -and $Path -cmatch '\.cpp$' -and $Text -cmatch '^constexpr\b') { continue }
 		return $pattern.Kind
 	}
 	return $null
@@ -358,7 +374,7 @@ try {
 		$kind = if (Test-Rule61Line $line.Path $line.Line $line.Text) { 'style-rule-61' }
 		elseif (Test-Rule22Line $line.Path $line.Line $line.Text) { 'style-rule-22' }
 		elseif (Test-Rule59Line $line.Path $line.Line $line.Text) { 'style-rule-59' }
-		else { Test-CandidatePattern $line.Text }
+		else { Test-CandidatePattern $line.Path $line.Text }
 		if ($null -eq $kind -and (Test-Rule62Line $line.Path $line.Line $line.Text)) { $kind = 'style-rule-62' }
 		if ($null -eq $kind -and (Test-Rule51Line $line.Path $line.Line $line.Text)) { $kind = 'style-rule-51' }
 		if ($null -eq $kind) { continue }

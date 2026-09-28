@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Threading/ThreadLocal.h"
 #include "LogFormatters.h"
 #include "LogTypes.h"
-#include "Threading/ThreadLocal.h"
 
 namespace common
 {

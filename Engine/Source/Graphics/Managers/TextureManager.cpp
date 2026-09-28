@@ -2,11 +2,12 @@
 
 #include "TextureManager.h"
 
-#include "Profile/ProfileManager.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/WaterWrappersBase.h"
+
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {
@@ -102,14 +103,12 @@ TextureManager::TextureManager()
 	gpProfileManager->BootStart(kBootTimerTextureUpload);
 
 	// Create 1x1 white placeholder textures for deferred texture loading
-	CreatePlaceholderTexture(mWhiteTexture, "WhitePlaceholder", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D,
-	[](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mWhiteTexture, "WhitePlaceholder", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
 	{
 		*static_cast<uint32_t*>(pData) = 0xFFFFFFFF;
 	});
 
-	CreatePlaceholderTexture(mWhiteCubeTexture, "WhiteCubePlaceholder", VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, VK_FORMAT_R8G8B8A8_UNORM, 6, VK_IMAGE_VIEW_TYPE_CUBE,
-	[](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mWhiteCubeTexture, "WhiteCubePlaceholder", VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, VK_FORMAT_R8G8B8A8_UNORM, 6, VK_IMAGE_VIEW_TYPE_CUBE, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
 	{
 		uint32_t* pPixels = static_cast<uint32_t*>(pData);
 		for (int64_t i = 0; i < 6; ++i)
@@ -121,8 +120,7 @@ TextureManager::TextureManager()
 	// Slot-0 island placeholders. Format-matched to the bindless arrays; values chosen so
 	// sampling slot 0 has no visible effect (ocean-bottom elevation submerged below the water,
 	// mid-gray color, up-vector normals, full-bright AO).
-	CreatePlaceholderTexture(mIslandPlaceholderElevation, "IslandPlaceholderElevation", 0, shaders::keElevationFormat, 1, VK_IMAGE_VIEW_TYPE_2D,
-	[](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderElevation, "IslandPlaceholderElevation", 0, shaders::keElevationFormat, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
 	{
 		// Ocean-bottom, matching the elevation RTT clear (RenderTargetTextures.cpp) and the
 		// open-ocean CPU floor (IslandTerrain::mfSeaFloorElevation). Island slots that are not yet
@@ -132,20 +130,17 @@ TextureManager::TextureManager()
 		*static_cast<uint16_t*>(pData) = DirectX::PackedVector::XMConvertFloatToHalf(gpIslandTerrain->mfSeaFloorElevation);
 	});
 
-	CreatePlaceholderTexture(mIslandPlaceholderColor, "IslandPlaceholderColor", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D,
-	[](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderColor, "IslandPlaceholderColor", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
 	{
 		*static_cast<uint32_t*>(pData) = 0xFF808080u;
 	});
 
-	CreatePlaceholderTexture(mIslandPlaceholderNormals, "IslandPlaceholderNormals", 0, VK_FORMAT_R8G8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D,
-	[](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderNormals, "IslandPlaceholderNormals", 0, VK_FORMAT_R8G8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
 	{
 		*static_cast<uint16_t*>(pData) = 0x8080u;
 	});
 
-	CreatePlaceholderTexture(mIslandPlaceholderAmbientOcclusion, "IslandPlaceholderAmbientOcclusion", 0, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D,
-	[](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderAmbientOcclusion, "IslandPlaceholderAmbientOcclusion", 0, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
 	{
 		*static_cast<uint8_t*>(pData) = 0xFFu;
 	});
@@ -153,8 +148,7 @@ TextureManager::TextureManager()
 	// All-zero RGBA: no rock/sand/snow/flow until the real BC7 mask chunk adopts. Bindless arrays
 	// don't require uniform format across slots, so R8G8B8A8 here while real masks are BC7 is OK
 	// (same precedent as mIslandPlaceholderColor above vs BC7 islands).
-	CreatePlaceholderTexture(mIslandPlaceholderMasks, "IslandPlaceholderMasks", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D,
-	[](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderMasks, "IslandPlaceholderMasks", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
 	{
 		*static_cast<uint32_t*>(pData) = 0x00000000u;
 	});

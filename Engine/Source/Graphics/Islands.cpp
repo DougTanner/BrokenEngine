@@ -1,6 +1,7 @@
 #if defined(BT_CLIENT)
 
 #include "Islands.h"
+
 #include "Frame/FrameStaticData.h"
 #include "Frame/IslandChainPlacement.h"
 

@@ -2,9 +2,9 @@
 
 #if defined(BT_CLIENT)
 
-#include "TweaksSliderMap.h"
 #include "Ui/CurveWidget.h"
 #include "Ui/LightingWrappersBase.h"
+#include "TweaksSliderMap.h"
 
 namespace engine
 {

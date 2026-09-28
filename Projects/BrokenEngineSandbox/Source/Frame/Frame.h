@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Frame/FrameBase.h"
+
 #include "Frame/FrameInput.h"
 // Direct include, not the Engine.h aggregation: the game PCH pulls this header in ahead of Engine.h.
 #include "Frame/FrameRegistry.h"

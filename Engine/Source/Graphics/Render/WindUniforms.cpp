@@ -1,9 +1,8 @@
 #if defined(BT_CLIENT)
 
-#include "Render.h"
-
 #include "Ui/SmokeWrappersBase.h"
 #include "Ui/WindWrappersBase.h"
+#include "Render.h"
 
 namespace engine
 {

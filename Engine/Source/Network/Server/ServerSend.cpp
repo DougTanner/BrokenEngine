@@ -2,9 +2,8 @@
 
 #if defined(BT_SERVER)
 
-#include "Network/Server/Server.h"
-
 #include "Frame/FrameStaticData.h"
+#include "Network/Server/Server.h"
 #include "Network/NetworkCursor.h"
 
 #include "Game.h"

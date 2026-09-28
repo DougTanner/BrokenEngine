@@ -1,12 +1,11 @@
 #include "Pch.h"
 
-#include "ProfileManagerBase.h"
-
 #include "Graphics/EngineCamera.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "ProfileManagerBase.h"
 
-#include "Game.h"
 #include "Profile/ProfileManager.h"
+#include "Game.h"
 
 namespace engine
 {

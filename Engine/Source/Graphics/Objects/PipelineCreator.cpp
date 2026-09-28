@@ -2,10 +2,9 @@
 
 #include "PipelineCreator.h"
 
-#include "Pipeline.h"
-
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/WrapperBase.h"
+#include "Pipeline.h"
 
 namespace engine
 {

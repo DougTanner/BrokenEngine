@@ -69,22 +69,21 @@ void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, 
 	// Get controller type
 	const PuffControllerType& rController = PuffsInterpolate::GetControllerType(uiControllerTypeIndex);
 
-	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition,
-		[&rInterpolate, &rPostRender]()
-		{
-			GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-		},
-		[&rInterpolate, &rPostRender]()
-		{
-			return AddElement(rInterpolate, rPostRender);
-		},
-		[&rInterpolate, &rController](int64_t iSpawnIndex)
-		{
-			rInterpolate.puiTypeIndices[iSpawnIndex] = rController.uiBaseTypeIndex;
-			rInterpolate.pfAreas[iSpawnIndex] = rController.keyframes[0].fArea * (rController.ppAreaScales[0] != nullptr ? rController.ppAreaScales[0]->Get() : 1.0f);
-			rInterpolate.pfIntensities[iSpawnIndex] = rController.keyframes[0].fIntensity * (rController.ppIntensityScales[0] != nullptr ? rController.ppIntensityScales[0]->Get() : 1.0f);
-			rInterpolate.pfRotations[iSpawnIndex] = rController.keyframes[0].fRotation;
-		});
+	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	{
+		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
+	},
+	[&rInterpolate, &rPostRender]()
+	{
+		return AddElement(rInterpolate, rPostRender);
+	},
+	[&rInterpolate, &rController](int64_t iSpawnIndex)
+	{
+		rInterpolate.puiTypeIndices[iSpawnIndex] = rController.uiBaseTypeIndex;
+		rInterpolate.pfAreas[iSpawnIndex] = rController.keyframes[0].fArea * (rController.ppAreaScales[0] != nullptr ? rController.ppAreaScales[0]->Get() : 1.0f);
+		rInterpolate.pfIntensities[iSpawnIndex] = rController.keyframes[0].fIntensity * (rController.ppIntensityScales[0] != nullptr ? rController.ppIntensityScales[0]->Get() : 1.0f);
+		rInterpolate.pfRotations[iSpawnIndex] = rController.keyframes[0].fRotation;
+	});
 }
 
 } // namespace engine

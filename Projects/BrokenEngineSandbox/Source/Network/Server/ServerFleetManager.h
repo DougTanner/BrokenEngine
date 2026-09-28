@@ -2,8 +2,8 @@
 
 #if defined(BT_SERVER)
 
-#include "Fleet.h"
 #include "Network/Server/FleetNavigationController.h"
+#include "Fleet.h"
 
 namespace engine
 {

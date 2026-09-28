@@ -6,8 +6,8 @@
 #include "Network/Client/ClientSessionRuntime.h"
 #include "Network/NetworkMessages.h"
 
-#include "Game.h"
 #include "Network/Client/ClientSession.h"
+#include "Game.h"
 
 namespace game
 {

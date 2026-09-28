@@ -1,10 +1,10 @@
 #include "ExportScene.h"
 
-#include "FileManager.h"
 #include "Scene/SceneAnimationLoader.h"
 #include "Scene/SceneSkeletonLoader.h"
-#include "SourceReadValidation.h"
 #include "Texture/Texture.h"
+#include "FileManager.h"
+#include "SourceReadValidation.h"
 
 std::optional<common::ChunkFlags_t> ExportScene::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {

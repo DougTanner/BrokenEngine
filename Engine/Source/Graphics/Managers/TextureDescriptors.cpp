@@ -2,9 +2,8 @@
 
 #include "TextureDescriptors.h"
 
-#include "TextureManager.h"
-
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
+#include "TextureManager.h"
 
 namespace engine
 {

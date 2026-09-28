@@ -3,8 +3,8 @@
 #include "ProfileManagerBase.h"
 
 #include "Memory/GlobalAllocator.h"
-#include "Profile/ProfileManager.h"
 
+#include "Profile/ProfileManager.h"
 #include "Game.h"
 
 namespace engine

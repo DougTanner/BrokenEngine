@@ -9,6 +9,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - When the caller supplies a cleanup scope, use exactly those C++ files and
      ranges; otherwise use the `.cpp` and `.h` ranges changed in this session,
      taken from the implementation handoff and conversation edits.
+   - A supplied `Paths` input narrows a session-changed scope to the paths
+     under those prefixes.
    - Done when the scope is fixed and stated as session-changed or
      caller-supplied.
 2. For a session-changed scope, derive those ranges from the read-only
@@ -19,6 +21,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      `broken-engine-session-change-inventory/v1` object.
    - When the caller supplied untracked paths, add
      `-IncludeUntracked <comma-separated paths>` to that command.
+   - When the caller supplied `Paths`, add
+     `-PathPrefix <comma-separated prefixes>` to that command.
    - Done when that object is in hand.
 3. Select the session-changed C++ ranges: the object's `regions` rows whose
    path carries the `class` `cpp` or `dual-language-header` in `entries`. Never
@@ -29,18 +33,21 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    proceeding. Done when the status is `pass` or the unavailability is
    reported.
 5. Confirm the ranges are complete.
-   - They are usable only when `truncated` is false; when it is true the run
-     emitted a short list, so report the ranges unavailable instead of
-     proceeding.
+   - They are usable only when `truncated` is false; when it is true, report
+     the ranges unavailable instead of proceeding.
+   - That report names the session's C++ total from `counts` (`cpp` plus
+     `dual-language-header`) and the re-run: dispatch again with `Paths` set to
+     disjoint prefixes whose non-truncated runs' C++ `entries` add up to that
+     total.
    - Done when `truncated` is false or the unavailability is reported.
 6. For a session-changed scope when the `Jev` input is absent, run the
    style-rule judgment once and keep its result: `pwsh -NoProfile -File
    .agents/scripts/Test-StyleRuleJudgment.ps1 -RepositoryRoot <absolute
    repository toplevel> -Baseline <full 40-character SHA> -OutputPath
    Temp/code-style-review-judgment.json`, with the same optional
-   `-Head <commit>` and `-IncludeUntracked` switch as step 8; the run sends
-   each changed block's text and identifier list to the TypeSafe service
-   through `Invoke-Jev.ps1`.
+   `-Head <commit>`, `-IncludeUntracked` switch, and `-PathPrefix` as step 8;
+   the run sends each changed block's text and identifier list to the
+   TypeSafe service through `Invoke-Jev.ps1`.
    - Create `Temp/` if absent, in a call of its own before the run: it is
      gitignored, so a fresh worktree lacks it, and the script does not create
      it.
@@ -69,7 +76,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    Rule 2 form the narrow scanner does not emit, and in every review for
    rules 3, 4, 7, 8, 12, 13, 14, 16 (including its vector `.at()` clause), 21,
    24, 31, 38, 42, 48, 49, 51, 56 and 62, and for these halves of rules split
-   with another owner:
+   with another owner, except rule 47, whose half is checked by the script run
+   its bullet states:
    - rule 5: a mutex locked and unlocked by hand instead of through a RAII
      lock owner;
    - rule 18: a read-only reference or pointer parameter, or a range-for
@@ -82,26 +90,39 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - rule 36: a class member initialized in a `.cpp` file instead of by an
      inline initializer in the header;
    - rule 41: the "always write `std::`" half;
-   - rule 47: include grouping and order.
+   - rule 47: include grouping and order, not hand read: run
+     `pwsh -NoProfile -Command "& '.agents/scripts/Test-IncludeOrder.ps1' -RepositoryRoot '<absolute repository toplevel>' -Path '<file>','<file>' -Fix"`
+     once over the distinct paths of the selected `cpp`-class ranges (or the
+     caller-supplied scope's files). Only `status` `pass` or `fail` is usable;
+     `error` means the include check is unavailable — report that instead of
+     using the run. Each rewritten file is one `Fixes Applied` row (Rule 47,
+     include block reordered) and adds its owning build targets to
+     `Build required`; that build is the rewrite's meaning-preservation proof
+     step 11 requires. Each violation the run still reports is
+     reported as a residual.
 
    Step 6's `flagged` entries for rule 49 are extra step-10 candidates; check
-   them first. The hand-read rules and the rules the scanner's
-   `style-rule-<n>` kinds cover are this review's whole style mandate; a rule
-   is on both lists when each covers a different form. Every other guide rule
-   has another owner: `/repo-code-review` owns rules 9, 53 and 60 and rule
-   47's external-header half
+   them first. The hand-read rules, rule 47 through the script run, and the
+   rules the scanner's `style-rule-<n>` kinds cover are this review's whole
+   style mandate; a rule is on both lists when each covers a different form.
+   Every other guide rule has another owner: `/repo-code-review` owns rules 9,
+   53 and 60 and rule 47's external-header half
    ([`../../repo-code-review/references/checks.md`](../../repo-code-review/references/checks.md)),
    `/comment-review` owns rule 64, and the compiler owns rules 43 (RTTI off,
    warnings as errors) and 63 (the rotate poison in `Common/ExternalHeaders.h`).
    Done when the guide is in hand, step 6's flagged entries are listed for
-   step 10, and the hand read covers every selected range.
+   step 10, and the hand read covers every selected range, and either the rule
+   47 script's run has `status` `pass` or `fail` with every remaining violation
+   reported as a residual, or its unavailability is reported.
 8. Run the session-added candidate scanner once: `pwsh -NoProfile -File
    .agents/scripts/Find-SessionCandidates.ps1 -RepositoryRoot <absolute
    repository toplevel> -Baseline <full 40-character SHA>`,
    - with optional `-Head <commit>` and the `-IncludeUntracked` switch, which
      makes the scanner enumerate every untracked file itself and include those
      files in the scan; pass the switch when the caller supplied any untracked
-     path.
+     path;
+   - with `-PathPrefix <comma-separated prefixes>` when the caller supplied
+     `Paths`.
    - Done when one `broken-engine-session-candidates/v1` object with `hits`
      rows of `path`, `line`, `kind`, and `text`, plus `counts` and `truncated`,
      is in hand.
