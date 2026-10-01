@@ -1272,3 +1272,17 @@
 {"index":1270,"date":"2026-09-28","captureMode":"carry-forward","verbosity":0.037008602188,"structuralErosion":0.570002890035,"supported":557,"parsed":556}
 {"index":1271,"date":"2026-09-28","captureMode":"carry-forward","verbosity":0.037008602188,"structuralErosion":0.570002890035,"supported":557,"parsed":556}
 {"index":1272,"date":"2026-09-28","captureMode":"carry-forward","verbosity":0.037008602188,"structuralErosion":0.570002890035,"supported":557,"parsed":556}
+{"index":1273,"date":"2026-10-01","captureMode":"carry-forward","verbosity":0.037008602188,"structuralErosion":0.570002890035,"supported":557,"parsed":556}
+{"index":1274,"date":"2026-10-01","captureMode":"carry-forward","verbosity":0.037008602188,"structuralErosion":0.570002890035,"supported":557,"parsed":556}
+{"index":1275,"date":"2026-10-01","captureMode":"carry-forward","verbosity":0.037008602188,"structuralErosion":0.570002890035,"supported":557,"parsed":556}
+{"index":1276,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037029924229,"structuralErosion":0.570183161264,"supported":557,"parsed":556}
+{"index":1277,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037028631285,"structuralErosion":0.570153421279,"supported":557,"parsed":556}
+{"index":1278,"date":"2026-10-01","captureMode":"carry-forward","verbosity":0.037028631285,"structuralErosion":0.570153421279,"supported":557,"parsed":556}
+{"index":1279,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037029277746,"structuralErosion":0.570149161069,"supported":557,"parsed":556}
+{"index":1280,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037029277746,"structuralErosion":0.570149161069,"supported":557,"parsed":556}
+{"index":1281,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037031217264,"structuralErosion":0.570203286684,"supported":557,"parsed":556}
+{"index":1282,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037026045667,"structuralErosion":0.570081174444,"supported":557,"parsed":556}
+{"index":1283,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037026045667,"structuralErosion":0.570081174444,"supported":557,"parsed":556}
+{"index":1284,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037024106691,"structuralErosion":0.57019190379,"supported":557,"parsed":556}
+{"index":1285,"date":"2026-10-01","captureMode":"carry-forward","verbosity":0.037024106691,"structuralErosion":0.57019190379,"supported":557,"parsed":556}
+{"index":1286,"date":"2026-10-01","captureMode":"cpp-change","verbosity":0.037015060819,"structuralErosion":0.570116200086,"supported":557,"parsed":556}

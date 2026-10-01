@@ -48,7 +48,7 @@ void HudScreen::Render()
 		bWantsForceOpen = true;
 		pcWantReason = "ClientPlayerId invalid";
 	}
-	else if (const Fleet* pFleet = gpGame->FocusedFleet(); pFleet == nullptr)
+	else if (const Fleet* pFleet = gpGame->mFleetSelection.FocusedFleet(); pFleet == nullptr)
 	{
 		bWantsForceOpen = true;
 		pcWantReason = "no focused fleet";
@@ -195,25 +195,25 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
 
-	int64_t iFleetCount = gpGame->FleetCount();
+	int64_t iFleetCount = std::ssize(gpGame->mFleetSelection.mClientFleets);
 
 	// Update fleet toggle: clears pending when fleet count changes
 	gpGame->mFleetSelection.mCreateFleetToggle.Update(iFleetCount);
 
 	// Fleet navigation row: [<] fleet_index/fleet_count [>] [+]
-	ImGui::BeginDisabled(!gpGame->CanFocusPrevFleet());
+	ImGui::BeginDisabled(gpGame->mFleetSelection.miFocusedFleetIndex <= 0);
 	if (ImGui::Button("[<]"))
 	{
-		gpGame->FocusPrevFleet();
+		gpGame->mFleetSelection.FocusPrevFleet();
 		gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kFocusPrevFleet);
-		LOG(kDefault, kVerbose, "HUD FocusPrevFleet NewIndex: {} FleetCount: {}", gpGame->FocusedFleetIndex(), iFleetCount);
+		LOG(kDefault, kVerbose, "HUD FocusPrevFleet NewIndex: {} FleetCount: {}", gpGame->mFleetSelection.miFocusedFleetIndex, iFleetCount);
 	}
 	ImGui::EndDisabled();
 
 	ImGui::SameLine();
 	if (iFleetCount > 0)
 	{
-		ImGui::Text("%lld/%lld", gpGame->FocusedFleetIndex() + 1, iFleetCount);
+		ImGui::Text("%lld/%lld", gpGame->mFleetSelection.miFocusedFleetIndex + 1, iFleetCount);
 	}
 	else
 	{
@@ -221,12 +221,12 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	}
 	ImGui::SameLine();
 
-	ImGui::BeginDisabled(!gpGame->CanFocusNextFleet());
+	ImGui::BeginDisabled(gpGame->mFleetSelection.miFocusedFleetIndex >= std::ssize(gpGame->mFleetSelection.mClientFleets) - 1);
 	if (ImGui::Button("[>]"))
 	{
-		gpGame->FocusNextFleet();
+		gpGame->mFleetSelection.FocusNextFleet();
 		gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kFocusNextFleet);
-		LOG(kDefault, kVerbose, "HUD FocusNextFleet NewIndex: {} FleetCount: {}", gpGame->FocusedFleetIndex(), iFleetCount);
+		LOG(kDefault, kVerbose, "HUD FocusNextFleet NewIndex: {} FleetCount: {}", gpGame->mFleetSelection.miFocusedFleetIndex, iFleetCount);
 	}
 	ImGui::EndDisabled();
 
@@ -243,7 +243,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	}
 	ImGui::EndDisabled();
 
-	const Fleet* pFleet = gpGame->FocusedFleet();
+	const Fleet* pFleet = gpGame->mFleetSelection.FocusedFleet();
 
 	// Delete empty fleet button
 	gpGame->mFleetSelection.mDeleteFleetToggle.Update(iFleetCount);
@@ -271,7 +271,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 		for (int64_t i = 0; const FleetMember& rMember : pFleet->members)
 		{
-			bool bSelected = rMember.globalPlayerId.IsValid() && rMember.globalPlayerId == gpGame->FocusedMemberGlobalId();
+			bool bSelected = rMember.globalPlayerId.IsValid() && rMember.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
 
 			// Find coord for display
 			engine::GridCoord memberCoord {};
@@ -291,7 +291,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoord.x, memberCoord.y, rMember.globalPlayerId.iValue);
 				if (ImGui::Selectable(pcLabel, bSelected))
 				{
-					gpGame->SelectPlayerInFleet(rMember.globalPlayerId);
+					gpGame->mFleetSelection.SelectPlayerInFleet(rMember.globalPlayerId);
 					gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kSelectPlayer);
 				}
 			}

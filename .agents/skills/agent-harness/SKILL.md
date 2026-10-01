@@ -25,7 +25,16 @@ length-prefixed JSON.
 
 ## Inputs
 
-Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`, and normalized `GameDataDirectory`. That result must also include the server executable, and the client executable unless the scenario launches only the server, for the requested configuration; request that build by stating the agent-harness scenario trigger in [`/compile`](../compile/SKILL.md) `## Inputs`. A replay determinism check needs a `kbDebugInput` build, so request `Debug` for it; [`replay.md`](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md) owns that rule. The brief may state a wall-clock budget for the run; otherwise a 20-minute default applies.
+Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`,
+and normalized `GameDataDirectory`. That result must also include the server
+executable, and the client executable unless the scenario launches only the
+server, for the requested configuration; request that build by stating the
+agent-harness scenario trigger in [`/compile`](../compile/SKILL.md) `## Inputs`.
+A replay determinism check needs a `kbDebugInput` build, so request `Debug` for
+it;
+[`replay.md`](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md)
+owns that rule. The brief may state a wall-clock budget for the run; otherwise a
+20-minute default applies.
 
 ## Handoff
 
@@ -52,7 +61,17 @@ that records the settling observation. Loading an image into context is a
 deliberate act for a check that genuinely needs pixels, and the report names
 which check and why.
 
-If a required command, parameter, result field, query, or input primitive is missing, return that criterion `BLOCKED`. Name the missing capability and the narrowest harness extension that would expose it. The main agent decides whether the authorized change includes that extension or whether user authority/criterion revision is required; when the blocked criterion belongs to a claimed Plan and the values it needs appear only in rendered pixels, that decision follows the screenshot-only deferral rule in [`../next-plan/SKILL.md`](../next-plan/SKILL.md) `## Rules`, which defers the Plan rather than waiving the criterion. Never fake state with pixel guessing or log scraping, create an out-of-scope runtime edit, waive the gate with a follow-up plan, or silently skip the criterion.
+If a required command, parameter, result field, query, or input primitive is
+missing, return that criterion `BLOCKED`. Name the missing capability and the
+narrowest harness extension that would expose it. The main agent decides
+whether the authorized change includes that extension or whether user
+authority/criterion revision is required; when the blocked criterion belongs to
+a claimed Plan and the values it needs appear only in rendered pixels, that
+decision follows the screenshot-only deferral rule in
+[`../next-plan/SKILL.md`](../next-plan/SKILL.md) `## Rules`, which defers the
+Plan rather than waiving the criterion. Never fake state with pixel guessing or
+log scraping, create an out-of-scope runtime edit, waive the gate with a
+follow-up plan, or silently skip the criterion.
 
 Return the shared handoff form in
 [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),

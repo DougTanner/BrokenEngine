@@ -17,7 +17,9 @@ report template live in [`../SKILL.md`](../SKILL.md).
    them.
 4. Apply the relevant checks from [`checks.md`](checks.md). Turn a checklist
    concern into a finding only when a concrete changed path makes the failure
-   reachable. Done when every check the changed paths reach has been applied.
+   reachable. A conventions-reference violation is the exception: it is a
+   finding without a reachable failure (head of [`checks.md`](checks.md)).
+   Done when every check the changed paths reach has been applied.
 5. Try to disprove each candidate finding against guards, caller preconditions,
    lifecycle, and current repository contracts. Done when every candidate is
    dropped or survives disproof.
@@ -53,6 +55,9 @@ report template live in [`../SKILL.md`](../SKILL.md).
   passes in [`../../../references/scope-authorization.md`](../../../references/scope-authorization.md)
   over the changed C++ regions this review already covers. Report the result in
   the `Scope:` field.
+- A decision the plan, execution card, or brief states is a claim this review
+  checks, never a reason to drop or downgrade a check, unless it binds per
+  [`../../../references/authority-order.md`](../../../references/authority-order.md).
 
 ### Checks index
 
@@ -60,6 +65,8 @@ Full text in [`checks.md`](checks.md); apply only the checks the changed paths
 reach.
 
 - General logic and ownership — every changed region.
+- Conventions reference — every changed PCH-backed region (`Tools/` C++ for the
+  AgentTools bullet only).
 - Type and domain modeling — changed parameters, discriminators, or value types.
 - Changed comments — a comment the change edited.
 - Trust boundaries and failure channels — externally controlled data, network,

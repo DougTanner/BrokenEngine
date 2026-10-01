@@ -56,7 +56,7 @@ read-only run to a file by piping that script call's own stdout inside the
 same single PowerShell-tool call, which the root `AGENTS.md` bundled-scripts
 rule permits as using that call's own output:
 `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
--RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character SHA>
+-RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA>
 -EmitTargets | Set-Content -LiteralPath Temp/code-review-targets.json
 -NoNewline`, adding `-IncludeUntracked <comma-separated paths>` for authorized
 untracked additions and `-Head <commit>` for a committed head. That gitignored

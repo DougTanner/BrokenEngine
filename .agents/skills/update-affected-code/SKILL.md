@@ -75,10 +75,9 @@ Trigger outcomes: <settled>/<total> settled
 <trigger> — UNRESOLVED — owner <owner> — action <action> — <path-plus-selector | Decisive checks row | Residuals row>
 ```
 
-Name each changed file once, and when the changed set would push a field past
-the shared row cap give the count in `Changed files` and move the per-file rows
-to the file cited under `Evidence` as path plus `##` selector, on the shared
-form's terms. `PASS` requires every trigger resolved or refuted
+Name each changed file once; past the shared character cap, the overflow file
+cited under `Evidence` follows `../../references/subagent-handoff.md`
+`## Handoffs`. `PASS` requires every trigger resolved or refuted
 and every planned search complete; requested builds remain `builder` work
 dispatched by the manager rather than passed checks.
 

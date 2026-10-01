@@ -149,7 +149,7 @@ void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
 			}
 
 			game::TransferData data = std::get<game::TransferData>(rTransfer.data);
-			game::SpawnTransfer(rDestFrame, rTransfer.eType, data, game::gpGame->PlayerAlignment());
+			game::SpawnTransfer(rDestFrame, rTransfer.eType, data, game::gpGame->mPlayerAlignment);
 		}
 	}
 }

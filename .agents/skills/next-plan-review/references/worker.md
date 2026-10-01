@@ -14,7 +14,7 @@ step owns.
    complete, or the source client is Claude, Codex, or unspecified and execution
    continues through the existing finder.
 2. Resolve the repository root, then run the finder exactly once as
-   `pwsh -NoProfile -File .agents/skills/next-plan-review/scripts/Find-AgentSessionTranscript.ps1 -RepositoryRoot <absolute repository root> -Commit <requested commit>`
+   `pwsh -NoProfile -File .agents/skills/next-plan-review/scripts/Find-AgentSessionTranscript.ps1 -RepositoryRoot '<absolute repository root>' -Commit <requested commit>`
    where `<requested commit>` is the requested commit-ish (default `HEAD`),
    adding `-SessionId <exact-id>` when one was supplied.
    - Do not use `rg`, a home-directory sweep, or any broader discovery fallback

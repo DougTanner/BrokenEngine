@@ -10,6 +10,12 @@
 namespace engine
 {
 
+enum class TextureManagerFlags : uint8_t
+{
+	kPendingAcquireBarriers = 1 << 0,
+	kPendingLightingReblur  = 1 << 1,
+};
+
 class TextureManager
 {
 public:
@@ -189,7 +195,7 @@ public:
 	VkCommandPool mAcquireVkCommandPool = VK_NULL_HANDLE;
 	std::vector<VkCommandBuffer> mAcquireVkCommandBuffers;
 	int64_t miAcquireFramebufferIndex = 0;
-	bool mbHasPendingAcquireBarriers = false;
+	common::Flags<TextureManagerFlags> mFlags;
 };
 
 inline TextureManager* gpTextureManager = nullptr;

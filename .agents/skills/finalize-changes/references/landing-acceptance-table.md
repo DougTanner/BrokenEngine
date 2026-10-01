@@ -6,8 +6,8 @@ diff, before main asks the confirmation.
 ## Reviewed diff and authorization
 
 1. Derive the reviewed diff from the read-only inventory: `pwsh -NoProfile -File
-   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
-   repository toplevel> -Baseline <primary-tip full SHA> -Head <session branch
+   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
+   repository toplevel>' -Baseline <primary-tip full SHA> -Head <session branch
    tip, or the squashed landing commit when one exists> -Landing`. Its
    `landing.reviewed` rows give status, path, old path, and baseline/current
    modes for that three-dot diff, covering additions/deletions, renames,
@@ -99,9 +99,9 @@ runs rather than a review.
 ## Executable Plan check
 
 For the `Executable Plan check` row the landing receipt's `acceptanceSkeleton`
-emits, run `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe
-plan validate --lint-only --repo <absolute Git common directory> --worktree
-<adopted checkout>` and require a valid result for the session worktree,
+emits, run `Tools/WorktreeCli/Platforms/VisualStudio2026/Output/WorktreeCli.exe
+plan validate --lint-only --repo '<absolute Git common directory>' --worktree
+'<adopted checkout>'` and require a valid result for the session worktree,
 recording its notices. `--lint-only` takes no scheduler guard, creates no
 storage, and heals nothing, so it reports `healedClaims` as an empty array and
 changes no scheduler state.

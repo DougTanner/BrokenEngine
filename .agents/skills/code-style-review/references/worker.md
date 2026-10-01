@@ -15,8 +15,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      caller-supplied.
 2. For a session-changed scope, derive those ranges from the read-only
    inventory: `pwsh -NoProfile -File
-   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
-   repository toplevel> -Baseline <full 40-character SHA> -Regions`.
+   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
+   repository toplevel>' -Baseline <full 40-character SHA> -Regions`.
    - It writes no file and prints one
      `broken-engine-session-change-inventory/v1` object.
    - When the caller supplied untracked paths, add
@@ -42,8 +42,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - Done when `truncated` is false or the unavailability is reported.
 6. For a session-changed scope when the `Jev` input is absent, run the
    style-rule judgment once and keep its result: `pwsh -NoProfile -File
-   .agents/scripts/Test-StyleRuleJudgment.ps1 -RepositoryRoot <absolute
-   repository toplevel> -Baseline <full 40-character SHA> -OutputPath
+   .agents/scripts/Test-StyleRuleJudgment.ps1 -RepositoryRoot '<absolute
+   repository toplevel>' -Baseline <full 40-character SHA> -OutputPath
    Temp/code-style-review-judgment.json`, with the same optional
    `-Head <commit>`, `-IncludeUntracked` switch, and `-PathPrefix` as step 8;
    the run sends each changed block's text and identifier list to the
@@ -115,8 +115,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    47 script's run has `status` `pass` or `fail` with every remaining violation
    reported as a residual, or its unavailability is reported.
 8. Run the session-added candidate scanner once: `pwsh -NoProfile -File
-   .agents/scripts/Find-SessionCandidates.ps1 -RepositoryRoot <absolute
-   repository toplevel> -Baseline <full 40-character SHA>`,
+   .agents/scripts/Find-SessionCandidates.ps1 -RepositoryRoot '<absolute
+   repository toplevel>' -Baseline <full 40-character SHA>`,
    - with optional `-Head <commit>` and the `-IncludeUntracked` switch, which
      makes the scanner enumerate every untracked file itself and include those
      files in the scan; pass the switch when the caller supplied any untracked

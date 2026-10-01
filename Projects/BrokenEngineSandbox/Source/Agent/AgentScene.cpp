@@ -87,14 +87,13 @@ nlohmann::json SpaceshipFlagNames(SpaceshipFlags_t flags)
 	return names;
 }
 
-// Focused-fleet members are the only per-fleet member list the client FleetSelection API exposes (FocusedFleet()).
-// Non-focused fleets get index + focused flag only.
+// Only the focused fleet reports its members; non-focused fleets get index + focused flag only.
 nlohmann::json BuildFleets()
 {
 	nlohmann::json fleets = nlohmann::json::array();
-	int64_t iFleetCount = gpGame->FleetCount();
-	int64_t iFocusedIndex = gpGame->FocusedFleetIndex();
-	const Fleet* pFocused = gpGame->FocusedFleet();
+	int64_t iFleetCount = std::ssize(gpGame->mFleetSelection.mClientFleets);
+	int64_t iFocusedIndex = gpGame->mFleetSelection.miFocusedFleetIndex;
+	const Fleet* pFocused = gpGame->mFleetSelection.FocusedFleet();
 	for (int64_t iFleet = 0; iFleet < iFleetCount; ++iFleet)
 	{
 		bool bFocused = iFleet == iFocusedIndex;

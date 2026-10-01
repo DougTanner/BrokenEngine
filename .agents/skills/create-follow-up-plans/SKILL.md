@@ -17,7 +17,15 @@ under `Documents/Plans/<area>/`, with tracked scheduler metadata.
   implementation boundary of the active change.
 - Review findings must be recorded without duplicating an existing Plan.
 - A tooling-friction follow-up is recorded at a `/next-plan` claim exit.
-- Not for routing an in-scope acceptance failure out of the active change.
+- Not for these proposals, which the worker rejects, stating why:
+  - an in-scope acceptance failure, including required structural work: it
+    remains a blocker in the active change;
+  - a worker's deviation from a handoff form the emitting skill correctly
+    declares: the skill's text is already correct and the deviation is
+    worker conduct;
+  - a stale, disproven, fixed, stylistic-only, or evidence-free proposal. An
+    evidence-free proposal — "the skill felt awkward", no citation — stays
+    rejected for a tooling-friction or context-efficiency follow-up too.
 
 ## Inputs
 

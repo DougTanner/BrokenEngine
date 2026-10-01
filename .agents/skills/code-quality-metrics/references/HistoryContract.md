@@ -11,11 +11,11 @@ volatile paths.
 
 ```powershell
 pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1 `
-  -Mode Contract -RepositoryRoot <absolute repository root> `
+  -Mode Contract -RepositoryRoot '<absolute repository root>' `
   -BaseCommit <current-primary-sha> -TipCommit <approved-source-sha>
 
 pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1 `
-  -Mode Generate -RepositoryRoot <absolute repository root> `
+  -Mode Generate -RepositoryRoot '<absolute repository root>' `
   -BaseCommit <current-primary-sha> -TipCommit <final-source-sha> -DateUtc YYYY-MM-DD `
   -OutputDirectory <new directory beneath RepositoryRoot/Temp>
 ```

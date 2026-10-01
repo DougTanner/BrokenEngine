@@ -301,12 +301,14 @@ public:
 	// storage and lifecycle share one object; the Frame/Frame.h include above supplies the complete type.
 	std::unordered_map<GridCoord, game::FrameInterpolate> mRenderInterpolates;
 
+	// Frame-head skip check shared by Render() and the Main.cpp boot render loop; true means skip this frame.
+	bool HandleDeferredSwapchain();
+
 private:
 
 	bool IsCoordRenderable(GridCoord coord) const;
 	void SelectRenderCamera(const std::vector<GridCoord>& rActiveCoords, GridCoord& rCameraCoord, bool& rbHaveRenderableCamera) const;
 	void UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, bool bHaveRenderableCamera);
-	bool HandleDeferredSwapchain();
 #endif // BT_CLIENT
 
 protected:
@@ -340,7 +342,7 @@ protected:
 	bool mbRenderClockSeeded = false;
 	common::Timer mRenderTimer;
 
-	// Minimized-render-loop throttle (Render()'s swapchain-recreate-deferred skip branch). While the
+	// Minimized-render-loop throttle (HandleDeferredSwapchain()'s swapchain-recreate-deferred skip branch). While the
 	// recreate stays deferred the branch early-returns past vkQueuePresentKHR — the client loop's only
 	// vsync throttle — so a high-resolution waitable timer paces the skip loop to one sim tick's cadence.
 	// Lazily created on first use, closed in ~GameBase. mMinimizedThrottleLast is the previous skip-branch

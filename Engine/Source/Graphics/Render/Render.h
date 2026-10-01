@@ -137,7 +137,7 @@ struct PresentationContinuitySnapshot
 inline PresentationContinuitySnapshot gPresentationContinuity {};
 
 void RenderFrameGlobal(int64_t iCommandBuffer, float fCurrentTime);
-void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord);
+void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, float fCurrentTime);
 
 // Shadow
 inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-arms the PopulateShadowParameters first-frame guard so a recreate doesn't blend stale history for one frame

@@ -806,10 +806,10 @@ bool GameBase::HandleDeferredSwapchain()
 {
 	// Skip rendering/submission/present when recreation is deferred or meDestroyType >= kSwapchain: the retired or
 	// torn-down swapchain has a stale framebuffer index and unsignaled acquire semaphore, risking a fence-wait timeout.
-	// At frame head the destroy tier comes from a failed OUT_OF_DATE acquire/present tail; that tail already consumes
-	// settings escalations. Retry Create each frame and acquire only once deferral clears, mirroring
-	// RenderMainPresentAcquire. The last rendered tail already waited for present, and skipped frames enqueue none, so
-	// no mPresent.Wait is needed here.
+	// At frame head the destroy tier comes from a failed acquire/present tail or, on the first boot iteration, the
+	// Graphics constructor's acquire; Create()'s Refresh() consumes settings escalations at every tail. Create is
+	// retried each frame, mirroring RenderMainPresentAcquire. The last rendered tail already waited for present, and
+	// skipped frames enqueue none, so no mPresent.Wait is needed here.
 	if (gpGraphics->mbSwapchainRecreateDeferred || gpGraphics->meDestroyType >= DestroyType::kSwapchain) [[unlikely]]
 	{
 		gpGraphics->Create();
@@ -887,7 +887,7 @@ void GameBase::Render()
 
 	// Capture command buffer index before async launch to avoid re-reading in async thread
 	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
-	gpGraphics->RenderMainPresentAcquire(iCommandBuffer, mRenderInterpolates, rActiveCoords, cameraCoord);
+	gpGraphics->RenderMainPresentAcquire(iCommandBuffer, mRenderInterpolates, rActiveCoords, cameraCoord, fCurrentTime);
 
 }
 #endif // BT_CLIENT

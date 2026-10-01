@@ -7,8 +7,8 @@ Steps and rules for the dispatched reviewer. The public
 
 1. Take the changed regions from the read-only inventory rather than
    re-deriving hunks: `pwsh -NoProfile -File
-   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
-   repository toplevel> -Baseline <full 40-character SHA> -Regions` (add `-Head
+   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
+   repository toplevel>' -Baseline <full 40-character SHA> -Regions` (add `-Head
    <commit>` for a committed head and `-IncludeUntracked <comma-separated
    paths>` for untracked files), filtered to instruction-doc paths.
 

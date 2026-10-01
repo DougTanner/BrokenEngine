@@ -25,16 +25,6 @@ void FleetSelection::AutoSelectFirstAliveMember()
 	}
 }
 
-int64_t FleetSelection::FleetCount() const
-{
-	return std::ssize(mClientFleets);
-}
-
-int64_t FleetSelection::FocusedFleetIndex() const
-{
-	return miFocusedFleetIndex;
-}
-
 void FleetSelection::FocusNextFleet()
 {
 	if (miFocusedFleetIndex < std::ssize(mClientFleets) - 1)
@@ -53,16 +43,6 @@ void FleetSelection::FocusPrevFleet()
 		AutoSelectFirstAliveMember();
 		gpGame->CaptureClientStateIfChanged();
 	}
-}
-
-bool FleetSelection::CanFocusNextFleet() const
-{
-	return miFocusedFleetIndex < std::ssize(mClientFleets) - 1;
-}
-
-bool FleetSelection::CanFocusPrevFleet() const
-{
-	return miFocusedFleetIndex > 0;
 }
 
 const Fleet* FleetSelection::FocusedFleet() const
@@ -110,11 +90,6 @@ void FleetSelection::SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerI
 	}
 
 	gpGame->CaptureClientStateIfChanged();
-}
-
-engine::global_id_t FleetSelection::FocusedMemberGlobalId() const
-{
-	return mFocusedMemberGlobalId;
 }
 
 void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)

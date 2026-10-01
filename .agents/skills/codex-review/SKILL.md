@@ -109,7 +109,7 @@ dispatch wrapper. Use that file as `<promptPath>`, then continue at step 9 with
    the session worktree root:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot <absolute repository toplevel> -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole]
+   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole]
    ```
 
    `-RiskTier` adds one `Risk tier: <n>` line above that text. `-PromptPath`
@@ -144,7 +144,7 @@ dispatch wrapper. Use that file as `<promptPath>`, then continue at step 9 with
    another command:
 
    ```powershell
-   pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <promptPath> -OutFile <out> -Agent <sol|opus>
+   pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree '<worktree>' -PromptFile '<promptPath>' -OutFile <out> -Agent <sol|opus>
    ```
 
    Select the Agent once for the assignment and pass it explicitly on every
@@ -246,7 +246,7 @@ anyway — leaked drafting notes, or an answer to no assigned scope — re-dispa
 the identical prompt exactly once, with a fresh `<out>` path and `-NoRetry`:
 
 ```powershell
-pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree <worktree> -PromptFile <the same promptPath> -OutFile <fresh out> -Agent <the same sol|opus selection> -NoRetry
+pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree '<worktree>' -PromptFile '<the same promptPath>' -OutFile <fresh out> -Agent <the same sol|opus selection> -NoRetry
 ```
 
 `-NoRetry` spends no automatic retry, so this dispatch is the assignment's last

@@ -261,9 +261,6 @@ without approval, main presents only the difference. When the approved presentat
 execution card, main updates the card to the approved scope before the run
 continues.
 
-When preparation shows the problem the Plan describes is gone, ask the user
-whether to retain the Plan or to explicitly authorize obsolete final cleanup.
-
 ### IMPORTANT: Session-complete marker
 
 The user closes the session tab on this line alone, so it must be
@@ -288,9 +285,13 @@ deferral, unknown claim state, or work still to land — never prints that line.
   [change-workflow.md](../../references/change-workflow.md); Tier 3
   additionally follows [tier3-workflow.md](references/tier3-workflow.md).
   Missing a mandatory reviewer blocks. When the preparation handoff reports an
-  empty realized change, the run goes from preparation straight to this file's
+  empty realized change, or that the problem the Plan describes is gone, the
+  run goes from preparation straight to this file's
   `### Implementation approval` route, at any tier, without reaching the Plan
-  review step.
+  review step. Approving either counts as implementation accepted; once step
+  8's acceptance checks pass on the empty change, step 10's completion
+  applies. Refusing either is the approval-refused
+  `### Post-checkpoint outcomes` row.
 - A Plan, card, scope, invariant, or acceptance change after approval, other
   than the redraft `### Implementation approval` allows, requires a new
   presentation of the difference.

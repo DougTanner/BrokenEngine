@@ -141,6 +141,8 @@ static_assert(VER_PRODUCTBUILD > 10'011 || (VER_PRODUCTBUILD == 10'011 && VER_PR
 #endif
 // DirectX Math, SSE only, no AVX because it's not deterministic (and SSE4 is actually slightly faster, for non-transcendentals anyway)
 #define _XM_SSE4_INTRINSICS_
+// Function form only (XMVectorAdd, not vec + vec): without DirectXMath's XMVECTOR operator overloads, operator use fails to compile under MSVC (clang's built-in vector operators still accept it).
+#define _XM_NO_XMVECTOR_OVERLOADS_
 #include <DirectXMath.h>
 #include <DirectXCollision.h>
 #include <DirectXPackedVector.h>

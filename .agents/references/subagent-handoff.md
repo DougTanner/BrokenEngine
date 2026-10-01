@@ -16,7 +16,7 @@ Findings: <review roles and skill-declared verification failures only; one row e
 Changed files: <one row each, path and region; or none>
 Decisive checks: <one row each, command or read and its result>
 Build required: <exact targets, or none>
-Evidence: <existing or Temp/ path plus selector, or none>
+Evidence: <one row each, existing or Temp/ path plus selector — one-line description of what it holds; or none>
 Residuals: <actionable blocker or none>
 ```
 
@@ -24,11 +24,19 @@ That fenced form is the whole return — nothing precedes or follows it except t
 extension fields, row forms, and typed blocks the assigned skill's `## Handoff`
 declares — and `Status` carries exactly one of the three tokens alone on its
 line. Every row is one line. Do not quote code and do not repeat a row from
-another field. A field over 10 rows moves its full material to an existing file
-or log, or to a `Temp/` file when no existing file holds it, and cites it under
-`Evidence` as path plus selector. A selector into a Markdown file is a `##`
-heading in it. The handoff itself still carries everything main needs; the file
-is for the workers main dispatches next, cited to them as path plus selector.
+another field. The whole returned handoff stays under 4,000 characters, or
+under the character cap a skill's `## Handoff` declares in its place. When it
+would exceed the cap, the full material of the fields that push it over moves to
+an existing file or log, or to a `Temp/` file when no existing file holds it,
+with one `##` heading per section of that material, and `Evidence` carries one
+table-of-contents row per section:
+`<path> ## <heading> — <one-line description of what the section holds>`. A
+selector into a Markdown file is a `##` heading in it. Text a skill's
+`## Handoff` requires inline never moves to a file, even past the cap. The
+handoff itself still carries the decision-relevant summary of each moved field,
+such as the count in `Changed files`, so main decides without opening the file;
+the file is for the workers main dispatches next, cited to them as path plus
+selector, and for main when a decision needs the detail.
 
 A skill extends this form only by adding rows inside an existing field or by
 declaring extra fields in its own `## Handoff` section, each one line or one row

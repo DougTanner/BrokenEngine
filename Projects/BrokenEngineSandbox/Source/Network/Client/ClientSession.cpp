@@ -89,7 +89,7 @@ void ClientSession::ProcessReceivedGamePackets()
 		if (ParseFleetSync(mpRuntime->mpClient->mReceivedGamePackets, receivedFleets))
 		{
 			engine::GridCoord preFleetCoord = gpGame->mClientGridCoord;
-			gpGame->SyncFleets(std::move(receivedFleets));
+			gpGame->mFleetSelection.SyncFleets(std::move(receivedFleets));
 			if (gpGame->mClientGridCoord != preFleetCoord)
 			{
 				UpdateDesiredCoords(SubscriptionChangeReason::kFleetSync);
@@ -139,7 +139,7 @@ void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
 		case PlayerEventType::kDied:
 			gpGame->RemoveClientPlayer(rEvent.globalPlayerId);
 			// A respawn keeps this ID and can come back in the weapon mode it had before a dropped request, which would never clear that pending toggle.
-			if (rEvent.globalPlayerId == gpGame->FocusedMemberGlobalId())
+			if (rEvent.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId)
 			{
 				gpGame->mWeaponModeToggle.Reset();
 			}
@@ -150,7 +150,7 @@ void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
 
 void ClientSession::UpdatePlayerCoord(engine::global_id_t globalPlayerId, engine::GridCoord coord)
 {
-	for (int64_t i = 0; i < gpGame->PlayerCount(); ++i)
+	for (int64_t i = 0; i < std::ssize(gpGame->mClientPlayerIds); ++i)
 	{
 		if (gpGame->mClientPlayerIds.at(i) == globalPlayerId)
 		{
@@ -245,7 +245,7 @@ void ClientSession::OnServerLoad()
 	gpGame->mClientPlayerIds.clear();
 	gpGame->mClientPlayerCoords.clear();
 	gpGame->SetClientGridCoord({});
-	gpGame->SetPreviousClientArmor(0.0f);
+	gpGame->mfPreviousClientArmor = 0.0f;
 	gpGame->mVecVisualErrorOffset = {};
 	gpGame->mWeaponModeToggle.Reset();
 

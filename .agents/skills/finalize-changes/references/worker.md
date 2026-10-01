@@ -44,8 +44,12 @@ the continuation capsule `SKILL.md` `### Landing confirmation` lists and skips
 1-8. A blocked result that needs recovery is returned as a handoff for the
 recovery dispatch: main dispatches a fresh preparation worker whose
 continuation capsule carries that blocked disposition as its unresolved-issue
-item and, for `primary.path-overlap`,
-`Temp/finalize-primary-movement-result.json` as path plus selector.
+item and, for a `primary.path-overlap` blocker that in-worker recovery
+returned, `Temp/finalize-primary-movement-result.json` as path plus selector.
+Every preparation dispatch recovers `primary.path-overlap` itself under
+`## Recovery`; the user-authorized recovery dispatch that `## Recovery` routes
+separately is the one whose capsule carries a `primary.path-overlap` conflict
+blocker as that blocked disposition.
 
 1. Run final preparation first when a claimed Plan finished.
    - Run `plan complete`, or `plan reject --user-authorized-rejection` after
@@ -108,6 +112,8 @@ item and, for `primary.path-overlap`,
      handoff in [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts), is
      consumed as a usable non-conflict terminal, and proceeds directly to the
      `SmartGit launch:` line in step 6 and the existing landing summary.
+   - A `primary.path-overlap` result runs the overlap recovery in
+     `## Recovery` in this same dispatch.
    - Apply the Verify and land step's rule that exactly one explicit user
      confirmation authorizes changing primary, and
      [`scripts.md#landing-and-recovery`](scripts.md#landing-and-recovery) for the
@@ -115,7 +121,8 @@ item and, for `primary.path-overlap`,
    - A candidate/session change still returns its changed bytes through normal
      review. Any later primary movement is handled by landing's existing bounded
      internal rebase and terminal result.
-   - Done when the result is a usable terminal or a blocker was returned.
+   - Done when the result is a usable terminal, a blocker was returned, or the
+     overlap recovery returned a blocker or the meaning-change handoff.
 6. Fill in the SmartGit launch line.
    - Only after this checker has returned a usable terminal result, take the
      `Show-FinalizeApprovalReview.ps1` command from
@@ -247,19 +254,44 @@ item and, for `primary.path-overlap`,
   primary checkout, then continues ordinary recovery; initial non-recovery sanity
   remains strict. Then delete the claim.
 - The movement check blocked with `primary.path-overlap` (foreign primary
-  movement touched a session-owned path): stop and return the result as a
-  handoff for the recovery dispatch. When the manager authorizes recovery, that
-  worker performs the single ordinary linear rebase and the re-invocation of
-  approval
-  preparation with the re-resolved tips and any verified-candidate pair stated
-  in [`scripts.md`](scripts.md)'s `Invoke-FinalizeApprovalPreparation.ps1`
-  entry, inspecting any place that rebase merged cleanly but changed the code's
-  meaning, re-runs step 3 for the changed regions, and re-runs the movement
-  check. That inspection and the step-3 re-run, including the review of the
-  changed regions that re-run triggers, cover the rebased tip a re-resolved pair
-  now names, so a supplied gate stays supplied instead of being dropped. This is
-  not the rewritten-history case below, which the fork-point repair script
-  handles
+  movement touched a session-owned path): this preparation worker recovers it
+  in the same dispatch, with no manager or user authorization. It runs the
+  single ordinary linear rebase in [`scripts.md`](scripts.md)'s
+  `Invoke-FinalizeApprovalPreparation.ps1` entry, and that rebase's exit status
+  alone decides clean or conflict.
+  - Exit 0 (clean): re-invoke approval preparation with the re-resolved tips
+    and any verified-candidate pair that entry states, inspect any place that
+    rebase merged cleanly but changed the code's meaning, re-run step 3 for the
+    changed regions, then re-run step 4 and act on step 5; a re-run result of
+    `primary.path-overlap` repeats this recovery. That inspection and the step-3
+    re-run cover the rebased tip a re-resolved pair now names, so a supplied
+    gate stays supplied instead of being dropped. A blocked or failed
+    approval-preparation re-invocation is returned as a blocker. A
+    changed-region row the step-3 re-run produced or changed that is not PASS
+    returns a blocker for the user. When the inspection finds a meaning
+    change, this worker cannot delegate the changed-region review
+    (`## Rules`): it returns a handoff naming those
+    regions, with `Build required` naming the targets they build, for main to
+    run the changed-region reviews, `/compile` for those targets, and then a
+    fresh preparation dispatch; that handoff alone goes to main with no user
+    question. A changed-region review finding or a failed build on that path
+    is main's, handled through its ordinary review-and-fix round before that
+    fresh preparation dispatch.
+  - Any other exit (conflict) in the user-authorized recovery dispatch the
+    `## Steps` intro identifies: resolve under the preconfirmation
+    reconciliation conflict rule above, then continue with every Exit 0 step
+    from the approval-preparation re-invocation on. The resolved hunks count as
+    a meaning change, so that dispatch returns the meaning-change handoff.
+  - Any other exit (conflict) in every other preparation dispatch: unlike the
+    preconfirmation reconciliation conflict rule above, run
+    `git rebase --abort`, prove the session tip is again the candidate commit
+    with no rebase in progress, and return the original `primary.path-overlap`
+    result as a blocker for the user, carrying the rebase's stderr verbatim so
+    a rebase that refused to start is not read as a conflict. If that proof
+    fails, keep the blocker and stop.
+
+  This is not the rewritten-history case below, which the fork-point repair
+  script handles
   ([`scripts.md#session-fork-point-repair`](scripts.md#session-fork-point-repair)).
 - Primary history rewritten under the session: reattaching through the wrapper
   repairs this, rebasing the session branch onto the new primary tip; the step-4

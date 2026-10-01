@@ -12,6 +12,7 @@ Client-only RAII wrappers for Vulkan buffers, textures, shaders, pipelines, and 
 ## Resource Contracts
 
 - Persistent mapped, one-shot staged, and copy-every-frame buffers have distinct ownership and barrier requirements. Keep draw indexing within the slots allocated for that mode.
+- Buffer memory property flags are hard requirements for the allocator, not preferences: a buffer gets every requested flag or its creation throws, so a device-local buffer never falls back to system memory. Every host-visible buffer is host-coherent and persistently mapped, and no code flushes or invalidates mapped memory; requesting non-coherent host memory breaks every caller that writes or reads through the mapping.
 - Descriptor arrays end at the first empty entry. Use each descriptor's resolved Vulkan binding for deferred updates.
 - A uniform-buffer descriptor must name the routing its source uses: `kGlobalLayoutUniformBuffers` for the per-frame global layout, `kMainLayoutUniformBuffers` for the per-frame main layout, and `kPerCommandBufferUniformBuffers` for any other caller-supplied array indexed by framebuffer. Per-frame data never uses plain `kUniformBuffer`, which binds one buffer shared by every frame in flight — the pipeline then reads a buffer the CPU is concurrently writing for another frame, giving stale or torn values with no validation error.
 - Vulkan viewports use negative height to retain the DirectX coordinate convention; pipeline front-face state and uploaded matrices depend on that choice.

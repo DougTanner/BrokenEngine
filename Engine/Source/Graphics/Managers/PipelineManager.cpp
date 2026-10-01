@@ -317,8 +317,6 @@ void PipelineManager::CreateSmokeWindPipelines()
 		},
 	});
 
-	gpBufferManager->CreateWindHierarchicalBuffers();
-
 	struct WindOccupancyPipelineDescription
 	{
 		Pipelines ePipeline;

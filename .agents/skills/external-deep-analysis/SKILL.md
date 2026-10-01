@@ -53,7 +53,7 @@ remains exact-file scope.
    `Recursive` scope mode, and the absolute checkout root:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 -Mode Snapshot -Target <resolved-relative-POSIX-path> -Scope <resolved-mode> -RepositoryRoot <absolute-checkout-root> -Phase0Hints -OutputPath <absolute-ignored-Temp-path>
+   pwsh -NoProfile -File .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1 -Mode Snapshot -Target <resolved-relative-POSIX-path> -Scope <resolved-mode> -RepositoryRoot '<absolute-checkout-root>' -Phase0Hints -OutputPath '<absolute-ignored-Temp-path>'
    ```
 
    Done when exactly one Snapshot run has covered both.

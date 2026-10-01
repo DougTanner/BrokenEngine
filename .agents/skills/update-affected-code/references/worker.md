@@ -58,8 +58,8 @@
    handoff.
 8. Read `triggers.vcxprojCandidates` from the session-change inventory receipt;
    when the assignment supplies none, produce it with `pwsh -NoProfile -File
-   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
-   repository toplevel> -Baseline <full 40-character SHA>` (add
+   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
+   repository toplevel>' -Baseline <full 40-character SHA>` (add
    `-Head <commit>` for a committed head, and
    `-IncludeUntracked <comma-separated paths>` listing the untracked paths in
    the owned change set, because the run covers an untracked file only when

@@ -23,30 +23,22 @@ void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, VkDeviceSize v
 		.pQueueFamilyIndices = nullptr,
 	};
 
-	// Configure VMA allocation based on memory properties
 	VmaAllocationCreateInfo vmaAllocationCreateInfo = {};
 	vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+	// Caller memory flags are requirements, not hints: host-visible callers read and write the persistent mapping with no flush or invalidate, so that memory must be host-visible and coherent.
+	vmaAllocationCreateInfo.requiredFlags = vkMemoryPropertyFlags;
 
 	if ((vkMemoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0u)
 	{
 		bool bIsReadbackBuffer = (vkBufferUsageFlags & VK_BUFFER_USAGE_TRANSFER_DST_BIT) != 0u && (vkBufferUsageFlags & VK_BUFFER_USAGE_TRANSFER_SRC_BIT) == 0u;
-		bool bIsIndirectBuffer = (vkBufferUsageFlags & VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT) != 0u;
 		if (bIsReadbackBuffer)
 		{
 			// Readback buffer (GPU→CPU): Must have mapped pointer for CPU reads
 			vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		}
-		else if (bIsIndirectBuffer)
-		{
-			// Indirect buffer: Requires true HOST_VISIBLE + HOST_COHERENT memory for CPU writes read by GPU
-			// Do NOT use ALLOW_TRANSFER_INSTEAD - we need guaranteed coherent access without staging
-			vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-			vmaAllocationCreateInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		}
 		else
 		{
-			// Upload buffer (CPU→GPU): Allow VMA to use device-local memory with staging if more optimal
-			vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT;
+			vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		}
 	}
 

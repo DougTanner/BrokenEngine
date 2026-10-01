@@ -22,10 +22,10 @@ scratch space.
 From repository root, run:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/analyze-diagsession/scripts/Invoke-DiagSessionSymbolization.ps1 -EtlPath <etl> -RepositoryRoot <repo> -OutputPath <profile.txt>
+pwsh -NoProfile -File .agents/skills/analyze-diagsession/scripts/Invoke-DiagSessionSymbolization.ps1 -EtlPath '<etl>' -RepositoryRoot '<repo>' -OutputPath '<profile.txt>'
 ```
 
-Use `-SymbolCacheRoot <short-path>` only when `%TEMP%` is unsuitable. The
+Use `-SymbolCacheRoot '<short-path>'` only when `%TEMP%` is unsuitable. The
 script scopes `_NT_SYMBOL_PATH` and `_NT_SYMCACHE_PATH` to xperf.
 
 - xperf is expected at the Windows Performance Toolkit path encoded by the

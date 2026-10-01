@@ -57,8 +57,8 @@ Require a self-contained, immutable brief containing:
   residual, and focus-area handoffs (`none` is valid for each).
 
 The inventory run is `pwsh -NoProfile -File
-.agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute adopted
-worktree> -Baseline <full 40-character SHA> -Regions`. It writes no file and
+.agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute adopted
+worktree>' -Baseline <full 40-character SHA> -Regions`. It writes no file and
 prints one
 `broken-engine-session-change-inventory/v1` object with `entries` and their
 `class` values, `counts`, `triggers`, and the per-hunk `regions` table. Only

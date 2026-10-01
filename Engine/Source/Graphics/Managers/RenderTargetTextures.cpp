@@ -277,6 +277,9 @@ void RenderTargetTextures::CreateWindTextures()
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
+	// Occupancy describes these textures' contents, so it is replaced exactly when they are and sized from their new extent.
+	gpBufferManager->CreateWindHierarchicalBuffers();
+
 	// Wind ping-pong textures are (re)created with undefined contents. On a device-lost / settings recreate the wind
 	// spread only touches active tiles (occupancy-driven), so it never decays garbage in inactive tiles, and smoke
 	// samples that garbage for several frames. Hard-clear both to zero once here (the device is idle on the
@@ -291,6 +294,24 @@ void RenderTargetTextures::CreateWindTextures()
 		vkCmdClearColorImage(oneShotCommandBuffer.mVkCommandBuffer, pWindTexture->mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &vkWindClearColor, 1, &vkWindSubresource);
 		pWindTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kTransferDestination, TextureLayout::kShaderReadOnly);
 	}
+	VkBufferMemoryBarrier pWindOccupancyInitBarriers[2] {};
+	for (int64_t i = 0; i < 2; ++i)
+	{
+		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, gpBufferManager->mWindOccupancyVkBuffers[i], 0, gpBufferManager->mWindOccupancyBufferSize, 0);
+		pWindOccupancyInitBarriers[i] =
+		{
+			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+			.pNext = nullptr,
+			.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+			.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.buffer = gpBufferManager->mWindOccupancyVkBuffers[i],
+			.offset = 0,
+			.size = VK_WHOLE_SIZE,
+		};
+	}
+	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pWindOccupancyInitBarriers)), pWindOccupancyInitBarriers, 0, nullptr);
 	oneShotCommandBuffer.Execute();
 }
 

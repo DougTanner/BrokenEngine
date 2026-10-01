@@ -41,7 +41,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	// Re-sync client identity from main thread
 	mConfirmedClientState.clientGridCoord = gpGame->mClientGridCoord;
 	mConfirmedClientState.clientGlobalPlayerId = gpGame->ClientPlayerId();
-	mConfirmedClientState.fPreviousClientArmor = gpGame->PreviousClientArmor();
+	mConfirmedClientState.fPreviousClientArmor = gpGame->mfPreviousClientArmor;
 
 	engine::ReconcileInputs inputs;
 	inputs.iTargetTick = gpGame->TickCounter();
@@ -118,7 +118,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	}
 
 	mConfirmedClientState = newConfirmedClientState;
-	gpGame->SetPreviousClientArmor(newConfirmedClientState.fPreviousClientArmor);
+	gpGame->mfPreviousClientArmor = newConfirmedClientState.fPreviousClientArmor;
 
 	gpProfileManager->SetReconcileCounters(dispatch.profiling.iCrcValidatedFrameTicks, dispatch.profiling.iAssumedFrameTicks, dispatch.profiling.iCrcFastPathEvents, dispatch.profiling.iStatusChangeReplayTicks, dispatch.profiling.iKnockOnReplayTicks);
 

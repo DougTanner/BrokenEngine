@@ -105,7 +105,7 @@ Evidence from this session (scratch artifacts under `Temp/`, not tracked):
   `## Game-Specific Rules`; `Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/PlayersCombat.cpp:107-109`).
 - Harness policy: a missing primitive returns the criterion `BLOCKED` and
   names the narrowest extension; the main agent decides whether the change
-  includes it (`.agents/skills/agent-harness/SKILL.md:55`).
+  includes it (`.agents/skills/agent-harness/SKILL.md` `## Handoff`).
 
 ## Options
 

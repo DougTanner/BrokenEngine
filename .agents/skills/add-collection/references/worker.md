@@ -136,10 +136,10 @@ runner applies. The purpose and the triggers live in
     Done when the run reports no violation.
 18. Return an exact `Build required` request naming every affected
     client/server target and that target's configuration/platform inline; when
-    the field would push past the shared row cap, only the per-`.cpp` selected
-    project-member path and each changed header's consuming targets move with
-    the overflow, on the shared form's terms, and the request stays executable
-    without rediscovery wherever that detail sits. Main schedules
+    the field would push the handoff past the shared character cap, only the
+    per-`.cpp` selected project-member path and each changed header's consuming
+    targets move with the overflow, on the shared form's terms, and the request
+    stays executable without rediscovery wherever that detail sits. Main schedules
     `/compile` after the C++ and project-membership stages are complete. Done
     when every affected target is present in that request.
 19. Return each runtime-observable acceptance criterion as an exact runtime

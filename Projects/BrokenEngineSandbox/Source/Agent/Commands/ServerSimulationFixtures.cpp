@@ -398,7 +398,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			.vecPosition = vecPosition,
 			.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
 			.vecVelocity = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
-			.alignment = gpGame->PlayerAlignment(),
+			.alignment = gpGame->mPlayerAlignment,
 			.fHealth = 1.0f,
 			.fShield = 1.0f,
 			.uiTypeIndex = PlayersInterpolate::suiBlasterTypeIndex,
@@ -803,7 +803,7 @@ void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json&
 			.vecPosition = XMVectorSet(fPositionX, fPositionY, engine::gBaseHeight.Get(), 1.0f),
 			.vecDirection = XMVector3Normalize(vecVelocity),
 			.vecVelocity = vecVelocity,
-			.alignment = gpGame->PlayerAlignment(),
+			.alignment = gpGame->mPlayerAlignment,
 			// A zero-armor arrival is flagged exploding on its first tick instead of transferring.
 			.fHealth = 1.0f,
 			.fShield = 1.0f,

@@ -34,8 +34,9 @@ Require all of the following before starting:
 - the draft execution card, carrying every field of the card template in
   [`../next-plan/SKILL.md`](../next-plan/SKILL.md) `## Handoff`;
 - for a round after the first, the previous round's `Decision detail file`
-  path plus both selectors, the recorded answers, and the external-claim
-  verdicts, in the continuation capsule.
+  path plus both selectors, the recorded answers (each relayed as
+  [`../../references/authority-order.md`](../../references/authority-order.md)
+  requires), and the external-claim verdicts, in the continuation capsule.
 - Roles: execution splits by role — the preparation `implementer` performs every
   repository read and search this skill requires and returns immutable decision
   briefs; the main session interviews the user, decides, and dispatches the

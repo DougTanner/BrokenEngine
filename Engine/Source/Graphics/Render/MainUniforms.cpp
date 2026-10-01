@@ -408,10 +408,10 @@ static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double
 	rMainLayout.iWaterMediumCount = static_cast<int32_t>(iCount);
 }
 
-// Wave phase reduction: read elapsed time from already-populated global layout.
+// Wave phase reduction: fCurrentTime is the same elapsed time this frame's RenderFrameGlobal received.
 // The band helpers publish each iWater*Count beside its MainLayout wave arrays; when a per-stack camera-eye-height
 // fade clamps amplitude to zero they zero the count so the WaterDisplacement.comp Gerstner loop short-circuits to no work.
-static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, const shaders::GlobalLayout& rGlobalLayout, GraphicsQualityLevel eWaterLevel)
+static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurrentTime, GraphicsQualityLevel eWaterLevel)
 {
 	if (eWaterLevel == GraphicsQualityLevel::kLow)
 	{
@@ -420,7 +420,7 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, const shader
 		return;
 	}
 
-	double dWaveTime = static_cast<double>(rGlobalLayout.fElapsedTime);
+	double dWaveTime = static_cast<double>(fCurrentTime);
 	XMFLOAT4A f4WaveCameraPos {};
 	XMStoreFloat4A(&f4WaveCameraPos, engine::gpCamera->mVecPosition);
 	// WaterDisplacement.comp adds dot(direction, worldPosition - waterOrigin) to this term, so the term must carry the
@@ -468,7 +468,7 @@ static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 	rMainLayout.fHexShieldDirectionMultiplier = engine::gHexShieldDirectionMultiplier.Get();
 }
 
-void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
+void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, float fCurrentTime)
 {
 	if (rActiveCoords.empty() || rRenderInterpolates.find(cameraCoord) == rRenderInterpolates.end())
 	{
@@ -491,7 +491,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	}
 
 	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoord);
-	const shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<const shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 	GraphicsQualityLevel eWaterLevel = static_cast<GraphicsQualityLevel>(std::clamp(gWaterLevel.Get<int64_t>(), int64_t {0}, static_cast<int64_t>(GraphicsQualityLevel::kCount) - 1));
 
@@ -612,7 +611,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	XMStoreFloat4(&rMainLayout.f4BillboardRight, vecBillboardRight);
 	XMStoreFloat4(&rMainLayout.f4BillboardUp, XMVector3Cross(vecToEyeNormal, vecBillboardRight));
 
-	PopulateGerstnerWaves(rMainLayout, rGlobalLayout, eWaterLevel);
+	PopulateGerstnerWaves(rMainLayout, fCurrentTime, eWaterLevel);
 
 	PopulateHexShield(rMainLayout);
 }

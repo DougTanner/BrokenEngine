@@ -24,6 +24,9 @@ $script:ScannedExtensions = $script:CppExtensions + $script:ShaderExtensions
 # A block is a run of consecutive lines whose first non-whitespace characters are `//`; the anchor allows
 # leading whitespace because an in-function comment is indented.
 $script:CommentPattern = '^\s*//'
+# A line's comment text: the line minus its leading whitespace, the `//` marker, and the whitespace after the
+# marker; trailing whitespace stays.
+$script:CommentPrefixPattern = '^\s*//\s*'
 # One entry per candidate kind. A block reports every kind any of its lines matches, in this order.
 $script:KindPatterns = @(
 	@{ Kind = 'banner'; Pattern = '^\s*//\s*[=\-*]{10,}' }
@@ -35,7 +38,7 @@ $script:KindPatterns = @(
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-comment-blocks/v1'
+	schemaVersion = 'broken-engine-comment-blocks/v2'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Comment block scan did not run.'
@@ -85,6 +88,7 @@ function Get-CommentBlock([string] $FullPath, [string] $Relative) {
 	$start = 0
 	$kinds = [Collections.Generic.List[string]]::new()
 	$first = ''
+	$charCount = 0
 	for ($number = 1; $number -le $lines.Count + 1; $number++) {
 		$line = if ($number -le $lines.Count) { $lines[$number - 1] } else { '' }
 		$isComment = $number -le $lines.Count -and $line -match $script:CommentPattern
@@ -94,7 +98,9 @@ function Get-CommentBlock([string] $FullPath, [string] $Relative) {
 				$kinds.Clear()
 				$first = $line.Trim()
 				if ($first.Length -gt $script:MaximumTextLength) { $first = $first.Substring(0, $script:MaximumTextLength) }
+				$charCount = 0
 			}
+			$charCount += ($line -replace $script:CommentPrefixPattern, '').Length
 			foreach ($kind in $script:KindPatterns) {
 				if ($line -match $kind.Pattern -and -not $kinds.Contains($kind.Kind)) { $kinds.Add($kind.Kind) }
 			}
@@ -105,7 +111,8 @@ function Get-CommentBlock([string] $FullPath, [string] $Relative) {
 		$blocks.Add([ordered]@{
 			path = $Relative
 			startLine = $start
-			lineCount = $number - $start
+			endLine = $number - 1
+			charCount = $charCount
 			kinds = [string[]] $kinds.ToArray()
 			firstLine = $first
 		})

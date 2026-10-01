@@ -504,7 +504,7 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 
 void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 {
-	mbHasPendingAcquireBarriers = false;
+	mFlags.Clear(TextureManagerFlags::kPendingAcquireBarriers);
 
 	// Idle-frame fast path: skip the full mTextureMap scan when nothing is in an adoptable state. The
 	// TextureUploadManager pending-adoption counter is armed when a chunk reaches kDiskLoaded/kGpuUploadComplete
@@ -581,7 +581,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 		mTextureDescriptors.UpdateTextureArrayDescriptors();
 	}
 
-	// Finalize acquire barrier command buffer for CommandBufferManager to prepend. mbHasPendingAcquireBarriers and
+	// Finalize acquire barrier command buffer for CommandBufferManager to prepend. mFlags (kPendingAcquireBarriers) and
 	// miAcquireFramebufferIndex (set earlier in this function) are plain non-atomic members written here on the main
 	// thread (ProcessPendingTextures runs from Graphics::RenderGlobal) and read on the mSubmitGlobal worker in
 	// CommandBufferManager::SubmitGlobalToQueue — the publish is ordered only by that worker's Wake/Wait edge. Same
@@ -589,7 +589,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 	if (bRecordedBarriers)
 	{
 		CHECK_VK(vkEndCommandBuffer(vkAcquireCommandBuffer));
-		mbHasPendingAcquireBarriers = true;
+		mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers);
 	}
 }
 
@@ -681,7 +681,7 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 			ProcessPendingTextures(0);
 
 			// Flush pending acquire barriers since we're not in the render loop
-			if (mbHasPendingAcquireBarriers)
+			if (mFlags & TextureManagerFlags::kPendingAcquireBarriers)
 			{
 				VkFenceCreateInfo vkFenceCreateInfo
 				{
@@ -709,7 +709,7 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 				CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX));
 
 				vkDestroyFence(gpDeviceManager->mVkDevice, vkFence, nullptr);
-				mbHasPendingAcquireBarriers = false;
+				mFlags.Clear(TextureManagerFlags::kPendingAcquireBarriers);
 			}
 		}
 	}

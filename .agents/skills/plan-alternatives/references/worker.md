@@ -7,13 +7,13 @@ step.
 
 ## Steps
 
-1. Read the brief text and the evidence paths it cites. Only the brief's
-   `Fixed decisions` are binding; what candidate zero happens to do is the
-   benchmark to beat, not a hidden requirement. A plan's own declarations,
-   including its scope boundaries, bind only as
+1. Read the brief text and the evidence paths it cites. The brief's
+   `Fixed decisions` and a plan's own declarations, including its scope
+   boundaries, bind only as
    [`../../../references/authority-order.md`](../../../references/authority-order.md)
-   provides. Done when the objective, fixed decisions, and candidate zero are
-   each recorded separately.
+   provides; what candidate zero happens to do is the benchmark to beat, not a
+   hidden requirement. Done when the objective, fixed decisions, and candidate
+   zero are each recorded separately.
 2. Search the repository for a mechanism on the assigned axis, which is one of:
 
    - Reuse — an existing repository mechanism or pattern that already solves

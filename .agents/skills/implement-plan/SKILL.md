@@ -68,16 +68,15 @@ extended with these fields:
   row giving those four parts; or none.
 
 Each shared `Build required` row names its distinct target and that target's
-configuration/platform inline in every case; when a field overflows, only the
-per-file attribution — which selected project-member `.cpp` belongs to which
-target, and which targets consume a changed header — moves with the overflow
-below. Each shared `Residuals` row names a contradiction, incomplete item, or
+configuration/platform inline in every case; when the field would push the
+handoff past the shared character cap, only the per-file attribution — which
+selected project-member `.cpp` belongs to which target, and which targets
+consume a changed header — moves with the overflow below. Each shared `Residuals` row names a contradiction, incomplete item, or
 blocker with evidence, using `none` when absent.
 
-Name each changed file once, and when the changed set would push a field past
-the shared row cap give the count in `Changed files` and move the per-file rows
-to the file cited under `Evidence` as path plus `##` selector, on the shared
-form's terms. Build requests must be executable without rediscovery wherever the
+Name each changed file once; past the shared character cap, the overflow file
+cited under `Evidence` follows `../../references/subagent-handoff.md`
+`## Handoffs`. Build requests must be executable without rediscovery wherever the
 per-`.cpp` detail sits, inline or in that cited file: it names the exact target,
 configuration/platform, and selected project-member path, and each changed
 header names every consuming target and configuration/platform. The manager

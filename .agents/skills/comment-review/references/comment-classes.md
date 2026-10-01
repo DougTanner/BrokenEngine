@@ -11,7 +11,7 @@ these classes enforce; they add no rule it does not state.
 | speculative | never describes a hypothetical or future code path, and never argues that the code is correct | a rebuttal of a review is such an argument | Required |
 | navigation | never carries an `AGENTS.md` navigation pointer as its content | — | Required |
 | false | every statement is true of the adjacent code as it stands | — | Required |
-| dense | says it in the fewest sentences that carry it | a block over 8 lines, or a fact the block or its function already states elsewhere | Recommended |
+| dense | says it in the fewest sentences that carry it | a block over 800 characters of comment text, or a fact the block or its function already states elsewhere | Recommended |
 
 ## Examples
 

@@ -341,13 +341,20 @@ int MainThread(HINSTANCE hinstance)
 	}
 	gpCamera->Update(pGame->mRenderInterpolates.at(kOriginCoord), static_cast<float>(pGame->mfLastRenderFrameSeconds));
 
-	// Render and present all framebuffers, then show window
+	// Render and present once per framebuffer, then show window. An iteration whose head check recreates or defers the
+	// swapchain is skipped, not retried; the count is captured first because a swapchain-tier Destroy() resets the
+	// command buffer manager.
 	gpProfileManager->BootStart(kBootTimerRenderPresent);
 	std::vector<GridCoord> bootActiveCoords = {kOriginCoord};
-	for (size_t i = 0; i < gpCommandBufferManager->mPerFramebufferCommandBuffers.size(); ++i)
+	size_t uiBootFramebufferCount = gpCommandBufferManager->mPerFramebufferCommandBuffers.size();
+	for (size_t i = 0; i < uiBootFramebufferCount; ++i)
 	{
+		if (pGame->HandleDeferredSwapchain())
+		{
+			continue;
+		}
 		gpGraphics->RenderGlobal(pGame->RenderFrame(pGame->mClientGridCoord).interpolate.fCurrentTime);
-		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoords, kOriginCoord);
+		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoords, kOriginCoord, pGame->RenderFrame(pGame->mClientGridCoord).interpolate.fCurrentTime);
 	}
 	gpProfileManager->BootStop(kBootTimerRenderPresent);
 

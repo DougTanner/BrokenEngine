@@ -102,27 +102,11 @@ public:
 
 	// Client player tracking (multi-player per client)
 	engine::global_id_t ClientPlayerId() const;
-	float PreviousClientArmor() const { return mfPreviousClientArmor; }
 	bool IsClientPlayer(engine::global_id_t id) const;
 	void AddClientPlayer(engine::global_id_t id, engine::GridCoord coord);
 	void RemoveClientPlayer(engine::global_id_t id);
-	int64_t PlayerCount() const;
 	void RestoreReplayMeta(const ReplayMeta& rMeta);
 	std::optional<int64_t> ClientPlayerIndex(const PlayersPostRender& rPlayers) const;
-
-	// Fleet navigation — delegated to mFleetSelection (client-only)
-#if defined(BT_CLIENT)
-	int64_t FleetCount() const { return mFleetSelection.FleetCount(); }
-	int64_t FocusedFleetIndex() const { return mFleetSelection.FocusedFleetIndex(); }
-	void FocusNextFleet() { mFleetSelection.FocusNextFleet(); }
-	void FocusPrevFleet() { mFleetSelection.FocusPrevFleet(); }
-	bool CanFocusNextFleet() const { return mFleetSelection.CanFocusNextFleet(); }
-	bool CanFocusPrevFleet() const { return mFleetSelection.CanFocusPrevFleet(); }
-	const Fleet* FocusedFleet() const { return mFleetSelection.FocusedFleet(); }
-	void SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerId) { mFleetSelection.SelectPlayerInFleet(memberGlobalPlayerId); }
-	engine::global_id_t FocusedMemberGlobalId() const { return mFleetSelection.FocusedMemberGlobalId(); }
-	void SyncFleets(std::vector<Fleet>&& fleets) { mFleetSelection.SyncFleets(std::move(fleets)); }
-#endif
 
 #if defined(BT_CLIENT)
 	XMVECTOR GetClientPlayerPosition() const;
@@ -178,16 +162,12 @@ private:
 public:
 	std::vector<engine::global_id_t> mClientPlayerIds;
 	std::vector<engine::GridCoord> mClientPlayerCoords;
-private:
 	float mfPreviousClientArmor = 0.0f;
 	engine::alignment_t mPlayerAlignment {};
+private:
 	engine::alignment_t mEnemyAlignment {};
-	engine::Alignments mAlignments {};
-
 public:
-	engine::alignment_t PlayerAlignment() const { return mPlayerAlignment; }
-	void SetPreviousClientArmor(float fArmor) { mfPreviousClientArmor = fArmor; }
-	const engine::Alignments& Alignments() const { return mAlignments; }
+	engine::Alignments mAlignments {};
 
 #if defined(BT_CLIENT)
 	void StartMenuMusic()

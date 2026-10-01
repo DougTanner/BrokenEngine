@@ -9,16 +9,30 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - When the caller supplies a scope, use exactly those files and directories;
      otherwise take the session-changed C++ and shader files from the read-only
      inventory: `pwsh -NoProfile -File
-     .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot <absolute
-     repository toplevel> -Baseline <full 40-character SHA> -Regions`, adding
+     .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
+     repository toplevel>' -Baseline <full 40-character SHA> -Regions`, adding
      `-IncludeUntracked <comma-separated paths>` when the caller supplied
      untracked paths, and keeping the `entries` rows whose `class` is `cpp`,
      `dual-language-header`, or `glsl` plus their `regions`.
-   - Only `status` `pass` with `truncated` false is usable; any other status, or
-     a true `truncated`, means the ranges are unavailable — report that instead
-     of enumerating hunks inline.
+   - Only `status` `pass` with `truncated` false is usable. On `pass` with a
+     true `truncated`, split the session into disjoint parts by top-level
+     directory and rerun the same command once per part with `-PathPrefix
+     <comma-separated prefixes>`, splitting any still-truncated part into
+     subdirectories or single files, until every run reports `pass` with
+     `truncated` false. Take the paths to split from the first run's `entries`
+     when its `truncation.entries.emitted` equals `truncation.entries.full`,
+     otherwise from the repository's top-level directories.
+   - The split is complete only when, for each of `cpp`,
+     `dual-language-header`, and `glsl`, the parts' `entries` rows of that
+     class add up to that class's total in `counts`, which every run reports
+     for the whole session; the scope is then the union of the parts' kept
+     entries and regions.
+   - Any other status, a single file whose run still truncates, or a class sum
+     that misses its `counts` total means the ranges are unavailable — report
+     that instead of enumerating hunks inline.
    - Done when the scope is fixed and stated as session-changed or
-     caller-supplied, or the unavailability is reported.
+     caller-supplied, from one run or from complete split runs, or the
+     unavailability is reported.
 2. Run the bundled scanner: `pwsh -NoProfile -File
    .agents/skills/comment-review/scripts/Find-CommentBlocks.ps1 -Path <paths>`,
    using `pwsh -NoProfile -Command "&
@@ -31,15 +45,16 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      one run: split it into subdirectories, or into groups of files, and rerun
      the scanner per part until every run reports `truncated` false. `Blocks
      scanned` is then the sum over those runs.
-   - In session mode keep only the blocks overlapping a changed region.
-   - Done when the `broken-engine-comment-blocks/v1` objects with their `blocks`
+   - In session mode keep only the blocks whose `startLine` through `endLine`
+     overlaps a changed region.
+   - Done when the `broken-engine-comment-blocks/v2` objects with their `blocks`
      rows are in hand, filtered to the scope, or the unavailability is reported.
 3. Read `Documents/C++StyleGuide.txt` rule 64 and
    [`comment-classes.md`](comment-classes.md), then classify every scanned block
-   by reading the surrounding code. The rows' `kinds` and `lineCount` are a
+   by reading the surrounding code. The rows' `kinds` and `charCount` are a
    starting list, not the finding set: a block with no kind can still be a
    finding, and a kind hit is rejected when the code shows the comment states a
-   present constraint. Judge `dense` from `lineCount` and from facts the block
+   present constraint. Judge `dense` from `charCount` and from facts the block
    or its function already states elsewhere.
    - Done when every scanned block is accepted with one class or rejected.
 4. Write each finding's replacement: `delete`, or the shortest present-tense

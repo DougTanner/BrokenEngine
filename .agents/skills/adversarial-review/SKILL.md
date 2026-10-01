@@ -34,7 +34,7 @@ hypothesis; and relevant prior findings, residuals, and focus areas.
 Whenever a session baseline exists, the complete changed-artifact list is the
 `entries` rows and their `class` values from the read-only inventory: `pwsh
 -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot
-<absolute repository toplevel> -Baseline <full 40-character SHA>` (add `-Head
+'<absolute repository toplevel>' -Baseline <full 40-character SHA>` (add `-Head
 <commit>` for a committed head). It writes no file and prints one
 `broken-engine-session-change-inventory/v1` object with `entries`, `counts`, and
 `triggers`. The run is usable only when `status` is `pass` and `truncated` is

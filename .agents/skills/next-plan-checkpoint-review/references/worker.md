@@ -13,7 +13,7 @@ are the isolation lens.
    `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`
    then measure it from the session worktree root:
    `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1 -SessionId <id>`
-   (or `-TranscriptPath <resolved path>`). Classify the returned envelope by the
+   (or `-TranscriptPath '<resolved path>'`). Classify the returned envelope by the
    states `## Measurement states` in
    `../../next-plan/references/run-checkpoint.md` keeps. Return `BLOCKED` for the
    whole review when that glob resolves to nothing, the transcript file cannot be
@@ -95,7 +95,7 @@ are the isolation lens.
 12. Select the transcript records to read only through the bundled script, whose
     header comment states the row shapes, never by reading the transcript
     whole-file:
-    `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath <transcript path>`
+    `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<transcript path>'`
 
     In the projection, inspect candidate `use Agent` rows and open only the
     candidate records needed to identify this review's

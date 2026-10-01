@@ -76,10 +76,9 @@ follows the over-cap file rule in `../../references/subagent-handoff.md`,
 - `Reviewer focus areas` — the condition the independent verifier must try to
   disprove, or none.
 
-Name each changed file once, and when the changed set would push a field past
-the shared row cap give the count in `Changed files` and move the per-file rows
-to the file cited under `Evidence` as path plus `##` selector, on the shared
-form's terms. Each shared `Build required` row names its distinct target and
+Name each changed file once; past the shared character cap, the overflow file
+cited under `Evidence` follows `../../references/subagent-handoff.md`
+`## Handoffs`. Each shared `Build required` row names its distinct target and
 that target's configuration/platform inline in every case; only the per-file
 attribution — which selected project-member `.cpp` belongs to which target, and
 which targets consume a changed header — moves with the overflow. Build

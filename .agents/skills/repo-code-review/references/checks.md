@@ -6,6 +6,16 @@ changed code is judged against are in the conventions reference,
 [`../../../references/cpp-conventions.md`](../../../references/cpp-conventions.md);
 the checks below say what to compare and what to flag.
 
+Apply every bullet of the conventions reference to the changed lines it reaches
+in PCH-backed code (Engine, game Projects, DataPacker, Common), and in `Tools/`
+C++ as well for a bullet
+that names the AgentTools. Report each violation as a hard flag, without the
+reachable-failure test above and regardless of the style exclusion under
+[Completeness and duplication](#completeness-and-duplication), except that the
+Workbuffer bullet is flagged only on the allocation-tracked Engine/Game paths
+that [Allocation-tracked paths and logging](#allocation-tracked-paths-and-logging)
+covers.
+
 - [General logic and ownership](#general-logic-and-ownership)
 - [Type and domain modeling](#type-and-domain-modeling)
 - [Changed comments](#changed-comments)
@@ -85,8 +95,9 @@ for a persistent member rebuilt under `ScopedSuppressAllocationTracking` for
 synchronous dispatch. For loop-built dynamic log text, follow the current
 `CrcValidateLoop` (`/Engine/Source/Network/Client/ReconcileReplayCrc.cpp`)
 `ScopedWorkbufferArena` construction. Verify changed tracked logs use the
-allocation-free wrappers and formatters the conventions reference requires,
-rather than temporary strings or allocating formatting paths.
+allocation-free wrappers and formatters the conventions reference's "LOG
+formatting" bullet points to, rather than temporary strings or allocating
+formatting paths.
 
 ### ASSERT behavior
 
@@ -175,7 +186,8 @@ ordering. Do not apply this check to semantic codecs or serialization adapters.
 ### Repository patterns
 
 - Flag a struct or function that grew to two or more `bool` members or
-  parameters in this change to use `common::Flags<EnumType>` instead (the
+  parameters in this change to use `common::Flags<EnumType>` or a raw integer
+  bit mask instead (the
   conventions reference). This is a hard flag, not a suggestion.
 - Flag a new standard-library or third-party `#include` added to a PCH-backed
   `.h`/`.cpp`; it belongs in `Common/ExternalHeaders.h`, not the individual

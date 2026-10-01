@@ -77,7 +77,7 @@ engine::global_id_t Game::ClientPlayerId() const
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
-		engine::global_id_t focusedMemberGlobalId = mFleetSelection.FocusedMemberGlobalId();
+		engine::global_id_t focusedMemberGlobalId = mFleetSelection.mFocusedMemberGlobalId;
 		auto memberIt = std::ranges::find(pFleet->members, focusedMemberGlobalId, &FleetMember::globalPlayerId);
 		if (focusedMemberGlobalId.IsValid() && memberIt != pFleet->members.end() && !(memberIt->flags & FleetMemberFlags::kIsDead))
 		{
@@ -113,11 +113,6 @@ void Game::RemoveClientPlayer(engine::global_id_t id)
 			return;
 		}
 	}
-}
-
-int64_t Game::PlayerCount() const
-{
-	return std::ssize(mClientPlayerIds);
 }
 
 std::optional<int64_t> Game::ClientPlayerIndex(const PlayersPostRender& rPlayers) const
@@ -677,7 +672,7 @@ void Game::CaptureClientStateIfChanged()
 	if (pFleet != nullptr)
 	{
 		newFleetGuid = pFleet->guid;
-		newShipId = mFleetSelection.FocusedMemberGlobalId();
+		newShipId = mFleetSelection.mFocusedMemberGlobalId;
 	}
 
 	float fNewCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget;

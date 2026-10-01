@@ -22,12 +22,15 @@ Choose a shape by who consumes the workflow. The presence of
 
 ## Section order
 
-1. `Purpose` (`SKILL.md`) — what the skill produces, in at most 3 lines.
+1. `Purpose` (`SKILL.md`) — what the skill produces, in at most 240
+   characters, counted with leading indentation removed and each line break as
+   one character.
 2. `When to use` (`SKILL.md`) — triggers only.
 3. `Inputs` (`SKILL.md`) — which task-brief fields from
    [`subagent-reporting.md`](subagent-reporting.md) the skill consumes.
 4. `Steps` — numbered, one imperative each, each ending on a checkable
-   done-condition, no paragraph over 4 lines.
+   done-condition, no paragraph or list item over 320 characters, counted as
+   in item 1.
 5. `Handoff` (`SKILL.md`) — the skill's extension fields, fixed shared values,
    and narrowed row forms as plain lines, or as a row-form fence holding no
    shared field name; it never re-renders the shared form from

@@ -104,7 +104,8 @@ The fixed terminal mapping is:
 | ---: | --- | --- | --- |
 | 0 | `pass` | `ok`, `primary.tree-identical` | Continue to the SmartGit review and the landing summary. |
 | 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the Verify and land step's rule that exactly one explicit user confirmation authorizes changing primary owns primary-movement policy. The normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
-| 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.path-overlap`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
+| 2 | `blocked` | `primary.path-overlap` | Run the overlap recovery in the [finalizer worker workflow](worker.md#recovery). |
+| 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 
 Malformed JSON, a schema mismatch, or an exit/status mismatch is itself a

@@ -23,7 +23,7 @@ bool WriteReplayMeta(const engine::FileFlags_t& rFlags, const std::filesystem::p
 	{
 		.clientGridCoord = game::gpGame->mClientGridCoord,
 		.iClientPlayerIdValue = game::gpGame->ClientPlayerId().iValue,
-		.fPreviousClientArmor = game::gpGame->PreviousClientArmor(),
+		.fPreviousClientArmor = game::gpGame->mfPreviousClientArmor,
 	};
 	return engine::WriteVersionedFile(rFlags, rFilename, meta);
 }
@@ -134,6 +134,11 @@ void GameSaveLoad::TickAutosave()
 bool GameSaveLoad::Autoload()
 {
 	ScopedSuppressAllocationTracking suppress;
+
+	if (!engine::gpFileManager->Exists({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save")))
+	{
+		return false;
+	}
 
 	engine::GridCoord loadedClientGridCoord {};
 	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save"), loadedClientGridCoord))

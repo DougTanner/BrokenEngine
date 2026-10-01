@@ -20,20 +20,15 @@ struct NavigationDelayKey
 
 // Owns the client's fleet list and focus state (focused fleet + member). Drives which grid cell the
 // camera follows. Reaches back into Game (grid coord, client-state persistence, owned-player lists)
-// via the gpGame global; Game holds one instance and forwards its public fleet-navigation API.
+// via the gpGame global.
 class FleetSelection
 {
 public:
 
-	int64_t FleetCount() const;
-	int64_t FocusedFleetIndex() const;
 	void FocusNextFleet();
 	void FocusPrevFleet();
-	bool CanFocusNextFleet() const;
-	bool CanFocusPrevFleet() const;
 	const Fleet* FocusedFleet() const;
 	void SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerId);
-	engine::global_id_t FocusedMemberGlobalId() const;
 	void SyncFleets(std::vector<Fleet>&& fleets);
 	void AutoSelectFirstAliveMember();
 	void Clear();
@@ -42,8 +37,6 @@ public:
 	engine::NetworkUiControl<int64_t> mSpawnIntoFleetToggle {};
 	engine::NetworkUiControl<int64_t> mDeleteFleetToggle {};
 	engine::NetworkUiControl<NavigationDelayKey> mNavigationDelayControl {};
-
-private:
 
 	std::vector<Fleet> mClientFleets;
 	int64_t miFocusedFleetIndex = -1;

@@ -196,15 +196,15 @@ void Graphics::RenderGlobal(float fCurrentTime)
 
 	miRenderFrameDeltaNs = mRenderFrameTimer.GetDeltaNs(true).count();
 
-	// EvictionSweep frees expired template GPU resources, then ProcessPendingTextures adopts chunks, and RestorationSweep restores channels
-	// from slot-0 fallback as chunks reach kReady. These descriptor changes run after fence waits and before command recording. Drain every
-	// framebuffer fence only when churn, adoption, or restoration is pending; UPDATE_AFTER_BIND permits writes but does not prevent races with
-	// in-flight samplers. AnyAdoptionPending covers per-slot, array-flush, and lighting-blur writes; AnyRestorationPending also covers
-	// template-owned elevation without a texture-map chunk. Clear the prior acquire publication before testing the predicate so an idle frame
-	// cannot resubmit it; ProcessPendingTextures republishes only inside the write epoch. This drain covers Vulkan descriptor and image use
-	// only — it is not the PackChunks loader drain (Graphics::Destroy owns that), so unrelated disk loads keep running through this window.
-	gpTextureManager->mbHasPendingAcquireBarriers = false;
-	bool bDescriptorChurnPending = gpIslandTerrain->AnyEvictionPending() || gpIslandTerrain->AnyRestorationPending() || gpTextureManager->AnyAdoptionPending();
+	// UPDATE_AFTER_BIND permits descriptor writes but does not prevent races with in-flight samplers, so eviction, adoption, lighting
+	// reblur, and restoration run only after every framebuffer fence drains. AnyRestorationPending also covers template-owned elevation
+	// without a texture-map chunk. Clear the prior acquire publication before testing the predicate so an idle frame cannot resubmit it;
+	// ProcessPendingTextures republishes only inside the write epoch. This drain covers Vulkan descriptor and image use only — it is not
+	// the PackChunks loader drain (Graphics::Destroy owns that), so unrelated disk loads keep running through this window.
+	gpTextureManager->mFlags.Clear(TextureManagerFlags::kPendingAcquireBarriers);
+	bool bDescriptorChurnPending = gpIslandTerrain->AnyEvictionPending() || gpIslandTerrain->AnyRestorationPending()
+	                            || gpTextureManager->AnyAdoptionPending()
+	                            || (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur);
 	if (bDescriptorChurnPending)
 	{
 		WaitAllFramebufferFencesIdle();
@@ -214,6 +214,11 @@ void Graphics::RenderGlobal(float fCurrentTime)
 		TextureDescriptors::ScopedBindlessWriteEpoch bindlessWriteEpoch(gpTextureManager->mTextureDescriptors);
 		gpIslandTerrain->EvictionSweep();
 		gpTextureManager->ProcessPendingTextures(iCommandBuffer);
+		if (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur)
+		{
+			gpTextureManager->ReblurAllLightingTextures();
+			gpTextureManager->mFlags.Clear(TextureManagerFlags::kPendingLightingReblur);
+		}
 		gpIslandTerrain->RestorationSweep();
 		gpTextureManager->mTextureDescriptors.VerifyAllDescriptorGenerations();
 	}
@@ -239,10 +244,10 @@ void Graphics::RenderGlobal(float fCurrentTime)
 	gpCommandBufferManager->SubmitGlobalCommandBuffer(iCommandBuffer);
 }
 
-void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
+void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, float fCurrentTime)
 {
 	gpProfileManager->CpuStart(kCpuTimerRenderMain);
-	RenderFrameMain(iCommandBuffer, rRenderInterpolates, rActiveCoords, cameraCoord);
+	RenderFrameMain(iCommandBuffer, rRenderInterpolates, rActiveCoords, cameraCoord, fCurrentTime);
 	gpProfileManager->CpuStop(kCpuTimerRenderMain);
 
 	gpImGuiManager->Prepare(iCommandBuffer);
@@ -291,7 +296,7 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 	// Acquire only if the recreate proceeded. A deferred Create() (window off-screen/minimized) leaves the swapchain
 	// retired, and a post-Destroy defer (TOCTOU zero-area re-check below) leaves the swapchain manager torn down —
 	// acquiring in either case is at best a wasted OUT_OF_DATE and at worst a null deref. The next frame's render
-	// skip (GameBase::Render) retries the recreate and re-acquires once it lands.
+	// skip (GameBase::HandleDeferredSwapchain) retries the recreate and re-acquires once it lands.
 	if (!mbSwapchainRecreateDeferred)
 	{
 		gpSwapchainManager->AcquireNextImage();
@@ -360,10 +365,11 @@ void Graphics::Create()
 	// zero the surface extent between the pre-Destroy gate's caps query and CreateSwapchain's re-query. Re-query here;
 	// on a zero-area defined extent, re-arm the swapchain tier and defer rather than feed a degenerate extent to
 	// CreateSwapchain (spec-invalid — .imageExtent must be non-zero). The swapchain manager is now torn down, so the
-	// next frame's render skip (GameBase::Render) guards rendering; its Create() retry re-enters the pre-Destroy gate,
-	// which defers again (no double-Destroy) until the extent is valid, then proceeds. A second Destroy() on that
-	// restore frame is re-run-safe (every teardown null-guards its handles). CHECK_VK can escalate to kSurface here
-	// (VK_ERROR_SURFACE_LOST_KHR); the < kSurface guard then lets a surface-loss teardown proceed instead of deferring.
+	// next frame's render skip (GameBase::HandleDeferredSwapchain) guards rendering; its Create() retry re-enters the
+	// pre-Destroy gate, which defers again (no double-Destroy) until the extent is valid, then proceeds. A second
+	// Destroy() on that restore frame is re-run-safe (every teardown null-guards its handles). CHECK_VK can escalate to
+	// kSurface here (VK_ERROR_SURFACE_LOST_KHR); the < kSurface guard then lets a surface-loss teardown proceed instead
+	// of deferring.
 	if (bSwapchainTierRecreate)
 	{
 		VkSurfaceCapabilitiesKHR vkSurfaceCapabilitiesKHR {};
@@ -570,7 +576,8 @@ void Graphics::Refresh()
 	auto [fLightingBlurEdgeFalloff, fLightingBlurEdgeFalloffPrevious, bLightingBlurEdgeFalloffChanged] = gLightingBlurEdgeFalloff.Changed<float>();
 	if ((bLightingBlurSigmaChanged || bLightingBlurSampleCountChanged || bLightingBlurEdgeFalloffChanged) && gpTextureManager != nullptr) [[unlikely]]
 	{
-		gpTextureManager->ReblurAllLightingTextures();
+		// Earlier frames may still sample the blur results, so RenderGlobal reblurs after its all-fence drain
+		gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingLightingReblur);
 	}
 
 	auto [fObjectShadowsRenderMultiplier, fObjectShadowsRenderMultiplierPrevious, bObjectShadowsRenderMultiplierChanged] = gObjectShadowsRenderMultiplier.Changed<float>();
