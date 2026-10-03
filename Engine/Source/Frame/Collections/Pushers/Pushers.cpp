@@ -26,9 +26,9 @@ bool PushersInterpolate::LogDifferences(const PushersInterpolate& rOther) const
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
-	for (int64_t i = 0; i < CommonRowCount(rOther); ++i)
+	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
-		bEqual &= common::LogDifference_Vec("pVecPositions", i, pVecPositions[i], rOther.pVecPositions[i]);
+		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pfRadii">(i, pfRadii[i], rOther.pfRadii[i]);
 		bEqual &= common::LogDifference<"pfIntensities">(i, pfIntensities[i], rOther.pfIntensities[i]);
 		bEqual &= common::LogDifference<"pfPowers">(i, pfPowers[i], rOther.pfPowers[i]);
@@ -44,9 +44,9 @@ bool PushersPostRender::LogDifferences(const PushersPostRender& rOther) const
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
-	for (int64_t i = 0; i < CommonRowCount(rOther); ++i)
+	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
-		bEqual &= common::LogDifference<"puiIds">(i, puiIds[i], rOther.puiIds[i]);
+		bEqual &= common::LogDifference<"pIds">(i, pIds[i], rOther.pIds[i]);
 	}
 
 	return bEqual;

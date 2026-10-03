@@ -8,8 +8,6 @@
 namespace game
 {
 
-namespace
-{
 const engine::TweaksSliderMapRegistrar gHexShieldRegistrar
 {
 	// Edge
@@ -27,7 +25,6 @@ const engine::TweaksSliderMapRegistrar gHexShieldRegistrar
 	{"Direction Falloff Power", &engine::gHexShieldDirectionFalloffPower},
 	{"Direction Multiplier", &engine::gHexShieldDirectionMultiplier},
 };
-}
 
 void TweaksScreen::RenderHexShieldSection()
 {

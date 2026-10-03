@@ -10,20 +10,17 @@
 namespace engine
 {
 
-namespace
-{
-
-// How many of the terrain grid's kiElevationGridDim sample positions along one axis resolve to distinct floats;
+// How many of the terrain grid's kiElevationGridDimension sample positions along one axis resolve to distinct floats;
 // fewer means neighbouring samples share a float at this coordinate. The positions increase monotonically, so
 // exact inequality against the predecessor — not an approximate comparison — finds every such collapse.
-constexpr int64_t DistinctAxisSamplePositions()
+static constexpr int64_t DistinctAxisSamplePositions()
 {
-	constexpr float kfGridPitch = kfCellWidth / static_cast<float>(kiElevationGridDim);
+	static constexpr float kfGridPitch = kfCellWidth / static_cast<float>(kiElevationGridDimension);
 	int64_t iDistinct = 0;
 	float fPrevious = 0.0f;
-	for (int64_t i = 0; i < kiElevationGridDim; ++i)
+	for (int64_t i = 0; i < kiElevationGridDimension; ++i)
 	{
-		float fPosition = kfBaseAreaMinX + (static_cast<float>(i) + 0.5f) * kfGridPitch;
+		float fPosition = kfBaseAreaMinimumX + (static_cast<float>(i) + 0.5f) * kfGridPitch;
 		if (i == 0 || fPosition != fPrevious)
 		{
 			++iDistinct;
@@ -35,47 +32,45 @@ constexpr int64_t DistinctAxisSamplePositions()
 
 // Fold the placements field by field in generation order, matching FrameStaticData::Write's member order rather
 // than hashing the struct's object representation, whose tail padding is not guaranteed equal between endpoints.
-common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacements)
+static common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacements)
 {
-	common::crc_t crc = common::Crc(static_cast<int64_t>(rPlacements.size()));
+	common::crc_t crc = common::Crc(std::ssize(rPlacements));
 	for (const IslandPlacement& rPlacement : rPlacements)
 	{
 		crc = (crc ^ common::Crc(rPlacement.islandCrc)) * common::kCrcMultiplier;
-		crc = (crc ^ common::Crc(rPlacement.f2WorldPos)) * common::kCrcMultiplier;
+		crc = (crc ^ common::Crc(rPlacement.f2WorldPosition)) * common::kCrcMultiplier;
 		crc = (crc ^ common::Crc(rPlacement.fRotation)) * common::kCrcMultiplier;
 	}
 	return crc;
 }
 
-} // namespace
-
 // cell_coordinate_probe: report the cell geometry a requested coordinate produces, on either endpoint, without
 // subscribing to it or touching live cells. Schema: {"coord":[x,y]}.
-void CommandCellCoordinateProbe(const nlohmann::json& rParams, nlohmann::json& rResult)
+void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.is_object() || rParams.size() != 1 || !rParams.contains("coord"))
+	if (!rParameters.is_object() || rParameters.size() != 1 || !rParameters.contains("coord"))
 	{
 		throw std::runtime_error("cell_coordinate_probe accepts only 'coord'");
 	}
-	const nlohmann::json& rCoord = rParams.at("coord");
-	if (!rCoord.is_array() || rCoord.size() != 2)
+	const nlohmann::json& rCoordinate = rParameters.at("coord");
+	if (!rCoordinate.is_array() || rCoordinate.size() != 2)
 	{
 		throw std::runtime_error("cell_coordinate_probe 'coord' must be an array of 2 integers");
 	}
-	GridCoord coord {AgentGridCoordValue(rCoord.at(0), "cell_coordinate_probe 'coord'"), AgentGridCoordValue(rCoord.at(1), "cell_coordinate_probe 'coord'")};
+	GridCoord coordinate {.iX = AgentGridCoordinateValue(rCoordinate.at(0), "cell_coordinate_probe 'coord'"), .iY = AgentGridCoordinateValue(rCoordinate.at(1), "cell_coordinate_probe 'coord'")};
 
 	if (gpIslandTerrain == nullptr)
 	{
 		throw std::runtime_error("cell_coordinate_probe requires loaded island templates");
 	}
 
-	// Heap: a locally owned placement list and one 1024x1024 elevation grid (~4 MB), built here through the same
-	// free functions the frame tick and cell creation call, and freed when this scope ends. Both of those sites
-	// suppress tracking for the same allocations. One coord at a time keeps the peak at a single grid.
+	// Placement generation and elevation building share their implementations and allocation tracking suppression
+	// with cell creation and the frame tick. One coordinate at a time limits peak elevation storage to one
+	// 1024x1024 grid (~4 MB).
 	ScopedSuppressAllocationTracking suppress;
 
 	std::vector<IslandPlacement> placements;
-	GenerateIslandChain(coord, placements);
+	GenerateIslandChain(coordinate, placements);
 
 	std::vector<float> elevationGrid;
 	gpIslandTerrain->BuildElevationGrid(placements, elevationGrid);
@@ -91,11 +86,11 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParams, nlohmann::json& r
 	}
 
 	FrameBounds bounds = ComputeFrameBounds(LocalFrameArea());
-	rResult["coord"] = AgentCoordJson(coord);
+	rResult["coord"] = AgentCoordinateJson(coordinate);
 	rResult["area"] = {{"width", bounds.fMaxX - bounds.fMinX}, {"height", bounds.fMaxY - bounds.fMinY}};
 	rResult["terrain"] = {{"axisSamplePositions", DistinctAxisSamplePositions()}, {"samplesFinite", bSamplesFinite}};
-	rResult["placements"] = {{"count", static_cast<int64_t>(placements.size())}, {"crc", PlacementsCrc(placements)}};
-	rResult["elevation"] = {{"crc", common::Crc(elevationGrid.data(), static_cast<int64_t>(elevationGrid.size()))}};
+	rResult["placements"] = {{"count", std::ssize(placements)}, {"crc", PlacementsCrc(placements)}};
+	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(elevationGrid.data(), elevationGrid.size()))}};
 }
 
 } // namespace engine

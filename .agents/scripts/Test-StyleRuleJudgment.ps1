@@ -5,7 +5,8 @@
 # exceptions; pasting the guide's rule text makes the model answer "does this rule apply" instead of "is it
 # broken" (Documents/Investigations/JevStyleRuleJudgment.md). Rule 61 is deliberately absent: the Allman
 # brace on its own line reads as "no brace" to the model, and a two-line scanner decides it exactly. Rules 14
-# and 62 are absent because Find-SessionCandidates.ps1's style-rule-14 and style-rule-62 kinds decide them.
+# and 62 are absent because Find-SessionCandidates.ps1's style-rule-14 kind decides rule 14 and its
+# style-rule-62 kind reports candidates that /code-style-review worker step 10 decides.
 # Rules 16, 21, 51, and the std:: half of 41 are absent because none of their flags in real sessions was a
 # violation (the same investigation).
 #
@@ -48,7 +49,7 @@ $script:HeadSideLines = @{}
 # forms the model must not flag; the criteria restate both so the boundary is explicit.
 $script:BlockQuestions = [ordered]@{
 	rule3 = [ordered]@{
-		instructions = 'Is there a variable in `code` whose name lacks the Hungarian prefix its type requires, or carries a prefix for a different type? Required prefixes: k constexpr, s static, g global, m class member (classes only, never struct members), p pointer, r reference, c char, i signed integer, ui unsigned integer, b bool, e enum value, f float or double, f2/f3/f4 XMFLOAT, vec XMVECTOR, mat XMMATRIX. These take NO prefix and are never violations: std::string and std::string_view, containers (std::vector, std::array, maps, sets), std::span, iterators, common::crc_t values (named crc), Vulkan handles (named with a vk prefix or Vk suffix), and instances of classes or structs. Function names are not judged.'
+		instructions = 'Is there a variable in `code` whose name lacks the Hungarian prefix its type requires, or carries a prefix for a different type? Required prefixes: k constexpr, s static, g global, m class member (classes only, never struct members), p pointer, r reference, c char, i signed integer, ui unsigned integer, b bool, e enum value, f float or double, f2/f3/f4 XMFLOAT, vec XMVECTOR, mat XMMATRIX, vk any Vulkan Vk* type including Vulkan enums such as VkResult, never e (written Vk after another prefix, like rVkBuffer, or as a Vk{TypeName} suffix on a class member, like mGlobalVkCommandBuffer). These take NO prefix and are never violations: std::string and std::string_view, containers (std::vector, std::array, maps, sets), std::span, iterators, common::crc_t values (named crc), and instances of classes or structs. Function names are not judged.'
 		true = 'At least one variable name is missing its required prefix (like `int64_t count`, `bool done`, `Unit* unit`) or has a prefix that contradicts its type (like `bool iEnabled`)'
 		false = 'Every variable name carries the prefix its type requires, or there are no variable declarations to judge'
 	}
@@ -131,14 +132,21 @@ function Get-InventoryDocument() {
 	if ($PathPrefix) { $arguments += @('-PathPrefix', ($PathPrefix -join ',')) }
 	$shell = [Environment]::ProcessPath
 	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
-	$run = Invoke-AgentProcess $shell $arguments $script:Root
+	# The file result is never truncated, so every changed block is judged.
+	$inventoryFile = [IO.Path]::GetTempFileName()
+	try {
+		$run = Invoke-AgentProcess $shell ($arguments + @('-OutputPath', $inventoryFile)) $script:Root
+		$text = if (Test-Path -LiteralPath $inventoryFile -PathType Leaf) { [IO.File]::ReadAllText($inventoryFile, $script:Utf8) } else { '' }
+	}
+	finally {
+		Remove-Item -LiteralPath $inventoryFile -ErrorAction SilentlyContinue
+	}
 	$document = $null
-	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) { $document = $run.Stdout | ConvertFrom-Json }
+	if (-not [string]::IsNullOrWhiteSpace($text)) { $document = $text | ConvertFrom-Json }
 	if ($run.ExitCode -ne 0 -or $null -eq $document -or $document.status -cne 'pass') {
 		if ($null -ne $document) { Complete-StyleRuleJudgment 2 'blocked' $document.code "The session change inventory did not pass, so no block was judged: $($document.message)" }
 		Complete-StyleRuleJudgment 2 'blocked' 'judgment.inventory-unavailable' "The session change inventory produced no result, so no block was judged: $($run.Stderr.Trim())"
 	}
-	if ($document.truncated) { Complete-StyleRuleJudgment 2 'blocked' 'judgment.inventory-truncated' 'The session change inventory truncated its regions, so a changed block could go unjudged.' }
 	return $document
 }
 

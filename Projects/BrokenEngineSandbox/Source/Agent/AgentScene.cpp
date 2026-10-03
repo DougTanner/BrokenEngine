@@ -11,19 +11,16 @@
 namespace game
 {
 
-namespace
-{
-
-// Coordinates and positions use the shared agent formatting (engine::AgentCoordJson / AgentLocalPositionJson);
+// Coordinates and positions use the shared agent formatting (engine::AgentCoordinateJson / AgentLocalPositionJson);
 // this local helper covers the remaining plain XY pairs, which are screen pixels and template footprints.
-nlohmann::json Vec2ToJson(float fX, float fY)
+static nlohmann::json Vec2ToJson(float fX, float fY)
 {
 	return nlohmann::json::array({fX, fY});
 }
 
 // Boolean PlayerFlags only — the packed nav-direction (bits 8-10) and nav-waypoint (bits 12-13) ranges are
 // excluded; iterating them as single bits would emit meaningless names.
-nlohmann::json PlayerFlagNames(PlayerFlags_t flags)
+static nlohmann::json PlayerFlagNames(PlayerFlags_t flags)
 {
 	nlohmann::json names = nlohmann::json::array();
 	if (flags & PlayerFlags::kExploding)
@@ -65,7 +62,7 @@ nlohmann::json PlayerFlagNames(PlayerFlags_t flags)
 	return names;
 }
 
-nlohmann::json SpaceshipFlagNames(SpaceshipFlags_t flags)
+static nlohmann::json SpaceshipFlagNames(SpaceshipFlags_t flags)
 {
 	nlohmann::json names = nlohmann::json::array();
 	if (flags & SpaceshipFlags::kFleePlayer)
@@ -88,7 +85,7 @@ nlohmann::json SpaceshipFlagNames(SpaceshipFlags_t flags)
 }
 
 // Only the focused fleet reports its members; non-focused fleets get index + focused flag only.
-nlohmann::json BuildFleets()
+static nlohmann::json BuildFleets()
 {
 	nlohmann::json fleets = nlohmann::json::array();
 	int64_t iFleetCount = std::ssize(gpGame->mFleetSelection.mClientFleets);
@@ -113,8 +110,6 @@ nlohmann::json BuildFleets()
 	}
 	return fleets;
 }
-
-} // namespace
 
 void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
@@ -177,7 +172,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 	// unit row's local position only compares with them once it is rebased from its own cell onto this one.
 	rResult["camera"] =
 	{
-		{"basisCoord", engine::AgentCoordJson(engine::gpCamera->mBasisCoord)},
+		{"basisCoord", engine::AgentCoordinateJson(engine::gpCamera->mBasisCoord)},
 		{"eye", engine::AgentLocalPositionJson(engine::gpCamera->mVecEyePosition)},
 		{"visibleArea", nlohmann::json::array({f4VisibleArea.x, f4VisibleArea.y, f4VisibleArea.z, f4VisibleArea.w})},
 		{"lod", engine::gpCamera->miVisibleAreaLod},
@@ -186,7 +181,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 	rResult["tweaksVisible"] = gpGame->mbShowImGui;
 	rResult["gameFlags"] = engine::GameFlagNames(gpGame->mGameFlags);
 	rResult["tick"] = gpGame->TickCounter();
-	rResult["clientGridCoord"] = engine::AgentCoordJson(gpGame->mClientGridCoord);
+	rResult["clientGridCoord"] = engine::AgentCoordinateJson(gpGame->mClientGridCoord);
 	rResult["fleets"] = BuildFleets();
 
 	nlohmann::json subscribedCoords = nlohmann::json::array();
@@ -201,7 +196,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 
 	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
 	{
-		subscribedCoords.push_back(engine::AgentCoordJson(rCoord));
+		subscribedCoords.push_back(engine::AgentCoordinateJson(rCoord));
 
 		// Island placements come from staticData, available regardless of whether a snapshot has arrived.
 		const engine::FrameStaticData& rStaticData = rFrames.staticData;
@@ -210,9 +205,9 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		{
 			const engine::IslandPlacement& rPlacement = rStaticData.islands.at(iIsland);
 			nlohmann::json islandJson;
-			islandJson["coord"] = engine::AgentCoordJson(rCoord);
+			islandJson["coord"] = engine::AgentCoordinateJson(rCoord);
 			// The placement center, in the owning cell's local meters like every other position here.
-			islandJson["local"] = Vec2ToJson(rPlacement.f2WorldPos.x, rPlacement.f2WorldPos.y);
+			islandJson["local"] = Vec2ToJson(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y);
 			islandJson["rotation"] = rPlacement.fRotation;
 			if (bHasFootprint)
 			{
@@ -266,12 +261,12 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 				{
 					{"type", "player"},
 					{"globalId", rPlayersPost.pGlobalPlayerIds[i].iValue},
-					{"coord", engine::AgentCoordJson(rCoord)},
+					{"coord", engine::AgentCoordinateJson(rCoord)},
 					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
 					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
 					{"armor", rPlayersPost.pfArmors[i]},
 					{"shield", rPlayersPost.pfShields[i]},
-					{"alignment", rPlayersPost.pAlignments[i].Value()},
+					{"alignment", rPlayersPost.pAlignments[i].uiValue},
 					{"flags", PlayerFlagNames(rPlayersPost.pFlags[i])},
 				});
 				++iUnitCount;
@@ -299,11 +294,11 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 				units.push_back(
 				{
 					{"type", "spaceship"},
-					{"coord", engine::AgentCoordJson(rCoord)},
+					{"coord", engine::AgentCoordinateJson(rCoord)},
 					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
 					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
 					{"health", rShipsPost.pfHealths[i]},
-					{"alignment", rShipsPost.pAlignments[i].Value()},
+					{"alignment", rShipsPost.pAlignments[i].uiValue},
 					{"flags", SpaceshipFlagNames(rShipsPost.pFlags[i])},
 				});
 				++iUnitCount;
@@ -332,10 +327,10 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 				units.push_back(
 				{
 					{"type", "blaster"},
-					{"coord", engine::AgentCoordJson(rCoord)},
+					{"coord", engine::AgentCoordinateJson(rCoord)},
 					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
 					{"screen", Vec2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
-					{"alignment", rBlastersPost.pAlignments[i].Value()},
+					{"alignment", rBlastersPost.pAlignments[i].uiValue},
 					{"windTrailIntensity", rBlastersInterp.pfWindTrailIntensities[i]},
 					{"windTrailWidth", rBlastersInterp.pfWindTrailWidths[i]},
 					{"windTrailLengthMultiplier", rBlastersInterp.pfWindTrailLengthMultipliers[i]},

@@ -8,21 +8,11 @@ namespace engine
 template struct Collection<PointLightsInterpolate, CollectionFlags::kIdToIndex>;
 template struct Collection<PointLightsPostRender>;
 
-void PointLightsInterpolate::AllocateAndCopy(PointLightsInterpolate& rCurrent, const PointLightsInterpolate& rPrevious)
-{
-	AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
-void PointLightsPostRender::AllocateAndCopy(PointLightsPostRender& rCurrent, const PointLightsPostRender& rPrevious)
-{
-	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
 void PointLightsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
-	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rFrame.interpolate.fCurrentTime, [](PointLightsInterpolate& rI, PointLightsPostRender& rPR, int64_t& i)
+	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rFrame.interpolate.fCurrentTime, [](PointLightsInterpolate& rInterpolate, PointLightsPostRender& rPostRender, int64_t& i)
 	{
-		RemoveIndexableElement(rI, rPR, rPR.puiIds[i], rI.Members(), rPR.Members());
+		RemoveIndexableElement(rInterpolate, rPostRender, rPostRender.pIds[i], rInterpolate.Members(), rPostRender.Members());
 		--i;
 	});
 }

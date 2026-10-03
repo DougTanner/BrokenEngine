@@ -7,17 +7,14 @@
 
 namespace toolcli
 {
-	namespace
-	{
-		std::string sToolName = "ToolCli";
+	static std::string sToolName = "ToolCli";
 
-		void ReportProcessFailure(const RunProcessOptions& rOptions, std::string_view operation)
+	static void ReportProcessFailure(const RunProcessOptions& rOptions, std::string_view operation)
+	{
+		DWORD uiError = ::GetLastError();
+		if (rOptions.FailureSink)
 		{
-			DWORD uiError = ::GetLastError();
-			if (rOptions.failureSink)
-			{
-				rOptions.failureSink(std::string(operation) + " failed (Windows error " + std::to_string(uiError) + ")");
-			}
+			rOptions.FailureSink(std::string(operation) + " failed (Windows error " + std::to_string(uiError) + ")");
 		}
 	}
 
@@ -163,9 +160,9 @@ namespace toolcli
 				{
 					continue;
 				}
-				if (rOptions.outputSink)
+				if (rOptions.OutputSink)
 				{
-					rOptions.outputSink(pBuffer, uiRead);
+					rOptions.OutputSink(std::span<const char>(pBuffer, uiRead));
 				}
 				else
 				{
@@ -390,4 +387,4 @@ namespace toolcli
 		std::wstring valueEnd(value.substr(value.size() - suffix.size()));
 		return ToLowerInvariant(std::move(valueEnd)) == ToLowerInvariant(std::wstring(suffix));
 	}
-}
+} // namespace toolcli

@@ -7,7 +7,7 @@ description: >-
   explicitly asks to run a named review, audit, or /plan-alternatives
   researcher on Codex. Codex callers never invoke it.
 disable-model-invocation: true
-allowed-tools: [Read, Bash, Agent]
+allowed-tools: [Read, Bash, Agent, Skill]
 ---
 
 # Codex Review
@@ -52,11 +52,13 @@ assigned skills' vocabulary. Codex callers never invoke this skill.
 Steps 1-8 assemble reviewer and auditor prompts only. For an explicitly
 requested `/plan-alternatives` researcher dispatch, write the complete per-axis
 shared task brief required by `../plan-alternatives/SKILL.md` directly to a
-new repo-relative file under `Temp/`; do not run the review prompt builder or
-add its reviewer guardrails. The brief must instruct the researcher to return
-the normal axis handoff and then append a standalone final `PASS` line for the
-dispatch wrapper. Use that file as `<promptPath>`, then continue at step 9 with
-`-Agent opus` and the same result-validation and wait contract.
+new repo-relative file under `Temp/`.
+
+For that dispatch, do not run the review prompt builder or add its reviewer
+guardrails. The brief must instruct the researcher to return the normal axis
+handoff and then append a standalone final `PASS` line for the dispatch
+wrapper. Use that file as `<promptPath>`, then continue at step 9 with
+`-Agent opus`.
 
 1. Write the judgment content yourself into `-ScopeFile`: the exact scope, the
    files and regions authorized for review, focus notes, and current residuals.
@@ -93,9 +95,12 @@ dispatch wrapper. Use that file as `<promptPath>`, then continue at step 9 with
    Done when that role name and its full review contract are in place, or the
    assigned skill has a skill file.
 5. A file the reviewer only needs to read — a plan snapshot for `plan-audit` or
-   `plan-simplicity-review`, for one — is not change evidence: keep it under `Temp/` (gitignored,
-   so never named), give its repo-relative path in `-ScopeFile`, and the reviewer reads it from the
-   worktree like any other file, because the read-only Codex run is rooted at the worktree.
+   `plan-simplicity-review`, for one — is not change evidence: keep it under
+   `Temp/` (gitignored, so never named) and give its repo-relative path in
+   `-ScopeFile`.
+
+   The reviewer reads it from the worktree like any other file, because the
+   read-only Codex run is rooted at the worktree.
 
    Done when every such file sits under `Temp/` with its repo-relative path
    named in `-ScopeFile`.
@@ -139,75 +144,24 @@ dispatch wrapper. Use that file as `<promptPath>`, then continue at step 9 with
 
    Done when the receipt's exit status is classified and, on exit `0`, its
    `promptPath` is in hand.
-9. Run the assigned task with one bare blocking script call, issued with a call
-   timeout of at least `600000` ms and never wrapped in a loop or chained with
-   another command:
+9. Run the prompt through `/claude-to-codex`
+   ([../claude-to-codex/SKILL.md](../claude-to-codex/SKILL.md)) with
+   the Repository root input as the Worktree, `-Sandbox read-only`, the
+   `-Agent` that `## Inputs` selects, and neither `-Model` nor `-Effort`.
 
-   ```powershell
-   pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree '<worktree>' -PromptFile '<promptPath>' -OutFile <out> -Agent <sol|opus>
-   ```
-
-   Select the Agent once for the assignment and pass it explicitly on every
-   dispatch: `sol` for a review, which preserves the script's default, and
-   `opus` for an explicitly requested `/plan-alternatives` researcher. The option
-   selects only the repository role configuration's model and effort pins; the
-   prompt and repository instructions define the task's conduct.
-
-   Pass a repo-relative `<out>` such as `Temp/<name>-out.md`; the launch
-   tolerates an existing out-file, so `<out>` must be a fresh path that does not
-   yet exist. The call starts Codex detached and waits up to 540 seconds for it,
-   then returns a single-line JSON receipt, whose fields and blocked exit codes
-   [receipts.md](references/receipts.md) owns for both scripts.
-
-   A `completed` receipt is followed by the separator line `--- findings ---`
-   and then the result itself, all on that same call's stdout, so the
-   success path never reads `<out>`; that file remains the retained full
-   result on disk.
-
-   To verify a change to `.codex/codex-review.ps1` on a machine without the
-   Codex CLI, issue that same call from the Bash tool with a stand-in `codex`
-   placed first on `PATH` — `PATH=<stub dir>:$PATH pwsh -NoProfile -File
-   .codex/codex-review.ps1 ...` — which stays one invocation; PowerShell has
-   no inline prefix form, so this verification form is Bash-tool only.
-
-   For a review or audit, `<promptPath>` is the receipt's `promptPath`. For a
+   For a review or audit, the prompt is the receipt's `promptPath`. For a
    researcher, it is the raw brief path prepared before step 9.
 
-   Done when that single call has returned its receipt.
-10. A result counts as well-formed only when its last non-empty line is the final
-    verdict line every prompt mandates — `PASS`, `CHANGES-REQUIRED: <n>`, or
-    `BLOCKED: <reason>`.
+   Done when `/claude-to-codex` has returned a terminal status or a genuine
+   failure, such as a model-check block, that ended the launch before one.
+10. Map the outcome: `completed` — proceed; `malformed`, `failed`, or another
+    genuine failure — map it to `CODEX-UNAVAILABLE` under `### Fallback`.
 
-    What each terminal status means for you: `completed` — proceed, and a
-    `retried: true` value on it needs no action; `malformed` or `failed` — map it
-    to `CODEX-UNAVAILABLE` under `### Fallback`.
+    A `completed` result that is not a review of the assigned scope is one this
+    session judges malformed under `/claude-to-codex` `## Rules`.
 
-    Your own judgment remains the backstop for a result the mechanical check
-    accepted: benign CLI notices/deprecations are not failures, but a `completed`
-    result that is drafting notes rather than a review of the assigned scope is
-    malformed however it ends, and `### Fallback` says what to do about it.
-
-    Done when the receipt is `completed` with the handoff this file defines and
-    its `<out>` path returned, `malformed` or `failed` mapped to
-    `CODEX-UNAVAILABLE`, or `running` with its `runId` carried to step 11.
-11. A review that outruns the budget comes back as a `running` receipt naming its
-    `runId`. Resume it with exactly one further bare call per wake, also issued
-    with a call timeout of at least `600000` ms and never in a loop:
-
-    ```powershell
-    pwsh -NoProfile -File .codex/codex-review.ps1 -Wait <runId>
-    ```
-
-    That call waits the same bounded budget and answers in the same shapes, so a
-    `completed` answer carries the separator and the findings inline exactly as
-    above. `completed`, `malformed`, or `failed` ends the wait.
-
-    Because the run is detached, a call killed by its host timeout never kills
-    the review and the same `runId` always resumes it, and every call stays
-    bounded below the host's 10-minute command cap, so a long review never needs
-    a background run or a truncated scope.
-
-    Done when the wait ends in `completed`, `malformed`, or `failed`.
+    Done when the status is `completed` with the handoff this file defines and
+    its `<out>` path returned, or the failure is mapped to `CODEX-UNAVAILABLE`.
 
 ## Handoff
 
@@ -221,8 +175,9 @@ authorization given in the current session unblocks a review or audit failure,
 by routing the same unchanged assignment to the Opus `reviewer` subagent. With
 that authorization the brief names the assigned skill and states that the user
 authorized the fallback in this session; `.claude/agents/reviewer.md` owns what
-else it carries. `## Rules` `### Fallback` owns the failure-time mechanics: what counts as genuine failure, the single
-`-NoRetry` re-dispatch, and the `general-purpose` last resort.
+else it carries. `/claude-to-codex` `## Rules` defines genuine failure and the
+single `-NoRetry` re-dispatch; `## Rules` `### Fallback` owns the
+`general-purpose` last resort.
 
 ## Rules
 
@@ -235,28 +190,7 @@ else it carries. `## Rules` `### Fallback` owns the failure-time mechanics: what
 
 ### Fallback
 
-Genuine failure means a `failed` wait status, a `malformed` wait status, or a
-non-zero script exit. None of the three is retried. Duration alone is never a
-`CODEX-UNAVAILABLE` cause: a run that stays `running` across many waits is
-progressing normally, so keep waiting.
-
-One bounded exception covers what the script's mechanical check cannot see. When
-a `completed` result passed that check but this session judges it malformed
-anyway — leaked drafting notes, or an answer to no assigned scope — re-dispatch
-the identical prompt exactly once, with a fresh `<out>` path and `-NoRetry`:
-
-```powershell
-pwsh -NoProfile -File .codex/codex-review.ps1 -Worktree '<worktree>' -PromptFile '<the same promptPath>' -OutFile <fresh out> -Agent <the same sol|opus selection> -NoRetry
-```
-
-`-NoRetry` spends no automatic retry, so this dispatch is the assignment's last
-one: its result is final, and a second malformed result is reported as
-`CODEX-UNAVAILABLE` under the rule below.
-
-On a genuine failure, stop and return the `CODEX-UNAVAILABLE` handoff that this
-file's `## Handoff` defines. When the wait status is
-`failed`, take its short reason from the receipt's own `reason` field, without a
-further diagnostic call. A researcher assignment stops there with no substitute.
+On a genuine failure, return this file's `## Handoff` failure form.
 
 For a review or audit, this is a blocking failure: never dispatch a substitute
 reviewer automatically. The user authorization that unblocks it, and its target,
@@ -265,5 +199,4 @@ is also unavailable, route at most once to `subagent_type: "general-purpose"`
 with `model: "opus"` and the reviewer or auditor role stated at the top of the
 prompt.
 
-Do not retry Codex beyond the single re-dispatch above or add another reviewer
-for consensus.
+Add no other reviewer for consensus.

@@ -9,7 +9,7 @@ namespace game
 
 #if defined(BT_CLIENT)
 
-static bool FindMatchingPlayerInCoord(std::span<const engine::CoordWork> works, engine::GridCoord destination, engine::global_id_t globalPlayerId)
+static bool FindMatchingPlayerInCoord(std::span<const engine::CoordWork> works, engine::GridCoord destination, engine::GlobalId globalPlayerId)
 {
 	for (const engine::CoordWork& rDestWork : works)
 	{
@@ -40,11 +40,11 @@ static bool FindMatchingPlayerInCoord(std::span<const engine::CoordWork> works, 
 		{
 			if (rDestFrame.postRender.pPlayers->pGlobalPlayerIds[j] == globalPlayerId)
 			{
-				LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer matched GlobalPlayerId: {} Coord: ({},{})", globalPlayerId, destination.x, destination.y);
+				LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer matched GlobalPlayerId: {} Coord: ({},{})", globalPlayerId, destination.iX, destination.iY);
 				return true;
 			}
 		}
-		LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer global ID match failed Coord: ({},{}) PlayerCount: {}", destination.x, destination.y, rDestFrame.postRender.pPlayers->iCount);
+		LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer global ID match failed Coord: ({},{}) PlayerCount: {}", destination.iX, destination.iY, rDestFrame.postRender.pPlayers->iCount);
 		break;
 	}
 	return false;
@@ -75,7 +75,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 					{
 						continue;
 					}
-					if (!clientState.clientGlobalPlayerId.IsValid())
+					if (!(clientState.clientGlobalPlayerId.iValue != 0))
 					{
 						continue;
 					}
@@ -86,17 +86,17 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 
 					if (std::abs(rRequest.iDeltaX) > 1 || std::abs(rRequest.iDeltaY) > 1) [[unlikely]]
 					{
-						LOG(kDefault, kError, "ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalPlayerId: {}", rFrame.interpolate.iTick, rWork.coord.x, rWork.coord.y, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), clientState.clientGlobalPlayerId);
+						LOG(kDefault, kError, "ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalPlayerId: {}", rFrame.interpolate.iTick, rWork.coord.iX, rWork.coord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), clientState.clientGlobalPlayerId);
 						DEBUG_BREAK();
 					}
 					// Checked exactly like the server's transfer destination, so a cell at a numeric coordinate edge
 					// follows the server in having no outward neighbour instead of wrapping to the far side.
 					engine::GridCoord destination {};
-					if (!engine::TryAddGridCoord(rWork.coord, rRequest.iDeltaX, rRequest.iDeltaY, destination)) [[unlikely]]
+					if (!engine::TryAddGridCoordinate(rWork.coord, rRequest.iDeltaX, rRequest.iDeltaY, destination)) [[unlikely]]
 					{
 						continue;
 					}
-					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferPlayer GlobalPlayerId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalPlayerId, rWork.coord.x, rWork.coord.y, destination.x, destination.y);
+					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferPlayer GlobalPlayerId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalPlayerId, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
 					clientState.fPreviousClientArmor = rRequest.data.fHealth;
 
 					FindMatchingPlayerInCoord(works, destination, clientState.clientGlobalPlayerId);

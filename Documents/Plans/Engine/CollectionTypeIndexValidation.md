@@ -7,7 +7,7 @@ The accepted finding `CAI/shard-0017/002` identifies raw registry-index bytes
 being accepted at the save read, the collection trust boundary. `Collection::Read` and
 `CollectionRead` hydrate member arrays without semantic validation
 (`Engine/Source/Frame/Collections/Collection.h:338-353`), while
-`TypeRegistry::GetType` throws only when a later phase calls `sTypes.at`
+Registry lookup throws only when a later phase calls `TypeRegistry::sTypes.at`
 (`Collection.h:164-167`). `ExplosionsInterpolate::PostRead` currently clamps
 trail counts but does not validate `puiTypeIndices` (`Engine/Source/Frame/Collections/Explosions/Explosions.h:171-184`).
 An explosion row containing `0xFF` can therefore be adopted and throw from

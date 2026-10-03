@@ -5,15 +5,10 @@
 namespace engine
 {
 
-namespace
-{
-
 constexpr int kiCurveSamples = 256;
 constexpr float kfPointRadius = 8.0f;    // control-point dot radius and DragPoint grab half-size in pixels
 constexpr float kfGrabTolerance = 24.0f; // pixel radius within which a left-click targets an existing point instead of adding a new one
 constexpr ImVec4 kGoldColor(0.95f, 0.75f, 0.2f, 1.0f);
-
-} // namespace
 
 bool CurveWidget(std::string_view label, CurveData& rCurve)
 {

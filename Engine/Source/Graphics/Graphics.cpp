@@ -201,7 +201,7 @@ void Graphics::RenderGlobal(float fCurrentTime)
 	// without a texture-map chunk. Clear the prior acquire publication before testing the predicate so an idle frame cannot resubmit it;
 	// ProcessPendingTextures republishes only inside the write epoch. This drain covers Vulkan descriptor and image use only — it is not
 	// the PackChunks loader drain (Graphics::Destroy owns that), so unrelated disk loads keep running through this window.
-	gpTextureManager->mFlags.Clear(TextureManagerFlags::kPendingAcquireBarriers);
+	gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
 	bool bDescriptorChurnPending = gpIslandTerrain->AnyEvictionPending() || gpIslandTerrain->AnyRestorationPending()
 	                            || gpTextureManager->AnyAdoptionPending()
 	                            || (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur);
@@ -217,7 +217,7 @@ void Graphics::RenderGlobal(float fCurrentTime)
 		if (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur)
 		{
 			gpTextureManager->ReblurAllLightingTextures();
-			gpTextureManager->mFlags.Clear(TextureManagerFlags::kPendingLightingReblur);
+			gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingLightingReblur, false);
 		}
 		gpIslandTerrain->RestorationSweep();
 		gpTextureManager->mTextureDescriptors.VerifyAllDescriptorGenerations();
@@ -610,7 +610,7 @@ void Graphics::Refresh()
 
 void Graphics::RecreateResources()
 {
-	if (mDestroyFlags.Empty())
+	if (std::to_underlying(mDestroyFlags.meFlags) == 0)
 	{
 		return;
 	}
@@ -669,7 +669,7 @@ void Graphics::RecreateResources()
 		}
 	}
 
-	mDestroyFlags.ClearAll();
+	mDestroyFlags.meFlags = static_cast<decltype(mDestroyFlags.meFlags)>(0);
 }
 
 bool Graphics::Destroy()

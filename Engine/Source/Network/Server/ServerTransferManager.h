@@ -13,7 +13,7 @@ namespace engine
 
 struct ClientTransferInfo
 {
-	engine::global_id_t globalPlayerId {};
+	engine::GlobalId globalPlayerId {};
 	engine::GridCoord destination {};
 	engine::ClientGuid clientGuid {};
 };
@@ -28,7 +28,6 @@ public:
 	void ResetState();
 	bool IsDestinationLive(engine::GridCoord destination) const;
 
-	bool HasPendingSubscriptionUpdate(int64_t iClientId) const;
 
 	std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>> mTransfers;
 
@@ -37,7 +36,7 @@ private:
 	void CollectTransfers(common::ScopedWorkbufferArena& rTransfersArena);
 	void SortTransfersByType();
 	void SpawnTransfers(bool bFilterDestinationLiveness);
-	void ApplyPreparedTransfers(common::ScopedWorkbufferArena& rTransfersArena, bool bFilterDestinationLiveness);
+	void ApplyPreparedTransfers(const common::ScopedWorkbufferArena& rTransfersArena, bool bFilterDestinationLiveness);
 	void TrackClientTransfers(std::span<const ClientTransferInfo> clientTransfers);
 };
 

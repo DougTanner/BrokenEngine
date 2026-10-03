@@ -8,13 +8,10 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gMiscRegistrar
 {
 	{"Debug Texture Range", &gMiscDebugTextureLinearRange},
 };
-}
 
 void TweaksScreenBase::RenderMiscSection()
 {

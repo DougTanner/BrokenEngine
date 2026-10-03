@@ -16,7 +16,7 @@ public:
 
 private:
 
-	SOCKET mSocket = INVALID_SOCKET;
+	SOCKET muiSocket = INVALID_SOCKET;
 };
 
 } // namespace engine

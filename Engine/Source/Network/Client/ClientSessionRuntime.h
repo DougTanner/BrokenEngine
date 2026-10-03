@@ -31,42 +31,40 @@ public:
 	explicit ClientSessionRuntime(game::ClientSession& rSession);
 	~ClientSessionRuntime();
 
-	void Connect(std::string_view serverAddress, uint16_t uiPort, int64_t iCoordSlots);
-	void ConnectToDiscoveredServer(uint16_t uiPort, int64_t iCoordSlots);
+	void Connect(std::string_view serverAddress, uint16_t uiPort, int64_t iCoordinateSlots);
+	void ConnectToDiscoveredServer(uint16_t uiPort, int64_t iCoordinateSlots);
 	void Disconnect();
 	void StartDiscovery();
 	void PollDiscovery();
 	void PollAndDrain(const NetworkTimeState& rTimeState);
-	// Flush is transport-private and runtime-owned; this surfaces it so the game session can make a rare
-	// user command depart immediately instead of waiting for the next tick-cadence ack flush.
-	void FlushOutgoing();
 
-	template <typename TPACKETTYPE, typename TLOGFUNCTION, typename... TARGS>
-	void SendGameRequest(TPACKETTYPE ePacketType, const TLOGFUNCTION& rLogFunction, const TARGS&... rArgs)
+	template <typename TPACKETTYPE, typename TLOGFUNCTION, typename... TARGUMENTS>
+	void SendGameRequest(TPACKETTYPE ePacketType, const TLOGFUNCTION& rLogFunction, const TARGUMENTS&... rArguments)
 	{
-		if (mpClient == nullptr || !(mpClient->mStateFlags & Client::ClientStateFlags::kConnected) || mpClient->mpServerPeer == nullptr)
+		if (mpClient == nullptr)
+		{
+			return;
+		}
+		if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnected) || mpClient->mpServerPeer == nullptr)
 		{
 			return;
 		}
 
 		std::optional<common::LogTickScope> optionalTickScope;
-		if (common::gpThreadLocal->miLogTickCounter < 0)
-		{
-			optionalTickScope.emplace(CurrentGameTick());
-		}
+		InitializeLogTickScope(optionalTickScope);
 
 		rLogFunction();
-		mpClient->SendSimplePacket(ePacketType, NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, rArgs...);
+		mpClient->SendSimplePacket(ePacketType, NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, rArguments...);
 
 		{
 			// Send the user command now instead of waiting for the tick-cadence ack flush.
 			// Heap: ENet may allocate while flushing outgoing commands
 			ScopedSuppressAllocationTracking suppress;
-			FlushOutgoing();
+			mpClient->Flush();
 		}
 	}
 
-	void SetDesiredCoords(const GridCoord* pDesiredCoords, int64_t iDesiredCount, std::string_view reason, int64_t iTick);
+	void SetDesiredCoordinates(std::span<const GridCoord> desiredCoordinates, std::string_view reason, int64_t iTick);
 	void SynchronizeSubscriptions();
 	void ClearSubscriptionState();
 
@@ -75,8 +73,7 @@ public:
 	int64_t GetServerUpdateBufferSize() const;
 
 	std::chrono::nanoseconds EvaluateClock(int64_t iPreReconcileTick);
-	// Evaluates the clock and applies the result: an extreme error snaps the game tick counter, anything
-	// smaller steers the time-step remainder. Pass the tick sampled before reconciliation ran.
+	// Pass the tick sampled before reconciliation.
 	void ApplyClockCorrection(int64_t iPreReconcileTick);
 	void ResetClock();
 
@@ -90,7 +87,7 @@ public:
 	int64_t miClockOffset = 0;
 	int64_t miClockTargetBehind = 0;
 	int64_t miCurrentTargetBehind = 0;
-	std::vector<GridCoord> mDesiredCoords;
+	std::vector<GridCoord> mDesiredCoordinates;
 	std::vector<GridCoord> mSubscriptionQueue;
 	std::unordered_map<GridCoord, std::chrono::steady_clock::time_point> mUnwantedTimestamps;
 
@@ -98,14 +95,13 @@ private:
 
 	void ResetForConnect();
 	void ResetForServerLoad();
-	void UnsubscribeStaleCoords(const GridCoord* pDesiredCoords, int64_t iDesiredCount);
-	void BuildSubscriptionQueue(const GridCoord* pDesiredCoords, int64_t iDesiredCount);
+	void UnsubscribeStaleCoordinates(std::span<const GridCoord> desiredCoordinates);
+	void BuildSubscriptionQueue(std::span<const GridCoord> desiredCoordinates);
 	void TrySubscribeNext();
 	void SendAckAndFlush();
 	void ApplyReceivedFullStates();
 	bool ApplyReceivedUpdates();
-	// Exception: this one-line bridge keeps the game-only gpGame definition out of the engine header.
-	int64_t CurrentGameTick() const;
+	void InitializeLogTickScope(std::optional<common::LogTickScope>& rOptionalTickScope) const;
 
 	int64_t miLastLoggedClockTargetBehind = -1;
 	int64_t miLastPeriodicClockLogTick = -1;
@@ -114,7 +110,7 @@ private:
 	int64_t miLowerTargetBehindStreakStartTick = -1;
 	// Sim tick the previous streak evaluation observed; -1 when no tick has been observed yet.
 	int64_t miLastEvaluateClockTick = -1;
-	static constexpr std::chrono::seconds kStickySubscriptionDuration {2};
+	static constexpr std::chrono::seconds kStickySubscriptionDuration = 2s;
 };
 
 } // namespace engine

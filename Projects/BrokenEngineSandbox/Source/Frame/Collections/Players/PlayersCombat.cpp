@@ -254,23 +254,23 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 		}
 
 		// Check collision results
-		if (engine::Collision::HasCollision(siCollisionLayerIndex, i))
+		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
 		{
 			std::span<const engine::CollisionResult> collisions = engine::Collision::GetCollisions(siCollisionLayerIndex, i);
 			for (const engine::CollisionResult& rResult : collisions)
 			{
 				if (rResult.uiOtherCategory == CollisionCategory::kSpaceship)
 				{
-					ApplyDamage(rFrame, rStaticData.coord, rCurrentInterpolate, rCurrentPostRender, i, kfSpaceshipCollisionDamage, rResult.vecContactPoint);
+					ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, kfSpaceshipCollisionDamage, rResult.vecContactPoint);
 				}
 				else if (rResult.uiOtherCategory == CollisionCategory::kBlaster)
 				{
-					ApplyDamage(rFrame, rStaticData.coord, rCurrentInterpolate, rCurrentPostRender, i, rResult.fDamageReceived, rResult.vecContactPoint);
+					ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, rResult.fDamageReceived, rResult.vecContactPoint);
 
 					// Spawn impact VFX at contact point
 #if defined(BT_CLIENT)
-					engine::PuffsPostRender::AddControlled(rFrame, rFrame.interpolate.fCurrentTime, PlayersInterpolate::suiImpactPuffControllerTypeIndex, rResult.vecContactPoint);
-					engine::PointLightsPostRender::AddControlled(rFrame, rFrame.interpolate.fCurrentTime, PlayersInterpolate::suiImpactPointLightControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+					engine::PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), PlayersInterpolate::suiImpactPuffControllerTypeIndex, rResult.vecContactPoint);
+					engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), PlayersInterpolate::suiImpactPointLightControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 				}
 			}
@@ -305,7 +305,7 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 		{
 			continue;
 		}
-		rCurrentPostRender.pFlags[i].Clear(kFireBlaster);
+		rCurrentPostRender.pFlags[i].Set(kFireBlaster, false);
 
 		if (rCurrentPostRender.pFlags[i] & kUseMissiles)
 		{
@@ -394,7 +394,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 		{
 			continue;
 		}
-		rCurrentPostRender.pFlags[i].Clear(kFireMissile);
+		rCurrentPostRender.pFlags[i].Set(kFireMissile, false);
 
 		if (!(rCurrentPostRender.pFlags[i] & kUseMissiles))
 		{
@@ -452,7 +452,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 		engine::RegistryResult acquireResult {};
 		engine::AcquireRegistryTargets(window.context,
 		{
-			.puiTargets = &uiRegistryTarget,
+			.pTargets = &uiRegistryTarget,
 			.pVecOrigins = &vecMissilePosition,
 			.pVecDirections = &vecAimDirection,
 			.pAlignments = &rCurrentPostRender.pAlignments[i],
@@ -505,7 +505,7 @@ void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict 
 		float fAdjustedPercent = (std::pow((1.0f - fPercent) + 1.0f, kfDeathRadialPower) - 1.0f) * kfExplosionsRadius;
 		vecJitteredPosition = XMVectorMultiplyAdd(vecJitteredDirection, XMVectorReplicate(fAdjustedPercent), vecJitteredPosition);
 
-		engine::ExplosionsPostRender::Spawn(rFrame, rFrame.interpolate.fCurrentTime,
+		engine::ExplosionsPostRender::Spawn(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 		{
 			.uiTypeIndex = PlayersInterpolate::suiExplosionTypeIndex,
 			.vecPosition = vecJitteredPosition,

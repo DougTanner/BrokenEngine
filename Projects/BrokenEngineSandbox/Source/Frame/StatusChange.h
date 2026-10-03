@@ -105,7 +105,7 @@ struct TransferData
 	XMVECTOR vecPosition = DirectX::XMVectorZero();
 	XMVECTOR vecDirection = DirectX::XMVectorZero();
 	XMVECTOR vecVelocity = DirectX::XMVectorZero();
-	engine::alignment_t alignment {};
+	engine::AlignmentIdentifier alignment {};
 	float fHealth = 0.0f;
 	float fShield = 0.0f;
 	uint8_t uiTypeIndex = 0;
@@ -138,7 +138,7 @@ struct TransferData
 	float fPitch = 0.0f;
 
 	// Global player ID (player transfers only)
-	engine::global_id_t globalPlayerId {};
+	engine::GlobalId globalPlayerId {};
 
 	// Fleet wanted coord (player transfers only)
 	engine::GridCoord fleetWantedCoord {};

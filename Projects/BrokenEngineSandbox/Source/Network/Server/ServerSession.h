@@ -24,7 +24,7 @@ struct SubscriptionUpdate
 {
 	int64_t iClientId = 0;
 	engine::GridCoord newCoord {};
-	engine::global_id_t globalPlayerId {};
+	engine::GlobalId globalPlayerId {};
 };
 
 class ServerSession
@@ -42,7 +42,7 @@ public:
 
 	void PrepareTick();
 	void ParseReceivedGamePackets();
-	void SendAssignPlayer(int64_t iClientId, engine::global_id_t globalId, engine::GridCoord coord);
+	void SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coord);
 	void SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coord);
 	void StepTimescale(bool bFaster); // step time scale one notch (faster/slower) and broadcast; shared by the packet handler and the agent command
 	void SubscriptionUpdates();

@@ -411,7 +411,7 @@ void AudioManager::AttemptSilentEngineRecovery()
 				LOG(kAudio, kWarning, "Device-default Reset failed after pin failure during silent recovery; staying silent");
 			}
 		}
-		mFlags.Clear(AudioManagerFlags::kExpectedResetInProgress);
+		mFlags.Set(AudioManagerFlags::kExpectedResetInProgress, false);
 	}
 
 	// Only claim recovery — re-armed warning, voice reset — when the graph is live, and claim the pin only
@@ -420,7 +420,7 @@ void AudioManager::AttemptSilentEngineRecovery()
 	if (mpAudioEngine->IsAudioDevicePresent())
 	{
 		mFlags.Set(AudioManagerFlags::kPinnedFormatValid, mpAudioEngine->GetOutputSampleRate() == kiMasteringSampleRate);
-		mFlags.Clear(AudioManagerFlags::kSilentRecoveryLogged);
+		mFlags.Set(AudioManagerFlags::kSilentRecoveryLogged, false);
 		LOG(kAudio, kInfo, "Audio device recovered; live graph established");
 		FinishDeviceReset();
 	}
@@ -500,7 +500,7 @@ void AudioManager::Update(const game::Frame* pFrame)
 	float fDeltaTime = common::NanosecondsToFloatSeconds<float>(mRealTime.GetDeltaNs(true));
 
 #if defined(BT_DEBUG)
-	if (!AudioStreamingFixture::SuppressTrackTransition())
+	if (AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire); pFixture == nullptr || !(pFixture->mFlags & AudioStreamingFixture::Flags::kMode))
 	{
 		mpStreamingVoices->CheckTrackTransition();
 	}

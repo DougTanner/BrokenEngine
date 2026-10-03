@@ -8,8 +8,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gSunMoonRegistrar
 {
 	// Color Phase Boundaries (radians)
@@ -46,7 +44,6 @@ const TweaksSliderMapRegistrar gSunMoonRegistrar
 	{"Shadow Sunrise Start", &gSunMoonShadowSunriseStart},
 	{"Shadow Sunrise End", &gSunMoonShadowSunriseEnd},
 };
-}
 
 void TweaksScreenBase::RenderSunMoonSection()
 {

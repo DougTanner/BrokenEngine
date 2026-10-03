@@ -6,80 +6,80 @@ namespace engine
 {
 
 // Cursor read helpers (shared across Network*.cpp files)
-inline void ReadBytes(const uint8_t*& pCursor, void* pDest, int64_t iSize)
+inline void ReadBytes(const uint8_t*& rpCursor, std::span<uint8_t> destination)
 {
-	std::memcpy(pDest, pCursor, iSize);
-	pCursor += iSize;
+	std::memcpy(destination.data(), rpCursor, destination.size());
+	rpCursor += destination.size();
 }
 
-inline uint8_t ReadUint8(const uint8_t*& pCursor)
+inline uint8_t ReadUint8(const uint8_t*& rpCursor)
 {
-	return *pCursor++;
+	return *rpCursor++;
 }
 
-inline uint16_t ReadUint16(const uint8_t*& pCursor)
+inline uint16_t ReadUint16(const uint8_t*& rpCursor)
 {
-	uint16_t ui = 0;
-	ReadBytes(pCursor, &ui, sizeof(uint16_t));
-	return ui;
+	uint16_t uiValue = 0;
+	ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&uiValue), sizeof(uint16_t)));
+	return uiValue;
 }
 
-inline int32_t ReadInt32(const uint8_t*& pCursor)
+inline int32_t ReadInt32(const uint8_t*& rpCursor)
 {
-	int32_t i = 0;
-	ReadBytes(pCursor, &i, sizeof(int32_t));
-	return i;
+	int32_t iValue = 0;
+	ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&iValue), sizeof(int32_t)));
+	return iValue;
 }
 
-inline uint32_t ReadUint32(const uint8_t*& pCursor)
+inline uint32_t ReadUint32(const uint8_t*& rpCursor)
 {
-	uint32_t ui = 0;
-	ReadBytes(pCursor, &ui, sizeof(uint32_t));
-	return ui;
+	uint32_t uiValue = 0;
+	ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&uiValue), sizeof(uint32_t)));
+	return uiValue;
 }
 
-inline int64_t ReadInt64(const uint8_t*& pCursor)
+inline int64_t ReadInt64(const uint8_t*& rpCursor)
 {
-	int64_t i = 0;
-	ReadBytes(pCursor, &i, sizeof(int64_t));
-	return i;
+	int64_t iValue = 0;
+	ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&iValue), sizeof(int64_t)));
+	return iValue;
 }
 
-inline uint64_t ReadUint64(const uint8_t*& pCursor)
+inline uint64_t ReadUint64(const uint8_t*& rpCursor)
 {
-	uint64_t ui = 0;
-	ReadBytes(pCursor, &ui, sizeof(uint64_t));
-	return ui;
+	uint64_t uiValue = 0;
+	ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&uiValue), sizeof(uint64_t)));
+	return uiValue;
 }
 
-inline float ReadFloat(const uint8_t*& pCursor)
+inline float ReadFloat(const uint8_t*& rpCursor)
 {
-	float f = 0.0f;
-	ReadBytes(pCursor, &f, sizeof(float));
-	return f;
+	float fValue = 0.0f;
+	ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&fValue), sizeof(float)));
+	return fValue;
 }
 
-inline XMVECTOR ReadVec4(const uint8_t*& pCursor)
+inline XMVECTOR ReadVector4(const uint8_t*& rpCursor)
 {
-	XMFLOAT4A f4 {};
-	ReadBytes(pCursor, &f4, sizeof(XMFLOAT4A));
-	return XMLoadFloat4A(&f4);
+	XMFLOAT4A f4Value {};
+	ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&f4Value), sizeof(XMFLOAT4A)));
+	return XMLoadFloat4A(&f4Value);
 }
 
-inline GridCoord ReadGridCoord(const uint8_t*& pCursor)
+inline GridCoord ReadGridCoord(const uint8_t*& rpCursor)
 {
-	GridCoord coord {};
-	coord.x = ReadInt32(pCursor);
-	coord.y = ReadInt32(pCursor);
-	return coord;
+	GridCoord gridCoordinate {};
+	gridCoordinate.iX = ReadInt32(rpCursor);
+	gridCoordinate.iY = ReadInt32(rpCursor);
+	return gridCoordinate;
 }
 
 // Bounds-tracking wrapper over the unchecked read helpers above for variable-length payloads:
 // callers verify Has()/Remaining() before passing pCursor to the Read* helpers
 struct BoundedCursor
 {
-	const uint8_t* pCursor {nullptr};
-	const uint8_t* pEnd {nullptr};
+	const uint8_t* pCursor = nullptr;
+	const uint8_t* pEnd = nullptr;
 
 	int64_t Remaining() const
 	{
@@ -93,77 +93,77 @@ struct BoundedCursor
 };
 
 // Cursor write helpers (shared across Network*.cpp files)
-inline void WriteBytes(uint8_t*& pCursor, const void* pData, int64_t iSize)
+inline void WriteBytes(uint8_t*& rpCursor, std::span<const uint8_t> data)
 {
-	std::memcpy(pCursor, pData, iSize);
-	pCursor += iSize;
+	std::memcpy(rpCursor, data.data(), data.size());
+	rpCursor += data.size();
 }
 
-inline void WriteUint8(uint8_t*& pCursor, uint8_t ui)
+inline void WriteUint8(uint8_t*& rpCursor, uint8_t uiValue)
 {
-	*pCursor++ = ui;
+	*rpCursor++ = uiValue;
 }
 
-inline void WriteUint16(uint8_t*& pCursor, uint16_t ui)
+inline void WriteUint16(uint8_t*& rpCursor, uint16_t uiValue)
 {
-	WriteBytes(pCursor, &ui, sizeof(uint16_t));
+	WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&uiValue), sizeof(uint16_t)));
 }
 
-inline void WriteInt32(uint8_t*& pCursor, int32_t i)
+inline void WriteInt32(uint8_t*& rpCursor, int32_t iValue)
 {
-	WriteBytes(pCursor, &i, sizeof(int32_t));
+	WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&iValue), sizeof(int32_t)));
 }
 
-inline void WriteUint32(uint8_t*& pCursor, uint32_t ui)
+inline void WriteUint32(uint8_t*& rpCursor, uint32_t uiValue)
 {
-	WriteBytes(pCursor, &ui, sizeof(uint32_t));
+	WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&uiValue), sizeof(uint32_t)));
 }
 
-inline void WriteInt64(uint8_t*& pCursor, int64_t i)
+inline void WriteInt64(uint8_t*& rpCursor, int64_t iValue)
 {
-	WriteBytes(pCursor, &i, sizeof(int64_t));
+	WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&iValue), sizeof(int64_t)));
 }
 
-inline void WriteUint64(uint8_t*& pCursor, uint64_t ui)
+inline void WriteUint64(uint8_t*& rpCursor, uint64_t uiValue)
 {
-	WriteBytes(pCursor, &ui, sizeof(uint64_t));
+	WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&uiValue), sizeof(uint64_t)));
 }
 
-inline void WriteFloat(uint8_t*& pCursor, float f)
+inline void WriteFloat(uint8_t*& rpCursor, float fValue)
 {
-	WriteBytes(pCursor, &f, sizeof(float));
+	WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&fValue), sizeof(float)));
 }
 
-inline void WriteVec4(uint8_t*& pCursor, XMVECTOR vec)
+inline void WriteVector4(uint8_t*& rpCursor, XMVECTOR vecValue)
 {
-	XMFLOAT4A f4 {};
-	XMStoreFloat4A(&f4, vec);
-	WriteBytes(pCursor, &f4, sizeof(XMFLOAT4A));
+	XMFLOAT4A f4Value {};
+	XMStoreFloat4A(&f4Value, vecValue);
+	WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&f4Value), sizeof(XMFLOAT4A)));
 }
 
-inline void WriteGridCoord(uint8_t*& pCursor, GridCoord coord)
+inline void WriteGridCoord(uint8_t*& rpCursor, GridCoord gridCoordinate)
 {
-	WriteInt32(pCursor, coord.x);
-	WriteInt32(pCursor, coord.y);
+	WriteInt32(rpCursor, gridCoordinate.iX);
+	WriteInt32(rpCursor, gridCoordinate.iY);
 }
 
-inline void WriteGridCoord(common::Workbuffer& rWorkbuffer, GridCoord coord)
+inline void WriteGridCoord(common::Workbuffer& rWorkbuffer, GridCoord gridCoordinate)
 {
-	rWorkbuffer.PushBack<int32_t>(coord.x);
-	rWorkbuffer.PushBack<int32_t>(coord.y);
+	rWorkbuffer.PushBack<int32_t>(gridCoordinate.iX);
+	rWorkbuffer.PushBack<int32_t>(gridCoordinate.iY);
 }
 
 template <typename T>
-inline void PushSimplePacketArg(common::Workbuffer& rWorkbuffer, const T& arg)
+inline void PushSimplePacketArgument(common::Workbuffer& rWorkbuffer, const T& rArgument)
 {
 	if constexpr (std::is_same_v<T, GridCoord>)
 	{
-		WriteGridCoord(rWorkbuffer, arg);
+		WriteGridCoord(rWorkbuffer, rArgument);
 	}
 	else
 	{
 		static_assert(std::is_arithmetic_v<T>, "SendSimplePacket only supports arithmetic types and GridCoord; unwrap enums/ids/flags at the call site");
-		rWorkbuffer.PushBack<T>(arg);
+		rWorkbuffer.PushBack<T>(rArgument);
 	}
 }
 

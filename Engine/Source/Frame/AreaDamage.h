@@ -23,12 +23,13 @@ public:
 	// Outputs the closest damage source position via rvecClosestSource
 	static float Get(FXMVECTOR vecPosition, uint16_t uiCategoryMask, XMVECTOR& rvecClosestSource);
 
-	static void Clear();
+	static inline thread_local int64_t siAreaDamageSourceCount = 0;
 
 private:
 
-	static thread_local common::StableVector<AreaDamageSource> sAreaDamageSources;
-	static inline thread_local int64_t siAreaDamageSourceCount = 0;
+	// StableVector construction only records the reserved count, so this reserves no address space and makes
+	// no OS call until the first Resize; growth then commits more of that reservation without moving.
+	static inline thread_local common::StableVector<AreaDamageSource> sAreaDamageSources = common::StableVector<AreaDamageSource>(64 * kiAreaDamageSourcePreallocate);
 };
 
 } // namespace engine

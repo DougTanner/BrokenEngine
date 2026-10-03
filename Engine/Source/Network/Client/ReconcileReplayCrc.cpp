@@ -10,7 +10,7 @@
 namespace engine
 {
 
-static int64_t FindSnapshotIndex(std::unique_ptr<game::Frame> (&rSnapshots)[engine::kiNetworkBufferSize], int64_t iHead, int64_t iCount, int64_t iTick)
+static int64_t FindSnapshotIndex(const std::unique_ptr<game::Frame> (&rSnapshots)[engine::kiNetworkBufferSize], int64_t iHead, int64_t iCount, int64_t iTick)
 {
 	for (int64_t i = 0; i < iCount; ++i)
 	{
@@ -35,7 +35,7 @@ struct CrcValidateResult
 	int64_t iLowestUnresolvedMismatch = -1;
 };
 
-static CrcValidateResult CrcValidateLoop(CoordWork& rWork, int64_t iTargetTick, bool bSuppressRepeatLogs)
+static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTargetTick, bool bSuppressRepeatLogs)
 {
 	engine::CoordFrames& rFrames = *rWork.pFrames;
 
@@ -62,14 +62,13 @@ static CrcValidateResult CrcValidateLoop(CoordWork& rWork, int64_t iTargetTick, 
 		int64_t iPhysical = SnapshotIndex(rFrames.iSnapshotHead, iIndex);
 		const game::Frame& rClientFrame = *rFrames.snapshots[iPhysical];
 
-		if (rClientFrame.postRender.sharedCrc == it->second.sharedCrc)
+		if (rClientFrame.postRender.uiSharedCrc == it->second.sharedCrc)
 		{
 			result.iHighestMatch = iTick;
 			result.iHighestMatchIndex = iIndex;
-			// Any prior-tracked mismatch is now bypassed — the new confirmed point is past it.
 			if (iLowestUnresolved != std::numeric_limits<int64_t>::max())
 			{
-				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch superseded by later CRC match Coord: ({},{}) MismatchTick: {} MatchTick: {}", rWork.coord.x, rWork.coord.y, iLowestUnresolved, iTick);
+				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch superseded by later CRC match Coord: ({},{}) MismatchTick: {} MatchTick: {}", rWork.coord.iX, rWork.coord.iY, iLowestUnresolved, iTick);
 				iLowestUnresolved = std::numeric_limits<int64_t>::max();
 			}
 		}
@@ -79,38 +78,37 @@ static CrcValidateResult CrcValidateLoop(CoordWork& rWork, int64_t iTargetTick, 
 			{
 				char acSharedCrc[20] {}, acClientCrc[20] {};
 				common::ToHex(std::span<char, 20>(acSharedCrc), it->second.sharedCrc);
-				common::ToHex(std::span<char, 20>(acClientCrc), rClientFrame.postRender.sharedCrc);
+				common::ToHex(std::span<char, 20>(acClientCrc), rClientFrame.postRender.uiSharedCrc);
 
-				// Collapse StatusChange types into counted format
 				common::ScopedWorkbufferArena builder = common::gpThreadLocal->mWorkbuffer.Push();
 				if (!it->second.statusChanges.empty())
 				{
-					int64_t counts[static_cast<int64_t>(game::StatusChangeType::kCount)] {};
+					int64_t iCounts[static_cast<int64_t>(game::StatusChangeType::kCount)] {};
 					for (const game::StatusChange& rStatusChange : it->second.statusChanges)
 					{
-						++counts[static_cast<int64_t>(rStatusChange.eType)];
+						++iCounts[static_cast<int64_t>(rStatusChange.eType)];
 					}
 					bool bFirst = true;
 					for (int64_t i = 0; i < static_cast<int64_t>(game::StatusChangeType::kCount); ++i)
 					{
-						if (counts[i] > 0)
+						if (iCounts[i] > 0)
 						{
 							if (!bFirst)
 							{
-								builder.Append(", ");
+								builder.mBuffer.Append(", ");
 							}
-							builder.Append(game::StatusChangeTypeName(static_cast<game::StatusChangeType>(i)));
-							if (counts[i] > 1)
+							builder.mBuffer.Append(game::StatusChangeTypeName(static_cast<game::StatusChangeType>(i)));
+							if (iCounts[i] > 1)
 							{
-								builder.Append("x");
-								builder.Append(counts[i]);
+								builder.mBuffer.Append("x");
+								builder.mBuffer.Append(iCounts[i]);
 							}
 							bFirst = false;
 						}
 					}
 				}
 
-				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch; reconciliation pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} StatusChanges: {} [{}] TicksSinceFullState: {}", rWork.coord.x, rWork.coord.y, iTick, acSharedCrc, acClientCrc, it->second.statusChanges.size(), builder.View(), (rFrames.iLastFullStateTick >= 0) ? (iTick - rFrames.iLastFullStateTick) : int64_t{-1});
+				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch; reconciliation pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} StatusChanges: {} [{}] TicksSinceFullState: {}", rWork.coord.iX, rWork.coord.iY, iTick, acSharedCrc, acClientCrc, std::ssize(it->second.statusChanges), builder.mBuffer.View(), (rFrames.iLastFullStateTick >= 0) ? (iTick - rFrames.iLastFullStateTick) : static_cast<int64_t>(-1));
 			}
 			++iMismatchCount;
 			if (iMismatchCount > 1)
@@ -135,7 +133,7 @@ static CrcValidateResult CrcValidateLoop(CoordWork& rWork, int64_t iTargetTick, 
 
 	if (!bSuppressRepeatLogs && iMismatchCount > 1)
 	{
-		LOG(kNetwork, kVerbose, "CrcValidateLoop {} additional mismatches Coord: ({},{}) Ticks: {}-{} ({} with StatusChanges)", iMismatchCount - 1, rWork.coord.x, rWork.coord.y, iSecondMismatchTick, iLastMismatchTick, iAdditionalMismatchesWithStatusChanges);
+		LOG(kNetwork, kVerbose, "CrcValidateLoop {} additional mismatches Coord: ({},{}) Ticks: {}-{} ({} with StatusChanges)", iMismatchCount - 1, rWork.coord.iX, rWork.coord.iY, iSecondMismatchTick, iLastMismatchTick, iAdditionalMismatchesWithStatusChanges);
 	}
 
 	if (iLowestUnresolved != std::numeric_limits<int64_t>::max())
@@ -171,7 +169,8 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 
 	CrcFastPathCoordResult result
 	{
-		.preWritebackLayout = {
+		.preWritebackLayout =
+		{
 			.iHead = rFrames.iSnapshotHead,
 			.iCount = rFrames.iSnapshotCount,
 			.iConfirmedInner = rFrames.iConfirmedOffset,
@@ -186,7 +185,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 	if (HasDuePendingFullState(rFrames, iTargetTick))
 	{
 		result.bHandled = false;
-		LOG(kNetwork, kVerbose, "CrcFastPathProcessCoord Due pending full state forces reconcile Coord: ({},{})", rWork.coord.x, rWork.coord.y);
+		LOG(kNetwork, kVerbose, "CrcFastPathProcessCoord Due pending full state forces reconcile Coord: ({},{})", rWork.coord.iX, rWork.coord.iY);
 		return result;
 	}
 
@@ -195,8 +194,8 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 	bool bSameState = (rFrames.iConfirmedTick == rFrames.iLastLoggedConfirmedTick);
 	if (bSameState && !rFrames.serverUpdates.empty())
 	{
-		auto itFirst = rFrames.serverUpdates.upper_bound(rFrames.iConfirmedTick);
-		bSameState = (itFirst != rFrames.serverUpdates.end() && itFirst->first == rFrames.iLastLoggedFirstMismatch);
+		auto it = rFrames.serverUpdates.upper_bound(rFrames.iConfirmedTick);
+		bSameState = (it != rFrames.serverUpdates.end() && it->first == rFrames.iLastLoggedFirstMismatch);
 	}
 
 	// Cooldown: suppress detail logging when mismatch was recently logged (covers multiple
@@ -206,14 +205,13 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 
 	CrcValidateResult validateResult = CrcValidateLoop(rWork, iTargetTick, bSameState || bCooldownActive);
 
-	// Update dedup state after validation
 	if (bSameState)
 	{
 		++rFrames.iStuckFrameCount;
 		rWork.scratch.flags.Set(ReconcileScratchFlags::kSuppressRepeatLogs);
 		if ((rFrames.iStuckFrameCount % engine::CoordFrames::kiStuckLogInterval) == 0)
 		{
-			LOG(kNetwork, kVerbose, "CrcValidateLoop still stuck Coord: ({},{}) ConfirmedTick: {} FirstMismatch: {} StuckFrames: {}", rWork.coord.x, rWork.coord.y, rFrames.iConfirmedTick, rFrames.iLastLoggedFirstMismatch, rFrames.iStuckFrameCount);
+			LOG(kNetwork, kVerbose, "CrcValidateLoop still stuck Coord: ({},{}) ConfirmedTick: {} FirstMismatch: {} StuckFrames: {}", rWork.coord.iX, rWork.coord.iY, rFrames.iConfirmedTick, rFrames.iLastLoggedFirstMismatch, rFrames.iStuckFrameCount);
 		}
 	}
 	else if (!validateResult.bMatch)
@@ -238,7 +236,6 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 		return result;
 	}
 
-	// No matches, no mismatches, already at/past target.
 	if (validateResult.iHighestMatch == -1 && validateResult.bMatch && rFrames.iConfirmedTick >= iTargetTick)
 	{
 		return result;
@@ -261,7 +258,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 			result.iLowestUnresolvedMismatch = validateResult.iLowestUnresolvedMismatch;
 			if (!(rWork.scratch.flags & ReconcileScratchFlags::kSuppressRepeatLogs))
 			{
-				LOG(kNetwork, kDebug, "CrcFastPathProcessCoord Later CRC match left an unresolved speculative mismatch; rollback/replay required Coord: ({},{}) HighestMatch: {} LowestMismatch: {}", rWork.coord.x, rWork.coord.y, validateResult.iHighestMatch, validateResult.iLowestUnresolvedMismatch);
+				LOG(kNetwork, kDebug, "CrcFastPathProcessCoord Later CRC match left an unresolved speculative mismatch; rollback/replay required Coord: ({},{}) HighestMatch: {} LowestMismatch: {}", rWork.coord.iX, rWork.coord.iY, validateResult.iHighestMatch, validateResult.iLowestUnresolvedMismatch);
 			}
 		}
 	}
@@ -271,7 +268,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 		result.iLowestUnresolvedMismatch = validateResult.iLowestUnresolvedMismatch;
 		if (!(rWork.scratch.flags & ReconcileScratchFlags::kSuppressRepeatLogs))
 		{
-			LOG(kNetwork, kDebug, "CrcFastPathProcessCoord No snapshot CRC match; rollback/replay required Coord: ({},{}) FirstMismatchTick: {}", rWork.coord.x, rWork.coord.y, validateResult.iLowestUnresolvedMismatch);
+			LOG(kNetwork, kDebug, "CrcFastPathProcessCoord No snapshot CRC match; rollback/replay required Coord: ({},{}) FirstMismatchTick: {}", rWork.coord.iX, rWork.coord.iY, validateResult.iLowestUnresolvedMismatch);
 		}
 	}
 	else if (rFrames.iConfirmedTick + 1 < iTargetTick)

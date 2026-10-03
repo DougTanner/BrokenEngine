@@ -50,16 +50,12 @@ inline constexpr crc_t kCrcMultiplier = 0x123456789abcdef1;
 // separating "data desynced" from "checksum algorithm changed" (skip it and straddling replays false-desync).
 
 // Custom 64-bit hash used for asset identification and lookup; it is not standard CRC32/64.
-constexpr crc_t Crc(std::string_view pData)
+constexpr crc_t Crc(std::string_view data)
 {
 	crc_t crc = kCrcSeed;
-	// Fold each byte as unsigned char so values >= 0x80 zero-extend deterministically regardless of
-	// char signedness (signed char sign-extends on the XOR, changing the hash cross-toolchain).
-	// Raw-pointer index loop with an 8-wide manual unroll: preserves the exact per-byte fold order and
-	// ops while shedding the Debug range-for iterator overhead. static_cast (not reinterpret_cast) keeps
-	// the char->unsigned char conversion a value cast, so the fold stays constexpr-evaluable.
-	const char* pBytes = pData.data();
-	int64_t iSize = static_cast<int64_t>(pData.size());
+	// Unsigned-byte conversion keeps high-bit input stable across char signedness; static_cast keeps the fold constexpr-evaluable. The 8-byte unroll preserves per-byte fold order.
+	const char* pBytes = data.data();
+	int64_t iSize = static_cast<int64_t>(data.size());
 	int64_t i = 0;
 	for (; i + 8 <= iSize; i += 8)
 	{
@@ -80,19 +76,19 @@ constexpr crc_t Crc(std::string_view pData)
 }
 
 #pragma warning(suppress: 26497) // consteval is stricter than constexpr
-consteval crc_t CrcConsteval(std::string_view pData)
+consteval crc_t CrcConsteval(std::string_view data)
 {
-	return Crc(pData);
+	return Crc(data);
 }
 static_assert(Crc("test") == CrcConsteval("test"), "CRC functions must produce identical results");
 
 // Hashes native object representations, including padding and float bit patterns; use layout-stable,
 // padding-free or deterministically-zeroed data.
 template<typename T>
-inline crc_t Crc(const T* pValues, int64_t iCount)
+inline crc_t Crc(std::span<const T> values)
 {
 	static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
-	return Crc(std::string_view(reinterpret_cast<const char*>(pValues), iCount * sizeof(T)));
+	return Crc(std::string_view(reinterpret_cast<const char*>(values.data()), values.size_bytes()));
 }
 
 // NotStringLike keeps this overload from competing with the string_view overload's implicit conversions.
@@ -123,7 +119,7 @@ template<int64_t SIZE>
 struct ConstexprCrcArray
 {
 	int64_t iCount = SIZE;
-	crc_t array[SIZE];
+	crc_t array[SIZE] {};
 
 	consteval ConstexprCrcArray(std::string_view prefix, std::string_view suffix)
 	{

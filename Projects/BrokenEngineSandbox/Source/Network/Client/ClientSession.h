@@ -63,7 +63,7 @@ public:
 	void SendUpdatePlayerRequest(int64_t iGlobalPlayerId, bool bUseMissiles, float fNavigationDelay);
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid);
-	void SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId);
+	void SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId);
 	void SendDeleteFleetRequest(const FleetGuid& rFleetGuid);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
 
@@ -95,7 +95,7 @@ private:
 
 	// Game packet helpers
 	void ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent);
-	void UpdatePlayerCoord(engine::global_id_t globalPlayerId, engine::GridCoord coord);
+	void UpdatePlayerCoord(engine::GlobalId globalPlayerId, engine::GridCoord coord);
 
 };
 

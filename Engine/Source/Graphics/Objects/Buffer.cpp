@@ -74,7 +74,7 @@ void Buffer::UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const D
 	{
 		const DeviceLocalBufferUpload& rUpload = uploads[iUpload];
 		std::memcpy(static_cast<std::byte*>(stagingBuffer.vmaAllocationInfo.pMappedData) + vkStagingOffset, rUpload.pData, static_cast<size_t>(rUpload.vkSize));
-		pCopies[iUpload] =
+		pCopies.mpData[iUpload] =
 		{
 			.srcOffset = vkStagingOffset,
 			.dstOffset = rUpload.vkDestinationOffset,
@@ -84,7 +84,7 @@ void Buffer::UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const D
 	}
 
 	OneShotCommandBuffer oneShotCommandBuffer;
-	vkCmdCopyBuffer(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.stagingVkBuffer, vkDeviceLocalBuffer, static_cast<uint32_t>(uploads.size()), pCopies);
+	vkCmdCopyBuffer(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.stagingVkBuffer, vkDeviceLocalBuffer, static_cast<uint32_t>(uploads.size()), pCopies.mpData);
 	oneShotCommandBuffer.Execute();
 }
 

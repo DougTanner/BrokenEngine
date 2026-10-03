@@ -11,18 +11,18 @@ namespace engine
 
 common::crc_t FrameInterpolateBase::Crcs() const
 {
-	common::crc_t sharedCrc = 0;
+	common::crc_t uiSharedCrc = 0;
 
-	sharedCrc = (sharedCrc ^ common::Crc(iTick)) * common::kCrcMultiplier;
-	sharedCrc = (sharedCrc ^ common::Crc(fCurrentTime)) * common::kCrcMultiplier;
-	sharedCrc = (sharedCrc ^ common::Crc(fDeltaTime)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(iTick)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(fCurrentTime)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(fDeltaTime)) * common::kCrcMultiplier;
 
-	std::apply([&](const auto&... collections)
+	std::apply([&](const auto&... rCollections)
 	{
-		((sharedCrc = (sharedCrc ^ SharedCollectionCrc(collections)) * common::kCrcMultiplier), ...);
+		((uiSharedCrc = (uiSharedCrc ^ SharedCollectionCrc(rCollections)) * common::kCrcMultiplier), ...);
 	}, ServerCollections());
 
-	return sharedCrc;
+	return uiSharedCrc;
 }
 
 bool FrameInterpolateBase::LogDifferences(const FrameInterpolateBase& rOther) const
@@ -32,7 +32,7 @@ bool FrameInterpolateBase::LogDifferences(const FrameInterpolateBase& rOther) co
 	bEqual &= common::LogDifference<"iTick">(iTick, rOther.iTick);
 	bEqual &= common::LogDifference<"fCurrentTime">(fCurrentTime, rOther.fCurrentTime);
 	bEqual &= common::LogDifference<"fDeltaTime">(fDeltaTime, rOther.fDeltaTime);
-	bEqual &= LogDifferencesCollections(ServerCollections(), rOther.ServerCollections(), std::make_index_sequence<std::tuple_size_v<decltype(ServerCollections())>>{});
+	bEqual &= LogDifferencesCollections(ServerCollections(), rOther.ServerCollections(), std::make_index_sequence<std::tuple_size_v<decltype(ServerCollections())>> {});
 	return bEqual;
 }
 
@@ -42,9 +42,9 @@ void FrameInterpolateBase::Write(std::ostream& rStream) const
 	common::Write(rStream, fCurrentTime);
 	common::Write(rStream, fDeltaTime);
 
-	std::apply([&](const auto&... collections)
+	std::apply([&](const auto&... rCollections)
 	{
-		(CollectionWrite(rStream, collections, collections.Members()), ...);
+		(CollectionWrite(rStream, rCollections, rCollections.Members()), ...);
 	}, Collections());
 }
 
@@ -54,9 +54,9 @@ void FrameInterpolateBase::Read(std::istream& rStream)
 	common::Read(rStream, fCurrentTime);
 	common::Read(rStream, fDeltaTime);
 
-	std::apply([&](auto&... collections)
+	std::apply([&](auto&... rCollections)
 	{
-		(CollectionRead(rStream, collections, collections.Members()), ...);
+		(CollectionRead(rStream, rCollections, rCollections.Members()), ...);
 	}, Collections());
 }
 
@@ -66,27 +66,27 @@ void FrameInterpolateBase::ServerRead(std::istream& rStream)
 	common::Read(rStream, fCurrentTime);
 	common::Read(rStream, fDeltaTime);
 
-	std::apply([&](auto&... collections)
+	std::apply([&](auto&... rCollections)
 	{
-		(SharedCollectionRead(rStream, collections), ...);
+		(SharedCollectionRead(rStream, rCollections), ...);
 	}, ServerCollections());
 }
 
 common::crc_t FramePostRenderBase::Crcs() const
 {
-	common::crc_t crc = 0;
+	common::crc_t uiCrc = 0;
 
-	crc = (crc ^ randomEngine.Crc()) * common::kCrcMultiplier;
-	crc = (crc ^ common::Crc(uiNextUuid)) * common::kCrcMultiplier;
-	crc = (crc ^ common::Crc(uiFrameId)) * common::kCrcMultiplier;
-	crc = (crc ^ alignments.Crc()) * common::kCrcMultiplier;
+	uiCrc = (uiCrc ^ randomEngine.Crc()) * common::kCrcMultiplier;
+	uiCrc = (uiCrc ^ common::Crc(uiNextUuid)) * common::kCrcMultiplier;
+	uiCrc = (uiCrc ^ common::Crc(uiFrameIdentifier)) * common::kCrcMultiplier;
+	uiCrc = (uiCrc ^ alignments.Crc()) * common::kCrcMultiplier;
 
-	std::apply([&](const auto&... collections)
+	std::apply([&](const auto&... rCollections)
 	{
-		((crc = (crc ^ SharedCollectionCrc(collections)) * common::kCrcMultiplier), ...);
+		((uiCrc = (uiCrc ^ SharedCollectionCrc(rCollections)) * common::kCrcMultiplier), ...);
 	}, ServerCollections());
 
-	return crc;
+	return uiCrc;
 }
 
 bool FramePostRenderBase::LogDifferences(const FramePostRenderBase& rOther) const
@@ -96,21 +96,19 @@ bool FramePostRenderBase::LogDifferences(const FramePostRenderBase& rOther) cons
 	bEqual &= common::LogDifference<"randomEngine">(randomEngine, rOther.randomEngine);
 	bEqual &= common::LogDifference<"uiNextUuid">(uiNextUuid, rOther.uiNextUuid);
 	// Skip uiNextSoundUuid and uiNextVisualUuid (client-only)
-	bEqual &= common::LogDifference<"uiFrameId">(uiFrameId, rOther.uiFrameId);
+	bEqual &= common::LogDifference<"uiFrameIdentifier">(uiFrameIdentifier, rOther.uiFrameIdentifier);
 	if (!(alignments == rOther.alignments))
 	{
 		bEqual = false;
 		LOG(kNetwork, kError, "LogDifferences {} alignments differ", common::gpLogDifferenceContext);
 	}
-	bEqual &= LogDifferencesCollections(ServerCollections(), rOther.ServerCollections(), std::make_index_sequence<std::tuple_size_v<decltype(ServerCollections())>>{});
+	bEqual &= LogDifferencesCollections(ServerCollections(), rOther.ServerCollections(), std::make_index_sequence<std::tuple_size_v<decltype(ServerCollections())>> {});
 	return bEqual;
 }
 
-// Write/Read serialize the client-only UUID counters under BT_CLIENT, so the two builds'
-// stream layouts differ structurally — a client-written stream is unreadable by a server
-// Read (and vice versa). Safe today only because the stream owners are server-only
-// (engine::GridSave and engine::Replay); the guard is convention, not structure. ServerRead handles the
-// cross-build (network) direction and documents the skip.
+// Write/Read include client-only UUID counters under BT_CLIENT, so their streams require the same build.
+// GridSave and Replay are server-only stream owners; callers enforce this restriction.
+// Cross-build network snapshots use ServerRead, which omits those counters.
 void FramePostRenderBase::Write(std::ostream& rStream) const
 {
 	common::Write(rStream, randomEngine);
@@ -119,12 +117,12 @@ void FramePostRenderBase::Write(std::ostream& rStream) const
 	common::Write(rStream, uiNextSoundUuid);
 	common::Write(rStream, uiNextVisualUuid);
 #endif
-	common::Write(rStream, uiFrameId);
+	common::Write(rStream, uiFrameIdentifier);
 	alignments.Write(rStream);
 
-	std::apply([&](const auto&... collections)
+	std::apply([&](const auto&... rCollections)
 	{
-		(CollectionWrite(rStream, collections, collections.Members()), ...);
+		(CollectionWrite(rStream, rCollections, rCollections.Members()), ...);
 	}, Collections());
 }
 
@@ -138,12 +136,12 @@ void FramePostRenderBase::Read(std::istream& rStream)
 	common::Read(rStream, uiNextSoundUuid);
 	common::Read(rStream, uiNextVisualUuid);
 #endif
-	common::Read(rStream, uiFrameId);
+	common::Read(rStream, uiFrameIdentifier);
 	alignments.Read(rStream);
 
-	std::apply([&](auto&... collections)
+	std::apply([&](auto&... rCollections)
 	{
-		(CollectionRead(rStream, collections, collections.Members()), ...);
+		(CollectionRead(rStream, rCollections, rCollections.Members()), ...);
 	}, Collections());
 }
 
@@ -154,49 +152,31 @@ void FramePostRenderBase::ServerRead(std::istream& rStream)
 	randomEngine.SetSerializedState(uiRandomState);
 	common::Read(rStream, uiNextUuid);
 	// Server does not write uiNextSoundUuid or uiNextVisualUuid
-	common::Read(rStream, uiFrameId);
+	common::Read(rStream, uiFrameIdentifier);
 	alignments.Read(rStream);
 
-	std::apply([&](auto&... collections)
+	std::apply([&](auto&... rCollections)
 	{
-		(SharedCollectionRead(rStream, collections), ...);
+		(SharedCollectionRead(rStream, rCollections), ...);
 	}, ServerCollections());
 }
-
-void FrameInterpolateBase::Register()
-{
-	ForEachRegister(InterpolateTypes {});
-}
-
-#if defined(BT_CLIENT)
-void FrameInterpolateBase::GraphicsResources()
-{
-	ForEachGraphicsResources(InterpolateTypes {});
-}
-#endif
 
 void FrameInterpolateBase::AllocateAndCopy([[maybe_unused]] game::FrameInterpolate& __restrict rCurrent, [[maybe_unused]] const game::FrameInterpolate& __restrict rPrevious)
 {
 	FrameInterpolateBase& rCurrentBase = rCurrent;
 	const FrameInterpolateBase& rPreviousBase = rPrevious;
-	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_index_sequence<std::tuple_size_v<decltype(rCurrentBase.Collections())>>{});
+	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_index_sequence<std::tuple_size_v<decltype(rCurrentBase.Collections())>> {});
 }
 
 void FrameInterpolateBase::Update([[maybe_unused]] game::FrameInterpolate& __restrict rCurrent, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] float fDeltaTime)
 {
-	// Store delta time in frame
 	rCurrent.fDeltaTime = fDeltaTime;
 
 #if defined(BT_CLIENT)
-	// kRecalculated propagates through the rPrevious chain: Reconcile pre-stamps it on each
-	// replay pNext (ReconcileReplay.cpp), and clears it on validated/catch-up snapshots so
-	// normal-tick rPrevious never carries the bit. Reading rCurrent.frameFlags here would
-	// surface stale ring-memory from a prior replay use of the slot — silencing audio.
-	const FrameInterpolateBase& rPrevious = rPreviousFrame.interpolate;
-	FrameFlags_t frameFlags = rPrevious.frameFlags;
-	frameFlags.Clear({FrameFlags::kInterpolate, FrameFlags::kPostRender});
-	frameFlags.Set(FrameFlags::kInterpolate);
-	rCurrent.frameFlags = frameFlags;
+	// On a reconcile tick, rCurrent's kRecalculated is that tick's replay marker, assigned before
+	// RunFrameTick; it must reach the PostRender Spawn readers, so only the phase bits change here.
+	rCurrent.frameFlags.Clear({FrameFlags::kInterpolate, FrameFlags::kPostRender});
+	rCurrent.frameFlags.Set(FrameFlags::kInterpolate);
 #endif
 
 	ForEachInterpolateUpdate(InterpolateTypes {}, rCurrent, rPreviousFrame);
@@ -206,7 +186,7 @@ void FramePostRenderBase::AllocateAndCopy([[maybe_unused]] game::FramePostRender
 {
 	FramePostRenderBase& rCurrentBase = rCurrent;
 	const FramePostRenderBase& rPreviousBase = rPrevious;
-	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_index_sequence<std::tuple_size_v<decltype(rCurrentBase.Collections())>>{});
+	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_index_sequence<std::tuple_size_v<decltype(rCurrentBase.Collections())>> {});
 }
 
 void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const game::FrameInput& __restrict rFrameInput, [[maybe_unused]] const FrameStaticData& rStaticData)
@@ -219,14 +199,13 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	rFrame.interpolate.frameFlags.Set(FrameFlags::kPostRender);
 #endif
 
-	// Carry persistent state forward from the previous frame
 	rCurrent.randomEngine = rPrevious.randomEngine;
 	rCurrent.uiNextUuid = rPrevious.uiNextUuid;
 #if defined(BT_CLIENT)
 	rCurrent.uiNextSoundUuid = rPrevious.uiNextSoundUuid;
 	rCurrent.uiNextVisualUuid = rPrevious.uiNextVisualUuid;
 #endif
-	rCurrent.uiFrameId = rPrevious.uiFrameId;
+	rCurrent.uiFrameIdentifier = rPrevious.uiFrameIdentifier;
 	rCurrent.alignments.CopyFrom(rPrevious.alignments);
 
 	ForEachPostRenderUpdate(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
@@ -235,54 +214,7 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	PushersInterpolate::SetupZones(rFrame, LocalFrameArea());
 }
 
-void FramePostRenderBase::PreCollision([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
-{
-	ForEachPostRenderPreCollision(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
-}
-
-void FramePostRenderBase::PostCollision([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
-{
-	ForEachPostRenderPostCollision(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
-}
-
-void FramePostRenderBase::AreaDamage([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
-{
-	ForEachPostRenderAreaDamage(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
-}
-
-void FramePostRenderBase::Transfer([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
-{
-	ForEachPostRenderTransfer(PostRenderBaseTypes {}, rFrame, rStaticData);
-}
-
-void FramePostRenderBase::Destroy([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
-{
-	ForEachPostRenderDestroy(PostRenderBaseTypes {}, rFrame, rStaticData);
-}
-
-void FramePostRenderBase::Spawn([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
-{
-	ForEachPostRenderSpawn(PostRenderBaseTypes {}, rFrame, rStaticData);
-}
-
-#if defined(BT_CLIENT)
-void FrameInterpolateBase::BeginRender([[maybe_unused]] int64_t iCommandBuffer, [[maybe_unused]] const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, [[maybe_unused]] const std::vector<GridCoord>& rActiveCoords)
-{
-	ForEachBeginRender(InterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
-}
-
-void FrameInterpolateBase::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rCurrent, [[maybe_unused]] int64_t iCommandBuffer)
-{
-	ForEachInterpolateRender(InterpolateTypes {}, rCurrent, iCommandBuffer);
-}
-
-void FrameInterpolateBase::EndRender([[maybe_unused]] int64_t iCommandBuffer)
-{
-	ForEachEndRender(InterpolateTypes {}, iCommandBuffer);
-}
-#endif // BT_CLIENT
-
-void RunFrameTick(const ActiveFrameRef& rRef, int64_t iTickCounter, float fCurrentTime)
+void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, float fCurrentTime)
 {
 	// Mark this thread as inside a deterministic tick so a stray render-path GlobalElevation/GlobalNormal
 	// call (which walks mCoordFrames with libm trig) fails fast instead of silently desyncing across CPUs.
@@ -294,27 +226,27 @@ void RunFrameTick(const ActiveFrameRef& rRef, int64_t iTickCounter, float fCurre
 	ASSERT((uiControlWord & _MCW_DN) == _DN_FLUSH);
 	ASSERT((uiControlWord & _MCW_RC) == _RC_NEAR);
 
-	game::Frame& rNext = *rRef.pNext;
-	const game::Frame& rCurrent = *rRef.pCurrent;
-	const FrameStaticData& rStaticData = *rRef.pStaticData;
+	game::Frame& rNext = *rReference.pNext;
+	const game::Frame& rCurrent = *rReference.pCurrent;
+	const FrameStaticData& rStaticData = *rReference.pStaticData;
 
 #if defined(BT_SERVER)
 	// NavData is derived from placements + per-template NavContour. Build it here on the
 	// per-coord dispatch thread (naturally parallel across coords) on the first tick after
-	// a coord is created or reloaded from save. Client receives prebuilt navData over the
+	// a coord is created or reloaded from save. Client receives prebuilt navigationData over the
 	// wire and never enters this branch (server-only NavContour).
-	if (!rStaticData.bNavDataBuilt)
+	if (!rStaticData.bNavigationDataBuilt)
 	{
 		ScopedSuppressAllocationTracking suppress;
-		BuildCellNavData(rStaticData.navData, rStaticData.islands);
-		rStaticData.bNavDataBuilt = true;
+		BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
+		rStaticData.bNavigationDataBuilt = true;
 	}
 #endif
 
 	// Per-cell elevation grid (purely derived from islands + shared heightmaps). Both client
 	// and server build their own bit-identical copy here — same deterministic placements, same
 	// shared heightmaps, /fp:strict math — so it stays out of the CRC and is never serialized.
-	// Builds before any sim phase below so every FrameElevation/FrameNormal caller this tick
+	// Builds before any sim phase below so every FrameElevationSampler::Sample/FrameNormal caller this tick
 	// sees a populated grid.
 	if (rStaticData.elevationGrid.empty() && !rStaticData.islands.empty())
 	{
@@ -335,31 +267,26 @@ void RunFrameTick(const ActiveFrameRef& rRef, int64_t iTickCounter, float fCurre
 	}
 #endif
 
-	// Phase 1: Interpolate
 	game::FrameInterpolate::AllocateAndCopy(rNext.interpolate, rCurrent.interpolate);
 	game::FrameInterpolate::Update(rNext.interpolate, rCurrent, kfDeltaTime);
 	rNext.interpolate.iTick = iTickCounter;
 	rNext.interpolate.fCurrentTime = fCurrentTime;
 
-	// Phase 2: PostRender
 	game::FramePostRender::AllocateAndCopy(rNext.postRender, rCurrent.postRender);
-	game::FramePostRender::Update(rNext, rCurrent, *rRef.pFrameInput, rStaticData);
+	game::FramePostRender::Update(rNext, rCurrent, *rReference.pFrameInput, rStaticData);
 
-	// Phase 3: Collision
 	game::FramePostRender::PreCollision(rNext, rCurrent, rStaticData);
 	Collision::Collide(rNext.postRender.alignments, LocalFrameArea());
 	game::FramePostRender::PostCollision(rNext, rCurrent, rStaticData);
 	game::FramePostRender::AreaDamage(rNext, rCurrent, rStaticData);
 
-	// Phase 4: Transfer
 	game::FramePostRender::Transfer(rNext, rStaticData);
 
-	// Phase 5: Destroy/Spawn
 	game::FramePostRender::Destroy(rNext, rStaticData);
-	game::FramePostRender::Spawn(rNext, *rRef.pFrameInput, rStaticData);
+	game::FramePostRender::Spawn(rNext, *rReference.pFrameInput, rStaticData);
 
 	// Compute CRCs after all phases complete
-	rNext.postRender.sharedCrc = rNext.Crcs();
+	rNext.postRender.uiSharedCrc = rNext.Crcs();
 }
 
 } // namespace engine

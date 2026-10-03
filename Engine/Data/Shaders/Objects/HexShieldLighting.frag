@@ -48,7 +48,7 @@ void main()
 	{
 		float fDot = dot(f3Normal, pHexShields[i].pf4Directions[j].xyz);
 		float fFalloff = pow(max(0.5f + 0.5f * fDot, 0.0f), mainLayout.fHexShieldDirectionFalloffPower);
-		fDirection += mainLayout.fHexShieldDirectionMultiplier * pHexShields[i].pfFragIntensities[j] * fFalloff;
+		fDirection += mainLayout.fHexShieldDirectionMultiplier * pHexShields[i].pfFragmentIntensities[j] * fFalloff;
 	}
 
 	// Lighting direction

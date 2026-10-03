@@ -11,12 +11,9 @@
 namespace game
 {
 
-namespace
-{
-
 // OptionalCount reads an agent parameter by key; a wrongly typed parameter or a negative count throws.
 
-int64_t OptionalCount(const nlohmann::json& rParams, std::string_view key, int64_t iDefault)
+static int64_t OptionalCount(const nlohmann::json& rParams, std::string_view key, int64_t iDefault)
 {
 	if (!rParams.contains(key))
 	{
@@ -33,13 +30,13 @@ int64_t OptionalCount(const nlohmann::json& rParams, std::string_view key, int64
 	return iCount;
 }
 
-nlohmann::json Vec3ToJson(XMVECTOR vec)
+static nlohmann::json Vec3ToJson(XMVECTOR vec)
 {
 	return nlohmann::json::array({XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec)});
 }
 
 // Bound a non-negative offset/limit window to the collection's live count → [iBegin, iEnd).
-void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t& riBegin, int64_t& riEnd)
+static void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t& riBegin, int64_t& riEnd)
 {
 	riBegin = std::min(iOffset, iTotal);
 	riEnd = iLimit >= iTotal - riBegin ? iTotal : riBegin + iLimit;
@@ -48,7 +45,7 @@ void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t& riBeg
 // Minimum+cheap field set per collection: index, local/dir, health, alignment, id — wherever the member exists.
 // Every row of one of these reports belongs to the cell the request named, so the position is the local
 // component alone; the caller's own 'coord' parameter identifies the cell.
-nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
+static nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
 	const PlayersInterpolate& rInterp = *rFrame.interpolate.pPlayers;
 	const PlayersPostRender& rPost = *rFrame.postRender.pPlayers;
@@ -61,20 +58,20 @@ nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64_t iLim
 		items.push_back(
 		{
 			{"index", i},
-			{"uuid", rPost.puiIds[i].ToUuid().Value()},
+			{"uuid", rPost.pIds[i].uuid.iValue},
 			{"globalId", rPost.pGlobalPlayerIds[i].iValue},
 			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
 			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
 			{"armor", rPost.pfArmors[i]},
 			{"shield", rPost.pfShields[i]},
 			{"flags", std::to_underlying(rPost.pFlags[i].meFlags)},
-			{"alignment", rPost.pAlignments[i].Value()},
+			{"alignment", rPost.pAlignments[i].uiValue},
 		});
 	}
 	return items;
 }
 
-nlohmann::json ExtractSpaceships(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
+static nlohmann::json ExtractSpaceships(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
 	const SpaceshipsInterpolate& rInterp = *rFrame.interpolate.pSpaceships;
 	const SpaceshipsPostRender& rPost = *rFrame.postRender.pSpaceships;
@@ -91,14 +88,14 @@ nlohmann::json ExtractSpaceships(const Frame& rFrame, int64_t iOffset, int64_t i
 			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
 			{"health", rPost.pfHealths[i]},
 			{"deltaRotation", rInterp.pfDeltaRotations[i]},
-			{"alignment", rPost.pAlignments[i].Value()},
-			{"registryId", rInterp.puiRegistryIds[i].ToUuid().Value()},
+			{"alignment", rPost.pAlignments[i].uiValue},
+			{"registryId", rInterp.puiRegistryIds[i].uuid.iValue},
 		});
 	}
 	return items;
 }
 
-nlohmann::json ExtractMissiles(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
+static nlohmann::json ExtractMissiles(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
 	const MissilesInterpolate& rInterp = *rFrame.interpolate.pMissiles;
 	const MissilesPostRender& rPost = *rFrame.postRender.pMissiles;
@@ -115,14 +112,14 @@ nlohmann::json ExtractMissiles(const Frame& rFrame, int64_t iOffset, int64_t iLi
 			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
 			{"deltaRotation", rPost.pfDeltaRotations[i]},
 			{"deltaRotationDelay", rPost.pfDeltaRotationDelays[i]},
-			{"alignment", rPost.pAlignments[i].Value()},
-			{"registryTargetId", rPost.puiRegistryTargets[i].ToUuid().Value()},
+			{"alignment", rPost.pAlignments[i].uiValue},
+			{"registryTargetId", rPost.puiRegistryTargets[i].uuid.iValue},
 		});
 	}
 	return items;
 }
 
-nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
+static nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
 	const BlastersInterpolate& rInterp = *rFrame.interpolate.pBlasters;
 	const BlastersPostRender& rPost = *rFrame.postRender.pBlasters;
@@ -137,13 +134,13 @@ nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int64_t iLi
 			{"index", i},
 			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
 			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
-			{"alignment", rPost.pAlignments[i].Value()},
+			{"alignment", rPost.pAlignments[i].uiValue},
 		});
 	}
 	return items;
 }
 
-const Frame& QueryFrame(const nlohmann::json& rParams)
+static const Frame& QueryFrame(const nlohmann::json& rParams)
 {
 	engine::GridCoord coord = CoordFromParam(rParams);
 	auto framesIt = gpGame->mCoordFrames.find(coord);
@@ -159,8 +156,6 @@ const Frame& QueryFrame(const nlohmann::json& rParams)
 	}
 	return gpGame->CurrentFrame(coord);
 }
-
-} // namespace
 
 void CommandQueryFrame(const nlohmann::json& rParams, nlohmann::json& rResult)
 {

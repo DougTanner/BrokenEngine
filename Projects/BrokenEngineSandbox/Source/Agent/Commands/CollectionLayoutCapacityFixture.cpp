@@ -5,9 +5,6 @@
 namespace game
 {
 
-namespace
-{
-
 // collection_layout_capacity_fixture verifies physical-layout capacity retention.
 
 // Deterministic per-row shared-member values. The identical formulas drive the source-stream writer and the
@@ -16,33 +13,33 @@ namespace
 // kbDebugInput-only branch, discarded on non-debug builds.)
 
 // Distinct exactly-representable value per (row, column), so a column swapped with its neighbour cannot match.
-constexpr float MissileSharedRowScalar(int64_t i, int64_t iSeed, int64_t iColumn)
+static constexpr float MissileSharedRowScalar(int64_t i, int64_t iSeed, int64_t iColumn)
 {
 	return static_cast<float>(iSeed * 100'000 + i * 10 + iColumn);
 }
 
-constexpr MissileFlags_t MissileSharedRowFlags(int64_t i, int64_t iSeed)
+static constexpr MissileFlags_t MissileSharedRowFlags(int64_t i, int64_t iSeed)
 {
 	return ((i + iSeed) & 1) ? MissileFlags_t {MissileFlags::kTransfer} : MissileFlags_t {MissileFlags::kExploding};
 }
 
-constexpr engine::alignment_t MissileSharedRowAlignment(int64_t i, int64_t iSeed)
+static constexpr engine::AlignmentIdentifier MissileSharedRowAlignment(int64_t i, int64_t iSeed)
 {
-	return engine::alignment_t {static_cast<uint32_t>(iSeed * 100 + i + 1)};
+	return engine::AlignmentIdentifier {static_cast<uint32_t>(iSeed * 100 + i + 1)};
 }
 
-constexpr engine::registry_id_t MissileSharedRowTarget(int64_t i, int64_t iSeed)
+static constexpr engine::registry_id_t MissileSharedRowTarget(int64_t i, int64_t iSeed)
 {
-	return engine::registry_id_t {engine::uuid_t {iSeed * 100'000 + i + 1}};
+	return engine::registry_id_t {engine::Uuid {iSeed * 100'000 + i + 1}};
 }
 
-XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn)
+static XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn)
 {
 	// Directions and velocities carry W=0.0.
 	return XMVectorSet(MissileSharedRowScalar(i, iSeed, iColumn), MissileSharedRowScalar(i, iSeed, iColumn + 1), MissileSharedRowScalar(i, iSeed, iColumn + 2), 0.0f);
 }
 
-[[maybe_unused]] void FillMissileSharedRow(MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
+[[maybe_unused]] static void FillMissileSharedRow(MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
 {
 	rMissiles.pFlags[i] = MissileSharedRowFlags(i, iSeed);
 	rMissiles.pVecVelocities[i] = MissileSharedRowVector(i, iSeed, 0);
@@ -60,7 +57,7 @@ XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn)
 	rMissiles.pAlignments[i] = MissileSharedRowAlignment(i, iSeed);
 }
 
-[[maybe_unused]] bool MissileSharedRowMatches(const MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
+[[maybe_unused]] static bool MissileSharedRowMatches(const MissilesPostRender& rMissiles, int64_t i, int64_t iSeed)
 {
 	return rMissiles.pFlags[i] == MissileSharedRowFlags(i, iSeed)
 	    && XMVector4Equal(rMissiles.pVecVelocities[i], MissileSharedRowVector(i, iSeed, 0))
@@ -82,8 +79,6 @@ XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn)
 // reused instance, proving the transient iPhysicalLayoutCapacity holds the true buffer stride across shrink-reuse:
 // the two shrinks reuse the 100-wide buffer and (client) zero the full physical layout including rows 70-99, while the
 // >100-row read reallocates exactly once and publishes the new capacity only after the allocation succeeds.
-
-} // namespace
 
 void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
@@ -138,7 +133,7 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		{
 			for (int64_t i = 0; i < destination.iPhysicalLayoutCapacity; ++i)
 			{
-				destination.puiSounds[i] = engine::sound_t {engine::uuid_t {0x7fffffffffffffffLL}};
+				destination.puiSounds[i] = engine::sound_t {engine::Uuid {0x7fffffffffffffffLL}};
 			}
 		};
 		auto CountNonZeroSounds = [&]() -> int64_t
@@ -146,7 +141,7 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 			int64_t iNonZero = 0;
 			for (int64_t i = 0; i < destination.iPhysicalLayoutCapacity; ++i)
 			{
-				if (destination.puiSounds[i].ToUuid().Value() != 0)
+				if (destination.puiSounds[i].uuid.iValue != 0)
 				{
 					++iNonZero;
 				}

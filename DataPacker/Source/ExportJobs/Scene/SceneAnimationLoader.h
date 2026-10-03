@@ -1,6 +1,9 @@
 #pragma once
 
-namespace tinygltf { class Model; }
+namespace tinygltf
+{
+	class Model;
+} // namespace tinygltf
 
 // Determine whether to use skeletal or node-based animation.
 // Returns true for skeletal (all channels target skin joints), false for node-based.
@@ -15,4 +18,4 @@ struct AnimationOutput
 	std::vector<common::AnimationKeyframeCubic>& rCubicKeyframes;
 };
 
-void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOut);
+void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput);

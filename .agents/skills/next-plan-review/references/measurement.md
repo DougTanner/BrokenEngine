@@ -106,7 +106,7 @@ not infer compliance.
 Use only this allowed evidence chain from claim to conclusion: a headless
 `/codex-review` is compliant only with its parent wrapper invocation/result, the
 commit-time `.codex/agents/<agent>.toml` `model` and `model_reasoning_effort`
-pins that `.codex/codex-review.ps1` applies, and fixed structured output.
+pins that `.agents/skills/claude-to-codex/scripts/Invoke-Codex.ps1` applies, and fixed structured output.
 A requested role, explicit requested model/effort, or configured mapping proves
 intent only; when required model or effort evidence cannot be proved, the verdict
 is `unverified`. Record the parent wrapper event, the actual concern, the

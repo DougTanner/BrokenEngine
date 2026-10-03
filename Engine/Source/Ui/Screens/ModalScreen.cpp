@@ -9,14 +9,9 @@
 namespace engine
 {
 
-namespace
-{
-
 constexpr float kfModalWindowWidthFraction = 0.24f;
 constexpr float kfModalMessageFontScale = 1.15f;
 constexpr float kfModalMessageActionGapPixels = 36.0f;
-
-} // namespace
 
 void ModalScreen::Render()
 {

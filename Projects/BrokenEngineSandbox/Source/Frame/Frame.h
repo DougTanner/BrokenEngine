@@ -22,7 +22,7 @@ struct MissilesPostRender;
 struct SpaceshipsInterpolate;
 struct SpaceshipsPostRender;
 
-using player_t = engine::id_t<PlayersInterpolate>;
+using player_t = engine::Id<PlayersInterpolate>;
 
 enum class GameFlags : uint64_t
 {
@@ -99,8 +99,8 @@ struct FramePostRender : public engine::FramePostRenderBase
 	static void Destroy(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData);
 
-	engine::alignment_t enemyAlignment {};
-	engine::alignment_t playerAlignment {};
+	engine::AlignmentIdentifier enemyAlignment {};
+	engine::AlignmentIdentifier playerAlignment {};
 
 	std::unique_ptr<PlayersPostRender> pPlayers;
 

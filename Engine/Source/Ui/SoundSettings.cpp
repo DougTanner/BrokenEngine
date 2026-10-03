@@ -43,11 +43,8 @@ void SaveSoundSettings()
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcSoundSettingsPath, soundSettings);
 }
 
-namespace
-{
-
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
-const char* FindInvalidSoundSetting(const SoundSettings& rSoundSettings)
+static const char* FindInvalidSoundSetting(const SoundSettings& rSoundSettings)
 {
 	if (!gMasterVolume.IsInRange(rSoundSettings.fMasterVolume))
 	{
@@ -66,8 +63,6 @@ const char* FindInvalidSoundSetting(const SoundSettings& rSoundSettings)
 
 	return nullptr;
 }
-
-} // namespace
 
 void LoadSoundSettings()
 {

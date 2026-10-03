@@ -1,11 +1,9 @@
 #include "InputFingerprint.h"
 
-namespace
-{
 
 // Opening the provider per hash is expensive; one process-lifetime handle serves every hash (BCrypt
 // algorithm handles are thread-safe) and is deliberately never closed.
-BCRYPT_ALG_HANDLE GetSha256Algorithm()
+static BCRYPT_ALG_HANDLE GetSha256Algorithm()
 {
 	static BCRYPT_ALG_HANDLE spAlgorithm = []()
 	{
@@ -76,7 +74,7 @@ private:
 	BCRYPT_HASH_HANDLE mpHash = nullptr;
 };
 
-std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprintMode eMode)
+static std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprintMode eMode)
 {
 	Sha256Hasher hasher;
 	std::fstream stream(rPath, std::ios::in | std::ios::binary);
@@ -90,21 +88,21 @@ std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprin
 	while (stream)
 	{
 		stream.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
-		size_t uiBytes = static_cast<size_t>(stream.gcount());
+		int64_t iByteCount = stream.gcount();
 		if (eMode == InputFingerprintMode::kRaw)
 		{
-			hasher.Update(std::span(buffer).first(uiBytes));
+			hasher.Update(std::span(buffer).first(static_cast<size_t>(iByteCount)));
 			continue;
 		}
 
-		size_t uiNormalizedBytes = 0;
-		for (size_t i = 0; i < uiBytes; ++i)
+		int64_t iNormalizedByteCount = 0;
+		for (int64_t i = 0; i < iByteCount; ++i)
 		{
 			std::byte uiByte = buffer.at(i);
 			if (bPendingCarriageReturn)
 			{
-				normalizedBuffer.at(uiNormalizedBytes++) = static_cast<std::byte>('\r');
-				normalizedBuffer.at(uiNormalizedBytes++) = static_cast<std::byte>('\n');
+				normalizedBuffer.at(iNormalizedByteCount++) = static_cast<std::byte>('\r');
+				normalizedBuffer.at(iNormalizedByteCount++) = static_cast<std::byte>('\n');
 				bPendingCarriageReturn = false;
 				if (uiByte == static_cast<std::byte>('\n'))
 				{
@@ -117,15 +115,15 @@ std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprin
 			}
 			else if (uiByte == static_cast<std::byte>('\n'))
 			{
-				normalizedBuffer.at(uiNormalizedBytes++) = static_cast<std::byte>('\r');
-				normalizedBuffer.at(uiNormalizedBytes++) = static_cast<std::byte>('\n');
+				normalizedBuffer.at(iNormalizedByteCount++) = static_cast<std::byte>('\r');
+				normalizedBuffer.at(iNormalizedByteCount++) = static_cast<std::byte>('\n');
 			}
 			else
 			{
-				normalizedBuffer.at(uiNormalizedBytes++) = uiByte;
+				normalizedBuffer.at(iNormalizedByteCount++) = uiByte;
 			}
 		}
-		hasher.Update(std::span(normalizedBuffer).first(uiNormalizedBytes));
+		hasher.Update(std::span(normalizedBuffer).first(static_cast<size_t>(iNormalizedByteCount)));
 	}
 	if (!stream.eof())
 	{
@@ -146,7 +144,7 @@ constexpr const char* kpcFingerprintCacheMagic = "DataPackerFingerprintCache";
 constexpr int64_t kiFingerprintCacheVersion = 1;
 constexpr uintmax_t kuiMaximumFingerprintCacheBytes = 64 * 1'024 * 1'024;
 
-bool IsSha256(std::string_view fingerprint)
+static bool IsSha256(std::string_view fingerprint)
 {
 	return fingerprint.size() == 64 && std::ranges::all_of(fingerprint, [](char cCharacter)
 	{
@@ -154,7 +152,6 @@ bool IsSha256(std::string_view fingerprint)
 	});
 }
 
-}
 
 InputFingerprintCache::InputFingerprintCache(const std::filesystem::path& rCacheFile)
 : mCacheFile(rCacheFile)
@@ -180,14 +177,22 @@ void InputFingerprintCache::Load()
 	{
 		std::error_code cacheSizeError;
 		uintmax_t uiCacheSize = std::filesystem::file_size(mCacheFile, cacheSizeError);
-		if (cacheSizeError || uiCacheSize > kuiMaximumFingerprintCacheBytes)
+		if (cacheSizeError)
+		{
+			return;
+		}
+		if (uiCacheSize > kuiMaximumFingerprintCacheBytes)
 		{
 			return;
 		}
 		std::ifstream cacheStream(mCacheFile);
 		nlohmann::json cache;
 		cacheStream >> cache;
-		if (cache.at("magic") != kpcFingerprintCacheMagic || cache.at("version") != kiFingerprintCacheVersion)
+		if (cache.at("magic") != kpcFingerprintCacheMagic)
+		{
+			return;
+		}
+		if (cache.at("version") != kiFingerprintCacheVersion)
 		{
 			return;
 		}
@@ -300,10 +305,10 @@ std::string InputFingerprintCache::GetFile(const std::filesystem::path& rPath, I
 {
 	std::string key = PathKey(rPath, eMode);
 	FileSnapshot snapshot = Snapshot(rPath);
-	auto cachedIterator = mCachedFingerprints.find(key);
-	if (cachedIterator != mCachedFingerprints.end() && cachedIterator->second.snapshot == snapshot)
+	auto it = mCachedFingerprints.find(key);
+	if (it != mCachedFingerprints.end() && it->second.snapshot == snapshot)
 	{
-		return cachedIterator->second.fingerprint;
+		return it->second.fingerprint;
 	}
 
 	std::string fingerprint = HashFileContents(rPath, eMode);
@@ -318,17 +323,21 @@ std::string InputFingerprintCache::GetPersistentFile(const std::filesystem::path
 	metadataPath += ".fingerprint.meta";
 	std::string key = PathKey(rPath, InputFingerprintMode::kRaw);
 	FileSnapshot snapshot = Snapshot(rPath);
-	auto cachedIterator = mCachedFingerprints.find(key);
-	if (cachedIterator != mCachedFingerprints.end() && cachedIterator->second.snapshot == snapshot)
+	auto it = mCachedFingerprints.find(key);
+	if (it != mCachedFingerprints.end() && it->second.snapshot == snapshot)
 	{
-		return cachedIterator->second.fingerprint;
+		return it->second.fingerprint;
 	}
 
 	try
 	{
 		std::error_code metadataSizeError;
 		uintmax_t uiMetadataSize = std::filesystem::file_size(metadataPath, metadataSizeError);
-		if (metadataSizeError || uiMetadataSize > kuiMaximumPersistentFingerprintBytes)
+		if (metadataSizeError)
+		{
+			throw std::runtime_error("Invalid fingerprint metadata size");
+		}
+		if (uiMetadataSize > kuiMaximumPersistentFingerprintBytes)
 		{
 			throw std::runtime_error("Invalid fingerprint metadata size");
 		}

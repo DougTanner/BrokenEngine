@@ -4,31 +4,36 @@ namespace engine
 {
 
 // Simple alignment identifier (0 = invalid)
-struct alignment_t
+struct AlignmentIdentifier
 {
 	uint32_t uiValue = 0;
 
-	constexpr alignment_t() = default;
-	constexpr explicit alignment_t(uint32_t uiValue) : uiValue(uiValue) {}
+	constexpr AlignmentIdentifier() = default;
+	constexpr explicit AlignmentIdentifier(uint32_t uiValue) : uiValue(uiValue)
+	{
+	}
 
-	constexpr bool IsValid() const { return uiValue != 0; }
-	constexpr uint32_t Value() const { return uiValue; }
+	constexpr bool operator==(const AlignmentIdentifier&) const = default;
+	constexpr std::strong_ordering operator<=>(const AlignmentIdentifier&) const = default;
 
-	constexpr bool operator==(const alignment_t&) const = default;
-	constexpr std::strong_ordering operator<=>(const alignment_t&) const = default;
-
-	void Write(std::ostream& rStream) const { common::Write(rStream, uiValue); }
-	void Read(std::istream& rStream) { common::Read(rStream, uiValue); }
+	void Write(std::ostream& rStream) const
+	{
+		common::Write(rStream, uiValue);
+	}
+	void Read(std::istream& rStream)
+	{
+		common::Read(rStream, uiValue);
+	}
 };
 
-inline constexpr alignment_t kInvalidAlignment {};
+inline constexpr AlignmentIdentifier kInvalidAlignment {};
 
 namespace AlignmentFlags
 {
-	inline constexpr uint8_t kNone = 0x00;
-	inline constexpr uint8_t kEnemies = 0x01;
-	inline constexpr uint8_t kAllies = 0x02;
-}
+	inline constexpr uint8_t kuiNone = 0x00;
+	inline constexpr uint8_t kuiEnemies = 0x01;
+	inline constexpr uint8_t kuiAllies = 0x02;
+} // namespace AlignmentFlags
 
 struct AlignmentPair
 {
@@ -40,13 +45,12 @@ struct AlignmentPair
 
 // Sorted flat vector for alignment collision filtering
 // Keys are two 32-bit alignment IDs concatenated (lower ID first)
-// Flags are alignment relationship flags
 struct Alignments
 {
 	std::vector<AlignmentPair> alignmentPairs;
 
-	void AddAlignment(alignment_t idA, alignment_t idB, uint8_t uiFlags);
-	bool CanCollide(alignment_t idA, alignment_t idB) const;
+	void AddAlignment(AlignmentIdentifier alignmentA, AlignmentIdentifier alignmentB, uint8_t uiFlags);
+	bool CanCollide(AlignmentIdentifier alignmentA, AlignmentIdentifier alignmentB) const;
 
 	void CopyFrom(const Alignments& rOther);
 
@@ -57,7 +61,7 @@ struct Alignments
 
 private:
 
-	static uint64_t MakeAlignmentKey(alignment_t idA, alignment_t idB);
+	static uint64_t MakeAlignmentKey(AlignmentIdentifier alignmentA, AlignmentIdentifier alignmentB);
 };
 
 } // namespace engine

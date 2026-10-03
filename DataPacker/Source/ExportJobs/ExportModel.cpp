@@ -2,12 +2,9 @@
 
 #include "SourceReadValidation.h"
 
-namespace
-{
 
 constexpr const char* kpcContext = "ExportModel::Export";
 
-} // namespace
 
 std::optional<common::ChunkFlags_t> ExportModel::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {
@@ -33,7 +30,7 @@ void ExportModel::Export()
 		throw std::runtime_error("ExportModel::Export failed to open source file");
 	}
 	RequireSourceExtent(uiFileSize, 0, sizeof(uiMaterialCount), kpcContext);
-	ReadSourceBytes(fileStream, reinterpret_cast<char*>(&uiMaterialCount), sizeof(uiMaterialCount), kpcContext);
+	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiMaterialCount), sizeof(uiMaterialCount)), kpcContext);
 
 	uintmax_t uiMaterialCountValue = static_cast<uintmax_t>(uiMaterialCount);
 	if (uiMaterialCount > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
@@ -47,14 +44,14 @@ void ExportModel::Export()
 	uiFileOffset = AddSourceBytes(uiFileOffset, uiMaterialIndexBytes, kpcContext);
 	RequireSourceExtent(uiFileSize, uiFileOffset, uiMaterialInfoBytes, kpcContext);
 	materialIndexPositions.resize(uiMaterialCount);
-	ReadSourceBytes(fileStream, reinterpret_cast<char*>(materialIndexPositions.data()), uiMaterialIndexBytes, kpcContext);
+	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(materialIndexPositions.data()), static_cast<size_t>(uiMaterialIndexBytes)), kpcContext);
 	// Skip past material info data (not needed for model export)
 	SkipSourceBytes(fileStream, uiMaterialInfoBytes, kpcContext);
 	uiFileOffset = AddSourceBytes(uiFileOffset, uiMaterialInfoBytes, kpcContext);
 	uintmax_t uiCountsBytes = AddSourceBytes(sizeof(uiIndexCount), sizeof(uiVertexCount), kpcContext);
 	RequireSourceExtent(uiFileSize, uiFileOffset, uiCountsBytes, kpcContext);
-	ReadSourceBytes(fileStream, reinterpret_cast<char*>(&uiIndexCount), sizeof(uiIndexCount), kpcContext);
-	ReadSourceBytes(fileStream, reinterpret_cast<char*>(&uiVertexCount), sizeof(uiVertexCount), kpcContext);
+	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiIndexCount), sizeof(uiIndexCount)), kpcContext);
+	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiVertexCount), sizeof(uiVertexCount)), kpcContext);
 	uiFileOffset = AddSourceBytes(uiFileOffset, uiCountsBytes, kpcContext);
 
 	if (uiVertexCount > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
@@ -80,12 +77,12 @@ void ExportModel::Export()
 	if (bUsesU16Indices)
 	{
 		indices16.resize(uiIndexCount);
-		ReadSourceBytes(fileStream, reinterpret_cast<char*>(indices16.data()), uiIndexBytes, kpcContext);
+		ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(indices16.data()), static_cast<size_t>(uiIndexBytes)), kpcContext);
 	}
 	else
 	{
 		indices32.resize(uiIndexCount);
-		ReadSourceBytes(fileStream, reinterpret_cast<char*>(indices32.data()), uiIndexBytes, kpcContext);
+		ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(indices32.data()), static_cast<size_t>(uiIndexBytes)), kpcContext);
 	}
 	// Trust boundary: a decoded index at or past the vertex count would read outside the packed vertex
 	// buffer at draw time, and the runtime validates only counts and byte extents.
@@ -98,7 +95,7 @@ void ExportModel::Export()
 		}
 	}
 	vertices.resize(static_cast<size_t>(uiVertexBytes));
-	ReadSourceBytes(fileStream, reinterpret_cast<char*>(vertices.data()), uiVertexBytes, kpcContext);
+	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(vertices.data()), static_cast<size_t>(uiVertexBytes)), kpcContext);
 	fileStream.close();
 
 	if (uiIndexBytes > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max()) - (common::kiAlignmentBytes - 1))

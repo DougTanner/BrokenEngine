@@ -3,15 +3,12 @@
 namespace audiorepair
 {
 
-namespace
-{
 
-// Fix thresholds
 constexpr float kfDcOffsetThreshold = 0.002f;
 constexpr float kfPeakNormalizeThreshold = 1.001f; // a legit -32768 16-bit sample lands at 1.00003 after /32767 — don't rescale a whole file for one LSB
 constexpr float kfEdgeAmplitudeThreshold = 0.01f;
 constexpr int64_t kiEdgeProbeFrames = 8; // sub-0.2ms attack is a click even when frame 0 is small
-constexpr float kfEdgeFadeSeconds = 0.003f; // raised cosine; 132 samples @ 44.1kHz
+constexpr std::chrono::duration<float> kfEdgeFadeDuration = std::chrono::duration<float>{0.003f}; // raised cosine; 132 samples @ 44.1kHz
 constexpr int64_t kiEdgeFadeMinSamples = 16;
 
 // Declip detection — shared by the fix path and every warn-only branch so reported numbers mean
@@ -26,7 +23,6 @@ constexpr int64_t kiClipSupportMinSamplesPerSide = 4;
 constexpr float kfDeclipMaxReconstruction = 2.0f; // spline blowup cap
 constexpr int64_t kiDeclipWarnOnlyRunCount = 256; // more runs per channel => mastering-style limiting, warn-only
 
-// Warn-only thresholds
 constexpr float kfLoopSeamWarnThreshold = 0.005f;
 
 struct ClipRun
@@ -36,7 +32,7 @@ struct ClipRun
 	float fRailValue = 0.0f; // signed mean of the run's samples — the flat-top level
 };
 
-int64_t ScrubNonFinite(std::vector<float>& rfSamples)
+static int64_t ScrubNonFinite(std::vector<float>& rfSamples)
 {
 	int64_t iScrubbed = 0;
 	for (float& rfSample : rfSamples)
@@ -51,15 +47,15 @@ int64_t ScrubNonFinite(std::vector<float>& rfSamples)
 }
 
 // Returns the per-channel mean actually subtracted (0.0 when below threshold)
-float RemoveDcOffset(std::vector<float>& rfSamples, int64_t iChannels, int64_t iChannel)
+static float RemoveDcOffset(std::vector<float>& rfSamples, int64_t iChannels, int64_t iChannel)
 {
-	double dSum = 0.0;
-	int64_t iFrames = static_cast<int64_t>(rfSamples.size()) / iChannels;
+	double fSum = 0.0;
+	int64_t iFrames = std::ssize(rfSamples) / iChannels;
 	for (int64_t i = 0; i < iFrames; ++i)
 	{
-		dSum += rfSamples[i * iChannels + iChannel];
+		fSum += rfSamples[i * iChannels + iChannel];
 	}
-	float fMean = static_cast<float>(dSum / static_cast<double>(iFrames));
+	float fMean = static_cast<float>(fSum / static_cast<double>(iFrames));
 	if (std::abs(fMean) <= kfDcOffsetThreshold)
 	{
 		return 0.0f;
@@ -74,59 +70,60 @@ float RemoveDcOffset(std::vector<float>& rfSamples, int64_t iChannels, int64_t i
 
 // Natural cubic spline second derivatives via the Thomas algorithm (M_first = M_last = 0),
 // non-uniform x spacing. Doubles internally — trivial cost offline.
-void SolveNaturalCubicSpline(const double* pXs, const double* pYs, double* pSecondDerivatives, int64_t iCount)
+static void SolveNaturalCubicSpline(std::span<const double> samplePositions, std::span<const double> sampleValues, std::span<double> secondDerivatives)
 {
-	pSecondDerivatives[0] = 0.0;
-	pSecondDerivatives[iCount - 1] = 0.0;
+	int64_t iCount = std::ssize(samplePositions);
+	secondDerivatives[0] = 0.0;
+	secondDerivatives[iCount - 1] = 0.0;
 	if (iCount < 3)
 	{
 		return;
 	}
 
 	// Forward elimination over the interior tridiagonal system
-	std::vector<double> dDiagonal(iCount, 0.0);
-	std::vector<double> dRhs(iCount, 0.0);
+	std::vector<double> fDiagonal(iCount, 0.0);
+	std::vector<double> fRightHandSide(iCount, 0.0);
 	for (int64_t i = 1; i < iCount - 1; ++i)
 	{
-		double dHPrevious = pXs[i] - pXs[i - 1];
-		double dHNext = pXs[i + 1] - pXs[i];
-		dDiagonal[i] = 2.0 * (dHPrevious + dHNext);
-		dRhs[i] = 6.0 * ((pYs[i + 1] - pYs[i]) / dHNext - (pYs[i] - pYs[i - 1]) / dHPrevious);
+		double fPreviousIntervalWidth = samplePositions[i] - samplePositions[i - 1];
+		double fNextIntervalWidth = samplePositions[i + 1] - samplePositions[i];
+		fDiagonal[i] = 2.0 * (fPreviousIntervalWidth + fNextIntervalWidth);
+		fRightHandSide[i] = 6.0 * ((sampleValues[i + 1] - sampleValues[i]) / fNextIntervalWidth - (sampleValues[i] - sampleValues[i - 1]) / fPreviousIntervalWidth);
 
 		if (i > 1)
 		{
-			double dFactor = dHPrevious / dDiagonal[i - 1];
-			dDiagonal[i] -= dFactor * dHPrevious;
-			dRhs[i] -= dFactor * dRhs[i - 1];
+			double fFactor = fPreviousIntervalWidth / fDiagonal[i - 1];
+			fDiagonal[i] -= fFactor * fPreviousIntervalWidth;
+			fRightHandSide[i] -= fFactor * fRightHandSide[i - 1];
 		}
 	}
 
 	// Back substitution
 	for (int64_t i = iCount - 2; i >= 1; --i)
 	{
-		double dHNext = pXs[i + 1] - pXs[i];
-		pSecondDerivatives[i] = (dRhs[i] - dHNext * pSecondDerivatives[i + 1]) / dDiagonal[i];
+		double fNextIntervalWidth = samplePositions[i + 1] - samplePositions[i];
+		secondDerivatives[i] = (fRightHandSide[i] - fNextIntervalWidth * secondDerivatives[i + 1]) / fDiagonal[i];
 	}
 }
 
-double EvaluateCubicSpline(const double* pXs, const double* pYs, const double* pSecondDerivatives, int64_t iInterval, double dX)
+static double EvaluateCubicSpline(const double* pSamplePositions, const double* pSampleValues, const double* pSecondDerivatives, int64_t iInterval, double fSamplePosition)
 {
-	double dH = pXs[iInterval + 1] - pXs[iInterval];
-	double dA = pXs[iInterval + 1] - dX;
-	double dB = dX - pXs[iInterval];
-	return pSecondDerivatives[iInterval] * dA * dA * dA / (6.0 * dH)
-		+ pSecondDerivatives[iInterval + 1] * dB * dB * dB / (6.0 * dH)
-		+ (pYs[iInterval] / dH - pSecondDerivatives[iInterval] * dH / 6.0) * dA
-		+ (pYs[iInterval + 1] / dH - pSecondDerivatives[iInterval + 1] * dH / 6.0) * dB;
+	double fIntervalWidth = pSamplePositions[iInterval + 1] - pSamplePositions[iInterval];
+	double fDistanceToRightSupport = pSamplePositions[iInterval + 1] - fSamplePosition;
+	double fDistanceFromLeftSupport = fSamplePosition - pSamplePositions[iInterval];
+	return pSecondDerivatives[iInterval] * fDistanceToRightSupport * fDistanceToRightSupport * fDistanceToRightSupport / (6.0 * fIntervalWidth)
+		+ pSecondDerivatives[iInterval + 1] * fDistanceFromLeftSupport * fDistanceFromLeftSupport * fDistanceFromLeftSupport / (6.0 * fIntervalWidth)
+		+ (pSampleValues[iInterval] / fIntervalWidth - pSecondDerivatives[iInterval] * fIntervalWidth / 6.0) * fDistanceToRightSupport
+		+ (pSampleValues[iInterval + 1] / fIntervalWidth - pSecondDerivatives[iInterval + 1] * fIntervalWidth / 6.0) * fDistanceFromLeftSupport;
 }
 
 struct ClipRunAnalysis
 {
-	std::vector<uint8_t> clippedMask;
+	std::vector<uint8_t> uiClippedMask;
 	std::vector<ClipRun> runs;
 };
 
-ClipRunAnalysis DetectClipRuns(const std::vector<float>& rSamples, int64_t iFrames, int64_t iChannels, int64_t iChannel)
+static ClipRunAnalysis DetectClipRuns(const std::vector<float>& rSamples, int64_t iFrames, int64_t iChannels, int64_t iChannel)
 {
 	ClipRunAnalysis analysis {};
 	auto Sample = [&](int64_t iFrame) -> const float&
@@ -151,35 +148,34 @@ ClipRunAnalysis DetectClipRuns(const std::vector<float>& rSamples, int64_t iFram
 		return analysis;
 	}
 
-	// Clipped mask + maximal same-sign runs
 	float fPositiveClipLevel = kfClipRunLevelFraction * fPositivePeak;
 	float fNegativeClipLevel = kfClipRunLevelFraction * fNegativePeak;
-	analysis.clippedMask.assign(iFrames, 0);
+	analysis.uiClippedMask.assign(iFrames, 0);
 	for (int64_t i = 0; i < iFrames; ++i)
 	{
 		float fSample = Sample(i);
-		analysis.clippedMask[i] = ((bDetectPositive && fSample >= fPositiveClipLevel) || (bDetectNegative && fSample <= -fNegativeClipLevel)) ? 1 : 0;
+		analysis.uiClippedMask[i] = ((bDetectPositive && fSample >= fPositiveClipLevel) || (bDetectNegative && fSample <= -fNegativeClipLevel)) ? 1 : 0;
 	}
 
 	for (int64_t i = 0; i < iFrames;)
 	{
-		if (analysis.clippedMask[i] == 0)
+		if (analysis.uiClippedMask[i] == 0)
 		{
 			++i;
 			continue;
 		}
 		bool bPositive = Sample(i) >= 0.0f;
 		int64_t iStart = i;
-		double dRailSum = 0.0;
-		while (i < iFrames && analysis.clippedMask[i] != 0 && (Sample(i) >= 0.0f) == bPositive)
+		double fRailSum = 0.0;
+		while (i < iFrames && analysis.uiClippedMask[i] != 0 && (Sample(i) >= 0.0f) == bPositive)
 		{
-			dRailSum += Sample(i);
+			fRailSum += Sample(i);
 			++i;
 		}
 		int64_t iLength = i - iStart;
 		if (iLength >= kiClipRunMinSamples)
 		{
-			analysis.runs.push_back(ClipRun { .iStart = iStart, .iEnd = i - 1, .fRailValue = static_cast<float>(dRailSum / static_cast<double>(iLength)), });
+			analysis.runs.push_back(ClipRun { .iStart = iStart, .iEnd = i - 1, .fRailValue = static_cast<float>(fRailSum / static_cast<double>(iLength)), });
 		}
 	}
 	return analysis;
@@ -198,7 +194,7 @@ struct DeclipPolicyClassification
 	int64_t iLongestRun = 0;
 };
 
-DeclipPolicyClassification ClassifyDeclipPolicy(const std::vector<ClipRun>& rRuns, bool bAllowDeclip)
+static DeclipPolicyClassification ClassifyDeclipPolicy(const std::vector<ClipRun>& rRuns, bool bAllowDeclip)
 {
 	int64_t iLongestRun = 0;
 	for (const ClipRun& rRun : rRuns)
@@ -225,7 +221,7 @@ struct DeclipStatistics
 	float fMaxReconstruction = 0.0f;
 };
 
-DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64_t iFrames, int64_t iChannels, int64_t iChannel, const std::vector<uint8_t>& rClippedMask, const std::vector<ClipRun>& rRuns)
+static DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64_t iFrames, int64_t iChannels, int64_t iChannel, const std::vector<uint8_t>& ruiClippedMask, const std::vector<ClipRun>& rRuns)
 {
 	DeclipStatistics statistics {};
 	auto Sample = [&](int64_t iFrame) -> float&
@@ -233,9 +229,9 @@ DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64_t iFra
 		return rfSamples[iFrame * iChannels + iChannel];
 	};
 
-	std::vector<double> dXs;
-	std::vector<double> dYs;
-	std::vector<double> dSecondDerivatives;
+	std::vector<double> fSamplePositions;
+	std::vector<double> fSampleValues;
+	std::vector<double> fSecondDerivatives;
 	for (const ClipRun& rRun : rRuns)
 	{
 		int64_t iLength = rRun.iEnd - rRun.iStart + 1;
@@ -246,15 +242,15 @@ DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64_t iFra
 		}
 
 		// Nearest clean frames each side, skipping neighboring runs' rail samples (they bias the fit low)
-		dXs.clear();
-		dYs.clear();
+		fSamplePositions.clear();
+		fSampleValues.clear();
 		int64_t iLeftCount = 0;
 		for (int64_t i = rRun.iStart - 1; i >= 0 && iLeftCount < kiClipSupportSamplesPerSide; --i)
 		{
-			if (rClippedMask[i] == 0)
+			if (ruiClippedMask[i] == 0)
 			{
-				dXs.push_back(static_cast<double>(i));
-				dYs.push_back(Sample(i));
+				fSamplePositions.push_back(static_cast<double>(i));
+				fSampleValues.push_back(Sample(i));
 				++iLeftCount;
 			}
 		}
@@ -263,16 +259,16 @@ DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64_t iFra
 			++statistics.iRunsSkipped;
 			continue;
 		}
-		std::reverse(dXs.begin(), dXs.end());
-		std::reverse(dYs.begin(), dYs.end());
+		std::reverse(fSamplePositions.begin(), fSamplePositions.end());
+		std::reverse(fSampleValues.begin(), fSampleValues.end());
 
 		int64_t iRightCount = 0;
 		for (int64_t i = rRun.iEnd + 1; i < iFrames && iRightCount < kiClipSupportSamplesPerSide; ++i)
 		{
-			if (rClippedMask[i] == 0)
+			if (ruiClippedMask[i] == 0)
 			{
-				dXs.push_back(static_cast<double>(i));
-				dYs.push_back(Sample(i));
+				fSamplePositions.push_back(static_cast<double>(i));
+				fSampleValues.push_back(Sample(i));
 				++iRightCount;
 			}
 		}
@@ -282,15 +278,15 @@ DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64_t iFra
 			continue;
 		}
 
-		dSecondDerivatives.assign(dXs.size(), 0.0);
-		SolveNaturalCubicSpline(dXs.data(), dYs.data(), dSecondDerivatives.data(), static_cast<int64_t>(dXs.size()));
+		fSecondDerivatives.assign(fSamplePositions.size(), 0.0);
+		SolveNaturalCubicSpline(fSamplePositions, fSampleValues, fSecondDerivatives);
 
 		// The gap lies in the interval between the innermost support points
 		int64_t iGapInterval = iLeftCount - 1;
 		bool bPositive = rRun.fRailValue >= 0.0f;
 		for (int64_t i = rRun.iStart; i <= rRun.iEnd; ++i)
 		{
-			float fReconstructed = static_cast<float>(EvaluateCubicSpline(dXs.data(), dYs.data(), dSecondDerivatives.data(), iGapInterval, static_cast<double>(i)));
+			float fReconstructed = static_cast<float>(EvaluateCubicSpline(fSamplePositions.data(), fSampleValues.data(), fSecondDerivatives.data(), iGapInterval, static_cast<double>(i)));
 			// Declip only restores magnitude the clip removed: force the run's sign and rail floor,
 			// and cap against spline blowup on pathological support. min/max ordering (not std::clamp):
 			// an over-full-scale float source can rail beyond the cap, and clamp with lo > hi is UB — the cap wins
@@ -311,12 +307,10 @@ DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64_t iFra
 	return statistics;
 }
 
-// Detects flat-top runs and (when bAllowDeclip) reconstructs short ones with a natural cubic
-// spline through the nearest clean samples each side. The clipped mask is computed once and never
-// updated, so every run reconstructs from original clean samples — order-independent.
-void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iChannel, bool bAllowDeclip, std::string_view relativeFile)
+// The clipped mask stays fixed so each run reconstructs from the original clean samples, independent of run order.
+static void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iChannel, bool bAllowDeclip, std::string_view relativeFile)
 {
-	int64_t iFrames = static_cast<int64_t>(rfSamples.size()) / iChannels;
+	int64_t iFrames = std::ssize(rfSamples) / iChannels;
 	ClipRunAnalysis analysis = DetectClipRuns(rfSamples, iFrames, iChannels, iChannel);
 	if (analysis.runs.empty())
 	{
@@ -335,7 +329,7 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 		return;
 	}
 
-	DeclipStatistics statistics = ReconstructClipRuns(rfSamples, iFrames, iChannels, iChannel, analysis.clippedMask, analysis.runs);
+	DeclipStatistics statistics = ReconstructClipRuns(rfSamples, iFrames, iChannels, iChannel, analysis.uiClippedMask, analysis.runs);
 	if (statistics.iRunsFixed > 0)
 	{
 		LOG(kDefault, kWarning, "{}: declipped {} runs (longest {}, max reconstruction {:.3f}) on channel {}", relativeFile, statistics.iRunsFixed, statistics.iLongestFixed, statistics.fMaxReconstruction, iChannel);
@@ -348,7 +342,7 @@ void DeclipChannel(std::vector<float>& rfSamples, int64_t iChannels, int64_t iCh
 
 // Whole-file rescale by one factor across all channels (preserves the stereo image). Absorbs
 // declip reconstruction overshoot and over-full-scale float sources.
-void NormalizePeak(std::vector<float>& rfSamples, std::string_view relativeFile)
+static void NormalizePeak(std::vector<float>& rfSamples, std::string_view relativeFile)
 {
 	float fPeak = 0.0f;
 	for (float fSample : rfSamples)
@@ -368,15 +362,15 @@ void NormalizePeak(std::vector<float>& rfSamples, std::string_view relativeFile)
 	LOG(kDefault, kWarning, "{}: peak {:.4f} above full scale, rescaled by {:.4f}", relativeFile, fPeak, fScale);
 }
 
-void ValidateLoopSeam(const std::vector<float>& rfSamples, int64_t iChannels, std::string_view relativeFile, bool bDcCorrected)
+static void ValidateLoopSeam(const std::vector<float>& rfSamples, int64_t iChannels, std::string_view relativeFile, bool bDcCorrected)
 {
-	int64_t iFrames = static_cast<int64_t>(rfSamples.size()) / iChannels;
-	for (int64_t iChannel = 0; iChannel < iChannels; ++iChannel)
+	int64_t iFrames = std::ssize(rfSamples) / iChannels;
+	for (int64_t i = 0; i < iChannels; ++i)
 	{
-		float fSeamJump = std::abs(rfSamples[iChannel] - rfSamples[(iFrames - 1) * iChannels + iChannel]);
+		float fSeamJump = std::abs(rfSamples[i] - rfSamples[(iFrames - 1) * iChannels + i]);
 		if (fSeamJump > kfLoopSeamWarnThreshold)
 		{
-			LOG(kDefault, kWarning, "{}: loop seam mismatch {:.4f} > {:.4f} on channel {} - will click every loop iteration (warn only){}", relativeFile, fSeamJump, kfLoopSeamWarnThreshold, iChannel, bDcCorrected ? "; DC offset was also corrected - check the source edit" : "");
+			LOG(kDefault, kWarning, "{}: loop seam mismatch {:.4f} > {:.4f} on channel {} - will click every loop iteration (warn only){}", relativeFile, fSeamJump, kfLoopSeamWarnThreshold, i, bDcCorrected ? "; DC offset was also corrected - check the source edit" : "");
 		}
 	}
 }
@@ -384,10 +378,10 @@ void ValidateLoopSeam(const std::vector<float>& rfSamples, int64_t iChannels, st
 // Raised-cosine fade-in/out when an edge is audibly non-zero. All channels fade together (fading
 // one channel of a stereo pair would skew the image). Runs last: every earlier pass changes edge
 // amplitudes, and measuring the final value avoids fading files an earlier pass already cured.
-void ApplyEdgeFades(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSamplesPerSec, std::string_view relativeFile, bool bAllowEdgeFades)
+static void ApplyEdgeFades(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSamplesPerSecond, std::string_view relativeFile, bool bAllowEdgeFades)
 {
-	int64_t iFrames = static_cast<int64_t>(rfSamples.size()) / iChannels;
-	int64_t iFadeFrames = std::max(kiEdgeFadeMinSamples, static_cast<int64_t>(kfEdgeFadeSeconds * static_cast<float>(iSamplesPerSec)));
+	int64_t iFrames = std::ssize(rfSamples) / iChannels;
+	int64_t iFadeFrames = std::max(kiEdgeFadeMinSamples, static_cast<int64_t>(kfEdgeFadeDuration.count() * static_cast<float>(iSamplesPerSecond)));
 	iFadeFrames = std::min(iFadeFrames, iFrames / 2);
 	if (iFadeFrames < 2)
 	{
@@ -401,10 +395,10 @@ void ApplyEdgeFades(std::vector<float>& rfSamples, int64_t iChannels, int64_t iS
 	float fTailPeak = 0.0f;
 	for (int64_t i = 0; i < iProbeFrames; ++i)
 	{
-		for (int64_t iChannel = 0; iChannel < iChannels; ++iChannel)
+		for (int64_t j = 0; j < iChannels; ++j)
 		{
-			fOnsetPeak = std::max(fOnsetPeak, std::abs(rfSamples[i * iChannels + iChannel]));
-			fTailPeak = std::max(fTailPeak, std::abs(rfSamples[(iFrames - 1 - i) * iChannels + iChannel]));
+			fOnsetPeak = std::max(fOnsetPeak, std::abs(rfSamples[i * iChannels + j]));
+			fTailPeak = std::max(fTailPeak, std::abs(rfSamples[(iFrames - 1 - i) * iChannels + j]));
 		}
 	}
 
@@ -415,9 +409,9 @@ void ApplyEdgeFades(std::vector<float>& rfSamples, int64_t iChannels, int64_t iS
 			for (int64_t i = 0; i < iFadeFrames; ++i)
 			{
 				float fGain = 0.5f * (1.0f - std::cos(std::numbers::pi_v<float> * static_cast<float>(i) / static_cast<float>(iFadeFrames)));
-				for (int64_t iChannel = 0; iChannel < iChannels; ++iChannel)
+				for (int64_t j = 0; j < iChannels; ++j)
 				{
-					rfSamples[i * iChannels + iChannel] *= fGain;
+					rfSamples[i * iChannels + j] *= fGain;
 				}
 			}
 			LOG(kDefault, kWarning, "{}: faded {}-frame onset (edge amplitude {:.3f})", relativeFile, iFadeFrames, fOnsetPeak);
@@ -435,9 +429,9 @@ void ApplyEdgeFades(std::vector<float>& rfSamples, int64_t iChannels, int64_t iS
 			for (int64_t i = 0; i < iFadeFrames; ++i)
 			{
 				float fGain = 0.5f * (1.0f - std::cos(std::numbers::pi_v<float> * static_cast<float>(i) / static_cast<float>(iFadeFrames)));
-				for (int64_t iChannel = 0; iChannel < iChannels; ++iChannel)
+				for (int64_t j = 0; j < iChannels; ++j)
 				{
-					rfSamples[(iFrames - 1 - i) * iChannels + iChannel] *= fGain;
+					rfSamples[(iFrames - 1 - i) * iChannels + j] *= fGain;
 				}
 			}
 			LOG(kDefault, kWarning, "{}: faded {}-frame tail (edge amplitude {:.3f})", relativeFile, iFadeFrames, fTailPeak);
@@ -451,40 +445,43 @@ void ApplyEdgeFades(std::vector<float>& rfSamples, int64_t iChannels, int64_t iS
 
 // Modified Bessel function of the first kind, order 0 — series sum_{k>=0} ((x/2)^k / k!)^2.
 // Doubles throughout; the series converges fast for the Kaiser beta range used here.
-double BesselI0(double dX)
+static double BesselI0(double fArgument)
 {
-	double dSum = 1.0;
-	double dTerm = 1.0;
-	double dHalfX = 0.5 * dX;
+	double fSum = 1.0;
+	double fTerm = 1.0;
+	double fHalfArgument = 0.5 * fArgument;
 	for (int64_t k = 1; k < 64; ++k)
 	{
-		dTerm *= dHalfX / static_cast<double>(k);
-		double dTermSquared = dTerm * dTerm;
-		dSum += dTermSquared;
-		if (dTermSquared < 1e-12 * dSum)
+		fTerm *= fHalfArgument / static_cast<double>(k);
+		double fTermSquared = fTerm * fTerm;
+		fSum += fTermSquared;
+		if (fTermSquared < 1.0e-12 * fSum)
 		{
 			break;
 		}
 	}
-	return dSum;
+	return fSum;
 }
 
 // Normalized sinc: sin(pi x) / (pi x), with the removable singularity at 0 handled.
-double NormalizedSinc(double dX)
+static double NormalizedSinc(double fArgument)
 {
-	if (dX == 0.0)
+	if (fArgument == 0.0)
 	{
 		return 1.0;
 	}
-	double dPiX = std::numbers::pi_v<double> * dX;
-	return std::sin(dPiX) / dPiX;
+	double fPiTimesArgument = std::numbers::pi_v<double> * fArgument;
+	return std::sin(fPiTimesArgument) / fPiTimesArgument;
 }
 
-} // namespace
 
 void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceRate, int64_t iTargetRate, std::string_view relativeFile)
 {
-	if (iSourceRate == iTargetRate || rfSamples.empty())
+	if (iSourceRate == iTargetRate)
+	{
+		return;
+	}
+	if (rfSamples.empty())
 	{
 		return;
 	}
@@ -496,8 +493,8 @@ void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceR
 	}
 
 	// Input frames advanced per output frame; output count preserves duration.
-	double dStep = static_cast<double>(iSourceRate) / static_cast<double>(iTargetRate);
-	int64_t iTargetFrames = std::llround(static_cast<double>(iSourceFrames) / dStep);
+	double fStep = static_cast<double>(iSourceRate) / static_cast<double>(iTargetRate);
+	int64_t iTargetFrames = std::llround(static_cast<double>(iSourceFrames) / fStep);
 	if (iTargetFrames < 1)
 	{
 		return;
@@ -508,42 +505,42 @@ void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceR
 	// input Nyquist. ~32 taps per output sample at unity rate (16 sinc zero-crossings each side).
 	// Per-output weight-sum normalization pins DC gain to 1 and absorbs edge-clamp asymmetry.
 	static constexpr int64_t kiZeroCrossings = 16;
-	static constexpr double kdKaiserBeta = 9.0; // ~ -90 dB stopband
-	double dCutoff = std::min(1.0, 1.0 / dStep); // == min(1, target/source)
-	double dHalfWidth = static_cast<double>(kiZeroCrossings) / dCutoff; // support half-width, in input frames
-	double dInverseI0Beta = 1.0 / BesselI0(kdKaiserBeta);
+	static constexpr double kfKaiserBeta = 9.0; // ~ -90 dB stopband
+	double fCutoff = std::min(1.0, 1.0 / fStep); // == min(1, target/source)
+	double fHalfWidth = static_cast<double>(kiZeroCrossings) / fCutoff; // support half-width, in input frames
+	double fInverseI0Beta = 1.0 / BesselI0(kfKaiserBeta);
 
 	std::vector<float> fResampled(static_cast<size_t>(iTargetFrames * iChannels));
-	for (int64_t iOut = 0; iOut < iTargetFrames; ++iOut)
+	for (int64_t i = 0; i < iTargetFrames; ++i)
 	{
-		double dCenter = static_cast<double>(iOut) * dStep; // position in input frames
-		int64_t iFirstTap = static_cast<int64_t>(std::ceil(dCenter - dHalfWidth));
-		int64_t iLastTap = static_cast<int64_t>(std::floor(dCenter + dHalfWidth));
+		double fCenter = static_cast<double>(i) * fStep; // position in input frames
+		int64_t iFirstTap = static_cast<int64_t>(std::ceil(fCenter - fHalfWidth));
+		int64_t iLastTap = static_cast<int64_t>(std::floor(fCenter + fHalfWidth));
 
-		double dAccumulator[2] = {0.0, 0.0}; // caller asserts iChannels <= 2
-		double dWeightSum = 0.0;
-		for (int64_t iTap = iFirstTap; iTap <= iLastTap; ++iTap)
+		double fAccumulator[2] = {0.0, 0.0}; // caller asserts iChannels <= 2
+		double fWeightSum = 0.0;
+		for (int64_t j = iFirstTap; j <= iLastTap; ++j)
 		{
-			double dDelta = dCenter - static_cast<double>(iTap);
-			double dWindowArg = dDelta / dHalfWidth;
-			if (dWindowArg <= -1.0 || dWindowArg >= 1.0)
+			double fDelta = fCenter - static_cast<double>(j);
+			double fWindowArgument = fDelta / fHalfWidth;
+			if (fWindowArgument <= -1.0 || fWindowArgument >= 1.0)
 			{
 				continue;
 			}
-			double dWindow = BesselI0(kdKaiserBeta * std::sqrt(1.0 - dWindowArg * dWindowArg)) * dInverseI0Beta;
-			double dWeight = NormalizedSinc(dCutoff * dDelta) * dWindow;
-			int64_t iClampedTap = std::clamp(iTap, static_cast<int64_t>(0), iSourceFrames - 1); // repeat edges
-			for (int64_t iChannel = 0; iChannel < iChannels; ++iChannel)
+			double fWindow = BesselI0(kfKaiserBeta * std::sqrt(1.0 - fWindowArgument * fWindowArgument)) * fInverseI0Beta;
+			double fWeight = NormalizedSinc(fCutoff * fDelta) * fWindow;
+			int64_t iClampedTap = std::clamp(j, static_cast<int64_t>(0), iSourceFrames - 1); // repeat edges
+			for (int64_t k = 0; k < iChannels; ++k)
 			{
-				dAccumulator[iChannel] += static_cast<double>(rfSamples[iClampedTap * iChannels + iChannel]) * dWeight;
+				fAccumulator[k] += static_cast<double>(rfSamples[iClampedTap * iChannels + k]) * fWeight;
 			}
-			dWeightSum += dWeight;
+			fWeightSum += fWeight;
 		}
 
-		double dInverseWeightSum = (dWeightSum != 0.0) ? 1.0 / dWeightSum : 0.0;
-		for (int64_t iChannel = 0; iChannel < iChannels; ++iChannel)
+		double fInverseWeightSum = (fWeightSum != 0.0) ? 1.0 / fWeightSum : 0.0;
+		for (int64_t j = 0; j < iChannels; ++j)
 		{
-			fResampled[iOut * iChannels + iChannel] = static_cast<float>(dAccumulator[iChannel] * dInverseWeightSum);
+			fResampled[i * iChannels + j] = static_cast<float>(fAccumulator[j] * fInverseWeightSum);
 		}
 	}
 
@@ -551,7 +548,7 @@ void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceR
 	LOG(kDefault, kInfo, "{}: resampled {} -> {} Hz ({} -> {} frames)", relativeFile, iSourceRate, iTargetRate, iSourceFrames, iTargetFrames);
 }
 
-void RepairAudio(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSamplesPerSec, std::string_view relativeFile, bool bLoopAsset, bool bAllowDeclip, bool bAllowEdgeFades)
+void RepairAudio(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSamplesPerSecond, std::string_view relativeFile, bool bLoopAsset, bool bAllowDeclip, bool bAllowEdgeFades)
 {
 	if (rfSamples.empty())
 	{
@@ -568,19 +565,19 @@ void RepairAudio(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSamp
 	}
 
 	bool bDcCorrected = false;
-	for (int64_t iChannel = 0; iChannel < iChannels; ++iChannel)
+	for (int64_t i = 0; i < iChannels; ++i)
 	{
-		float fMean = RemoveDcOffset(rfSamples, iChannels, iChannel);
+		float fMean = RemoveDcOffset(rfSamples, iChannels, i);
 		if (fMean != 0.0f)
 		{
 			bDcCorrected = true;
-			LOG(kDefault, kWarning, "{}: DC offset {:+.4f} removed on channel {}", relativeFile, fMean, iChannel);
+			LOG(kDefault, kWarning, "{}: DC offset {:+.4f} removed on channel {}", relativeFile, fMean, i);
 		}
 	}
 
-	for (int64_t iChannel = 0; iChannel < iChannels; ++iChannel)
+	for (int64_t i = 0; i < iChannels; ++i)
 	{
-		DeclipChannel(rfSamples, iChannels, iChannel, bAllowDeclip, relativeFile);
+		DeclipChannel(rfSamples, iChannels, i, bAllowDeclip, relativeFile);
 	}
 
 	NormalizePeak(rfSamples, relativeFile);
@@ -591,7 +588,7 @@ void RepairAudio(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSamp
 	}
 	else
 	{
-		ApplyEdgeFades(rfSamples, iChannels, iSamplesPerSec, relativeFile, bAllowEdgeFades);
+		ApplyEdgeFades(rfSamples, iChannels, iSamplesPerSecond, relativeFile, bAllowEdgeFades);
 	}
 }
 

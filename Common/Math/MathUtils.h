@@ -5,16 +5,16 @@
 namespace common
 {
 
-// Clamps fA to fB's magnitude while preserving fA's sign; callers provide a nonnegative fB.
-constexpr float MinAbs(float fA, float fB)
+// Clamps fValue to fMagnitudeLimit's magnitude while preserving fValue's sign; callers provide a nonnegative fMagnitudeLimit.
+constexpr float ClampMagnitude(float fValue, float fMagnitudeLimit)
 {
-	return fA >= 0.0f ? std::min(fA, fB) : -std::min(-fA, fB);
+	return fValue >= 0.0f ? std::min(fValue, fMagnitudeLimit) : -std::min(-fValue, fMagnitudeLimit);
 }
 
 #pragma warning(suppress: 26497) // consteval is stricter than constexpr
-consteval int64_t Ceil(float f)
+consteval int64_t Ceiling(float fValue)
 {
-	return static_cast<float>(static_cast<int64_t>(f)) == f ? static_cast<int64_t>(f) : static_cast<int64_t>(f) + ((f > 0.0f) ? 1 : 0);
+	return static_cast<float>(static_cast<int64_t>(fValue)) == fValue ? static_cast<int64_t>(fValue) : static_cast<int64_t>(fValue) + ((fValue > 0.0f) ? 1 : 0);
 }
 
 struct AreaVertices
@@ -54,24 +54,23 @@ XMVECTOR XM_CALLCONV ColorToVector(uint32_t uiColor);
 uint32_t XM_CALLCONV ColorToUint(FXMVECTOR vecColor);
 
 // Interpolates packed RGBA colors with fPercent in [0, 1].
-uint32_t ColorLerp(uint32_t uiA, uint32_t uiB, float fPercent);
+uint32_t InterpolatePackedColor(uint32_t uiFirstColor, uint32_t uiSecondColor, float fPercent);
 
 XMVECTOR XM_CALLCONV ToBaseHeight(FXMVECTOR vecPosition, FXMVECTOR vecEyePosition, float fBaseHeight);
 float RotationFromPosition(FXMVECTOR vecPosition);
 XMVECTOR XM_CALLCONV QuaternionFromDirection(FXMVECTOR vecDirection, FXMVECTOR vecOriginNormal, FXMVECTOR vecUp = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
 AreaVertices XM_CALLCONV CalculateArea(FXMVECTOR vecPosition, FXMVECTOR vecDirection, float fForward, float fBack, float fWidth);
 XMVECTOR XM_CALLCONV RotateTowardsPercent(FXMVECTOR vecDirection, FXMVECTOR vecTowards, float fPercent);
-XMVECTOR XM_CALLCONV RandomAngleJitter(FXMVECTOR vecDirection, float fMaxJitter, RandomEngine& rRandomEngine);
+XMVECTOR XM_CALLCONV RandomAngleJitter(FXMVECTOR vecDirection, float fMaximumJitter, RandomEngine& rRandomEngine);
 
 // Generate random XY offset in range [-JITTER, +JITTER] for each component
-// Compile-time jitter value for constexpr cases
 template<float JITTER>
 inline XMVECTOR XM_CALLCONV RandomXYJitter(RandomEngine& rRandomEngine)
 {
 	return XMVectorSet(-JITTER + Random(2.0f * JITTER, rRandomEngine), -JITTER + Random(2.0f * JITTER, rRandomEngine), 0.0f, 0.0f);
 }
 
-// Runtime jitter value (for dynamic values like rType.fParticlePositionJitter)
+// For dynamic values such as rType.fParticlePositionJitter.
 // Operation order matches the compile-time RandomXYJitter<JITTER> form so identical magnitudes consume the RNG identically
 inline XMVECTOR XM_CALLCONV RandomXYJitter(float fJitter, RandomEngine& rRandomEngine)
 {
@@ -85,13 +84,11 @@ inline XMVECTOR XM_CALLCONV RandomPositionJitter(FXMVECTOR vecPosition, RandomEn
 	return XMVectorAdd(vecPosition, RandomXYJitter<JITTER>(rRandomEngine));
 }
 
-// Runtime version for dynamic jitter values
 inline XMVECTOR XM_CALLCONV RandomPositionJitter(FXMVECTOR vecPosition, float fJitter, RandomEngine& rRandomEngine)
 {
 	return XMVectorAdd(vecPosition, RandomXYJitter(fJitter, rRandomEngine));
 }
 
-// Add random XY jitter to a direction and normalize
 template<float JITTER>
 inline XMVECTOR XM_CALLCONV RandomDirectionJitter(FXMVECTOR vecDirection, RandomEngine& rRandomEngine)
 {
@@ -104,10 +101,8 @@ float XM_CALLCONV Distance(FXMVECTOR vecOne, FXMVECTOR vecTwo);
 
 XMVECTOR XM_CALLCONV DirectionTo(FXMVECTOR vecFrom, FXMVECTOR vecTo);
 
-// Compute lead position to intercept a moving target with a constant-speed projectile.
-// Solves the quadratic ||(T - S) + Vt*t|| = vp*t for the smallest positive t and returns T + Vt*t.
-// Falls back to vecTargetPosition when no positive intercept exists (target outruns projectile,
-// degenerate, etc.). Assumes the projectile does NOT inherit shooter velocity.
+// Solves ||(T - S) + Vt*t|| = vp*t for the smallest positive t (the linear root when the quadratic coefficient is negligible) and returns T + Vt*t,
+// for a projectile that does not inherit shooter velocity. Returns vecTargetPosition when no positive t exists.
 XMVECTOR XM_CALLCONV ComputeLeadPosition(FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity, float fProjectileSpeed);
 
 // Computes on make_unsigned_t to avoid signed-overflow UB on large valid inputs; result is identical to the signed form for non-negative inputs
@@ -143,12 +138,12 @@ constexpr inline T RoundDown(T iToRound, T iMultiple)
 template<std::floating_point T>
 constexpr inline T RoundDown(T fToRound, T fMultiple)
 {
-	T fInv = static_cast<T>(1.0) / fMultiple;
-	return std::floor(fToRound * fInv) / fInv;
+	T fInverse = static_cast<T>(1.0) / fMultiple;
+	return std::floor(fToRound * fInverse) / fInverse;
 }
 
 template <std::unsigned_integral T>
-inline T FloatToUnorm(float fValue)
+inline T FloatToUnsignedNormalizedInteger(float fValue)
 {
 	ASSERT(fValue >= 0.0f && fValue <= 1.0f);
 	if constexpr (sizeof(T) <= 2)
@@ -164,7 +159,7 @@ inline T FloatToUnorm(float fValue)
 }
 
 template <std::unsigned_integral T>
-inline float UnormToFloat(T uiValue)
+inline float UnsignedNormalizedIntegerToFloat(T uiValue)
 {
 	if constexpr (sizeof(T) <= 2)
 	{
@@ -223,17 +218,17 @@ inline SinCos DeterministicSinCos(float fRadians)
 }
 
 template<typename... ARGS>
-inline std::pair<XMVECTOR, XMVECTOR> XM_CALLCONV ComputeAabb(FXMVECTOR vecFirst, ARGS... vecRest)
+inline std::pair<XMVECTOR, XMVECTOR> XM_CALLCONV ComputeAxisAlignedBoundingBox(FXMVECTOR vecFirst, ARGS... vecRest)
 {
-	XMVECTOR vecMin = vecFirst;
-	XMVECTOR vecMax = vecFirst;
+	XMVECTOR vecMinimum = vecFirst;
+	XMVECTOR vecMaximum = vecFirst;
 
-	((vecMin = XMVectorMin(vecMin, vecRest), vecMax = XMVectorMax(vecMax, vecRest)), ...);
+	((vecMinimum = XMVectorMin(vecMinimum, vecRest), vecMaximum = XMVectorMax(vecMaximum, vecRest)), ...);
 
-	return {vecMin, vecMax};
+	return {vecMinimum, vecMaximum};
 }
 
-bool XM_CALLCONV AabbIntersectsArea(XMFLOAT4 f4Area, FXMVECTOR vecMin, FXMVECTOR vecMax);
+bool XM_CALLCONV AxisAlignedBoundingBoxIntersectsArea(XMFLOAT4 f4Area, FXMVECTOR vecMinimum, FXMVECTOR vecMaximum);
 
 bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, const XMFLOAT4& rf4Area);
 bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, FXMVECTOR vecArea);

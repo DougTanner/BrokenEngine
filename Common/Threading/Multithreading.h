@@ -28,7 +28,7 @@ public:
 	}
 
 	template <typename FUNC>
-	void Dispatch(int64_t iCount, FUNC& processRange)
+	void Dispatch(int64_t iCount, FUNC& rProcessRange)
 	{
 		if (iCount <= 0)
 		{
@@ -61,24 +61,23 @@ public:
 
 			int64_t iStart = iPos;
 			int64_t iEnd = iPos + iThreadItems;
-			mWorkers.at(i)->Wake([&processRange, iStart, iEnd, iLogTickCounter, iLogIndent]()
+			mWorkers.at(i)->Wake([&rProcessRange, iStart, iEnd, iLogTickCounter, iLogIndent]()
 			{
 				// Propagate the caller's tick/indent so worker logs tag under the dispatching scope
 				LogTickScope logTickScope(iLogTickCounter);
 				LogIndentScope logIndentScope(iLogIndent);
-				processRange(iStart, iEnd);
+				rProcessRange(iStart, iEnd);
 			});
 			iPos += iThreadItems;
 		}
 
 		std::exception_ptr firstException = nullptr;
 
-		// Main thread processes the remaining items
 		if (iPos < iCount)
 		{
 			try
 			{
-				processRange(iPos, iCount);
+				rProcessRange(iPos, iCount);
 			}
 			catch (...)
 			{
@@ -87,7 +86,7 @@ public:
 		}
 
 		// Drain every worker even on a throw (Wait is a no-op if not dispatched): a skipped Wait leaves that worker running against this unwound stack frame, and its unconsumed mDone token would early-join the next Dispatch
-		for (std::unique_ptr<PersistentWorker>& pWorker : mWorkers)
+		for (const std::unique_ptr<PersistentWorker>& pWorker : mWorkers)
 		{
 			try
 			{

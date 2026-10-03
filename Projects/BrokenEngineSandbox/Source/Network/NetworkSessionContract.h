@@ -22,7 +22,7 @@ struct NetworkSessionContract
 	{
 		return Frame::kiVersion;
 	}
-	static constexpr std::chrono::nanoseconds kTickDuration = engine::kTickNs;
+	static constexpr std::chrono::nanoseconds kTickDuration = engine::kTickNanoseconds;
 	static constexpr int64_t kiCoordSlots = kiDesiredCoordSlots;
 	static constexpr bool kbDebugFrames = kbDesyncDebugFrames;
 
@@ -41,11 +41,11 @@ struct NetworkSessionContract
 	}
 	static int64_t CompressStatusChanges(const StatusChange* pChanges, int64_t iCount, void* pDestination, int64_t iCapacity)
 	{
-		return engine::CompressStatusChangeBatch(pChanges, iCount, pDestination, iCapacity);
+		return engine::CompressStatusChangeBatch(std::span<const StatusChange>(pChanges, static_cast<size_t>(iCount)), std::span<uint8_t>(static_cast<uint8_t*>(pDestination), static_cast<size_t>(iCapacity)));
 	}
 	static int64_t DecompressStatusChanges(const void* pSource, int64_t iSize, StatusChange* pDestination)
 	{
-		return engine::DecompressStatusChangeBatch(pSource, iSize, pDestination);
+		return engine::DecompressStatusChangeBatch(std::span<const uint8_t>(static_cast<const uint8_t*>(pSource), static_cast<size_t>(iSize)), pDestination);
 	}
 };
 

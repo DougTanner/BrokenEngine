@@ -28,7 +28,6 @@ public:
 	{
 		return mDesyncDebugState.iTick >= 0 || (mpfnAdditionalStall != nullptr && mpfnAdditionalStall(*this));
 	}
-	int64_t GetDesyncTick() const { return mDesyncDebugState.iTick; }
 
 	void OnDesyncDetected(ReconcileDesyncInfo&& rDesyncInfo);
 	void PollDebugFrameResponse();
@@ -39,24 +38,23 @@ public:
 	bool (*mpfnAdditionalStall)(const ClientDesyncCore&) = nullptr;
 	void (*mpfnResetObserver)(ClientDesyncCore&) = nullptr;
 
-private:
-
 	struct DesyncDebugState
 	{
 		int64_t iTick = -1;
 		GridCoord coord {};
 		std::unique_ptr<game::Frame> pClientFrame;
-		std::chrono::steady_clock::time_point entryTime {};
+		std::chrono::steady_clock::time_point entryTime = std::chrono::steady_clock::time_point();
 	};
-	DesyncDebugState mDesyncDebugState;
+	DesyncDebugState mDesyncDebugState {};
 
-	static constexpr std::chrono::seconds kDesyncDebugTimeout {5};
+private:
 
-	// Desync frequency tracking for escalation
+	static constexpr std::chrono::seconds kDesyncDebugTimeout = 5s;
+
 	int64_t miDesyncCount = 0;
-	std::chrono::steady_clock::time_point mFirstDesyncTime {};
+	std::chrono::steady_clock::time_point mFirstDesyncTime = std::chrono::steady_clock::time_point();
 	static constexpr int64_t kiMaxDesyncsBeforeDisconnect = 3;
-	static constexpr std::chrono::seconds kDesyncWindowDuration {10};
+	static constexpr std::chrono::seconds kDesyncWindowDuration = 10s;
 };
 
 } // namespace engine

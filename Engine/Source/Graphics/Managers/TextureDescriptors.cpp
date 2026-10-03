@@ -239,10 +239,10 @@ void TextureDescriptors::WriteFullArrayDescriptors(Pipeline& rPipeline, int64_t 
 	auto pImageInfos = common::gpThreadLocal->mWorkbuffer.PushBuffer<VkDescriptorImageInfo*>(iCount * static_cast<int64_t>(sizeof(VkDescriptorImageInfo)));
 	for (int64_t i = 0; i < iCount; ++i)
 	{
-		pImageInfos[i].sampler = vkSampler;
+		pImageInfos.mpData[i].sampler = vkSampler;
 		// Null-view guard: mid-reload slot (see WriteArrayBindingDescriptors)
-		pImageInfos[i].imageView = ppArray[i] != nullptr && ppArray[i]->mVkImageView != VK_NULL_HANDLE ? ppArray[i]->mVkImageView : mrTextureManager.mWhiteTexture.mVkImageView;
-		pImageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		pImageInfos.mpData[i].imageView = ppArray[i] != nullptr && ppArray[i]->mVkImageView != VK_NULL_HANDLE ? ppArray[i]->mVkImageView : mrTextureManager.mWhiteTexture.mVkImageView;
+		pImageInfos.mpData[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 
 	for (VkDescriptorSet& rVkDescriptorSet : rPipeline.mVkDescriptorSets)
@@ -256,7 +256,7 @@ void TextureDescriptors::WriteFullArrayDescriptors(Pipeline& rPipeline, int64_t 
 			.dstArrayElement = 0,
 			.descriptorCount = static_cast<uint32_t>(iCount),
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.pImageInfo = pImageInfos,
+			.pImageInfo = pImageInfos.mpData,
 			.pBufferInfo = nullptr,
 			.pTexelBufferView = nullptr,
 		};

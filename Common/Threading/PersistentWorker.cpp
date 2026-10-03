@@ -11,7 +11,6 @@ PersistentWorker::PersistentWorker(std::optional<int64_t> iThreadId, int64_t iWo
 	while (true)
 	{
 		mWake.acquire();
-		// Read only right after mWake.acquire(): this acquire-load pairs with the destructor's release-store (the mWake/mDone semaphores already carry the happens-before edge)
 		if (mShutdown.load(std::memory_order_acquire)) [[unlikely]]
 		{
 			break;
@@ -32,7 +31,7 @@ PersistentWorker::PersistentWorker(std::optional<int64_t> iThreadId, int64_t iWo
 
 PersistentWorker::~PersistentWorker()
 {
-	ASSERT(!mbDispatched); // Destruction requires an idle worker (Wait before destroy); otherwise this release() over-releases mWake or the worker consumes the token as work and join() hangs
+	ASSERT(!mbDispatched); // Wait before destruction; a pending mWake token makes this release exceed the semaphore's maximum count.
 	mShutdown.store(true, std::memory_order_release);
 	mWake.release();
 	mThread.join();
@@ -40,7 +39,7 @@ PersistentWorker::~PersistentWorker()
 
 void PersistentWorker::Wake(std::move_only_function<void()> work)
 {
-	ASSERT(!mbDispatched); // Single-dispatch: a second Wake before Wait would re-release the count-1 mWake (past max() == 1, UB) and clobber the in-flight mWork
+	ASSERT(!mbDispatched); // Wait before another Wake; otherwise the assignment can race with the worker's use of mWork, and a second release can exceed mWake's maximum while the first token is pending.
 	mWork = std::move(work);
 	mbDispatched = true;
 	mWake.release();

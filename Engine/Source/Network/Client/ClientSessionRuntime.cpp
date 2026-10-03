@@ -15,11 +15,7 @@
 namespace engine
 {
 
-namespace
-{
-
-// The on-disk header version belongs to this file wrapper rather than Guid128. Version 2 uses the shared version+size
-// convention, and version 1 files reset once.
+// The file wrapper owns the on-disk version; the version-and-size header precedes the bare GUID body.
 struct ClientGuidFile
 {
 	static constexpr int64_t kiVersion = 2;
@@ -31,12 +27,12 @@ static_assert(sizeof(ClientGuidFile) == sizeof(ClientGuid), "ClientGuidFile must
 static_assert(alignof(ClientGuidFile) == alignof(ClientGuid), "ClientGuidFile alignment diverged from ClientGuid");
 static_assert(BT_OFFSETOF(ClientGuidFile, guid) == 0, "ClientGuidFile::guid must start at offset 0 — the file body is the bare GUID");
 
-ClientGuid LoadClientGuidFromDisk()
+static ClientGuid LoadClientGuidFromDisk()
 {
 	// Heap: filesystem path and file stream operations for GUID persistence
 	ScopedSuppressAllocationTracking suppress;
 	ClientGuidFile loadedFile {};
-	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, std::filesystem::path("ClientGuid.bin"), loadedFile) && !loadedFile.guid.IsEmpty())
+	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, std::filesystem::path("ClientGuid.bin"), loadedFile) && (loadedFile.guid.uiHigh != 0 || loadedFile.guid.uiLow != 0))
 	{
 		LOG(kNetwork, kInfo, "ClientSessionRuntime loaded GUID from disk: {} {}", loadedFile.guid.uiHigh, loadedFile.guid.uiLow);
 		return loadedFile.guid;
@@ -44,34 +40,34 @@ ClientGuid LoadClientGuidFromDisk()
 	return {};
 }
 
-void PersistClientGuidToDisk(const ClientGuid& rGuid)
+static void PersistClientGuidToDisk(const ClientGuid& rGuid)
 {
 	// Heap: filesystem path and file stream operations for GUID persistence
 	ScopedSuppressAllocationTracking suppress;
-	ClientGuidFile guidFile {rGuid};
+	ClientGuidFile guidFile {.guid = rGuid};
 	if (!WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path("ClientGuid.bin"), guidFile))
 	{
 		LOG(kNetwork, kError, "Failed to persist ClientGuid.bin (next session will re-handshake as a new client)");
 	}
 }
 
-// Lowering miCurrentTargetBehind waits out one mSmoothedJitterUs window's worth of sim ticks, so in
+// Lowering miCurrentTargetBehind waits out one mSmoothedJitterMicroseconds window's worth of sim ticks, so in
 // loss-free arrival the average has mostly turned over before the lower target is adopted. Measured in
 // sim ticks, not EvaluateClock calls: jitter samples arrive one per coord update, so they land at tick
 // cadence while EvaluateClock runs at render cadence. Packet loss yields fewer than one sample per tick,
 // so the window is an approximation, not a guarantee that every higher-jitter sample has aged out.
-constexpr int64_t kiLowerTargetBehindStreakTicks = decltype(Client::mSmoothedJitterUs)::kiCapacity;
+constexpr int64_t kiLowerTargetBehindStreakTicks = decltype(Client::mSmoothedJitterMicroseconds)::kiCapacity;
 
-bool IsSlotActive(const ClientCoordSlot& rSlot)
+static bool IsSlotActive(const ClientCoordSlot& rSlot)
 {
 	return rSlot.eState != CoordSubscriptionState::kUnsubscribed && rSlot.eState != CoordSubscriptionState::kUnsubscribing;
 }
 
-bool ContainsCoordinate(const GridCoord* pCoordinates, int64_t iCount, GridCoord coordinate)
+static bool ContainsCoordinate(std::span<const GridCoord> coordinates, GridCoord coordinate)
 {
-	for (int64_t i = 0; i < iCount; ++i)
+	for (const GridCoord& rCoordinate : coordinates)
 	{
-		if (pCoordinates[i] == coordinate)
+		if (rCoordinate == coordinate)
 		{
 			return true;
 		}
@@ -79,20 +75,18 @@ bool ContainsCoordinate(const GridCoord* pCoordinates, int64_t iCount, GridCoord
 	return false;
 }
 
-ClientNetworkFixtures::CoordUpdateState QueryFixtureCoordUpdateState(GridCoord coord, int64_t iTick)
+static ClientNetworkFixtures::CoordUpdateState QueryFixtureCoordinateUpdateState(GridCoord coordinate, int64_t iTick)
 {
-	auto coordIt = game::gpGame->mCoordFrames.find(coord);
-	if (coordIt == game::gpGame->mCoordFrames.end())
+	auto it = game::gpGame->mCoordFrames.find(coordinate);
+	if (it == game::gpGame->mCoordFrames.end())
 	{
 		return {};
 	}
-	ClientNetworkFixtures::CoordUpdateState state {.iConfirmedTick = coordIt->second.iConfirmedTick};
+	ClientNetworkFixtures::CoordUpdateState state {.iConfirmedTick = it->second.iConfirmedTick};
 	state.flags.Set(ClientNetworkFixtures::CoordUpdateFlags::kPresent);
-	state.flags.Set(ClientNetworkFixtures::CoordUpdateFlags::kUpdateRetained, coordIt->second.serverUpdates.contains(iTick));
+	state.flags.Set(ClientNetworkFixtures::CoordUpdateFlags::kUpdateRetained, it->second.serverUpdates.contains(iTick));
 	return state;
 }
-
-} // namespace
 
 ClientSessionRuntime::ClientSessionRuntime(game::ClientSession& rSession)
 :	mrSession(rSession)
@@ -101,9 +95,12 @@ ClientSessionRuntime::ClientSessionRuntime(game::ClientSession& rSession)
 
 ClientSessionRuntime::~ClientSessionRuntime() = default;
 
-int64_t ClientSessionRuntime::CurrentGameTick() const
+void ClientSessionRuntime::InitializeLogTickScope(std::optional<common::LogTickScope>& rOptionalTickScope) const
 {
-	return game::gpGame->TickCounter();
+	if (common::gpThreadLocal->miLogTickCounter < 0)
+	{
+		rOptionalTickScope.emplace(game::gpGame->TickCounter());
+	}
 }
 
 void ClientSessionRuntime::ResetClock()
@@ -125,19 +122,19 @@ void ClientSessionRuntime::ResetForConnect()
 	ResetClock();
 	ClearSubscriptionState();
 	mpDiscoveryScanner.reset();
-	mStateFlags.Clear(ClientSessionStateFlags::kServerDiscovered);
-	mStateFlags.Clear(ClientSessionStateFlags::kDiscoveryScanTimedOut);
-	mStateFlags.Clear(ClientSessionStateFlags::kNoFreeSlotLogged);
+	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
+	mStateFlags.Set(ClientSessionStateFlags::kDiscoveryScanTimedOut, false);
+	mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged, false);
 }
 
-void ClientSessionRuntime::Connect(std::string_view serverAddress, uint16_t uiPort, int64_t iCoordSlots)
+void ClientSessionRuntime::Connect(std::string_view serverAddress, uint16_t uiPort, int64_t iCoordinateSlots)
 {
 	// Heap: address copy, GUID file I/O, and Client/ENet construction
 	ScopedSuppressAllocationTracking suppress;
 	ResetForConnect();
 	std::string serverAddressString(serverAddress);
 	ClientGuid clientGuid = LoadClientGuidFromDisk();
-	mpClient = std::make_unique<Client>(serverAddressString.c_str(), uiPort, iCoordSlots, clientGuid, &PersistClientGuidToDisk);
+	mpClient = std::make_unique<Client>(serverAddressString.c_str(), uiPort, iCoordinateSlots, clientGuid, &PersistClientGuidToDisk);
 	if (mpClient->mpHost == nullptr)
 	{
 		mrSession.OnConnectionFailed();
@@ -145,10 +142,10 @@ void ClientSessionRuntime::Connect(std::string_view serverAddress, uint16_t uiPo
 	}
 }
 
-void ClientSessionRuntime::ConnectToDiscoveredServer(uint16_t uiPort, int64_t iCoordSlots)
+void ClientSessionRuntime::ConnectToDiscoveredServer(uint16_t uiPort, int64_t iCoordinateSlots)
 {
-	mStateFlags.Clear(ClientSessionStateFlags::kServerDiscovered);
-	Connect(mcDiscoveredAddress, uiPort, iCoordSlots);
+	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
+	Connect(mcDiscoveredAddress, uiPort, iCoordinateSlots);
 }
 
 void ClientSessionRuntime::Disconnect()
@@ -160,9 +157,9 @@ void ClientSessionRuntime::Disconnect()
 	mpDiscoveryScanner.reset();
 	ResetClock();
 	ClearSubscriptionState();
-	mStateFlags.Clear(ClientSessionStateFlags::kServerDiscovered);
-	mStateFlags.Clear(ClientSessionStateFlags::kDiscoveryScanTimedOut);
-	mStateFlags.Clear(ClientSessionStateFlags::kNoFreeSlotLogged);
+	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
+	mStateFlags.Set(ClientSessionStateFlags::kDiscoveryScanTimedOut, false);
+	mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged, false);
 	mrSession.OnRuntimeDisconnected();
 }
 
@@ -181,9 +178,9 @@ void ClientSessionRuntime::PollDiscovery()
 		return;
 	}
 	mpDiscoveryScanner->Poll();
-	if (mpDiscoveryScanner->IsFound())
+	if ((mpDiscoveryScanner->mFlags & NetworkDiscoveryScanner::DiscoveryScannerFlags::kFound))
 	{
-		std::snprintf(mcDiscoveredAddress, sizeof(mcDiscoveredAddress), "%s", mpDiscoveryScanner->GetFoundAddress());
+		std::snprintf(mcDiscoveredAddress, sizeof(mcDiscoveredAddress), "%s", mpDiscoveryScanner->mpcFoundAddress);
 		mpDiscoveryScanner.reset();
 		mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered);
 	}
@@ -198,14 +195,14 @@ void ClientSessionRuntime::PollDiscovery()
 void ClientSessionRuntime::ResetForServerLoad()
 {
 	ResetClock();
-	mpClient->mSmoothedJitterUs.Reset();
-	mpClient->mStateFlags.Clear(Client::ClientStateFlags::kHasLastUpdateArrival);
+	mpClient->mSmoothedJitterMicroseconds = common::Smoothed<int64_t>();
+	mpClient->mStateFlags.Set(Client::ClientStateFlags::kHasLastUpdateArrival, false);
 	mpClient->mStateFlags.Set(Client::ClientStateFlags::kSkipNextJitterInterval);
 	ClearSubscriptionState();
 	mpClient->ResetAllSlots();
 	mpClient->mReceivedFullStates.clear();
 	mpClient->mReceivedStaticData.clear();
-	for (std::vector<ReceivedCoordUpdate>& rSlotUpdates : mpClient->mReceivedCoordUpdates)
+	for (std::vector<ReceivedCoordUpdate>& rSlotUpdates : mpClient->mReceivedCoordinateUpdates)
 	{
 		rSlotUpdates.clear();
 	}
@@ -214,7 +211,7 @@ void ClientSessionRuntime::ResetForServerLoad()
 	// the control channel is left alone because it carries the load notification and handshake traffic
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		for (int64_t i = 0; i < std::ssize(mpClient->mCoordSlots); ++i)
+		for (int64_t i = 0; i < std::ssize(mpClient->mCoordinateSlots); ++i)
 		{
 			NetworkSimulation::PurgeDelayedForSlot(mpClient->mDelayedPackets, i);
 		}
@@ -272,12 +269,12 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		mrSession.OnServerLoad();
 	}
 	std::shared_ptr<ClientNetworkFixtures::StaleUpdateState> pDeliveredFixture =
-		ClientNetworkFixtures::PollBeforeDrain(*mpClient, &QueryFixtureCoordUpdateState);
+		ClientNetworkFixtures::PollBeforeDrain(*mpClient, &QueryFixtureCoordinateUpdateState);
 	mrSession.ProcessReceivedGamePackets();
 	mrSession.ApplyReceivedStaticData();
 	ApplyReceivedFullStates();
 	ApplyReceivedUpdates();
-	ClientNetworkFixtures::PollAfterDrain(*mpClient, pDeliveredFixture, &QueryFixtureCoordUpdateState);
+	ClientNetworkFixtures::PollAfterDrain(*mpClient, pDeliveredFixture, &QueryFixtureCoordinateUpdateState);
 
 	SendAckAndFlush();
 }
@@ -295,47 +292,42 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 
 	for (ReceivedCoordFullState& rFullState : rFullStates)
 	{
-		GridCoord coord = rFullState.coord;
+		GridCoord coordinate = rFullState.coordinate;
 		int64_t iTick = rFullState.iTick;
 
-		CoordFrames& rCoordFrames = game::gpGame->mCoordFrames.try_emplace(coord).first->second;
+		CoordFrames& rCoordinateFrames = game::gpGame->mCoordFrames.try_emplace(coordinate).first->second;
 
 		const game::Frame* pRingTail = nullptr;
-		if (rCoordFrames.iSnapshotCount > 0)
+		if (rCoordinateFrames.iSnapshotCount > 0)
 		{
-			int64_t iTailPhysical = SnapshotIndex(rCoordFrames.iSnapshotHead, rCoordFrames.iSnapshotCount - 1);
-			pRingTail = rCoordFrames.snapshots[iTailPhysical].get();
+			int64_t iTailPhysical = SnapshotIndex(rCoordinateFrames.iSnapshotHead, rCoordinateFrames.iSnapshotCount - 1);
+			pRingTail = rCoordinateFrames.snapshots[iTailPhysical].get();
 		}
 		mrSession.HydrateReceivedFullState(*rFullState.pFrame, pRingTail);
 
-		if (rCoordFrames.iConfirmedTick < 0)
+		if (rCoordinateFrames.iConfirmedTick < 0)
 		{
-			// Only advance tick counter during initial setup (no other coords have confirmed data yet)
 			bool bInitialSetup = (GetConfirmedTick() < 0);
 
-			// Move the received full state into the ring as the confirmed frame.
-			rCoordFrames.iSnapshotHead = 0;
-			rCoordFrames.snapshots[0] = std::move(rFullState.pFrame);
-			rCoordFrames.snapshots[0]->postRender.sharedCrc = rCoordFrames.snapshots[0]->Crcs();
-			rCoordFrames.iSnapshotCount = 1;
-			rCoordFrames.iConfirmedTick = iTick;
-			rCoordFrames.iLastFullStateTick = iTick;
-			rCoordFrames.iConfirmedOffset = 0;
+			rCoordinateFrames.iSnapshotHead = 0;
+			rCoordinateFrames.snapshots[0] = std::move(rFullState.pFrame);
+			rCoordinateFrames.snapshots[0]->postRender.uiSharedCrc = rCoordinateFrames.snapshots[0]->Crcs();
+			rCoordinateFrames.iSnapshotCount = 1;
+			rCoordinateFrames.iConfirmedTick = iTick;
+			rCoordinateFrames.iLastFullStateTick = iTick;
+			rCoordinateFrames.iConfirmedOffset = 0;
 
-			float fFullStateTime = rCoordFrames.snapshots[0]->interpolate.fCurrentTime;
+			float fFullStateTime = rCoordinateFrames.snapshots[0]->interpolate.fCurrentTime;
 
-			// Set frame counter from first received full state only (not from subsequent neighbor subscriptions).
-			// Offset sim tick back by the jitter-safety floor so sim starts BEHIND latestServerTick, matching
-			// the steady-state target computed by ComputeClockCorrectionNs. Avoids a ~150 ms freeze while the
-			// ceiling clamp waits for latest to catch up and drains the spurious +targetBehind error.
-			// Clamp the offset at iTick so a fresh post-load server (iTick < jitter-safety floor) does
-			// not produce a negative sim tick.
+			// Only the first full state sets the game clock. Start behind the server by the jitter-safety floor,
+			// matching EvaluateClock, to avoid a ~150 ms ceiling stall and an initial target-behind error.
+			// Clamp the offset to iTick so a freshly loaded server cannot produce a negative simulation tick.
 			if (bInitialSetup && game::gpGame->TickCounter() < iTick)
 			{
 				// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
 				// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
-				int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimToWall(engine::kTickNs).count();
-				int64_t iInitialTargetBehind = (engine::kiJitterSafetyUs * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
+				int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimulationToWall(engine::kTickNanoseconds).count();
+				int64_t iInitialTargetBehind = (engine::kiJitterSafetyMicroseconds * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
 				int64_t iAppliedBehind = std::min<int64_t>(iInitialTargetBehind, iTick);
 				game::gpGame->SetTickCounter(iTick - iAppliedBehind);
 				game::gpGame->SetCurrentTime(fFullStateTime - static_cast<float>(iAppliedBehind) * engine::kfDeltaTime);
@@ -344,15 +336,15 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 		}
 		else
 		{
-			// Reject stale full states: tick must be after confirmed tick
-			if (iTick <= rCoordFrames.iConfirmedTick)
+			if (iTick <= rCoordinateFrames.iConfirmedTick)
 			{
-				LOG(kNetwork, kVerbose, "ApplyReceivedFullStates Rejected stale full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", coord.x, coord.y, iTick, rCoordFrames.iConfirmedTick);
+				LOG(kNetwork, kVerbose, "ApplyReceivedFullStates Rejected stale full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", coordinate.iX, coordinate.iY, iTick, rCoordinateFrames.iConfirmedTick);
 				continue;
 			}
 
 			// Coord already has confirmed state: store as pending for reconcile injection
-			rCoordFrames.pendingFullState = CoordFrames::PendingFullState {
+			rCoordinateFrames.pendingFullState = CoordFrames::PendingFullState
+			{
 				.iTick = iTick,
 				.pFrame = std::move(rFullState.pFrame),
 			};
@@ -366,45 +358,45 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 	ScopedSuppressAllocationTracking suppress;
 
 	bool bHasNewData = false;
-	const std::vector<ClientCoordSlot>& rCoordSlots = mpClient->mCoordSlots;
-	std::vector<std::vector<ReceivedCoordUpdate>>& rAllUpdates = mpClient->mReceivedCoordUpdates;
+	const std::vector<ClientCoordSlot>& rCoordinateSlots = mpClient->mCoordinateSlots;
+	std::vector<std::vector<ReceivedCoordUpdate>>& rAllUpdates = mpClient->mReceivedCoordinateUpdates;
 
-	for (int64_t iSlot = 0; iSlot < std::ssize(rCoordSlots); ++iSlot)
+	for (int64_t i = 0; i < std::ssize(rCoordinateSlots); ++i)
 	{
-		std::vector<ReceivedCoordUpdate>& rSlotUpdates = rAllUpdates.at(iSlot);
+		std::vector<ReceivedCoordUpdate>& rSlotUpdates = rAllUpdates.at(i);
 		if (rSlotUpdates.empty())
 		{
 			continue;
 		}
 
-		const ClientCoordSlot& rSlot = rCoordSlots.at(iSlot);
+		const ClientCoordSlot& rSlot = rCoordinateSlots.at(i);
 		if (rSlot.eState != CoordSubscriptionState::kActive)
 		{
 			rSlotUpdates.clear();
 			continue;
 		}
 
-		GridCoord coord = rSlot.coord;
-		CoordFrames& rCoordFrames = game::gpGame->mCoordFrames.at(coord);
+		GridCoord coordinate = rSlot.coordinate;
+		CoordFrames& rCoordinateFrames = game::gpGame->mCoordFrames.at(coordinate);
 
 		for (ReceivedCoordUpdate& rUpdate : rSlotUpdates)
 		{
-			if (rUpdate.iTick <= rCoordFrames.iConfirmedTick)
+			if (rUpdate.iTick <= rCoordinateFrames.iConfirmedTick)
 			{
 				continue;
 			}
 
 			miLatestServerTick = std::max(miLatestServerTick, rUpdate.iTick);
 
-			if (static_cast<int64_t>(rCoordFrames.serverUpdates.size()) >= engine::kiMaxBufferedFrames)
+			if (static_cast<int64_t>(rCoordinateFrames.serverUpdates.size()) >= engine::kiMaximumBufferedFrames)
 			{
-				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full, requesting full-state resync Coord: ({},{}) Size: {} Tick: {}", coord.x, coord.y, rCoordFrames.serverUpdates.size(), rUpdate.iTick);
+				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full, requesting full-state resync Coord: ({},{}) Size: {} Tick: {}", coordinate.iX, coordinate.iY, rCoordinateFrames.serverUpdates.size(), rUpdate.iTick);
 
 				// The engine already acked these ticks, so a dropped update would never be resent: abandon the
 				// whole drain and take authoritative state instead. Returning here sends exactly one request even
 				// when several coords are over budget, and the reset plus the discard below empties every
-				// serverUpdates map, so this branch cannot arm again for at least kiMaxBufferedFrames ticks.
-				mpClient->SendResyncRequest();
+				// serverUpdates map, so this branch cannot arm again for at least kiMaximumBufferedFrames ticks.
+				mpClient->SendResynchronizationRequest();
 				mrSession.ResetCoordStatesForResync();
 				for (std::vector<ReceivedCoordUpdate>& rDrainedUpdates : rAllUpdates)
 				{
@@ -413,8 +405,9 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 				return false;
 			}
 
-			bool bInserted = rCoordFrames.serverUpdates.try_emplace(rUpdate.iTick, CoordFrames::CoordServerUpdate {
-				.sharedCrc = rUpdate.sharedCrc,
+			bool bInserted = rCoordinateFrames.serverUpdates.try_emplace(rUpdate.iTick, CoordFrames::CoordServerUpdate
+			{
+				.sharedCrc = rUpdate.uiSharedCrc,
 				.statusChanges = std::move(rUpdate.statusChanges),
 			}).second;
 			if (bInserted)
@@ -432,11 +425,11 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 int64_t ClientSessionRuntime::GetConfirmedTick() const
 {
 	int64_t iMinimumTick = -1;
-	for (const auto& [rCoord, rCoordFrames] : game::gpGame->mCoordFrames)
+	for (const auto& [rCoordinate, rCoordinateFrames] : game::gpGame->mCoordFrames)
 	{
-		if (rCoordFrames.iConfirmedTick >= 0 && (iMinimumTick < 0 || rCoordFrames.iConfirmedTick < iMinimumTick))
+		if (rCoordinateFrames.iConfirmedTick >= 0 && (iMinimumTick < 0 || rCoordinateFrames.iConfirmedTick < iMinimumTick))
 		{
-			iMinimumTick = rCoordFrames.iConfirmedTick;
+			iMinimumTick = rCoordinateFrames.iConfirmedTick;
 		}
 	}
 	return iMinimumTick;
@@ -445,7 +438,11 @@ int64_t ClientSessionRuntime::GetConfirmedTick() const
 int64_t ClientSessionRuntime::GetClientConfirmedTick() const
 {
 	auto it = game::gpGame->mCoordFrames.find(game::gpGame->mClientGridCoord);
-	if (it == game::gpGame->mCoordFrames.end() || it->second.iConfirmedTick < 0)
+	if (it == game::gpGame->mCoordFrames.end())
+	{
+		return -1;
+	}
+	if (it->second.iConfirmedTick < 0)
 	{
 		return -1;
 	}
@@ -455,37 +452,32 @@ int64_t ClientSessionRuntime::GetClientConfirmedTick() const
 int64_t ClientSessionRuntime::GetServerUpdateBufferSize() const
 {
 	int64_t iTotal = 0;
-	for (const auto& [rCoord, rCoordFrames] : game::gpGame->mCoordFrames)
+	for (const auto& [rCoordinate, rCoordinateFrames] : game::gpGame->mCoordFrames)
 	{
-		if (rCoordFrames.iConfirmedTick >= 0)
+		if (rCoordinateFrames.iConfirmedTick >= 0)
 		{
-			iTotal += static_cast<int64_t>(rCoordFrames.serverUpdates.size());
+			iTotal += static_cast<int64_t>(rCoordinateFrames.serverUpdates.size());
 		}
 	}
 	return iTotal;
 }
 
-void ClientSessionRuntime::FlushOutgoing()
-{
-	mpClient->Flush();
-}
-
 void ClientSessionRuntime::SendAckAndFlush()
 {
 	gpProfileManager->CpuStart(kCpuTimerNetworkSend);
-	if (mpClient->SendAck())
+	if (mpClient->SendAcknowledgement())
 	{
 		mpClient->Flush();
 	}
 	gpProfileManager->CpuStop(kCpuTimerNetworkSend, CpuStopFlags::kSmoothNow);
 }
 
-void ClientSessionRuntime::SetDesiredCoords(const GridCoord* pDesiredCoords, int64_t iDesiredCount, std::string_view reason, int64_t iTick)
+void ClientSessionRuntime::SetDesiredCoordinates(std::span<const GridCoord> desiredCoordinates, std::string_view reason, int64_t iTick)
 {
-	bool bChanged = iDesiredCount != std::ssize(mDesiredCoords);
-	for (int64_t i = 0; !bChanged && i < iDesiredCount; ++i)
+	bool bChanged = std::ssize(desiredCoordinates) != std::ssize(mDesiredCoordinates);
+	for (int64_t i = 0; !bChanged && i < std::ssize(desiredCoordinates); ++i)
 	{
-		bChanged = pDesiredCoords[i] != mDesiredCoords.at(i);
+		bChanged = desiredCoordinates[i] != mDesiredCoordinates.at(i);
 	}
 	if (!bChanged)
 	{
@@ -495,23 +487,23 @@ void ClientSessionRuntime::SetDesiredCoords(const GridCoord* pDesiredCoords, int
 	// Heap: sticky-coordinate map insertion and desired-coordinate vector assignment
 	ScopedSuppressAllocationTracking suppress;
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	for (const GridCoord& rCoord : mDesiredCoords)
+	for (const GridCoord& rCoordinate : mDesiredCoordinates)
 	{
-		if (!ContainsCoordinate(pDesiredCoords, iDesiredCount, rCoord))
+		if (!ContainsCoordinate(desiredCoordinates, rCoordinate))
 		{
-			mUnwantedTimestamps.try_emplace(rCoord, now);
+			mUnwantedTimestamps.try_emplace(rCoordinate, now);
 		}
 	}
-	for (int64_t i = 0; i < iDesiredCount; ++i)
+	for (int64_t i = 0; i < std::ssize(desiredCoordinates); ++i)
 	{
-		mUnwantedTimestamps.erase(pDesiredCoords[i]);
+		mUnwantedTimestamps.erase(desiredCoordinates[i]);
 	}
-	mDesiredCoords.clear();
-	if (iDesiredCount > 0)
+	mDesiredCoordinates.clear();
+	if (!desiredCoordinates.empty())
 	{
-		mDesiredCoords.assign(pDesiredCoords, pDesiredCoords + iDesiredCount);
+		mDesiredCoordinates.assign(desiredCoordinates.begin(), desiredCoordinates.end());
 	}
-	LOG(kNetwork, kVerbose, "Desired subscriptions changed Reason: {} Count: {} Tick: {}", reason, iDesiredCount, iTick);
+	LOG(kNetwork, kVerbose, "Desired subscriptions changed Reason: {} Count: {} Tick: {}", reason, std::ssize(desiredCoordinates), iTick);
 }
 
 void ClientSessionRuntime::SynchronizeSubscriptions()
@@ -527,9 +519,9 @@ void ClientSessionRuntime::SynchronizeSubscriptions()
 	// Heap: subscription queue growth and ENet subscription sends
 	ScopedSuppressAllocationTracking suppress;
 	common::ScopedWorkbufferArena desiredArena = common::gpThreadLocal->mWorkbuffer.Push();
-	for (const GridCoord& rCoord : mDesiredCoords)
+	for (const GridCoord& rCoordinate : mDesiredCoordinates)
 	{
-		desiredArena.PushBack(rCoord);
+		desiredArena.mBuffer.PushBack(rCoordinate);
 	}
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	std::erase_if(mUnwantedTimestamps, [&](const std::pair<const GridCoord, std::chrono::steady_clock::time_point>& rPair)
@@ -538,58 +530,61 @@ void ClientSessionRuntime::SynchronizeSubscriptions()
 		{
 			return true;
 		}
-		desiredArena.PushBack(rPair.first);
+		desiredArena.mBuffer.PushBack(rPair.first);
 		return false;
 	});
-	const GridCoord* pDesiredCoords = desiredArena.Data<GridCoord>();
-	int64_t iDesiredCount = desiredArena.Count<GridCoord>();
-	UnsubscribeStaleCoords(pDesiredCoords, iDesiredCount);
+	const GridCoord* pDesiredCoordinates = desiredArena.mBuffer.Data<GridCoord>();
+	int64_t iDesiredCount = desiredArena.mBuffer.Count<GridCoord>();
+	UnsubscribeStaleCoordinates(std::span<const GridCoord>(pDesiredCoordinates, iDesiredCount));
 	mpClient->RecoverTimedOutSubscriptions();
-	BuildSubscriptionQueue(pDesiredCoords, iDesiredCount);
+	BuildSubscriptionQueue(std::span<const GridCoord>(pDesiredCoordinates, iDesiredCount));
 	TrySubscribeNext();
 }
 
-void ClientSessionRuntime::UnsubscribeStaleCoords(const GridCoord* pDesiredCoords, int64_t iDesiredCount)
+void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord> desiredCoordinates)
 {
-	const std::vector<ClientCoordSlot>& rSlots = mpClient->mCoordSlots;
+	const std::vector<ClientCoordSlot>& rSlots = mpClient->mCoordinateSlots;
 	for (int64_t i = 0; i < std::ssize(rSlots); ++i)
 	{
-		if (!IsSlotActive(rSlots.at(i)) || ContainsCoordinate(pDesiredCoords, iDesiredCount, rSlots.at(i).coord))
+		if (!IsSlotActive(rSlots.at(i)))
 		{
 			continue;
 		}
-		GridCoord coord = rSlots.at(i).coord;
+		if (ContainsCoordinate(desiredCoordinates, rSlots.at(i).coordinate))
+		{
+			continue;
+		}
+		GridCoord coordinate = rSlots.at(i).coordinate;
 		mpClient->SendUnsubscribe(i);
 		if (rSlots.at(i).eState == CoordSubscriptionState::kUnsubscribing)
 		{
-			mrSession.OnCoordReleased(coord);
+			mrSession.OnCoordReleased(coordinate);
 		}
 	}
 
-	for (const SubscribeRequest& rRecord : mpClient->mSubscribeRequests.Records())
+	for (const SubscribeRequest& rRecord : mpClient->mSubscribeRequests.mRecords)
 	{
-		if (!(rRecord.flags & SubscribeRequestFlags::kCancelled) &&!ContainsCoordinate(pDesiredCoords, iDesiredCount, rRecord.coord))
+		if (!(rRecord.flags & SubscribeRequestFlags::kCancelled) &&!ContainsCoordinate(desiredCoordinates, rRecord.coordinate))
 		{
-			mpClient->mSubscribeRequests.Cancel(rRecord.coord);
-			mrSession.OnCoordReleased(rRecord.coord);
+			mpClient->mSubscribeRequests.Cancel(rRecord.coordinate);
+			mrSession.OnCoordReleased(rRecord.coordinate);
 		}
 	}
 }
 
-void ClientSessionRuntime::BuildSubscriptionQueue(const GridCoord* pDesiredCoords, int64_t iDesiredCount)
+void ClientSessionRuntime::BuildSubscriptionQueue(std::span<const GridCoord> desiredCoordinates)
 {
 	mSubscriptionQueue.clear();
-	const std::vector<ClientCoordSlot>& rSlots = mpClient->mCoordSlots;
-	for (int64_t i = 0; i < iDesiredCount; ++i)
+	const std::vector<ClientCoordSlot>& rSlots = mpClient->mCoordinateSlots;
+	for (const GridCoord& rCoordinate : desiredCoordinates)
 	{
-		const GridCoord& rCoord = pDesiredCoords[i];
 		bool bActive = std::ranges::any_of(rSlots, [&](const ClientCoordSlot& rSlot)
 		{
-			return IsSlotActive(rSlot) && rSlot.coord == rCoord;
+			return IsSlotActive(rSlot) && rSlot.coordinate == rCoordinate;
 		});
-		if (!bActive && !mpClient->mSubscribeRequests.IsLive(rCoord))
+		if (!bActive && !mpClient->mSubscribeRequests.IsLive(rCoordinate))
 		{
-			mSubscriptionQueue.push_back(rCoord);
+			mSubscriptionQueue.push_back(rCoordinate);
 		}
 	}
 }
@@ -607,18 +602,18 @@ void ClientSessionRuntime::TrySubscribeNext()
 			if (!(mStateFlags & ClientSessionStateFlags::kNoFreeSlotLogged))
 			{
 				mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged);
-				LOG(kNetwork, kWarning, "ClientSessionRuntime no free subscription slot Pending: {}", mSubscriptionQueue.size());
+				LOG(kNetwork, kWarning, "ClientSessionRuntime no free subscription slot Pending: {}", std::ssize(mSubscriptionQueue));
 			}
 			return;
 		}
 		mSubscriptionQueue.erase(mSubscriptionQueue.begin());
 	}
-	mStateFlags.Clear(ClientSessionStateFlags::kNoFreeSlotLogged);
+	mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged, false);
 }
 
 void ClientSessionRuntime::ClearSubscriptionState()
 {
-	mDesiredCoords.clear();
+	mDesiredCoordinates.clear();
 	mUnwantedTimestamps.clear();
 	mSubscriptionQueue.clear();
 }
@@ -630,7 +625,7 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 		miLowerTargetBehindStreakStartTick = -1;
 		return 0ns;
 	}
-	bool bHasActiveSlot = std::ranges::any_of(mpClient->mCoordSlots, [](const ClientCoordSlot& rSlot)
+	bool bHasActiveSlot = std::ranges::any_of(mpClient->mCoordinateSlots, [](const ClientCoordSlot& rSlot)
 	{
 		return rSlot.eState == CoordSubscriptionState::kActive;
 	});
@@ -648,11 +643,11 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 	{
 		miLowerTargetBehindStreakStartTick = -1;
 	}
-	int64_t iJitterMicroseconds = mpClient->mSmoothedJitterUs.Get();
+	int64_t iJitterMicroseconds = mpClient->mSmoothedJitterMicroseconds.mSmoothedValue;
 	// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
 	// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
-	int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimToWall(engine::kTickNs).count();
-	int64_t iComputedTargetBehind = ((3 * iJitterMicroseconds + kiJitterSafetyUs) * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
+	int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimulationToWall(engine::kTickNanoseconds).count();
+	int64_t iComputedTargetBehind = ((3 * iJitterMicroseconds + kiJitterSafetyMicroseconds) * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
 	if (miCurrentTargetBehind == 0)
 	{
 		miCurrentTargetBehind = iComputedTargetBehind;
@@ -710,7 +705,7 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 
 void ClientSessionRuntime::ApplyClockCorrection(int64_t iPreReconcileTick)
 {
-	std::chrono::nanoseconds clockCorrectionNs = EvaluateClock(iPreReconcileTick);
+	std::chrono::nanoseconds clockCorrectionNanoseconds = EvaluateClock(iPreReconcileTick);
 	gpProfileManager->SetClockCorrection(miClockOffset, miClockTargetBehind, miClockError);
 
 	if (miLatestServerTick >= 0 && std::abs(miClockError) >= kiClockSnapThreshold)
@@ -721,13 +716,13 @@ void ClientSessionRuntime::ApplyClockCorrection(int64_t iPreReconcileTick)
 		int64_t iSnapTick = std::max<int64_t>(0, miLatestServerTick - miCurrentTargetBehind);
 		LOG(kNetwork, kWarning, "ClientSessionRuntime::ApplyClockCorrection Clock snap OldTick: {} NewTick: {} LatestServerTick: {} TargetBehind: {}", iPreReconcileTick, iSnapTick, miLatestServerTick, miCurrentTargetBehind);
 		game::gpGame->SetTickCounter(iSnapTick);
-		game::gpGame->mTimeStep.ClearAccumulator();
+		game::gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
 		game::gpGame->ResetRenderClock();
 		miClockError = 0;
 	}
 	else
 	{
-		game::gpGame->mTimeStep.mTickRemainderNs = std::max(0ns, game::gpGame->mTimeStep.mTickRemainderNs + clockCorrectionNs);
+		game::gpGame->mTimeStep.mTickRemainderNanoseconds = std::max(0ns, game::gpGame->mTimeStep.mTickRemainderNanoseconds + clockCorrectionNanoseconds);
 	}
 }
 

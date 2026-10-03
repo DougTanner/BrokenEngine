@@ -112,18 +112,18 @@ void SpaceshipsInterpolate::Register()
 	engine::ExplosionsInterpolate::RegisterType(gSpaceshipExplosionTypeIndex,
 	{
 #if defined(BT_CLIENT)
-		.uiPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::GetPrimaryLightControllerTypeIndex(),
-		.uiSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::GetSecondaryLightControllerTypeIndex(),
-		.uiPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::GetPrimaryPuffControllerTypeIndex(),
-		.uiSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::GetSecondaryPuffControllerTypeIndex(),
-		.uiTrailTypeIndex = engine::ExplosionsInterpolate::GetTrailTypeIndex(),
-		.uiWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::GetWindRadialControllerTypeIndex(),
+		.uiPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
+		.uiSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
+		.uiPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
+		.uiSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
+		.uiTrailTypeIndex = engine::ExplosionsInterpolate::suiExplosionTrailTypeIndex,
+		.uiWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
 #endif // BT_CLIENT
 		.uiBaseParticleCount = kuiSpaceshipExplosionBaseParticleCount,
 		.uiParticleColor = kuiSpaceshipExplosionParticleColor,
-		.fParticleVelocityMin = kfSpaceshipExplosionParticleVelocityMin,
+		.fParticleVelocityMinimum = kfSpaceshipExplosionParticleVelocityMin,
 		.fParticleVelocityRandom = kfSpaceshipExplosionParticleVelocityRandom,
-		.fParticleVerticalVelocityMin = kfSpaceshipExplosionParticleVerticalVelocityMin,
+		.fParticleVerticalVelocityMinimum = kfSpaceshipExplosionParticleVerticalVelocityMin,
 		.fParticleVerticalVelocityRandom = kfSpaceshipExplosionParticleVerticalVelocityRandom,
 		.fParticleIntensityDecay = kfSpaceshipExplosionParticleIntensityDecay,
 		.fTrailLengthRandom = kfSpaceshipExplosionTrailLengthRandom,
@@ -165,7 +165,7 @@ static void RegisterEnemyBlasterType()
 	// Register camera-aligned point light type for enemy blasters
 	engine::PointLightsInterpolate::RegisterType(suiEnemyBlasterPointLightTypeIndex,
 	{
-		.crc = data::kTexturesBlasterBC72pngCrc,
+		.uiCrc = data::kTexturesBlasterBC72pngCrc,
 		.uiColor = 0xFFFFFFFF,
 		.fVisibleArea = kfEnemyBlasterSize,
 		.bCameraAligned = true,
@@ -205,7 +205,7 @@ static void RegisterSpaceshipHitFlashEffect()
 	{
 		engine::PointLightsInterpolate::RegisterType(suiSpaceshipHitFlashTypeIndex,
 		{
-			.crc = data::kTexturesBlasterBC74pngCrc,
+			.uiCrc = data::kTexturesBlasterBC74pngCrc,
 			.uiColor = 0xFFFFFFFF,
 		});
 
@@ -214,7 +214,7 @@ static void RegisterSpaceshipHitFlashEffect()
 			.uiBaseTypeIndex = suiSpaceshipHitFlashTypeIndex,
 			.uiKeyframeCount = 2,
 			.bDestroysSelf = true,
-			.pfTimes = {0.0f, kfHitFlashDuration, 0.0f, 0.0f},
+			.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfHitFlashDuration), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 			.keyframes =
 			{
 				{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -236,7 +236,7 @@ void SpawnSpaceshipExplosion(Frame& __restrict rFrame, XMVECTOR vecPosition, XMV
 	XMVECTOR vecJitteredPosition = common::RandomPositionJitter<kfSpaceshipExplosionPositionJitter>(vecPosition, rFrame.postRender.randomEngine);
 	XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<kfSpaceshipExplosionDirectionJitter>(vecDirection, rFrame.postRender.randomEngine);
 
-	engine::ExplosionsPostRender::Spawn(rFrame, rFrame.interpolate.fCurrentTime,
+	engine::ExplosionsPostRender::Spawn(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 	{
 		.uiTypeIndex = gSpaceshipExplosionTypeIndex,
 		.vecPosition = vecJitteredPosition,
@@ -326,7 +326,7 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 
 		// Sync wind deposit
 #if defined(BT_CLIENT)
-		if (rCurrent.puiWindTrails[i].IsValid())
+		if ((rCurrent.puiWindTrails[i].uuid.iValue != 0))
 		{
 			engine::WindTrailsInterpolate::Sync(rCurrentFrameInterpolate, rCurrent.puiWindTrails[i],
 			{
@@ -359,9 +359,9 @@ static void RemoveOwnedObjects(Frame& rFrame, SpaceshipsInterpolate& rCurrentInt
 	}
 	engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
 #if defined(BT_CLIENT)
-	if (rCurrentInterpolate.puiWindTrails[i].IsValid())
+	if ((rCurrentInterpolate.puiWindTrails[i].uuid.iValue != 0))
 	{
-		engine::WindTrailsPostRender::Remove(rFrame, rCurrentInterpolate.puiWindTrails[i]);
+		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.windTrails, rFrame.postRender.windTrails, rCurrentInterpolate.puiWindTrails[i], rFrame.interpolate.windTrails.Members(), rFrame.postRender.windTrails.Members());
 	}
 #endif
 }
@@ -398,7 +398,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 		};
 		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{
-			LOG(kDefault, kError, "Spaceship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coord.x, rStaticData.coord.y, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Spaceship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		PushTransferRequest(rFrame.postRender, request);
@@ -500,7 +500,7 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			});
 
 #if defined(BT_CLIENT)
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coord, vecPosition, gEnemyBlasterVolume.Get(), gEnemyBlasterPitchMin.Get(), gEnemyBlasterPitchRandom.Get());
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecPosition, gEnemyBlasterVolume.Get(), gEnemyBlasterPitchMin.Get(), gEnemyBlasterPitchRandom.Get());
 #endif
 		}
 	}
@@ -616,9 +616,9 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 	for (int64_t iIsland = 0; iIsland < iIslandCount; ++iIsland)
 	{
 		const engine::IslandPlacement& rPlacement = rStaticData.islands[iIsland];
-		XMStoreFloat4(&pIslandCandidates[iIsland], XMVectorSet(rPlacement.f2WorldPos.x, rPlacement.f2WorldPos.y, engine::gBaseHeight.Get(), 1.0f));
+		XMStoreFloat4(&pIslandCandidates.mpData[iIsland], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gBaseHeight.Get(), 1.0f));
 	}
-	std::span<const XMFLOAT4> islandCandidates(static_cast<XMFLOAT4*>(pIslandCandidates), static_cast<size_t>(iIslandCount));
+	std::span<const XMFLOAT4> islandCandidates(static_cast<XMFLOAT4*>(pIslandCandidates.mpData), static_cast<size_t>(iIslandCount));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -660,7 +660,7 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 		ApplyTerrainBounce(rStaticData, rCurrentInterpolate, i, fDeltaTime, fDeltaRotation, vecVelocity);
 
 		// Clamp delta rotation
-		fDeltaRotation = common::MinAbs(fDeltaRotation, kfSpaceshipMaxTurnRate);
+		fDeltaRotation = common::ClampMagnitude(fDeltaRotation, kfSpaceshipMaxTurnRate);
 
 		// Save to PostRender (static fields copied via memcpy in AllocateAndCopy)
 		rCurrent.pFlags[i] = flags;
@@ -682,10 +682,10 @@ bool SpaceshipsInterpolate::LogDifferences(const SpaceshipsInterpolate& rOther) 
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
-	for (int64_t i = 0; i < CommonRowCount(rOther); ++i)
+	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
-		bEqual &= common::LogDifference_Vec("pVecPositions", i, pVecPositions[i], rOther.pVecPositions[i]);
-		bEqual &= common::LogDifference_Vec("pVecDirections", i, pVecDirections[i], rOther.pVecDirections[i]);
+		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
+		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 		bEqual &= common::LogDifference<"pfDestroyedTimes">(i, pfDestroyedTimes[i], rOther.pfDestroyedTimes[i]);
 		bEqual &= common::LogDifference<"puiPushers">(i, puiPushers[i], rOther.puiPushers[i]);
 		bEqual &= common::LogDifference<"puiRegistryIds">(i, puiRegistryIds[i], rOther.puiRegistryIds[i]);
@@ -701,11 +701,11 @@ bool SpaceshipsPostRender::LogDifferences(const SpaceshipsPostRender& rOther) co
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
-	for (int64_t i = 0; i < CommonRowCount(rOther); ++i)
+	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
-		bEqual &= common::LogDifference_Vec("pVecVelocities", i, pVecVelocities[i], rOther.pVecVelocities[i]);
-		bEqual &= common::LogDifference_Vec("pVecDamageDirections", i, pVecDamageDirections[i], rOther.pVecDamageDirections[i]);
+		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
+		bEqual &= common::LogDifference<"pVecDamageDirections">(i, pVecDamageDirections[i], rOther.pVecDamageDirections[i]);
 		bEqual &= common::LogDifference<"pfHealths">(i, pfHealths[i], rOther.pfHealths[i]);
 		bEqual &= common::LogDifference<"pfDestroyedExplosionTimes">(i, pfDestroyedExplosionTimes[i], rOther.pfDestroyedExplosionTimes[i]);
 		bEqual &= common::LogDifference<"pfNextBlasterSpawnTimes">(i, pfNextBlasterSpawnTimes[i], rOther.pfNextBlasterSpawnTimes[i]);

@@ -15,7 +15,7 @@ namespace game
 
 #if defined(BT_SERVER)
 
-void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId)
+void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId)
 {
 	// A queued spawn revives the client: clear its dead/processed state unconditionally.
 	mDeadClientIds.erase(iClientId);
@@ -47,7 +47,8 @@ void ServerClientManager::NewClients()
 			continue;
 		}
 
-		if (!gpServerSession->mClientPlayers.Owned(rClient.iClientId).empty())
+		auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(rClient.iClientId);
+		if (ownedIt != gpServerSession->mClientPlayers.mOwned.end() && !ownedIt->second.empty())
 		{
 			continue;
 		}
@@ -85,7 +86,7 @@ void ServerClientManager::NewClients()
 void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConnection& rClient)
 {
 	// Diagnostic: dump connecting GUID, server-side fleet roster, and per-coord player GUIDs so we can see whether reconnect should re-link
-	LOG(kNetwork, kInfo, "ServerClientManager::NewClients Connecting Client: {} Guid: ({},{}) Empty: {}", rClient.iClientId, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow, rClient.clientGuid.IsEmpty());
+	LOG(kNetwork, kInfo, "ServerClientManager::NewClients Connecting Client: {} Guid: ({},{}) Empty: {}", rClient.iClientId, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow, (rClient.clientGuid.uiHigh == 0 && rClient.clientGuid.uiLow == 0));
 	LOG(kNetwork, kInfo, "  FleetGuids: {}", gpServerSession->mpFleetManager->mFleets.size());
 	for (const auto& [rExistingGuid, rExistingFleets] : gpServerSession->mpFleetManager->mFleets)
 	{
@@ -98,7 +99,7 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 		{
 			continue;
 		}
-		LOG(kNetwork, kInfo, "  Coord: ({},{}) PlayerCount: {}", rCoord.x, rCoord.y, rPlayers.iCount);
+		LOG(kNetwork, kInfo, "  Coord: ({},{}) PlayerCount: {}", rCoord.iX, rCoord.iY, rPlayers.iCount);
 		for (int64_t i = 0; i < rPlayers.iCount; ++i)
 		{
 			LOG(kNetwork, kInfo, "    Global: {} Guid: ({},{}) Match: {}", rPlayers.pGlobalPlayerIds[i].iValue, rPlayers.pClientGuids[i].uiHigh, rPlayers.pClientGuids[i].uiLow, rPlayers.pClientGuids[i] == rClient.clientGuid);
@@ -114,14 +115,14 @@ void ServerClientManager::SpawnWaitingClients()
 	for (const ClientSpawnInfo& rClientSpawnInformation : mClientsWaitingForSpawn)
 	{
 		// A respawned fleet member keeps its global ID; only a new ship mints one.
-		engine::global_id_t globalPlayerId = rClientSpawnInformation.memberGlobalPlayerId.IsValid()
+		engine::GlobalId globalPlayerId = (rClientSpawnInformation.memberGlobalPlayerId.iValue != 0)
 			? rClientSpawnInformation.memberGlobalPlayerId
-			: engine::global_id_t {gpGame->GenerateGlobalId()};
+			: engine::GlobalId {gpGame->GenerateGlobalId()};
 
 		bool bIsFlagship = false;
 		engine::GridCoord spawnFleetWantedCoord {};
 		uint8_t uiSpawnPendingFleetTicks = 0;
-		if (!rClientSpawnInformation.fleetGuid.IsEmpty())
+		if ((rClientSpawnInformation.fleetGuid.uiHigh != 0 || rClientSpawnInformation.fleetGuid.uiLow != 0))
 		{
 			ServerFleetManager::FleetLookupResult result = gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalPlayerId);
 			bIsFlagship = result.flags & ServerFleetManager::FleetLookupFlags::kIsFlagship;
@@ -131,14 +132,14 @@ void ServerClientManager::SpawnWaitingClients()
 
 		// The requesting client's GUID rides the status change, so the row this tick creates is born owned.
 		StatusChange spawnChange {.eType = StatusChangeType::kSpawnPlayer, .data = SpawnPlayerData{.iGlobalId = globalPlayerId.iValue, .bIsFlagship = bIsFlagship, .fleetWantedCoord = spawnFleetWantedCoord, .uiPendingFleetWantedCoordTicks = uiSpawnPendingFleetTicks, .clientGuid = rClientSpawnInformation.clientGuid}};
-		gpGame->mFrameInputs.try_emplace(engine::kOriginCoord).first->second.statusChanges.push_back(spawnChange);
-		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients::kSpawnPlayer Client: {} GlobalId: {} Coord: ({},{}) Flagship: {}", rClientSpawnInformation.iClientId, globalPlayerId.iValue, engine::kOriginCoord.x, engine::kOriginCoord.y, bIsFlagship);
+		gpGame->mFrameInputs.try_emplace(engine::kOriginCoordinate).first->second.statusChanges.push_back(spawnChange);
+		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients::kSpawnPlayer Client: {} GlobalId: {} Coord: ({},{}) Flagship: {}", rClientSpawnInformation.iClientId, globalPlayerId.iValue, engine::kOriginCoordinate.iX, engine::kOriginCoordinate.iY, bIsFlagship);
 
 		// Assignment is keyed on this spawn's id, so it completes here rather than waiting for the row to exist.
 		// Client handles subscriptions — no full state sent here.
-		gpServerSession->SendAssignPlayer(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoord);
-		gpServerSession->SendPlayerState(rClientSpawnInformation.iClientId, PlayerStateWireType::kSpawned, globalPlayerId.iValue, engine::kOriginCoord);
-		gpServerSession->mClientPlayers.Add(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoord);
+		gpServerSession->SendAssignPlayer(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoordinate);
+		gpServerSession->SendPlayerState(rClientSpawnInformation.iClientId, PlayerStateWireType::kSpawned, globalPlayerId.iValue, engine::kOriginCoordinate);
+		gpServerSession->mClientPlayers.Add(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoordinate);
 
 		// Associate with fleet if this spawn was fleet-triggered
 		gpServerSession->mpFleetManager->OnPlayerSpawned(rClientSpawnInformation.iClientId, rClientSpawnInformation.clientGuid, rClientSpawnInformation, globalPlayerId);
@@ -154,7 +155,11 @@ void ServerClientManager::Disconnects()
 
 	for (const engine::PendingDisconnect& rDisconnect : gpServerSession->mpRuntime->mpServer->mPendingDisconnects)
 	{
-		LOG(kNetwork, kVerbose, "ServerClientManager::Disconnects Client: {} Players: {}", rDisconnect.iClientId, gpServerSession->mClientPlayers.Owned(rDisconnect.iClientId).size());
+		LOG(kNetwork, kVerbose, "ServerClientManager::Disconnects Client: {} Players: {}", rDisconnect.iClientId, [&]()
+		{
+			auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(rDisconnect.iClientId);
+			return ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::ssize(ownedIt->second) : static_cast<int64_t>(0);
+		}());
 		mDeadClientIds.erase(rDisconnect.iClientId);
 		mProcessedClientIds.erase(rDisconnect.iClientId);
 
@@ -166,7 +171,7 @@ void ServerClientManager::Disconnects()
 			return rInfo.iClientId == rDisconnect.iClientId;
 		});
 
-		gpServerSession->mClientPlayers.Remove(rDisconnect.iClientId);
+		gpServerSession->mClientPlayers.mOwned.erase(rDisconnect.iClientId);
 	}
 }
 
@@ -175,7 +180,8 @@ void ServerClientManager::DetectPlayerDeaths()
 	std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
 	for (engine::ClientConnection& rClient : rClients)
 	{
-		std::span<const engine::OwnedEntity> ownedPlayers = gpServerSession->mClientPlayers.Owned(rClient.iClientId);
+		auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(rClient.iClientId);
+		std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
 
 		if (ownedPlayers.empty())
 		{
@@ -188,7 +194,7 @@ void ServerClientManager::DetectPlayerDeaths()
 		}
 
 		// Skip clients mid-transfer (subscription update pending from HarvestTransfers)
-		if (gpServerSession->mpTransferManager->HasPendingSubscriptionUpdate(rClient.iClientId))
+		if (std::ranges::contains(gpServerSession->mPendingSubscriptionUpdates, rClient.iClientId, &game::SubscriptionUpdate::iClientId))
 		{
 			continue;
 		}
@@ -200,7 +206,7 @@ void ServerClientManager::DetectPlayerDeaths()
 		for (int64_t i = std::ssize(ownedPlayers) - 1; i >= 0; --i)
 		{
 			const engine::OwnedEntity& rOwnedPlayer = ownedPlayers[i];
-			engine::global_id_t globalId = rOwnedPlayer.globalId;
+			engine::GlobalId globalId = rOwnedPlayer.globalId;
 			engine::GridCoord coord = rOwnedPlayer.coord;
 
 			if (!gpGame->mCoordFrames.contains(coord))
@@ -223,7 +229,7 @@ void ServerClientManager::DetectPlayerDeaths()
 			if (!bFound)
 			{
 				gpServerSession->SendPlayerState(rClient.iClientId, PlayerStateWireType::kDied, globalId.iValue, coord);
-				LOG(kNetwork, kVerbose, "ServerClientManager::DetectPlayerDeaths Client: {} GlobalPlayer: {} Coord: ({},{})", rClient.iClientId, globalId, coord.x, coord.y);
+				LOG(kNetwork, kVerbose, "ServerClientManager::DetectPlayerDeaths Client: {} GlobalPlayer: {} Coord: ({},{})", rClient.iClientId, globalId, coord.iX, coord.iY);
 				gpServerSession->mClientPlayers.RemoveAt(rClient.iClientId, i);
 
 				gpServerSession->mpFleetManager->OnPlayerDeath(rClient.clientGuid, globalId);
@@ -231,7 +237,8 @@ void ServerClientManager::DetectPlayerDeaths()
 		}
 
 		// Mark client as dead only when ALL owned players are dead
-		if (gpServerSession->mClientPlayers.Owned(rClient.iClientId).empty())
+		ownedIt = gpServerSession->mClientPlayers.mOwned.find(rClient.iClientId);
+		if (ownedIt == gpServerSession->mClientPlayers.mOwned.end() || ownedIt->second.empty())
 		{
 			mDeadClientIds.insert(rClient.iClientId);
 		}

@@ -19,14 +19,14 @@ void ParsePlayerEvents(const std::vector<std::pair<uint8_t, std::vector<uint8_t>
 		{
 			GameMessages::AssignPlayerMessage message {};
 			engine::NetworkMessages::Read(rPayload, message);
-			rOutEventsArena.PushBack(ReceivedPlayerEvent{.eType = PlayerEventType::kAssigned, .globalPlayerId = engine::global_id_t {message.iGlobalPlayerId}, .coord = message.coord});
+			rOutEventsArena.mBuffer.PushBack(ReceivedPlayerEvent{.eType = PlayerEventType::kAssigned, .globalPlayerId = engine::GlobalId {message.iGlobalPlayerId}, .coord = message.coord});
 		}
 		else if (eType == GamePacketType::kServerPlayerState)
 		{
 			GameMessages::PlayerStateMessage message {};
 			engine::NetworkMessages::Read(rPayload, message);
 			const GameMessages::PlayerStateDescriptor& rDescriptor = GameMessages::GetPlayerStateDescriptor(static_cast<PlayerStateWireType>(message.uiWireType));
-			rOutEventsArena.PushBack(ReceivedPlayerEvent{.eType = rDescriptor.eEventType, .globalPlayerId = engine::global_id_t {message.iGlobalPlayerId}, .coord = message.coord});
+			rOutEventsArena.mBuffer.PushBack(ReceivedPlayerEvent{.eType = rDescriptor.eEventType, .globalPlayerId = engine::GlobalId {message.iGlobalPlayerId}, .coord = message.coord});
 		}
 	}
 }

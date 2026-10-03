@@ -53,5 +53,4 @@ private:
 	std::string GetTextureFingerprint() const;
 	bool AreTextureOutputsPresent() const;
 	bool AreTexturesFresh() const;
-	void WriteTextureMarker() const;
 };

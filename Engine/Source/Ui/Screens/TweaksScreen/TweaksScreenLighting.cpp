@@ -9,8 +9,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gLightingRegistrar
 {
 	// Write - Pre-Blur
@@ -112,7 +110,6 @@ const TweaksSliderMapRegistrar gLightingRegistrar
 	{"Water Reflected Fresnel", &gLightingWaterReflectedFresnel},
 	{"Water Reflected Intensity", &gLightingWaterReflectedIntensity},
 };
-}
 
 void TweaksScreenBase::RenderLightingSection()
 {

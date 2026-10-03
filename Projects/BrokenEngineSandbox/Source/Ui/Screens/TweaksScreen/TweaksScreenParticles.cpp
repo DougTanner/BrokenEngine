@@ -8,8 +8,6 @@
 namespace game
 {
 
-namespace
-{
 const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 {
 	// Missile
@@ -58,7 +56,6 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Spaceship Particle Intensity Decay", &gSpaceshipExplosionParticleIntensityDecay},
 	{"Spaceship Particle Intensity Power", &gSpaceshipExplosionParticleIntensityPower},
 };
-}
 
 void TweaksScreen::RenderParticlesSection()
 {

@@ -5,9 +5,6 @@
 namespace engine
 {
 
-namespace
-{
-
 struct ContourEdge
 {
 	XMFLOAT2 f2A {};
@@ -23,162 +20,154 @@ struct ContourEdge
 // row ∈ [0, iHeight-1] / col ∈ [0, iWidth]. The 32+16+16 packing leaves comfortable headroom for
 // the heightmap sizes the engine builds (kiElevationDivisor = 4 caps heightmap dims at a few
 // thousand pixels).
-inline constexpr uint64_t EncodeEdgeKey(uint32_t uiOrient, int32_t iRow, int32_t iCol)
+static constexpr uint64_t EncodeEdgeKey(uint32_t uiOrientation, int32_t iRow, int32_t iColumn)
 {
-	return (static_cast<uint64_t>(uiOrient) << 32) | (static_cast<uint64_t>(static_cast<uint32_t>(iRow)) << 16) | static_cast<uint64_t>(static_cast<uint32_t>(iCol));
+	return (static_cast<uint64_t>(uiOrientation) << 32) | (static_cast<uint64_t>(static_cast<uint32_t>(iRow)) << 16) | static_cast<uint64_t>(static_cast<uint32_t>(iColumn));
 }
 
 // Marching squares: extract isocontour edges at the given world-space elevation threshold.
 // Heightmap pixels are engine-meters relative to beach (0 == sea level) — sampled directly.
 // Heightmap is anisotropic (DataPacker auto-crop produces non-square dims); UV scale is per-axis
 // so the contour lives in [0, 1]² regardless of aspect ratio. Row stride is iWidth.
-void ExtractContourEdges(std::vector<ContourEdge>& rEdges, const float* pfHeightmapData, int32_t iWidth, int32_t iHeight, float fWorldThreshold)
+static void ExtractContourEdges(std::vector<ContourEdge>& rEdges, std::span<const float> heightmapData, int32_t iWidth, int32_t iHeight, float fWorldThreshold)
 {
 	float fScaleU = 1.0f / static_cast<float>(iWidth - 1);
 	float fScaleV = 1.0f / static_cast<float>(iHeight - 1);
 
-	for (int32_t iY = 0; iY < iHeight - 1; ++iY)
+	for (int32_t i = 0; i < iHeight - 1; ++i)
 	{
-		for (int32_t iX = 0; iX < iWidth - 1; ++iX)
+		for (int32_t j = 0; j < iWidth - 1; ++j)
 		{
-			float fTL = pfHeightmapData[iY * iWidth + iX];
-			float fTR = pfHeightmapData[iY * iWidth + iX + 1];
-			float fBR = pfHeightmapData[(iY + 1) * iWidth + iX + 1];
-			float fBL = pfHeightmapData[(iY + 1) * iWidth + iX];
+			float fTopLeft = heightmapData[i * iWidth + j];
+			float fTopRight = heightmapData[i * iWidth + j + 1];
+			float fBottomRight = heightmapData[(i + 1) * iWidth + j + 1];
+			float fBottomLeft = heightmapData[(i + 1) * iWidth + j];
 
 			// Classification: 1 = above threshold (obstacle), 0 = below (navigable)
-			int32_t iCase = 0;
-			if (fTL >= fWorldThreshold)
+			uint32_t uiCase = 0;
+			if (fTopLeft >= fWorldThreshold)
 			{
-				iCase |= 8;
+				uiCase |= 8;
 			}
-			if (fTR >= fWorldThreshold)
+			if (fTopRight >= fWorldThreshold)
 			{
-				iCase |= 4;
+				uiCase |= 4;
 			}
-			if (fBR >= fWorldThreshold)
+			if (fBottomRight >= fWorldThreshold)
 			{
-				iCase |= 2;
+				uiCase |= 2;
 			}
-			if (fBL >= fWorldThreshold)
+			if (fBottomLeft >= fWorldThreshold)
 			{
-				iCase |= 1;
+				uiCase |= 1;
 			}
 
-			if (iCase == 0 || iCase == 15)
+			if (uiCase == 0 || uiCase == 15)
 			{
 				continue;
 			}
 
-			// Interpolation helper: find the UV position where the contour crosses an edge
-			float fCellU = static_cast<float>(iX) * fScaleU;
-			float fCellV = static_cast<float>(iY) * fScaleV;
+			float fCellU = static_cast<float>(j) * fScaleU;
+			float fCellV = static_cast<float>(i) * fScaleV;
 			float fStepU = fScaleU;
 			float fStepV = fScaleV;
 
-			// Edge midpoints via linear interpolation. Result is the unbounded crossing fraction in
-			// [0, 1]; downstream chain keying uses the integer cell-edge identifier so float drift
-			// or corner-snap quantization cannot split a shared midpoint across two keys.
+			// Integer cell-edge identifiers keep shared contour crossings together despite float drift.
 			auto Lerp = [](float fA, float fB, float fThresholdValue) -> float
 			{
-				float fDenom = fA - fB;
-				if (std::abs(fDenom) < 1e-8f)
+				float fDenominator = fA - fB;
+				if (std::abs(fDenominator) < 1.0e-8f)
 				{
 					return 0.5f;
 				}
-				return std::clamp((fA - fThresholdValue) / fDenom, 0.0f, 1.0f);
+				return std::clamp((fA - fThresholdValue) / fDenominator, 0.0f, 1.0f);
 			};
 
-			uint64_t uiKeyTop = EncodeEdgeKey(0, iY, iX);
-			uint64_t uiKeyRight = EncodeEdgeKey(1, iY, iX + 1);
-			uint64_t uiKeyBottom = EncodeEdgeKey(0, iY + 1, iX);
-			uint64_t uiKeyLeft = EncodeEdgeKey(1, iY, iX);
+			uint64_t uiKeyTop = EncodeEdgeKey(0, i, j);
+			uint64_t uiKeyRight = EncodeEdgeKey(1, i, j + 1);
+			uint64_t uiKeyBottom = EncodeEdgeKey(0, i + 1, j);
+			uint64_t uiKeyLeft = EncodeEdgeKey(1, i, j);
 
-			// Top edge (TL to TR)
-			float fTopT = Lerp(fTL, fTR, fWorldThreshold);
+			float fTopT = Lerp(fTopLeft, fTopRight, fWorldThreshold);
 			XMFLOAT2 f2Top {fCellU + fTopT * fStepU, fCellV};
 
-			// Right edge (TR to BR)
-			float fRightT = Lerp(fTR, fBR, fWorldThreshold);
+			float fRightT = Lerp(fTopRight, fBottomRight, fWorldThreshold);
 			XMFLOAT2 f2Right {fCellU + fStepU, fCellV + fRightT * fStepV};
 
-			// Bottom edge (BL to BR)
-			float fBottomT = Lerp(fBL, fBR, fWorldThreshold);
+			float fBottomT = Lerp(fBottomLeft, fBottomRight, fWorldThreshold);
 			XMFLOAT2 f2Bottom {fCellU + fBottomT * fStepU, fCellV + fStepV};
 
-			// Left edge (TL to BL)
-			float fLeftT = Lerp(fTL, fBL, fWorldThreshold);
+			float fLeftT = Lerp(fTopLeft, fBottomLeft, fWorldThreshold);
 			XMFLOAT2 f2Left {fCellU, fCellV + fLeftT * fStepV};
 
-			// Produce edges based on case (standard marching squares lookup)
 			// Cases 5 and 10 are saddle points: disambiguate by averaging corners
-			switch (iCase)
+			switch (uiCase)
 			{
 				case 1:
-					rEdges.push_back({f2Bottom, f2Left, uiKeyBottom, uiKeyLeft});
+					rEdges.push_back({.f2A = f2Bottom, .f2B = f2Left, .uiKeyA = uiKeyBottom, .uiKeyB = uiKeyLeft});
 					break;
 				case 2:
-					rEdges.push_back({f2Right, f2Bottom, uiKeyRight, uiKeyBottom});
+					rEdges.push_back({.f2A = f2Right, .f2B = f2Bottom, .uiKeyA = uiKeyRight, .uiKeyB = uiKeyBottom});
 					break;
 				case 3:
-					rEdges.push_back({f2Right, f2Left, uiKeyRight, uiKeyLeft});
+					rEdges.push_back({.f2A = f2Right, .f2B = f2Left, .uiKeyA = uiKeyRight, .uiKeyB = uiKeyLeft});
 					break;
 				case 4:
-					rEdges.push_back({f2Top, f2Right, uiKeyTop, uiKeyRight});
+					rEdges.push_back({.f2A = f2Top, .f2B = f2Right, .uiKeyA = uiKeyTop, .uiKeyB = uiKeyRight});
 					break;
 				case 5:
 				{
-					float fCenter = (fTL + fTR + fBR + fBL) * 0.25f;
+					float fCenter = (fTopLeft + fTopRight + fBottomRight + fBottomLeft) * 0.25f;
 					if (fCenter >= fWorldThreshold)
 					{
-						rEdges.push_back({f2Top, f2Left, uiKeyTop, uiKeyLeft});
-						rEdges.push_back({f2Bottom, f2Right, uiKeyBottom, uiKeyRight});
+						rEdges.push_back({.f2A = f2Top, .f2B = f2Left, .uiKeyA = uiKeyTop, .uiKeyB = uiKeyLeft});
+						rEdges.push_back({.f2A = f2Bottom, .f2B = f2Right, .uiKeyA = uiKeyBottom, .uiKeyB = uiKeyRight});
 					}
 					else
 					{
-						rEdges.push_back({f2Top, f2Right, uiKeyTop, uiKeyRight});
-						rEdges.push_back({f2Bottom, f2Left, uiKeyBottom, uiKeyLeft});
+						rEdges.push_back({.f2A = f2Top, .f2B = f2Right, .uiKeyA = uiKeyTop, .uiKeyB = uiKeyRight});
+						rEdges.push_back({.f2A = f2Bottom, .f2B = f2Left, .uiKeyA = uiKeyBottom, .uiKeyB = uiKeyLeft});
 					}
 					break;
 				}
 				case 6:
-					rEdges.push_back({f2Top, f2Bottom, uiKeyTop, uiKeyBottom});
+					rEdges.push_back({.f2A = f2Top, .f2B = f2Bottom, .uiKeyA = uiKeyTop, .uiKeyB = uiKeyBottom});
 					break;
 				case 7:
-					rEdges.push_back({f2Top, f2Left, uiKeyTop, uiKeyLeft});
+					rEdges.push_back({.f2A = f2Top, .f2B = f2Left, .uiKeyA = uiKeyTop, .uiKeyB = uiKeyLeft});
 					break;
 				case 8:
-					rEdges.push_back({f2Left, f2Top, uiKeyLeft, uiKeyTop});
+					rEdges.push_back({.f2A = f2Left, .f2B = f2Top, .uiKeyA = uiKeyLeft, .uiKeyB = uiKeyTop});
 					break;
 				case 9:
-					rEdges.push_back({f2Bottom, f2Top, uiKeyBottom, uiKeyTop});
+					rEdges.push_back({.f2A = f2Bottom, .f2B = f2Top, .uiKeyA = uiKeyBottom, .uiKeyB = uiKeyTop});
 					break;
 				case 10:
 				{
-					float fCenter = (fTL + fTR + fBR + fBL) * 0.25f;
+					float fCenter = (fTopLeft + fTopRight + fBottomRight + fBottomLeft) * 0.25f;
 					if (fCenter >= fWorldThreshold)
 					{
-						rEdges.push_back({f2Left, f2Bottom, uiKeyLeft, uiKeyBottom});
-						rEdges.push_back({f2Right, f2Top, uiKeyRight, uiKeyTop});
+						rEdges.push_back({.f2A = f2Left, .f2B = f2Bottom, .uiKeyA = uiKeyLeft, .uiKeyB = uiKeyBottom});
+						rEdges.push_back({.f2A = f2Right, .f2B = f2Top, .uiKeyA = uiKeyRight, .uiKeyB = uiKeyTop});
 					}
 					else
 					{
-						rEdges.push_back({f2Left, f2Top, uiKeyLeft, uiKeyTop});
-						rEdges.push_back({f2Right, f2Bottom, uiKeyRight, uiKeyBottom});
+						rEdges.push_back({.f2A = f2Left, .f2B = f2Top, .uiKeyA = uiKeyLeft, .uiKeyB = uiKeyTop});
+						rEdges.push_back({.f2A = f2Right, .f2B = f2Bottom, .uiKeyA = uiKeyRight, .uiKeyB = uiKeyBottom});
 					}
 					break;
 				}
 				case 11:
-					rEdges.push_back({f2Right, f2Top, uiKeyRight, uiKeyTop});
+					rEdges.push_back({.f2A = f2Right, .f2B = f2Top, .uiKeyA = uiKeyRight, .uiKeyB = uiKeyTop});
 					break;
 				case 12:
-					rEdges.push_back({f2Left, f2Right, uiKeyLeft, uiKeyRight});
+					rEdges.push_back({.f2A = f2Left, .f2B = f2Right, .uiKeyA = uiKeyLeft, .uiKeyB = uiKeyRight});
 					break;
 				case 13:
-					rEdges.push_back({f2Bottom, f2Right, uiKeyBottom, uiKeyRight});
+					rEdges.push_back({.f2A = f2Bottom, .f2B = f2Right, .uiKeyA = uiKeyBottom, .uiKeyB = uiKeyRight});
 					break;
 				case 14:
-					rEdges.push_back({f2Left, f2Bottom, uiKeyLeft, uiKeyBottom});
+					rEdges.push_back({.f2A = f2Left, .f2B = f2Bottom, .uiKeyA = uiKeyLeft, .uiKeyB = uiKeyBottom});
 					break;
 				default:
 					break;
@@ -187,24 +176,20 @@ void ExtractContourEdges(std::vector<ContourEdge>& rEdges, const float* pfHeight
 	}
 }
 
-// Chain contour edges into closed polygons by matching endpoints
-void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const std::vector<ContourEdge>& rEdges)
+static void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const std::vector<ContourEdge>& rEdges)
 {
-	// Adjacency: each cell-edge identifier maps to the edges that touch it. Because each midpoint
-	// lives on exactly one cell-edge and is shared with exactly one neighbour cell, every key has
-	// exactly two entries (one per cell on either side of the edge) — no quantization-induced
-	// false T-junctions.
-	struct EdgeRef
+	// Cell-edge identifiers join shared crossings without position quantization.
+	struct EdgeReference
 	{
-		size_t iEdgeIndex = 0;
+		int64_t iEdgeIndex = 0;
 		bool bIsEndpointB = false; // false = matched on f2A / uiKeyA, true = matched on f2B / uiKeyB
 	};
-	std::unordered_multimap<uint64_t, EdgeRef> vertexToEdge;
+	std::unordered_multimap<uint64_t, EdgeReference> vertexToEdge;
 	vertexToEdge.reserve(rEdges.size() * 2);
-	for (size_t i = 0; i < rEdges.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rEdges); ++i)
 	{
-		vertexToEdge.insert({rEdges.at(i).uiKeyA, {i, false}});
-		vertexToEdge.insert({rEdges.at(i).uiKeyB, {i, true}});
+		vertexToEdge.insert({rEdges.at(i).uiKeyA, {.iEdgeIndex = i, .bIsEndpointB = false}});
+		vertexToEdge.insert({rEdges.at(i).uiKeyB, {.iEdgeIndex = i, .bIsEndpointB = true}});
 
 		// Each cell-edge key has at most two entries, one per side; boundary edges have one. This makes
 		// the unused chain candidate unique regardless of bucket order. Duplicate ExtractContourEdges
@@ -215,7 +200,7 @@ void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const
 
 	std::vector<bool> used(rEdges.size(), false);
 
-	for (size_t i = 0; i < rEdges.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rEdges); ++i)
 	{
 		if (used.at(i))
 		{
@@ -234,7 +219,7 @@ void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const
 			auto [itBegin, itEnd] = vertexToEdge.equal_range(uiTailKey);
 			for (auto it = itBegin; it != itEnd; ++it)
 			{
-				size_t j = it->second.iEdgeIndex;
+				int64_t j = it->second.iEdgeIndex;
 				if (used.at(j))
 				{
 					continue;
@@ -258,7 +243,7 @@ void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const
 
 		// Closed iff the chain returned to the head's cell-edge. Integer-exact compare — no
 		// epsilon needed, since cell-edge keys are derived from cell indices, not float positions.
-		if (polygon.size() >= 3 && uiTailKey == uiHeadKey)
+		if (std::ssize(polygon) >= 3 && uiTailKey == uiHeadKey)
 		{
 			polygon.pop_back();
 			rPolygons.push_back(std::move(polygon));
@@ -266,43 +251,42 @@ void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const
 	}
 }
 
-} // anonymous namespace
-
 // Shared segment intersection test for NavCellData's crossing diagnostic and NavQuery's edge test; it
 // accepts proper interior crossings only, not endpoint touching.
 bool SegmentsIntersect(XMFLOAT2 f2A1, XMFLOAT2 f2A2, XMFLOAT2 f2B1, XMFLOAT2 f2B2)
 {
-	float fD1x = f2A2.x - f2A1.x;
-	float fD1y = f2A2.y - f2A1.y;
-	float fD2x = f2B2.x - f2B1.x;
-	float fD2y = f2B2.y - f2B1.y;
+	float fDeltaAX = f2A2.x - f2A1.x;
+	float fDeltaAY = f2A2.y - f2A1.y;
+	float fDeltaBX = f2B2.x - f2B1.x;
+	float fDeltaBY = f2B2.y - f2B1.y;
 
-	float fDenom = fD1x * fD2y - fD1y * fD2x;
-	if (std::abs(fDenom) < 1e-10f)
+	float fDenominator = fDeltaAX * fDeltaBY - fDeltaAY * fDeltaBX;
+	if (std::abs(fDenominator) < 1.0e-10f)
 	{
 		return false;
 	}
 
-	float fDiffX = f2B1.x - f2A1.x;
-	float fDiffY = f2B1.y - f2A1.y;
+	float fDifferenceX = f2B1.x - f2A1.x;
+	float fDifferenceY = f2B1.y - f2A1.y;
 
-	float fT = (fDiffX * fD2y - fDiffY * fD2x) / fDenom;
-	float fU = (fDiffX * fD1y - fDiffY * fD1x) / fDenom;
+	float fT = (fDifferenceX * fDeltaBY - fDifferenceY * fDeltaBX) / fDenominator;
+	float fU = (fDifferenceX * fDeltaAY - fDifferenceY * fDeltaAX) / fDenominator;
 
-	static constexpr float kfSegmentEpsilon = 1e-6f;
+	static constexpr float kfSegmentEpsilon = 1.0e-6f;
 	return fT > kfSegmentEpsilon && fT < (1.0f - kfSegmentEpsilon) && fU > kfSegmentEpsilon && fU < (1.0f - kfSegmentEpsilon);
 }
 
 // The builder and NavQuery's PointInAnyPolygon share this winding-number core so boundary rules cannot
-// drift. Pointer plus count accepts subranges of a larger vertex buffer.
-bool PointInPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, int32_t iVertexCount)
+// drift.
+bool PointInPolygon(XMFLOAT2 f2Point, std::span<const XMFLOAT2> vertices)
 {
-	int32_t iWinding = 0;
-	for (int32_t i = 0; i < iVertexCount; ++i)
+	int64_t iVertexCount = std::ssize(vertices);
+	int64_t iWinding = 0;
+	for (int64_t i = 0; i < iVertexCount; ++i)
 	{
-		int32_t iNext = (i + 1) % iVertexCount;
-		XMFLOAT2 f2A = pVertices[i];
-		XMFLOAT2 f2B = pVertices[iNext];
+		int64_t iNext = (i + 1) % iVertexCount;
+		XMFLOAT2 f2A = vertices[i];
+		XMFLOAT2 f2B = vertices[iNext];
 
 		if (f2A.y <= f2Point.y)
 		{
@@ -330,27 +314,25 @@ bool PointInPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, int32_t iVertex
 	return iWinding != 0;
 }
 
-void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters)
+void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters)
 {
 	LOG(kNavData, kDebug, "NavBuild: heightmap {}x{} worldThreshold={}", iHeightmapWidth, iHeightmapHeight, common::Wb(fWorldThreshold, 4));
 
-	// Step 1: Extract contour edges via marching squares
 	std::vector<ContourEdge> contourEdges;
 	contourEdges.reserve(static_cast<size_t>(iHeightmapWidth) * static_cast<size_t>(iHeightmapHeight));
-	ExtractContourEdges(contourEdges, pfHeightmapData, iHeightmapWidth, iHeightmapHeight, fWorldThreshold);
+	ExtractContourEdges(contourEdges, heightmapData, iHeightmapWidth, iHeightmapHeight, fWorldThreshold);
 
-	LOG(kNavData, kDebug, "NavBuild: extracted {} contour edges", contourEdges.size());
+	LOG(kNavData, kDebug, "NavBuild: extracted {} contour edges", std::ssize(contourEdges));
 
 	if (contourEdges.empty())
 	{
 		return;
 	}
 
-	// Step 2: Chain edges into closed polygons
 	std::vector<std::vector<XMFLOAT2>> polygons;
 	ChainEdgesIntoPolygons(polygons, contourEdges);
 
-	LOG(kNavData, kDebug, "NavBuild: chained into {} polygons", polygons.size());
+	LOG(kNavData, kDebug, "NavBuild: chained into {} polygons", std::ssize(polygons));
 
 	// Union raw chained polygons in UV, then transform to centered local meters for isotropic inflation
 	// and simplification before mapping back to UV. Clipper2 uses integer-coordinate robustness and
@@ -363,17 +345,17 @@ void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t
 
 	Clipper2Lib::PathsD obstacles;
 	obstacles.reserve(polygons.size());
-	for (const std::vector<XMFLOAT2>& rPoly : polygons)
+	for (const std::vector<XMFLOAT2>& rPolygon : polygons)
 	{
-		if (rPoly.size() < 3)
+		if (std::ssize(rPolygon) < 3)
 		{
 			continue;
 		}
 		Clipper2Lib::PathD path;
-		path.reserve(rPoly.size());
-		for (const XMFLOAT2& rVert : rPoly)
+		path.reserve(rPolygon.size());
+		for (const XMFLOAT2& rVertex : rPolygon)
 		{
-			path.emplace_back(rVert.x, rVert.y);
+			path.emplace_back(rVertex.x, rVertex.y);
 		}
 		obstacles.push_back(std::move(path));
 	}
@@ -389,19 +371,16 @@ void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t
 		}
 	}
 
-	// Navigation uses the terrain-push contour plus ship clearance. All distances and tolerances are
-	// meters; UV is representation only. Clipper2 applies an outward miter offset and squares joins
-	// beyond the miter limit.
+	// Clearance is added to the terrain-push contour; distances and tolerances are in meters.
 	Clipper2Lib::PathsD inflated = Clipper2Lib::InflatePaths(unioned, static_cast<double>(fClearanceMeters), Clipper2Lib::JoinType::Miter, Clipper2Lib::EndType::Polygon, kfMiterLimit, kiClipperPrecision);
 	// Topology-preserving simplification (does not introduce crossings).
 	Clipper2Lib::PathsD simplified = Clipper2Lib::SimplifyPaths(inflated, kfSimplifyEpsilonMeters);
 
-	// Step 4: Pack outer obstacle loops into flat arrays. Discard holes (Area < 0): they sit
-	// inside obstacles and the visibility graph cannot route through obstacles regardless.
-	int32_t iDroppedHoles = 0;
+	// Holes lie inside obstacles, which the visibility graph cannot route through.
+	int64_t iDroppedHoles = 0;
 	for (const Clipper2Lib::PathD& rPath : simplified)
 	{
-		if (rPath.size() < 3)
+		if (std::ssize(rPath) < 3)
 		{
 			continue;
 		}
@@ -428,7 +407,7 @@ void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t
 		LOG(kNavData, kDebug, "NavBuild: dropped {} interior holes", iDroppedHoles);
 	}
 
-	LOG(kNavData, kDebug, "NavBuild: total vertices={} polygons={}", rContour.vertices.size(), rContour.polygonOffsets.size());
+	LOG(kNavData, kDebug, "NavBuild: total vertices={} polygons={}", std::ssize(rContour.vertices), std::ssize(rContour.polygonOffsets));
 
 	if (rContour.vertices.empty())
 	{
@@ -438,19 +417,19 @@ void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t
 	// Clipper2's Area > 0 filter above kept only outer obstacle loops; this verifies the float-cast
 	// vertices still wind the same way, so a near-degenerate truncation can't silently flip one into a
 	// hole. Not a PointInPolygon precondition — that test counts nonzero winding and is orientation-
-	// agnostic. The invariant is UV-space only: BuildCellNavData mirrors Y when it places a template, so
+	// agnostic. The invariant is UV-space only: BuildCellNavigationData mirrors Y when it places a template, so
 	// the merged world-space polygons are wound clockwise.
-	int32_t iPolyCount = static_cast<int32_t>(rContour.polygonOffsets.size());
+	int64_t iPolygonCount = std::ssize(rContour.polygonOffsets);
 	int32_t iVertexTotal = static_cast<int32_t>(rContour.vertices.size());
-	for (int32_t iPoly = 0; iPoly < iPolyCount; ++iPoly)
+	for (int64_t i = 0; i < iPolygonCount; ++i)
 	{
-		auto [iStart, iEnd] = PolygonRange(rContour.polygonOffsets, iPoly, iVertexTotal);
+		auto [iStart, iEnd] = PolygonRange(rContour.polygonOffsets, i, iVertexTotal);
 		int32_t iCount = iEnd - iStart;
 		if (iCount < 3)
 		{
 			continue;
 		}
-		ASSERT(common::IsPolygonCcw(&rContour.vertices.at(iStart), iCount));
+		ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(&rContour.vertices.at(iStart), static_cast<size_t>(iCount))));
 	}
 }
 

@@ -27,9 +27,6 @@ void ChunkReadRequest::Reset()
 
 #endif // BT_CLIENT
 
-namespace
-{
-
 [[noreturn]] static void FailCreateDirectory(std::string_view directoryKind, const std::filesystem::path& rDirectoryPath, const std::error_code& rError)
 {
 	LOG(kLoading, kError, "Failed to create {} directory \"{}\" (error {}: {})", directoryKind, rDirectoryPath.string(), rError.value(), rError.message());
@@ -131,8 +128,6 @@ private:
 
 	HANDLE mhFile = INVALID_HANDLE_VALUE;
 };
-
-}
 
 FileManager::FileManager()
 {
@@ -344,7 +339,7 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 
 	Sha256Hasher hasher;
 	auto bufferAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(64 * 1'024);
-	std::span<std::byte> buffer(static_cast<std::byte*>(bufferAllocation), 64 * 1'024);
+	std::span<std::byte> buffer(static_cast<std::byte*>(bufferAllocation.mpData), 64 * 1'024);
 	int64_t iByteCount = 0;
 	for (;;)
 	{

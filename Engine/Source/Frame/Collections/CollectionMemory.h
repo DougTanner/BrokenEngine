@@ -5,37 +5,36 @@ namespace engine
 
 // ForEachMemberPointer visits array pointer elements in index order and scalar pointers once; order
 // determines CRC and layout. Callbacks receive pointer references for assign/reset/swap, preserving
-// constness. Derive ElementType with remove_pointer_t<remove_reference_t<decltype(elementPtrRef)>>:
+// constness. Derive ElementType with remove_pointer_t<remove_reference_t<decltype(rElementPointer)>>:
 // reversing the removals leaves a pointer type and gives pointer-sized storage.
 
 template <typename MEMBER, typename FN>
-constexpr void ForEachMemberPointer(MEMBER& member, FN&& fn)
+constexpr void ForEachMemberPointer(MEMBER& rMember, FN&& rFunction)
 {
 	if constexpr (std::is_array_v<MEMBER>)
 	{
-		constexpr size_t N = std::extent_v<MEMBER>;
-		for (size_t i = 0; i < N; ++i)
+		for (std::remove_extent_t<MEMBER>& rElementPointer : rMember)
 		{
-			fn(member[i]);
+			rFunction(rElementPointer);
 		}
 	}
 	else
 	{
-		fn(member);
+		rFunction(rMember);
 	}
 }
 
 // Computes 64-byte-rounded storage for array or scalar member pointers at iCapacity.
 
 template <typename T>
-constexpr int64_t CalculateBufferSize(int64_t iCapacity, const T& member)
+constexpr int64_t CalculateBufferSize(int64_t iCapacity, const T& rMember)
 {
 	ASSERT(iCapacity >= 0);
 
 	int64_t iBufferSize = 0;
-	ForEachMemberPointer(member, [&](auto& elementPtrRef)
+	ForEachMemberPointer(rMember, [&](auto& rElementPointer)
 	{
-		using ElementType = std::remove_pointer_t<std::remove_reference_t<decltype(elementPtrRef)>>;
+		using ElementType = std::remove_pointer_t<std::remove_reference_t<decltype(rElementPointer)>>;
 		iBufferSize += common::RoundUp<int64_t, 64>(iCapacity * sizeof(ElementType));
 	});
 	return iBufferSize;
@@ -45,78 +44,70 @@ constexpr int64_t CalculateBufferSize(int64_t iCapacity, const T& member)
 // max(size, 1) so a zero-member layout still backs a positive capacity, while the deserialize zero-fill wants the
 // exact physical-layout sum.
 template <typename TUPLE>
-int64_t MemberTupleBufferSize(int64_t iCapacity, const TUPLE& members)
+int64_t MemberTupleBufferSize(int64_t iCapacity, const TUPLE& rMembers)
 {
 	int64_t iBufferSize = 0;
-	std::apply([&](const auto&... memberPtrRefs)
+	std::apply([&](const auto&... rMemberPointers)
 	{
-		((iBufferSize += CalculateBufferSize(iCapacity, memberPtrRefs)), ...);
-	}, members);
+		((iBufferSize += CalculateBufferSize(iCapacity, rMemberPointers)), ...);
+	}, rMembers);
 	return iBufferSize;
 }
 
-// Member-pointer helpers maintain 64-byte alignment for contiguous collection storage.
 
-// Aligns pointer to 64-byte boundary and advances current position. Used during initial allocation.
 template <typename T>
-void AssignAligned(T& member, int64_t iCapacity, std::byte*& rpCurrent)
+void AssignAligned(T& rMember, int64_t iCapacity, std::byte*& rpCurrent)
 {
-	ForEachMemberPointer(member, [&](auto& elementPtrRef)
+	ForEachMemberPointer(rMember, [&](auto& rElementPointer)
 	{
-		using ElementPtrType = std::remove_reference_t<decltype(elementPtrRef)>;
+		using ElementPtrType = std::remove_reference_t<decltype(rElementPointer)>;
 		using ElementType = std::remove_pointer_t<ElementPtrType>;
 		rpCurrent = reinterpret_cast<std::byte*>(common::RoundUp<uintptr_t, 64>(reinterpret_cast<uintptr_t>(rpCurrent)));
-		elementPtrRef = reinterpret_cast<ElementPtrType>(rpCurrent);
+		rElementPointer = reinterpret_cast<ElementPtrType>(rpCurrent);
 		rpCurrent += iCapacity * sizeof(ElementType);
 	});
 }
 
-// Aligns pointer, copies existing data, and advances current position. Used during capacity growth.
 template <typename T>
-void AssignAndCopyAligned(T& member, int64_t iCapacity, int64_t iCount, std::byte*& rpCurrent)
+void AssignAndCopyAligned(T& rMember, int64_t iCapacity, int64_t iCount, std::byte*& rpCurrent)
 {
-	ForEachMemberPointer(member, [&](auto& elementPtrRef)
+	ForEachMemberPointer(rMember, [&](auto& rElementPointer)
 	{
-		using ElementPtrType = std::remove_reference_t<decltype(elementPtrRef)>;
+		using ElementPtrType = std::remove_reference_t<decltype(rElementPointer)>;
 		using ElementType = std::remove_pointer_t<ElementPtrType>;
 		rpCurrent = reinterpret_cast<std::byte*>(common::RoundUp<uintptr_t, 64>(reinterpret_cast<uintptr_t>(rpCurrent)));
 
-		if (elementPtrRef != nullptr)
+		if (rElementPointer != nullptr)
 		{
-			std::memcpy(rpCurrent, elementPtrRef, iCount * sizeof(ElementType));
+			std::memcpy(rpCurrent, rElementPointer, iCount * sizeof(ElementType));
 		}
 
-		elementPtrRef = reinterpret_cast<ElementPtrType>(rpCurrent);
+		rElementPointer = reinterpret_cast<ElementPtrType>(rpCurrent);
 		rpCurrent += iCapacity * sizeof(ElementType);
 	});
 }
 
-// Allocation helpers manage contiguous Structure-of-Arrays storage.
 
-// Resets collection to null state by releasing buffer and zeroing member pointers.
 template <typename STRUCT, typename TUPLE>
-void ResetDataToNull(STRUCT& rStruct, TUPLE&& members)
+void ResetDataToNull(STRUCT& rStruct, TUPLE&& rMembers)
 {
 	rStruct.pData.reset();
 	rStruct.iCapacity = 0;
 	rStruct.iPhysicalLayoutCapacity = 0;
 
-	std::apply([&](auto&... memberPtrRefs)
+	std::apply([&](auto&... rMemberPointers)
 	{
-		(ForEachMemberPointer(memberPtrRefs, [](auto& elementPtrRef)
+		(ForEachMemberPointer(rMemberPointers, [](auto& rElementPointer)
 		{
-			elementPtrRef = nullptr;
+			rElementPointer = nullptr;
 		}), ...);
-	}, std::forward<TUPLE>(members));
+	}, std::forward<TUPLE>(rMembers));
 }
 
-// Allocates single contiguous buffer and positions member array pointers within it. Used during initial allocation and deserialization.
-// Reuses the existing buffer when its physical layout already spans iCapacity (avoids reallocation when deserializing into an
-// already-allocated collection, e.g. replay-load). iPhysicalLayoutCapacity is the true stride of the installed buffer and
-// survives a shrink-reuse even as iCapacity drops to a smaller stream value, so it is the correct reuse bound; comparing the
-// just-read iCapacity against itself would instead reuse an undersized buffer and overrun on the next MultiRead.
+// iPhysicalLayoutCapacity records the installed buffer's stride capacity and survives shrink reuse.
+// Deserialization can already have overwritten iCapacity, so buffer reuse is bounded by the physical capacity.
 template <typename STRUCT, typename TUPLE>
-void AllocateAndAssign(STRUCT& rStruct, int64_t iCapacity, TUPLE&& members)
+void AllocateAndAssign(STRUCT& rStruct, int64_t iCapacity, TUPLE&& rMembers)
 {
 	if (rStruct.iPhysicalLayoutCapacity >= iCapacity && rStruct.pData != nullptr)
 	{
@@ -126,33 +117,32 @@ void AllocateAndAssign(STRUCT& rStruct, int64_t iCapacity, TUPLE&& members)
 	// Heap: MakeAligned allocates the SOA data buffer, which must persist across frames and can be arbitrarily
 	// large depending on entity count. Workbuffer is temporary (lost on Pop) and can't hold cross-frame state.
 	ScopedSuppressAllocationTracking suppress;
-	int64_t iBufferSize = std::max<int64_t>(MemberTupleBufferSize(iCapacity, members), 1);
+	int64_t iBufferSize = std::max<int64_t>(MemberTupleBufferSize(iCapacity, rMembers), 1);
 	if (iBufferSize > common::kiMaxDeserializedBytes)
 	{
-		ResetDataToNull(rStruct, members);
+		ResetDataToNull(rStruct, rMembers);
 		throw std::ios_base::failure("AllocateAndAssign");
 	}
 
 	common::AlignedUniquePtr<std::byte> pNewData = common::MakeAligned<std::byte>(iBufferSize);
 	if (pNewData == nullptr)
 	{
-		ResetDataToNull(rStruct, members);
+		ResetDataToNull(rStruct, rMembers);
 		throw std::ios_base::failure("AllocateAndAssign");
 	}
 
-	// Publish the capacity and physical layout only after a successful install.
+	// Publish capacity and physical layout only after allocation succeeds.
 	rStruct.iCapacity = iCapacity;
 	rStruct.iPhysicalLayoutCapacity = iCapacity;
 	rStruct.pData = std::move(pNewData);
 
 	std::byte* pCurrent = rStruct.pData.get();
-	std::apply([&](auto&... memberPtrRefs)
+	std::apply([&](auto&... rMemberPointers)
 	{
-		(AssignAligned(memberPtrRefs, iCapacity, pCurrent), ...);
-	}, std::forward<TUPLE>(members));
+		(AssignAligned(rMemberPointers, iCapacity, pCurrent), ...);
+	}, std::forward<TUPLE>(rMembers));
 }
 
-// Detects whether a collection type has an idToIndexMap member.
 template <typename T>
 concept HasIdToIndex = requires(T& rStruct)
 {
@@ -183,17 +173,15 @@ inline bool IsMemberTupleSubset(const SUBSET_TUPLE& rSubsetMembers, const FULL_T
 	}, rSubsetMembers);
 }
 
-// Copies metadata and reallocates buffer for AllocateAndCopy() phase. Resets null previous-frame data.
-// Used in AllocateAndCopy() static methods to prepare collections before Update() phase.
+// Called during AllocateAndCopy before Update; a previous frame without backing storage resets current pointers and capacities.
 template <typename STRUCT, typename TUPLE>
-void Allocate(STRUCT& rCurrent, const STRUCT& rPrevious, TUPLE&& members)
+void Allocate(STRUCT& rCurrent, const STRUCT& rPrevious, TUPLE&& rMembers)
 {
 	// Heap: MakeAligned for the SOA buffer and unordered_map copy for idToIndexMap. Both persist across frames
 	// with sizes that vary at runtime based on entity count, so neither workbuffer nor static arrays work.
 	ScopedSuppressAllocationTracking suppress;
 	rCurrent.iCount = rPrevious.iCount;
 
-	// Copy indexable state if applicable
 	if constexpr (HasIdToIndex<STRUCT>)
 	{
 		rCurrent.idToIndexMap = rPrevious.idToIndexMap;
@@ -201,7 +189,7 @@ void Allocate(STRUCT& rCurrent, const STRUCT& rPrevious, TUPLE&& members)
 
 	if (rPrevious.pData == nullptr)
 	{
-		ResetDataToNull(rCurrent, std::forward<TUPLE>(members));
+		ResetDataToNull(rCurrent, std::forward<TUPLE>(rMembers));
 		return;
 	}
 
@@ -212,7 +200,7 @@ void Allocate(STRUCT& rCurrent, const STRUCT& rPrevious, TUPLE&& members)
 	// The equal-capacity else path reuses rCurrent's existing buffer as-is, preserving its iPhysicalLayoutCapacity.
 	if (rCurrent.iCapacity != iCapacity)
 	{
-		int64_t iBufferSize = std::max<int64_t>(MemberTupleBufferSize(iCapacity, members), 1);
+		int64_t iBufferSize = std::max<int64_t>(MemberTupleBufferSize(iCapacity, rMembers), 1);
 
 		common::AlignedUniquePtr<std::byte> pNewData = common::MakeAligned<std::byte>(iBufferSize);
 		if (pNewData == nullptr)
@@ -225,16 +213,15 @@ void Allocate(STRUCT& rCurrent, const STRUCT& rPrevious, TUPLE&& members)
 		rCurrent.pData = std::move(pNewData);
 
 		std::byte* pCurrent = rCurrent.pData.get();
-		std::apply([&](auto&... memberPtrRefs)
+		std::apply([&](auto&... rMemberPointers)
 		{
-			(AssignAligned(memberPtrRefs, iCapacity, pCurrent), ...);
-		}, std::forward<TUPLE>(members));
+			(AssignAligned(rMemberPointers, iCapacity, pCurrent), ...);
+		}, std::forward<TUPLE>(rMembers));
 
 		ASSERT(rCurrent.iCount <= rCurrent.iCapacity);
 	}
 }
 
-// Copies one corresponding member array for the live row count.
 template <typename CURRENT_POINTER, typename PREVIOUS_POINTER>
 void CopyMemberPointerRows(int64_t iCount, CURRENT_POINTER& rCurrentPointer, const PREVIOUS_POINTER& rPreviousPointer)
 {
@@ -249,7 +236,7 @@ void CopyMemberPointerRows(int64_t iCount, CURRENT_POINTER& rCurrentPointer, con
 	std::memcpy(rCurrentPointer, rPreviousPointer, iCount * sizeof(CurrentElement));
 }
 
-// Copies one corresponding Members() tuple entry. C arrays of member pointers are copied in index order.
+// C arrays of member pointers are copied in index order.
 template <typename CURRENT_MEMBER, typename PREVIOUS_MEMBER>
 void CopyMemberEntryRows(int64_t iCount, CURRENT_MEMBER& rCurrentMember, const PREVIOUS_MEMBER& rPreviousMember)
 {
@@ -274,14 +261,14 @@ void CopyMemberEntryRows(int64_t iCount, CURRENT_MEMBER& rCurrentMember, const P
 }
 
 template <typename CURRENT_TUPLE, typename PREVIOUS_TUPLE, size_t... INDICES>
-void CopyMemberRows(int64_t iCount, CURRENT_TUPLE&& currentMembers, PREVIOUS_TUPLE&& previousMembers, std::index_sequence<INDICES...>)
+void CopyMemberRows(int64_t iCount, CURRENT_TUPLE&& rCurrentMembers, PREVIOUS_TUPLE&& rPreviousMembers, std::index_sequence<INDICES...>)
 {
-	(CopyMemberEntryRows(iCount, std::get<INDICES>(currentMembers), std::get<INDICES>(previousMembers)), ...);
+	(CopyMemberEntryRows(iCount, std::get<INDICES>(rCurrentMembers), std::get<INDICES>(rPreviousMembers)), ...);
 }
 
 // Copies corresponding member arrays in stable tuple order, and array entries in stable index order.
 template <typename CURRENT_TUPLE, typename PREVIOUS_TUPLE>
-void CopyMemberRows(int64_t iCount, CURRENT_TUPLE&& currentMembers, PREVIOUS_TUPLE&& previousMembers)
+void CopyMemberRows(int64_t iCount, CURRENT_TUPLE&& rCurrentMembers, PREVIOUS_TUPLE&& rPreviousMembers)
 {
 	using CurrentTuple = std::remove_reference_t<CURRENT_TUPLE>;
 	using PreviousTuple = std::remove_reference_t<PREVIOUS_TUPLE>;
@@ -293,7 +280,7 @@ void CopyMemberRows(int64_t iCount, CURRENT_TUPLE&& currentMembers, PREVIOUS_TUP
 	{
 		if (iCount > 0)
 		{
-			CopyMemberRows(iCount, std::forward<CURRENT_TUPLE>(currentMembers), std::forward<PREVIOUS_TUPLE>(previousMembers), std::make_index_sequence<kuiCurrentSize> {});
+			CopyMemberRows(iCount, std::forward<CURRENT_TUPLE>(rCurrentMembers), std::forward<PREVIOUS_TUPLE>(rPreviousMembers), std::make_index_sequence<kuiCurrentSize> {});
 		}
 	}
 }
@@ -316,7 +303,7 @@ void AllocateAndCopyMembers(STRUCT& rCurrent, const STRUCT& rPrevious)
 }
 
 // Allocates and copies the ID array from previous frame. Used by PostRender collections
-// whose only persistent member is puiIds.
+// whose only persistent member is pIds.
 template <typename POST_RENDER>
 void AllocateAndCopyIds(POST_RENDER& rCurrent, const POST_RENDER& rPrevious)
 {
@@ -324,18 +311,17 @@ void AllocateAndCopyIds(POST_RENDER& rCurrent, const POST_RENDER& rPrevious)
 
 	if (rCurrent.iCount > 0)
 	{
-		std::memcpy(rCurrent.puiIds, rPrevious.puiIds, rCurrent.iCount * sizeof(rCurrent.puiIds[0]));
+		std::memcpy(rCurrent.pIds, rPrevious.pIds, rCurrent.iCount * sizeof(rCurrent.pIds[0]));
 	}
 }
 
-// Grows capacity while preserving existing data.
 template <typename STRUCT, typename TUPLE>
-void GrowCapacityWithCopy(STRUCT& rStruct, int64_t iNewCapacity, int64_t iCurrentCount, TUPLE&& members)
+void GrowCapacityWithCopy(STRUCT& rStruct, int64_t iNewCapacity, int64_t iCurrentCount, TUPLE&& rMembers)
 {
 	// Heap: MakeAligned for a larger SOA buffer that replaces the old one. The buffer persists across frames
 	// and grows with entity count, so workbuffer (lost on Pop) and static arrays (fixed size) don't work.
 	ScopedSuppressAllocationTracking suppress;
-	int64_t iBufferSize = std::max<int64_t>(MemberTupleBufferSize(iNewCapacity, members), 1);
+	int64_t iBufferSize = std::max<int64_t>(MemberTupleBufferSize(iNewCapacity, rMembers), 1);
 
 	common::AlignedUniquePtr<std::byte> pNewData = common::MakeAligned<std::byte>(iBufferSize);
 	if (pNewData == nullptr)
@@ -344,32 +330,32 @@ void GrowCapacityWithCopy(STRUCT& rStruct, int64_t iNewCapacity, int64_t iCurren
 	}
 
 	std::byte* pCurrent = pNewData.get();
-	std::apply([&](auto&... memberPtrRefs)
+	std::apply([&](auto&... rMemberPointers)
 	{
-		(AssignAndCopyAligned(memberPtrRefs, iNewCapacity, iCurrentCount, pCurrent), ...);
-	}, std::forward<TUPLE>(members));
+		(AssignAndCopyAligned(rMemberPointers, iNewCapacity, iCurrentCount, pCurrent), ...);
+	}, std::forward<TUPLE>(rMembers));
 	rStruct.pData = std::move(pNewData);
 	rStruct.iCapacity = iNewCapacity;
 	rStruct.iPhysicalLayoutCapacity = iNewCapacity;
 }
 
-// Swaps element at index i with last element for O(1) unordered removal.
-// Does NOT decrement count or bounds-check - caller must handle count decrement and index re-checking.
+// Overwrite row i with the last row for O(1) unordered removal.
+// The caller must check bounds, decrement the count, and recheck i.
 template <typename STRUCT, typename TUPLE>
-void SwapElement(STRUCT& rStruct, int64_t i, TUPLE&& members)
+void SwapElement(STRUCT& rStruct, int64_t i, TUPLE&& rMembers)
 {
-	std::apply([&](auto&... memberPtrRefs)
+	std::apply([&](auto&... rMemberPointers)
 	{
-		(ForEachMemberPointer(memberPtrRefs, [&](auto& elementPtrRef)
+		(ForEachMemberPointer(rMemberPointers, [&](auto& rElementPointer)
 		{
-			elementPtrRef[i] = elementPtrRef[rStruct.iCount - 1];
+			rElementPointer[i] = rElementPointer[rStruct.iCount - 1];
 		}), ...);
-	}, std::forward<TUPLE>(members));
+	}, std::forward<TUPLE>(rMembers));
 }
 
 // Value-initializes every Members() entry at one row before collection-specific defaults are applied.
 template <typename TUPLE>
-void ZeroMemberRow(int64_t i, TUPLE&& members)
+void ZeroMemberRow(int64_t i, TUPLE&& rMembers)
 {
 	std::apply([&](auto&... rMemberPointers)
 	{
@@ -377,7 +363,7 @@ void ZeroMemberRow(int64_t i, TUPLE&& members)
 		{
 			rElementPointer[i] = {};
 		}), ...);
-	}, std::forward<TUPLE>(members));
+	}, std::forward<TUPLE>(rMembers));
 }
 
 } // namespace engine

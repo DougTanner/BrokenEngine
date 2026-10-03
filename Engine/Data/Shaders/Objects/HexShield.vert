@@ -64,15 +64,15 @@ void main()
 	// Direction wave
 	for (int32_t j = 0; j < kiHexShieldDirections; ++j)
 	{
-		if (pHexShields[i].pfVertIntensities[j] <= 0.0f)
+		if (pHexShields[i].pfVertexIntensities[j] <= 0.0f)
 		{
 			continue;
 		}
 
 		float fDot = dot(f3OutNormal, pHexShields[i].pf4Directions[j].xyz);
-		float fWave = sin(mainLayout.fHexShieldWaveDotMultiplier * fDot + mainLayout.fHexShieldWaveIntensityMultiplier * pow(pHexShields[i].pfVertIntensities[j], mainLayout.fHexShieldWaveIntensityPower));
+		float fWave = sin(mainLayout.fHexShieldWaveDotMultiplier * fDot + mainLayout.fHexShieldWaveIntensityMultiplier * pow(pHexShields[i].pfVertexIntensities[j], mainLayout.fHexShieldWaveIntensityPower));
 		float fFalloff = 0.5f * pow(max(0.5f + 0.5f * fDot, 0.0f), mainLayout.fHexShieldWaveFalloffPower);
-		f3OutPosition += f3OutNormal * mainLayout.fHexShieldWaveMultiplier * pHexShields[i].pfVertIntensities[j] * fWave * fFalloff;
+		f3OutPosition += f3OutNormal * mainLayout.fHexShieldWaveMultiplier * pHexShields[i].pfVertexIntensities[j] * fWave * fFalloff;
 	}
 
 	// Size

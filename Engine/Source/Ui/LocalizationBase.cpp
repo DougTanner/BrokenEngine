@@ -3,12 +3,9 @@
 namespace engine
 {
 
-namespace
-{
-
 // Outer extent is deduced ([]) on purpose: a dropped/extra string row then changes std::size and trips the
 // static_assert below. Pinning it to [kCount + 1] would make that guard a tautology that catches nothing.
-char32_t gppTranslatedStrings[][kLanguageCount][256]
+static char32_t sppTranslatedStrings[][kLanguageCount][256]
 {
 	// kStringComplete
 	{
@@ -195,18 +192,16 @@ char32_t gppTranslatedStrings[][kLanguageCount][256]
 // One outer row per StandardString enumerator plus the trailing all-empty sentinel row; static_assert catches a dropped
 // row, which would otherwise silently shift every later string's translations. (Inner [kLanguageCount][256] extents are
 // fixed by the array type, so per-language drift within a row stays a positional authoring contract.)
-static_assert(std::size(gppTranslatedStrings) == static_cast<size_t>(StandardString::kCount) + 1);
-
-} // namespace
+static_assert(std::size(sppTranslatedStrings) == static_cast<size_t>(StandardString::kCount) + 1);
 
 std::u32string_view TranslatedString(StandardString eString)
 {
-	if (gppTranslatedStrings[static_cast<size_t>(eString)][static_cast<size_t>(geLanguage)][0] == 0) [[unlikely]]
+	if (sppTranslatedStrings[static_cast<size_t>(eString)][static_cast<size_t>(geLanguage)][0] == 0) [[unlikely]]
 	{
-		return gppTranslatedStrings[static_cast<size_t>(eString)][static_cast<size_t>(Language::kEnglish)];
+		return sppTranslatedStrings[static_cast<size_t>(eString)][static_cast<size_t>(Language::kEnglish)];
 	}
 
-	return gppTranslatedStrings[static_cast<size_t>(eString)][static_cast<size_t>(geLanguage)];
+	return sppTranslatedStrings[static_cast<size_t>(eString)][static_cast<size_t>(geLanguage)];
 }
 
 void InitializeLocalization()
@@ -217,9 +212,9 @@ void InitializeLocalization()
 		for (int64_t j = 0; j < kLanguageCount; ++j)
 		{
 			int64_t k = 0;
-			while (gppTranslatedStrings[i][j][k] != 0)
+			while (sppTranslatedStrings[i][j][k] != 0)
 			{
-				gppTranslatedStrings[i][j][k] = towupper(static_cast<wint_t>(gppTranslatedStrings[i][j][k]));
+				sppTranslatedStrings[i][j][k] = towupper(static_cast<wint_t>(sppTranslatedStrings[i][j][k]));
 				++k;
 			}
 		}

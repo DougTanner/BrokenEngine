@@ -54,7 +54,7 @@ const Fleet* FleetSelection::FocusedFleet() const
 	return nullptr;
 }
 
-void FleetSelection::SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerId)
+void FleetSelection::SelectPlayerInFleet(engine::GlobalId memberGlobalPlayerId)
 {
 	const Fleet* pFleet = FocusedFleet();
 	if (pFleet == nullptr)
@@ -62,7 +62,7 @@ void FleetSelection::SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerI
 		return;
 	}
 
-	if (!memberGlobalPlayerId.IsValid())
+	if (!(memberGlobalPlayerId.iValue != 0))
 	{
 		return;
 	}
@@ -112,7 +112,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 
 	auto FindFleetIndexByGuid = [this](const FleetGuid& rGuid) -> int64_t
 	{
-		if (rGuid.IsEmpty())
+		if ((rGuid.uiHigh == 0 && rGuid.uiLow == 0))
 		{
 			return -1;
 		}
@@ -137,7 +137,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 			const Fleet& rFleet = mClientFleets.at(static_cast<size_t>(iRememberedFleetIndex));
 			miFocusedFleetIndex = iRememberedFleetIndex;
 			mFocusedMemberGlobalId = {};
-			if (gpGame->mRememberedFocusedShipId.IsValid())
+			if ((gpGame->mRememberedFocusedShipId.iValue != 0))
 			{
 				for (int64_t j = 0; j < std::ssize(rFleet.members); ++j)
 				{
@@ -150,7 +150,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 				}
 			}
 			// The server's fleet invariant guarantees the flagship names a member, or is {} for an empty fleet.
-			if (!mFocusedMemberGlobalId.IsValid())
+			if (!(mFocusedMemberGlobalId.iValue != 0))
 			{
 				mFocusedMemberGlobalId = rFleet.flagshipGlobalPlayerId;
 			}
@@ -199,14 +199,14 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 		{
 			mFocusedMemberGlobalId = pFleet->members.back().globalPlayerId;
 		}
-		else if (!mFocusedMemberGlobalId.IsValid() && !pFleet->members.empty())
+		else if (!(mFocusedMemberGlobalId.iValue != 0) && !pFleet->members.empty())
 		{
 			mFocusedMemberGlobalId = pFleet->members.back().globalPlayerId;
 		}
 
 		// If focused member is dead, auto-fallback to first alive member
 		auto focusedIt = std::ranges::find(pFleet->members, mFocusedMemberGlobalId, &FleetMember::globalPlayerId);
-		if (mFocusedMemberGlobalId.IsValid() && focusedIt != pFleet->members.end() && (focusedIt->flags & FleetMemberFlags::kIsDead))
+		if ((mFocusedMemberGlobalId.iValue != 0) && focusedIt != pFleet->members.end() && (focusedIt->flags & FleetMemberFlags::kIsDead))
 		{
 			mFocusedMemberGlobalId = {};
 			for (int64_t i = 0; i < std::ssize(pFleet->members); ++i)
@@ -226,9 +226,9 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 	}
 
 	// Update mClientGridCoord based on current selection
-	engine::global_id_t focusedId = gpGame->ClientPlayerId();
+	engine::GlobalId focusedId = gpGame->ClientPlayerId();
 	bool bGridCoordResolved = false;
-	if (focusedId.IsValid())
+	if ((focusedId.iValue != 0))
 	{
 		for (int64_t i = 0; i < std::ssize(gpGame->mClientPlayerIds); ++i)
 		{

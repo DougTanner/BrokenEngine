@@ -13,7 +13,7 @@ struct FrameStaticData;
 
 struct PointLightsType
 {
-	common::crc_t crc = 0;
+	common::crc_t uiCrc = 0;
 	uint32_t uiColor = 0xFFFFFFFF;
 	float fVisibleArea = 1.0f;
 	float fVisibleIntensity = 1.0f;
@@ -30,19 +30,14 @@ struct PointLightsInterpolate : public Collection<PointLightsInterpolate, Collec
 	public TypeRegistry<PointLightsType>,
 	public ControllerTypeRegistry<PointLightsInterpolate>
 {
-	static constexpr const char* kName = "PointLights";
+	static constexpr const char* kpcName = "PointLights";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("PointLights");
 
-	// Allocate and copy
-	static void AllocateAndCopy(PointLightsInterpolate& rCurrent, const PointLightsInterpolate& rPrevious);
-
-	// Interpolate
 	static void Update(game::FrameInterpolate& __restrict rFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
-	// SyncData for parent-provided values
 	struct SyncData
 	{
-		XMVECTOR vecPosition;
+		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		float fVisibleArea = 0.0f;
 		float fVisibleIntensity = 0.0f;
 		float fLightingArea = 0.0f;
@@ -57,7 +52,7 @@ struct PointLightsInterpolate : public Collection<PointLightsInterpolate, Collec
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	float* __restrict pfRotations = nullptr;
 
-	// Per-instance animatable properties (initialized from Type defaults, can be overridden by controllers)
+	// Owner Sync writes these values directly; controllers animate them from their keyframes.
 	float* __restrict pfVisibleAreas = nullptr;
 	float* __restrict pfVisibleIntensities = nullptr;
 	float* __restrict pfLightingAreas = nullptr;
@@ -77,10 +72,8 @@ struct PointLightsInterpolate : public Collection<PointLightsInterpolate, Collec
 		return std::tie(rSelf.puiTypeIndices, rSelf.puiControllerTypeIndices, rSelf.pfStartTimes, rSelf.pfBaseRotations);
 	}
 
-	// Graphics resources
 	static void GraphicsResources();
 
-	// Render
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords);
 	static void Render(const game::FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
@@ -89,25 +82,23 @@ using point_lights_t = PointLightsInterpolate::id_t;
 
 struct PointLightsPostRender : public Collection<PointLightsPostRender>
 {
-	// Allocate and copy
-	static void AllocateAndCopy(PointLightsPostRender& rCurrent, const PointLightsPostRender& rPrevious);
-
-	// Update
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
 	// Add non-controlled point light
 	static void Add(game::Frame& __restrict rFrame, point_lights_t& rId, uint8_t uiTypeIndex);
 
-	// Add controlled point light with keyframe animation (fire-and-forget, auto-destroys when animation ends)
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
+	// Fire-and-forget keyframe animation; the controller's bDestroysSelf enables removal after the final keyframe.
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
 
-	static void Remove(game::Frame& __restrict rFrame, point_lights_t& rId);
 
 	// Destroy handles auto-removal of expired controlled lights
 	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
 
-	point_lights_t* __restrict puiIds = nullptr;
-	auto Members(this auto&& rSelf) { return std::tie(rSelf.puiIds); }
+	point_lights_t* __restrict pIds = nullptr;
+	auto Members(this auto&& rSelf)
+	{
+		return std::tie(rSelf.pIds);
+	}
 
 };
 

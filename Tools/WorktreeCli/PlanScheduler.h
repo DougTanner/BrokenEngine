@@ -1,6 +1,8 @@
 #pragma once
 
+#include <span>
+
 namespace toolcli
 {
-	int RunPlanSchedulerCommand(int iArgumentCount, wchar_t* pArgumentValues[]);
-}
+	int RunPlanSchedulerCommand(std::span<wchar_t* const> argumentValues);
+} // namespace toolcli

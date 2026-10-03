@@ -7,8 +7,6 @@
 // each quadrant, with auto-crop and underwater recoloring once per chunk. Each call mutates its own
 // post-subdivision mesh copy. Return true when written, false below kfMinIslandMaxHeightMeters.
 
-namespace
-{
 
 // Widest edge-taper band: about one sixteenth of a 400 m island footprint (Island.json widthMeters). The
 // quarter-dimension clamp keeps small leaves from deepening their entire shoal with this fixed-width band.
@@ -34,27 +32,27 @@ struct RegionBbox
 	int64_t iMaxY = 0;
 };
 
-// Expand bbox span [iLo, iHi] symmetrically to a multiple of kiCropAlignment, clamped to
-// [iClampLo, iClampHi]; when clamping at one edge consumes that side's padding, push the remainder
+// Expand bbox span [iLow, iHigh] symmetrically to a multiple of kiCropAlignment, clamped to
+// [iClampLow, iClampHigh]; when clamping at one edge consumes that side's padding, push the remainder
 // onto the opposite side. Outputs the aligned start and size.
-void ExpandSpan(int64_t iLo, int64_t iHi, int64_t iClampLo, int64_t iClampHi, int64_t& riStart, int64_t& riSize)
+static void ExpandSpan(int64_t iLow, int64_t iHigh, int64_t iClampLow, int64_t iClampHigh, int64_t& riStart, int64_t& riSize)
 {
-	int64_t iSpan = iHi - iLo + 1;
+	int64_t iSpan = iHigh - iLow + 1;
 	int64_t iRequired = ((iSpan + kiCropAlignment - 1) / kiCropAlignment) * kiCropAlignment;
-	int64_t iPad = iRequired - iSpan;
-	int64_t iPadLow = iPad / 2;
-	int64_t iPadHigh = iPad - iPadLow;
-	int64_t iStart = iLo - iPadLow;
-	int64_t iEnd = iHi + iPadHigh;
-	if (iStart < iClampLo)
+	int64_t iPadding = iRequired - iSpan;
+	int64_t iPaddingLow = iPadding / 2;
+	int64_t iPaddingHigh = iPadding - iPaddingLow;
+	int64_t iStart = iLow - iPaddingLow;
+	int64_t iEnd = iHigh + iPaddingHigh;
+	if (iStart < iClampLow)
 	{
-		iEnd += iClampLo - iStart;
-		iStart = iClampLo;
+		iEnd += iClampLow - iStart;
+		iStart = iClampLow;
 	}
-	if (iEnd > iClampHi)
+	if (iEnd > iClampHigh)
 	{
-		iStart -= iEnd - iClampHi;
-		iEnd = iClampHi;
+		iStart -= iEnd - iClampHigh;
+		iEnd = iClampHigh;
 	}
 	riStart = iStart;
 	riSize = iEnd - iStart + 1;
@@ -64,25 +62,25 @@ void ExpandSpan(int64_t iLo, int64_t iHi, int64_t iClampLo, int64_t iClampHi, in
 // 2x1 half never pulls land across the split seam. Cut line = -fBeachOffsetMeters +
 // kfCropEpsilonAboveSeaFloorMeters (epsilon meters up from the per-island sea floor). An empty
 // bbox (iMaxX < 0) is left for the caller to report as a configuration error.
-RegionBbox FindRegionBbox(const std::vector<float>& rFullElevationMeters, int64_t iTexturePixels, const RegionBounds& rRegion, float fBeachOffsetMeters)
+static RegionBbox FindRegionBoundingBox(const std::vector<float>& rFullElevationMeters, int64_t iTexturePixels, const RegionBounds& rRegion, float fBeachOffsetMeters)
 {
 	float fCropCutLineMeters = -fBeachOffsetMeters + kfCropEpsilonAboveSeaFloorMeters;
-	RegionBbox bbox {.iMinX = rRegion.iEndX, .iMinY = rRegion.iEndY, .iMaxX = -1, .iMaxY = -1};
+	RegionBbox boundingBox {.iMinX = rRegion.iEndX, .iMinY = rRegion.iEndY, .iMaxX = -1, .iMaxY = -1};
 	for (int64_t iY = rRegion.iStartY; iY < rRegion.iEndY; ++iY)
 	{
-		const float* pfRow = &rFullElevationMeters.at(static_cast<size_t>(iY) * static_cast<size_t>(iTexturePixels));
+		const float* pfRow = &rFullElevationMeters.at(iY * iTexturePixels);
 		for (int64_t iX = rRegion.iStartX; iX < rRegion.iEndX; ++iX)
 		{
 			if (pfRow[iX] > fCropCutLineMeters)
 			{
-				bbox.iMinX = std::min(bbox.iMinX, iX);
-				bbox.iMaxX = std::max(bbox.iMaxX, iX);
-				bbox.iMinY = std::min(bbox.iMinY, iY);
-				bbox.iMaxY = std::max(bbox.iMaxY, iY);
+				boundingBox.iMinX = std::min(boundingBox.iMinX, iX);
+				boundingBox.iMaxX = std::max(boundingBox.iMaxX, iX);
+				boundingBox.iMinY = std::min(boundingBox.iMinY, iY);
+				boundingBox.iMaxY = std::max(boundingBox.iMaxY, iY);
 			}
 		}
 	}
-	return bbox;
+	return boundingBox;
 }
 
 // Expand bbox symmetrically to a multiple of kiCropAlignment per axis, clamped to the FULL bake
@@ -93,17 +91,17 @@ RegionBbox FindRegionBbox(const std::vector<float>& rFullElevationMeters, int64_
 // side's padding, push the remainder onto the opposite side. iTexturePixels is itself a multiple of
 // kiCropAlignment, so the worst case (a 1x1 island spanning the whole bake) needs no padding and
 // never overflows.
-CropRect ComputeCropRect(const RegionBbox& rBbox, int64_t iTexturePixels)
+static CropRect ComputeCropRect(const RegionBbox& rBoundingBox, int64_t iTexturePixels)
 {
 	CropRect crop {.iX = 0, .iY = 0, .iWidth = 0, .iHeight = 0};
-	ExpandSpan(rBbox.iMinX, rBbox.iMaxX, 0, iTexturePixels - 1, crop.iX, crop.iWidth);
-	ExpandSpan(rBbox.iMinY, rBbox.iMaxY, 0, iTexturePixels - 1, crop.iY, crop.iHeight);
+	ExpandSpan(rBoundingBox.iMinX, rBoundingBox.iMaxX, 0, iTexturePixels - 1, crop.iX, crop.iWidth);
+	ExpandSpan(rBoundingBox.iMinY, rBoundingBox.iMaxY, 0, iTexturePixels - 1, crop.iY, crop.iHeight);
 	return crop;
 }
 
 // Crop elevation to iCropWidth × iCropHeight, then box-filter downsample by kiElevationDivisor.
 // Downsampled dims are multiples of 4 because crop dims are multiples of 4 × kiElevationDivisor.
-std::vector<float> CropAndDownsampleElevation(const std::vector<float>& rFullElevationMeters, int64_t iTexturePixels, const CropRect& rCrop)
+static std::vector<float> CropAndDownsampleElevation(const std::vector<float>& rFullElevationMeters, int64_t iTexturePixels, const CropRect& rCrop)
 {
 	int64_t iElevationWidth = rCrop.iWidth / kiElevationDivisor;
 	int64_t iElevationHeight = rCrop.iHeight / kiElevationDivisor;
@@ -116,13 +114,13 @@ std::vector<float> CropAndDownsampleElevation(const std::vector<float>& rFullEle
 			float fSum = 0.0f;
 			for (int64_t iDy = 0; iDy < kiElevationDivisor; ++iDy)
 			{
-				const float* pfRow = &rFullElevationMeters.at(static_cast<size_t>(rCrop.iY + iOutY * kiElevationDivisor + iDy) * static_cast<size_t>(iTexturePixels) + static_cast<size_t>(rCrop.iX + iOutX * kiElevationDivisor));
+				const float* pfRow = &rFullElevationMeters.at((rCrop.iY + iOutY * kiElevationDivisor + iDy) * iTexturePixels + rCrop.iX + iOutX * kiElevationDivisor);
 				for (int64_t iDx = 0; iDx < kiElevationDivisor; ++iDx)
 				{
 					fSum += pfRow[iDx];
 				}
 			}
-			downsampledPixels.at(static_cast<size_t>(iOutY) * static_cast<size_t>(iElevationWidth) + static_cast<size_t>(iOutX)) = fSum * fOneOverBoxSize;
+			downsampledPixels.at(iOutY * iElevationWidth + iOutX) = fSum * fOneOverBoxSize;
 		}
 	}
 	return downsampledPixels;
@@ -133,7 +131,7 @@ std::vector<float> CropAndDownsampleElevation(const std::vector<float>& rFullEle
 // receive the full lowering weight; shallower water changes little to preserve the visible sand apron.
 // Only underwater pixels change and none is raised, preserving land and detail already below the taper
 // ceiling.
-void TaperLeafElevationEdgesToSeaFloor(std::vector<float>& rDownsampledPixels, int64_t iWidth, int64_t iHeight, float fMetersPerPixel, float fBeachOffsetMeters)
+static void TaperLeafElevationEdgesToSeaFloor(std::vector<float>& rDownsampledPixels, int64_t iWidth, int64_t iHeight, float fMetersPerPixel, float fBeachOffsetMeters)
 {
 	float fBandMeters = std::min(kfEdgeTaperMaxMeters, 0.25f * fMetersPerPixel * static_cast<float>(std::min(iWidth, iHeight)));
 	if (fBandMeters <= 0.0f)
@@ -157,7 +155,7 @@ void TaperLeafElevationEdgesToSeaFloor(std::vector<float>& rDownsampledPixels, i
 			float fT = fS * fS * (3.0f - 2.0f * fS);
 			float fCeiling = fSeaFloorMeters + fT * (0.0f - fSeaFloorMeters);
 
-			float& rfPixel = rDownsampledPixels[static_cast<size_t>(iY) * static_cast<size_t>(iWidth) + static_cast<size_t>(iX)];
+			float& rfPixel = rDownsampledPixels[iY * iWidth + iX];
 			if (rfPixel < 0.0f)
 			{
 				float fDepthWeight = std::clamp(rfPixel / fHalfwayMeters, 0.0f, 1.0f);
@@ -168,11 +166,10 @@ void TaperLeafElevationEdgesToSeaFloor(std::vector<float>& rDownsampledPixels, i
 	}
 }
 
-// Write the downsampled leaf Elevation.r32.
-void WriteElevation(const std::filesystem::path& rLeafIntermediatesDir, const std::vector<float>& rDownsampledPixels)
+static void WriteElevation(const std::filesystem::path& rLeafIntermediatesDirectory, const std::vector<float>& rDownsampledPixels)
 {
-	std::ofstream writeStream(rLeafIntermediatesDir / "Elevation.r32", std::ios::binary | std::ios::trunc);
-	writeStream.write(reinterpret_cast<const char*>(rDownsampledPixels.data()), rDownsampledPixels.size() * sizeof(float));
+	std::ofstream writeStream(rLeafIntermediatesDirectory / "Elevation.r32", std::ios::binary | std::ios::trunc);
+	writeStream.write(reinterpret_cast<const char*>(rDownsampledPixels.data()), static_cast<std::streamsize>(std::ssize(rDownsampledPixels) * static_cast<int64_t>(sizeof(float))));
 	writeStream.close();
 	VERIFY_SUCCESS(writeStream.good());
 }
@@ -180,17 +177,17 @@ void WriteElevation(const std::filesystem::path& rLeafIntermediatesDir, const st
 // Crop AmbientOcclusion to the same bbox and write the leaf AmbientOcclusion.r16. Color.png and
 // Normals.exr stay full-res in the route cache (no writer in Texture.cpp for either
 // format); ExportIsland crops their pixel data in-memory via this leaf's crop rect.
-void CropAndWriteAmbientOcclusion(const std::filesystem::path& rLeafIntermediatesDir, const std::vector<uint16_t>& rFullAmbientOcclusion, int64_t iTexturePixels, const CropRect& rCrop)
+static void CropAndWriteAmbientOcclusion(const std::filesystem::path& rLeafIntermediatesDirectory, const std::vector<uint16_t>& rFullAmbientOcclusion, int64_t iTexturePixels, const CropRect& rCrop)
 {
-	std::vector<uint16_t> aoCropped(static_cast<size_t>(rCrop.iWidth) * static_cast<size_t>(rCrop.iHeight));
+	std::vector<uint16_t> ambientOcclusionCropped(static_cast<size_t>(rCrop.iWidth) * static_cast<size_t>(rCrop.iHeight));
 	for (int64_t iY = 0; iY < rCrop.iHeight; ++iY)
 	{
-		const uint16_t* puiSrc = &rFullAmbientOcclusion.at(static_cast<size_t>(rCrop.iY + iY) * static_cast<size_t>(iTexturePixels) + static_cast<size_t>(rCrop.iX));
-		uint16_t* puiDst = &aoCropped.at(static_cast<size_t>(iY) * static_cast<size_t>(rCrop.iWidth));
-		std::memcpy(puiDst, puiSrc, static_cast<size_t>(rCrop.iWidth) * sizeof(uint16_t));
+		const uint16_t* puiSource = &rFullAmbientOcclusion.at((rCrop.iY + iY) * iTexturePixels + rCrop.iX);
+		uint16_t* puiDestination = &ambientOcclusionCropped.at(iY * rCrop.iWidth);
+		std::memcpy(puiDestination, puiSource, static_cast<size_t>(rCrop.iWidth) * sizeof(uint16_t));
 	}
-	std::ofstream writeStream(rLeafIntermediatesDir / "AmbientOcclusion.r16", std::ios::binary | std::ios::trunc);
-	writeStream.write(reinterpret_cast<const char*>(aoCropped.data()), aoCropped.size() * sizeof(uint16_t));
+	std::ofstream writeStream(rLeafIntermediatesDirectory / "AmbientOcclusion.r16", std::ios::binary | std::ios::trunc);
+	writeStream.write(reinterpret_cast<const char*>(ambientOcclusionCropped.data()), static_cast<std::streamsize>(std::ssize(ambientOcclusionCropped) * static_cast<int64_t>(sizeof(uint16_t))));
 	writeStream.close();
 	VERIFY_SUCCESS(writeStream.good());
 }
@@ -203,27 +200,27 @@ void CropAndWriteAmbientOcclusion(const std::filesystem::path& rLeafIntermediate
 // the same partial-cross behavior the single-island crop already uses at every edge). After the
 // index buffer is compacted, repack the vertex buffer to drop orphans, then re-center. Mutates the
 // caller's by-value mesh copies in place.
-void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const WorldDimensions& rDimensions, int64_t iTexturePixels, const CropRect& rCrop, const RegionBounds& rRegion, const std::filesystem::path& rLeafDir)
+static void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const WorldDimensions& rDimensions, int64_t iTexturePixels, const CropRect& rCrop, const RegionBounds& rRegion, const std::filesystem::path& rLeafDirectory)
 {
 	int64_t iDiscardedTriangles = 0;
-	double dPixelsToMeters = static_cast<double>(rDimensions.fFootprintMeters) / static_cast<double>(iTexturePixels);
-	float fCropMinXMeters = static_cast<float>(static_cast<double>(rCrop.iX)                          * dPixelsToMeters - 0.5 * rDimensions.fFootprintMeters);
-	float fCropMaxXMeters = static_cast<float>(static_cast<double>(rCrop.iX + rCrop.iWidth)           * dPixelsToMeters - 0.5 * rDimensions.fFootprintMeters);
-	float fCropMaxYMeters = static_cast<float>(0.5 * rDimensions.fFootprintMeters - static_cast<double>(rCrop.iY)               * dPixelsToMeters);
-	float fCropMinYMeters = static_cast<float>(0.5 * rDimensions.fFootprintMeters - static_cast<double>(rCrop.iY + rCrop.iHeight) * dPixelsToMeters);
+	double fPixelsToMeters = static_cast<double>(rDimensions.fFootprintMeters) / static_cast<double>(iTexturePixels);
+	float fCropMinXMeters = static_cast<float>(static_cast<double>(rCrop.iX)                          * fPixelsToMeters - 0.5 * rDimensions.fFootprintMeters);
+	float fCropMaxXMeters = static_cast<float>(static_cast<double>(rCrop.iX + rCrop.iWidth)           * fPixelsToMeters - 0.5 * rDimensions.fFootprintMeters);
+	float fCropMaxYMeters = static_cast<float>(0.5 * rDimensions.fFootprintMeters - static_cast<double>(rCrop.iY)               * fPixelsToMeters);
+	float fCropMinYMeters = static_cast<float>(0.5 * rDimensions.fFootprintMeters - static_cast<double>(rCrop.iY + rCrop.iHeight) * fPixelsToMeters);
 	float fCropCenterXMeters = 0.5f * (fCropMinXMeters + fCropMaxXMeters);
 	float fCropCenterYMeters = 0.5f * (fCropMinYMeters + fCropMaxYMeters);
 
-	auto VertexOutside = [&rMeshPositions, fCropMinXMeters, fCropMaxXMeters, fCropMinYMeters, fCropMaxYMeters](uint32_t iV) -> bool
+	auto VertexOutside = [&rMeshPositions, fCropMinXMeters, fCropMaxXMeters, fCropMinYMeters, fCropMaxYMeters](int64_t iVertexIndex) -> bool
 	{
-		float fX = rMeshPositions[static_cast<size_t>(iV) * 3 + 0];
-		float fY = rMeshPositions[static_cast<size_t>(iV) * 3 + 1];
+		float fX = rMeshPositions[iVertexIndex * 3 + 0];
+		float fY = rMeshPositions[iVertexIndex * 3 + 1];
 		return fX < fCropMinXMeters || fX > fCropMaxXMeters || fY < fCropMinYMeters || fY > fCropMaxYMeters;
 	};
 
 	std::vector<uint32_t> survivingIndices;
 	survivingIndices.reserve(rMeshIndices.size());
-	for (size_t i = 0; i + 2 < rMeshIndices.size(); i += 3)
+	for (int64_t i = 0; i + 2 < std::ssize(rMeshIndices); i += 3)
 	{
 		uint32_t iA = rMeshIndices[i + 0];
 		uint32_t iB = rMeshIndices[i + 1];
@@ -242,7 +239,7 @@ void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<uint32_t>
 	// Reject an empty cropped mesh after the pixel-bbox check so no invisible island chunk is written.
 	if (rMeshIndices.empty())
 	{
-		throw std::runtime_error(std::format("Island chunk \"{}\" region [{}..{}, {}..{}] has zero surviving triangles after mesh crop ({} discarded): the Route subdivision produced no mesh inside this chunk's bbox. Check the archetype's Mesher resolution or Route shape.", rLeafDir.string(), rRegion.iStartX, rRegion.iEndX - 1, rRegion.iStartY, rRegion.iEndY - 1, iDiscardedTriangles));
+		throw std::runtime_error(std::format("Island chunk \"{}\" region [{}..{}, {}..{}] has zero surviving triangles after mesh crop ({} discarded): the Route subdivision produced no mesh inside this chunk's bbox. Check the archetype's Mesher resolution or Route shape.", rLeafDirectory.string(), rRegion.iStartX, rRegion.iEndX - 1, rRegion.iStartY, rRegion.iEndY - 1, iDiscardedTriangles));
 	}
 
 	// Compact + cache-optimize the vertex buffer: meshopt_optimizeVertexFetch reorders surviving
@@ -256,33 +253,32 @@ void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<uint32_t>
 
 	// Re-center XY of every surviving vertex on the post-crop center. Z is unchanged
 	// (Z=0 is sea level globally, independent of horizontal crop).
-	for (size_t iV = 0; iV < rMeshPositions.size() / 3; ++iV)
+	for (int64_t i = 0; i < std::ssize(rMeshPositions) / 3; ++i)
 	{
-		rMeshPositions[iV * 3 + 0] -= fCropCenterXMeters;
-		rMeshPositions[iV * 3 + 1] -= fCropCenterYMeters;
+		rMeshPositions[i * 3 + 0] -= fCropCenterXMeters;
+		rMeshPositions[i * 3 + 1] -= fCropCenterYMeters;
 	}
-	LOG(kDefault, kDebug, "Mesh chunk \"{}\": cropped {} triangles outside bbox, re-centered XY by ({:.2f}, {:.2f})m, {} -> {} vertices", rLeafDir.string(), iDiscardedTriangles, fCropCenterXMeters, fCropCenterYMeters, uiOldVertexCount, static_cast<int64_t>(rMeshPositions.size() / 3));
+	LOG(kDefault, kDebug, "Mesh chunk \"{}\": cropped {} triangles outside bbox, re-centered XY by ({:.2f}, {:.2f})m, {} -> {} vertices", rLeafDirectory.string(), iDiscardedTriangles, fCropCenterXMeters, fCropCenterYMeters, uiOldVertexCount, std::ssize(rMeshPositions) / 3);
 }
 
-// Write the cropped / repacked / re-centered mesh to the leaf MeshProcessed.bin.
-void WriteMeshProcessed(const std::filesystem::path& rLeafIntermediatesDir, const std::vector<float>& rMeshPositions, const std::vector<uint32_t>& rMeshIndices)
+static void WriteMeshProcessed(const std::filesystem::path& rLeafIntermediatesDirectory, const std::vector<float>& rMeshPositions, const std::vector<uint32_t>& rMeshIndices)
 {
-	std::ofstream meshOut(rLeafIntermediatesDir / "MeshProcessed.bin", std::ios::binary | std::ios::trunc);
+	std::ofstream meshOutput(rLeafIntermediatesDirectory / "MeshProcessed.bin", std::ios::binary | std::ios::trunc);
 	int32_t iVertexCount32 = static_cast<int32_t>(rMeshPositions.size() / 3);
 	int32_t iIndexCount32 = static_cast<int32_t>(rMeshIndices.size());
-	meshOut.write(reinterpret_cast<const char*>(&iVertexCount32), sizeof(int32_t));
-	meshOut.write(reinterpret_cast<const char*>(&iIndexCount32), sizeof(int32_t));
-	meshOut.write(reinterpret_cast<const char*>(rMeshPositions.data()), static_cast<std::streamsize>(rMeshPositions.size() * sizeof(float)));
-	meshOut.write(reinterpret_cast<const char*>(rMeshIndices.data()), static_cast<std::streamsize>(rMeshIndices.size() * sizeof(uint32_t)));
-	meshOut.close();
-	VERIFY_SUCCESS(meshOut.good());
+	meshOutput.write(reinterpret_cast<const char*>(&iVertexCount32), sizeof(int32_t));
+	meshOutput.write(reinterpret_cast<const char*>(&iIndexCount32), sizeof(int32_t));
+	meshOutput.write(reinterpret_cast<const char*>(rMeshPositions.data()), static_cast<std::streamsize>(std::ssize(rMeshPositions) * static_cast<int64_t>(sizeof(float))));
+	meshOutput.write(reinterpret_cast<const char*>(rMeshIndices.data()), static_cast<std::streamsize>(std::ssize(rMeshIndices) * static_cast<int64_t>(sizeof(uint32_t))));
+	meshOutput.close();
+	VERIFY_SUCCESS(meshOutput.good());
 }
 
-// BakedDimensions.json, written LAST in the leaf — its presence is the leaf-complete marker
-// ExportIsland::Handles keys on. Anisotropic post-crop world dims (meters-per-pixel is global,
-// so the formula is unchanged from the single-island case), the crop rect into the full bake,
-// into the full bake. The shared texture source path is derived from the cache layout.
-void WriteBakedDimensions(const std::filesystem::path& rLeafIntermediatesDirectory, const WorldDimensions& rDimensions, int64_t iTexturePixels, const CropRect& rCrop)
+// BakedDimensions.json is written last in the leaf; ExportIsland::Handles treats its presence as the
+// leaf-complete marker. The post-crop world width and height use the global meters-per-pixel scale,
+// and the crop rect maps the leaf into the full bake. The shared texture source path follows the
+// cache layout.
+static void WriteBakedDimensions(const std::filesystem::path& rLeafIntermediatesDirectory, const WorldDimensions& rDimensions, int64_t iTexturePixels, const CropRect& rCrop)
 {
 	nlohmann::json bakedJson;
 	bakedJson["widthMeters"] = rDimensions.fFootprintMeters * static_cast<float>(rCrop.iWidth) / static_cast<float>(iTexturePixels);
@@ -299,7 +295,6 @@ void WriteBakedDimensions(const std::filesystem::path& rLeafIntermediatesDirecto
 	VERIFY_SUCCESS(bakedStream.good());
 }
 
-} // namespace
 
 bool ProcessBakedRegion(const IslandBakeContext& rContext, const BakeOutput& rBakeOutput, const RegionBounds& rRegion, std::vector<float> meshPositions, std::vector<uint32_t> meshIndices, const LeafTarget& rLeaf)
 {
@@ -308,16 +303,16 @@ bool ProcessBakedRegion(const IslandBakeContext& rContext, const BakeOutput& rBa
 
 	// Auto-crop bbox of pixels above the sea-floor cut line, confined to this region. An empty bbox
 	// is a configuration error: the route produced no terrain in this chunk.
-	RegionBbox bbox = FindRegionBbox(rBakeOutput.rFullElevationMeters, rContext.iTexturePixels, rRegion, rBakeOutput.fBeachOffsetMeters);
-	if (bbox.iMaxX < 0)
+	RegionBbox boundingBox = FindRegionBoundingBox(rBakeOutput.rFullElevationMeters, rContext.iTexturePixels, rRegion, rBakeOutput.fBeachOffsetMeters);
+	if (boundingBox.iMaxX < 0)
 	{
 		float fCropCutLineMeters = -rBakeOutput.fBeachOffsetMeters + kfCropEpsilonAboveSeaFloorMeters;
 		throw std::runtime_error(std::format("Island chunk \"{}\" region [{}..{}, {}..{}] has no pixels above the sea-floor cut line ({:.2f} m): the Route subdivision produced no terrain in this chunk. Check the archetype's Route shape or raise Island.json's elevationMeters.", rSourceLeafDirectory.string(), rRegion.iStartX, rRegion.iEndX - 1, rRegion.iStartY, rRegion.iEndY - 1, fCropCutLineMeters));
 	}
 
 	// Align and expand the bbox to the crop rect (multiple of kiCropAlignment per axis).
-	CropRect crop = ComputeCropRect(bbox, rContext.iTexturePixels);
-	LOG(kDefault, kDebug, "Cropping island chunk \"{}\": bbox ({}..{},{}..{}) -> ({}+{},{}+{}) [aligned to {}]", rSourceLeafDirectory.string(), bbox.iMinX, bbox.iMaxX, bbox.iMinY, bbox.iMaxY, crop.iX, crop.iWidth, crop.iY, crop.iHeight, kiCropAlignment);
+	CropRect crop = ComputeCropRect(boundingBox, rContext.iTexturePixels);
+	LOG(kDefault, kDebug, "Cropping island chunk \"{}\": bbox ({}..{},{}..{}) -> ({}+{},{}+{}) [aligned to {}]", rSourceLeafDirectory.string(), boundingBox.iMinX, boundingBox.iMaxX, boundingBox.iMinY, boundingBox.iMaxY, crop.iX, crop.iWidth, crop.iY, crop.iHeight, kiCropAlignment);
 
 	// Crop + box-filter downsample elevation, then reject very low / underwater leaves: the peak is
 	// measured on the downsampled elevation this leaf would ship, not the full bake. Below the

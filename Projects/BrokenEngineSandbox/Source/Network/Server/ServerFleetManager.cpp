@@ -13,13 +13,8 @@ namespace game
 
 #if defined(BT_SERVER)
 
-namespace
-{
-
 // 32 ticks at engine::kiTickRate; exact in float, so the countdown expires on a tick boundary.
 constexpr float kfRespawnDelay = 1.0f;
-
-} // namespace
 
 ServerFleetManager::ServerFleetManager()
 {
@@ -186,7 +181,7 @@ void ServerFleetManager::ProcessRespawnInFleetRequests()
 
 		const Fleet& rFleet = it->second.at(static_cast<size_t>(iFleetIndex));
 		auto memberIt = std::ranges::find(rFleet.members, rRequest.memberGlobalPlayerId, &FleetMember::globalPlayerId);
-		if (!rRequest.memberGlobalPlayerId.IsValid() || memberIt == rFleet.members.end() || !(memberIt->flags & FleetMemberFlags::kIsDead))
+		if (!(rRequest.memberGlobalPlayerId.iValue != 0) || memberIt == rFleet.members.end() || !(memberIt->flags & FleetMemberFlags::kIsDead))
 		{
 			continue;
 		}
@@ -289,7 +284,7 @@ void ServerFleetManager::ClearPendingRequests()
 	mPendingRespawnInFleetRequests.clear();
 }
 
-void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::global_id_t globalId)
+void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::GlobalId globalId)
 {
 	auto fleetIt = mFleets.find(rGuid);
 	if (fleetIt == mFleets.end())
@@ -323,9 +318,9 @@ void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::
 	}
 }
 
-void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInfo& rSpawnInfo, engine::global_id_t globalPlayerId)
+void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInfo& rSpawnInfo, engine::GlobalId globalPlayerId)
 {
-	if (rSpawnInfo.fleetGuid.IsEmpty())
+	if ((rSpawnInfo.fleetGuid.uiHigh == 0 && rSpawnInfo.fleetGuid.uiLow == 0))
 	{
 		return;
 	}
@@ -341,7 +336,7 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 	}
 
 	Fleet& rFleet = rFleets.at(static_cast<size_t>(iFleetIndex));
-	if (rSpawnInfo.memberGlobalPlayerId.IsValid())
+	if ((rSpawnInfo.memberGlobalPlayerId.iValue != 0))
 	{
 		// Respawn: revive the dead member in place; it keeps its global ID and list position
 		auto memberIt = std::ranges::find(rFleet.members, rSpawnInfo.memberGlobalPlayerId, &FleetMember::globalPlayerId);
@@ -349,8 +344,8 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 		{
 			return;
 		}
-		memberIt->flags.Clear(FleetMemberFlags::kIsDead);
-		memberIt->coord = engine::kOriginCoord;
+		memberIt->flags.Set(FleetMemberFlags::kIsDead, false);
+		memberIt->coord = engine::kOriginCoordinate;
 	}
 	else
 	{
@@ -362,17 +357,17 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 			LOG(kNetwork, kWarning, "ServerFleetManager::OnPlayerSpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kuiMaxFleetMembers);
 			return;
 		}
-		rFleet.members.push_back(FleetMember {.globalPlayerId = globalPlayerId, .coord = engine::kOriginCoord});
+		rFleet.members.push_back(FleetMember {.globalPlayerId = globalPlayerId, .coord = engine::kOriginCoordinate});
 	}
 
 	// Queue flagship update if this member is or becomes the Flagship
 	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-	bool bHasAliveFlagship = rFleet.flagshipGlobalPlayerId.IsValid() && flagshipIt != rFleet.members.end() && !(flagshipIt->flags & FleetMemberFlags::kIsDead)
+	bool bHasAliveFlagship = (rFleet.flagshipGlobalPlayerId.iValue != 0) && flagshipIt != rFleet.members.end() && !(flagshipIt->flags & FleetMemberFlags::kIsDead)
 	                      && rFleet.flagshipGlobalPlayerId != globalPlayerId;
 	if (!bHasAliveFlagship)
 	{
 		rFleet.flagshipGlobalPlayerId = globalPlayerId;
-		rFleet.wantedCoord = engine::kOriginCoord;
+		rFleet.wantedCoord = engine::kOriginCoordinate;
 		rFleet.fFrameChangeTimer = common::Random(rFleet.fNavigationDelay, mRandomEngine);
 		mNavigation.QueueFlagshipUpdate({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoord = rFleet.wantedCoord});
 	}
@@ -381,7 +376,7 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 	SendFleetSyncToClient(iClientId, rClientGuid);
 }
 
-void ServerFleetManager::OnPlayerTransferred(const engine::ClientGuid& rGuid, engine::global_id_t globalPlayerId, engine::GridCoord destination)
+void ServerFleetManager::OnPlayerTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalPlayerId, engine::GridCoord destination)
 {
 	auto fleetIt = mFleets.find(rGuid);
 	if (fleetIt == mFleets.end())
@@ -408,7 +403,8 @@ void ServerFleetManager::OnClientConnected(int64_t iClientId, const engine::Clie
 	ScopedSuppressAllocationTracking suppress;
 
 	mGuidToClientId.insert_or_assign(rClientGuid, iClientId);
-	std::span<const engine::OwnedEntity> ownedPlayers = gpServerSession->mClientPlayers.Owned(iClientId);
+	auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(iClientId);
+	std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
 
 	auto fleetIt = mFleets.find(rClientGuid);
 	if (fleetIt != mFleets.end())
@@ -417,7 +413,7 @@ void ServerFleetManager::OnClientConnected(int64_t iClientId, const engine::Clie
 		{
 			RefreshFleetMembers(rFleet, ownedPlayers);
 			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-			if (rFleet.flagshipGlobalPlayerId.IsValid() && flagshipIt != rFleet.members.end() && (flagshipIt->flags & FleetMemberFlags::kIsDead))
+			if ((rFleet.flagshipGlobalPlayerId.iValue != 0) && flagshipIt != rFleet.members.end() && (flagshipIt->flags & FleetMemberFlags::kIsDead))
 			{
 				mNavigation.ShiftFlagshipAfterDeath(rClientGuid, rFleet);
 			}
@@ -464,7 +460,7 @@ void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const engi
 		{
 			if (rOwnedPlayer.globalId == rMember.globalPlayerId)
 			{
-				rMember.flags.Clear(FleetMemberFlags::kIsDead);
+				rMember.flags.Set(FleetMemberFlags::kIsDead, false);
 				rMember.coord = rOwnedPlayer.coord;
 				break;
 			}
@@ -474,10 +470,12 @@ void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const engi
 
 void ServerFleetManager::ResetFleetForLoad(Fleet& rFleet, const engine::ClientGuid& rClientGuid)
 {
-	RefreshFleetMembers(rFleet, gpServerSession->mClientPlayers.Owned(FindClientIdForGuid(rClientGuid)));
+	auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(FindClientIdForGuid(rClientGuid));
+	std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+	RefreshFleetMembers(rFleet, ownedPlayers);
 
 	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-	if (!rFleet.flagshipGlobalPlayerId.IsValid() || flagshipIt == rFleet.members.end())
+	if (!(rFleet.flagshipGlobalPlayerId.iValue != 0) || flagshipIt == rFleet.members.end())
 	{
 		return;
 	}
@@ -496,7 +494,7 @@ void ServerFleetManager::ResetFleetForLoad(Fleet& rFleet, const engine::ClientGu
 	}
 }
 
-ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId)
+ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId)
 {
 	auto fleetIt = mFleets.find(rClientGuid);
 	if (fleetIt == mFleets.end())
@@ -512,7 +510,7 @@ ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord
 
 	const Fleet& rFleet = fleetIt->second.at(static_cast<size_t>(iFleetIndex));
 	bool bIsFlagship = rFleet.members.empty();
-	if (memberGlobalPlayerId.IsValid())
+	if ((memberGlobalPlayerId.iValue != 0))
 	{
 		// A respawn is still spawnable only while its member is dead; the broadcaster drops it otherwise, so a live
 		// global ID is never minted twice.

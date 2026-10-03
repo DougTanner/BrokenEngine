@@ -6,8 +6,6 @@
 namespace attribution
 {
 
-namespace
-{
 struct PendingCopy
 {
 	std::filesystem::path source;
@@ -15,19 +13,19 @@ struct PendingCopy
 	std::string libraryName;
 };
 
-bool PathLess(const std::filesystem::path& rLeft, const std::filesystem::path& rRight)
+static bool PathLess(const std::filesystem::path& rLeft, const std::filesystem::path& rRight)
 {
 	int iResult = CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, TRUE);
 	return iResult == CSTR_LESS_THAN || (iResult == CSTR_EQUAL && CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, FALSE) == CSTR_LESS_THAN);
 }
 
-bool IsReparsePoint(const std::filesystem::path& rPath)
+static bool IsReparsePoint(const std::filesystem::path& rPath)
 {
 	DWORD uiAttributes = GetFileAttributesW(rPath.native().c_str());
 	return uiAttributes != INVALID_FILE_ATTRIBUTES && (uiAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
-void ValidateAttributionDestination(const std::filesystem::path& rAttributionDirectory, const std::filesystem::path& rDestination)
+static void ValidateAttributionDestination(const std::filesystem::path& rAttributionDirectory, const std::filesystem::path& rDestination)
 {
 	std::filesystem::path currentPath = rAttributionDirectory;
 	for (const std::filesystem::path& rComponent : rDestination.lexically_relative(rAttributionDirectory))
@@ -50,7 +48,7 @@ void ValidateAttributionDestination(const std::filesystem::path& rAttributionDir
 	}
 }
 
-std::vector<std::filesystem::directory_entry> DiscoverLibraries(const std::filesystem::path& rThirdPartyDirectory)
+static std::vector<std::filesystem::directory_entry> DiscoverLibraries(const std::filesystem::path& rThirdPartyDirectory)
 {
 	std::vector<std::filesystem::directory_entry> libraries;
 	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(rThirdPartyDirectory))
@@ -72,7 +70,7 @@ std::vector<std::filesystem::directory_entry> DiscoverLibraries(const std::files
 	return libraries;
 }
 
-std::vector<std::filesystem::directory_entry> EnumerateLibraryFiles(const std::filesystem::path& rLibraryDirectory)
+static std::vector<std::filesystem::directory_entry> EnumerateLibraryFiles(const std::filesystem::path& rLibraryDirectory)
 {
 	std::vector<std::filesystem::directory_entry> files;
 	for (const std::filesystem::directory_entry& rFile : std::filesystem::directory_iterator(rLibraryDirectory))
@@ -103,7 +101,7 @@ std::vector<std::filesystem::directory_entry> EnumerateLibraryFiles(const std::f
 	return files;
 }
 
-std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<std::filesystem::directory_entry>& rFiles)
+static std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<std::filesystem::directory_entry>& rFiles)
 {
 	bool bFoundLicense = false;
 	std::filesystem::path primaryLicenseFile;
@@ -144,7 +142,7 @@ std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<std::fil
 	return licenseFiles;
 }
 
-std::vector<PendingCopy> BuildPendingCopies(const std::filesystem::path& rThirdPartyDirectory, const std::filesystem::path& rAttributionDirectory)
+static std::vector<PendingCopy> BuildPendingCopies(const std::filesystem::path& rThirdPartyDirectory, const std::filesystem::path& rAttributionDirectory)
 {
 	std::vector<PendingCopy> pendingCopies;
 
@@ -186,7 +184,7 @@ std::vector<PendingCopy> BuildPendingCopies(const std::filesystem::path& rThirdP
 	return pendingCopies;
 }
 
-void PublishPendingCopies(const std::vector<PendingCopy>& rPendingCopies)
+static void PublishPendingCopies(const std::vector<PendingCopy>& rPendingCopies)
 {
 	LOG(kDefault, kDebug, "\nCopying ThirdParty attribution files");
 	ScopedLogIndent scopedLogIndent;
@@ -197,12 +195,11 @@ void PublishPendingCopies(const std::vector<PendingCopy>& rPendingCopies)
 		LOG(kDefault, kDebug, "Copied: {}/{}", rPending.libraryName, rPending.source.filename().string());
 	}
 }
-}
 
 bool CopyThirdPartyLicenses()
 {
 	std::filesystem::path thirdPartyDirectory = gpFileManager->mThirdPartyDirectory;
-	std::filesystem::path attributionDirectory = gpFileManager->GetAttributionDirectory();
+	std::filesystem::path attributionDirectory = gpFileManager->mOutputDirectory.parent_path() / "Attribution";
 	std::vector<PendingCopy> pendingCopies = BuildPendingCopies(thirdPartyDirectory, attributionDirectory);
 
 	if (pendingCopies.empty())
@@ -218,4 +215,4 @@ bool CopyThirdPartyLicenses()
 	return true;
 }
 
-}
+} // namespace attribution

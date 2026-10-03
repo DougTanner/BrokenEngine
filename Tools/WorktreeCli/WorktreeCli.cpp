@@ -1,5 +1,3 @@
-// WorktreeCli — repository build, lock, and plan coordination.
-
 #include "BuildCommand.h"
 #include "LandingLockCommands.h"
 #include "PlanScheduler.h"
@@ -10,23 +8,20 @@
 
 namespace toolcli
 {
-	namespace
+	static void PrintUsage(std::ostream& rOutput)
 	{
-		void PrintUsage(std::ostream& rOutput)
-		{
-			rOutput << "Usage: WorktreeCli.exe lock <token|claim|status|refresh|recover|release|steal> ...\n";
-			rOutput << "       WorktreeCli.exe plan validate --repo COMMON-DIR --worktree CHECKOUT [--plan Documents/Plans/...md] [--lint-only]\n";
-			rOutput << "       WorktreeCli.exe plan list --repo COMMON-DIR --worktree CHECKOUT\n";
-			rOutput << "       WorktreeCli.exe plan claim-next --repo COMMON-DIR --primary-worktree PRIMARY --worktree SESSION --branch TARGET --owner TOKEN --session TOKEN [--plan Documents/Plans/...md]\n";
-			rOutput << "       WorktreeCli.exe plan claim-status --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN [--plan Documents/Plans/...md]\n";
-			rOutput << "       WorktreeCli.exe plan unclaim --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN\n";
-			rOutput << "       WorktreeCli.exe plan complete --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN\n";
-			rOutput << "       WorktreeCli.exe plan reject --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN --user-authorized-rejection\n";
-			rOutput << "       WorktreeCli.exe build [--files <cpp...> --] <project-or-solution> <MSBuild args...>\n";
-			rOutput << "       WorktreeCli.exe --help\n";
-		}
+		rOutput << "Usage: WorktreeCli.exe lock <token|claim|status|refresh|recover|release|steal> ...\n";
+		rOutput << "       WorktreeCli.exe plan validate --repo COMMON-DIR --worktree CHECKOUT [--plan Documents/Plans/...md] [--lint-only]\n";
+		rOutput << "       WorktreeCli.exe plan list --repo COMMON-DIR --worktree CHECKOUT\n";
+		rOutput << "       WorktreeCli.exe plan claim-next --repo COMMON-DIR --primary-worktree PRIMARY --worktree SESSION --branch TARGET --owner TOKEN --session TOKEN [--plan Documents/Plans/...md]\n";
+		rOutput << "       WorktreeCli.exe plan claim-status --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN [--plan Documents/Plans/...md]\n";
+		rOutput << "       WorktreeCli.exe plan unclaim --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN\n";
+		rOutput << "       WorktreeCli.exe plan complete --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN\n";
+		rOutput << "       WorktreeCli.exe plan reject --repo COMMON-DIR --worktree SESSION --owner TOKEN --session TOKEN --user-authorized-rejection\n";
+		rOutput << "       WorktreeCli.exe build [--files <cpp...> --] <project-or-solution> <MSBuild args...>\n";
+		rOutput << "       WorktreeCli.exe --help\n";
 	}
-}
+} // namespace toolcli
 
 int wmain(int iArgumentCount, wchar_t* pArgumentValues[])
 {
@@ -54,11 +49,11 @@ int wmain(int iArgumentCount, wchar_t* pArgumentValues[])
 		{
 			return toolcli::PrintOwnerToken();
 		}
-		return toolcli::RunLandingLockCommand(iArgumentCount, pArgumentValues);
+		return toolcli::RunLandingLockCommand(std::span<const wchar_t* const>(pArgumentValues, static_cast<size_t>(iArgumentCount)));
 	}
 	if (mode == L"plan")
 	{
-		return toolcli::RunPlanSchedulerCommand(iArgumentCount, pArgumentValues);
+		return toolcli::RunPlanSchedulerCommand(std::span<wchar_t* const>(pArgumentValues, static_cast<size_t>(iArgumentCount)));
 	}
 	if (mode == L"build")
 	{

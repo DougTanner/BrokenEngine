@@ -11,18 +11,13 @@ namespace engine
 
 // NetworkProtocol.h cannot include NetworkManager.h; tie the codec's maximum ack message to the real
 // slot ceiling here so a transport slot change trips this assertion.
-static_assert(NetworkMessages::ClientAckStreamMessage::kiMaxSlotCount == NetworkManager::kiMaxEnetCoordSlots, "ack-stream codec cardinality must match the transport slot ceiling");
-static_assert(kiMaxAckStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaxEnetCoordSlots), "kiMaxAckStreamPacketSize must match the ack-stream wire layout sized by kiMaxEnetCoordSlots");
-
-namespace
-{
+static_assert(NetworkMessages::ClientAckStreamMessage::kiMaxSlotCount == NetworkManager::kiMaximumEnetCoordinateSlots, "ack-stream codec cardinality must match the transport slot ceiling");
+static_assert(kiMaximumAcknowledgmentStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaximumEnetCoordinateSlots), "kiMaxAckStreamPacketSize must match the ack-stream wire layout sized by kiMaxEnetCoordSlots");
 
 // Both the unscheduled poll gap that opens the budget stall grace and the grace length, each on top of the
 // scheduled update interval. Every stall long enough to queue a budget-crossing ack backlog (~4.6 s at 1:1)
 // exceeds it, and ordinary running never reaches it.
 constexpr std::chrono::seconds kBudgetStallGrace = 1s;
-
-} // namespace
 
 Server::Server(uint16_t uiPort)
 {
@@ -91,7 +86,7 @@ void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 	}
 
 	mPendingDisconnects.clear();
-	// mPendingNewSubscriptions / mPendingResyncClientIds are intentionally NOT cleared here. Their consumers
+	// mPendingNewSubscriptions / mPendingResynchronizationClientIds are intentionally NOT cleared here. Their consumers
 	// (ServerSessionRuntime::SendNewSubscriptionFullStates / ServerSessionRuntime::HandleResyncRequests) run post-tick,
 	// so a per-poll clear would drop a subscribe/resync accepted between servicings. They persist until the runtime
 	// consumers service and clear them. While paused or otherwise zero-tick (iFullTicks == 0),
@@ -106,7 +101,7 @@ void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 		{
 			rClient.iTickPacketCount = 0;
 			rClient.iTickByteCount = 0;
-			std::memset(rClient.tickTypeCounts, 0, sizeof(rClient.tickTypeCounts));
+			std::memset(rClient.uiTickTypeCounts, 0, sizeof(rClient.uiTickTypeCounts));
 		}
 	}
 
@@ -117,7 +112,7 @@ void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 	// length because a burst drained here can first cross the budget at the tick-boundary poll one interval later.
 	// The gap runs from the previous poll's end, so draining a flood cannot open a window.
 	std::chrono::steady_clock::time_point pollStart = std::chrono::steady_clock::now();
-	std::chrono::microseconds scheduledInterval {rTimeState.iExpectedUpdateIntervalMicroseconds};
+	std::chrono::microseconds scheduledInterval(rTimeState.iExpectedUpdateIntervalMicroseconds);
 	if (pollStart - mPreviousPollEnd > kBudgetStallGrace + scheduledInterval)
 	{
 		mBudgetGraceDeadline = pollStart + kBudgetStallGrace + scheduledInterval;
@@ -158,27 +153,27 @@ void Server::DispatchIncoming(ENetEvent& rEvent, bool bFastForward)
 {
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		static constexpr NetworkSimulationConfig kSimConfig = GetNetworkSimulationConfig(keNetworkSimulation);
-		NetworkSimulation::DispatchOrEnqueue(mDelayedPackets, mNetworkSimState, kSimConfig, bFastForward, rEvent, [this](ENetEvent& rInner)
+		static constexpr NetworkSimulationConfig kSimulationConfiguration = GetNetworkSimulationConfiguration(keNetworkSimulation);
+		NetworkSimulation::DispatchOrEnqueue(mDelayedPackets, mNetworkSimulationState, kSimulationConfiguration, bFastForward, rEvent, [this](ENetEvent& rInner)
 		{
-			Receive(rInner);
+			Receive(std::span<const uint8_t>(rInner.packet->data, rInner.packet->dataLength), rInner.peer);
 		});
 	}
 	else
 	{
-		Receive(rEvent);
+		Receive(std::span<const uint8_t>(rEvent.packet->data, rEvent.packet->dataLength), rEvent.peer);
 		enet_packet_destroy(rEvent.packet);
 	}
 }
 
-void Server::Connect(ENetEvent& rEvent)
+void Server::Connect(const ENetEvent& rEvent)
 {
 	ScopedSuppressAllocationTracking suppress;
 
 	ClientConnection connection {};
 	connection.pPeer = rEvent.peer;
 	connection.iClientId = miNextClientId++;
-	connection.slots.resize(NetworkManager::kiMaxEnetCoordSlots);
+	connection.slots.resize(NetworkManager::kiMaximumEnetCoordinateSlots);
 
 	rEvent.peer->data = reinterpret_cast<void*>(connection.iClientId);
 
@@ -191,28 +186,26 @@ void Server::Connect(ENetEvent& rEvent)
 	LOG(kNetwork, kInfo, "Server::Connect Client: {}", mClients.back().iClientId);
 }
 
-void Server::Disconnect(ENetEvent& rEvent)
+void Server::Disconnect(const ENetEvent& rEvent)
 {
 	int64_t iClientId = reinterpret_cast<int64_t>(rEvent.peer->data);
 
 	ClientConnection* pClient = FindClient(iClientId);
 	if (pClient != nullptr)
 	{
-		mPendingDisconnects.push_back({iClientId, pClient->clientGuid});
+		mPendingDisconnects.push_back({.iClientId = iClientId, .clientGuid = pClient->clientGuid});
 	}
 	RemoveClient(iClientId);
 
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		std::erase_if(mDelayedPackets, [&rEvent](const DelayedPacket& rPacket) { return rPacket.pPeer == rEvent.peer; });
+		std::erase_if(mDelayedPackets, [&rEvent](const DelayedPacket& rPacket)
+		{
+			return rPacket.pPeer == rEvent.peer;
+		});
 	}
 
 	LOG(kNetwork, kInfo, "Server::Disconnect Client: {}", iClientId);
-}
-
-void Server::Receive(ENetEvent& rEvent)
-{
-	Receive(std::span<const uint8_t>(rEvent.packet->data, rEvent.packet->dataLength), rEvent.peer);
 }
 
 void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
@@ -232,23 +225,19 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		return;
 	}
 
-	// Gate 2: per-update (~ per-tick) global packet/byte budget -- applies to every type including game-range, except a handshaken client's subscribe/unsubscribe.
-	// The budget window spans both of an update's polls (Server::Poll resets it only at kUpdateStart).
-	// Record a rate violation only on the FIRST crossing of each budget within the update window; all further
-	// over-budget packets that update drop silently. A sustained hostile flood still escalates (1-2 violations per
-	// update -> disconnect within ~8 updates ~= 0.25 s at 32 Hz). A stall-recovery ack burst lands inside the
-	// grace window Server::Poll opens after an unscheduled stall, where a crossing still drops but records
-	// nothing, so it costs a legitimate client no violation. RecordContractViolation may invalidate pClient, so
-	// the first-crossing record is the last touch of the client and returns immediately.
-	// A handshaken client's subscribe and unsubscribe skip this gate: they are reliable with no client retry, so a
-	// stall burst of acks must not silently drop one, and gates 3-5 still bound them by fixed size and a
-	// violation-counted per-type cap. Pre-handshake ones stay budgeted because gate 4 drops them before gate 5 counts.
+	// Both polls share one packet/byte budget for all types. Only the first crossing of each budget records
+	// a rate violation; subsequent crossings drop silently. Sustained floods can add two violations per
+	// update and disconnect in about eight updates (0.25 s at 32 Hz). Poll's unscheduled-stall grace drops
+	// crossings without charging ACK backlogs. Handshaken subscribe/unsubscribe requests bypass this budget
+	// because they are reliable with no retry; gates 3–5 still enforce size and per-type caps. Pre-handshake
+	// requests remain budgeted because gate 4 drops them before gate 5. RecordContractViolation can remove
+	// pClient; return immediately afterward.
 	bool bBudgetExempt = pClient->bHandshakeComplete && (eType == PacketType::kClientSubscribe || eType == PacketType::kClientUnsubscribe);
 	if (!bBudgetExempt)
 	{
-		bool bPacketWasUnderBudget = pClient->iTickPacketCount <= kiMaxClientPacketsPerTick;
+		bool bPacketWasUnderBudget = pClient->iTickPacketCount <= kiMaximumClientPacketsPerTick;
 		++pClient->iTickPacketCount;
-		if (pClient->iTickPacketCount > kiMaxClientPacketsPerTick)
+		if (pClient->iTickPacketCount > kiMaximumClientPacketsPerTick)
 		{
 			if (bPacketWasUnderBudget && std::chrono::steady_clock::now() >= mBudgetGraceDeadline)
 			{
@@ -257,9 +246,9 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 			return;
 		}
 
-		bool bByteWasUnderBudget = pClient->iTickByteCount <= kiMaxClientInboundBytesPerTick;
+		bool bByteWasUnderBudget = pClient->iTickByteCount <= kiMaximumClientInboundBytesPerTick;
 		pClient->iTickByteCount += static_cast<int64_t>(packetData.size());
-		if (pClient->iTickByteCount > kiMaxClientInboundBytesPerTick)
+		if (pClient->iTickByteCount > kiMaximumClientInboundBytesPerTick)
 		{
 			if (bByteWasUnderBudget && std::chrono::steady_clock::now() >= mBudgetGraceDeadline)
 			{
@@ -269,20 +258,20 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		}
 	}
 
-	// Gates 3-5 apply to engine types only. Game-range types (>= kGamePacketStart) skip the contract table and
-	// keep their existing dispatch path (default branch: FindHandshakenClient gate + parse-time contract checks).
+	// Gates 3–5 apply only to engine types. Game-range types use the default branch's handshake gate
+	// and parse-time contract checks.
 	if (static_cast<uint8_t>(eType) < static_cast<uint8_t>(PacketType::kGamePacketStart))
 	{
 		ClientPacketContract contract = GetClientPacketContract(eType);
 
 		// Gate 3: contract lookup -- sentinel row (not client-sendable)
 		// or size outside [min, max].
-		if (contract.iMaxSize == 0)
+		if (contract.iMaximumSize == 0)
 		{
 			RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "not client-sendable", packetData[0], static_cast<int64_t>(packetData.size()));
 			return;
 		}
-		if (static_cast<int64_t>(packetData.size()) < contract.iMinSize || static_cast<int64_t>(packetData.size()) > contract.iMaxSize)
+		if (static_cast<int64_t>(packetData.size()) < contract.iMinimumSize || static_cast<int64_t>(packetData.size()) > contract.iMaximumSize)
 		{
 			RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "size out of range", packetData[0], static_cast<int64_t>(packetData.size()));
 			return;
@@ -297,7 +286,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		}
 
 		// Gate 5: per-type per-tick cap -- drop; violation only if the contract counts over-cap.
-		if (++pClient->tickTypeCounts[packetData[0]] > contract.iMaxPerTick)
+		if (++pClient->uiTickTypeCounts[packetData[0]] > contract.iMaximumPerTick)
 		{
 			if (contract.bOverCapCountsViolation)
 			{
@@ -311,11 +300,11 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 	{
 		switch (eType)
 		{
-			case PacketType::kClientAckStream:
-				ClientAckStream(packetData, iClientId);
+			case PacketType::kClientAcknowledgmentStream:
+				ClientAcknowledgementStream(packetData, iClientId);
 				break;
-			case PacketType::kClientDesyncReport:
-				ClientDesyncReport(packetData, iClientId);
+			case PacketType::kClientDesynchronizationReport:
+				ClientDesynchronizationReport(packetData, iClientId);
 				break;
 			case PacketType::kClientDebugFrameRequest:
 				ClientDebugFrameRequest(packetData, pPeer, iClientId);
@@ -329,8 +318,8 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 			case PacketType::kClientUnsubscribe:
 				ClientUnsubscribe(packetData, iClientId);
 				break;
-			case PacketType::kClientResyncRequest:
-				ClientResyncRequest(packetData, iClientId);
+			case PacketType::kClientResynchronizationRequest:
+				ClientResynchronizationRequest(packetData, iClientId);
 				break;
 			default:
 				// Only game-range types reach the default -- engine sentinel types are caught at gate 3.
@@ -343,58 +332,55 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 					}
 					ScopedSuppressAllocationTracking suppress;
 					// Heap: raw game packet buffer grows on game-specific packets
-					mReceivedGamePackets.push_back({iClientId, packetData[0], std::vector<uint8_t>(packetData.begin() + 1, packetData.end())});
+					mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = packetData[0], .payload = std::vector<uint8_t>(packetData.begin() + 1, packetData.end())});
 				}
 				break;
 		}
 	}
 	catch (const std::exception& rException)
 	{
-		// Trust boundary: a reader that decided this client's bytes are impossible throws
-		// std::ios_base::failure (a local .at()/bad_alloc lands here too) before any client state is
-		// mutated, because handlers land parsed values in locals first. This catch is the single recorder
-		// for such a packet -- the readers themselves count nothing: drop the packet whole and charge one
-		// corrupt-data violation, which tears down the peer only once the corrupt-data limit is reached.
+		// Packet readers throw std::ios_base::failure for corrupt input; this catch also handles
+		// standard-library failures. Readers record no violations. Drop the packet and charge one
+		// corrupt-data violation; the peer disconnects at the corrupt-data limit.
 		LOG(kNetwork, kDebug, "Server::Receive dropped corrupt packet (type {}) Client: {}: {}", static_cast<uint8_t>(eType), iClientId, rException.what());
 		RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "corrupt payload", packetData[0], static_cast<int64_t>(packetData.size()));
 	}
 }
 
-void Server::BufferFrame(int64_t iTick, const std::pair<GridCoord, GridUpdateData>* pGridUpdates, int64_t iGridUpdateCount)
+void Server::BufferFrame(int64_t iTick, std::span<const std::pair<GridCoord, GridUpdateData>> gridUpdates)
 {
 	miLatestBufferedTick = iTick;
 	ScopedSuppressAllocationTracking suppress;
 
-	std::unordered_set<GridCoord> activeCoords;
-	activeCoords.reserve(static_cast<size_t>(iGridUpdateCount));
+	std::unordered_set<GridCoord> activeCoordinates;
+	activeCoordinates.reserve(gridUpdates.size());
 
-	for (int64_t i = 0; i < iGridUpdateCount; ++i)
+	for (const std::pair<GridCoord, GridUpdateData>& rGridUpdate : gridUpdates)
 	{
-		const std::pair<GridCoord, GridUpdateData>& rGridUpdate = pGridUpdates[i];
-		const GridCoord& rCoord = rGridUpdate.first;
+		const GridCoord& rCoordinate = rGridUpdate.first;
 		const GridUpdateData& rUpdateData = rGridUpdate.second;
-		activeCoords.insert(rCoord);
+		activeCoordinates.insert(rCoordinate);
 
 		// Heap: per-coord ring buffer grows until steady state
 		PerCoordBufferedFrame buffered {};
 		buffered.iTick = iTick;
-		buffered.sharedCrc = rUpdateData.sharedCrc;
+		buffered.uiSharedCrc = rUpdateData.uiSharedCrc;
 
 		if (!rUpdateData.statusChanges.empty())
 		{
 			int64_t iStatusChangeCount = static_cast<int64_t>(rUpdateData.statusChanges.size());
-			if (iStatusChangeCount > kiMaxStatusChangesPerCell)
+			if (iStatusChangeCount > kiMaximumStatusChangesPerCell)
 			{
 				// Should never happen: the sim must not exceed the protocol's per-cell cap (also the client decode
 				// scratch size and the compression-scratch sizing basis). Alert in debug, then drop the payload rather
-				// than overflow the scratch. The frame is still buffered (ring contiguity) with its sharedCrc, so the
+				// than overflow the scratch. The frame is still buffered (ring contiguity) with its uiSharedCrc, so the
 				// client CRC-mismatches and resyncs instead of applying a truncated batch.
 				DEBUG_BREAK();
-				LOG(kNetwork, kError, "Server::BufferFrame status change count {} exceeds cap {}, dropping payload Coord: ({},{}) Frame: {}", iStatusChangeCount, kiMaxStatusChangesPerCell, rCoord.x, rCoord.y, iTick);
+				LOG(kNetwork, kError, "Server::BufferFrame status change count {} exceeds cap {}, dropping payload Coord: ({},{}) Frame: {}", iStatusChangeCount, kiMaximumStatusChangesPerCell, rCoordinate.iX, rCoordinate.iY, iTick);
 			}
 			else
 			{
-				int64_t iCompressedSize = game::NetworkSessionContract::CompressStatusChanges(rUpdateData.statusChanges.data(), iStatusChangeCount, mCompressionBuffer.data(), static_cast<int64_t>(mCompressionBuffer.size()));
+				int64_t iCompressedSize = game::NetworkSessionContract::CompressStatusChanges(rUpdateData.statusChanges.data(), iStatusChangeCount, mCompressionBuffer.data(), std::ssize(mCompressionBuffer));
 				if (iCompressedSize > 0)
 				{
 					buffered.compressedData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);
@@ -404,36 +390,36 @@ void Server::BufferFrame(int64_t iTick, const std::pair<GridCoord, GridUpdateDat
 					// Compression failed despite the sized scratch — drop the payload (logged kError by the codec)
 					// rather than buffer an empty prefix, which the client's status-change decoder rejects as a corrupt
 					// payload — a fatal response to the server's own encoding failure.
-					LOG(kNetwork, kError, "Server::BufferFrame compression failed, dropping payload Coord: ({},{}) Frame: {} Count: {}", rCoord.x, rCoord.y, iTick, iStatusChangeCount);
+					LOG(kNetwork, kError, "Server::BufferFrame compression failed, dropping payload Coord: ({},{}) Frame: {} Count: {}", rCoordinate.iX, rCoordinate.iY, iTick, iStatusChangeCount);
 				}
 			}
 		}
 
-		std::deque<PerCoordBufferedFrame>& rCoordBuffer = mPerCoordBufferedFrames.try_emplace(rCoord).first->second;
-		rCoordBuffer.push_back(std::move(buffered));
-		while (static_cast<int64_t>(rCoordBuffer.size()) > kiMaxBufferedFrames)
+		std::deque<PerCoordBufferedFrame>& rCoordinateBuffer = mPerCoordinateBufferedFrames.try_emplace(rCoordinate).first->second;
+		rCoordinateBuffer.push_back(std::move(buffered));
+		while (static_cast<int64_t>(rCoordinateBuffer.size()) > kiMaximumBufferedFrames)
 		{
-			rCoordBuffer.pop_front();
+			rCoordinateBuffer.pop_front();
 		}
 	}
 
 	// Prune ring buffers for coords no longer in the active set
-	std::erase_if(mPerCoordBufferedFrames, [&activeCoords](const std::pair<const GridCoord, std::deque<PerCoordBufferedFrame>>& rEntry)
+	std::erase_if(mPerCoordinateBufferedFrames, [&activeCoordinates](const std::pair<const GridCoord, std::deque<PerCoordBufferedFrame>>& rEntry)
 	{
-		return !activeCoords.contains(rEntry.first);
+		return !activeCoordinates.contains(rEntry.first);
 	});
 }
 
-void Server::BufferFullFrame(int64_t iTick, const std::pair<GridCoord, const game::Frame*>* pFrames, int64_t iFrameCount)
+void Server::BufferFullFrame(int64_t iTick, std::span<const std::pair<GridCoord, const game::Frame*>> frames)
 {
 	ScopedSuppressAllocationTracking suppress;
 
 	// Evict oldest entries first, recycling their per-coord string storage into the pool so the build
 	// loop below serializes into reused capacity (no large allocation once at steady state).
 	// Heap: ring/pool grow until steady state
-	while (static_cast<int64_t>(mBufferedFullFrames.size()) >= kiMaxBufferedFrames)
+	while (static_cast<int64_t>(mBufferedFullFrames.size()) >= kiMaximumBufferedFrames)
 	{
-		for (auto& [rCoord, rSerialized] : mBufferedFullFrames.front().serializedFrames)
+		for (auto& [rCoordinate, rSerialized] : mBufferedFullFrames.front().serializedFrames)
 		{
 			mFullFramePool.push_back(std::move(rSerialized));
 		}
@@ -443,9 +429,8 @@ void Server::BufferFullFrame(int64_t iTick, const std::pair<GridCoord, const gam
 	BufferedFullFrame buffered {};
 	buffered.iTick = iTick;
 
-	for (int64_t i = 0; i < iFrameCount; ++i)
+	for (const std::pair<GridCoord, const game::Frame*>& rFrame : frames)
 	{
-		const std::pair<GridCoord, const game::Frame*>& rFrame = pFrames[i];
 		std::string serialized;
 		if (!mFullFramePool.empty())
 		{
@@ -454,7 +439,7 @@ void Server::BufferFullFrame(int64_t iTick, const std::pair<GridCoord, const gam
 		}
 		serialized.clear();
 
-		mFrameStreamBuf.mpTarget = &serialized;
+		mFrameStreamBuffer.mpTarget = &serialized;
 		game::NetworkSessionContract::WriteFrame(mFrameStream, *rFrame.second);
 
 		buffered.serializedFrames.insert_or_assign(rFrame.first, std::move(serialized));
@@ -465,48 +450,49 @@ void Server::BufferFullFrame(int64_t iTick, const std::pair<GridCoord, const gam
 
 void Server::ClearBufferedFrames()
 {
-	mPerCoordBufferedFrames.clear();
+	mPerCoordinateBufferedFrames.clear();
 	mBufferedFullFrames.clear();
 	miLatestBufferedTick = -1;
 }
 
-const PerCoordBufferedFrame* Server::FindBufferedFrame(GridCoord coord, int64_t iTick) const
+const PerCoordBufferedFrame* Server::FindBufferedFrame(GridCoord coordinate, int64_t iTick) const
 {
-	auto coordBufferIt = mPerCoordBufferedFrames.find(coord);
-	if (coordBufferIt == mPerCoordBufferedFrames.end())
+	auto it = mPerCoordinateBufferedFrames.find(coordinate);
+	if (it == mPerCoordinateBufferedFrames.end())
 	{
 		return nullptr;
 	}
-	const std::deque<PerCoordBufferedFrame>& rCoordBuffer = coordBufferIt->second;
-	if (rCoordBuffer.empty())
+	const std::deque<PerCoordBufferedFrame>& rCoordinateBuffer = it->second;
+	if (rCoordinateBuffer.empty())
 	{
 		return nullptr;
 	}
-	int64_t iIndex = iTick - rCoordBuffer.front().iTick;
-	if (iIndex < 0 || iIndex >= static_cast<int64_t>(rCoordBuffer.size()))
+	int64_t iIndex = iTick - rCoordinateBuffer.front().iTick;
+	if (iIndex < 0 || iIndex >= static_cast<int64_t>(rCoordinateBuffer.size()))
 	{
 		return nullptr;
 	}
-	return &rCoordBuffer.at(static_cast<size_t>(iIndex));
+	return &rCoordinateBuffer.at(static_cast<size_t>(iIndex));
 }
 
-int Server::CompressToBuffer(const char* pData, int iSize)
+int Server::CompressToBuffer(std::span<const char> data)
 {
+	int iSize = static_cast<int>(data.size());
 	int iMaxCompressed = LZ4_compressBound(iSize);
 	if (static_cast<int>(mCompressionBuffer.size()) < iMaxCompressed)
 	{
 		mCompressionBuffer.resize(iMaxCompressed);
 	}
-	return LZ4_compress_default(pData, reinterpret_cast<char*>(mCompressionBuffer.data()), iSize, iMaxCompressed);
+	return LZ4_compress_default(data.data(), reinterpret_cast<char*>(mCompressionBuffer.data()), iSize, iMaxCompressed);
 }
 
 void Server::RemoveClient(int64_t iClientId)
 {
-	for (size_t i = 0; i < mClients.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(mClients); ++i)
 	{
 		if (mClients.at(i).iClientId == iClientId)
 		{
-			if (i != mClients.size() - 1)
+			if (i != std::ssize(mClients) - 1)
 			{
 				mClients.at(i) = std::move(mClients.back());
 			}
@@ -597,7 +583,7 @@ void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eK
 			ScopedSuppressAllocationTracking suppress;
 			// Heap: push the disconnect ourselves (not via the ENet DISCONNECT event) so the game layer
 			// persists fleet state; the later DISCONNECT event finds no client (gate 1) and is a safe no-op.
-			mPendingDisconnects.push_back({iClientId, clientGuid});
+			mPendingDisconnects.push_back({.iClientId = iClientId, .clientGuid = clientGuid});
 		}
 
 		enet_peer_disconnect(pPeer, 0);
@@ -614,23 +600,23 @@ bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPack
 		return false;
 	}
 
-	int64_t iFullSize = static_cast<int64_t>(rPacket.payload.size()) + 1; // + type byte (already stripped from payload)
-	if (rContract.iMaxSize == 0)
+	int64_t iFullSize = std::ssize(rPacket.payload) + 1; // + type byte (already stripped from payload)
+	if (rContract.iMaximumSize == 0)
 	{
 		// Sentinel: not client-sendable (server->client, unknown, or debug-control on a non-debug server).
 		// RecordContractViolation may remove the client — do not touch pClient afterward.
 		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game type not client-sendable", rPacket.uiPacketType, iFullSize);
 		return false;
 	}
-	if (iFullSize < rContract.iMinSize || iFullSize > rContract.iMaxSize)
+	if (iFullSize < rContract.iMinimumSize || iFullSize > rContract.iMaximumSize)
 	{
 		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game packet size out of range", rPacket.uiPacketType, iFullSize);
 		return false;
 	}
-	// Per-type per-tick cap. tickTypeCounts is reset once per update by the engine (both of the update's polls
+	// Per-type per-tick cap. uiTickTypeCounts is reset once per update by the engine (both of the update's polls
 	// share the window); engine and game types occupy disjoint type-byte ranges, so sharing one array across
 	// both dispatch points is coherent within that window.
-	if (++pClient->tickTypeCounts[rPacket.uiPacketType] > rContract.iMaxPerTick)
+	if (++pClient->uiTickTypeCounts[rPacket.uiPacketType] > rContract.iMaximumPerTick)
 	{
 		if (rContract.bOverCapCountsViolation)
 		{
@@ -640,12 +626,6 @@ bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPack
 	}
 
 	return true;
-}
-
-void Server::RecordGamePacketHandlerThrow(const ReceivedGamePacket& rPacket)
-{
-	// Count the throw as a corrupt-data violation (drop -> count -> escalate). Do not touch any client pointer afterward.
-	RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game packet handler threw", rPacket.uiPacketType, static_cast<int64_t>(rPacket.payload.size()) + 1);
 }
 
 } // namespace engine

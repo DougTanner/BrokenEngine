@@ -3,17 +3,23 @@
 #include "BakeIslandIntermediatesInternal.h"
 #include "FileManager.h"
 
-namespace
-{
 
-std::filesystem::path IslandRelativePath(const std::filesystem::path& rSourcePath)
+static std::filesystem::path IslandRelativePath(const std::filesystem::path& rSourcePath)
 {
 	bool bUnderInputRoot = false;
 	for (const std::filesystem::path& rInputRoot : gpFileManager->mpInputDirectories)
 	{
 		std::error_code error;
 		std::filesystem::path relativePath = std::filesystem::relative(rSourcePath, rInputRoot, error);
-		if (error || relativePath.empty() || *relativePath.begin() == "..")
+		if (error)
+		{
+			continue;
+		}
+		if (relativePath.empty())
+		{
+			continue;
+		}
+		if (*relativePath.begin() == "..")
 		{
 			continue;
 		}
@@ -40,19 +46,19 @@ std::filesystem::path IslandRelativePath(const std::filesystem::path& rSourcePat
 // only the split.
 constexpr RouteSubdivision kRouteSubdivisions[] =
 {
-	{"1x1", 0, 1, 1},
-	{"2x1", 1, 1, 2},
-	{"2x2", 2, 2, 2},
-	{"3x1", 3, 1, 3},
-	{"3x2", 4, 2, 3},
-	{"3x3", 5, 3, 3},
-	{"3x4", 6, 4, 3},
-	{"8x4", 7, 4, 8},
-	{"4x2", 8, 2, 4},
-	{"4x4", 9, 4, 4},
+	{ .pcLabel = "1x1", .iGaeaChoice = 0, .iColumns = 1, .iRows = 1, },
+	{ .pcLabel = "2x1", .iGaeaChoice = 1, .iColumns = 1, .iRows = 2, },
+	{ .pcLabel = "2x2", .iGaeaChoice = 2, .iColumns = 2, .iRows = 2, },
+	{ .pcLabel = "3x1", .iGaeaChoice = 3, .iColumns = 1, .iRows = 3, },
+	{ .pcLabel = "3x2", .iGaeaChoice = 4, .iColumns = 2, .iRows = 3, },
+	{ .pcLabel = "3x3", .iGaeaChoice = 5, .iColumns = 3, .iRows = 3, },
+	{ .pcLabel = "3x4", .iGaeaChoice = 6, .iColumns = 4, .iRows = 3, },
+	{ .pcLabel = "8x4", .iGaeaChoice = 7, .iColumns = 4, .iRows = 8, },
+	{ .pcLabel = "4x2", .iGaeaChoice = 8, .iColumns = 2, .iRows = 4, },
+	{ .pcLabel = "4x4", .iGaeaChoice = 9, .iColumns = 4, .iRows = 4, },
 };
 
-const RouteSubdivision& LookupRouteSubdivision(std::string_view label, const std::filesystem::path& rIslandJsonFile)
+static const RouteSubdivision& LookupRouteSubdivision(std::string_view label, const std::filesystem::path& rIslandJsonFile)
 {
 	for (const RouteSubdivision& rRoute : kRouteSubdivisions)
 	{
@@ -74,7 +80,7 @@ const RouteSubdivision& LookupRouteSubdivision(std::string_view label, const std
 	throw std::runtime_error(std::format("\"{}\" lists unknown route \"{}\". Valid routes: {}.", rIslandJsonFile.string(), label, validLabels));
 }
 
-std::filesystem::path ResolveTerrain(const std::filesystem::path& rIslandFolder, const nlohmann::json& rIslandJson)
+static std::filesystem::path ResolveTerrain(const std::filesystem::path& rIslandFolder, const nlohmann::json& rIslandJson)
 {
 	// Named archetype: two-tier lookup — any input dir's shared Islands/ folder, then sibling in
 	// the island folder. Iterates all input directories so archetypes can live anywhere on the
@@ -103,7 +109,7 @@ std::filesystem::path ResolveTerrain(const std::filesystem::path& rIslandFolder,
 // drops folders for routes removed from the list, so no orphaned leaf produces a stale chunk.
 // Island.json and the archetype .terrain are files, so this never touches them. An empty route
 // list therefore removes every generated sub-folder of the island folder.
-void RemoveNonRouteSubFolders(const std::filesystem::path& rIslandFolder, const std::vector<const RouteSubdivision*>& rRoutes)
+static void RemoveNonRouteSubFolders(const std::filesystem::path& rIslandFolder, const std::vector<const RouteSubdivision*>& rRoutes)
 {
 	// Collect stale sub-folders first, then delete — mutating the directory mid-iteration via
 	// remove_all is unspecified behavior for directory_iterator.
@@ -136,7 +142,7 @@ void RemoveNonRouteSubFolders(const std::filesystem::path& rIslandFolder, const 
 	}
 }
 
-void BakeOne(const std::filesystem::path& rIslandFolder)
+static void BakeOne(const std::filesystem::path& rIslandFolder)
 {
 	std::filesystem::path islandJsonFile = rIslandFolder / "Island.json";
 
@@ -173,7 +179,7 @@ void BakeOne(const std::filesystem::path& rIslandFolder)
 	};
 
 	// Optional: override the Mesher's VerticesPerSide (per-island mesh density). When absent, leave
-	// whatever value the archetype's Mesher node already has. Stripped from varsJson so it doesn't
+	// whatever value the archetype's Mesher node already has. Stripped from variablesJson so it doesn't
 	// reach Gaea as a graph variable.
 	std::optional<int64_t> oiMeshResolution;
 	if (islandJson.contains("meshResolution"))
@@ -222,7 +228,7 @@ void BakeOne(const std::filesystem::path& rIslandFolder)
 
 	RemoveNonRouteSubFolders(rIslandFolder, routes);
 
-	std::function<void(const std::filesystem::path&)> pruneStaleCacheRoutes = [&routes](const std::filesystem::path& rCacheIslandFolder)
+	std::function<void(const std::filesystem::path&)> PruneStaleCacheRoutes = [&routes](const std::filesystem::path& rCacheIslandFolder)
 	{
 		if (!std::filesystem::exists(rCacheIslandFolder))
 		{
@@ -250,8 +256,8 @@ void BakeOne(const std::filesystem::path& rIslandFolder)
 			LOG(kDefault, kDebug, "Removed stale Gaea cache route: \"{}\"", rStaleCacheRoute.string());
 		}
 	};
-	pruneStaleCacheRoutes(cacheIslandFolder);
-	pruneStaleCacheRoutes(GetIslandDiagnosticsPath(rIslandFolder));
+	PruneStaleCacheRoutes(cacheIslandFolder);
+	PruneStaleCacheRoutes(GetIslandDiagnosticsPath(rIslandFolder));
 
 	IslandBakeContext context
 	{
@@ -271,7 +277,6 @@ void BakeOne(const std::filesystem::path& rIslandFolder)
 	}
 }
 
-} // namespace
 
 std::filesystem::path GetIslandCachePath(const std::filesystem::path& rSourcePath)
 {

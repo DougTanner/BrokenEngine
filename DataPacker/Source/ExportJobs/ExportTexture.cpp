@@ -97,7 +97,7 @@ void ExportTexture::ProcessKtxCubemap()
 	ASSERT(textureCube.format() == gli::FORMAT_RGBA16_SFLOAT_PACK16);
 
 	int64_t iUncompressedSize = static_cast<int64_t>(textureCube.size());
-	std::vector<std::byte> compressed = Lz4Compress(static_cast<const std::byte*>(textureCube.data()), iUncompressedSize);
+	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(static_cast<const std::byte*>(textureCube.data()), static_cast<size_t>(iUncompressedSize)));
 	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
@@ -113,7 +113,7 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 {
 	std::vector<std::byte> fileBytes = common::ReadEntireFile(mInputPath);
 	int64_t iFileSize = static_cast<int64_t>(fileBytes.size());
-	TextureIntermediateHeader header = ReadTextureIntermediateHeader(fileBytes.data(), iFileSize);
+	TextureIntermediateHeader header = ReadTextureIntermediateHeader(fileBytes);
 	int64_t iWidth = header.iWidth;
 	int64_t iHeight = header.iHeight;
 	int64_t iMipMaps = header.iMipCount;
@@ -138,8 +138,8 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 
 	// Texture .pack chunks are LZ4-compressed (the runtime FileManager LZ4-decompresses them). Neither
 	// raw-passthrough intermediate is LZ4 on disk, so both transcode into an LZ4 chunk here:
-	//   * BCn / R16 intermediates from Texture::Save are zlib streams on disk (that intermediate format
-	//     is unchanged) — zlib-inflate to raw bytes, then LZ4-compress. Uncompressed size is the 2D
+	//   * BCn / R16 intermediates from Texture::Save are zlib streams on disk —
+	//     zlib-inflate to raw bytes, then LZ4-compress. Uncompressed size is the 2D
 	//     mip-chain byte count derived from the intermediate dims.
 	//   * .R16G16B16A16_SFLOAT cubemap intermediates from Generate{Irradiance,PreFiltered}Cubemaps are
 	//     raw half-float pixels with 6 cube faces packed in — LZ4-compress directly, using the on-disk
@@ -179,7 +179,7 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 	}
 	const std::vector<std::byte>& rRawBytes = bRawHalfFloat ? data : inflated;
 
-	std::vector<std::byte> compressed = Lz4Compress(rRawBytes.data(), static_cast<int64_t>(rRawBytes.size()));
+	std::vector<std::byte> compressed = Lz4Compress(rRawBytes);
 	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
@@ -224,7 +224,7 @@ void ExportTexture::ProcessLiveCubemap(VkFormat vkFormat)
 	}
 
 	int64_t iUncompressedSize = static_cast<int64_t>(data.size());
-	std::vector<std::byte> compressed = Lz4Compress(data.data(), iUncompressedSize);
+	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(data.data(), static_cast<size_t>(iUncompressedSize)));
 	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
@@ -237,8 +237,8 @@ void ExportTexture::ProcessLiveCubemap(VkFormat vkFormat)
 }
 
 // Per-mip Toksvig slope variance for a BC5 normal map: decode mip 0 to 3D normals, box-average a
-// pyramid WITHOUT renormalizing (the shortened mean-normal length IS the sub-texel variance), and
-// record mean((1 - |avgN|) / |avgN|) per level. Baked here because the runtime cannot recover it:
+// pyramid WITHOUT renormalizing (the shortened mean-normal length encodes sub-texel variance), and
+// record mean((1 - |avgN|) / max(|avgN|, 0.01)) per level. Baked here because the runtime cannot recover it:
 // BC5 stores only XY and the shader's DecodeNormal reconstructs a unit-length Z, so mip filtering
 // silently discards the variance. Consumed by Water.frag's WATER_SPEC_AA_MIP_HANDOFF kernel via
 // TextureHeader::pfMipVariance. Levels past iMipLevels pad with the last real value so the engine
@@ -261,7 +261,7 @@ static void ComputeBc5MipVariance(const Texture& rTexture, float pfOutVariance[c
 		normals.at(3 * i + 2) = std::sqrt(std::max(0.0f, 1.0f - fX * fX - fY * fY));
 	}
 
-	int64_t iMipLevels = static_cast<int64_t>(rTexture.mData.size());
+	int64_t iMipLevels = std::ssize(rTexture.mData);
 	for (int64_t iLevel = 0; iLevel < common::TextureHeader::kiMipVarianceCount; ++iLevel)
 	{
 		if (iLevel >= iMipLevels)
@@ -270,13 +270,13 @@ static void ComputeBc5MipVariance(const Texture& rTexture, float pfOutVariance[c
 			continue;
 		}
 
-		double dVarianceSum = 0.0;
+		double fVarianceSum = 0.0;
 		for (int64_t i = 0; i < iWidth * iHeight; ++i)
 		{
 			float fLength = std::sqrt(normals.at(3 * i) * normals.at(3 * i) + normals.at(3 * i + 1) * normals.at(3 * i + 1) + normals.at(3 * i + 2) * normals.at(3 * i + 2));
-			dVarianceSum += (1.0 - fLength) / std::max(fLength, 0.01f);
+			fVarianceSum += (1.0 - fLength) / std::max(fLength, 0.01f);
 		}
-		pfOutVariance[iLevel] = static_cast<float>(dVarianceSum / static_cast<double>(iWidth * iHeight));
+		pfOutVariance[iLevel] = static_cast<float>(fVarianceSum / static_cast<double>(iWidth * iHeight));
 
 		// 2x2 box-average down to the next level, clamping the source coordinate for odd dimensions
 		int64_t iNextWidth = std::max<int64_t>(iWidth / 2, 1);
@@ -321,7 +321,7 @@ void ExportTexture::ProcessRegularTexture(VkFormat vkFormat)
 	std::vector<std::byte> data = texture.Export(vkFormat, {});
 
 	int64_t iUncompressedSize = static_cast<int64_t>(data.size());
-	std::vector<std::byte> compressed = Lz4Compress(data.data(), iUncompressedSize);
+	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(data.data(), static_cast<size_t>(iUncompressedSize)));
 	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));

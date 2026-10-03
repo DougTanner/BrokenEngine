@@ -12,13 +12,8 @@
 namespace engine
 {
 
-namespace
-{
-
 constexpr float kfSoundSliderWidthPixels = 640.0f;
 constexpr std::string_view kMuteInBackgroundLabel = "Mute in background";
-
-} // namespace
 
 void SoundMenuScreen::Render()
 {
@@ -45,7 +40,7 @@ void SoundMenuScreen::Render()
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
-	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)), kfMainMenuHeadingScale);
+	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)).mpData, kfMainMenuHeadingScale);
 
 	float fSliderWidth = kfSoundSliderWidthPixels * UiScale();
 	ImGui::SetNextItemWidth(fSliderWidth);
@@ -64,7 +59,7 @@ void SoundMenuScreen::Render()
 	float fButtonWidth = MenuButtonsWidth({TranslatedString(StandardString::kStringDefaults), U"Back"});
 
 	// Defaults button
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringDefaults)), ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnim))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringDefaults)).mpData, ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnim))
 	{
 		ResetSoundSettings();
 	}

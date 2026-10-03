@@ -30,8 +30,7 @@ inline void AlignOutputStream(std::fstream& rFileStream)
 	static constexpr char kpcPadding[kiAlignmentBytes] {};
 	std::streamoff iPos = rFileStream.tellp();
 	ASSERT(iPos >= 0);
-	// Double modulo yields the correct [0, kiAlignmentBytes) padding count and collapses the
-	// already-aligned case to 0 without relying on a < kiAlignmentBytes branch guard.
+	// The padding count is in [0, kiAlignmentBytes) and is zero when the position is aligned.
 	int64_t iBytesToAlign = (kiAlignmentBytes - (static_cast<int64_t>(iPos) % kiAlignmentBytes)) % kiAlignmentBytes;
 	if (iBytesToAlign > 0)
 	{
@@ -142,8 +141,7 @@ static_assert(sizeof(AnimationKeyframeCubic) == 52, "AnimationKeyframeCubic layo
 // Animation channel (one property of one node)
 struct AnimationChannel
 {
-	// glTF channel enums shared by the runtime reader (AnimationData) and the DataPacker writer
-	// (SceneAnimationLoader). static constexpr members do not affect sizeof, so the layout static_assert holds.
+	// The runtime reader (AnimationData) and DataPacker writer (SceneAnimationLoader) share these glTF channel enums.
 	static constexpr uint8_t kTargetPathTranslation = 0;
 	static constexpr uint8_t kTargetPathRotation    = 1;
 	static constexpr uint8_t kTargetPathScale       = 2;
@@ -214,7 +212,7 @@ static_assert(BT_OFFSETOF(MaterialInfo, f4x4RelativeTransform) == 8, "MaterialIn
 // Joint matrices are stored in a separate buffer so MeshData stays small and fixed-size
 struct MeshData
 {
-	static constexpr int64_t kiMaxMeshes = 512;  // Buffer capacity (must be >= 2 * SceneHeader::kiMaxMaterials)
+	static constexpr int64_t kiMaxMeshes = 512;  // This constant sets the buffer capacity.
 	XMFLOAT4X4 matrix {};                    // Mesh world matrix
 	XMFLOAT4 normalMatrix[3] {};             // Normal matrix: transpose(inverse(mat3(matrix))), stored as 3 vec4s
 	uint32_t uiJointCount = 0;               // 0 for non-skinned meshes

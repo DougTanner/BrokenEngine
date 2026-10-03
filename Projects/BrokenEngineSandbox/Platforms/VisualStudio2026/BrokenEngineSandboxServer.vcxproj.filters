@@ -713,9 +713,6 @@
     <ClCompile Include="..\..\..\..\Common\Log\Log.cpp">
       <Filter>Common\Log</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Common\Log\LogDifference.cpp">
-      <Filter>Common\Log</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Common\Smoothed.cpp">
       <Filter>Common</Filter>
     </ClCompile>

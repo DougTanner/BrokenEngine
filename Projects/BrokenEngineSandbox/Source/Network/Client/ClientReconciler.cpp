@@ -66,7 +66,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 		char acExpected[20] {}, acActual[20] {};
 		common::ToHex(std::span<char, 20>(acExpected), pDesyncWork->scratch.desyncExpectedCrc);
 		common::ToHex(std::span<char, 20>(acActual), pDesyncWork->scratch.desyncActualCrc);
-		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.x, pDesyncWork->coord.y, pDesyncWork->scratch.iDesyncTick, acExpected, acActual, pDesyncWork->scratch.iReplayStackCount, pDesyncWork->scratch.iNewConfirmedTick);
+		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iX, pDesyncWork->coord.iY, pDesyncWork->scratch.iDesyncTick, acExpected, acActual, pDesyncWork->scratch.iReplayStackCount, pDesyncWork->scratch.iNewConfirmedTick);
 
 		engine::ReconcileDesyncInfo desyncInfo;
 		desyncInfo.bDesync = true;
@@ -80,7 +80,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 
 	// Compute new confirmed client state (client coord time advance + transfer migration)
 	ConfirmedClientState newConfirmedClientState = mConfirmedClientState;
-	ReconcileUpdateClientState(mDispatcher.ActiveWorks(), dispatch.bAnyFullReplay, newConfirmedClientState);
+	ReconcileUpdateClientState(std::span<const engine::CoordWork>(mDispatcher.mWorks.data(), static_cast<size_t>(mDispatcher.miActiveCount)), dispatch.bAnyFullReplay, newConfirmedClientState);
 
 	// Visual error offset: pre/post client position delta accumulated into gpGame
 	if (bCapturedPrePosition && dispatch.bAnyFullReplay)
@@ -94,7 +94,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 			if (fTotal > Game::kfVisualErrorMaxDistance)
 			{
 				gpGame->mVecVisualErrorOffset = {};
-				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(Game::kfVisualErrorMaxDistance, 1));
+				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoord.iX, gpGame->mClientGridCoord.iY, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(Game::kfVisualErrorMaxDistance, 1));
 			}
 			else
 			{
@@ -108,7 +108,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 					int64_t iCurrentTick = gpGame->TickCounter();
 					if (fChange > 0.15f && (iCurrentTick - miLastVisualErrorLogTick > 32))
 					{
-						LOG(kNetwork, kDebug, "Visual error offset Coord: ({},{}) Delta: {} Accumulated: {}", gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y, common::Wb(fDelta, 3), common::Wb(fTotal, 3));
+						LOG(kNetwork, kDebug, "Visual error offset Coord: ({},{}) Delta: {} Accumulated: {}", gpGame->mClientGridCoord.iX, gpGame->mClientGridCoord.iY, common::Wb(fDelta, 3), common::Wb(fTotal, 3));
 						mfLastLoggedVisualErrorDelta = fDelta;
 						miLastVisualErrorLogTick = iCurrentTick;
 					}

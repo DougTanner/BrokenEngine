@@ -33,7 +33,7 @@ public:
 	[[nodiscard]] ScopedWorkbufferArena Push();
 
 	// Typed reservation. Opens a frame and reserves iSizeInBytes; returns an RAII handle
-	// carrying the typed pointer (implicit-convertible to T) that pops on scope exit.
+	// carrying the typed pointer in mpData that pops on scope exit.
 	template<typename T>
 	[[nodiscard]] ScopedWorkbufferAllocation<T> PushBuffer(int64_t iSizeInBytes);
 
@@ -65,7 +65,6 @@ public:
 		return (miSize - miBase) / static_cast<int64_t>(sizeof(T));
 	}
 
-	// Typed element append
 	template<typename T>
 	void PushBack(const T& rValue)
 	{
@@ -79,7 +78,6 @@ public:
 		miSize += static_cast<int64_t>(sizeof(T));
 	}
 
-	// Shrinks the most recent PushBuffer reservation to iActualSize bytes.
 	// Operates on the last PushBuffer call only — Push frames don't update the tracked size.
 	void ShrinkLastPushBuffer(int64_t iActualSize)
 	{
@@ -201,72 +199,10 @@ public:
 	ScopedWorkbufferArena(const ScopedWorkbufferArena&) = delete;
 	ScopedWorkbufferArena& operator=(const ScopedWorkbufferArena&) = delete;
 
-	void Append(std::string_view text)
-	{
-		mBuffer.Append(text);
-	}
-
-	void Append(std::wstring_view text)
-	{
-		mBuffer.Append(text);
-	}
-
-	void Append(int64_t iValue)
-	{
-		mBuffer.Append(iValue);
-	}
-
-	void AppendFloat(float fValue, int iPrecision)
-	{
-		mBuffer.AppendFloat(fValue, iPrecision);
-	}
-
-	template<typename T>
-	void PushBack(const T& rValue)
-	{
-		mBuffer.PushBack(rValue);
-	}
-
-	std::string_view View() const
-	{
-		return mBuffer.View();
-	}
-
-	template <typename T>
-	const T* Data() const
-	{
-		return mBuffer.Data<T>();
-	}
-	template <typename T>
-	T* Data()
-	{
-		return mBuffer.Data<T>();
-	}
-	template <typename T>
-	int64_t Count() const
-	{
-		return mBuffer.Count<T>();
-	}
-	template<typename T>
-	std::span<const T> Span() const
-	{
-		return mBuffer.Span<T>();
-	}
-
-	template<typename T>
-	std::span<T> Span()
-	{
-		return mBuffer.Span<T>();
-	}
-
-	void ShrinkLastPushBuffer(int64_t iActualSize)
-	{
-		mBuffer.ShrinkLastPushBuffer(iActualSize);
-	}
+	Workbuffer& mBuffer;
 
 private:
 
-	Workbuffer& mBuffer;
 	int64_t miOwningDepth = 0;
 };
 
@@ -287,7 +223,7 @@ public:
 	ScopedWorkbufferAllocation& operator=(const ScopedWorkbufferAllocation&) = delete;
 	ScopedWorkbufferAllocation& operator=(ScopedWorkbufferAllocation&&) = delete;
 
-	// Move ctor: transfer frame ownership; source becomes inert.
+	// Frame-pop ownership transfers from the source to this allocation.
 	ScopedWorkbufferAllocation(ScopedWorkbufferAllocation&& rOther) noexcept
 	: mpBuffer(rOther.mpBuffer)
 	, mpData(rOther.mpData)
@@ -296,24 +232,13 @@ public:
 		rOther.mpBuffer = nullptr;
 	}
 
-	// Reinterpret the pointer type while transferring frame ownership. Lets a function that
-	// allocated a typed buffer return an allocation typed against a different pointer.
+	// Transfer frame ownership to an allocation carrying a different pointer type.
 	template<typename U>
 	[[nodiscard]] ScopedWorkbufferAllocation<U> Adopt(U pData) && noexcept
 	{
 		Workbuffer& rBuffer = *mpBuffer;
 		mpBuffer = nullptr;
 		return ScopedWorkbufferAllocation<U>(rBuffer, pData);
-	}
-
-	operator T() const
-	{
-		return mpData;
-	}
-
-	T operator->() const
-	{
-		return mpData;
 	}
 
 private:
@@ -326,7 +251,13 @@ private:
 	}
 
 	Workbuffer* mpBuffer = nullptr;
+
+public:
+
 	T mpData;
+
+private:
+
 	int64_t miOwningDepth = 0;
 
 	friend class Workbuffer;
@@ -350,7 +281,9 @@ ScopedWorkbufferAllocation<T> Workbuffer::PushBuffer(int64_t iSizeInBytes)
 struct Wb
 {
 	Wb(float fValue, int iPrecision)
-	: fValue(fValue), iPrecision(iPrecision) {}
+	: fValue(fValue), iPrecision(iPrecision)
+	{
+	}
 
 	float fValue = 0.0f;
 	int   iPrecision = 0;
@@ -359,30 +292,36 @@ struct Wb
 // 2D XMVECTOR formatted as "(x,y)" with shared precision.
 struct WbV2
 {
-	WbV2(DirectX::XMVECTOR vec, int iPrecision)
-	: vec(vec), iPrecision(iPrecision) {}
+	WbV2(DirectX::XMVECTOR vecValue, int iPrecision)
+	: vecValue(vecValue), iPrecision(iPrecision)
+	{
+	}
 
-	DirectX::XMVECTOR vec;
+	DirectX::XMVECTOR vecValue;
 	int               iPrecision = 0;
 };
 
 // 3D XMVECTOR formatted as "(x,y,z)" with shared precision.
 struct WbV3
 {
-	WbV3(DirectX::XMVECTOR vec, int iPrecision)
-	: vec(vec), iPrecision(iPrecision) {}
+	WbV3(DirectX::XMVECTOR vecValue, int iPrecision)
+	: vecValue(vecValue), iPrecision(iPrecision)
+	{
+	}
 
-	DirectX::XMVECTOR vec;
+	DirectX::XMVECTOR vecValue;
 	int               iPrecision = 0;
 };
 
 // 4D XMVECTOR formatted as "(x,y,z,w)" with shared precision.
 struct WbV4
 {
-	WbV4(DirectX::XMVECTOR vec, int iPrecision)
-	: vec(vec), iPrecision(iPrecision) {}
+	WbV4(DirectX::XMVECTOR vecValue, int iPrecision)
+	: vecValue(vecValue), iPrecision(iPrecision)
+	{
+	}
 
-	DirectX::XMVECTOR vec;
+	DirectX::XMVECTOR vecValue;
 	int               iPrecision = 0;
 };
 
@@ -394,7 +333,7 @@ struct std::formatter<common::ScopedWorkbufferArena> : std::formatter<std::strin
 	template <typename CONTEXT>
 	auto format(const common::ScopedWorkbufferArena& rValue, CONTEXT& rContext) const
 	{
-		return std::formatter<std::string_view>::format(rValue.View(), rContext);
+		return std::formatter<std::string_view>::format(rValue.mBuffer.View(), rContext);
 	}
 };
 
@@ -404,6 +343,6 @@ struct std::formatter<common::ScopedWorkbufferAllocation<const char*>> : std::fo
 	template <typename CONTEXT>
 	auto format(const common::ScopedWorkbufferAllocation<const char*>& rValue, CONTEXT& rContext) const
 	{
-		return std::formatter<std::string_view>::format(static_cast<const char*>(rValue), rContext);
+		return std::formatter<std::string_view>::format(rValue.mpData, rContext);
 	}
 };

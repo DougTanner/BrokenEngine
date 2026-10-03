@@ -1,6 +1,6 @@
 #include <source_location>
 #include <string_view>
-namespace common { void Assert(bool bCondition, std::string_view expression, std::source_location loc = std::source_location::current()); }
+namespace common { void Assert(bool bCondition, std::string_view expression, std::source_location sourceLocation = std::source_location::current()); }
 
 // ImGui Vulkan backend needs Volk for function loading
 #define IMGUI_DEFINE_MATH_OPERATORS

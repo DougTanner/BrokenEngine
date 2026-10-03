@@ -8,8 +8,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gPbrRegistrar
 {
 	// Engine Variables
@@ -49,7 +47,6 @@ const TweaksSliderMapRegistrar gPbrRegistrar
 	// Emissive
 	{"Emissive", &gPbrEmissive},
 };
-}
 
 void TweaksScreenBase::RenderPbrSection()
 {

@@ -8,8 +8,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gWindRegistrar
 {
 	// Time & Global
@@ -34,7 +32,6 @@ const TweaksSliderMapRegistrar gWindRegistrar
 	{"Wind Diffusion High", &gWindDiffusionHigh},
 	{"Wind Diffusion Low", &gWindDiffusionLow},
 };
-}
 
 void TweaksScreenBase::RenderWindSection()
 {

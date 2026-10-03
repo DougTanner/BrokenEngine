@@ -6,13 +6,15 @@
 # A segment is a maximal run of #include lines and the blank lines between them; any other line ends it.
 # A segment is checked at conditional depth 0 or directly inside a whole-file guard (an #if whose
 # matching #endif is the last non-blank line); other segments keep their hand order and are not read.
-# Groups, in order: 0 a leading "Pch.h"; 1 the corresponding header of a .cpp; then, resolving a quoted
-# include as MSVC does (the including file's directory, then the owning vcxproj's
-# AdditionalIncludeDirectories in order), 2 engine (under Engine/, Common/, DataPacker/ or Tools/, or an
-# unresolved Data/ generated pack header), 3 game (under Projects/), 4 external (under ThirdParty/, or
-# any angle-bracket include). Canonical form: sorted by group, then path compared one folder level at a
-# time with folders before files and names ordinal case-insensitive; no blank line inside a group,
-# exactly one between groups; equal keys keep their order.
+# Groups, in order: 0 a leading "Pch.h"; 1 the corresponding header of a .cpp: the .h in the .cpp's
+# directory whose name stem is the longest ordinal case-insensitive prefix of the .cpp's name stem,
+# wherever it is included; then, resolving a quoted include as MSVC does (the including file's
+# directory, then the owning vcxproj's AdditionalIncludeDirectories in order), 2 engine (under Engine/,
+# Common/, DataPacker/ or Tools/, or an unresolved Data/ generated pack header), 3 game (under
+# Projects/), 4 external (under ThirdParty/, or any angle-bracket include). Canonical form: sorted by
+# group, then path compared one folder level at a time with folders before files and names ordinal
+# case-insensitive; no blank line inside a group, exactly one between groups; equal keys keep their
+# order.
 # Violation kinds: order, blank-missing and blank-extra are fixable; unresolved is not. Without -Fix the
 # script only reports. With -Fix it rewrites each file whose violations are all fixable, replacing only
 # the rewritten segments' lines and keeping the BOM, line endings and final newline, and leaves every
@@ -131,12 +133,12 @@ function Compare-IncludeKey([string] $Left, [string] $Right) {
 	return $leftParts.Count - $rightParts.Count
 }
 
-function Get-IncludeGroup([string] $File, [string] $Delimiter, [string] $Spelled, [bool] $FirstInclude) {
+function Get-IncludeGroup([string] $File, [string] $Delimiter, [string] $Spelled, [bool] $FirstInclude, [string] $CorrespondingHeader) {
 	if ($FirstInclude -and $Delimiter -eq '"' -and $Spelled -eq 'Pch.h') { return 0 }
 	if ($Delimiter -eq '<') { return 4 }
 	$resolved = Resolve-Include $File $Spelled
 	if ($null -eq $resolved) { return $(if ($Spelled -match '^Data/') { 2 } else { $null }) }
-	if ($File -match '\.cpp$' -and $resolved -ieq ($File -replace '\.cpp$', '.h')) { return 1 }
+	if ($CorrespondingHeader -and $resolved -ieq $CorrespondingHeader) { return 1 }
 	if ($resolved -match '^(?:Engine|Common|DataPacker|Tools)/') { return 2 }
 	if ($resolved -match '^Projects/') { return 3 }
 	if ($resolved -match '^ThirdParty/') { return 4 }
@@ -166,6 +168,19 @@ function Test-IncludeFile([string] $File) {
 		}
 	}
 
+	$correspondingHeader = ''
+	if ($File -match '\.cpp$') {
+		$stem = [IO.Path]::GetFileNameWithoutExtension($File)
+		$bestLength = 0
+		foreach ($header in [IO.Directory]::EnumerateFiles((Split-Path $fullPath -Parent), '*.h')) {
+			$headerStem = [IO.Path]::GetFileNameWithoutExtension($header)
+			if ([IO.Path]::GetExtension($header) -cne '.h' -or $headerStem.Length -le $bestLength) { continue }
+			if (-not $stem.StartsWith($headerStem, [StringComparison]::OrdinalIgnoreCase)) { continue }
+			$bestLength = $headerStem.Length
+			$correspondingHeader = ($File -replace '[^/]+$', '') + [IO.Path]::GetFileName($header)
+		}
+	}
+
 	$violations = [Collections.Generic.List[object]]::new()
 	$replacements = @{}
 	$fixable = $true
@@ -189,7 +204,7 @@ function Test-IncludeFile([string] $File) {
 		for ($line = $start; $line -le $end; $line++) {
 			$match = [regex]::Match($lines[$line], $script:IncludePattern)
 			if (-not $match.Success) { continue }
-			$group = Get-IncludeGroup $File $match.Groups[1].Value $match.Groups[2].Value ($line -eq $firstInclude)
+			$group = Get-IncludeGroup $File $match.Groups[1].Value $match.Groups[2].Value ($line -eq $firstInclude) $correspondingHeader
 			if ($null -eq $group) {
 				$violations.Add([ordered]@{ path = $File; line = $line + 1; kind = 'unresolved' })
 				$unresolved = $true

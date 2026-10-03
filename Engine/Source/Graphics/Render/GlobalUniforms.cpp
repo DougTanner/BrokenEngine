@@ -529,9 +529,9 @@ void RenderFrameGlobal(int64_t iCommandBuffer, float fCurrentTime)
 	float fHigh = 0.0f;
 	for (const auto& [rCrc, rIsland] : gpIslandTerrain->mIslands)
 	{
-		if (rIsland.mbGpuResident)
+		if (rIsland.bGpuResident)
 		{
-			fHigh = std::max(fHigh, rIsland.mfWorldElevationMeters);
+			fHigh = std::max(fHigh, rIsland.fWorldElevationMeters);
 		}
 	}
 	rGlobalLayout.fDebugTerrainElevationHigh = fHigh;

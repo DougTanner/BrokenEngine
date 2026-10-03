@@ -33,23 +33,20 @@ static int64_t siRendered = 0;
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
 static std::atomic<bool> sbRenderActive = false;
 
-namespace
-{
 // RAII tripwire guard: sets sbRenderActive on entry, clears it on scope exit — so an exception between the
 // capacity ASSERT and the slab writes unwinds it instead of wedging it true (every later Render would else false-assert).
-struct RenderActiveGuard
+struct SpaceshipsRenderActiveGuard
 {
-	RenderActiveGuard()
+	SpaceshipsRenderActiveGuard()
 	{
 		ASSERT(!sbRenderActive.exchange(true));
 	}
 
-	~RenderActiveGuard()
+	~SpaceshipsRenderActiveGuard()
 	{
 		sbRenderActive.store(false);
 	}
 };
-} // namespace
 
 void SpaceshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords)
 {
@@ -89,7 +86,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 		return;
 	}
 
-	RenderActiveGuard renderActiveGuard;
+	SpaceshipsRenderActiveGuard renderActiveGuard;
 
 	static const XMMATRIX sMatPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 
@@ -127,7 +124,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 			continue;
 		}
 
-		pVisibleIndices[iVisibleCount++] = i;
+		pVisibleIndices.mpData[iVisibleCount++] = i;
 	}
 
 	// Bulk skinning pre-allocation (main thread) — one call instead of N per-spaceship calls
@@ -159,7 +156,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 	{
 		for (int64_t j = iStart; j < iEnd; ++j)
 		{
-			int64_t i = pVisibleIndices[j];
+			int64_t i = pVisibleIndices.mpData[j];
 
 			float fSize = kfSpaceshipRadius * kfModelScale;
 			if (rCurrent.pfDestroyedTimes[i] > 0.0f)

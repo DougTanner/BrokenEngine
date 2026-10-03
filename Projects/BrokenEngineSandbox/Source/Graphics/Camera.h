@@ -20,7 +20,7 @@ public:
 
 	float SunAngle() const override;
 
-	engine::global_id_t mLastTrackedPlayerId {};
+	engine::GlobalId mLastTrackedPlayerId {};
 
 protected:
 

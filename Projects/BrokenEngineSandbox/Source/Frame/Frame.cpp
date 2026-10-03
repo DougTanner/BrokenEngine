@@ -65,7 +65,7 @@ void FrameInterpolate::Register()
 {
 #if defined(BT_CLIENT)
 	// Explosion tuning is game content driven by the Tweaks sliders; the engine owns only the effect mechanism.
-	// This must complete before the parent Register() below, which reads every field.
+	// This must complete before the engine ForEachRegister() below, which reads every field.
 	engine::ExplosionsInterpolate::sTuning =
 	{
 		.pPrimaryVisibleAreaOne = &gExplosionPrimaryVisibleAreaOne,
@@ -112,7 +112,7 @@ void FrameInterpolate::Register()
 #endif // BT_CLIENT
 
 	// Parent
-	FrameInterpolateBase::Register();
+	engine::ForEachRegister(engine::InterpolateTypes {});
 
 	// Player
 	PlayersInterpolate::Register();
@@ -125,7 +125,7 @@ void FrameInterpolate::Register()
 void FrameInterpolate::GraphicsResources()
 {
 	// Parent
-	FrameInterpolateBase::GraphicsResources();
+	engine::ForEachGraphicsResources(engine::InterpolateTypes {});
 
 	// Player
 	PlayersInterpolate::GraphicsResources();
@@ -218,7 +218,7 @@ void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict r
 void FramePostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
 {
 	// Parent
-	FramePostRenderBase::Transfer(rFrame, rStaticData);
+	engine::ForEachPostRenderTransfer(engine::PostRenderBaseTypes {}, rFrame, rStaticData);
 
 	// Player
 	PlayersPostRender::Transfer(rFrame, rStaticData);
@@ -232,7 +232,7 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderDestroy);
 
 	// Parent
-	FramePostRenderBase::Destroy(rFrame, rStaticData);
+	engine::ForEachPostRenderDestroy(engine::PostRenderBaseTypes {}, rFrame, rStaticData);
 
 	// Player
 	PlayersPostRender::Destroy(rFrame, rStaticData);
@@ -282,7 +282,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 		{
 			return false;
 		}
-		if (engine::gpIslandTerrain->FrameElevation(rStaticData, vecPosition) > engine::gBaseHeight.Get() - kfTerrainClearance)
+		if (engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecPosition) > engine::gBaseHeight.Get() - kfTerrainClearance)
 		{
 			return false;
 		}
@@ -426,7 +426,7 @@ void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderSpawn);
 
 	// Parent
-	FramePostRenderBase::Spawn(rFrame, rStaticData);
+	engine::ForEachPostRenderSpawn(engine::PostRenderBaseTypes {}, rFrame, rStaticData);
 
 	// Player
 	PlayersPostRender::Spawn(rFrame, rFrameInput, rStaticData);
@@ -453,7 +453,7 @@ void FramePostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderPreCollision);
 
 	// Parent
-	FramePostRenderBase::PreCollision(rFrame, rPreviousFrame, rStaticData);
+	engine::ForEachPostRenderPreCollision(engine::PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	// Player
 	PlayersPostRender::PreCollision(rFrame, rPreviousFrame, rStaticData);
@@ -467,7 +467,7 @@ void FramePostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderPostCollision);
 
 	// Parent
-	FramePostRenderBase::PostCollision(rFrame, rPreviousFrame, rStaticData);
+	engine::ForEachPostRenderPostCollision(engine::PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	// Player
 	PlayersPostRender::PostCollision(rFrame, rPreviousFrame, rStaticData);
@@ -475,7 +475,7 @@ void FramePostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 	// Collections
 	engine::ForEachPostRenderPostCollision(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 
-	engine::Collision::Clear();
+	engine::Collision::siLayerCount = 0;
 }
 
 void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
@@ -483,12 +483,12 @@ void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderAreaDamage);
 
 	// Parent
-	FramePostRenderBase::AreaDamage(rFrame, rPreviousFrame, rStaticData);
+	engine::ForEachPostRenderAreaDamage(engine::PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	// Collections
 	engine::ForEachPostRenderAreaDamage(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 
-	engine::AreaDamage::Clear();
+	engine::AreaDamage::siAreaDamageSourceCount = 0;
 }
 
 // Both spatial windows bind the same single spaceship source layer and the same missile subscription layer; they
@@ -503,7 +503,10 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 	int64_t iSubscriberCount = rSubscribers.iCount;
 
 	// A spaceship is targetable after its arrival grace expires while it publishes a registry id.
-	auto IsEligible = [&](int64_t i) { return rSpaceships.puiRegistryIds[i].IsValid() && pfArrivalGracePeriods[i] <= 0.0f; };
+	auto IsEligible = [&](int64_t i)
+	{
+		return (rSpaceships.puiRegistryIds[i].uuid.iValue != 0) && pfArrivalGracePeriods[i] <= 0.0f;
+	};
 
 	int64_t iEligibleCount = 0;
 	for (int64_t i = 0; i < iSpaceshipCount; ++i)
@@ -520,7 +523,7 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 	int64_t iLayerOffset = common::RoundUp(iAscendingBytes + iScratchBytes, static_cast<int64_t>(16));
 	int64_t iTotalBytes = iLayerOffset + static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
 	auto pBuffer = rWorkbuffer.PushBuffer<std::byte*>(iTotalBytes);
-	std::byte* pBufferBytes = static_cast<std::byte*>(pBuffer);
+	std::byte* pBufferBytes = static_cast<std::byte*>(pBuffer.mpData);
 	int64_t* pAscendingRows = reinterpret_cast<int64_t*>(pBufferBytes);
 	std::byte* pScratch = pBufferBytes + iAscendingBytes;
 	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iLayerOffset);
@@ -544,7 +547,7 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 
 	pLayers[0] =
 	{
-		.puiIds = rSpaceships.puiRegistryIds,
+		.pIds = rSpaceships.puiRegistryIds,
 		.pVecCurrentPositions = rSpaceships.pVecPositions,
 		.pVecPreviousPositions = pVecPreviousPositions,
 		.pAlignments = rSpaceshipsPostRender.pAlignments,
@@ -555,7 +558,7 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 
 	engine::RegistrySubscriptionLayer subscriptionLayer
 	{
-		.puiTargets = rSubscribers.puiRegistryTargets,
+		.pTargets = rSubscribers.puiRegistryTargets,
 		.rows = std::span<const int64_t>(pAscendingRows, static_cast<size_t>(iSubscriberCount)),
 		.iSourceCount = iSubscriberCount,
 	};
@@ -587,7 +590,7 @@ engine::RegistryOwnershipLayer Frame::OwnershipLayer(const Frame& rFrame)
 
 	return
 	{
-		.pIdBytes = engine::RegistryIdBytes(rPlayers.puiIds),
+		.pIdBytes = engine::RegistryIdBytes(rPlayers.pIds),
 		.pGlobalIds = rPlayers.pGlobalPlayerIds,
 		.pClientGuids = rPlayers.pClientGuids,
 		.iCount = rPlayers.iCount,
@@ -598,7 +601,8 @@ engine::RegistryOwnershipLayer Frame::OwnershipLayer(const Frame& rFrame)
 void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords)
 {
 	// Parent
-	engine::FrameInterpolateBase::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
+	engine::ExplosionsInterpolate::siTotalCount = 0;
+	engine::ForEachBeginRender(engine::InterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
 
 	// Player
 	PlayersInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
@@ -635,7 +639,8 @@ void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpola
 	engine::ScopedCpuProfile scopedCpuProfile(kCpuTimerRender);
 
 	// Parent (excludes manually rendered collections)
-	engine::FrameInterpolateBase::Render(rFrameInterpolate, iCommandBuffer);
+	engine::ExplosionsInterpolate::siTotalCount += rFrameInterpolate.explosions.iCount;
+	engine::ForEachInterpolateRender(engine::InterpolateTypes {}, rFrameInterpolate, iCommandBuffer);
 
 	// Player
 	PlayersInterpolate::Render(rFrameInterpolate, iCommandBuffer);
@@ -647,7 +652,8 @@ void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpola
 void FrameInterpolate::EndRender(int64_t iCommandBuffer)
 {
 	// Parent
-	engine::FrameInterpolateBase::EndRender(iCommandBuffer);
+	gpProfileManager->SetCount(engine::kCpuCounterExplosions, engine::ExplosionsInterpolate::siTotalCount);
+	engine::ForEachEndRender(engine::InterpolateTypes {}, iCommandBuffer);
 
 	// Player
 	PlayersInterpolate::EndRender(iCommandBuffer);

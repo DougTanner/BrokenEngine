@@ -5,9 +5,9 @@ namespace common
 
 struct AlignedDeleter
 {
-	void operator()(void* p) const noexcept
+	void operator()(void* pMemory) const noexcept
 	{
-		_aligned_free(p);
+		_aligned_free(pMemory);
 	}
 };
 

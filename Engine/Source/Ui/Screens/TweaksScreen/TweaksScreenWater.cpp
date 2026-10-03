@@ -9,8 +9,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gWaterRegistrar
 {
 	// Specular - Normals (per-sample row layout: chevron | size | weight-min | weight-max | rotation | speed-min | speed-max | speed-direction)
@@ -119,7 +117,6 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Beach Skybox 2 Reduction", &gLightingWaterSkyboxTwoBeachReduction},
 	{"Beach Skybox 3 Reduction", &gLightingWaterSkyboxThreeBeachReduction},
 };
-}
 
 void TweaksScreenBase::RenderWaterSection()
 {

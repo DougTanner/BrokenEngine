@@ -15,18 +15,14 @@ inline constexpr int64_t kiAudioExportSampleRate = 48'000;
 inline constexpr bool kbDeclipEnabled = true;
 inline constexpr bool kbDeclipMusic = false;
 
-// Analyzes and repairs interleaved float samples in place. One LOG(kWarning) line per fix applied,
-// prefixed with relativeFile; silent when the file is clean.
+// Emits one LOG(kWarning) line per applied fix with relativeFile; stays silent when the file is clean.
 // bLoopAsset: whole-buffer loop — skip edge fades, validate seam continuity instead.
 // bAllowDeclip: reconstruct short clipped runs (else clipping is warn-only).
 // bAllowEdgeFades: fade non-zero onsets/tails (music passes false — the runtime crossfade always
 // ramps music in from zero and transitions out before track end, so edge defects are warn-only).
-void RepairAudio(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSamplesPerSec, std::string_view relativeFile, bool bLoopAsset, bool bAllowDeclip, bool bAllowEdgeFades);
+void RepairAudio(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSamplesPerSecond, std::string_view relativeFile, bool bLoopAsset, bool bAllowDeclip, bool bAllowEdgeFades);
 
-// Resamples the interleaved float buffer in place from iSourceRate to iTargetRate (per-channel over
-// the interleaved layout; iChannels asserted <= 2 by the caller). Offline Kaiser-windowed sinc,
-// ~32 taps per output sample — quality over speed. No-op when the rates already match; otherwise
-// logs one kInfo line. Duration is preserved (pitch/length unchanged, rate conversion only).
+// The caller supplies one or two channels. Offline, the Kaiser-windowed sinc uses ~32 taps per output sample at unity rate for quality over speed and preserves duration; matching rates are a no-op, while conversions log one kInfo line.
 void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceRate, int64_t iTargetRate, std::string_view relativeFile);
 
 } // namespace audiorepair

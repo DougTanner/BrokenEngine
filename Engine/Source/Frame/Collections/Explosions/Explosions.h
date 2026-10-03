@@ -7,7 +7,7 @@ namespace game
 
 struct Frame;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -17,14 +17,13 @@ class Wrapper;
 
 #if defined(BT_CLIENT)
 struct SmokeTrailsInterpolate;
-using smoke_trails_t = id_t<SmokeTrailsInterpolate>;
+using smoke_trails_t = Id<SmokeTrailsInterpolate>;
 
 // Live-tunable explosion content values. The game owns the sliders; the engine owns the effect mechanism.
-// Contract: the game fills every field once at client startup, before FrameInterpolateBase::Register(). The
+// Contract: the game fills every field once at client startup, before ForEachRegister(). The
 // server never reads it, and the engine dereferences each pointer without a null fallback.
 struct ExplosionTuning
 {
-	// Primary light
 	Wrapper* pPrimaryVisibleAreaOne = nullptr;
 	Wrapper* pPrimaryVisibleAreaTwo = nullptr;
 	Wrapper* pPrimaryVisibleAreaThree = nullptr;
@@ -38,7 +37,6 @@ struct ExplosionTuning
 	Wrapper* pPrimaryLightingIntensityTwo = nullptr;
 	Wrapper* pPrimaryLightingIntensityThree = nullptr;
 
-	// Secondary light
 	Wrapper* pSecondaryVisibleAreaOne = nullptr;
 	Wrapper* pSecondaryVisibleAreaTwo = nullptr;
 	Wrapper* pSecondaryVisibleAreaThree = nullptr;
@@ -52,7 +50,6 @@ struct ExplosionTuning
 	Wrapper* pSecondaryLightingIntensityTwo = nullptr;
 	Wrapper* pSecondaryLightingIntensityThree = nullptr;
 
-	// Puffs
 	Wrapper* pPrimaryPuffAreaOne = nullptr;
 	Wrapper* pPrimaryPuffAreaTwo = nullptr;
 	Wrapper* pPrimaryPuffIntensityOne = nullptr;
@@ -62,7 +59,6 @@ struct ExplosionTuning
 	Wrapper* pSecondaryPuffIntensityOne = nullptr;
 	Wrapper* pSecondaryPuffIntensityTwo = nullptr;
 
-	// Trails
 	Wrapper* pPrimaryTrailLength = nullptr;
 	Wrapper* pPrimaryTrailDuration = nullptr;
 	Wrapper* pPrimaryTrailIntensity = nullptr;
@@ -70,7 +66,6 @@ struct ExplosionTuning
 	Wrapper* pSecondaryTrailDuration = nullptr;
 	Wrapper* pSecondaryTrailIntensity = nullptr;
 
-	// Wind
 	Wrapper* pWindIntensity = nullptr;
 	Wrapper* pWindWidth = nullptr;
 };
@@ -97,45 +92,40 @@ struct ExplosionType
 	uint8_t uiTrailTypeIndex = kuiInvalidTrailType;
 	uint8_t uiWindRadialControllerTypeIndex = kuiInvalidControllerType;
 
-	// Particle config
 	uint32_t uiBaseParticleCount = 0;
 	common::crc_t particleCrc = common::CrcConsteval("Textures\\Particles\\[BC4]Long\\5.png");
 	uint32_t uiParticleColor = 0xFF0000FF;
 
-	// Particle physics
 	float fParticlePositionJitter = 0.5f;
-	float fParticleVelocityMin = 1.0f;
+	float fParticleVelocityMinimum = 1.0f;
 	float fParticleVelocityRandom = 10.0f;
-	float fParticleVerticalVelocityMin = 0.0f;
+	float fParticleVerticalVelocityMinimum = 0.0f;
 	float fParticleVerticalVelocityRandom = 20.0f;
 	float fParticleVelocityDecay = 1.0f;
 	float fParticleGravity = 30.0f;
 	float fParticleWidth = 0.035f;
 	float fParticleLength = 0.1f;
-	float fParticleIntensityMin = 0.25f;
+	float fParticleIntensityMinimum = 0.25f;
 	float fParticleIntensityRandom = 2.0f;
 	float fParticleIntensityDecay = 2.4f;
 	float fParticleIntensityPower = 2.5f;
 
-	// Timing
 	float fPrimaryTime = 0.075f;
 
-	// Trail configuration
 	float fTrailDelayTime = 0.0f;
-	float fTrailTimeMin = 0.2f;
+	float fTrailTimeMinimum = 0.2f;
 	float fTrailTimeRandom = 0.2f;
-	float fTrailIntensityMin = 0.025f;
+	float fTrailIntensityMinimum = 0.025f;
 	float fTrailIntensityRandom = 0.025f;
 	float fTrailStart = 0.6f;
-	float fTrailLengthMin = 0.75f;
+	float fTrailLengthMinimum = 0.75f;
 	float fTrailLengthRandom = 4.5f;
 	float fTrailGravity = 2.0f;
 
 	// Secondary explosion count (lights and puffs)
 	uint32_t uiSecondaryExplosionCount = 4;
 
-	// Secondary explosion configuration
-	float fSecondaryPositionMin = 0.25f;
+	float fSecondaryPositionMinimum = 0.25f;
 	float fSecondaryPositionJitter = 1.0f;
 
 	// Per-type runtime tweak multipliers (Particles tab). Null on server, optional on client.
@@ -162,10 +152,9 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 {
 	static constexpr int64_t kiVersion = 1;
 
-	// Register default explosion effect types (called from FrameInterpolateBase::Register)
+	// Register default explosion effect types (called from ForEachRegister)
 	static void Register();
 
-	// Allocate and copy
 	static void AllocateAndCopy(ExplosionsInterpolate& rCurrent, const ExplosionsInterpolate& rPrevious);
 
 	// Spawn caps the trail count at the fixed trail slots; reject any other count as a corrupt stream, since trail loops index those slots by it.
@@ -181,36 +170,25 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	}
 
 #if defined(BT_CLIENT)
-	// Game-filled tuning pointers; see ExplosionTuning for the fill contract
 	static inline ExplosionTuning sTuning;
+	static inline int64_t siTotalCount = 0;
 
-	// Get registered controller type indices
-	static uint8_t GetPrimaryLightControllerTypeIndex();
-	static uint8_t GetSecondaryLightControllerTypeIndex();
-	static uint8_t GetPrimaryPuffControllerTypeIndex();
-	static uint8_t GetSecondaryPuffControllerTypeIndex();
-	static uint8_t GetTrailTypeIndex();
-	static uint8_t GetWindRadialControllerTypeIndex();
+	static inline uint8_t suiPrimaryLightControllerTypeIndex = kuiInvalidControllerType;
+	static inline uint8_t suiSecondaryLightControllerTypeIndex = kuiInvalidControllerType;
+	static inline uint8_t suiPrimaryPuffControllerTypeIndex = kuiInvalidControllerType;
+	static inline uint8_t suiSecondaryPuffControllerTypeIndex = kuiInvalidControllerType;
+	static inline uint8_t suiExplosionTrailTypeIndex = kuiInvalidTrailType;
+	static inline uint8_t suiWindRadialControllerTypeIndex = kuiInvalidControllerType;
 #endif // BT_CLIENT
 
-	// Interpolate
 	static void Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
-#if defined(BT_CLIENT)
-	// Render
-	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords);
-	static void Render(const game::FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
-	static void EndRender(int64_t iCommandBuffer);
-#endif
-
-	// Member arrays (SOA)
 	uint8_t* __restrict puiTypeIndices = nullptr;
 	ExplosionFlags_t* __restrict pFlags = nullptr;
 	float* __restrict pfStartTimes = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
 
-	// Per-instance time-scaling percentage
 	float* __restrict pfTimePercents = nullptr;
 
 	// Trail state (8 separate arrays - pTrails[j] is array of all explosions' j-th trail)
@@ -252,7 +230,6 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 #endif
 	}
 
-	// Utility
 	bool LogDifferences(const ExplosionsInterpolate& rOther) const;
 };
 
@@ -261,26 +238,24 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 	// Bump on any SOA layout change — feeds the Frame::kiVersion save/replay gate
 	static constexpr int64_t kiVersion = 1;
 
-	// Allocate and copy
 	static void AllocateAndCopy(ExplosionsPostRender& rCurrent, const ExplosionsPostRender& rPrevious);
 
-	// Update
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
-	// Destroy expired explosions
 	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
 
-	auto Members([[maybe_unused]] this auto&& rSelf) { return std::tie(); }
+	auto Members([[maybe_unused]] this auto&& rSelf)
+	{
+		return std::tie();
+	}
 
-	// Utility
 	bool LogDifferences(const ExplosionsPostRender& rOther) const;
 
-	// SpawnInfo for spawn parameters
 	struct SpawnInfo
 	{
 		uint8_t uiTypeIndex = 0;
-		XMVECTOR vecPosition;
-		XMVECTOR vecDirection;
+		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+		XMVECTOR vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		ExplosionFlags_t flags {};
 		uint32_t uiTrailCount = 0;
 		float fTrailAngle = XM_2PI;
@@ -291,7 +266,7 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		float fTimePercent = 1.0f;
 	};
 
-	static bool Spawn(game::Frame& __restrict rFrame, float fCurrentTime, const SpawnInfo& rInfo);
+	static bool Spawn(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation);
 };
 
 extern template struct Collection<ExplosionsInterpolate>;

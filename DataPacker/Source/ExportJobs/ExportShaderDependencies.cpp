@@ -1,8 +1,7 @@
 #include "ExportShader.h"
+
 #include "FileManager.h"
 
-namespace
-{
 
 constexpr int64_t kiDependencyMetadataMagic = 0x53484445504D5431;
 constexpr int64_t kiDependencyMetadataVersion = 2;
@@ -15,7 +14,7 @@ struct CachedDependencyFingerprint
 	std::string fingerprint;
 };
 
-bool IsDependencyInInputRoot(const std::filesystem::path& rDependency)
+static bool IsDependencyInInputRoot(const std::filesystem::path& rDependency)
 {
 	if (!std::filesystem::exists(rDependency))
 	{
@@ -34,7 +33,7 @@ bool IsDependencyInInputRoot(const std::filesystem::path& rDependency)
 	return false;
 }
 
-std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMetadata(const std::filesystem::path& rPath)
+static std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMetadata(const std::filesystem::path& rPath)
 {
 	std::fstream stream(rPath, std::ios::in | std::ios::binary);
 	int64_t iMagic = 0;
@@ -43,7 +42,19 @@ std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMetadata(c
 	stream.read(reinterpret_cast<char*>(&iMagic), sizeof(iMagic));
 	stream.read(reinterpret_cast<char*>(&iVersion), sizeof(iVersion));
 	stream.read(reinterpret_cast<char*>(&iCount), sizeof(iCount));
-	if (!stream || iMagic != kiDependencyMetadataMagic || iVersion != kiDependencyMetadataVersion || iCount < 0 || iCount > 10'000)
+	if (!stream)
+	{
+		return std::nullopt;
+	}
+	if (iMagic != kiDependencyMetadataMagic)
+	{
+		return std::nullopt;
+	}
+	if (iVersion != kiDependencyMetadataVersion)
+	{
+		return std::nullopt;
+	}
+	if (iCount < 0 || iCount > 10'000)
 	{
 		return std::nullopt;
 	}
@@ -56,7 +67,15 @@ std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMetadata(c
 		int64_t iPathCharacters = 0;
 		stream.read(reinterpret_cast<char*>(&iInputRoot), sizeof(iInputRoot));
 		stream.read(reinterpret_cast<char*>(&iPathCharacters), sizeof(iPathCharacters));
-		if (!stream || iInputRoot < 0 || iInputRoot >= static_cast<int64_t>(std::size(gpFileManager->mpInputDirectories)) || iPathCharacters <= 0 || iPathCharacters > MAX_PATH * 4)
+		if (!stream)
+		{
+			return std::nullopt;
+		}
+		if (iInputRoot < 0 || iInputRoot >= static_cast<int64_t>(std::size(gpFileManager->mpInputDirectories)))
+		{
+			return std::nullopt;
+		}
+		if (iPathCharacters <= 0 || iPathCharacters > MAX_PATH * 4)
 		{
 			return std::nullopt;
 		}
@@ -69,7 +88,15 @@ std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMetadata(c
 			return std::nullopt;
 		}
 		std::filesystem::path relativeDependencyPath = std::filesystem::path(relativePath).lexically_normal();
-		if (relativeDependencyPath.is_absolute() || relativeDependencyPath.empty() || *relativeDependencyPath.begin() == "..")
+		if (relativeDependencyPath.is_absolute())
+		{
+			return std::nullopt;
+		}
+		if (relativeDependencyPath.empty())
+		{
+			return std::nullopt;
+		}
+		if (*relativeDependencyPath.begin() == "..")
 		{
 			return std::nullopt;
 		}
@@ -83,7 +110,6 @@ std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMetadata(c
 	return dependencies;
 }
 
-}
 
 static std::string ReadAndValidateDependencyFile(const std::filesystem::path& rDependencyFilePath)
 {
@@ -106,7 +132,11 @@ static std::string ReadAndValidateDependencyFile(const std::filesystem::path& rD
 	{
 		content.pop_back();
 	}
-	if (content.empty() || content.find_first_of("\r\n") != std::string::npos)
+	if (content.empty())
+	{
+		throw std::runtime_error(std::format("Shader dependency file \"{}\" is empty or contains an unsupported continuation", rDependencyFilePath.string()));
+	}
+	if (content.find_first_of("\r\n") != std::string::npos)
 	{
 		throw std::runtime_error(std::format("Shader dependency file \"{}\" is empty or contains an unsupported continuation", rDependencyFilePath.string()));
 	}
@@ -121,18 +151,18 @@ static std::vector<std::string> BuildDependencyRootPrefixes()
 		for (std::string rootPrefix : {rInputRoot.string(), rInputRoot.generic_string()})
 		{
 			std::string lowerPrefix = common::ToLower(rootPrefix);
-			if (std::ranges::none_of(rootPrefixes, [&lowerPrefix](const std::string& rExisting)
+			if (std::ranges::none_of(rootPrefixes, [&lowerPrefix](std::string_view existing)
 			{
-				return common::ToLower(rExisting) == lowerPrefix;
+				return common::ToLower(existing) == lowerPrefix;
 			}))
 			{
 				rootPrefixes.push_back(std::move(rootPrefix));
 			}
 		}
 	}
-	std::ranges::sort(rootPrefixes, [](const std::string& rLeft, const std::string& rRight)
+	std::ranges::sort(rootPrefixes, [](std::string_view left, std::string_view right)
 	{
-		return rLeft.size() > rRight.size();
+		return left.size() > right.size();
 	});
 	return rootPrefixes;
 }
@@ -183,19 +213,18 @@ static std::vector<std::filesystem::path> ParseRootDelimitedDependencies(const s
 	return dependencies;
 }
 
-static std::vector<std::filesystem::path> ParseWhitespaceDependencies(const std::filesystem::path& rDependencyFilePath, const std::string& rContent)
+static std::vector<std::filesystem::path> ParseWhitespaceDependencies(const std::filesystem::path& rDependencyFilePath, std::string_view content)
 {
-	// Retain the old whitespace parser only when every resulting token independently names an
-	// existing dependency under an input root. A filename containing spaces fails this proof loudly.
+	// Each whitespace token must independently resolve to an existing dependency under an input root; invalid tokens throw.
 	std::vector<std::filesystem::path> dependencies;
-	std::istringstream stream(rContent);
+	std::istringstream stream((std::string(content)));
 	std::string token;
 	while (stream >> token)
 	{
 		std::filesystem::path dependency(token);
 		if (!IsDependencyInInputRoot(dependency))
 		{
-			throw std::runtime_error(std::format("Shader dependency file \"{}\" cannot unambiguously delimit \"{}\" using DataPacker input roots", rDependencyFilePath.string(), rContent));
+			throw std::runtime_error(std::format("Shader dependency file \"{}\" cannot unambiguously delimit \"{}\" using DataPacker input roots", rDependencyFilePath.string(), content));
 		}
 		dependencies.push_back(std::move(dependency));
 	}
@@ -239,7 +268,7 @@ bool ExportShader::CheckDirty(const std::filesystem::path& rPackFile)
 			mbDirty = true;
 			return true;
 		}
-		if (gpFileManager->GetFingerprint(dependencyPath) != rDependency.fingerprint)
+		if (gpFileManager->mpInputFingerprintCache->Get(dependencyPath) != rDependency.fingerprint)
 		{
 			LOG(kDefault, kDebug, "Shader dependency changed: \"{}\"", dependencyPath.string());
 			mbDirty = true;
@@ -266,7 +295,15 @@ void ExportShader::CaptureDependencies()
 		{
 			std::error_code error;
 			std::filesystem::path relativePath = std::filesystem::relative(dependency, gpFileManager->mpInputDirectories[iRoot], error);
-			if (error || relativePath.empty() || *relativePath.begin() == "..")
+			if (error)
+			{
+				continue;
+			}
+			if (relativePath.empty())
+			{
+				continue;
+			}
+			if (*relativePath.begin() == "..")
 			{
 				continue;
 			}
@@ -274,7 +311,7 @@ void ExportShader::CaptureDependencies()
 			{
 				.iInputRoot = iRoot,
 				.relativePath = relativePath,
-				.fingerprint = gpFileManager->GetFingerprint(dependency),
+				.fingerprint = gpFileManager->mpInputFingerprintCache->Get(dependency),
 			});
 			bFoundRoot = true;
 			break;

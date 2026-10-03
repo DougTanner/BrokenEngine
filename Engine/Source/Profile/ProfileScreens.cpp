@@ -24,7 +24,7 @@ void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	{
 		CpuTimer& rCpuTimer = gpProfileManager->GetCpuTimer(i);
 
-		int64_t iValue = rCpuTimer.smoothedMicroseconds.Get();
+		int64_t iValue = rCpuTimer.smoothedMicroseconds.mSmoothedValue;
 		if (bReevaluate)
 		{
 			rCpuTimer.flags.Set(ProfileRowFlags::kVisible, iValue != 0);
@@ -45,10 +45,10 @@ void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 			rWorkbuffer.Append(rCpuTimer.iThreads);
 			rWorkbuffer.Append(")");
 		}
-		if (rCpuTimer.smoothedAllocations.Get() > 0)
+		if (rCpuTimer.smoothedAllocations.mSmoothedValue > 0)
 		{
 			rWorkbuffer.Append(" [");
-			rWorkbuffer.Append(rCpuTimer.smoothedAllocations.Get());
+			rWorkbuffer.Append(rCpuTimer.smoothedAllocations.mSmoothedValue);
 			rWorkbuffer.Append("]");
 		}
 		rWorkbuffer.Append("\n");
@@ -85,11 +85,8 @@ void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	}
 }
 
-namespace
-{
-
 #if defined(BT_CLIENT)
-void AppendMemoryStats(common::Workbuffer& rWorkbuffer, bool bEager)
+static void AppendMemoryStats(common::Workbuffer& rWorkbuffer, bool bEager)
 {
 	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 	{
@@ -107,7 +104,7 @@ void AppendMemoryStats(common::Workbuffer& rWorkbuffer, bool bEager)
 	}
 }
 
-void FormatGpuGraphicsInfo(common::Workbuffer& rWorkbuffer)
+static void FormatGpuGraphicsInfo(common::Workbuffer& rWorkbuffer)
 {
 	auto [iX, iY] = FullDetail();
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -127,7 +124,7 @@ void FormatGpuGraphicsInfo(common::Workbuffer& rWorkbuffer)
 	gpImGuiManager->UpdateTextArea(kTextGraphics, rWorkbuffer.View());
 }
 
-void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate)
+static void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
 	GpuTimer* pGpuTimers = gpProfileManager->GetGpuTimers();
 
@@ -143,8 +140,8 @@ void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 
 	for (int64_t i = 0; i < kGpuTimerCount; ++i)
 	{
-		int64_t iValue = pGpuTimers[i].smoothedMicroseconds.Get();
-		int64_t iMax = pGpuTimers[i].smoothedMicroseconds.Max();
+		int64_t iValue = pGpuTimers[i].smoothedMicroseconds.mSmoothedValue;
+		int64_t iMax = pGpuTimers[i].smoothedMicroseconds.Maximum();
 		if (bReevaluate)
 		{
 			pGpuTimers[i].flags.Set(ProfileRowFlags::kVisible, !(iValue < 10 || (iValue < 200 && !(iMax > 2 * iValue))));
@@ -190,12 +187,12 @@ void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	gpImGuiManager->UpdateTextArea(kTextProfileGpuTimers, rWorkbuffer.View());
 }
 
-void FormatCellReadout(common::Workbuffer& rWorkbuffer)
+static void FormatCellReadout(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("Cell: [");
-	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoord.x));
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoord.iX));
 	rWorkbuffer.Append(",");
-	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoord.y));
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoord.iY));
 	rWorkbuffer.Append("]\nActive: ");
 	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mActiveCoords.size()));
 	rWorkbuffer.Append("\n");
@@ -213,7 +210,7 @@ void FormatCellReadout(common::Workbuffer& rWorkbuffer)
 	rWorkbuffer.Append("\n");
 }
 
-void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
+static void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
 {
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	FormatCellReadout(rWorkbuffer);
@@ -268,8 +265,6 @@ void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
 }
 #endif // BT_CLIENT
 
-} // namespace
-
 #if defined(BT_CLIENT)
 
 void FormatFpsHeader(common::Workbuffer& rWorkbuffer, int64_t iTotalCpuTimeUs)
@@ -290,7 +285,7 @@ void FormatFpsHeader(common::Workbuffer& rWorkbuffer, int64_t iTotalCpuTimeUs)
 	}
 
 	GpuTimer* pGpuTimers = gpProfileManager->GetGpuTimers();
-	int64_t iTotalGpuTime = pGpuTimers[kGpuTimerGlobal].smoothedMicroseconds.Get() + pGpuTimers[kGpuTimerMain].smoothedMicroseconds.Get() + pGpuTimers[kGpuTimerImage].smoothedMicroseconds.Get();
+	int64_t iTotalGpuTime = pGpuTimers[kGpuTimerGlobal].smoothedMicroseconds.mSmoothedValue + pGpuTimers[kGpuTimerMain].smoothedMicroseconds.mSmoothedValue + pGpuTimers[kGpuTimerImage].smoothedMicroseconds.mSmoothedValue;
 	if (iTotalGpuTime > 0)
 	{
 		rWorkbuffer.Append("Gpu: ");
@@ -352,7 +347,7 @@ void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	rWorkbuffer.Append(iTotalCount);
 	rWorkbuffer.Append(")");
 	rWorkbuffer.Append("\nAllocations: ");
-	rWorkbuffer.Append(gpProfileManager->GetSmoothedAllocations().Get());
+	rWorkbuffer.Append(gpProfileManager->GetSmoothedAllocations().mSmoothedValue);
 	gpImGuiManager->UpdateTextArea(kTextProfileMemory, rWorkbuffer.View());
 }
 

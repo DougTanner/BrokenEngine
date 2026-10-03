@@ -8,8 +8,6 @@
 namespace game
 {
 
-namespace
-{
 // SmokeDeposits is the sole consumer of these labels, despite their gExplosion*/gBlasterPuff*/gPlayerImpactPuff*/gMissileTrail* globals living in SmokeWrappers.h. Owning them here keeps registration co-located with the WrapperSlider call sites below.
 const engine::TweaksSliderMapRegistrar gSmokeDepositsRegistrar
 {
@@ -44,7 +42,6 @@ const engine::TweaksSliderMapRegistrar gSmokeDepositsRegistrar
 	// Missile Trail
 	{"Missile Trail Intensity", &gMissileTrailIntensity},
 };
-}
 
 void TweaksScreen::RenderSmokeDepositsTab()
 {

@@ -21,34 +21,22 @@ using enum ExplosionFlags;
 
 #if defined(BT_CLIENT)
 
-// Wind
 constexpr float kfWindDepositDuration = 0.3f;
 
-// Explosion timing
 constexpr float kfPrimaryTime = 0.06f;
 
-// Puff timing
 constexpr float kfPrimaryPuffStartTime = 0.0f;
 constexpr float kfPrimaryPuffEndTime = 0.2f;
 constexpr float kfSecondaryPuffTimes = 0.4f * (kfPrimaryPuffEndTime - kfPrimaryPuffStartTime);
 
-// Explosion trail
 constexpr float kfExplosionTrailWidth = 1.0f;
 
-// Static indices for registered explosion effect types
 static uint8_t suiExplosionPointLightTypeIndex = kuiInvalidControllerType;
-static uint8_t suiPrimaryLightControllerTypeIndex = kuiInvalidControllerType;
-static uint8_t suiSecondaryLightControllerTypeIndex = kuiInvalidControllerType;
 static uint8_t suiExplosionPuffTypeIndex = kuiInvalidControllerType;
-static uint8_t suiPrimaryPuffControllerTypeIndex = kuiInvalidControllerType;
-static uint8_t suiSecondaryPuffControllerTypeIndex = kuiInvalidControllerType;
-static uint8_t suiExplosionTrailTypeIndex = kuiInvalidTrailType;
-static uint8_t suiWindRadialControllerTypeIndex = kuiInvalidControllerType;
 
-// Helper to sync an explosion trail
 void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, smoke_trails_t trailId, FXMVECTOR vecPosition, float fIntensity)
 {
-	if (!trailId.IsValid())
+	if (!(trailId.uuid.iValue != 0))
 	{
 		return;
 	}
@@ -75,7 +63,6 @@ void ExplosionsPostRender::AllocateAndCopy(ExplosionsPostRender& rCurrent, const
 void ExplosionsInterpolate::Register()
 {
 #if defined(BT_CLIENT)
-	// Guard against double registration
 	if (suiExplosionPointLightTypeIndex != kuiInvalidControllerType)
 	{
 		return;
@@ -90,10 +77,9 @@ void ExplosionsInterpolate::Register()
 		ASSERT(pTuningField != nullptr);
 	}
 
-	// Register PointLights::Type for explosions
 	PointLightsInterpolate::RegisterType(suiExplosionPointLightTypeIndex,
 	{
-		.crc = data::kTexturesBC7ExplosionpngCrc,
+		.uiCrc = data::kTexturesBC7ExplosionpngCrc,
 		.uiColor = 0xFFFFFFFF,
 		.fVisibleArea = sTuning.pPrimaryVisibleAreaOne->Get(),
 		.fVisibleIntensity = sTuning.pPrimaryVisibleIntensityOne->Get(),
@@ -101,14 +87,13 @@ void ExplosionsInterpolate::Register()
 		.fLightingIntensity = sTuning.pPrimaryLightingIntensityOne->Get(),
 	});
 
-	// Register primary light controller type (3-keyframe: start -> peak -> fade)
-	// Keyframes normalized; wrappers provide base magnitude
+	// Keyframes are normalized; wrappers supply their magnitudes.
 	PointLightsInterpolate::RegisterControllerType(suiPrimaryLightControllerTypeIndex,
 	{
 		.uiBaseTypeIndex = suiExplosionPointLightTypeIndex,
 		.uiKeyframeCount = 3,
 		.bDestroysSelf = true,
-		.pfTimes = {0.0f, 0.4f * kfPrimaryTime, 3.0f * kfPrimaryTime, 0.0f},
+		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.4f * kfPrimaryTime), std::chrono::duration<float>(3.0f * kfPrimaryTime), std::chrono::duration<float>(0.0f)},
 		.keyframes =
 		{
 			{.fVisibleArea = 0.3f, .fVisibleIntensity = 0.25f, .fLightingArea = 0.6f, .fLightingIntensity = 0.25f, .fRotation = 0.0f},
@@ -122,13 +107,12 @@ void ExplosionsInterpolate::Register()
 		.ppLightingIntensityScales = {sTuning.pPrimaryLightingIntensityOne, sTuning.pPrimaryLightingIntensityTwo, sTuning.pPrimaryLightingIntensityThree, nullptr},
 	});
 
-	// Register secondary light controller type (3-keyframe: delayed start -> peak -> fade)
 	PointLightsInterpolate::RegisterControllerType(suiSecondaryLightControllerTypeIndex,
 	{
 		.uiBaseTypeIndex = suiExplosionPointLightTypeIndex,
 		.uiKeyframeCount = 3,
 		.bDestroysSelf = true,
-		.pfTimes = {0.0f, 1.0f * kfPrimaryTime, 3.0f * kfPrimaryTime, 0.0f},
+		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(1.0f * kfPrimaryTime), std::chrono::duration<float>(3.0f * kfPrimaryTime), std::chrono::duration<float>(0.0f)},
 		.keyframes =
 		{
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -142,20 +126,18 @@ void ExplosionsInterpolate::Register()
 		.ppLightingIntensityScales = {sTuning.pSecondaryLightingIntensityOne, sTuning.pSecondaryLightingIntensityTwo, sTuning.pSecondaryLightingIntensityThree, nullptr},
 	});
 
-	// Register Puffs::Type for explosions
 	PuffsInterpolate::RegisterType(suiExplosionPuffTypeIndex,
 	{
-		.crc = 0,
+		.uiCrc = 0,
 		.uiColor = 0xFFFFFFFF,
 	});
 
-	// Register primary puff controller type (2-keyframe: start -> expand)
 	PuffsInterpolate::RegisterControllerType(suiPrimaryPuffControllerTypeIndex,
 	{
 		.uiBaseTypeIndex = suiExplosionPuffTypeIndex,
 		.uiKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.pfTimes = {kfPrimaryPuffStartTime, kfPrimaryPuffEndTime, 0.0f, 0.0f},
+		.times = {std::chrono::duration<float>(kfPrimaryPuffStartTime), std::chrono::duration<float>(kfPrimaryPuffEndTime), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -167,13 +149,12 @@ void ExplosionsInterpolate::Register()
 		.ppIntensityScales = {sTuning.pPrimaryPuffIntensityOne, sTuning.pPrimaryPuffIntensityTwo, nullptr, nullptr},
 	});
 
-	// Register secondary puff controller type (2-keyframe: smaller, shorter)
 	PuffsInterpolate::RegisterControllerType(suiSecondaryPuffControllerTypeIndex,
 	{
 		.uiBaseTypeIndex = suiExplosionPuffTypeIndex,
 		.uiKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.pfTimes = {0.0f, kfSecondaryPuffTimes, 0.0f, 0.0f},
+		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfSecondaryPuffTimes), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -185,56 +166,24 @@ void ExplosionsInterpolate::Register()
 		.ppIntensityScales = {sTuning.pSecondaryPuffIntensityOne, sTuning.pSecondaryPuffIntensityTwo, nullptr, nullptr},
 	});
 
-	// Register SmokeTrails::Type for explosion trails
 	SmokeTrailsInterpolate::RegisterType(suiExplosionTrailTypeIndex,
 	{
-		.crc = 0,
+		.uiCrc = 0,
 		.uiColor = 0xFFFFFFFF,
 		.fWidth = kfExplosionTrailWidth,
 	});
 
-	// Register wind radial controller type (2-keyframe: full intensity -> zero)
 	WindRadialsInterpolate::RegisterControllerType(suiWindRadialControllerTypeIndex,
 	{
 		.uiKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.pfTimes = {0.0f, kfWindDepositDuration, 0.0f, 0.0f},
+		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfWindDepositDuration), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes = {{.fIntensity = 1.0f, .fSize = 1.0f}, {.fIntensity = 0.0f, .fSize = 1.0f}, {}, {}},
 	});
 #endif // BT_CLIENT
 }
 
 #if defined(BT_CLIENT)
-
-uint8_t ExplosionsInterpolate::GetPrimaryLightControllerTypeIndex()
-{
-	return suiPrimaryLightControllerTypeIndex;
-}
-
-uint8_t ExplosionsInterpolate::GetSecondaryLightControllerTypeIndex()
-{
-	return suiSecondaryLightControllerTypeIndex;
-}
-
-uint8_t ExplosionsInterpolate::GetPrimaryPuffControllerTypeIndex()
-{
-	return suiPrimaryPuffControllerTypeIndex;
-}
-
-uint8_t ExplosionsInterpolate::GetSecondaryPuffControllerTypeIndex()
-{
-	return suiSecondaryPuffControllerTypeIndex;
-}
-
-uint8_t ExplosionsInterpolate::GetTrailTypeIndex()
-{
-	return suiExplosionTrailTypeIndex;
-}
-
-uint8_t ExplosionsInterpolate::GetWindRadialControllerTypeIndex()
-{
-	return suiWindRadialControllerTypeIndex;
-}
 
 #endif // BT_CLIENT
 
@@ -254,17 +203,17 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 		float fExplosionTime = fCurrentTime - fStartTime;
 		float fTimePercent = rInterpolate.pfTimePercents[i];
 
-		int32_t iTrailCount = rInterpolate.piTrailCounts[i];
+		int64_t iTrailCount = rInterpolate.piTrailCounts[i];
 
 #if defined(BT_CLIENT)
 		// Remove expired trails (cleanup happens every frame, not just at explosion expiration).
 		// Cleanup uses unmultiplied pfTrailTimes so it fires in lockstep with the shared explosion-entry
 		// destruction below — applying the client-only Duration multiplier here would let the entry be
 		// destroyed before the cleanup fires, orphaning the SmokeTrail and leaking it indefinitely.
-		for (int32_t j = 0; j < iTrailCount; ++j)
+		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
-			smoke_trails_t& trailId = rInterpolate.pTrails[j][i];
-			if (!trailId.IsValid())
+			smoke_trails_t& rTrailId = rInterpolate.pTrails[j][i];
+			if (!(rTrailId.uuid.iValue != 0))
 			{
 				continue;
 			}
@@ -272,28 +221,25 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 			float fTrailEndTime = fTimePercent * rType.fTrailDelayTime + rInterpolate.pfTrailTimes[j][i];
 			if (fExplosionTime >= fTrailEndTime)
 			{
-				SmokeTrailsPostRender::Remove(rFrame, trailId);
+				RemoveIndexableElementAndClearHandle(rFrame.interpolate.smokeTrails, rFrame.postRender.smokeTrails, rTrailId, rFrame.interpolate.smokeTrails.Members(), rFrame.postRender.smokeTrails.Members());
 			}
 		}
 #endif // BT_CLIENT
 
 		ExplosionFlags_t flags = rInterpolate.pFlags[i];
 
-		// Skip non-self-destroying explosions for full removal
 		if (!(flags & kDestroysSelf))
 		{
 			continue;
 		}
 
-		// Calculate end time (longest of trail durations)
 		float fEndTime = 0.0f;
-		for (int32_t j = 0; j < iTrailCount; ++j)
+		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
 			float fTrailEndTime = fTimePercent * rType.fTrailDelayTime + rInterpolate.pfTrailTimes[j][i];
 			fEndTime = std::max(fEndTime, fTrailEndTime);
 		}
 
-		// Check if explosion has expired
 		if (fExplosionTime < fEndTime)
 		{
 			continue;
@@ -311,13 +257,13 @@ bool ExplosionsInterpolate::LogDifferences(const ExplosionsInterpolate& rOther) 
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
-	for (int64_t i = 0; i < CommonRowCount(rOther); ++i)
+	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
 		bEqual &= common::LogDifference<"puiTypeIndices">(i, puiTypeIndices[i], rOther.puiTypeIndices[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pfStartTimes">(i, pfStartTimes[i], rOther.pfStartTimes[i]);
-		bEqual &= common::LogDifference_Vec("pVecPositions", i, pVecPositions[i], rOther.pVecPositions[i]);
-		bEqual &= common::LogDifference_Vec("pVecDirections", i, pVecDirections[i], rOther.pVecDirections[i]);
+		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
+		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 		bEqual &= common::LogDifference<"pfTimePercents">(i, pfTimePercents[i], rOther.pfTimePercents[i]);
 		bEqual &= common::LogDifference<"piTrailCounts">(i, piTrailCounts[i], rOther.piTrailCounts[i]);
 
@@ -337,23 +283,6 @@ bool ExplosionsPostRender::LogDifferences(const ExplosionsPostRender& rOther) co
 }
 
 #if defined(BT_CLIENT)
-
-static int64_t siTotalCount = 0;
-
-void ExplosionsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, [[maybe_unused]] const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, [[maybe_unused]] const std::vector<GridCoord>& rActiveCoords)
-{
-	siTotalCount = 0;
-}
-
-void ExplosionsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
-{
-	siTotalCount += rFrameInterpolate.explosions.iCount;
-}
-
-void ExplosionsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
-{
-	gpProfileManager->SetCount(kCpuCounterExplosions, siTotalCount);
-}
 
 #endif // BT_CLIENT
 

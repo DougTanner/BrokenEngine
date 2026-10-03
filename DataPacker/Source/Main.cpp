@@ -40,11 +40,11 @@ static constexpr DataTypeEntry kDataTypes[] =
 	{.enumSuffix = "Texture", .displayName = "Texture", .headerFile = "Texture.h"},
 	{.enumSuffix = "Raw",     .displayName = "Raw",     .headerFile = "Raw.h"},
 };
-static constexpr size_t kDataTypeCount = std::size(kDataTypes);
+static constexpr size_t kuiDataTypeCount = std::size(kDataTypes);
 
-static bool WriteIfChanged(const std::string& rContent, const std::filesystem::path& rPath, std::string_view logName)
+static bool WriteIfChanged(std::string_view content, const std::filesystem::path& rPath, std::string_view logName)
 {
-	if (!common::ContentsEqual(rContent, rPath))
+	if (!common::ContentsEqual(std::string(content), rPath))
 	{
 		FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
 		if (eResult == FileManager::EnsureLocalResult::kCancelled || eResult == FileManager::EnsureLocalResult::kFailed)
@@ -52,7 +52,7 @@ static bool WriteIfChanged(const std::string& rContent, const std::filesystem::p
 			return false;
 		}
 		std::fstream stream(rPath, std::ios::out | std::ios::binary);
-		stream << rContent;
+		stream << content;
 		stream.close();
 		VERIFY_SUCCESS(stream.good());
 		LOG(kDefault, kDebug, "Re-generated {}", logName);
@@ -219,7 +219,7 @@ static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManife
 {
 	static constexpr uint64_t kuiChunkTableOffset = static_cast<uint64_t>(common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader))));
 
-	const std::optional<uint64_t> optionalManifestFileSize = GetReadableFileSize(rManifestFile);
+	std::optional<uint64_t> optionalManifestFileSize = GetReadableFileSize(rManifestFile);
 	if (!optionalManifestFileSize.has_value())
 	{
 		return false;
@@ -288,7 +288,7 @@ static bool LoadPublishedManifest(const std::filesystem::path& rManifestFile, in
 
 static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, const std::vector<common::ChunkLocation>& rManifestChunkLocations)
 {
-	const std::optional<uint64_t> optionalPackFileSize = GetReadableFileSize(rPackFile);
+	std::optional<uint64_t> optionalPackFileSize = GetReadableFileSize(rPackFile);
 	if (!optionalPackFileSize.has_value())
 	{
 		return false;
@@ -382,7 +382,7 @@ static std::vector<std::unique_ptr<T>> DiscoverExportJobsAndAggregateDirty(const
 		std::sort(jobPathCrcs.begin(), jobPathCrcs.end());
 		if (manifestPathCrcs != jobPathCrcs)
 		{
-			LOG(kDefault, kDebug, "\"{}\" asset path set differs from the published manifest ({} jobs, {} manifest chunks); re-exporting", T::kName, jobPathCrcs.size(), manifestPathCrcs.size());
+			LOG(kDefault, kDebug, "\"{}\" asset path set differs from the published manifest ({} jobs, {} manifest chunks); re-exporting", T::kName, std::ssize(jobPathCrcs), std::ssize(manifestPathCrcs));
 			rbDirty = true;
 		}
 	}
@@ -425,7 +425,7 @@ static void SortAndCheckDuplicateExportJobs(std::vector<std::unique_ptr<T>>& rEx
 	// manifest CRC and generated constant from the relative path, so duplicates make runtime lookup
 	// ambiguous. Lowered-path sorting puts duplicates adjacent for this check and removes tied keys for
 	// deterministic order. This validates path uniqueness, not CRC collisions between distinct paths.
-	for (size_t i = 1; i < rExportJobs.size(); ++i)
+	for (int64_t i = 1; i < std::ssize(rExportJobs); ++i)
 	{
 		const T& rPrevious = *rExportJobs.at(i - 1);
 		const T& rCurrent = *rExportJobs.at(i);
@@ -444,7 +444,7 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 	common::DataHeader dataHeader {};
 	dataHeader.iMagic = common::DataHeader::kiMagic;
 	dataHeader.iVersion = common::DataHeader::kiVersion;
-	dataHeader.iChunkCount = rExportJobs.size();
+	dataHeader.iChunkCount = std::ssize(rExportJobs);
 	temporaryManifestFileStream.write(reinterpret_cast<char*>(&dataHeader), sizeof(dataHeader));
 	common::AlignOutputStream(temporaryManifestFileStream);
 
@@ -463,11 +463,11 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 				.crc = rpExportJob->mCrc,
 				.uiOffset = static_cast<uint64_t>(temporaryPackFileStream.tellp()),
 				.uiSize = rData.size(),
-				.contentCrc = rData.empty() ? common::kCrcSeed : common::Crc(rData.data(), static_cast<int64_t>(rData.size())),
+				.contentCrc = rData.empty() ? common::kCrcSeed : common::Crc(std::span<const std::byte>(rData.data(), rData.size())),
 			};
 			temporaryManifestFileStream.write(reinterpret_cast<char*>(&chunkLocation), sizeof(chunkLocation));
 
-			temporaryPackFileStream.write(reinterpret_cast<char*>(rData.data()), rData.size());
+			temporaryPackFileStream.write(reinterpret_cast<char*>(rData.data()), std::ssize(rData));
 			common::AlignOutputStream(temporaryPackFileStream);
 
 			if (rpExportJob->mbDirty)
@@ -667,10 +667,10 @@ static bool GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
 	content << std::endl;
 	content << "inline constexpr const char* kpcDataTypeNames[kDataTypeCount] =" << std::endl;
 	content << "{" << std::endl;
-	for (size_t i = 0; i < kDataTypeCount; ++i)
+	for (size_t i = 0; i < kuiDataTypeCount; ++i)
 	{
 		content << "\t\"" << kDataTypes[i].displayName << "\"";
-		if (i + 1 < kDataTypeCount)
+		if (i + 1 < kuiDataTypeCount)
 		{
 			content << ",";
 		}
@@ -700,7 +700,7 @@ static bool GenerateDataHeader(const std::filesystem::path& rOutPath)
 	return WriteIfChanged(content.str(), rOutPath, "Data.h");
 }
 
-bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
+bool MainThread(int iArgumentCount, char* ppcArguments[], DataPackerRunSummary& rRunSummary)
 {
 	common::Multithreading multithreading(std::max<int64_t>(0, common::HardwareCoreCount() - 3));
 
@@ -709,10 +709,10 @@ bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 
 	VERIFY_SUCCESS(XMVerifyCPUSupport());
 
-	Texture::StaticInit();
+	Texture::StaticInitialize();
 
 	FileManager::EnsureLocalResult eInitializationResult = FileManager::EnsureLocalResult::kAlreadyLocal;
-	auto pFileManager = std::make_unique<FileManager>(std::span(argv, argc), eInitializationResult);
+	auto pFileManager = std::make_unique<FileManager>(std::span(ppcArguments, iArgumentCount), eInitializationResult);
 	if (eInitializationResult == FileManager::EnsureLocalResult::kCancelled || eInitializationResult == FileManager::EnsureLocalResult::kFailed)
 	{
 		pFileManager.reset();
@@ -766,9 +766,9 @@ bool MainThread(int argc, char* argv[], DataPackerRunSummary& rRunSummary)
 	return bSuccess;
 }
 
-bool MaterializeData(char* argv[])
+bool MaterializeData(char* ppcArguments[])
 {
-	std::array<char*, 4> fileManagerArguments { argv[0], argv[2], argv[3], argv[4] };
+	std::array<char*, 4> fileManagerArguments { ppcArguments[0], ppcArguments[2], ppcArguments[3], ppcArguments[4] };
 	FileManager::EnsureLocalResult eInitializationResult = FileManager::EnsureLocalResult::kAlreadyLocal;
 	auto pFileManager = std::make_unique<FileManager>(fileManagerArguments, eInitializationResult, FileManager::InitializationMode::kDataOnly);
 	if (eInitializationResult == FileManager::EnsureLocalResult::kCancelled || eInitializationResult == FileManager::EnsureLocalResult::kFailed)
@@ -780,22 +780,22 @@ bool MaterializeData(char* argv[])
 	return eResult != FileManager::EnsureLocalResult::kCancelled && eResult != FileManager::EnsureLocalResult::kFailed;
 }
 
-static bool RunCommand(int argc, char* argv[])
+static bool RunCommand(int iArgumentCount, char* ppcArguments[])
 {
-	if (argc >= 2 && std::string_view(argv[1]) == "--materialize-data")
+	if (iArgumentCount >= 2 && std::string_view(ppcArguments[1]) == "--materialize-data")
 	{
 		// CLI trust boundary: data materialization takes exactly the two input roots and output Data path
-		if (argc != 5)
+		if (iArgumentCount != 5)
 		{
 			std::printf("--materialize-data requires exactly <engine-data> <project-data> <output-data>\n");
 			return false;
 		}
-		return MaterializeData(argv);
+		return MaterializeData(ppcArguments);
 	}
 
 	std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 	DataPackerRunSummary runSummary;
-	auto logSummary = [&runSummary, startTime](bool bSuccess)
+	auto LogSummary = [&runSummary, startTime](bool bSuccess)
 	{
 		{
 			// Clean jobs are the expected case, so only exports and failures get a line inside the block.
@@ -815,23 +815,23 @@ static bool RunCommand(int argc, char* argv[])
 
 	try
 	{
-		bool bSuccess = MainThread(argc, argv, runSummary);
-		logSummary(bSuccess);
+		bool bSuccess = MainThread(iArgumentCount, ppcArguments, runSummary);
+		LogSummary(bSuccess);
 		return bSuccess;
 	}
 	catch (...)
 	{
-		logSummary(false);
+		LogSummary(false);
 		throw;
 	}
 }
 
-static bool RunCommandWithExceptionHandling(int argc, char* argv[])
+static bool RunCommandWithExceptionHandling(int iArgumentCount, char* ppcArguments[])
 {
 	bool bSuccess = false;
 	try
 	{
-		bSuccess = RunCommand(argc, argv);
+		bSuccess = RunCommand(iArgumentCount, ppcArguments);
 	}
 	catch (const std::exception& rException)
 	{
@@ -861,7 +861,7 @@ static bool RunCommandWithExceptionHandling(int argc, char* argv[])
 	return bSuccess;
 }
 
-static int ProcessMain(int argc, char* argv[])
+static int ProcessMain(int iArgumentCount, char* ppcArguments[])
 {
 	HANDLE hMutex = CreateMutex(nullptr, TRUE, "BrokenEngineDataPacker");
 	if (hMutex == nullptr)
@@ -881,7 +881,7 @@ static int ProcessMain(int argc, char* argv[])
 
 	// A handle for an existing mutex is not owned until the wait succeeds, so failed waits only close it.
 	bool bOwnsMutex = true;
-	auto mutexDeleter = [&bOwnsMutex](void* pHandle)
+	auto MutexDeleter = [&bOwnsMutex](void* pHandle)
 	{
 		if (bOwnsMutex)
 		{
@@ -889,7 +889,7 @@ static int ProcessMain(int argc, char* argv[])
 		}
 		CloseHandle(pHandle);
 	};
-	std::unique_ptr<void, decltype(mutexDeleter)> pMutex(hMutex, mutexDeleter);
+	std::unique_ptr<void, decltype(MutexDeleter)> pMutex(hMutex, MutexDeleter);
 	if (GetLastError() == ERROR_ALREADY_EXISTS)
 	{
 		bOwnsMutex = false;
@@ -930,45 +930,113 @@ static int ProcessMain(int argc, char* argv[])
 
 	if (IsDebuggerPresent() == TRUE)
 	{
-		bSuccess = RunCommand(argc, argv);
+		bSuccess = RunCommand(iArgumentCount, ppcArguments);
 	}
 	else
 	{
-		bSuccess = RunCommandWithExceptionHandling(argc, argv);
+		bSuccess = RunCommandWithExceptionHandling(iArgumentCount, ppcArguments);
 	}
 
 	fflush(stdout);
 	return bSuccess ? 0 : 1;
 }
 
-int main(int argc, char* argv[])
+int main(int iArgumentCount, char* ppcArguments[])
 {
-	return common::ThreadLocal::Entry(ProcessMain, common::kiMinWorkbufferSize, std::nullopt, false)(argc, argv);
+	return common::ThreadLocal::Entry(ProcessMain, common::kiMinWorkbufferSize, std::nullopt, false)(iArgumentCount, ppcArguments);
 }
 
 #if defined(_CRTDBG_MAP_ALLOC)
 
-[[nodiscard]] _Ret_notnull_ _Post_writable_byte_size_(n) void* operator new(std::size_t n) noexcept(false) { void* p = std::malloc(n); __assume(p != nullptr); return p; }
-[[nodiscard]] _Ret_notnull_ _Post_writable_byte_size_(n) void* operator new[](std::size_t n) noexcept(false) { void* p = std::malloc(n); __assume(p != nullptr); return p; }
-[[nodiscard]] _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(n) void* operator new  (std::size_t n, const std::nothrow_t&) noexcept { return std::malloc(n); }
-[[nodiscard]] _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(n) void* operator new[](std::size_t n, const std::nothrow_t&) noexcept { return std::malloc(n); }
-[[nodiscard]] _Ret_notnull_ _Post_writable_byte_size_(n) void* operator new  (std::size_t n, std::align_val_t al) noexcept(false) { void* p = _aligned_malloc(n, static_cast<size_t>(al)); __assume(p != nullptr); return p; }
-[[nodiscard]] _Ret_notnull_ _Post_writable_byte_size_(n) void* operator new[](std::size_t n, std::align_val_t al) noexcept(false) { void* p = _aligned_malloc(n, static_cast<size_t>(al)); __assume(p != nullptr); return p; }
-[[nodiscard]] _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(n) void* operator new  (std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept { return _aligned_malloc(n, static_cast<size_t>(al)); }
-[[nodiscard]] _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(n) void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept { return _aligned_malloc(n, static_cast<size_t>(al)); }
+[[nodiscard]] _Ret_notnull_ _Post_writable_byte_size_(uiSize) void* operator new(std::size_t uiSize) noexcept(false)
+{
+	void* pAllocation = std::malloc(uiSize);
+	__assume(pAllocation != nullptr);
+	return pAllocation;
+}
+[[nodiscard]] _Ret_notnull_ _Post_writable_byte_size_(uiSize) void* operator new[](std::size_t uiSize) noexcept(false)
+{
+	void* pAllocation = std::malloc(uiSize);
+	__assume(pAllocation != nullptr);
+	return pAllocation;
+}
+[[nodiscard]] _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(uiSize) void* operator new  (std::size_t uiSize, const std::nothrow_t&) noexcept
+{
+	return std::malloc(uiSize);
+}
+[[nodiscard]] _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(uiSize) void* operator new[](std::size_t uiSize, const std::nothrow_t&) noexcept
+{
+	return std::malloc(uiSize);
+}
+[[nodiscard]] _Ret_notnull_ _Post_writable_byte_size_(uiSize) void* operator new  (std::size_t uiSize, std::align_val_t eAlignment) noexcept(false)
+{
+	void* pAllocation = _aligned_malloc(uiSize, static_cast<size_t>(eAlignment));
+	__assume(pAllocation != nullptr);
+	return pAllocation;
+}
+[[nodiscard]] _Ret_notnull_ _Post_writable_byte_size_(uiSize) void* operator new[](std::size_t uiSize, std::align_val_t eAlignment) noexcept(false)
+{
+	void* pAllocation = _aligned_malloc(uiSize, static_cast<size_t>(eAlignment));
+	__assume(pAllocation != nullptr);
+	return pAllocation;
+}
+[[nodiscard]] _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(uiSize) void* operator new  (std::size_t uiSize, std::align_val_t eAlignment, const std::nothrow_t&) noexcept
+{
+	return _aligned_malloc(uiSize, static_cast<size_t>(eAlignment));
+}
+[[nodiscard]] _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(uiSize) void* operator new[](std::size_t uiSize, std::align_val_t eAlignment, const std::nothrow_t&) noexcept
+{
+	return _aligned_malloc(uiSize, static_cast<size_t>(eAlignment));
+}
 
-void operator delete(void* p) noexcept { std::free(p); }
-void operator delete[](void* p) noexcept { std::free(p); }
-void operator delete  (void* p, const std::nothrow_t&) noexcept { std::free(p); }
-void operator delete[](void* p, const std::nothrow_t&) noexcept { std::free(p); }
-void operator delete  (void* p, std::size_t) noexcept { std::free(p); }
-void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
-void operator delete  (void* p, std::align_val_t) noexcept { _aligned_free(p); }
-void operator delete[](void* p, std::align_val_t) noexcept { _aligned_free(p); }
-void operator delete  (void* p, std::size_t, std::align_val_t) noexcept { _aligned_free(p); }
-void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { _aligned_free(p); }
-void operator delete  (void* p, std::align_val_t, const std::nothrow_t&) noexcept { _aligned_free(p); }
-void operator delete[](void* p, std::align_val_t, const std::nothrow_t&) noexcept { _aligned_free(p); }
+void operator delete(void* pAllocation) noexcept
+{
+	std::free(pAllocation);
+}
+void operator delete[](void* pAllocation) noexcept
+{
+	std::free(pAllocation);
+}
+void operator delete  (void* pAllocation, const std::nothrow_t&) noexcept
+{
+	std::free(pAllocation);
+}
+void operator delete[](void* pAllocation, const std::nothrow_t&) noexcept
+{
+	std::free(pAllocation);
+}
+void operator delete  (void* pAllocation, std::size_t) noexcept
+{
+	std::free(pAllocation);
+}
+void operator delete[](void* pAllocation, std::size_t) noexcept
+{
+	std::free(pAllocation);
+}
+void operator delete  (void* pAllocation, std::align_val_t) noexcept
+{
+	_aligned_free(pAllocation);
+}
+void operator delete[](void* pAllocation, std::align_val_t) noexcept
+{
+	_aligned_free(pAllocation);
+}
+void operator delete  (void* pAllocation, std::size_t, std::align_val_t) noexcept
+{
+	_aligned_free(pAllocation);
+}
+void operator delete[](void* pAllocation, std::size_t, std::align_val_t) noexcept
+{
+	_aligned_free(pAllocation);
+}
+void operator delete  (void* pAllocation, std::align_val_t, const std::nothrow_t&) noexcept
+{
+	_aligned_free(pAllocation);
+}
+void operator delete[](void* pAllocation, std::align_val_t, const std::nothrow_t&) noexcept
+{
+	_aligned_free(pAllocation);
+}
 
 struct CrtBreakAllocSetter
 {
@@ -976,8 +1044,6 @@ struct CrtBreakAllocSetter
 	{
 		_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-		// Set to the allocation number from the CRT leak report to break on that allocation
-		// _crtBreakAlloc = 5374;
 	}
 };
 

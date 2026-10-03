@@ -8,8 +8,6 @@
 namespace game
 {
 
-namespace
-{
 const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 {
 	// Blasters - Player
@@ -42,7 +40,6 @@ const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 	{"Spaceship Death Pitch Random", &gSpaceshipDeathPitchRandom},
 	{"Spaceship Hit Volume", &gSpaceshipHitVolume},
 };
-}
 
 void TweaksScreen::RenderSoundEffects()
 {

@@ -15,9 +15,6 @@
 namespace engine
 {
 
-namespace
-{
-
 constexpr float kfGraphicsMinWidthFraction = 0.5f;
 constexpr float kfGraphicsMaxWidthFraction = 0.9f;
 constexpr float kfGraphicsFontScaleAtMinimum = 2.0f;
@@ -28,7 +25,7 @@ constexpr float kfGraphicsColumnGutterPixels = 80.0f;
 // Draw pcLabel separately on the left so WrapperSlider fills the remaining column (-FLT_MIN). Its hidden ## ID is
 // recorded by the agent snapshot; AgentUiRegistry::ResolveLabel maps a human-readable query through case-insensitive
 // substring matching.
-void ColumnSlider(const char* pcLabel, Wrapper* pWrapper, std::string_view format = "%.2f")
+static void ColumnSlider(const char* pcLabel, Wrapper* pWrapper, std::string_view format = "%.2f")
 {
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted(pcLabel);
@@ -39,8 +36,6 @@ void ColumnSlider(const char* pcLabel, Wrapper* pWrapper, std::string_view forma
 	ImGui::SetNextItemWidth(-FLT_MIN);
 	WrapperSlider(pcSliderId, pWrapper, format);
 }
-
-} // namespace
 
 void GraphicsMenuScreen::Render()
 {
@@ -92,7 +87,7 @@ void GraphicsMenuScreen::Render()
 		{
 			ScopedMenuFont headingFont(fMenuFontScale * kfGraphicsHeadingScale);
 			fHeaderHeight = ImGui::GetTextLineHeight();
-			ImGui::TextUnformatted(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(StandardString::kStringGraphics)));
+			ImGui::TextUnformatted(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(StandardString::kStringGraphics)).mpData);
 		}
 
 		ImGui::TableNextColumn();
@@ -101,7 +96,7 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::TableNextColumn();
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + std::max(0.0f, (fHeaderHeight - ImGui::GetFrameHeight()) * 0.5f));
-		if (MenuButton(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(StandardString::kStringDefaults)), ImVec2(fHeaderButtonWidth, 0.0f), mfDefaultsHoverAnim))
+		if (MenuButton(AppendUtf8(common::gpThreadLocal->mWorkbuffer, TranslatedString(StandardString::kStringDefaults)).mpData, ImVec2(fHeaderButtonWidth, 0.0f), mfDefaultsHoverAnim))
 		{
 			ResetGraphicsSettings();
 		}

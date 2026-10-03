@@ -42,10 +42,10 @@ inline std::pair<bool, std::string> GetFileOrStringContent(const T& rSource)
 template<typename T1, typename T2>
 inline bool ContentsEqual(const T1& rOne, const T2& rTwo)
 {
-	auto [oneValid, oneContent] = GetFileOrStringContent(rOne);
-	auto [twoValid, twoContent] = GetFileOrStringContent(rTwo);
+	auto [bOneValid, oneContent] = GetFileOrStringContent(rOne);
+	auto [bTwoValid, twoContent] = GetFileOrStringContent(rTwo);
 
-	if (!oneValid || !twoValid)
+	if (!bOneValid || !bTwoValid)
 	{
 		return false;
 	}
@@ -53,7 +53,7 @@ inline bool ContentsEqual(const T1& rOne, const T2& rTwo)
 	return oneContent == twoContent;
 }
 
-// Reads an entire file into a freshly-allocated byte vector. Offline / tool-side use only — allocates.
+// Offline/tool-side use only.
 // Named ReadEntireFile (not ReadFile) to avoid colliding with the Win32 ReadFile API inside namespace common.
 inline std::vector<std::byte> ReadEntireFile(const std::filesystem::path& rPath)
 {
@@ -71,7 +71,6 @@ inline std::vector<std::byte> ReadEntireFile(const std::filesystem::path& rPath)
 	return data;
 }
 
-// Crash-report file sink: a raw OS handle with no buffering and no formatting state.
 // Reachable from the SIGABRT handler during heap corruption, where std::ofstream cannot be used at all — its
 // construction allocates (new locale), which re-enters allocation tracking and can deadlock on the non-recursive log mutex.
 struct CrashFileWriter
@@ -101,7 +100,7 @@ struct CrashFileWriter
 		}
 
 		DWORD uiWritten = 0;
-		// Result deliberately ignored: nothing on the crash path may recover or log a failed write.
+		// Nothing on the crash path may recover or log a failed write.
 		WriteFile(handle, text.data(), static_cast<DWORD>(text.size()), &uiWritten, nullptr);
 	}
 

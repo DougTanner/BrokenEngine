@@ -8,8 +8,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gTerrainRegistrar
 {
 	// Ambient Occlusion
@@ -36,7 +34,6 @@ const TweaksSliderMapRegistrar gTerrainRegistrar
 	{"Rock Normals Size 3", &gTerrainRockNormalsSizeThree},
 	{"Rock Normals Blend", &gTerrainRockNormalsBlend},
 };
-}
 
 void TweaksScreenBase::RenderTerrainSection()
 {

@@ -223,7 +223,7 @@ void StreamingVoice::CancelPendingReads()
 
 void StreamingVoice::BeginFadeOut()
 {
-	mFlags.Clear(kFadingIn);
+	mFlags.Set(kFadingIn, false);
 	mFlags.Set(kFadingOut);
 }
 
@@ -239,7 +239,7 @@ bool StreamingVoice::UpdateVolume(float fDeltaTime)
 		mfCurrentVolume += fDeltaTime / kfCrossfadeDuration;
 		if (mfCurrentVolume >= 1.0f)
 		{
-			mFlags.Clear(kFadingIn);
+			mFlags.Set(kFadingIn, false);
 		}
 	}
 	else if (mFlags & kFadingOut)
@@ -247,7 +247,7 @@ bool StreamingVoice::UpdateVolume(float fDeltaTime)
 		mfCurrentVolume -= fDeltaTime / kfCrossfadeDuration;
 		if (mfCurrentVolume <= 0.0f)
 		{
-			mFlags.Clear(kFadingOut);
+			mFlags.Set(kFadingOut, false);
 		}
 	}
 	mfCurrentVolume = std::clamp(mfCurrentVolume, 0.0f, 1.0f);

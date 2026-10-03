@@ -15,25 +15,22 @@ namespace toolcli::landing
 	using coordination::NewMetadata;
 	using coordination::ParseUtcTimestamp;
 
-	namespace
+	constexpr std::chrono::seconds kMinimumLeaseDuration = std::chrono::seconds(60);
+	constexpr std::chrono::seconds kMaximumLeaseDuration = std::chrono::seconds(86'400);
+
+	bool IsValidLeaseDuration(std::chrono::seconds leaseDuration)
 	{
-		constexpr int64_t kiMinimumLeaseSeconds = 60;
-		constexpr int64_t kiMaximumLeaseSeconds = 86'400;
+		return leaseDuration >= kMinimumLeaseDuration && leaseDuration <= kMaximumLeaseDuration;
 	}
 
-	bool IsValidLeaseDuration(int64_t iLeaseSeconds)
-	{
-		return iLeaseSeconds >= kiMinimumLeaseSeconds && iLeaseSeconds <= kiMaximumLeaseSeconds;
-	}
-
-	nlohmann::json NewLandingMetadata(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds)
+	nlohmann::json NewLandingMetadata(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, std::chrono::seconds leaseDuration)
 	{
 		nlohmann::json metadata = NewMetadata(rLocator, owner, session, worktree);
 		metadata["schemaVersion"] = kiLandingLeaseSchemaVersion;
-		metadata["leaseDurationSeconds"] = iLeaseSeconds;
+		metadata["leaseDurationSeconds"] = leaseDuration.count();
 		uint64_t uiHeartbeatTicks = 0;
 		ParseUtcTimestamp(metadata["heartbeatAt"].get<std::string>(), uiHeartbeatTicks);
-		uint64_t uiExpiresTicks = uiHeartbeatTicks + static_cast<uint64_t>(iLeaseSeconds) * 10'000'000ull;
+		uint64_t uiExpiresTicks = uiHeartbeatTicks + static_cast<uint64_t>(leaseDuration.count()) * 10'000'000ull;
 		metadata["expiresAt"] = FormatUtcTimestamp(uiExpiresTicks);
 		return metadata;
 	}
@@ -52,8 +49,8 @@ namespace toolcli::landing
 		{
 			return std::nullopt;
 		}
-		const std::optional<int64_t> durationSeconds = JsonInt64(rMetadata["leaseDurationSeconds"]);
-		if (!durationSeconds || !IsValidLeaseDuration(*durationSeconds))
+		std::optional<int64_t> durationSeconds = JsonInt64(rMetadata["leaseDurationSeconds"]);
+		if (!durationSeconds || !IsValidLeaseDuration(std::chrono::seconds(*durationSeconds)))
 		{
 			return std::nullopt;
 		}
@@ -62,14 +59,14 @@ namespace toolcli::landing
 		lease.claimedAt = rMetadata["claimedAt"].get<std::string>();
 		lease.heartbeatAt = rMetadata["heartbeatAt"].get<std::string>();
 		lease.expiresAt = rMetadata["expiresAt"].get<std::string>();
-		lease.iDurationSeconds = *durationSeconds;
+		lease.duration = std::chrono::seconds(*durationSeconds);
 		// The envelope already proved claimedAt and heartbeatAt parse and are ordered; these calls exist to fill the lease ticks.
 		if (!ParseUtcTimestamp(lease.claimedAt, lease.uiClaimedTicks) || !ParseUtcTimestamp(lease.heartbeatAt, lease.uiHeartbeatTicks) || !ParseUtcTimestamp(lease.expiresAt, lease.uiExpiresTicks))
 		{
 			return std::nullopt;
 		}
-		if (lease.uiHeartbeatTicks > (std::numeric_limits<uint64_t>::max)() - static_cast<uint64_t>(lease.iDurationSeconds) * 10'000'000ull
-		 || lease.uiExpiresTicks != lease.uiHeartbeatTicks + static_cast<uint64_t>(lease.iDurationSeconds) * 10'000'000ull)
+		if (lease.uiHeartbeatTicks > (std::numeric_limits<uint64_t>::max)() - static_cast<uint64_t>(lease.duration.count()) * 10'000'000ull
+		 || lease.uiExpiresTicks != lease.uiHeartbeatTicks + static_cast<uint64_t>(lease.duration.count()) * 10'000'000ull)
 		{
 			return std::nullopt;
 		}
@@ -116,14 +113,14 @@ namespace toolcli::landing
 		std::vector<std::wstring> worktrees;
 		std::wstring currentWorktree;
 		bool bInvalidEntry = false;
-		for (size_t uiStart = 0; uiStart < listing->size();)
+		for (size_t i = 0; i < listing->size();)
 		{
-			size_t uiEnd = listing->find('\0', uiStart);
+			size_t uiEnd = listing->find('\0', i);
 			if (uiEnd == std::string::npos)
 			{
 				uiEnd = listing->size();
 			}
-			std::string_view field(listing->data() + uiStart, uiEnd - uiStart);
+			std::string_view field(listing->data() + i, uiEnd - i);
 			if (field.empty())
 			{
 				if (currentWorktree.empty())
@@ -146,7 +143,7 @@ namespace toolcli::landing
 			{
 				bInvalidEntry = true;
 			}
-			uiStart = uiEnd + 1;
+			i = uiEnd + 1;
 		}
 		if (!currentWorktree.empty())
 		{
@@ -193,4 +190,4 @@ namespace toolcli::landing
 		}
 		return true;
 	}
-}
+} // namespace toolcli::landing

@@ -10,14 +10,14 @@ namespace engine
 
 void WindRadialsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositAxisAlignedA(kCrc, kName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositAxisAlignedB(kCrc, kName);
+	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositAxisAlignedA(kuiCrc, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositAxisAlignedB(kuiCrc, kpcName);
 }
 
 static int64_t siRendered = 0;
 
-void WindRadialsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords)
+void WindRadialsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
 
@@ -26,7 +26,7 @@ void WindRadialsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 		return;
 	}
 
-	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const WindRadialsInterpolate&
+	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const WindRadialsInterpolate&
 	{
 		return rInterpolate.windRadials;
 	});
@@ -36,10 +36,10 @@ void WindRadialsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 		return;
 	}
 
-	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer))
+	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
+		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
+		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
 	}
 }
 
@@ -48,36 +48,38 @@ void WindRadialsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 	const WindRadialsInterpolate& rCurrent = rFrameInterpolate.windRadials;
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 
-	if (!gWindEnabled.Get<bool>() || rCurrent.iCount == 0)
+	if (!gWindEnabled.Get<bool>())
 	{
 		return;
 	}
 
-	auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(kCrc, kBufferMain, iCommandBuffer);
+	if (rCurrent.iCount == 0)
+	{
+		return;
+	}
+
+	auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(kuiCrc, kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load. Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
+		// Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
 		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
 		float fIntensity = rCurrent.pfIntensities[i];
 		float fSize = rCurrent.pfSizes[i];
 
-		// Visibility culling
 		XMFLOAT4A f4Position {};
 		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
 		{
 			continue;
 		}
 
-		// Project to base height
 		XMVECTOR vecBasePosition = ProjectToBaseHeight(vecLocalPosition, rBasis);
 		XMStoreFloat4A(&f4Position, vecBasePosition);
 
-		// Build AxisAlignedQuadLayout
-		// Per-quad params: {intensity, 0, 0, 1} where .w = 1.0 is the radial flag for WindDeposit.frag
-		XMFLOAT4A f4Params = {fIntensity, 0.0f, 0.0f, 1.0f};
-		BuildAxisAlignedQuad(pLayouts[siRendered], f4Position, fSize, f4Params, 0xFFFFFFFF);
+		// WindDeposit.frag interprets .w = 1.0 as radial wind.
+		XMFLOAT4A f4Parameters = {fIntensity, 0.0f, 0.0f, 1.0f};
+		BuildAxisAlignedQuad(pLayouts[siRendered], f4Position, fSize, f4Parameters, 0xFFFFFFFF);
 
 		++siRendered;
 	}
@@ -85,8 +87,8 @@ void WindRadialsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 void WindRadialsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
 }
 
 } // namespace engine

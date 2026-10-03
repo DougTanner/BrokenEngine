@@ -13,7 +13,7 @@ using enum MissileFlags;
 
 // Collision layer index (set each frame in PreCollision)
 // thread_local: parallel per-Frame tick via Dispatch
-static thread_local size_t suiCollisionLayerIndex = 0;
+static thread_local int64_t siCollisionLayerIndex = 0;
 static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
 static thread_local std::vector<float> sCollisionRadii;
 static thread_local std::vector<float> sCollisionDamages;
@@ -153,7 +153,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 				uint32_t uiRandom = common::Random(2u, rFrame.postRender.randomEngine);
 				float fDeltaAnglePercentExtra = 1.0f + 3.0f * fDeltaAnglePercent;
-				float fDeltaAngleJitter = !uiTarget.IsValid() ? kfDeltaAngleJitterRandom : kfDeltaAngleJitterRandomWithTarget;
+				float fDeltaAngleJitter = !(uiTarget.uuid.iValue != 0) ? kfDeltaAngleJitterRandom : kfDeltaAngleJitterRandomWithTarget;
 				if (uiRandom == 0)
 				{
 					vecVelocity = XMVector3RotateSafe(vecVelocity, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, fDeltaAnglePercentExtra * (-kfDirectionJitterRandom + common::Random(2.0f * kfDirectionJitterRandom, rFrame.postRender.randomEngine))));
@@ -174,7 +174,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			// that died, transferred, or is still in arrival grace drops the handle.
 			engine::RegistryResult retained {};
 			bool bRetained = false;
-			if (uiTarget.IsValid())
+			if ((uiTarget.uuid.iValue != 0))
 			{
 				bRetained = engine::ResolveRegistryHandle(window.context, uiTarget, retained);
 				if (!bRetained)
@@ -218,7 +218,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			}
 
 			// Clamp delta rotation
-			fDeltaRotation = common::MinAbs(fDeltaRotation, rCurrent.pfDeltaRotationMax[i]);
+			fDeltaRotation = common::ClampMagnitude(fDeltaRotation, rCurrent.pfDeltaRotationMax[i]);
 
 			// Keep velocity in XY plane
 			vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
@@ -264,7 +264,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	{
 		engine::AcquireRegistryTargets(window.context,
 		{
-			.puiTargets = rCurrent.puiRegistryTargets,
+			.pTargets = rCurrent.puiRegistryTargets,
 			.pVecOrigins = rCurrentInterpolate.pVecPositions,
 			.pVecDirections = rCurrentInterpolate.pVecDirections,
 			.pAlignments = rCurrent.pAlignments,
@@ -292,7 +292,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			continue;
 		}
 
-		if (rCurrent.puiRegistryTargets[i].IsValid())
+		if ((rCurrent.puiRegistryTargets[i].uuid.iValue != 0))
 		{
 			continue;
 		}
@@ -362,7 +362,7 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	}
 
 	// Note: Damage is applied via area damage system, not direct collision
-	suiCollisionLayerIndex = engine::Collision::AddLayer(
+	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
 		.pVecStartPositions = rPreviousInterpolate.pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
@@ -406,9 +406,9 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 
 		size_t uiIndex = static_cast<size_t>(i);
 		// Entity results are pre-filtered against terrain and frame-exit cutoffs.
-		if (engine::Collision::HasCollision(suiCollisionLayerIndex, i))
+		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
 		{
-			const engine::CollisionResult& rResult = engine::Collision::GetCollisions(suiCollisionLayerIndex, i).front();
+			const engine::CollisionResult& rResult = engine::Collision::GetCollisions(siCollisionLayerIndex, i).front();
 			rCurrentInterpolate.pVecPositions[i] = rResult.vecSelfPosition;
 #if defined(BT_CLIENT)
 			SyncMissileTrail(rFrame.interpolate, rCurrentInterpolate.puiSmokeTrails[i], rResult.vecSelfPosition);

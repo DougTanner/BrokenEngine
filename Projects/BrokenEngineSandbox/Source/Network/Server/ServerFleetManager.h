@@ -38,7 +38,7 @@ struct PendingRespawnInFleetRequest
 {
 	int64_t iClientId = 0;
 	FleetGuid fleetGuid {};
-	engine::global_id_t memberGlobalPlayerId {};
+	engine::GlobalId memberGlobalPlayerId {};
 };
 
 class ServerFleetManager
@@ -62,9 +62,9 @@ public:
 	void QueueRespawnRequest(const PendingRespawnInFleetRequest& rRequest);
 	void ClearPendingRequests();
 
-	void OnPlayerDeath(const engine::ClientGuid& rGuid, engine::global_id_t globalId);
-	void OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInfo& rSpawnInfo, engine::global_id_t globalPlayerId);
-	void OnPlayerTransferred(const engine::ClientGuid& rGuid, engine::global_id_t globalPlayerId, engine::GridCoord destination);
+	void OnPlayerDeath(const engine::ClientGuid& rGuid, engine::GlobalId globalId);
+	void OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInfo& rSpawnInfo, engine::GlobalId globalPlayerId);
+	void OnPlayerTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalPlayerId, engine::GridCoord destination);
 	void OnClientConnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void OnClientDisconnected(const engine::ClientGuid& rClientGuid);
 	void OnResetForLoad(int64_t iClientId, const engine::ClientGuid& rClientGuid);
@@ -82,7 +82,7 @@ public:
 		engine::GridCoord fleetWantedCoord {};
 		uint8_t uiPendingFleetWantedCoordTicks = 0;
 	};
-	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId);
+	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId);
 
 	void UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, float fDelay);
 

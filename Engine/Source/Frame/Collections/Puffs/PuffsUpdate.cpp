@@ -11,11 +11,10 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 {
 	PuffsInterpolate& __restrict rCurrent = rFrameInterpolate.puffs;
 	const PuffsInterpolate& rPrevious = rPreviousFrame.interpolate.puffs;
-	float fCurrentTime = rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime;
+	std::chrono::duration<float> currentTime(rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		float fIntensity = rPrevious.pfIntensities[i];
 		float fArea = rPrevious.pfAreas[i];
@@ -23,15 +22,14 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 
 		// Load controller fields (copied in AllocateAndCopy)
 		uint8_t uiControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
-		float fStartTime = rCurrent.pfStartTimes[i];
+		std::chrono::duration<float> startTime(rCurrent.pfStartTimes[i]);
 
-		// Apply controller interpolation if this is a controlled puff
 		if (uiControllerTypeIndex != kuiInvalidControllerType)
 		{
-			float fElapsedTime = fCurrentTime - fStartTime;
-			const PuffControllerType& rController = PuffsInterpolate::GetControllerType(uiControllerTypeIndex);
+			std::chrono::duration<float> elapsedTime = currentTime - startTime;
+			const PuffControllerType& rController = PuffsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
 
-			PuffKeyframe interpolated = InterpolateScaledKeyframes(rController, fElapsedTime, [](PuffControllerType& rScaledController, const PuffControllerType& rOriginalController, int64_t j)
+			PuffKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime.count(), [](PuffControllerType& rScaledController, const PuffControllerType& rOriginalController, int64_t j)
 			{
 				if (rOriginalController.ppAreaScales[j] != nullptr)
 				{
@@ -43,13 +41,11 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 				}
 			});
 
-			// Map PuffKeyframe fields to puff properties
 			fArea = interpolated.fArea;
 			fIntensity = interpolated.fIntensity;
 			fRotation = interpolated.fRotation;
 		}
 
-		// Save
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pfIntensities[i] = fIntensity;
 		rCurrent.pfAreas[i] = fArea;
@@ -61,23 +57,20 @@ void PuffsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[
 {
 }
 
-void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition)
+void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition)
 {
 	PuffsInterpolate& rInterpolate = rFrame.interpolate.puffs;
 	PuffsPostRender& rPostRender = rFrame.postRender.puffs;
 
-	// Get controller type
-	const PuffControllerType& rController = PuffsInterpolate::GetControllerType(uiControllerTypeIndex);
+	const PuffControllerType& rController = PuffsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
 
-	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	AddControlledElement(rInterpolate, rPostRender, currentTime.count(), uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-	},
-	[&rInterpolate, &rPostRender]()
+	}, [&rInterpolate, &rPostRender]()
 	{
 		return AddElement(rInterpolate, rPostRender);
-	},
-	[&rInterpolate, &rController](int64_t iSpawnIndex)
+	}, [&rInterpolate, &rController](int64_t iSpawnIndex)
 	{
 		rInterpolate.puiTypeIndices[iSpawnIndex] = rController.uiBaseTypeIndex;
 		rInterpolate.pfAreas[iSpawnIndex] = rController.keyframes[0].fArea * (rController.ppAreaScales[0] != nullptr ? rController.ppAreaScales[0]->Get() : 1.0f);

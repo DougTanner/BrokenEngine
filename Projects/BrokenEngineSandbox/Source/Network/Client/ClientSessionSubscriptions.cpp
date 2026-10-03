@@ -23,7 +23,7 @@ void ClientSession::UpdateDesiredCoords(SubscriptionChangeReason eReason)
 		desiredCoords[iDesiredCount++] = coord;
 	};
 
-	if (gpGame->ClientPlayerId().IsValid())
+	if ((gpGame->ClientPlayerId().iValue != 0))
 	{
 		pushCoord(gpGame->mClientGridCoord);
 		for (int64_t i = 0; i < gpGame->miVisibleNeighborCount; ++i)
@@ -33,10 +33,10 @@ void ClientSession::UpdateDesiredCoords(SubscriptionChangeReason eReason)
 	}
 	else
 	{
-		pushCoord(engine::kOriginCoord);
+		pushCoord(engine::kOriginCoordinate);
 	}
 
-	mpRuntime->SetDesiredCoords(desiredCoords, iDesiredCount, ToString(eReason), gpGame->TickCounter());
+	mpRuntime->SetDesiredCoordinates(std::span<const engine::GridCoord>(desiredCoords, static_cast<size_t>(iDesiredCount)), ToString(eReason), gpGame->TickCounter());
 }
 
 void ClientSession::UpdateSubscriptions()

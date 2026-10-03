@@ -1,7 +1,5 @@
 #include "GaeaArchetype.h"
 
-namespace
-{
 
 constexpr const wchar_t* kpwcGaeaDefaultPath = L"C:\\Program Files\\QuadSpinner\\Gaea 2\\Gaea.Swarm.exe";
 constexpr const char* kpcGaeaEnvVar = "GAEA2_PATH";
@@ -14,19 +12,17 @@ constexpr const char* kpcGaeaEnvVar = "GAEA2_PATH";
 // beach offset (engine-Z 0 == beach; sea floor sits at -(Level × elevationMeters)).
 constexpr float kfGaeaSeaLevelDefault = 0.1f;
 
-void WriteFileBytes(const std::filesystem::path& rFile, std::string_view bytes)
+static void WriteFileBytes(const std::filesystem::path& rFile, std::string_view bytes)
 {
 	// Atomic replace: partial write on crash leaves a stray .tmp, not a half-written archetype.
 	// PID suffix so concurrent crashes from peer DataPacker processes leave distinct orphan
 	// .<pid>.tmp files instead of clobbering each other's in-flight writes.
 	std::filesystem::path tempFile = rFile;
 	tempFile += L"." + std::to_wstring(GetCurrentProcessId()) + L".tmp";
-	{
-		std::ofstream stream(tempFile, std::ios::binary);
-		stream.write(bytes.data(), bytes.size());
-		stream.close();
-		VERIFY_SUCCESS(stream.good());
-	}
+	std::ofstream stream(tempFile, std::ios::binary);
+	stream.write(bytes.data(), bytes.size());
+	stream.close();
+	VERIFY_SUCCESS(stream.good());
 	std::filesystem::rename(tempFile, rFile);
 }
 
@@ -34,7 +30,7 @@ void WriteFileBytes(const std::filesystem::path& rFile, std::string_view bytes)
 // with iSeed. Gaea's `--seed` CLI flag only mixes a global seed into per-node randomness; it
 // doesn't override the per-node "Seed" fields baked into the .terrain JSON. Patching them
 // directly is the only way to make Island.json's seed value fully determine the bake.
-void PatchArchetypeSeeds(nlohmann::json& rJson, int32_t iSeed)
+static void PatchArchetypeSeeds(nlohmann::json& rJson, int32_t iSeed)
 {
 	if (rJson.is_object())
 	{
@@ -62,7 +58,7 @@ void PatchArchetypeSeeds(nlohmann::json& rJson, int32_t iSeed)
 // Recursive walker: every node whose $type contains "Mesher" gets its VerticesPerSide set. Gaea's
 // default Mesher resolution is implicit (inherits BakeResolution) so the property may be absent
 // from the JSON — we create the key when missing. Restored via the standard archetype-bytes rollback.
-void PatchArchetypeMesherResolution(nlohmann::json& rJson, int64_t iVerticesPerSide)
+static void PatchArchetypeMesherResolution(nlohmann::json& rJson, int64_t iVerticesPerSide)
 {
 	if (rJson.is_object())
 	{
@@ -91,7 +87,7 @@ void PatchArchetypeMesherResolution(nlohmann::json& rJson, int64_t iVerticesPerS
 // archetype authors Choice at whatever the editor was last saved at; DataPacker always patches it
 // per route so the bake is deterministic. riRouteNodeCount accumulates matches so the caller can
 // assert exactly one Route node exists.
-void PatchArchetypeRoute(nlohmann::json& rJson, int32_t iChoice, int64_t& riRouteNodeCount)
+static void PatchArchetypeRoute(nlohmann::json& rJson, int32_t iChoice, int64_t& riRouteNodeCount)
 {
 	if (rJson.is_object())
 	{
@@ -115,17 +111,16 @@ void PatchArchetypeRoute(nlohmann::json& rJson, int32_t iChoice, int64_t& riRout
 	}
 }
 
-} // namespace
 
 std::filesystem::path ResolveGaeaExecutable()
 {
 	char* pcEnvValue = nullptr;
 	size_t uiEnvSize = 0;
 	_dupenv_s(&pcEnvValue, &uiEnvSize, kpcGaeaEnvVar);
-	if (pcEnvValue != nullptr)
+	std::unique_ptr<char, decltype(&std::free)> pcEnvValueOwner(pcEnvValue, &std::free);
+	if (pcEnvValueOwner != nullptr)
 	{
-		std::filesystem::path envPath(pcEnvValue);
-		std::free(pcEnvValue);
+		std::filesystem::path envPath(pcEnvValueOwner.get());
 		if (std::filesystem::exists(envPath))
 		{
 			return envPath;

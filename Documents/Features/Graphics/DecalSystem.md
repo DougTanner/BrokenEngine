@@ -46,7 +46,7 @@ Changes (15 files)
    Client-only (#ifdef BT_CLIENT) collection header following the
    Billboards pattern.  Define:
 
-   - DecalsType struct: crc (texture), fSizeX/fSizeY (world-space
+   - DecalsType struct: uiCrc (texture), fSizeX/fSizeY (world-space
      dimensions), fAlpha
    - DecalsInterpolate: Collection<DecalsInterpolate, CollectionFlags::kIdToIndex>
      with TypeRegistry<DecalsType>.  SOA members: puiTypeIndices (uint8_t*),
@@ -54,7 +54,7 @@ Changes (15 files)
      SyncData struct with vecPosition, uiTypeIndex, fRotation, fAlpha.
      Static methods: Register, AllocateAndCopy, Sync, Update,
      GraphicsResources, BeginRender, Render, EndRender
-   - DecalsPostRender: Collection<DecalsPostRender> with puiIds member.
+   - DecalsPostRender: Collection<DecalsPostRender> with pIds member.
      Static methods: AllocateAndCopy, Update, PreCollision, Add, Remove,
      PostCollision, AreaDamage, Transfer, Destroy, Spawn
    - extern template declarations for both collections
@@ -71,7 +71,7 @@ Changes (15 files)
 3. Engine/Source/Frame/Collections/Decals/DecalsUpdate.cpp  [NEW]
    Following BillboardsUpdate.cpp pattern:
    - Update() -- empty stub
-   - Sync() -- copy SyncData fields to SOA arrays by IdToIndex
+   - Sync() -- copy SyncData fields to SOA arrays through idToIndexMap.at()
    - Add() -- GrowPairedCollections + AddVisualIndexableElement,
      set type index
    - Remove() -- RemoveIndexableElement, clear id

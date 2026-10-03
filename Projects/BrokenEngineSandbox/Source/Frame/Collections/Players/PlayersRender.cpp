@@ -54,18 +54,16 @@ static int64_t siRendered = 0;
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
 static std::atomic<bool> sbRenderActive = false;
 
-namespace
-{
 // RAII tripwire guard: sets sbRenderActive on entry, clears it on scope exit — so an exception between the
 // capacity ASSERT and the slab writes unwinds it instead of wedging it true (every later Render would else false-assert).
-struct RenderActiveGuard
+struct PlayersRenderActiveGuard
 {
-	RenderActiveGuard()
+	PlayersRenderActiveGuard()
 	{
 		ASSERT(!sbRenderActive.exchange(true));
 	}
 
-	~RenderActiveGuard()
+	~PlayersRenderActiveGuard()
 	{
 		sbRenderActive.store(false);
 	}
@@ -178,7 +176,6 @@ static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rP
 		engine::DebugRender::Circle(f3Dest, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
 }
-} // namespace
 
 void PlayersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords)
 {
@@ -226,7 +223,7 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 		return;
 	}
 
-	RenderActiveGuard renderActiveGuard;
+	PlayersRenderActiveGuard renderActiveGuard;
 
 	auto [pPlayerLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kCrc, engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);

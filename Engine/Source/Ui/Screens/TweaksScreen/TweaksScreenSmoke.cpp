@@ -8,8 +8,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gSmokeRegistrar
 {
 	// Decay
@@ -44,7 +42,6 @@ const TweaksSliderMapRegistrar gSmokeRegistrar
 	{"Smoke Trails Side Jitter", &gSmokeTrailsSideJitter},
 	{"Smoke Intensity Falloff", &gSmokeIntensityFalloff},
 };
-}
 
 void TweaksScreenBase::RenderSmokeSection()
 {

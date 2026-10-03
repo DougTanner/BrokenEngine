@@ -14,19 +14,19 @@
 struct ImRect;
 struct ImGuiLastItemData;
 
-void ImGuiTestEngineHook_ItemAdd([[maybe_unused]] ImGuiContext* ctx, [[maybe_unused]] ImGuiID id, [[maybe_unused]] const ImRect& bb, [[maybe_unused]] const ImGuiLastItemData* item_data)
+void ImGuiTestEngineHook_ItemAdd([[maybe_unused]] ImGuiContext* pContext, [[maybe_unused]] ImGuiID uiIdentifier, [[maybe_unused]] const ImRect& rBoundingBox, [[maybe_unused]] const ImGuiLastItemData* pItemData)
 {
 }
 
-void ImGuiTestEngineHook_ItemInfo([[maybe_unused]] ImGuiContext* ctx, [[maybe_unused]] ImGuiID id, [[maybe_unused]] const char* label, [[maybe_unused]] int flags)
+void ImGuiTestEngineHook_ItemInfo([[maybe_unused]] ImGuiContext* pContext, [[maybe_unused]] ImGuiID uiIdentifier, [[maybe_unused]] const char* pcLabel, [[maybe_unused]] int iFlags)
 {
 }
 
-void ImGuiTestEngineHook_Log([[maybe_unused]] ImGuiContext* ctx, [[maybe_unused]] const char* fmt, ...)
+void ImGuiTestEngineHook_Log([[maybe_unused]] ImGuiContext* pContext, [[maybe_unused]] const char* pcFormat, ...)
 {
 }
 
-const char* ImGuiTestEngine_FindItemDebugLabel([[maybe_unused]] ImGuiContext* ctx, [[maybe_unused]] ImGuiID id)
+const char* ImGuiTestEngine_FindItemDebugLabel([[maybe_unused]] ImGuiContext* pContext, [[maybe_unused]] ImGuiID uiIdentifier)
 {
 	return nullptr;
 }

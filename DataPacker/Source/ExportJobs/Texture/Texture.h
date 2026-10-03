@@ -54,18 +54,14 @@ constexpr const char* TextureIntermediateSuffix(VkFormat vkFormat)
 // and Z_OK handling can't drift between them. The on-disk texture intermediates stay zlib; the .pack
 // texture chunks themselves are LZ4 (see Lz4Compress) and transcoded from zlib in ExportTexture's
 // raw-passthrough path.
-std::vector<std::byte> ZlibCompress(const std::byte* puiSource, int64_t iSourceSize);
+std::vector<std::byte> ZlibCompress(std::span<const std::byte> source);
 
-// LZ4HC-compress a byte buffer at LZ4HC_CLEVEL_MAX; returns a size-trimmed vector. Used for texture
-// .pack chunk payloads, which the runtime FileManager LZ4-decompresses (5-10x faster than zlib inflate,
-// no adler32 pass). Offline cost of max level is acceptable. Sibling of ZlibCompress.
-std::vector<std::byte> Lz4Compress(const std::byte* puiSource, int64_t iSourceSize);
+// LZ4HC-compresses a byte buffer at LZ4HC_CLEVEL_MAX and returns a size-trimmed vector.
+// .pack texture chunks use this format; runtime FileManager LZ4-decompresses them.
+std::vector<std::byte> Lz4Compress(std::span<const std::byte> source);
 
-// Loads a gli container (.ktx / .dds / .kmg) through a wide-correct path read. gli::load(path) opens via ANSI
-// fopen_s (no UTF-8 conversion), so a non-ASCII path fails or mis-resolves; this reads the whole file with the
-// wide-correct std::filesystem::path stream, then hands gli the bytes via its memory overload. gli::load(path)
-// itself does the identical read-whole-file-then-memory-parse, so the returned texture is byte-identical for
-// valid inputs. Shared by ExportTexture's KTX cubemap path and the IBL cubemap pre-pass (ExportCubemapIbl).
+// Loads gli containers by reading through a filesystem path and passing the bytes to gli's memory overload.
+// gli::load(path) uses ANSI fopen_s and can fail for non-ASCII paths.
 gli::texture LoadGliFromPath(const std::filesystem::path& rPath);
 
 // Publishes an intermediate at `rPath`: opens a private, untagged sibling stage, lets `rWriteBody` emit the
@@ -96,7 +92,7 @@ struct TextureIntermediateHeader
 // plausibility-checks the legacy header and skips a bad one). For a magic-prefixed buffer `iDataSize` must cover
 // >= 4 qwords; legacy needs >= 3 (callers that can't guarantee that gate the call with their own size
 // check). Out-of-range qwords read as 0 rather than overrunning the buffer.
-TextureIntermediateHeader ReadTextureIntermediateHeader(const std::byte* puiData, int64_t iDataSize);
+TextureIntermediateHeader ReadTextureIntermediateHeader(std::span<const std::byte> data);
 
 // True when the filename carries the `[C]` cubemap tag — the convention marking a .ktx or
 // face-image-directory cubemap input. Shared by ExportTexture routing and the IBL pre-pass
@@ -113,9 +109,9 @@ public:
 	// Callers must hold this mutex around any Texture construction + MakeMipmaps + Save/Export
 	// chain that uses BC encoding. Encoding dispatches across the shared bounded worker pool; the mutex
 	// bounds memory and keeps that non-reentrant pool to one active encode at a time.
-	static std::mutex sEncodeMutex;
+	inline static std::mutex sEncodeMutex;
 
-	static void StaticInit();
+	static void StaticInitialize();
 
 	Texture() = delete;
 	Texture(const std::filesystem::path& rPath, FileType eFileType, int64_t iWidth = 0, int64_t iHeight = 0);
@@ -125,7 +121,7 @@ public:
 
 	void MakeMipmaps(VkFormat vkFormat, int64_t iMaxLevel = 32)
 	{
-		ASSERT(mData.size() == 1);
+		ASSERT(std::ssize(mData) == 1);
 		MakeMipmaps(vkFormat, iMaxLevel, 0, miWidth, miHeight);
 	}
 
@@ -145,13 +141,13 @@ public:
 	// before BC encoding, giving the base codecs and zlib large constant runs to compress.
 	void MaskByHeightmap(const std::vector<float>& rHeightmap, int64_t iHeightmapWidth, int64_t iHeightmapHeight, int64_t iHeightmapDivisor, float fThresholdMeters, const float pfFlatValue[4]);
 
-	static uint32_t PixelToUint32(const std::vector<float>& rIn, int64_t iWidth, int64_t iX, int64_t iY);
-	static void ToBc4(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight);
-	static void ToBc5(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight);
-	static void ToBc7(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, TextureOptions_t options);
-	static void ToR8G8B8A8(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight);
-	static void ToR16(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight);
-	static void ToR32Sfloat(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight);
+	static uint32_t PixelToUint32(const std::vector<float>& rInput, int64_t iWidth, int64_t iX, int64_t iY);
+	static void ToBc4(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight);
+	static void ToBc5(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight);
+	static void ToBc7(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight, TextureOptions_t options);
+	static void ToR8G8B8A8(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight);
+	static void ToR16(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight);
+	static void ToR32Sfloat(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight);
 
 	void Export(std::vector<std::byte>& rData, VkFormat vkFormat, TextureOptions_t options);
 
@@ -179,7 +175,7 @@ public:
 
 private:
 
-	static void EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, TextureOptions_t options);
+	static void EncodeBlocks(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, TextureOptions_t options);
 
 	// The file-loading constructor dispatches to one loader per FileType; each fills mData and (for the
 	// image / EXR paths that don't receive dimensions) miWidth / miHeight. kFloat32 / kUint16Raw require

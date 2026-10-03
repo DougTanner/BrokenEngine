@@ -38,7 +38,7 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 
 	// Format exception message with call site information
 	auto pcException = rWorkbuffer.PushBuffer<char*>(1'024);
-	std::snprintf(pcException, 1'023, "CheckVk failed: \"%.*s\" at %s:%u in %s\nVkResult: %s", static_cast<int>(expression.size()), expression.data(), loc.file_name(), loc.line(), loc.function_name(), pcResult);
+	std::snprintf(pcException.mpData, 1'023, "CheckVk failed: \"%.*s\" at %s:%u in %s\nVkResult: %s", static_cast<int>(expression.size()), expression.data(), loc.file_name(), loc.line(), loc.function_name(), pcResult);
 
 	if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR)
 	{
@@ -55,11 +55,11 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 
 	if (vkResult == VK_ERROR_DEVICE_LOST)
 	{
-		throw std::system_error(VkErrorCode(vkResult), pcException);
+		throw std::system_error(VkErrorCode(vkResult), pcException.mpData);
 	}
 
 	DEBUG_BREAK();
-	throw std::runtime_error(pcException);
+	throw std::runtime_error(pcException.mpData);
 }
 
 void SetVkObjectName([[maybe_unused]] VkObjectType type, [[maybe_unused]] uint64_t handle, [[maybe_unused]] std::string_view name)
@@ -107,7 +107,7 @@ XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasi
 {
 	// The elevation query is answered in the emitter's own cell, from the coordinate the basis carries; the
 	// projection toward the eye is the conversion point, so the rebase happens exactly once here.
-	float fElevation = gpIslandTerrain->GlobalElevation(rBasis.coord, vecLocalPosition);
+	float fElevation = gpIslandTerrain->GlobalElevation(rBasis.coordinate, vecLocalPosition);
 	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gBaseHeight.Get()));
 }
 

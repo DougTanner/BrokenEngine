@@ -19,9 +19,6 @@
 namespace engine
 {
 
-namespace
-{
-
 // Keep integer-truncated ImGui geometry fields at least one pixel; WindowBorderHoverPadding is 4px by default.
 constexpr float kfMinimumStyleGeometryFactor = 0.25f;
 
@@ -76,12 +73,10 @@ constexpr ThemePalette kThemePalettes[]
 };
 static_assert(std::size(kThemePalettes) == static_cast<size_t>(UiTheme::kCount));
 
-ImVec4 WithAlpha(const ImVec4& rf4Color, float fAlpha)
+static ImVec4 WithAlpha(const ImVec4& rf4Color, float fAlpha)
 {
 	return ImVec4(rf4Color.x, rf4Color.y, rf4Color.z, fAlpha);
 }
-
-} // namespace
 
 ImGuiManager::ImGuiManager(HWND hwnd)
 {
@@ -477,7 +472,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	// it so the injected pos wins last-writer-wins in ImGui::NewFrame (agent harness only; pin-valid gate lives inside).
 	if (gpAgentInput != nullptr)
 	{
-		gpAgentInput->ReissueImGuiMousePos();
+		gpAgentInput->ReissueImGuiMousePosition();
 	}
 
 	// Suppressed harness client: neutralize the two NewFrame physical polls the Win32 backend just ran. This runs after
@@ -488,7 +483,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 
 		// (d) Physical cursor poll: unless a synthetic pin owns io.MousePos, park it at ImGui's no-mouse sentinel.
 		// Missing agent input must also suppress the physical cursor rather than dereference a nullable startup global.
-		if (gpAgentInput == nullptr || !gpAgentInput->ImGuiMousePosPinned())
+		if (gpAgentInput == nullptr || !gpAgentInput->mbImGuiMousePositionPinned)
 		{
 			rIo.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
 		}

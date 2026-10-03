@@ -7,12 +7,11 @@ namespace engine
 
 int64_t TimeStep::TickRealtime()
 {
-	std::chrono::nanoseconds realDeltaNs = mRealTime.GetDeltaNs(true);
+	std::chrono::nanoseconds realDeltaNanoseconds = mRealTime.GetDeltaNs(true);
 
 	if constexpr (kbProfilingFrameSpike)
 	{
-		// Track delta for performance monitoring
-		float fDelta = common::NanosecondsToFloatSeconds<float>(realDeltaNs);
+		float fDelta = common::NanosecondsToFloatSeconds<float>(realDeltaNanoseconds);
 		if (mAverageDelta.miCount > 200 && fDelta > 1.9f * mAverageDelta.Average())
 		{
 			LOG(kDefault, kWarning, "\n\n\n  deltaNs spike {} > {}", common::Wb(fDelta, 4), common::Wb(mAverageDelta.Average(), 4));
@@ -28,16 +27,15 @@ int64_t TimeStep::TickRealtime()
 		mAverageDelta = fDelta;
 	}
 
-	// Accumulate time with scaling
-	mTickRemainderNs += WallToSim(realDeltaNs);
+	mTickRemainderNanoseconds += WallToSimulation(realDeltaNanoseconds);
 
 #if defined(BT_SERVER)
 	// Death spiral prevention: detect excessive updates and auto-reduce time scale. Server only, because
 	// the server broadcasts the new ratio to every client; the client only consumes a broadcast ratio.
 	if constexpr (kbDebugInput)
 	{
-		int64_t iEstimatedTicks = mTickRemainderNs / kTickNs;
-		if (iEstimatedTicks > kiMaxTicksPerFrame && miTimeMultiply > 1) [[unlikely]]
+		int64_t iEstimatedTicks = mTickRemainderNanoseconds / kTickNanoseconds;
+		if (iEstimatedTicks > kiMaximumTicksPerFrame && miTimeMultiply > 1) [[unlikely]]
 		{
 			LOG(kDefault, kWarning, "Death spiral detected: {} ticks at {}x speed", iEstimatedTicks, miTimeMultiply);
 			DecreaseTimeScale(false);
@@ -46,28 +44,17 @@ int64_t TimeStep::TickRealtime()
 #endif
 
 	// Clamp accumulator to prevent backlog cascade (e.g., after background/focus loss)
-	std::chrono::nanoseconds maxAccumulator = kTickNs * kiMaxAccumulatorTicks;
-	if (mTickRemainderNs > maxAccumulator)
+	std::chrono::nanoseconds maximumAccumulator = kTickNanoseconds * kiMaximumAccumulatorTicks;
+	if (mTickRemainderNanoseconds > maximumAccumulator)
 	{
 		LOG(kDefault, kVerbose, "TimeStep::TickRealtime Accumulator clamped");
-		mTickRemainderNs = maxAccumulator;
+		mTickRemainderNanoseconds = maximumAccumulator;
 	}
 
-	// Calculate number of ticks needed
-	int64_t iTicks = mTickRemainderNs / kTickNs;
-	mTickRemainderNs %= kTickNs;
+	int64_t iTicks = mTickRemainderNanoseconds / kTickNanoseconds;
+	mTickRemainderNanoseconds %= kTickNanoseconds;
 
 	return iTicks;
-}
-
-void TimeStep::ClearAccumulator()
-{
-	mTickRemainderNs = 0ns;
-}
-
-void TimeStep::AbsorbUnusedTicks(int64_t iTicks)
-{
-	mTickRemainderNs += iTicks * kTickNs;
 }
 
 void TimeStep::SetTimeScale(int64_t iMultiply, int64_t iDivide)
@@ -77,7 +64,7 @@ void TimeStep::SetTimeScale(int64_t iMultiply, int64_t iDivide)
 	mbTimeScaleChanged = true;
 }
 
-bool TimeStep::DecreaseTimeScale(bool bAllowSlowMo)
+bool TimeStep::DecreaseTimeScale(bool bAllowSlowMotion)
 {
 	if (miTimeMultiply > 1)
 	{
@@ -86,7 +73,7 @@ bool TimeStep::DecreaseTimeScale(bool bAllowSlowMo)
 		mbTimeScaleChanged = true;
 		return true;
 	}
-	else if (bAllowSlowMo && miTimeDivide < kiMaxTimeDivide)
+	else if (bAllowSlowMotion && miTimeDivide < kiMaximumTimeDivide)
 	{
 		miTimeDivide *= 2;
 		LOG(kDefault, kDebug, "Time ratio: 1/{}x", miTimeDivide);

@@ -8,30 +8,27 @@
 namespace engine
 {
 
-namespace
-{
-
 // Thread-safe hand-off of the finished agent "result" JSON from the async save/encode thread to the main-thread
 // deferred-response poll. There is one active agent request/result slot, but abandoned screenshot and dump encoders
 // may overlap because their independent futures outlive timeout/disconnect. The active token rejects their late
 // publications so they cannot replace the newer request's result.
-std::mutex sCaptureResultMutex;
-std::optional<nlohmann::json> sCaptureResult;
-uint64_t sCaptureTokenNext = 0; // monotonic mint (guarded by sCaptureResultMutex)
-uint64_t suiCaptureTokenActive = 0; // current request token (guarded by sCaptureResultMutex)
+static std::mutex sCaptureResultMutex;
+static std::optional<nlohmann::json> sCaptureResult;
+static uint64_t sCaptureTokenNext = 0; // monotonic mint (guarded by sCaptureResultMutex)
+static uint64_t suiCaptureTokenActive = 0; // current request token (guarded by sCaptureResultMutex)
 
-std::u8string PathToU8(const std::filesystem::path& rPath)
+static std::u8string PathToU8(const std::filesystem::path& rPath)
 {
 	return rPath.u8string();
 }
 
-std::string PathToString(const std::filesystem::path& rPath)
+static std::string PathToString(const std::filesystem::path& rPath)
 {
 	std::u8string u8 = rPath.u8string();
 	return std::string(reinterpret_cast<const char*>(u8.c_str()), u8.size());
 }
 
-void ReportCaptureFailure(std::string_view error, bool bPublishResult, uint64_t uiCaptureToken)
+static void ReportCaptureFailure(std::string_view error, bool bPublishResult, uint64_t uiCaptureToken)
 {
 	LOG(kGraphics, kWarning, "{}", error);
 	if (bPublishResult)
@@ -42,9 +39,7 @@ void ReportCaptureFailure(std::string_view error, bool bPublishResult, uint64_t 
 	}
 }
 
-constexpr bool IsBgra(VkFormat vkFormat);
-
-} // namespace
+static constexpr bool IsBgra(VkFormat vkFormat);
 
 uint64_t ResetCaptureResult()
 {
@@ -210,11 +205,8 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 	}, common::kiMinWorkbufferSize, common::kThreadScreenshot));
 }
 
-namespace
-{
-
 // Throws if iIndex is outside [0, iCount); otherwise returns it as an array subscript.
-size_t CheckDumpIndex(int64_t iIndex, int64_t iCount, std::string_view name)
+static size_t CheckDumpIndex(int64_t iIndex, int64_t iCount, std::string_view name)
 {
 	if (iIndex < 0 || iIndex >= iCount)
 	{
@@ -232,7 +224,7 @@ constexpr const char* kpcValidDumpNames =
 
 // Resolve a dump name (+ indices) to a live RenderTargetTextures member. Throws std::runtime_error listing valid
 // names on an unknown name, or on an out-of-range index (both surfaced to the agent).
-Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64_t iChannel)
+static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64_t iChannel)
 {
 	RenderTargetTextures& r = gpTextureManager->mRenderTargetTextures;
 
@@ -338,7 +330,7 @@ Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64_t iCha
 	throw std::runtime_error("unknown render target '" + std::string(name) + "'; valid names: " + kpcValidDumpNames);
 }
 
-const char* FormatName(VkFormat vkFormat)
+static const char* FormatName(VkFormat vkFormat)
 {
 	switch (vkFormat)
 	{
@@ -355,24 +347,24 @@ const char* FormatName(VkFormat vkFormat)
 	}
 }
 
-constexpr bool IsFourByteColor(VkFormat vkFormat)
+static constexpr bool IsFourByteColor(VkFormat vkFormat)
 {
 	return vkFormat == VK_FORMAT_R8G8B8A8_UNORM || vkFormat == VK_FORMAT_R8G8B8A8_SRGB || vkFormat == VK_FORMAT_B8G8R8A8_UNORM
 	    || vkFormat == VK_FORMAT_B8G8R8A8_SRGB;
 }
 
-constexpr bool IsBgra(VkFormat vkFormat)
+static constexpr bool IsBgra(VkFormat vkFormat)
 {
 	return vkFormat == VK_FORMAT_B8G8R8A8_UNORM || vkFormat == VK_FORMAT_B8G8R8A8_SRGB;
 }
 
-constexpr bool IsSingleChannelNormalizable(VkFormat vkFormat)
+static constexpr bool IsSingleChannelNormalizable(VkFormat vkFormat)
 {
 	return vkFormat == VK_FORMAT_R16_UNORM || vkFormat == VK_FORMAT_R16_SFLOAT || vkFormat == VK_FORMAT_R32_SFLOAT;
 }
 
 // Convert one single-channel texel (per format) to float, for min/max normalization.
-float SingleChannelToFloat(const std::byte* pData, int64_t iTexel, VkFormat vkFormat)
+static float SingleChannelToFloat(const std::byte* pData, int64_t iTexel, VkFormat vkFormat)
 {
 	if (vkFormat == VK_FORMAT_R16_UNORM)
 	{
@@ -392,7 +384,7 @@ float SingleChannelToFloat(const std::byte* pData, int64_t iTexel, VkFormat vkFo
 // screenshot thread (own ThreadLocal; the lambda suppresses tracking). Only formats pre-validated in
 // ValidateDumpRenderTargetRequest reach the PNG paths; any unexpected failure publishes an error result so the
 // deferred poll never hangs.
-void EncodeAndWriteDump(std::vector<std::byte>& rData, VkExtent3D vkExtent3D, VkFormat vkFormat, const DumpRenderTargetRequest& rRequest)
+static void EncodeAndWriteDump(std::vector<std::byte>& rData, VkExtent3D vkExtent3D, VkFormat vkFormat, const DumpRenderTargetRequest& rRequest)
 {
 	try
 	{
@@ -516,8 +508,6 @@ void EncodeAndWriteDump(std::vector<std::byte>& rData, VkExtent3D vkExtent3D, Vk
 		}
 	}
 }
-
-} // namespace
 
 void ValidateDumpRenderTargetRequest(const DumpRenderTargetRequest& rRequest)
 {

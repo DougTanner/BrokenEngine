@@ -22,7 +22,7 @@ constexpr float kfDeathKnockbackSpeed = 20.0f;
 
 // Collision layer index (set each frame in PreCollision)
 // thread_local: parallel per-Frame tick via Dispatch
-static thread_local size_t suiCollisionLayerIndex = 0;
+static thread_local int64_t siCollisionLayerIndex = 0;
 static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
 static thread_local std::vector<float> sCollisionRadii;
 static thread_local std::vector<float> sCollisionDamages;
@@ -123,7 +123,7 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 	}
 
 	// Add spaceship layer to Collision
-	suiCollisionLayerIndex = engine::Collision::AddLayer(
+	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
 		.pVecStartPositions = rPreviousFrame.interpolate.pSpaceships->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
@@ -162,9 +162,9 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 
 		// Check collision results - spaceships take damage from player blasters only
 		// Note: Missile damage is handled via area damage system in AreaDamage phase
-		if (engine::Collision::HasCollision(suiCollisionLayerIndex, i))
+		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
 		{
-			std::span<const engine::CollisionResult> collisions = engine::Collision::GetCollisions(suiCollisionLayerIndex, i);
+			std::span<const engine::CollisionResult> collisions = engine::Collision::GetCollisions(siCollisionLayerIndex, i);
 			for (const engine::CollisionResult& rResult : collisions)
 			{
 				if (rResult.uiOtherCategory == CollisionCategory::kBlaster)
@@ -173,18 +173,18 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 
 					// Play hit sound
 #if defined(BT_CLIENT)
-					engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coord, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.Get());
+					engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.Get());
 #endif
 
 					// Spawn hit flash effect at collision point
 #if defined(BT_CLIENT)
-					engine::PointLightsPostRender::AddControlled(rFrame, rFrame.interpolate.fCurrentTime, gSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+					engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), gSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 
 					if (rCurrentPostRender.pfHealths[i] <= 0.0f)
 					{
 						XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorNegate(rResult.vecOtherVelocity));
-						BeginExplosion(rFrame, rStaticData.coord, i, vecDamageDirection);
+						BeginExplosion(rFrame, rStaticData.coordinate, i, vecDamageDirection);
 						break;
 					}
 				}
@@ -232,7 +232,7 @@ void SpaceshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame,
 		if (rCurrentPostRender.pfHealths[i] <= 0.0f)
 		{
 			XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecClosestSource, rCurrentInterpolate.pVecPositions[i]));
-			BeginExplosion(rFrame, rStaticData.coord, i, vecDamageDirection);
+			BeginExplosion(rFrame, rStaticData.coordinate, i, vecDamageDirection);
 		}
 	}
 }

@@ -8,8 +8,6 @@
 namespace game
 {
 
-namespace
-{
 const engine::TweaksSliderMapRegistrar gWindDepositsRegistrar
 {
 	// Player
@@ -31,7 +29,6 @@ const engine::TweaksSliderMapRegistrar gWindDepositsRegistrar
 	{"Explosions Deposit Width", &gWindDepositExplosionsWidth},
 	{"Explosions Deposit Intensity", &gWindDepositExplosionsIntensity},
 };
-}
 
 void TweaksScreen::RenderWindDepositsTab()
 {

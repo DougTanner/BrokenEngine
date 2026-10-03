@@ -5,7 +5,7 @@
 namespace engine
 {
 
-static constexpr float kfSmoothingRate = 20.0f;
+constexpr float kfSmoothingRate = 20.0f;
 
 void SmokeTrailsInterpolate::Update(game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame)
 {
@@ -28,7 +28,7 @@ void SmokeTrailsInterpolate::Update(game::FrameInterpolate& __restrict rFrameInt
 void SmokeTrailsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData)
 {
 	SmokeTrailsInterpolate& rSmokeTrails = rFrameInterpolate.smokeTrails;
-	int64_t iIndex = rSmokeTrails.IdToIndex(id);
+	int64_t iIndex = rSmokeTrails.idToIndexMap.at(id);
 
 	rSmokeTrails.pVecPositions[iIndex] = XMVectorSetW(rData.vecPosition, 1.0f);
 	rSmokeTrails.pfIntensities[iIndex] = rData.fIntensity;
@@ -40,7 +40,7 @@ void SmokeTrailsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFra
 
 void SmokeTrailsPostRender::Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, uint8_t uiTypeIndex)
 {
-	ASSERT(!rId.IsValid());
+	ASSERT(!(rId.uuid.iValue != 0));
 
 	SmokeTrailsInterpolate& rInterpolate = rFrame.interpolate.smokeTrails;
 	SmokeTrailsPostRender& rPostRender = rFrame.postRender.smokeTrails;
@@ -50,18 +50,10 @@ void SmokeTrailsPostRender::Add(game::Frame& __restrict rFrame, smoke_trails_t& 
 	auto [iSpawnIndex, id] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
 
 	rId = id;
-	rPostRender.puiIds[iSpawnIndex] = id;
+	rPostRender.pIds[iSpawnIndex] = id;
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
 	rInterpolate.puiTypeIndices[iSpawnIndex] = uiTypeIndex;
 	rInterpolate.pfStartTimes[iSpawnIndex] = rFrame.interpolate.fCurrentTime;
-}
-
-void SmokeTrailsPostRender::Remove(game::Frame& __restrict rFrame, smoke_trails_t& rId)
-{
-	SmokeTrailsInterpolate& rInterpolate = rFrame.interpolate.smokeTrails;
-	SmokeTrailsPostRender& rPostRender = rFrame.postRender.smokeTrails;
-
-	RemoveIndexableElementAndClearHandle(rInterpolate, rPostRender, rId, rInterpolate.Members(), rPostRender.Members());
 }
 
 } // namespace engine

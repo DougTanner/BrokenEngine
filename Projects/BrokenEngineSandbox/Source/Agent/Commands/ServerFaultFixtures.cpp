@@ -82,7 +82,7 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json
 	{
 		// Start the fixed burst at zero for its raw packet type; all other client counters remain unchanged.
 		engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
-		pClient->tickTypeCounts[static_cast<uint8_t>(GamePacketType::kClientUpdatePlayerRequest)] = 0;
+		pClient->uiTickTypeCounts[static_cast<uint8_t>(GamePacketType::kClientUpdatePlayerRequest)] = 0;
 	}
 	if (caseName == "server_only")
 	{
@@ -118,7 +118,7 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json
 
 // engine_packet_fault_fixture: dispatch one malformed engine packet through the real Server::Receive path, so the
 // admission gates, the dispatch catch, and RecordContractViolation all run. Ungated, mirroring
-// game_packet_fault_fixture, because it only drops a packet. Both cases use kClientAckStream: it is the one
+// game_packet_fault_fixture, because it only drops a packet. Both cases use kClientAcknowledgmentStream: it is the one
 // client-sendable engine row whose [min,max] size range admits a packet the reader can still reject, so the failure
 // lands in decode rather than at the exact-size admission gate.
 void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
@@ -173,7 +173,7 @@ void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::js
 	// "ackstream size" locally. The two are mutually exclusive, so one packet is counted exactly once.
 	int64_t iSize = caseName == "truncated" ? 10 : 38;
 	std::vector<uint8_t> packet(static_cast<size_t>(iSize), 0);
-	packet.at(0) = static_cast<uint8_t>(engine::PacketType::kClientAckStream);
+	packet.at(0) = static_cast<uint8_t>(engine::PacketType::kClientAcknowledgmentStream);
 	packet.at(1) = 1;
 
 	// RecordContractViolation may remove the client, so nothing below touches the connection again.
@@ -224,11 +224,11 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture requires exactly one handshaken client");
 		}
-		if (pClient->iTickPacketCount > engine::kiMaxClientPacketsPerTick - 1)
+		if (pClient->iTickPacketCount > engine::kiMaximumClientPacketsPerTick - 1)
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture requires packet-count headroom");
 		}
-		if (pClient->iTickByteCount > engine::kiMaxClientInboundBytesPerTick - engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize)
+		if (pClient->iTickByteCount > engine::kiMaximumClientInboundBytesPerTick - engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize)
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture requires byte-count headroom");
 		}
@@ -240,9 +240,9 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		int64_t iRateViolations = pClient->iRateViolations;
 		int64_t iPacketCount = pClient->iTickPacketCount;
 		int64_t iByteCount = pClient->iTickByteCount;
-		static constexpr uint8_t kuiPacketType = static_cast<uint8_t>(engine::PacketType::kClientAckStream);
-		uint16_t uiTypeCount = pClient->tickTypeCounts[kuiPacketType];
-		int64_t iClientTimestampNs = pClient->iClientTimestampNs;
+		static constexpr uint8_t kuiPacketType = static_cast<uint8_t>(engine::PacketType::kClientAcknowledgmentStream);
+		uint16_t uiTypeCount = pClient->uiTickTypeCounts[kuiPacketType];
+		int64_t iClientTimestampNs = pClient->iClientTimestampNanoseconds;
 		int64_t iConsecutiveZeroAdvanceAcks = pClient->iConsecutiveZeroAdvanceAcks;
 		bool bFloorStalled = pClient->bFloorStalled;
 		int64_t iPeakConsecutiveStallAcks = pClient->iPeakConsecutiveStallAcks;
@@ -291,18 +291,18 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		{
 			const engine::AckState& rBefore = ackStates.at(i);
 			const engine::AckState& rAfter = pClient->slots.at(i).ack;
-			bAckSlotsUnchanged = rAfter.iAckFloor == rBefore.iAckFloor && rAfter.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow
+			bAckSlotsUnchanged = rAfter.iAcknowledgmentFloor == rBefore.iAcknowledgmentFloor && rAfter.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow
 			                  && rAfter.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh && rAfter.uiEpoch == rBefore.uiEpoch;
 		}
 
 		bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1
 		                       && pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;
 		bool bHandshakeRestored = bHandshakeComplete && pClient->bHandshakeComplete;
-		bool bTypeCountUnchanged = pClient->tickTypeCounts[kuiPacketType] == uiTypeCount;
+		bool bTypeCountUnchanged = pClient->uiTickTypeCounts[kuiPacketType] == uiTypeCount;
 		bool bAckStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcks
 		                       && pClient->bFloorStalled == bFloorStalled
 		                       && pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcks;
-		bool bTimestampUnchanged = pClient->iClientTimestampNs == iClientTimestampNs;
+		bool bTimestampUnchanged = pClient->iClientTimestampNanoseconds == iClientTimestampNs;
 		bool bContractViolationsUnchanged = pClient->iCorruptViolations == iCorruptViolations && pClient->iRateViolations == iRateViolations;
 		if (!bAdmissionAdvanced)
 		{

@@ -11,7 +11,7 @@ namespace game
 struct Frame;
 struct FrameInterpolate;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -20,15 +20,12 @@ struct FrameStaticData;
 
 struct SoundsInterpolate : public Collection<SoundsInterpolate, CollectionFlags::kIdToIndex>
 {
-	// Allocate and copy
-	static void AllocateAndCopy(SoundsInterpolate& rCurrent, const SoundsInterpolate& rPrevious);
-
 	// SyncData for parent-provided values
 	struct SyncData
 	{
-		XMVECTOR vecPosition;
-		XMVECTOR vecVelocity;
-		common::crc_t uiCrc;
+		XMVECTOR vecPosition {};
+		XMVECTOR vecVelocity {};
+		common::crc_t uiCrc = 0;
 		float fVolume = 0.0f;
 		float fPitch = 0.0f;
 		float fFadeOutTime = 0.0f;
@@ -37,10 +34,8 @@ struct SoundsInterpolate : public Collection<SoundsInterpolate, CollectionFlags:
 	// Sync owned sound with parent-provided data
 	static void Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData);
 
-	// Update
 	static void Update(game::FrameInterpolate& __restrict rFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
-	// Member arrays (SOA)
 	common::crc_t* __restrict puiCrcs = nullptr;
 	float* __restrict pfVolumes = nullptr;
 	float* __restrict pfPitches = nullptr;
@@ -58,20 +53,16 @@ using sound_t = SoundsInterpolate::id_t;
 
 struct SoundsPostRender : public Collection<SoundsPostRender>
 {
-	// Allocate and copy
-	static void AllocateAndCopy(SoundsPostRender& rCurrent, const SoundsPostRender& rPrevious);
-
-	// Update
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
-	// Add sound
 	static void Add(game::Frame& __restrict rFrame, sound_t& rId);
 
-	// Remove sound by ID
-	static void Remove(game::Frame& __restrict rFrame, sound_t& rId);
 
-	sound_t* __restrict puiIds = nullptr;
-	auto Members(this auto&& rSelf) { return std::tie(rSelf.puiIds); }
+	sound_t* __restrict pIds = nullptr;
+	auto Members(this auto&& rSelf)
+	{
+		return std::tie(rSelf.pIds);
+	}
 
 };
 

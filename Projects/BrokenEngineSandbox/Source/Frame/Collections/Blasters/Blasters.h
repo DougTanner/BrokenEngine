@@ -111,7 +111,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 
 	BlasterFlags_t* __restrict pFlags = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
-	engine::alignment_t* __restrict pAlignments = nullptr;
+	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pAlignments); }
 	auto Members(this auto&& rSelf) { return rSelf.SharedMembers(); }
 
@@ -125,7 +125,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
 		uint8_t uiTypeIndex = 0;
 		BlasterFlags_t flags {};
-		engine::alignment_t alignment {};
+		engine::AlignmentIdentifier alignment {};
 		float fWindTrailIntensity = 0.0f;
 		float fWindTrailWidth = 0.0f;
 		float fWindTrailLengthMultiplier = 1.0f;

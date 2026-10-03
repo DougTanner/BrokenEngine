@@ -14,17 +14,14 @@
 namespace engine
 {
 
-namespace
-{
-
-std::filesystem::path PathFromParam(const nlohmann::json& rValue)
+static std::filesystem::path PathFromParameter(const nlohmann::json& rValue)
 {
 	// Agent-supplied path is UTF-8; .get<std::string>() throws on a non-string.
 	std::string utf8 = rValue.get<std::string>();
 	return std::filesystem::path(reinterpret_cast<const char8_t*>(utf8.c_str()));
 }
 
-int32_t FrameCountParameter(const nlohmann::json& rParameters, std::string_view command, const char* pcParameter, int32_t iDefault, int64_t iMax)
+static int64_t FrameCountParameter(const nlohmann::json& rParameters, std::string_view command, const char* pcParameter, int64_t iDefault, int64_t iMax)
 {
 	if (!rParameters.contains(pcParameter))
 	{
@@ -45,7 +42,7 @@ int32_t FrameCountParameter(const nlohmann::json& rParameters, std::string_view 
 		{
 			throw std::runtime_error(integerError + " in [0," + std::to_string(iMax) + "]");
 		}
-		return static_cast<int32_t>(uiFrames);
+		return static_cast<int64_t>(uiFrames);
 	}
 
 	int64_t iFrames = rFrames.get<int64_t>();
@@ -53,7 +50,7 @@ int32_t FrameCountParameter(const nlohmann::json& rParameters, std::string_view 
 	{
 		throw std::runtime_error(integerError + " in [0," + std::to_string(iMax) + "]");
 	}
-	return static_cast<int32_t>(iFrames);
+	return static_cast<int64_t>(iFrames);
 }
 
 enum class CaptureCommandPhase : uint8_t
@@ -70,13 +67,13 @@ struct CaptureCommandState
 	{
 		// Deferred-response timeout/discard does not poll again. Restore the original minimized state when the
 		// state object is released so every failure path cleans up before AgentCommandServer publishes or exits.
-		if (bRestoreMinimized && ePhase != CaptureCommandPhase::kDone && IsWindow(hwnd) != FALSE && IsIconic(hwnd) == FALSE)
+		if (bRestoreMinimized && ePhase != CaptureCommandPhase::kDone && IsWindow(windowHandle) != FALSE && IsIconic(windowHandle) == FALSE)
 		{
-			ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
+			ShowWindow(windowHandle, SW_SHOWMINNOACTIVE);
 		}
 	}
 
-	HWND hwnd = nullptr;
+	HWND windowHandle = nullptr;
 	CaptureCommandPhase ePhase = CaptureCommandPhase::kAwaitResult;
 	bool bRestoreMinimized = false;
 	uint64_t uiCaptureToken = 0;
@@ -97,13 +94,13 @@ struct RenderDocCaptureState
 	{
 		// Mirror CaptureCommandState: the deferred-response timeout/discard does not poll again, so restore the
 		// original minimized state on release, cleaning up before AgentCommandServer publishes or exits.
-		if (bRestoreMinimized && ePhase != RenderDocCapturePhase::kDone && IsWindow(hwnd) != FALSE && IsIconic(hwnd) == FALSE)
+		if (bRestoreMinimized && ePhase != RenderDocCapturePhase::kDone && IsWindow(windowHandle) != FALSE && IsIconic(windowHandle) == FALSE)
 		{
-			ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
+			ShowWindow(windowHandle, SW_SHOWMINNOACTIVE);
 		}
 	}
 
-	HWND hwnd = nullptr;
+	HWND windowHandle = nullptr;
 	RenderDocCapturePhase ePhase = RenderDocCapturePhase::kAwaitCaptures;
 	bool bRestoreMinimized = false;
 	uint32_t uiBaselineCaptures = 0;
@@ -111,38 +108,38 @@ struct RenderDocCaptureState
 };
 
 template <typename QUEUE_CAPTURE>
-void BeginCaptureAndDefer(QUEUE_CAPTURE queueCapture)
+static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 {
-	HWND hwnd = engine::gpGraphics->mHwnd;
-	bool bRestoreMinimized = IsIconic(hwnd) != FALSE;
+	HWND windowHandle = engine::gpGraphics->mHwnd;
+	bool bRestoreMinimized = IsIconic(windowHandle) != FALSE;
 	if (!bRestoreMinimized && engine::gpGraphics->mbSwapchainRecreateDeferred)
 	{
-		// Preserve the existing fast failure when a non-minimized window has no live capture target.
+		// A non-minimized window with deferred swapchain recreation has no live capture target.
 		throw std::runtime_error("window is minimized or swapchain recreate is deferred");
 	}
 
 	std::shared_ptr<CaptureCommandState> pState = std::make_shared<CaptureCommandState>();
-	pState->hwnd = hwnd;
+	pState->windowHandle = windowHandle;
 	pState->bRestoreMinimized = bRestoreMinimized;
 	if (bRestoreMinimized)
 	{
 		pState->ePhase = CaptureCommandPhase::kAwaitRestore;
-		ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+		ShowWindow(windowHandle, SW_SHOWNOACTIVATE);
 	}
 	else
 	{
 		pState->uiCaptureToken = engine::ResetCaptureResult();
-		queueCapture(pState->uiCaptureToken);
+		QueueCapture(pState->uiCaptureToken);
 	}
 
-	engine::gpAgentCommandServer->DeferResponse([pState, queueCapture = std::move(queueCapture)]() mutable -> std::optional<nlohmann::json>
+	engine::gpAgentCommandServer->DeferResponse([pState, QueueCapture = std::move(QueueCapture)]() mutable -> std::optional<nlohmann::json>
 	{
 		if (pState->ePhase == CaptureCommandPhase::kAwaitRestore)
 		{
-			if (IsIconic(pState->hwnd) == FALSE && engine::gpGraphics->ExtentSettled())
+			if (IsIconic(pState->windowHandle) == FALSE && engine::gpGraphics->ExtentSettled())
 			{
 				pState->uiCaptureToken = engine::ResetCaptureResult();
-				queueCapture(pState->uiCaptureToken);
+				QueueCapture(pState->uiCaptureToken);
 				pState->ePhase = CaptureCommandPhase::kAwaitResult;
 			}
 		}
@@ -158,7 +155,7 @@ void BeginCaptureAndDefer(QUEUE_CAPTURE queueCapture)
 				}
 				else
 				{
-					ShowWindow(pState->hwnd, SW_SHOWMINNOACTIVE);
+					ShowWindow(pState->windowHandle, SW_SHOWMINNOACTIVE);
 					pState->ePhase = CaptureCommandPhase::kAwaitMinimize;
 				}
 			}
@@ -166,7 +163,7 @@ void BeginCaptureAndDefer(QUEUE_CAPTURE queueCapture)
 
 		if (pState->ePhase == CaptureCommandPhase::kAwaitMinimize)
 		{
-			if (IsIconic(pState->hwnd) == FALSE)
+			if (IsIconic(pState->windowHandle) == FALSE)
 			{
 				return std::nullopt;
 			}
@@ -192,7 +189,7 @@ void BeginCaptureAndDefer(QUEUE_CAPTURE queueCapture)
 
 // screenshot: capture the live window to a downscaled JPG/PNG. Completes via the deferred-response mechanism once
 // the async save records its result. Schema: {"path"?,"maxWidth"?:1568,"format"?:"jpg|png","quality"?:80}.
-void CommandScreenshot(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandScreenshot(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	// The capture consume site (RenderMainPresentAcquire) is compiled out under !kbScreenshots, so a deferred request
 	// would never resolve — fail fast instead of blocking the agent channel until the liveness timeout.
@@ -205,17 +202,17 @@ void CommandScreenshot(const nlohmann::json& rParams, [[maybe_unused]] nlohmann:
 	// then returns it to the minimized state after the capture result arrives.
 	engine::ScreenshotRequest request;
 	request.bPublishResult = true;
-	if (rParams.contains("path"))
+	if (rParameters.contains("path"))
 	{
-		request.path = PathFromParam(rParams.at("path"));
+		request.path = PathFromParameter(rParameters.at("path"));
 	}
-	if (rParams.contains("maxWidth"))
+	if (rParameters.contains("maxWidth"))
 	{
-		request.iMaxWidth = rParams.at("maxWidth").get<int64_t>();
+		request.iMaxWidth = rParameters.at("maxWidth").get<int64_t>();
 	}
-	if (rParams.contains("format"))
+	if (rParameters.contains("format"))
 	{
-		std::string format = rParams.at("format").get<std::string>();
+		std::string format = rParameters.at("format").get<std::string>();
 		if (format == "png")
 		{
 			request.bPng = true;
@@ -229,9 +226,9 @@ void CommandScreenshot(const nlohmann::json& rParams, [[maybe_unused]] nlohmann:
 			throw std::runtime_error("screenshot 'format' must be 'jpg' or 'png'");
 		}
 	}
-	if (rParams.contains("quality"))
+	if (rParameters.contains("quality"))
 	{
-		int64_t iQuality = rParams.at("quality").get<int64_t>();
+		int64_t iQuality = rParameters.at("quality").get<int64_t>();
 		if (iQuality < 1 || iQuality > 100)
 		{
 			throw std::runtime_error("screenshot 'quality' must be an integer in [1,100]");
@@ -251,7 +248,7 @@ void CommandScreenshot(const nlohmann::json& rParams, [[maybe_unused]] nlohmann:
 // restored for the live present, then re-minimized after RenderDoc serializes every capture. Completes via the
 // deferred-response mechanism once GetNumCaptures() reaches the pre-trigger baseline plus the requested frame count.
 // Schema: {"frames"?:1 (1..8)} -> {"paths":[absolute .rdc paths]}.
-void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	RENDERDOC_API_1_6_0* pRenderDocApi = engine::gpInstanceManager->mpRenderDocApi;
 	if (pRenderDocApi == nullptr)
@@ -260,21 +257,21 @@ void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlo
 	}
 
 	int64_t iFrames = 1;
-	if (rParams.contains("frames"))
+	if (rParameters.contains("frames"))
 	{
-		if (!rParams.at("frames").is_number_integer())
+		if (!rParameters.at("frames").is_number_integer())
 		{
 			throw std::runtime_error("renderdoc_capture 'frames' must be an integer in [1,8]");
 		}
-		iFrames = rParams.at("frames").get<int64_t>();
+		iFrames = rParameters.at("frames").get<int64_t>();
 		if (iFrames < 1 || iFrames > 8)
 		{
 			throw std::runtime_error("renderdoc_capture 'frames' must be an integer in [1,8]");
 		}
 	}
 
-	HWND hwnd = engine::gpGraphics->mHwnd;
-	bool bRestoreMinimized = IsIconic(hwnd) != FALSE;
+	HWND windowHandle = engine::gpGraphics->mHwnd;
+	bool bRestoreMinimized = IsIconic(windowHandle) != FALSE;
 	if (!bRestoreMinimized && engine::gpGraphics->mbSwapchainRecreateDeferred)
 	{
 		// Mirror BeginCaptureAndDefer's fast-fail: a deferred swapchain recreate skips present, so a trigger on a
@@ -283,13 +280,13 @@ void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlo
 	}
 
 	std::shared_ptr<RenderDocCaptureState> pState = std::make_shared<RenderDocCaptureState>();
-	pState->hwnd = hwnd;
+	pState->windowHandle = windowHandle;
 	pState->bRestoreMinimized = bRestoreMinimized;
 	pState->iFrames = iFrames;
 	if (bRestoreMinimized)
 	{
 		pState->ePhase = RenderDocCapturePhase::kAwaitRestore;
-		ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+		ShowWindow(windowHandle, SW_SHOWNOACTIVATE);
 	}
 	else
 	{
@@ -308,7 +305,7 @@ void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlo
 	{
 		if (pState->ePhase == RenderDocCapturePhase::kAwaitRestore)
 		{
-			if (IsIconic(pState->hwnd) == FALSE && engine::gpGraphics->ExtentSettled())
+			if (IsIconic(pState->windowHandle) == FALSE && engine::gpGraphics->ExtentSettled())
 			{
 				pState->uiBaselineCaptures = pRenderDocApi->GetNumCaptures();
 				if (pState->iFrames == 1)
@@ -333,7 +330,7 @@ void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlo
 			}
 			if (pState->bRestoreMinimized)
 			{
-				ShowWindow(pState->hwnd, SW_SHOWMINNOACTIVE);
+				ShowWindow(pState->windowHandle, SW_SHOWMINNOACTIVE);
 				pState->ePhase = RenderDocCapturePhase::kAwaitMinimize;
 			}
 			else
@@ -344,7 +341,7 @@ void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlo
 
 		if (pState->ePhase == RenderDocCapturePhase::kAwaitMinimize)
 		{
-			if (IsIconic(pState->hwnd) == FALSE)
+			if (IsIconic(pState->windowHandle) == FALSE)
 			{
 				return std::nullopt;
 			}
@@ -357,16 +354,16 @@ void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlo
 		}
 
 		nlohmann::json paths = nlohmann::json::array();
-		for (uint32_t uiIndex = pState->uiBaselineCaptures; uiIndex < pState->uiBaselineCaptures + static_cast<uint32_t>(pState->iFrames); ++uiIndex)
+		for (uint32_t i = pState->uiBaselineCaptures; i < pState->uiBaselineCaptures + static_cast<uint32_t>(pState->iFrames); ++i)
 		{
 			// Two-call GetCapture: first with a null buffer to size the path (length includes the NUL), then read it.
 			uint32_t uiPathLength = 0;
-			if (pRenderDocApi->GetCapture(uiIndex, nullptr, &uiPathLength, nullptr) == 0)
+			if (pRenderDocApi->GetCapture(i, nullptr, &uiPathLength, nullptr) == 0)
 			{
 				throw std::runtime_error("renderdoc_capture: capture index unavailable");
 			}
 			std::string capturePath(uiPathLength, '\0');
-			pRenderDocApi->GetCapture(uiIndex, capturePath.data(), &uiPathLength, nullptr);
+			pRenderDocApi->GetCapture(i, capturePath.data(), &uiPathLength, nullptr);
 			capturePath.resize(uiPathLength > 0 ? uiPathLength - 1 : 0);
 
 			if (!std::filesystem::exists(std::filesystem::path(reinterpret_cast<const char8_t*>(capturePath.c_str()))))
@@ -388,15 +385,15 @@ void CommandRenderDocCapture(const nlohmann::json& rParams, [[maybe_unused]] nlo
 // The swapchain additionally clamps to surface caps, so the applied extent may differ from the requested one.
 // Completes synchronously if already at the requested extent, else via the deferred-response mechanism once the
 // swapchain has recreated. Never mutates the persisted gFullscreen setting. Schema: {"width","height"}.
-void CommandResize(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.contains("width") || !rParams.at("width").is_number() || !rParams.contains("height") || !rParams.at("height").is_number())
+	if (!rParameters.contains("width") || !rParameters.at("width").is_number() || !rParameters.contains("height") || !rParameters.at("height").is_number())
 	{
 		throw std::runtime_error("resize requires numeric 'width' and 'height'");
 	}
 
-	int64_t iWidth = rParams.at("width").get<int64_t>();
-	int64_t iHeight = rParams.at("height").get<int64_t>();
+	int64_t iWidth = rParameters.at("width").get<int64_t>();
+	int64_t iHeight = rParameters.at("height").get<int64_t>();
 	if (iWidth < 320 || iWidth > 16'384 || iHeight < 180 || iHeight > 16'384)
 	{
 		throw std::runtime_error("resize 'width'/'height' out of bounds [320x180, 16384x16384]");
@@ -414,8 +411,8 @@ void CommandResize(const nlohmann::json& rParams, nlohmann::json& rResult)
 
 	// Style-aware client -> outer conversion: WS_OVERLAPPEDWINDOW grows the client rect by the frame via
 	// AdjustWindowRect; WS_POPUP (borderless windowed-fullscreen) has no frame, so client size is the outer size.
-	HWND hwnd = engine::gpGraphics->mHwnd;
-	LONG_PTR iStyle = GetWindowLongPtr(hwnd, GWL_STYLE);
+	HWND windowHandle = engine::gpGraphics->mHwnd;
+	LONG_PTR iStyle = GetWindowLongPtr(windowHandle, GWL_STYLE);
 	RECT outerRect {.left = 0, .top = 0, .right = iClientWidth, .bottom = iClientHeight};
 	if ((iStyle & WS_OVERLAPPEDWINDOW) != 0)
 	{
@@ -427,46 +424,46 @@ void CommandResize(const nlohmann::json& rParams, nlohmann::json& rResult)
 	// On-screen clamping: a fixed top-left with a growing size can push the bottom/right edges off screen. Query
 	// the window's current monitor (mirrors SetupWindow) and keep the outer rect fully within rcMonitor.
 	RECT currentRect {};
-	GetWindowRect(hwnd, &currentRect);
-	LONG iPosX = currentRect.left;
-	LONG iPosY = currentRect.top;
+	GetWindowRect(windowHandle, &currentRect);
+	LONG iPositionX = currentRect.left;
+	LONG iPositionY = currentRect.top;
 
 	MONITORINFO monitorInfo = {};
 	monitorInfo.cbSize = sizeof(monitorInfo);
-	GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitorInfo);
+	GetMonitorInfo(MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST), &monitorInfo);
 	const RECT& rMonitor = monitorInfo.rcMonitor;
 
 	if (iClientWidth == rMonitor.right - rMonitor.left && iClientHeight == rMonitor.bottom - rMonitor.top)
 	{
 		// Rounded client size exactly the monitor's pixel size: land at the monitor origin (pixel-accurate).
-		iPosX = rMonitor.left;
-		iPosY = rMonitor.top;
+		iPositionX = rMonitor.left;
+		iPositionY = rMonitor.top;
 	}
 	else
 	{
 		// Otherwise keep the current position but shift left/up so the outer rect stays fully on the monitor;
 		// if the window is larger than the monitor in a dimension, pin that axis to the monitor origin.
-		if (iPosX + iOuterWidth > rMonitor.right)
+		if (iPositionX + iOuterWidth > rMonitor.right)
 		{
-			iPosX = rMonitor.right - iOuterWidth;
+			iPositionX = rMonitor.right - iOuterWidth;
 		}
-		if (iPosX < rMonitor.left)
+		if (iPositionX < rMonitor.left)
 		{
-			iPosX = rMonitor.left;
+			iPositionX = rMonitor.left;
 		}
-		if (iPosY + iOuterHeight > rMonitor.bottom)
+		if (iPositionY + iOuterHeight > rMonitor.bottom)
 		{
-			iPosY = rMonitor.bottom - iOuterHeight;
+			iPositionY = rMonitor.bottom - iOuterHeight;
 		}
-		if (iPosY < rMonitor.top)
+		if (iPositionY < rMonitor.top)
 		{
-			iPosY = rMonitor.top;
+			iPositionY = rMonitor.top;
 		}
 	}
 
 	// Drain() runs on the WndProc thread, so this SetWindowPos's WM_SIZE fires synchronously and writes
 	// gWantedFramebufferExtent2D exactly as a human drag does. No z-order / activation change.
-	SetWindowPos(hwnd, nullptr, iPosX, iPosY, iOuterWidth, iOuterHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+	SetWindowPos(windowHandle, nullptr, iPositionX, iPositionY, iOuterWidth, iOuterHeight, SWP_NOZORDER | SWP_NOACTIVATE);
 
 	// Fast path: if the swapchain already sits at the requested (rounded) extent, answer synchronously.
 	if (engine::gpGraphics->mFramebufferExtent2D.width == static_cast<uint32_t>(iClientWidth) && engine::gpGraphics->mFramebufferExtent2D.height == static_cast<uint32_t>(iClientHeight))
@@ -500,14 +497,14 @@ void CommandResize(const nlohmann::json& rParams, nlohmann::json& rResult)
 // via an agent override. 'on' is validated to a bool. Idempotent — an already-in-state request
 // answers synchronously. Never mutates the persisted gFullscreen setting; windowed restore returns to the launch
 // extent (a mid-run resize is not preserved). Schema: {"on"}; result: {"fullscreen","width","height"}.
-void CommandFullscreen(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandFullscreen(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.contains("on") || !rParams.at("on").is_boolean())
+	if (!rParameters.contains("on") || !rParameters.at("on").is_boolean())
 	{
 		throw std::runtime_error("fullscreen requires boolean 'on'");
 	}
 
-	bool bOn = rParams.at("on").get<bool>();
+	bool bOn = rParameters.at("on").get<bool>();
 
 	// Reject while minimized: the style toggle drives a swapchain recreate that can't converge off-screen, so the
 	// deferred poll would never settle (mirrors resize).
@@ -517,8 +514,8 @@ void CommandFullscreen(const nlohmann::json& rParams, nlohmann::json& rResult)
 	}
 
 	// Live style read: WS_POPUP set == borderless windowed-fullscreen; WS_OVERLAPPEDWINDOW == windowed.
-	HWND hwnd = engine::gpGraphics->mHwnd;
-	bool bIsFullscreen = (GetWindowLongPtr(hwnd, GWL_STYLE) & WS_POPUP) != 0;
+	HWND windowHandle = engine::gpGraphics->mHwnd;
+	bool bIsFullscreen = (GetWindowLongPtr(windowHandle, GWL_STYLE) & WS_POPUP) != 0;
 
 	// Fast path: already in the requested mode — report the current extent synchronously (idempotence).
 	if (bIsFullscreen == bOn)
@@ -558,20 +555,20 @@ void CommandFullscreen(const nlohmann::json& rParams, nlohmann::json& rResult)
 // produces the minimized/recreate-deferred state that resize/fullscreen reject; captures temporarily restore it. Completes
 // synchronously if already in state, else via the deferred-response mechanism once the window state settles. Schema:
 // {"minimized"}; result: {"minimized"}, plus {"width","height"} of the settled extent on restore.
-void CommandWindowState(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.contains("minimized") || !rParams.at("minimized").is_boolean())
+	if (!rParameters.contains("minimized") || !rParameters.at("minimized").is_boolean())
 	{
 		throw std::runtime_error("window_state requires boolean 'minimized'");
 	}
 
-	bool bMinimized = rParams.at("minimized").get<bool>();
+	bool bMinimized = rParameters.at("minimized").get<bool>();
 
-	HWND hwnd = engine::gpGraphics->mHwnd;
+	HWND windowHandle = engine::gpGraphics->mHwnd;
 
 	// Fast path: already in the requested state — report it synchronously (idempotence), including the current extent
 	// on restore (matches resize/fullscreen).
-	if ((IsIconic(hwnd) != FALSE) == bMinimized)
+	if ((IsIconic(windowHandle) != FALSE) == bMinimized)
 	{
 		rResult["minimized"] = bMinimized;
 		if (!bMinimized)
@@ -585,7 +582,7 @@ void CommandWindowState(const nlohmann::json& rParams, nlohmann::json& rResult)
 	if (bMinimized)
 	{
 		// Minimize, then poll until the window reports iconic.
-		ShowWindow(hwnd, SW_MINIMIZE);
+		ShowWindow(windowHandle, SW_MINIMIZE);
 		engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 		{
 			if (IsIconic(engine::gpGraphics->mHwnd) == FALSE)
@@ -602,7 +599,7 @@ void CommandWindowState(const nlohmann::json& rParams, nlohmann::json& rResult)
 	// No-activate restore (never steal foreground focus, per Main.cpp's agent-mode convention). Poll until the window
 	// is no longer iconic AND the extent has settled — a bare !IsIconic restore would report success before the deferred
 	// swapchain recreate lands, the false-success class the sibling polls already guard against.
-	ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+	ShowWindow(windowHandle, SW_SHOWNOACTIVATE);
 	engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 	{
 		if (IsIconic(engine::gpGraphics->mHwnd) != FALSE || !engine::gpGraphics->ExtentSettled())
@@ -620,14 +617,14 @@ void CommandWindowState(const nlohmann::json& rParams, nlohmann::json& rResult)
 // audio_resume: resume client audio, which an agent launch boots suspended (Main.cpp) and which only a real OS focus
 // gain would otherwise resume — something the harness never produces. Runs on the client main thread via Drain(), the
 // thread AudioManager::Update runs on. Repeat calls re-apply the same state. No parameters; no result fields.
-void CommandAudioResume([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandAudioResume([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::gpAudioManager->Resume();
 }
 
 // dump_render_target: read back an offscreen render target and encode it (normalized grayscale PNG for
 // single-channel, direct PNG for 4x8-bit, optional raw .bin). Schema: {"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}.
-void CommandDumpRenderTarget(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandDumpRenderTarget(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	// As CommandScreenshot: the readback consume site is compiled out under !kbScreenshots, so fail fast.
 	if constexpr (!kbScreenshots)
@@ -636,29 +633,29 @@ void CommandDumpRenderTarget(const nlohmann::json& rParams, [[maybe_unused]] nlo
 	}
 
 	// As CommandScreenshot: BeginCaptureAndDefer temporarily restores an iconic window for the live readback.
-	if (!rParams.contains("name") || !rParams.at("name").is_string())
+	if (!rParameters.contains("name") || !rParameters.at("name").is_string())
 	{
 		throw std::runtime_error("dump_render_target requires string 'name'");
 	}
 
 	engine::DumpRenderTargetRequest request;
 	request.bPublishResult = true;
-	request.name = rParams.at("name").get<std::string>();
-	if (rParams.contains("index"))
+	request.name = rParameters.at("name").get<std::string>();
+	if (rParameters.contains("index"))
 	{
-		request.iIndex = rParams.at("index").get<int64_t>();
+		request.iIndex = rParameters.at("index").get<int64_t>();
 	}
-	if (rParams.contains("channel"))
+	if (rParameters.contains("channel"))
 	{
-		request.iChannel = rParams.at("channel").get<int64_t>();
+		request.iChannel = rParameters.at("channel").get<int64_t>();
 	}
-	if (rParams.contains("path"))
+	if (rParameters.contains("path"))
 	{
-		request.path = PathFromParam(rParams.at("path"));
+		request.path = PathFromParameter(rParameters.at("path"));
 	}
-	if (rParams.contains("raw"))
+	if (rParameters.contains("raw"))
 	{
-		request.bRaw = rParams.at("raw").get<bool>();
+		request.bRaw = rParameters.at("raw").get<bool>();
 	}
 
 	// Validate now (unknown name / bad index / non-encodable format) so errors report synchronously.
@@ -672,7 +669,7 @@ void CommandDumpRenderTarget(const nlohmann::json& rParams, [[maybe_unused]] nlo
 }
 
 // Full structured dump of the last completed ImGui frame (registry read table) plus game UI state.
-nlohmann::json BuildDescribeUi()
+static nlohmann::json BuildDescribeUi()
 {
 	nlohmann::json result;
 	result["uiState"] = UiStateName(game::gpGame->meUiState);
@@ -681,21 +678,21 @@ nlohmann::json BuildDescribeUi()
 
 	result["framebuffer"] = {engine::gpGraphics->mFramebufferExtent2D.width, engine::gpGraphics->mFramebufferExtent2D.height};
 
-	ImVec2 mousePos = (ImGui::GetCurrentContext() != nullptr) ? ImGui::GetIO().MousePos : ImVec2(0.0f, 0.0f);
-	result["mouse"] = {mousePos.x, mousePos.y};
+	ImVec2 mousePosition = (ImGui::GetCurrentContext() != nullptr) ? ImGui::GetIO().MousePos : ImVec2(0.0f, 0.0f);
+	result["mouse"] = {mousePosition.x, mousePosition.y};
 
 	nlohmann::json windows = nlohmann::json::array();
 	nlohmann::json items = nlohmann::json::array();
 	if (engine::gpAgentUiRegistry != nullptr)
 	{
-		for (int64_t i = 0; i < engine::gpAgentUiRegistry->WindowCount(); ++i)
+		for (int64_t i = 0; i < engine::gpAgentUiRegistry->miWindowCount[engine::gpAgentUiRegistry->miRead]; ++i)
 		{
-			const engine::AgentUiWindow& rWindow = engine::gpAgentUiRegistry->Window(i);
-			windows.push_back({{"name", rWindow.pcName}, {"rect", {rWindow.f4Rect.x, rWindow.f4Rect.y, rWindow.f4Rect.z, rWindow.f4Rect.w}}, {"focused", rWindow.bFocused}});
+			const engine::AgentUiWindow& rWindow = engine::gpAgentUiRegistry->mWindows[engine::gpAgentUiRegistry->miRead][i];
+			windows.push_back({{"name", rWindow.pcName}, {"rect", {rWindow.f4Rectangle.x, rWindow.f4Rectangle.y, rWindow.f4Rectangle.z, rWindow.f4Rectangle.w}}, {"focused", rWindow.bFocused}});
 		}
-		for (int64_t i = 0; i < engine::gpAgentUiRegistry->ItemCount(); ++i)
+		for (int64_t i = 0; i < engine::gpAgentUiRegistry->miItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
 		{
-			const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->Item(i);
+			const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mItems[engine::gpAgentUiRegistry->miRead][i];
 			if (rItem.pcLabel[0] == '\0')
 			{
 				continue; // no label recorded (invisible / no ItemInfo) — not addressable, omit
@@ -704,7 +701,7 @@ nlohmann::json BuildDescribeUi()
 			{
 				{"label", rItem.pcLabel},
 				{"window", rItem.pcWindow},
-				{"rect", {rItem.f4Rect.x, rItem.f4Rect.y, rItem.f4Rect.z, rItem.f4Rect.w}},
+				{"rect", {rItem.f4Rectangle.x, rItem.f4Rectangle.y, rItem.f4Rectangle.z, rItem.f4Rectangle.w}},
 				{"disabled", rItem.bDisabled},
 				{"checked", (rItem.iStatusFlags & ImGuiItemStatusFlags_Checked) != 0},
 				{"inputable", (rItem.iStatusFlags & ImGuiItemStatusFlags_Inputable) != 0},
@@ -724,16 +721,16 @@ nlohmann::json BuildDescribeUi()
 }
 
 // Comma-joined list of candidate labels (optionally filtered to one window) for a not-found / ambiguous error.
-std::string CandidateLabels(const char* pcWindow)
+static std::string CandidateLabels(const char* pcWindow)
 {
 	std::string candidates;
 	if (engine::gpAgentUiRegistry == nullptr)
 	{
 		return candidates;
 	}
-	for (int64_t i = 0; i < engine::gpAgentUiRegistry->ItemCount(); ++i)
+	for (int64_t i = 0; i < engine::gpAgentUiRegistry->miItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
 	{
-		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->Item(i);
+		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mItems[engine::gpAgentUiRegistry->miRead][i];
 		if (rItem.pcLabel[0] == '\0')
 		{
 			continue;
@@ -757,11 +754,11 @@ std::string CandidateLabels(const char* pcWindow)
 }
 
 // Win32 VK code for a named key (letters/digits directly; a small symbolic table for the game bindings).
-int32_t ParseKeyVk(const std::string& rName)
+static int32_t ParseVirtualKey(std::string_view name)
 {
-	if (rName.size() == 1)
+	if (name.size() == 1)
 	{
-		char cChar = rName[0];
+		char cChar = name[0];
 		if (cChar >= 'a' && cChar <= 'z')
 		{
 			cChar = static_cast<char>(cChar - 'a' + 'A');
@@ -771,41 +768,41 @@ int32_t ParseKeyVk(const std::string& rName)
 			return static_cast<int32_t>(static_cast<unsigned char>(cChar));
 		}
 	}
-	if (rName == "ESC" || rName == "ESCAPE")
+	if (name == "ESC" || name == "ESCAPE")
 	{
 		return VK_ESCAPE;
 	}
-	if (rName == "SPACE")
+	if (name == "SPACE")
 	{
 		return VK_SPACE;
 	}
-	if (rName == "TAB")
+	if (name == "TAB")
 	{
 		return VK_TAB;
 	}
-	if (rName == "ENTER" || rName == "RETURN")
+	if (name == "ENTER" || name == "RETURN")
 	{
 		return VK_RETURN;
 	}
-	if (rName == "UP")
+	if (name == "UP")
 	{
 		return VK_UP;
 	}
-	if (rName == "DOWN")
+	if (name == "DOWN")
 	{
 		return VK_DOWN;
 	}
-	if (rName == "LEFT")
+	if (name == "LEFT")
 	{
 		return VK_LEFT;
 	}
-	if (rName == "RIGHT")
+	if (name == "RIGHT")
 	{
 		return VK_RIGHT;
 	}
-	if (rName.size() >= 2 && (rName[0] == 'F' || rName[0] == 'f'))
+	if (name.size() >= 2 && (name[0] == 'F' || name[0] == 'f'))
 	{
-		int32_t iNumber = std::atoi(rName.c_str() + 1);
+		int32_t iNumber = std::atoi(std::string(name.substr(1)).c_str());
 		if (iNumber >= 1 && iNumber <= 24)
 		{
 			return VK_F1 + (iNumber - 1);
@@ -815,34 +812,34 @@ int32_t ParseKeyVk(const std::string& rName)
 }
 
 // Fill a bounded char buffer from a string param (.get<std::string>() throws on non-string).
-void CopyStringParam(char* pcDst, int64_t iDstSize, std::string_view source)
+static void CopyStringParameter(std::span<char> destination, std::string_view source)
 {
 	int64_t i = 0;
-	for (; i < iDstSize - 1 && i < static_cast<int64_t>(source.size()); ++i)
+	for (; i < static_cast<int64_t>(destination.size()) - 1 && i < static_cast<int64_t>(source.size()); ++i)
 	{
-		pcDst[i] = source[i];
+		destination[i] = source[i];
 	}
-	pcDst[i] = '\0';
+	destination[i] = '\0';
 }
 
 // Shared label-target parse for click / hover / set_slider.
-void FillLabelTarget(const nlohmann::json& rParams, engine::AgentScript& rScript)
+static void FillLabelTarget(const nlohmann::json& rParameters, engine::AgentScript& rScript)
 {
-	if (!rParams.contains("label") || !rParams.at("label").is_string())
+	if (!rParameters.contains("label") || !rParameters.at("label").is_string())
 	{
 		throw std::runtime_error("command requires string 'label'");
 	}
-	CopyStringParam(rScript.pcLabel, static_cast<int64_t>(sizeof(rScript.pcLabel)), rParams.at("label").get<std::string>());
-	if (rParams.contains("window"))
+	CopyStringParameter(rScript.pcLabel, rParameters.at("label").get<std::string>());
+	if (rParameters.contains("window"))
 	{
-		CopyStringParam(rScript.pcWindow, static_cast<int64_t>(sizeof(rScript.pcWindow)), rParams.at("window").get<std::string>());
+		CopyStringParameter(rScript.pcWindow, rParameters.at("window").get<std::string>());
 		rScript.bHasWindow = true;
 	}
 }
 
 // Begin a script (throwing "busy" if one is already running) and defer the response until the script completes.
 // For label-based scripts, a not-found / ambiguous error's candidate list is limited to errorWindow only when bHasWindow is set.
-void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescribeUiAfter, bool bLabelBased, bool bHasWindow, std::string errorWindow)
+static void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescribeUiAfter, bool bLabelBased, bool bHasWindow, std::string errorWindow)
 {
 	if (!engine::gpAgentInput->BeginScript(rScript))
 	{
@@ -851,7 +848,7 @@ void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescribeUiAft
 
 	engine::gpAgentCommandServer->DeferResponse([bDescribeUiAfter, bLabelBased, bHasWindow, errorWindow]() -> std::optional<nlohmann::json>
 	{
-		engine::AgentScriptStatus eStatus = engine::gpAgentInput->ScriptStatus();
+		engine::AgentScriptStatus eStatus = engine::gpAgentInput->meStatus;
 		if (eStatus == engine::AgentScriptStatus::kPending)
 		{
 			return std::nullopt;
@@ -881,7 +878,7 @@ void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescribeUiAft
 		if (bLabelBased)
 		{
 			result["found"] = true;
-			result["enabled"] = !engine::gpAgentInput->ResolvedDisabled();
+			result["enabled"] = !engine::gpAgentInput->mbResolvedDisabled;
 		}
 		else
 		{
@@ -895,59 +892,59 @@ void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescribeUiAft
 	});
 }
 
-void CommandDescribeUi([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandDescribeUi([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	rResult = BuildDescribeUi();
 }
 
 // click {label, window?, timeoutFrames?=120, describeUiAfter?=true}: stabilize target rect, press/release the left
 // mouse button at its center through ImGui IO, then optionally dump the post-click UI.
-void CommandClick(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandClick(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kClick;
-	FillLabelTarget(rParams, script);
+	FillLabelTarget(rParameters, script);
 	// Latest stabilization lands on advance timeoutFrames - 1; press, release, and settle add 4 more advances.
-	script.iTimeoutFrames = FrameCountParameter(rParams, "click", "timeoutFrames", script.iTimeoutFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - 3);
-	bool bDescribeUiAfter = !rParams.contains("describeUiAfter") || rParams.at("describeUiAfter").get<bool>();
+	script.iTimeoutFrames = FrameCountParameter(rParameters, "click", "timeoutFrames", script.iTimeoutFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - 3);
+	bool bDescribeUiAfter = !rParameters.contains("describeUiAfter") || rParameters.at("describeUiAfter").get<bool>();
 	BeginScriptAndDefer(script, bDescribeUiAfter, true, script.bHasWindow, script.pcWindow);
 }
 
 // hover {label, window?, holdFrames?=2}: move to and stabilize on the target, hold, then dump the UI.
-void CommandHover(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandHover(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kHover;
-	FillLabelTarget(rParams, script);
+	FillLabelTarget(rParameters, script);
 	// Latest stabilization lands on advance iTimeoutFrames - 1, and the hold then finishes at least holdFrames advances later.
-	script.iHoldFrames = FrameCountParameter(rParams, "hover", "holdFrames", script.iHoldFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - script.iTimeoutFrames + 1);
+	script.iHoldFrames = FrameCountParameter(rParameters, "hover", "holdFrames", script.iHoldFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - script.iTimeoutFrames + 1);
 	BeginScriptAndDefer(script, true, true, script.bHasWindow, script.pcWindow);
 }
 
 // set_slider {label, window?, value}: Ctrl+Click the slider to open ImGui temp-input, type the value, commit (Enter).
-void CommandSetSlider(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandSetSlider(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
-	if (!rParams.contains("value"))
+	if (!rParameters.contains("value"))
 	{
 		throw std::runtime_error("set_slider requires 'value'");
 	}
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kSetSlider;
-	FillLabelTarget(rParams, script);
-	double dValue = rParams.at("value").get<double>();
-	std::snprintf(script.pcValueText, sizeof(script.pcValueText), "%g", dValue);
+	FillLabelTarget(rParameters, script);
+	double fValue = rParameters.at("value").get<double>();
+	std::snprintf(script.pcValueText, sizeof(script.pcValueText), "%g", fValue);
 	BeginScriptAndDefer(script, false, true, script.bHasWindow, script.pcWindow);
 }
 
 // get_wrapper {key}: read a Tweaks-registered wrapper by its slider map key; set_slider is the write path.
-void CommandGetWrapper(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandGetWrapper(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.contains("key") || !rParams.at("key").is_string())
+	if (!rParameters.contains("key") || !rParameters.at("key").is_string())
 	{
 		throw std::runtime_error("get_wrapper requires string 'key'");
 	}
 
-	std::string key = rParams.at("key").get<std::string>();
+	std::string key = rParameters.at("key").get<std::string>();
 	const std::unordered_map<std::string_view, Wrapper*>& rSliderMap = TweaksSliderMap::Get();
 	auto it = rSliderMap.find(key);
 	if (it == rSliderMap.end())
@@ -965,29 +962,29 @@ void CommandGetWrapper(const nlohmann::json& rParams, nlohmann::json& rResult)
 }
 
 // key {key, holdFrames?=1}: hold then release a named VK through the RawInput overlay, driving KeyboardPressed edges.
-void CommandKey(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandKey(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
-	if (!rParams.contains("key") || !rParams.at("key").is_string())
+	if (!rParameters.contains("key") || !rParameters.at("key").is_string())
 	{
 		throw std::runtime_error("key requires string 'key'");
 	}
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kKey;
-	script.iKeyVk = ParseKeyVk(rParams.at("key").get<std::string>());
+	script.iVirtualKey = ParseVirtualKey(rParameters.at("key").get<std::string>());
 	// The key script adds a press advance before the hold and a finish advance after it.
-	script.iHoldFrames = FrameCountParameter(rParams, "key", "holdFrames", 1, engine::AgentCommandServer::kiDeferredTimeoutDrains - 2);
+	script.iHoldFrames = FrameCountParameter(rParameters, "key", "holdFrames", 1, engine::AgentCommandServer::kiDeferredTimeoutDrains - 2);
 	BeginScriptAndDefer(script, false, false, false, std::string());
 }
 
 // mouse {x, y, action:"move|down|up|click|wheel", button?="left", notches?}: raw pixel coords feeding both the ImGui
 // IO sink and the RawInput overlay (normalized) for world clicks / unlabeled targets and camera-zoom wheel.
 // (x/y optional for wheel — both or neither)
-void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandMouse(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kMouse;
 
-	std::string action = rParams.contains("action") ? rParams.at("action").get<std::string>() : "move";
+	std::string action = rParameters.contains("action") ? rParameters.at("action").get<std::string>() : "move";
 	if (action == "move")
 	{
 		script.eMouseAction = engine::AgentMouseAction::kMove;
@@ -1016,9 +1013,9 @@ void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 	if (script.eMouseAction == engine::AgentMouseAction::kWheel)
 	{
 		int64_t iNotches = 1;
-		if (rParams.contains("notches"))
+		if (rParameters.contains("notches"))
 		{
-			const nlohmann::json& rNotches = rParams.at("notches");
+			const nlohmann::json& rNotches = rParameters.at("notches");
 			bool bValid = rNotches.is_number_integer();
 			if (bValid && rNotches.is_number_unsigned())
 			{
@@ -1044,30 +1041,30 @@ void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 		// coordinate mouse move runs two active frames and, once complete, establishes its new target. A direct
 		// coordinate-bearing background wheel immediately after plot hover may remain UI-owned; a subsequent notch after
 		// that command completes reaches the camera.
-		bool bHasX = rParams.contains("x");
-		bool bHasY = rParams.contains("y");
+		bool bHasX = rParameters.contains("x");
+		bool bHasY = rParameters.contains("y");
 		if (bHasX != bHasY)
 		{
 			throw std::runtime_error("mouse wheel requires both 'x' and 'y' or neither");
 		}
 		if (bHasX)
 		{
-			script.f2CoordPixels[0] = static_cast<float>(rParams.at("x").get<double>());
-			script.f2CoordPixels[1] = static_cast<float>(rParams.at("y").get<double>());
-			script.bHasCoord = true;
+			script.f2CoordinatePixels[0] = static_cast<float>(rParameters.at("x").get<double>());
+			script.f2CoordinatePixels[1] = static_cast<float>(rParameters.at("y").get<double>());
+			script.bHasCoordinate = true;
 		}
 	}
 	else
 	{
-		if (!rParams.contains("x") || !rParams.contains("y"))
+		if (!rParameters.contains("x") || !rParameters.contains("y"))
 		{
 			throw std::runtime_error("mouse requires 'x' and 'y'");
 		}
-		script.f2CoordPixels[0] = static_cast<float>(rParams.at("x").get<double>());
-		script.f2CoordPixels[1] = static_cast<float>(rParams.at("y").get<double>());
-		script.bHasCoord = true;
+		script.f2CoordinatePixels[0] = static_cast<float>(rParameters.at("x").get<double>());
+		script.f2CoordinatePixels[1] = static_cast<float>(rParameters.at("y").get<double>());
+		script.bHasCoordinate = true;
 
-		std::string button = rParams.contains("button") ? rParams.at("button").get<std::string>() : "left";
+		std::string button = rParameters.contains("button") ? rParameters.at("button").get<std::string>() : "left";
 		if (button == "left")
 		{
 			script.iImGuiMouseButton = 0;
@@ -1092,9 +1089,9 @@ void CommandMouse(const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json
 	BeginScriptAndDefer(script, false, false, false, std::string());
 }
 
-void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.is_object() || !rParams.empty())
+	if (!rParameters.is_object() || !rParameters.empty())
 	{
 		throw std::runtime_error("query_profile requires empty params");
 	}
@@ -1109,7 +1106,7 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 		gpuTimer["name"] = std::string(engine::kGpuTimerNames[i]);
 		gpuTimer["currentUs"] = rGpuTimer.smoothedMicroseconds.Current();
 		gpuTimer["averageUs"] = rGpuTimer.smoothedMicroseconds.Average();
-		gpuTimer["maxUs"] = rGpuTimer.smoothedMicroseconds.Max();
+		gpuTimer["maxUs"] = rGpuTimer.smoothedMicroseconds.Maximum();
 		gpuTimers.push_back(std::move(gpuTimer));
 	}
 	rResult["gpuTimers"] = std::move(gpuTimers);
@@ -1142,8 +1139,6 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 	}
 	rResult["counters"] = std::move(counters);
 }
-
-} // namespace
 
 const char* UiStateName(UiState eState)
 {
@@ -1185,86 +1180,86 @@ nlohmann::json GameFlagNames(GameFlags_t flags)
 	return names;
 }
 
-bool ExecuteClientAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
+bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (cmd == "screenshot")
+	if (command == "screenshot")
 	{
-		CommandScreenshot(rParams, rResult);
+		CommandScreenshot(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "renderdoc_capture")
+	if (command == "renderdoc_capture")
 	{
-		CommandRenderDocCapture(rParams, rResult);
+		CommandRenderDocCapture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "resize")
+	if (command == "resize")
 	{
-		CommandResize(rParams, rResult);
+		CommandResize(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "fullscreen")
+	if (command == "fullscreen")
 	{
-		CommandFullscreen(rParams, rResult);
+		CommandFullscreen(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "window_state")
+	if (command == "window_state")
 	{
-		CommandWindowState(rParams, rResult);
+		CommandWindowState(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "audio_resume")
+	if (command == "audio_resume")
 	{
-		CommandAudioResume(rParams, rResult);
+		CommandAudioResume(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "dump_render_target")
+	if (command == "dump_render_target")
 	{
-		CommandDumpRenderTarget(rParams, rResult);
+		CommandDumpRenderTarget(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "describe_ui")
+	if (command == "describe_ui")
 	{
-		CommandDescribeUi(rParams, rResult);
+		CommandDescribeUi(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "click")
+	if (command == "click")
 	{
-		CommandClick(rParams, rResult);
+		CommandClick(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "hover")
+	if (command == "hover")
 	{
-		CommandHover(rParams, rResult);
+		CommandHover(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "set_slider")
+	if (command == "set_slider")
 	{
-		CommandSetSlider(rParams, rResult);
+		CommandSetSlider(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "get_wrapper")
+	if (command == "get_wrapper")
 	{
-		CommandGetWrapper(rParams, rResult);
+		CommandGetWrapper(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "key")
+	if (command == "key")
 	{
-		CommandKey(rParams, rResult);
+		CommandKey(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "mouse")
+	if (command == "mouse")
 	{
-		CommandMouse(rParams, rResult);
+		CommandMouse(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "query_profile")
+	if (command == "query_profile")
 	{
-		CommandQueryProfile(rParams, rResult);
+		CommandQueryProfile(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "presentation_continuity_probe")
+	if (command == "presentation_continuity_probe")
 	{
-		CommandPresentationContinuityProbe(rParams, rResult);
+		CommandPresentationContinuityProbe(rParameters, rResult);
 		return true;
 	}
 	return false;

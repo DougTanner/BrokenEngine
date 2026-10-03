@@ -8,26 +8,20 @@
 namespace engine
 {
 
-static std::unordered_map<wind_trail_t, XMVECTOR> sPreviousPositions;
 static int64_t siRendered = 0;
 
 void WindTrailsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kName, sizeof(shaders::QuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositA(kCrc, kName, sizeof(shaders::QuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositB(kCrc, kName);
+	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositA(kuiCrc, kpcName, sizeof(shaders::QuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositB(kuiCrc, kpcName);
 }
 
-void WindTrailsInterpolate::ResetRenderState()
-{
-	sPreviousPositions.clear();
-}
-
-void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords)
+void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
 
-	EraseStaleRenderState(sPreviousPositions, rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const std::unordered_map<WindTrailsInterpolate::id_t, int64_t>&
+	EraseStaleRenderState(sPreviousPositions, rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const std::unordered_map<WindTrailsInterpolate::id_t, int64_t>&
 	{
 		return rInterpolate.windTrails.idToIndexMap;
 	});
@@ -37,7 +31,7 @@ void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 		return;
 	}
 
-	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const WindTrailsInterpolate&
+	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const WindTrailsInterpolate&
 	{
 		return rInterpolate.windTrails;
 	});
@@ -47,10 +41,10 @@ void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 		return;
 	}
 
-	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer))
+	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositA].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositB].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
+		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
+		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
 	}
 }
 
@@ -66,9 +60,9 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		// Heap: unordered_map insertions/lookups for per-trail previous positions
 		ScopedSuppressAllocationTracking suppress;
 
-		for (const auto& [id, iIndex] : rCurrent.idToIndexMap)
+		for (const auto& [rId, rIndex] : rCurrent.idToIndexMap)
 		{
-			sPreviousPositions.insert_or_assign(id, rCurrent.pVecPositions[iIndex]);
+			sPreviousPositions.insert_or_assign(rId, rCurrent.pVecPositions[rIndex]);
 		}
 		return;
 	}
@@ -78,62 +72,53 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		return;
 	}
 
-	auto [pQuadLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::QuadLayout>(kCrc, kBufferMain, iCommandBuffer);
+	auto [pQuadLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::QuadLayout>(kuiCrc, kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
 
 	{
 		// Heap: unordered_map insertions/lookups for per-trail previous positions
 		ScopedSuppressAllocationTracking suppress;
 
-		// Build GPU quads
-		for (const auto& [id, iIndex] : rCurrent.idToIndexMap)
+		for (const auto& [rId, rIndex] : rCurrent.idToIndexMap)
 		{
-			XMVECTOR vecLocalPosition = rCurrent.pVecPositions[iIndex];
-			float fIntensity = rCurrent.pfIntensities[iIndex];
-			float fWidth = rCurrent.pfWidths[iIndex];
+			XMVECTOR vecLocalPosition = rCurrent.pVecPositions[rIndex];
+			float fIntensity = rCurrent.pfIntensities[rIndex];
+			float fWidth = rCurrent.pfWidths[rIndex];
 
-			// Visibility culling
 			XMFLOAT4A f4Position {};
 			if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
 			{
 				continue;
 			}
 
-			// Look up or initialize previous position
-			auto it = sPreviousPositions.find(id);
+			auto it = sPreviousPositions.find(rId);
 			XMVECTOR vecLocalPreviousPosition = (it != sPreviousPositions.end()) ? it->second : vecLocalPosition;
-			float fLengthMultiplier = rCurrent.pfLengthMultipliers[iIndex];
+			float fLengthMultiplier = rCurrent.pfLengthMultipliers[rIndex];
 
-			// Project to base height
 			XMVECTOR vecBasePosition = ProjectToBaseHeight(vecLocalPosition, rBasis);
 			XMVECTOR vecBasePreviousPosition = ProjectToBaseHeight(vecLocalPreviousPosition, rBasis);
 
-			// Calculate direction from previous to current, scaled by length multiplier
-			XMVECTOR vecDirection = XMVectorSubtract(vecBasePosition, vecBasePreviousPosition);
-			vecDirection = XMVectorScale(vecDirection, fLengthMultiplier);
-			vecBasePreviousPosition = XMVectorSubtract(vecBasePosition, vecDirection);
-			float fDistance = XMVectorGetX(XMVector3Length(vecDirection));
+			XMVECTOR vecDisplacement = XMVectorSubtract(vecBasePosition, vecBasePreviousPosition);
+			vecDisplacement = XMVectorScale(vecDisplacement, fLengthMultiplier);
+			vecBasePreviousPosition = XMVectorSubtract(vecBasePosition, vecDisplacement);
+			float fDistance = XMVectorGetX(XMVector3Length(vecDisplacement));
 			if (fDistance <= 0.001f)
 			{
 				continue;
 			}
 
-			XMVECTOR vecDirNormal = XMVector3Normalize(vecDirection);
+			XMVECTOR vecDirectionNormal = XMVector3Normalize(vecDisplacement);
 
-			// Calculate perpendicular direction for width
-			XMVECTOR vecPerpNormal = XMVector3Normalize(XMVector3Cross(vecDirNormal, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)));
+			XMVECTOR vecPerpendicularNormal = XMVector3Normalize(XMVector3Cross(vecDirectionNormal, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)));
 
-			// Build oriented quad: front (current) ± width, back (previous) ± width
-			XMVECTOR vecFrontLeft = XMVectorAdd(vecBasePosition, XMVectorScale(vecPerpNormal, fWidth));
-			XMVECTOR vecFrontRight = XMVectorSubtract(vecBasePosition, XMVectorScale(vecPerpNormal, fWidth));
-			XMVECTOR vecBackLeft = XMVectorAdd(vecBasePreviousPosition, XMVectorScale(vecPerpNormal, fWidth));
-			XMVECTOR vecBackRight = XMVectorSubtract(vecBasePreviousPosition, XMVectorScale(vecPerpNormal, fWidth));
+			XMVECTOR vecFrontLeft = XMVectorAdd(vecBasePosition, XMVectorScale(vecPerpendicularNormal, fWidth));
+			XMVECTOR vecFrontRight = XMVectorSubtract(vecBasePosition, XMVectorScale(vecPerpendicularNormal, fWidth));
+			XMVECTOR vecBackLeft = XMVectorAdd(vecBasePreviousPosition, XMVectorScale(vecPerpendicularNormal, fWidth));
+			XMVECTOR vecBackRight = XMVectorSubtract(vecBasePreviousPosition, XMVectorScale(vecPerpendicularNormal, fWidth));
 
-			// Wind direction from motion
-			float fWindDirX = XMVectorGetX(vecDirNormal);
-			float fWindDirY = XMVectorGetY(vecDirNormal);
+			float fWindDirectionX = XMVectorGetX(vecDirectionNormal);
+			float fWindDirectionY = XMVectorGetY(vecDirectionNormal);
 
-			// Build QuadLayout vertices
 			XMFLOAT4A f4Vertex {};
 
 			XMStoreFloat4A(&f4Vertex, vecFrontLeft);
@@ -145,12 +130,11 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			XMStoreFloat4A(&f4Vertex, vecBackRight);
 			pQuadLayouts[siRendered].pf4VerticesTexcoords[3] = {f4Vertex.x, f4Vertex.y, 1.0f, 0.0f};
 
-			// Per-vertex params: {magnitude, windDirX, windDirY, 0}
-			XMFLOAT4A f4Params = {fIntensity, fWindDirX, fWindDirY, 0.0f};
-			pQuadLayouts[siRendered].pf4Params[0] = f4Params;
-			pQuadLayouts[siRendered].pf4Params[1] = f4Params;
-			pQuadLayouts[siRendered].pf4Params[2] = f4Params;
-			pQuadLayouts[siRendered].pf4Params[3] = f4Params;
+			XMFLOAT4A f4Parameters = {fIntensity, fWindDirectionX, fWindDirectionY, 0.0f};
+			pQuadLayouts[siRendered].pf4Params[0] = f4Parameters;
+			pQuadLayouts[siRendered].pf4Params[1] = f4Parameters;
+			pQuadLayouts[siRendered].pf4Params[2] = f4Parameters;
+			pQuadLayouts[siRendered].pf4Params[3] = f4Parameters;
 
 			pQuadLayouts[siRendered].f4Params = {};
 			pQuadLayouts[siRendered].uiColor = 0xFFFFFFFF;
@@ -159,17 +143,17 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		}
 
 		// Snapshot current positions as previous for next render
-		for (const auto& [id, iIndex] : rCurrent.idToIndexMap)
+		for (const auto& [rId, rIndex] : rCurrent.idToIndexMap)
 		{
-			sPreviousPositions.insert_or_assign(id, rCurrent.pVecPositions[iIndex]);
+			sPreviousPositions.insert_or_assign(rId, rCurrent.pVecPositions[rIndex]);
 		}
 	}
 }
 
 void WindTrailsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositA].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositB].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
 }
 
 } // namespace engine

@@ -1,19 +1,17 @@
 #include "SubdivideBeachBand.h"
 
-namespace
-{
 
 // BeachSubdivider keeps caller-owned mesh/config references that outlive Run; worklist, per-triangle
 // state, and edge maps are internal. Run drives the worklist.
 struct BeachSubdivider
 {
 	BeachSubdivider(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits)
-		: meshPositions(rMeshPositions)
-		, meshIndices(rMeshIndices)
-		, fBandMinZ(rConfig.fBandMinMeters)
-		, fBandMaxZ(rConfig.fBandMaxMeters)
-		, fMaxEdge(rConfig.fMaxEdgeMeters)
-		, iMaxDepth(rConfig.iMaxDepth)
+		: rMeshPositions(rMeshPositions)
+		, rMeshIndices(rMeshIndices)
+		, fBandMinimumZ(rConfig.fBandMinimumMeters)
+		, fBandMaximumZ(rConfig.fBandMaximumMeters)
+		, fMaximumEdge(rConfig.fMaximumEdgeMeters)
+		, iMaximumDepth(rConfig.iMaximumDepth)
 		, riDepthCapHits(riDepthCapHits)
 	{
 	}
@@ -26,32 +24,32 @@ struct BeachSubdivider
 	};
 
 	void Run();
-	void SplitInBand(uint32_t iTriangle, uint32_t iA, uint32_t iB, uint32_t iC, uint32_t iMidpointAB, uint32_t iMidpointBC, uint32_t iMidpointCA, uint8_t iChildDepth);
-	void AbsorbMidpoints(uint32_t iTriangle, uint32_t iA, uint32_t iB, uint32_t iC, uint32_t iMidpointAB, uint32_t iMidpointBC, uint32_t iMidpointCA, int32_t iExistingMidpoints, uint8_t iChildDepth);
+	void SplitInBand(uint32_t uiTriangle, uint32_t uiA, uint32_t uiB, uint32_t uiC, uint32_t uiMidpointAB, uint32_t uiMidpointBC, uint32_t uiMidpointCA, uint8_t uiChildDepth);
+	void AbsorbMidpoints(uint32_t uiTriangle, uint32_t uiA, uint32_t uiB, uint32_t uiC, uint32_t uiMidpointAB, uint32_t uiMidpointBC, uint32_t uiMidpointCA, int32_t iExistingMidpoints, uint8_t uiChildDepth);
 
-	uint64_t EdgeKey(uint32_t iA, uint32_t iB) const
+	uint64_t EdgeKey(uint32_t uiA, uint32_t uiB) const
 	{
-		uint32_t iMin = std::min(iA, iB);
-		uint32_t iMax = std::max(iA, iB);
-		return (static_cast<uint64_t>(iMin) << 32) | static_cast<uint64_t>(iMax);
-	}
-
-	float VertexX(uint32_t iV) const
-	{
-		return meshPositions[static_cast<size_t>(iV) * 3 + 0];
-	}
-	float VertexY(uint32_t iV) const
-	{
-		return meshPositions[static_cast<size_t>(iV) * 3 + 1];
-	}
-	float VertexZ(uint32_t iV) const
-	{
-		return meshPositions[static_cast<size_t>(iV) * 3 + 2];
+		uint32_t uiMinimum = std::min(uiA, uiB);
+		uint32_t uiMaximum = std::max(uiA, uiB);
+		return (static_cast<uint64_t>(uiMinimum) << 32) | static_cast<uint64_t>(uiMaximum);
 	}
 
-	void EdgeAdd(uint64_t iKey, int32_t iTriangle)
+	float VertexX(uint32_t uiV) const
 	{
-		EdgeSlots& rSlots = edgeTriangles.try_emplace(iKey, EdgeSlots {}).first->second;
+		return rMeshPositions.at(static_cast<int64_t>(uiV) * 3 + 0);
+	}
+	float VertexY(uint32_t uiV) const
+	{
+		return rMeshPositions.at(static_cast<int64_t>(uiV) * 3 + 1);
+	}
+	float VertexZ(uint32_t uiV) const
+	{
+		return rMeshPositions.at(static_cast<int64_t>(uiV) * 3 + 2);
+	}
+
+	void EdgeAdd(uint64_t uiKey, int32_t iTriangle)
+	{
+		EdgeSlots& rSlots = edgeTriangles.try_emplace(uiKey, EdgeSlots {}).first->second;
 		if (rSlots.iSlot0 < 0)
 		{
 			rSlots.iSlot0 = iTriangle;
@@ -65,9 +63,9 @@ struct BeachSubdivider
 		ASSERT(false);  // 3+ triangles share a single edge -- malformed mesh input.
 	}
 
-	void EdgeRemove(uint64_t iKey, int32_t iTriangle)
+	void EdgeRemove(uint64_t uiKey, int32_t iTriangle)
 	{
-		auto it = edgeTriangles.find(iKey);
+		auto it = edgeTriangles.find(uiKey);
 		if (it == edgeTriangles.end())
 		{
 			return;
@@ -87,9 +85,9 @@ struct BeachSubdivider
 		}
 	}
 
-	int32_t EdgeOther(uint64_t iKey, int32_t iTriangle) const
+	int32_t EdgeOther(uint64_t uiKey, int32_t iTriangle) const
 	{
-		auto it = edgeTriangles.find(iKey);
+		auto it = edgeTriangles.find(uiKey);
 		if (it == edgeTriangles.end())
 		{
 			return -1;
@@ -106,90 +104,90 @@ struct BeachSubdivider
 		return -1;
 	}
 
-	bool IsBandEligible(uint32_t iA, uint32_t iB, uint32_t iC) const
+	bool IsBandEligible(uint32_t uiA, uint32_t uiB, uint32_t uiC) const
 	{
-		float fMinZ = std::min({VertexZ(iA), VertexZ(iB), VertexZ(iC)});
-		float fMaxZ = std::max({VertexZ(iA), VertexZ(iB), VertexZ(iC)});
-		return fMinZ <= fBandMaxZ && fMaxZ >= fBandMinZ;
+		float fMinimumZ = std::min({VertexZ(uiA), VertexZ(uiB), VertexZ(uiC)});
+		float fMaximumZ = std::max({VertexZ(uiA), VertexZ(uiB), VertexZ(uiC)});
+		return fMinimumZ <= fBandMaximumZ && fMaximumZ >= fBandMinimumZ;
 	}
 
-	float LongestEdgeXY(uint32_t iA, uint32_t iB, uint32_t iC) const
+	float LongestEdgeXY(uint32_t uiA, uint32_t uiB, uint32_t uiC) const
 	{
-		auto LengthSquared = [this](uint32_t iU, uint32_t iV) -> float
+		auto LengthSquared = [this](uint32_t uiU, uint32_t uiV) -> float
 		{
-			float fDx = VertexX(iV) - VertexX(iU);
-			float fDy = VertexY(iV) - VertexY(iU);
-			return fDx * fDx + fDy * fDy;
+			float fDeltaX = VertexX(uiV) - VertexX(uiU);
+			float fDeltaY = VertexY(uiV) - VertexY(uiU);
+			return fDeltaX * fDeltaX + fDeltaY * fDeltaY;
 		};
-		float fMaxSquared = std::max({LengthSquared(iA, iB), LengthSquared(iB, iC), LengthSquared(iC, iA)});
-		return std::sqrt(fMaxSquared);
+		float fMaximumSquared = std::max({LengthSquared(uiA, uiB), LengthSquared(uiB, uiC), LengthSquared(uiC, uiA)});
+		return std::sqrt(fMaximumSquared);
 	}
 
 	uint32_t AddVertex(float fX, float fY, float fZ)
 	{
-		uint32_t iNewIndex = static_cast<uint32_t>(meshPositions.size() / 3);
-		meshPositions.push_back(fX);
-		meshPositions.push_back(fY);
-		meshPositions.push_back(fZ);
-		return iNewIndex;
+		uint32_t uiNewIndex = static_cast<uint32_t>(rMeshPositions.size() / 3);
+		rMeshPositions.push_back(fX);
+		rMeshPositions.push_back(fY);
+		rMeshPositions.push_back(fZ);
+		return uiNewIndex;
 	}
 
-	uint32_t GetOrCreateMidpoint(uint32_t iA, uint32_t iB)
+	uint32_t GetOrCreateMidpoint(uint32_t uiA, uint32_t uiB)
 	{
-		uint64_t iKey = EdgeKey(iA, iB);
-		auto it = edgeMidpoints.find(iKey);
+		uint64_t uiKey = EdgeKey(uiA, uiB);
+		auto it = edgeMidpoints.find(uiKey);
 		if (it != edgeMidpoints.end())
 		{
 			return it->second;
 		}
-		float fMidX = 0.5f * (VertexX(iA) + VertexX(iB));
-		float fMidY = 0.5f * (VertexY(iA) + VertexY(iB));
-		float fMidZ = 0.5f * (VertexZ(iA) + VertexZ(iB));
-		uint32_t iMidpoint = AddVertex(fMidX, fMidY, fMidZ);
-		edgeMidpoints.emplace(iKey, iMidpoint);
-		return iMidpoint;
+		float fMidpointX = 0.5f * (VertexX(uiA) + VertexX(uiB));
+		float fMidpointY = 0.5f * (VertexY(uiA) + VertexY(uiB));
+		float fMidpointZ = 0.5f * (VertexZ(uiA) + VertexZ(uiB));
+		uint32_t uiMidpoint = AddVertex(fMidpointX, fMidpointY, fMidpointZ);
+		edgeMidpoints.emplace(uiKey, uiMidpoint);
+		return uiMidpoint;
 	}
 
-	uint32_t LookupMidpoint(uint32_t iA, uint32_t iB) const
+	uint32_t LookupMidpoint(uint32_t uiA, uint32_t uiB) const
 	{
-		auto it = edgeMidpoints.find(EdgeKey(iA, iB));
+		auto it = edgeMidpoints.find(EdgeKey(uiA, uiB));
 		return it != edgeMidpoints.end() ? it->second : UINT32_MAX;
 	}
 
-	uint32_t AppendTriangle(uint32_t iA, uint32_t iB, uint32_t iC, uint8_t iDepth)
+	uint32_t AppendTriangle(uint32_t uiA, uint32_t uiB, uint32_t uiC, uint8_t uiDepth)
 	{
-		uint32_t iNewTriangle = static_cast<uint32_t>(meshIndices.size() / 3);
-		meshIndices.push_back(iA);
-		meshIndices.push_back(iB);
-		meshIndices.push_back(iC);
+		uint32_t uiNewTriangle = static_cast<uint32_t>(rMeshIndices.size() / 3);
+		rMeshIndices.push_back(uiA);
+		rMeshIndices.push_back(uiB);
+		rMeshIndices.push_back(uiC);
 		triangleAlive.push_back(1);
-		triangleDepth.push_back(iDepth);
-		EdgeAdd(EdgeKey(iA, iB), static_cast<int32_t>(iNewTriangle));
-		EdgeAdd(EdgeKey(iB, iC), static_cast<int32_t>(iNewTriangle));
-		EdgeAdd(EdgeKey(iC, iA), static_cast<int32_t>(iNewTriangle));
-		return iNewTriangle;
+		triangleDepth.push_back(uiDepth);
+		EdgeAdd(EdgeKey(uiA, uiB), static_cast<int32_t>(uiNewTriangle));
+		EdgeAdd(EdgeKey(uiB, uiC), static_cast<int32_t>(uiNewTriangle));
+		EdgeAdd(EdgeKey(uiC, uiA), static_cast<int32_t>(uiNewTriangle));
+		return uiNewTriangle;
 	}
 
-	void KillTriangle(uint32_t iTriangle)
+	void KillTriangle(uint32_t uiTriangle)
 	{
-		uint32_t iA = meshIndices[static_cast<size_t>(iTriangle) * 3 + 0];
-		uint32_t iB = meshIndices[static_cast<size_t>(iTriangle) * 3 + 1];
-		uint32_t iC = meshIndices[static_cast<size_t>(iTriangle) * 3 + 2];
-		EdgeRemove(EdgeKey(iA, iB), static_cast<int32_t>(iTriangle));
-		EdgeRemove(EdgeKey(iB, iC), static_cast<int32_t>(iTriangle));
-		EdgeRemove(EdgeKey(iC, iA), static_cast<int32_t>(iTriangle));
-		triangleAlive[iTriangle] = 0;
-		meshIndices[static_cast<size_t>(iTriangle) * 3 + 0] = UINT32_MAX;
-		meshIndices[static_cast<size_t>(iTriangle) * 3 + 1] = UINT32_MAX;
-		meshIndices[static_cast<size_t>(iTriangle) * 3 + 2] = UINT32_MAX;
+		uint32_t uiA = rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 0);
+		uint32_t uiB = rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 1);
+		uint32_t uiC = rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 2);
+		EdgeRemove(EdgeKey(uiA, uiB), static_cast<int32_t>(uiTriangle));
+		EdgeRemove(EdgeKey(uiB, uiC), static_cast<int32_t>(uiTriangle));
+		EdgeRemove(EdgeKey(uiC, uiA), static_cast<int32_t>(uiTriangle));
+		triangleAlive[uiTriangle] = 0;
+		rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 0) = UINT32_MAX;
+		rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 1) = UINT32_MAX;
+		rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 2) = UINT32_MAX;
 	}
 
-	std::vector<float>& meshPositions;
-	std::vector<uint32_t>& meshIndices;
-	float fBandMinZ = 0.0f;
-	float fBandMaxZ = 0.0f;
-	float fMaxEdge = 0.0f;
-	int32_t iMaxDepth = 0;
+	std::vector<float>& rMeshPositions;
+	std::vector<uint32_t>& rMeshIndices;
+	float fBandMinimumZ = 0.0f;
+	float fBandMaximumZ = 0.0f;
+	float fMaximumEdge = 0.0f;
+	int32_t iMaximumDepth = 0;
 	int64_t& riDepthCapHits;
 
 	std::unordered_map<uint64_t, uint32_t> edgeMidpoints;
@@ -201,192 +199,188 @@ struct BeachSubdivider
 
 void BeachSubdivider::Run()
 {
-	int64_t iInitialTriangleCount = static_cast<int64_t>(meshIndices.size() / 3);
+	int64_t iInitialTriangleCount = static_cast<int64_t>(rMeshIndices.size() / 3);
 	triangleAlive.assign(static_cast<size_t>(iInitialTriangleCount), 1);
 	triangleDepth.assign(static_cast<size_t>(iInitialTriangleCount), 0);
 
-	// Build initial edge adjacency.
-	for (int64_t iTriangle = 0; iTriangle < iInitialTriangleCount; ++iTriangle)
+	for (int64_t i = 0; i < iInitialTriangleCount; ++i)
 	{
-		uint32_t iA = meshIndices[static_cast<size_t>(iTriangle) * 3 + 0];
-		uint32_t iB = meshIndices[static_cast<size_t>(iTriangle) * 3 + 1];
-		uint32_t iC = meshIndices[static_cast<size_t>(iTriangle) * 3 + 2];
-		EdgeAdd(EdgeKey(iA, iB), static_cast<int32_t>(iTriangle));
-		EdgeAdd(EdgeKey(iB, iC), static_cast<int32_t>(iTriangle));
-		EdgeAdd(EdgeKey(iC, iA), static_cast<int32_t>(iTriangle));
+		uint32_t uiA = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 0);
+		uint32_t uiB = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 1);
+		uint32_t uiC = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 2);
+		EdgeAdd(EdgeKey(uiA, uiB), static_cast<int32_t>(i));
+		EdgeAdd(EdgeKey(uiB, uiC), static_cast<int32_t>(i));
+		EdgeAdd(EdgeKey(uiC, uiA), static_cast<int32_t>(i));
 	}
 
-	// Seed worklist with every initial triangle that is in-band AND oversized.
-	for (int64_t iTriangle = 0; iTriangle < iInitialTriangleCount; ++iTriangle)
+	for (int64_t i = 0; i < iInitialTriangleCount; ++i)
 	{
-		uint32_t iA = meshIndices[static_cast<size_t>(iTriangle) * 3 + 0];
-		uint32_t iB = meshIndices[static_cast<size_t>(iTriangle) * 3 + 1];
-		uint32_t iC = meshIndices[static_cast<size_t>(iTriangle) * 3 + 2];
-		if (IsBandEligible(iA, iB, iC) && LongestEdgeXY(iA, iB, iC) > fMaxEdge)
+		uint32_t uiA = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 0);
+		uint32_t uiB = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 1);
+		uint32_t uiC = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 2);
+		if (IsBandEligible(uiA, uiB, uiC) && LongestEdgeXY(uiA, uiB, uiC) > fMaximumEdge)
 		{
-			worklist.push_back(static_cast<uint32_t>(iTriangle));
+			worklist.push_back(static_cast<uint32_t>(i));
 		}
 	}
 
 	while (!worklist.empty())
 	{
-		uint32_t iTriangle = worklist.front();
+		uint32_t uiTriangle = worklist.front();
 		worklist.pop_front();
-		if (triangleAlive[iTriangle] == 0)
+		if (triangleAlive.at(uiTriangle) == 0)
 		{
 			continue;
 		}
-		if (triangleDepth[iTriangle] >= iMaxDepth)
+		if (triangleDepth.at(uiTriangle) >= iMaximumDepth)
 		{
 			++riDepthCapHits;
 			continue;
 		}
 
-		uint32_t iA = meshIndices[static_cast<size_t>(iTriangle) * 3 + 0];
-		uint32_t iB = meshIndices[static_cast<size_t>(iTriangle) * 3 + 1];
-		uint32_t iC = meshIndices[static_cast<size_t>(iTriangle) * 3 + 2];
+		uint32_t uiA = rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 0);
+		uint32_t uiB = rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 1);
+		uint32_t uiC = rMeshIndices.at(static_cast<int64_t>(uiTriangle) * 3 + 2);
 
-		bool bBandTrigger = IsBandEligible(iA, iB, iC) && LongestEdgeXY(iA, iB, iC) > fMaxEdge;
-		uint32_t iMidpointAB = LookupMidpoint(iA, iB);
-		uint32_t iMidpointBC = LookupMidpoint(iB, iC);
-		uint32_t iMidpointCA = LookupMidpoint(iC, iA);
-		int32_t iExistingMidpoints = (iMidpointAB != UINT32_MAX) + (iMidpointBC != UINT32_MAX) + (iMidpointCA != UINT32_MAX);
+		bool bBandTrigger = IsBandEligible(uiA, uiB, uiC) && LongestEdgeXY(uiA, uiB, uiC) > fMaximumEdge;
+		uint32_t uiMidpointAB = LookupMidpoint(uiA, uiB);
+		uint32_t uiMidpointBC = LookupMidpoint(uiB, uiC);
+		uint32_t uiMidpointCA = LookupMidpoint(uiC, uiA);
+		int32_t iExistingMidpoints = (uiMidpointAB != UINT32_MAX) + (uiMidpointBC != UINT32_MAX) + (uiMidpointCA != UINT32_MAX);
 
 		if (!bBandTrigger && iExistingMidpoints == 0)
 		{
 			continue;
 		}
 
-		uint8_t iChildDepth = static_cast<uint8_t>(triangleDepth[iTriangle] + 1);
+		uint8_t uiChildDepth = static_cast<uint8_t>(triangleDepth.at(uiTriangle) + 1);
 
 		if (bBandTrigger)
 		{
-			SplitInBand(iTriangle, iA, iB, iC, iMidpointAB, iMidpointBC, iMidpointCA, iChildDepth);
+			SplitInBand(uiTriangle, uiA, uiB, uiC, uiMidpointAB, uiMidpointBC, uiMidpointCA, uiChildDepth);
 			continue;
 		}
 
-		AbsorbMidpoints(iTriangle, iA, iB, iC, iMidpointAB, iMidpointBC, iMidpointCA, iExistingMidpoints, iChildDepth);
+		AbsorbMidpoints(uiTriangle, uiA, uiB, uiC, uiMidpointAB, uiMidpointBC, uiMidpointCA, iExistingMidpoints, uiChildDepth);
 	}
 
-	// Compact: drop dead triangles (UINT32_MAX sentinel indices).
+	// UINT32_MAX marks dead triangles.
 	std::vector<uint32_t> compactedIndices;
-	compactedIndices.reserve(meshIndices.size());
-	for (size_t i = 0; i < meshIndices.size(); i += 3)
+	compactedIndices.reserve(rMeshIndices.size());
+	for (int64_t i = 0; i < std::ssize(rMeshIndices); i += 3)
 	{
-		if (meshIndices[i] == UINT32_MAX)
+		if (rMeshIndices.at(i) == UINT32_MAX)
 		{
 			continue;
 		}
-		compactedIndices.push_back(meshIndices[i + 0]);
-		compactedIndices.push_back(meshIndices[i + 1]);
-		compactedIndices.push_back(meshIndices[i + 2]);
+		compactedIndices.push_back(rMeshIndices.at(i + 0));
+		compactedIndices.push_back(rMeshIndices.at(i + 1));
+		compactedIndices.push_back(rMeshIndices.at(i + 2));
 	}
-	meshIndices = std::move(compactedIndices);
+	rMeshIndices = std::move(compactedIndices);
 }
 
-void BeachSubdivider::SplitInBand(uint32_t iTriangle, uint32_t iA, uint32_t iB, uint32_t iC, uint32_t iMidpointAB, uint32_t iMidpointBC, uint32_t iMidpointCA, uint8_t iChildDepth)
+void BeachSubdivider::SplitInBand(uint32_t uiTriangle, uint32_t uiA, uint32_t uiB, uint32_t uiC, uint32_t uiMidpointAB, uint32_t uiMidpointBC, uint32_t uiMidpointCA, uint8_t uiChildDepth)
 {
 	// In-band 1->4 split. Capture neighbors BEFORE mutating edge tables so we know
 	// who to notify on each parent edge. Create midpoints for any edges that don't
 	// already have one; those new midpoints are what neighbors will absorb.
-	int32_t iNeighborAB = EdgeOther(EdgeKey(iA, iB), static_cast<int32_t>(iTriangle));
-	int32_t iNeighborBC = EdgeOther(EdgeKey(iB, iC), static_cast<int32_t>(iTriangle));
-	int32_t iNeighborCA = EdgeOther(EdgeKey(iC, iA), static_cast<int32_t>(iTriangle));
+	int32_t iNeighborAB = EdgeOther(EdgeKey(uiA, uiB), static_cast<int32_t>(uiTriangle));
+	int32_t iNeighborBC = EdgeOther(EdgeKey(uiB, uiC), static_cast<int32_t>(uiTriangle));
+	int32_t iNeighborCA = EdgeOther(EdgeKey(uiC, uiA), static_cast<int32_t>(uiTriangle));
 
-	if (iMidpointAB == UINT32_MAX)
+	if (uiMidpointAB == UINT32_MAX)
 	{
-		iMidpointAB = GetOrCreateMidpoint(iA, iB);
+		uiMidpointAB = GetOrCreateMidpoint(uiA, uiB);
 	}
-	if (iMidpointBC == UINT32_MAX)
+	if (uiMidpointBC == UINT32_MAX)
 	{
-		iMidpointBC = GetOrCreateMidpoint(iB, iC);
+		uiMidpointBC = GetOrCreateMidpoint(uiB, uiC);
 	}
-	if (iMidpointCA == UINT32_MAX)
+	if (uiMidpointCA == UINT32_MAX)
 	{
-		iMidpointCA = GetOrCreateMidpoint(iC, iA);
+		uiMidpointCA = GetOrCreateMidpoint(uiC, uiA);
 	}
 
-	KillTriangle(iTriangle);
+	KillTriangle(uiTriangle);
 
-	uint32_t iChild0 = AppendTriangle(iA, iMidpointAB, iMidpointCA, iChildDepth);
-	uint32_t iChild1 = AppendTriangle(iMidpointAB, iB, iMidpointBC, iChildDepth);
-	uint32_t iChild2 = AppendTriangle(iMidpointCA, iMidpointBC, iC, iChildDepth);
-	uint32_t iChild3 = AppendTriangle(iMidpointAB, iMidpointBC, iMidpointCA, iChildDepth);
+	uint32_t uiChild0 = AppendTriangle(uiA, uiMidpointAB, uiMidpointCA, uiChildDepth);
+	uint32_t uiChild1 = AppendTriangle(uiMidpointAB, uiB, uiMidpointBC, uiChildDepth);
+	uint32_t uiChild2 = AppendTriangle(uiMidpointCA, uiMidpointBC, uiC, uiChildDepth);
+	uint32_t uiChild3 = AppendTriangle(uiMidpointAB, uiMidpointBC, uiMidpointCA, uiChildDepth);
 
-	worklist.push_back(iChild0);
-	worklist.push_back(iChild1);
-	worklist.push_back(iChild2);
-	worklist.push_back(iChild3);
+	worklist.push_back(uiChild0);
+	worklist.push_back(uiChild1);
+	worklist.push_back(uiChild2);
+	worklist.push_back(uiChild3);
 
-	if (iNeighborAB >= 0 && triangleAlive[static_cast<size_t>(iNeighborAB)] != 0)
+	if (iNeighborAB >= 0 && triangleAlive.at(static_cast<int64_t>(iNeighborAB)) != 0)
 	{
 		worklist.push_back(static_cast<uint32_t>(iNeighborAB));
 	}
-	if (iNeighborBC >= 0 && triangleAlive[static_cast<size_t>(iNeighborBC)] != 0)
+	if (iNeighborBC >= 0 && triangleAlive.at(static_cast<int64_t>(iNeighborBC)) != 0)
 	{
 		worklist.push_back(static_cast<uint32_t>(iNeighborBC));
 	}
-	if (iNeighborCA >= 0 && triangleAlive[static_cast<size_t>(iNeighborCA)] != 0)
+	if (iNeighborCA >= 0 && triangleAlive.at(static_cast<int64_t>(iNeighborCA)) != 0)
 	{
 		worklist.push_back(static_cast<uint32_t>(iNeighborCA));
 	}
 }
 
-void BeachSubdivider::AbsorbMidpoints(uint32_t iTriangle, uint32_t iA, uint32_t iB, uint32_t iC, uint32_t iMidpointAB, uint32_t iMidpointBC, uint32_t iMidpointCA, int32_t iExistingMidpoints, uint8_t iChildDepth)
+void BeachSubdivider::AbsorbMidpoints(uint32_t uiTriangle, uint32_t uiA, uint32_t uiB, uint32_t uiC, uint32_t uiMidpointAB, uint32_t uiMidpointBC, uint32_t uiMidpointCA, int32_t iExistingMidpoints, uint8_t uiChildDepth)
 {
-	// Absorption split: 1->2, 1->3, or 1->4 depending on midpoint count. No new midpoints
-	// are created, so neighbors of this triangle gain no new T-junctions -- cascade firewall.
-	KillTriangle(iTriangle);
+	// Existing midpoints add no new T-junctions to adjacent triangles.
+	KillTriangle(uiTriangle);
 
 	if (iExistingMidpoints == 1)
 	{
-		if (iMidpointAB != UINT32_MAX)
+		if (uiMidpointAB != UINT32_MAX)
 		{
-			AppendTriangle(iA, iMidpointAB, iC, iChildDepth);
-			AppendTriangle(iMidpointAB, iB, iC, iChildDepth);
+			AppendTriangle(uiA, uiMidpointAB, uiC, uiChildDepth);
+			AppendTriangle(uiMidpointAB, uiB, uiC, uiChildDepth);
 		}
-		else if (iMidpointBC != UINT32_MAX)
+		else if (uiMidpointBC != UINT32_MAX)
 		{
-			AppendTriangle(iA, iB, iMidpointBC, iChildDepth);
-			AppendTriangle(iA, iMidpointBC, iC, iChildDepth);
+			AppendTriangle(uiA, uiB, uiMidpointBC, uiChildDepth);
+			AppendTriangle(uiA, uiMidpointBC, uiC, uiChildDepth);
 		}
 		else
 		{
-			AppendTriangle(iA, iB, iMidpointCA, iChildDepth);
-			AppendTriangle(iB, iC, iMidpointCA, iChildDepth);
+			AppendTriangle(uiA, uiB, uiMidpointCA, uiChildDepth);
+			AppendTriangle(uiB, uiC, uiMidpointCA, uiChildDepth);
 		}
 	}
 	else if (iExistingMidpoints == 2)
 	{
-		if (iMidpointAB != UINT32_MAX && iMidpointBC != UINT32_MAX)
+		if (uiMidpointAB != UINT32_MAX && uiMidpointBC != UINT32_MAX)
 		{
 			// Midpoints on A-B and B-C. Corner B is between them.
-			AppendTriangle(iMidpointAB, iB, iMidpointBC, iChildDepth);
-			AppendTriangle(iA, iMidpointAB, iMidpointBC, iChildDepth);
-			AppendTriangle(iA, iMidpointBC, iC, iChildDepth);
+			AppendTriangle(uiMidpointAB, uiB, uiMidpointBC, uiChildDepth);
+			AppendTriangle(uiA, uiMidpointAB, uiMidpointBC, uiChildDepth);
+			AppendTriangle(uiA, uiMidpointBC, uiC, uiChildDepth);
 		}
-		else if (iMidpointBC != UINT32_MAX && iMidpointCA != UINT32_MAX)
+		else if (uiMidpointBC != UINT32_MAX && uiMidpointCA != UINT32_MAX)
 		{
 			// Midpoints on B-C and C-A. Corner C is between them.
-			AppendTriangle(iMidpointBC, iC, iMidpointCA, iChildDepth);
-			AppendTriangle(iB, iMidpointBC, iMidpointCA, iChildDepth);
-			AppendTriangle(iA, iB, iMidpointCA, iChildDepth);
+			AppendTriangle(uiMidpointBC, uiC, uiMidpointCA, uiChildDepth);
+			AppendTriangle(uiB, uiMidpointBC, uiMidpointCA, uiChildDepth);
+			AppendTriangle(uiA, uiB, uiMidpointCA, uiChildDepth);
 		}
 		else
 		{
 			// Midpoints on A-B and C-A. Corner A is between them.
-			AppendTriangle(iA, iMidpointAB, iMidpointCA, iChildDepth);
-			AppendTriangle(iMidpointAB, iB, iMidpointCA, iChildDepth);
-			AppendTriangle(iMidpointCA, iB, iC, iChildDepth);
+			AppendTriangle(uiA, uiMidpointAB, uiMidpointCA, uiChildDepth);
+			AppendTriangle(uiMidpointAB, uiB, uiMidpointCA, uiChildDepth);
+			AppendTriangle(uiMidpointCA, uiB, uiC, uiChildDepth);
 		}
 	}
 	else
 	{
-		// All three edges have midpoints. True 1->4 using the existing midpoints.
-		AppendTriangle(iA, iMidpointAB, iMidpointCA, iChildDepth);
-		AppendTriangle(iMidpointAB, iB, iMidpointBC, iChildDepth);
-		AppendTriangle(iMidpointCA, iMidpointBC, iC, iChildDepth);
-		AppendTriangle(iMidpointAB, iMidpointBC, iMidpointCA, iChildDepth);
+		AppendTriangle(uiA, uiMidpointAB, uiMidpointCA, uiChildDepth);
+		AppendTriangle(uiMidpointAB, uiB, uiMidpointBC, uiChildDepth);
+		AppendTriangle(uiMidpointCA, uiMidpointBC, uiC, uiChildDepth);
+		AppendTriangle(uiMidpointAB, uiMidpointBC, uiMidpointCA, uiChildDepth);
 	}
 	// Absorption children inherit the parent's out-of-band Z-range (Z-range of children
 	// is a subset of the parent's), so they cannot trigger a band split themselves --
@@ -394,7 +388,6 @@ void BeachSubdivider::AbsorbMidpoints(uint32_t iTriangle, uint32_t iA, uint32_t 
 	// split creates a new midpoint on one of their edges (via the iNeighbor* lookups).
 }
 
-} // namespace
 
 void SubdivideBeachBand(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits)
 {

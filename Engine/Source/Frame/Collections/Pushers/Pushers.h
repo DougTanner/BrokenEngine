@@ -8,7 +8,7 @@ namespace game
 
 struct Frame;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -23,7 +23,7 @@ enum class PusherFlags : uint8_t
 };
 using PusherFlags_t = common::Flags<PusherFlags>;
 
-// Apply a clamped push impulse: caps velocity in push direction to fMaxPushVelocity
+// Limits the added push; an existing velocity above fMaxPushVelocity is not reduced.
 [[nodiscard]] inline XMVECTOR XM_CALLCONV ApplyClampedPush(FXMVECTOR vecVelocity, FXMVECTOR vecPushDirection, float fPushStrength, float fMaxPushVelocity)
 {
 	float fCurrentPushVelocity = XMVectorGetX(XMVector3Dot(vecVelocity, vecPushDirection));
@@ -36,16 +36,13 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	// Bump on any SOA layout or push behavior change — feeds the Frame::kiVersion save/replay gate
 	static constexpr int64_t kiVersion = 2;
 
-	// Allocate and copy
 	static void AllocateAndCopy(PushersInterpolate& rCurrent, const PushersInterpolate& rPrevious);
 
-	// Update
 	static void Update(game::FrameInterpolate& __restrict rFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
-	// Sync data for owner collections to update pusher state
 	struct SyncData
 	{
-		XMVECTOR vecPosition;
+		XMVECTOR vecPosition {};
 		float fRadius = 0.0f;
 		float fIntensity = 0.0f;
 		float fPower = 0.0f;
@@ -56,19 +53,17 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	static void XM_CALLCONV Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData);
 
 	// Zone system - builds spatial acceleration structure each frame over the cell's own area
-	static void XM_CALLCONV SetupZones(game::Frame& __restrict rFrame, FXMVECTOR vecArea);
+	static void XM_CALLCONV SetupZones(const game::Frame& __restrict rFrame, FXMVECTOR vecArea);
 
 	// Query force at position using zone acceleration
-	static XMVECTOR XM_CALLCONV ApplyPush(const game::FrameInterpolate& rFrameInterpolate, FXMVECTOR vecPosition, id_t uiIgnorePusher = id_t {}, PusherFlags_t includeFlags = PusherFlags::kTypeDefault, PusherFlags_t excludeFlags = PusherFlags::kTypeMines);
+	static XMVECTOR XM_CALLCONV ApplyPush(const game::FrameInterpolate& rFrameInterpolate, FXMVECTOR vecPosition, id_t ignorePusher = id_t {}, PusherFlags_t includeFlags = PusherFlags::kTypeDefault, PusherFlags_t excludeFlags = PusherFlags::kTypeMines);
 
 #if defined(BT_CLIENT)
-	// Render
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords);
 	static void Render(const game::FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 #endif
 
-	// Member arrays (SOA)
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	float* __restrict pfRadii = nullptr;
 	float* __restrict pfIntensities = nullptr;
@@ -89,22 +84,18 @@ struct PushersPostRender : public Collection<PushersPostRender>
 	// Bump on any SOA layout change — feeds the Frame::kiVersion save/replay gate
 	static constexpr int64_t kiVersion = 1;
 
-	// Allocate and copy
 	static void AllocateAndCopy(PushersPostRender& rCurrent, const PushersPostRender& rPrevious);
 
-	// Update
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
-	// Add pusher
 	static void Add(game::Frame& __restrict rFrame, pusher_t& rId);
 
-	// Remove pusher by ID
 	static void Remove(game::Frame& __restrict rFrame, pusher_t& rId);
 
-	pusher_t* __restrict puiIds = nullptr;
+	pusher_t* __restrict pIds = nullptr;
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiIds);
+		return std::tie(rSelf.pIds);
 	}
 
 	bool LogDifferences(const PushersPostRender& rOther) const;

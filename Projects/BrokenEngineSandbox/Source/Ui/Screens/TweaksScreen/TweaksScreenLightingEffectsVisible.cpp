@@ -8,8 +8,6 @@
 namespace game
 {
 
-namespace
-{
 const engine::TweaksSliderMapRegistrar gLightingEffectsVisibleRegistrar
 {
 	// Explosion Primary Visible
@@ -52,7 +50,6 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsVisibleRegistrar
 	{"Hit Flash Visible Intensity One", &gHitFlashVisibleIntensityOne},
 	{"Hit Flash Visible Intensity Two", &gHitFlashVisibleIntensityTwo},
 };
-}
 
 void TweaksScreen::RenderLightingEffectsVisibleTab()
 {

@@ -12,8 +12,6 @@ static_assert(std::string_view(kpcIslandColor).ends_with(TextureIntermediateSuff
 static_assert(std::string_view(kpcIslandMasks).ends_with(TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK)));
 static_assert(std::string_view(kpcIslandNormals).ends_with(TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK)));
 
-namespace
-{
 
 struct ExportedIsland
 {
@@ -31,7 +29,7 @@ struct ExportedIsland
 	float fWorldElevationMeters = 0.0f;
 };
 
-size_t CheckedProduct(size_t uiLeft, size_t uiRight, std::string_view what)
+static size_t CheckedProduct(size_t uiLeft, size_t uiRight, std::string_view what)
 {
 	if (uiRight != 0 && uiLeft > std::numeric_limits<size_t>::max() / uiRight)
 	{
@@ -40,7 +38,7 @@ size_t CheckedProduct(size_t uiLeft, size_t uiRight, std::string_view what)
 	return uiLeft * uiRight;
 }
 
-size_t CheckedSum(size_t uiLeft, size_t uiRight, std::string_view what)
+static size_t CheckedSum(size_t uiLeft, size_t uiRight, std::string_view what)
 {
 	if (uiLeft > std::numeric_limits<size_t>::max() - uiRight)
 	{
@@ -49,7 +47,6 @@ size_t CheckedSum(size_t uiLeft, size_t uiRight, std::string_view what)
 	return uiLeft + uiRight;
 }
 
-} // namespace
 
 // Convex hull (Andrew's monotone chain) of the island's valid area — the pixels at or above
 // common::kfUnderwaterMaskThresholdMeters, the same cut line the texture masking uses. Per heightmap
@@ -75,29 +72,29 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 
 	std::vector<XMFLOAT2> candidates;
 	candidates.reserve(static_cast<size_t>(iHeight) * 2);
-	for (int32_t iY = 0; iY < iHeight; ++iY)
+	for (int32_t i = 0; i < iHeight; ++i)
 	{
 		int32_t iLeft = -1;
 		int32_t iRight = -1;
-		for (int32_t iX = 0; iX < iWidth; ++iX)
+		for (int32_t j = 0; j < iWidth; ++j)
 		{
-			if (rOut.cpuHeightmapData[static_cast<size_t>(iY) * static_cast<size_t>(iWidth) + static_cast<size_t>(iX)] >= common::kfUnderwaterMaskThresholdMeters)
+			if (rOut.cpuHeightmapData.at(static_cast<size_t>(i) * static_cast<size_t>(iWidth) + static_cast<size_t>(j)) >= common::kfUnderwaterMaskThresholdMeters)
 			{
 				if (iLeft < 0)
 				{
-					iLeft = iX;
+					iLeft = j;
 				}
-				iRight = iX;
+				iRight = j;
 			}
 		}
 		if (iLeft < 0)
 		{
 			continue;
 		}
-		candidates.push_back(PixelToLocal(iLeft, iY));
+		candidates.push_back(PixelToLocal(iLeft, i));
 		if (iRight != iLeft)
 		{
-			candidates.push_back(PixelToLocal(iRight, iY));
+			candidates.push_back(PixelToLocal(iRight, i));
 		}
 	}
 
@@ -117,27 +114,28 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 		return (rA.x - rO.x) * (rB.y - rO.y) - (rA.y - rO.y) * (rB.x - rO.x);
 	};
 
-	int32_t iCount = static_cast<int32_t>(candidates.size());
+	int64_t iCount = std::ssize(candidates);
 	std::vector<XMFLOAT2> hull(static_cast<size_t>(iCount) * 2);
-	int32_t iK = 0;
-	for (int32_t i = 0; i < iCount; ++i)
+	int64_t iHullVertexCount = 0;
+	for (int64_t i = 0; i < iCount; ++i)
 	{
-		while (iK >= 2 && Cross(hull[static_cast<size_t>(iK) - 2], hull[static_cast<size_t>(iK) - 1], candidates[static_cast<size_t>(i)]) <= 0.0f)
+		while (iHullVertexCount >= 2 && Cross(hull.at(iHullVertexCount - 2), hull.at(iHullVertexCount - 1), candidates.at(i)) <= 0.0f)
 		{
-			--iK;
+			--iHullVertexCount;
 		}
-		hull[static_cast<size_t>(iK++)] = candidates[static_cast<size_t>(i)];
+		hull.at(iHullVertexCount++) = candidates.at(i);
 	}
-	for (int32_t i = iCount - 2, iLower = iK + 1; i >= 0; --i)
+	int64_t iLower = iHullVertexCount + 1;
+	for (int64_t i = iCount - 2; i >= 0; --i)
 	{
-		while (iK >= iLower && Cross(hull[static_cast<size_t>(iK) - 2], hull[static_cast<size_t>(iK) - 1], candidates[static_cast<size_t>(i)]) <= 0.0f)
+		while (iHullVertexCount >= iLower && Cross(hull.at(iHullVertexCount - 2), hull.at(iHullVertexCount - 1), candidates.at(i)) <= 0.0f)
 		{
-			--iK;
+			--iHullVertexCount;
 		}
-		hull[static_cast<size_t>(iK++)] = candidates[static_cast<size_t>(i)];
+		hull.at(iHullVertexCount++) = candidates.at(i);
 	}
 	// Last point repeats the first; drop it.
-	hull.resize(static_cast<size_t>(iK) - 1);
+	hull.resize(static_cast<size_t>(iHullVertexCount) - 1);
 
 	if (hull.size() < 3)
 	{
@@ -162,18 +160,18 @@ static void VerifyHullCcwConvex(const ExportedIsland& rOut)
 	{
 		// cpuValidAreaVertices is interleaved x,y floats; XMFLOAT2 is a padding-free {float,float}, so
 		// it aliases the same bytes as the hull vertices for the shared CCW predicate.
-		ASSERT(common::IsPolygonCcw(reinterpret_cast<const XMFLOAT2*>(rOut.cpuValidAreaVertices.data()), rOut.iValidAreaVertexCount));
-		for (int32_t i = 0; i < rOut.iValidAreaVertexCount; ++i)
+		ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(reinterpret_cast<const XMFLOAT2*>(rOut.cpuValidAreaVertices.data()), static_cast<size_t>(rOut.iValidAreaVertexCount))));
+		for (int64_t i = 0; i < rOut.iValidAreaVertexCount; ++i)
 		{
-			int32_t iPrev = (i + rOut.iValidAreaVertexCount - 1) % rOut.iValidAreaVertexCount;
-			int32_t iNext = (i + 1) % rOut.iValidAreaVertexCount;
-			float fPx = rOut.cpuValidAreaVertices.at(static_cast<size_t>(iPrev) * 2);
-			float fPy = rOut.cpuValidAreaVertices.at(static_cast<size_t>(iPrev) * 2 + 1);
-			float fCx = rOut.cpuValidAreaVertices.at(static_cast<size_t>(i) * 2);
-			float fCy = rOut.cpuValidAreaVertices.at(static_cast<size_t>(i) * 2 + 1);
-			float fNx = rOut.cpuValidAreaVertices.at(static_cast<size_t>(iNext) * 2);
-			float fNy = rOut.cpuValidAreaVertices.at(static_cast<size_t>(iNext) * 2 + 1);
-			float fCross = (fCx - fPx) * (fNy - fPy) - (fCy - fPy) * (fNx - fPx);
+			int64_t iPreviousVertex = (i + rOut.iValidAreaVertexCount - 1) % rOut.iValidAreaVertexCount;
+			int64_t iNextVertex = (i + 1) % rOut.iValidAreaVertexCount;
+			float fPreviousX = rOut.cpuValidAreaVertices.at(iPreviousVertex * 2);
+			float fPreviousY = rOut.cpuValidAreaVertices.at(iPreviousVertex * 2 + 1);
+			float fCurrentX = rOut.cpuValidAreaVertices.at(i * 2);
+			float fCurrentY = rOut.cpuValidAreaVertices.at(i * 2 + 1);
+			float fNextX = rOut.cpuValidAreaVertices.at(iNextVertex * 2);
+			float fNextY = rOut.cpuValidAreaVertices.at(iNextVertex * 2 + 1);
+			float fCross = (fCurrentX - fPreviousX) * (fNextY - fPreviousY) - (fCurrentY - fPreviousY) * (fNextX - fPreviousX);
 			ASSERT(fCross > 0.0f);
 		}
 	}
@@ -182,9 +180,9 @@ static void VerifyHullCcwConvex(const ExportedIsland& rOut)
 // Shared encode tail: mask invisible underwater texels flat, build the BC mip chain, write the
 // committed intermediate, then the debug JPEG sidecar. Each caller still constructs / crops / packs
 // its own Texture and holds Texture::sEncodeMutex; only this trailing sequence is shared.
-static void MaskMipSaveTexture(Texture& rTexture, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int64_t iMaskDivisor, const float (&pfFlat)[4], VkFormat vkFormat, const std::filesystem::path& rSavePath, TextureOptions_t saveOptions, const std::filesystem::path& rJpegPath, int iJpegQuality, TextureOptions_t jpegOptions)
+static void MaskMipSaveTexture(Texture& rTexture, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int64_t iMaskDivisor, const float (&rFlatValues)[4], VkFormat vkFormat, const std::filesystem::path& rSavePath, TextureOptions_t saveOptions, const std::filesystem::path& rJpegPath, int iJpegQuality, TextureOptions_t jpegOptions)
 {
-	rTexture.MaskByHeightmap(rHeightmapData, iElevationWidth, iElevationHeight, iMaskDivisor, common::kfUnderwaterMaskThresholdMeters, pfFlat);
+	rTexture.MaskByHeightmap(rHeightmapData, iElevationWidth, iElevationHeight, iMaskDivisor, common::kfUnderwaterMaskThresholdMeters, rFlatValues);
 	rTexture.MakeMipmaps(vkFormat);
 	rTexture.Save(rSavePath, vkFormat, saveOptions);
 	rTexture.SaveJpegSidecar(rJpegPath, iJpegQuality, jpegOptions);
@@ -234,10 +232,10 @@ static void EncodeMaterialMasks(const std::filesystem::path& rInputPath, const s
 	int64_t iPixelCount = static_cast<int64_t>(iMaskWidth) * static_cast<int64_t>(iMaskHeight);
 	for (int64_t i = 0; i < iPixelCount; ++i)
 	{
-		packedRgba[static_cast<size_t>(i * 4 + 0)] = std::byte {ppMaskPixels[0][i]};
-		packedRgba[static_cast<size_t>(i * 4 + 1)] = std::byte {ppMaskPixels[1][i]};
-		packedRgba[static_cast<size_t>(i * 4 + 2)] = std::byte {ppMaskPixels[2][i]};
-		packedRgba[static_cast<size_t>(i * 4 + 3)] = std::byte {ppMaskPixels[3][i]};
+		packedRgba.at(i * 4 + 0) = std::byte {ppMaskPixels[0][i]};
+		packedRgba.at(i * 4 + 1) = std::byte {ppMaskPixels[1][i]};
+		packedRgba.at(i * 4 + 2) = std::byte {ppMaskPixels[2][i]};
+		packedRgba.at(i * 4 + 3) = std::byte {ppMaskPixels[3][i]};
 	}
 
 	Texture texture(packedRgba.data(), iMaskWidth, iMaskHeight, 4);
@@ -320,27 +318,27 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 	{
 		throw std::runtime_error(std::format("Failed to read processed mesh indices from \"{}\".", meshFile.string()));
 	}
-	for (size_t uiVertex = 0; uiVertex < uiMeshVertexCount; ++uiVertex)
+	for (size_t i = 0; i < uiMeshVertexCount; ++i)
 	{
-		const float* pfPosition = meshPositionsXYZ.data() + uiVertex * 3;
+		const float* pfPosition = meshPositionsXYZ.data() + i * 3;
 		if (!std::isfinite(pfPosition[0]))
 		{
-			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), uiVertex, pfPosition[0], pfPosition[1], pfPosition[2]));
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), i, pfPosition[0], pfPosition[1], pfPosition[2]));
 		}
 		if (!std::isfinite(pfPosition[1]))
 		{
-			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), uiVertex, pfPosition[0], pfPosition[1], pfPosition[2]));
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), i, pfPosition[0], pfPosition[1], pfPosition[2]));
 		}
 		if (!std::isfinite(pfPosition[2]))
 		{
-			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), uiVertex, pfPosition[0], pfPosition[1], pfPosition[2]));
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), i, pfPosition[0], pfPosition[1], pfPosition[2]));
 		}
 	}
-	for (size_t uiIndex = 0; uiIndex < uiMeshIndexCount; ++uiIndex)
+	for (size_t i = 0; i < uiMeshIndexCount; ++i)
 	{
-		if (meshIndices.at(uiIndex) >= uiMeshVertexCount)
+		if (meshIndices.at(i) >= uiMeshVertexCount)
 		{
-			throw std::runtime_error(std::format("Processed mesh file \"{}\" index {} references vertex {}, but the vertex count is {}.", meshFile.string(), uiIndex, meshIndices.at(uiIndex), uiMeshVertexCount));
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" index {} references vertex {}, but the vertex count is {}.", meshFile.string(), i, meshIndices.at(i), uiMeshVertexCount));
 		}
 	}
 
@@ -348,10 +346,10 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 	rOut.iMeshIndexCount = iMeshIndexCount;
 	rOut.cpuMeshPositions = std::move(meshPositions);
 	rOut.cpuMeshIndices = std::move(meshIndices);
-	for (int32_t i = 0; i < iMeshVertexCount; ++i)
+	for (int64_t i = 0; i < iMeshVertexCount; ++i)
 	{
-		rOut.cpuMeshPositions.at(static_cast<size_t>(i) * 2)     = meshPositionsXYZ.at(static_cast<size_t>(i) * 3);
-		rOut.cpuMeshPositions.at(static_cast<size_t>(i) * 2 + 1) = meshPositionsXYZ.at(static_cast<size_t>(i) * 3 + 1);
+		rOut.cpuMeshPositions.at(i * 2)     = meshPositionsXYZ.at(i * 3);
+		rOut.cpuMeshPositions.at(i * 2 + 1) = meshPositionsXYZ.at(i * 3 + 1);
 	}
 }
 
@@ -482,10 +480,6 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 		EncodeMaterialMasks(rInputPath, textureSourceDirectory, diagnosticsDirectory, baked, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, kiJpegSidecarQuality);
 	}
 
-	// cpuHeightmapData / iHeightmapWidth / iHeightmapHeight were populated at the top of this
-	// function so the underwater mask could share the buffer; nothing more to do for the heightmap
-	// here — Export() packs it into the chunk payload below.
-
 }
 
 std::optional<common::ChunkFlags_t> ExportIsland::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
@@ -510,7 +504,11 @@ std::optional<common::ChunkFlags_t> ExportIsland::Handles(const std::filesystem:
 			break;
 		}
 	}
-	if (!bUnderIslands || !std::filesystem::exists(GetIslandCachePath(rDirectoryEntry.path()) / kpcBakedDimensionsFile))
+	if (!bUnderIslands)
+	{
+		return std::nullopt;
+	}
+	if (!std::filesystem::exists(GetIslandCachePath(rDirectoryEntry.path()) / kpcBakedDimensionsFile))
 	{
 		return std::nullopt;
 	}
@@ -526,11 +524,11 @@ std::string ExportIsland::GetInputFingerprint() const
 	nlohmann::json fingerprint;
 	for (const char* pcFile : kpcLeafInputs)
 	{
-		fingerprint["leaf"][pcFile] = gpFileManager->GetSharedCacheFingerprint(cacheLeafDirectory / pcFile);
+		fingerprint["leaf"][pcFile] = gpFileManager->mpInputFingerprintCache->GetPersistent(cacheLeafDirectory / pcFile);
 	}
 	for (const char* pcFile : kpcRouteInputs)
 	{
-		fingerprint["route"][pcFile] = gpFileManager->GetSharedCacheFingerprint(cacheRouteDirectory / pcFile);
+		fingerprint["route"][pcFile] = gpFileManager->mpInputFingerprintCache->GetPersistent(cacheRouteDirectory / pcFile);
 	}
 	return fingerprint.dump();
 }
@@ -560,11 +558,11 @@ std::string ExportIsland::GetTextureFingerprint() const
 	fingerprint["textureVersion"] = kiTextureVersion;
 	for (const char* pcFile : kpcLeafInputs)
 	{
-		fingerprint["leaf"][pcFile] = gpFileManager->GetSharedCacheFingerprint(cacheLeafDirectory / pcFile);
+		fingerprint["leaf"][pcFile] = gpFileManager->mpInputFingerprintCache->GetPersistent(cacheLeafDirectory / pcFile);
 	}
 	for (const char* pcFile : kpcRouteInputs)
 	{
-		fingerprint["route"][pcFile] = gpFileManager->GetSharedCacheFingerprint(cacheRouteDirectory / pcFile);
+		fingerprint["route"][pcFile] = gpFileManager->mpInputFingerprintCache->GetPersistent(cacheRouteDirectory / pcFile);
 	}
 	return fingerprint.dump();
 }
@@ -595,11 +593,6 @@ bool ExportIsland::AreTexturesFresh() const
 	return markerFingerprint.has_value() && markerFingerprint.value() == GetTextureFingerprint();
 }
 
-void ExportIsland::WriteTextureMarker() const
-{
-	WriteMarkerFile(GetTextureMarkerPath(), GetTextureFingerprint());
-}
-
 bool ExportIsland::CheckDirty(const std::filesystem::path& rPackFile)
 {
 	// The base check compares only the chunk payload version and its input fingerprint, neither of which
@@ -611,13 +604,10 @@ bool ExportIsland::CheckDirty(const std::filesystem::path& rPackFile)
 		return true;
 	}
 
-	// Seeding a marker here is the one deliberate side effect in the dirty check: a clean chunk cache proves
-	// the committed BC outputs were produced from exactly these inputs, so adopting them costs nothing and
-	// spares the split's first run a re-encode and rewrite of all ~446 MB of tracked island textures for
-	// byte-identical output.
+	// A clean chunk cache proves these committed textures match the current inputs, so seeding the marker avoids a byte-identical rewrite.
 	if (!std::filesystem::exists(GetTextureMarkerPath()) && AreTextureOutputsPresent())
 	{
-		WriteTextureMarker();
+		WriteMarkerFile(GetTextureMarkerPath(), GetTextureFingerprint());
 	}
 
 	mbDirty = !AreTexturesFresh();
@@ -628,7 +618,7 @@ void ExportIsland::UpdateCacheMetadata()
 {
 	// RunExport calls this only after Export() and the chunk write both succeeded, so the marker can only
 	// ever record a complete encode. A run that reused the textures rewrites the same fingerprint.
-	WriteTextureMarker();
+	WriteMarkerFile(GetTextureMarkerPath(), GetTextureFingerprint());
 }
 
 void ExportIsland::CleanupOnFailure()

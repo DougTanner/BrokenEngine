@@ -504,7 +504,7 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 
 void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 {
-	mFlags.Clear(TextureManagerFlags::kPendingAcquireBarriers);
+	mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
 
 	// Idle-frame fast path: skip the full mTextureMap scan when nothing is in an adoptable state. The
 	// TextureUploadManager pending-adoption counter is armed when a chunk reaches kDiskLoaded/kGpuUploadComplete
@@ -709,7 +709,7 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 				CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX));
 
 				vkDestroyFence(gpDeviceManager->mVkDevice, vkFence, nullptr);
-				mFlags.Clear(TextureManagerFlags::kPendingAcquireBarriers);
+				mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
 			}
 		}
 	}

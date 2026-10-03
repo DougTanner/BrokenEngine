@@ -10,7 +10,7 @@ these classes enforce; they add no rule it does not state.
 | history | never describes the previous implementation, the change that produced the code, or a comparison against replaced code | trigger words: "now", "no longer", "previously", "instead of" | Required |
 | speculative | never describes a hypothetical or future code path, and never argues that the code is correct | a rebuttal of a review is such an argument | Required |
 | navigation | never carries an `AGENTS.md` navigation pointer as its content | — | Required |
-| false | every statement is true of the adjacent code as it stands | — | Required |
+| false | every statement is true of the code as it now stands, including any code elsewhere the comment names | — | Required |
 | dense | says it in the fewest sentences that carry it | a block over 800 characters of comment text, or a fact the block or its function already states elsewhere | Recommended |
 
 ## Examples
@@ -29,11 +29,12 @@ these classes enforce; they add no rule it does not state.
 - navigation — `// See AGENTS.md for the threading rules.` Delete a comment
   whose sole content is the pointer; otherwise keep the technical statement and
   remove only the pointer.
-- false — no fixed example applies: the test is to read the adjacent
-  code and accept the class only when that code contradicts the stated fact,
-  rather than to match a pattern. When the claim is about runtime correctness,
-  the replacement slot is `route: /repo-code-review`, because either the comment
-  or the code is wrong and only that review decides which.
+- false — no fixed example applies: the test is to read the code the
+  statement is about, adjacent or named elsewhere, and accept the class only
+  when that code contradicts the stated fact, rather than to match a pattern.
+  When the claim is about runtime correctness, the replacement slot is
+  `route: /repo-code-review`, because either the comment or the code is wrong
+  and only that review decides which.
 - dense — a nine-line block spelling out a thread-safety precondition one
   sentence carries: the constraint is real, so it is shortened, never deleted.
 

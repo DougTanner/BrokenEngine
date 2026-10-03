@@ -53,8 +53,7 @@ Changes (15 files)
 
 1. DataPacker/Source/ExportJobs/ExportIsland.h
    Add a placement mask texture constant (e.g. "PlacementMask.r32")
-   alongside the existing elevation/color/normal/AO constants.  Bump
-   GetVersion() to force re-export.
+   alongside the existing elevation/color/normal/AO constants.  Bump the island export version to force re-export.
 
 2. DataPacker/Source/ExportJobs/ExportIsland.cpp
    After exporting elevation data, add a tree placement phase:

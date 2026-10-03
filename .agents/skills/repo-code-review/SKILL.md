@@ -35,13 +35,13 @@ Require a self-contained brief containing:
   owned changes;
 - a `broken-engine-code-quality-targets/v1` targets file produced by
   `.agents/scripts/Get-SessionChangeInventory.ps1 -EmitTargets` from that
-  authorized diff (or focused re-review), listing the baseline and current paths
-  of additions, deletions, and renames; it excludes pre-existing and concurrently
-  owned changes;
-- that targets file's C++ target selection, which is the same run's `cpp` and
-  `dual-language-header` classes; those class rules are the only statement of
-  which `.h` files are GLSL-only, and every `dual-language-header` entry routes
-  to both this C++ review and the GLSL review;
+  authorized diff (or focused re-review), listing the script-selected baseline
+  and current C++ paths of additions, deletions, and renames; it excludes
+  pre-existing and concurrently owned changes. Its `paths` are the C++ target
+  set selected by the same run's `cpp` and `dual-language-header` classes,
+  requiring no separately supplied class decision. Those script class rules
+  are the only statement of which `.h` files are GLSL-only, and every
+  `dual-language-header` entry routes to both this C++ review and the GLSL review;
 - approved intent, plan and deltas, affected contracts, and declared
   invariants;
 - implementation handoff, acceptance criteria, notes on which other code sites

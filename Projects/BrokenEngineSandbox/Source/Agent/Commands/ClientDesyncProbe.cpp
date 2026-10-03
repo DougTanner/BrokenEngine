@@ -11,10 +11,7 @@
 namespace game
 {
 
-namespace
-{
-
-int64_t DesyncProbeCountParameter(const nlohmann::json& rParameters, std::string_view parameterName)
+static int64_t DesyncProbeCountParameter(const nlohmann::json& rParameters, std::string_view parameterName)
 {
 	std::string parameterNameString(parameterName);
 	if (!rParameters.contains(parameterNameString))
@@ -47,8 +44,6 @@ int64_t DesyncProbeCountParameter(const nlohmann::json& rParameters, std::string
 	}
 	return iCount;
 }
-
-} // namespace
 
 void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
@@ -136,12 +131,12 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 
 	int64_t iTick = pCurrentFrame->interpolate.iTick;
 	engine::GridCoord coord = gpGame->mClientGridCoord;
-	common::crc_t uiExpectedCrc = pCurrentFrame->postRender.sharedCrc;
+	common::crc_t uiExpectedCrc = pCurrentFrame->postRender.uiSharedCrc;
 	common::crc_t uiActualCrc = uiExpectedCrc ^ static_cast<common::crc_t>(1);
 
 	for (int64_t i = 0; i < iDesyncReportCount; ++i)
 	{
-		gpClientSession->mpRuntime->mpClient->SendDesyncReport(iTick, coord, uiExpectedCrc, uiActualCrc);
+		gpClientSession->mpRuntime->mpClient->SendDesynchronizationReport(iTick, coord, uiExpectedCrc, uiActualCrc);
 	}
 	for (int64_t i = 0; i < iDebugFrameRequestCount; ++i)
 	{
@@ -171,7 +166,7 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 	}
 
 	rResult["tick"] = iTick;
-	rResult["coord"] = {coord.x, coord.y};
+	rResult["coord"] = {coord.iX, coord.iY};
 	rResult["desyncDebugFrames"] = kbDesyncDebugFrames;
 	rResult["stalled"] = gpClientSession->mpDesyncCore->IsStalled();
 	rResult["desyncReports"] = iDesyncReportCount;

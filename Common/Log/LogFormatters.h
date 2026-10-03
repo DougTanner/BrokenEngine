@@ -8,12 +8,12 @@ namespace common
 
 // Assembles a brace-wrapped, comma-separated float list ("{1.5, 2.5}") in shortest round-trip form (matching std::format
 // "{}") into a caller stack buffer, so the caller can forward the view through std::formatter<std::string_view> and have
-// width/precision/fill specs apply. Allocation-free — the discarded-spec format_to(rContext.out(), ...) form did not honor specs.
-inline std::string_view FormatVector(std::span<char> pcBuffer, std::initializer_list<float> values)
+// width/precision/fill specs apply.
+inline std::string_view FormatVector(std::span<char> buffer, std::initializer_list<float> values)
 {
-	char* pWrite = pcBuffer.data();
-	char* pEnd = pcBuffer.data() + pcBuffer.size();
-	auto put = [&pWrite, pEnd](char c)
+	char* pWrite = buffer.data();
+	char* pEnd = buffer.data() + buffer.size();
+	auto Put = [&pWrite, pEnd](char c)
 	{
 		if (pWrite < pEnd)
 		{
@@ -21,27 +21,26 @@ inline std::string_view FormatVector(std::span<char> pcBuffer, std::initializer_
 		}
 	};
 
-	put('{');
+	Put('{');
 	bool bFirst = true;
 	for (float fValue : values)
 	{
 		if (!bFirst)
 		{
-			put(',');
-			put(' ');
+			Put(',');
+			Put(' ');
 		}
 		bFirst = false;
 		pWrite = std::to_chars(pWrite, pEnd, fValue).ptr;
 	}
-	put('}');
-	return std::string_view(pcBuffer.data(), pWrite - pcBuffer.data());
+	Put('}');
+	return std::string_view(buffer.data(), pWrite - buffer.data());
 }
 
-// Integer value with a trailing unit suffix ("123ns"); same stack-buffer + forward rationale as FormatVector.
-inline std::string_view FormatSuffixed(std::span<char> pcBuffer, int64_t iValue, std::string_view suffix)
+inline std::string_view FormatSuffixed(std::span<char> buffer, int64_t iValue, std::string_view suffix)
 {
-	char* pEnd = pcBuffer.data() + pcBuffer.size();
-	char* pWrite = std::to_chars(pcBuffer.data(), pEnd, iValue).ptr;
+	char* pEnd = buffer.data() + buffer.size();
+	char* pWrite = std::to_chars(buffer.data(), pEnd, iValue).ptr;
 	for (char c : suffix)
 	{
 		if (pWrite < pEnd)
@@ -49,7 +48,7 @@ inline std::string_view FormatSuffixed(std::span<char> pcBuffer, int64_t iValue,
 			*(pWrite++) = c;
 		}
 	}
-	return std::string_view(pcBuffer.data(), pWrite - pcBuffer.data());
+	return std::string_view(buffer.data(), pWrite - buffer.data());
 }
 
 } // namespace common
@@ -75,8 +74,8 @@ struct std::formatter<std::wstring> : std::formatter<std::string_view>
 		// Release code-analysis build.
 		ASSERT(common::gpThreadLocal != nullptr);
 		common::ScopedWorkbufferArena arena = common::gpThreadLocal->mWorkbuffer.Push();
-		arena.Append(rString);
-		return std::formatter<std::string_view>::format(arena.View(), rContext);
+		arena.mBuffer.Append(rString);
+		return std::formatter<std::string_view>::format(arena.mBuffer.View(), rContext);
 	}
 };
 
@@ -89,8 +88,8 @@ struct std::formatter<std::filesystem::path> : std::formatter<std::string_view>
 		// See the std::wstring formatter above: requires a live ThreadLocal, and the ASSERT is required for /analyze.
 		ASSERT(common::gpThreadLocal != nullptr);
 		common::ScopedWorkbufferArena arena = common::gpThreadLocal->mWorkbuffer.Push();
-		arena.Append(rPath.native());
-		return std::formatter<std::string_view>::format(arena.View(), rContext);
+		arena.mBuffer.Append(rPath.native());
+		return std::formatter<std::string_view>::format(arena.mBuffer.View(), rContext);
 	}
 };
 
@@ -174,10 +173,10 @@ template<>
 struct std::formatter<std::chrono::nanoseconds> : std::formatter<std::string_view>
 {
 	template<typename CONTEXT>
-	auto format(const std::chrono::nanoseconds ns, CONTEXT& rContext) const
+	auto format(const std::chrono::nanoseconds nanoseconds, CONTEXT& rContext) const
 	{
 		char pcBuffer[32];
-		return std::formatter<std::string_view>::format(common::FormatSuffixed(pcBuffer, ns.count(), "ns"), rContext);
+		return std::formatter<std::string_view>::format(common::FormatSuffixed(pcBuffer, nanoseconds.count(), "ns"), rContext);
 	}
 };
 
@@ -185,10 +184,10 @@ template<>
 struct std::formatter<std::chrono::microseconds> : std::formatter<std::string_view>
 {
 	template<typename CONTEXT>
-	auto format(const std::chrono::microseconds us, CONTEXT& rContext) const
+	auto format(const std::chrono::microseconds microseconds, CONTEXT& rContext) const
 	{
 		char pcBuffer[32];
-		return std::formatter<std::string_view>::format(common::FormatSuffixed(pcBuffer, us.count(), "us"), rContext);
+		return std::formatter<std::string_view>::format(common::FormatSuffixed(pcBuffer, microseconds.count(), "us"), rContext);
 	}
 };
 
@@ -196,10 +195,10 @@ template<>
 struct std::formatter<std::chrono::milliseconds> : std::formatter<std::string_view>
 {
 	template<typename CONTEXT>
-	auto format(const std::chrono::milliseconds ms, CONTEXT& rContext) const
+	auto format(const std::chrono::milliseconds milliseconds, CONTEXT& rContext) const
 	{
 		char pcBuffer[32];
-		return std::formatter<std::string_view>::format(common::FormatSuffixed(pcBuffer, ms.count(), "ms"), rContext);
+		return std::formatter<std::string_view>::format(common::FormatSuffixed(pcBuffer, milliseconds.count(), "ms"), rContext);
 	}
 };
 
@@ -207,10 +206,10 @@ template<>
 struct std::formatter<std::chrono::seconds> : std::formatter<std::string_view>
 {
 	template<typename CONTEXT>
-	auto format(const std::chrono::seconds s, CONTEXT& rContext) const
+	auto format(const std::chrono::seconds seconds, CONTEXT& rContext) const
 	{
 		char pcBuffer[32];
-		return std::formatter<std::string_view>::format(common::FormatSuffixed(pcBuffer, s.count(), "s"), rContext);
+		return std::formatter<std::string_view>::format(common::FormatSuffixed(pcBuffer, seconds.count(), "s"), rContext);
 	}
 };
 
@@ -218,9 +217,9 @@ template<>
 struct std::formatter<int8_t> : std::formatter<int>
 {
 	template<typename CONTEXT>
-	auto format(const int8_t value, CONTEXT& rContext) const
+	auto format(const int8_t iValue, CONTEXT& rContext) const
 	{
-		return std::formatter<int>::format(static_cast<int>(value), rContext);
+		return std::formatter<int>::format(static_cast<int>(iValue), rContext);
 	}
 };
 
@@ -228,9 +227,9 @@ template<>
 struct std::formatter<uint8_t> : std::formatter<uint32_t>
 {
 	template<typename CONTEXT>
-	auto format(const uint8_t value, CONTEXT& rContext) const
+	auto format(const uint8_t uiValue, CONTEXT& rContext) const
 	{
-		return std::formatter<uint32_t>::format(static_cast<uint32_t>(value), rContext);
+		return std::formatter<uint32_t>::format(static_cast<uint32_t>(uiValue), rContext);
 	}
 };
 
@@ -274,8 +273,8 @@ struct std::formatter<common::Wb> : std::formatter<std::string_view>
 		ASSERT(common::gpThreadLocal != nullptr);
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-		arena.AppendFloat(rValue.fValue, rValue.iPrecision);
-		return std::formatter<std::string_view>::format(arena.View(), rContext);
+		arena.mBuffer.AppendFloat(rValue.fValue, rValue.iPrecision);
+		return std::formatter<std::string_view>::format(arena.mBuffer.View(), rContext);
 	}
 };
 
@@ -288,12 +287,12 @@ struct std::formatter<common::WbV2> : std::formatter<std::string_view>
 		ASSERT(common::gpThreadLocal != nullptr);
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-		arena.Append(std::string_view("("));
-		arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(","));
-		arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(")"));
-		return std::formatter<std::string_view>::format(arena.View(), rContext);
+		arena.mBuffer.Append(std::string_view("("));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetX(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(","));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetY(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(")"));
+		return std::formatter<std::string_view>::format(arena.mBuffer.View(), rContext);
 	}
 };
 
@@ -306,14 +305,14 @@ struct std::formatter<common::WbV3> : std::formatter<std::string_view>
 		ASSERT(common::gpThreadLocal != nullptr);
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-		arena.Append(std::string_view("("));
-		arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(","));
-		arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(","));
-		arena.AppendFloat(DirectX::XMVectorGetZ(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(")"));
-		return std::formatter<std::string_view>::format(arena.View(), rContext);
+		arena.mBuffer.Append(std::string_view("("));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetX(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(","));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetY(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(","));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetZ(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(")"));
+		return std::formatter<std::string_view>::format(arena.mBuffer.View(), rContext);
 	}
 };
 
@@ -326,15 +325,15 @@ struct std::formatter<common::WbV4> : std::formatter<std::string_view>
 		ASSERT(common::gpThreadLocal != nullptr);
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-		arena.Append(std::string_view("("));
-		arena.AppendFloat(DirectX::XMVectorGetX(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(","));
-		arena.AppendFloat(DirectX::XMVectorGetY(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(","));
-		arena.AppendFloat(DirectX::XMVectorGetZ(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(","));
-		arena.AppendFloat(DirectX::XMVectorGetW(rValue.vec), rValue.iPrecision);
-		arena.Append(std::string_view(")"));
-		return std::formatter<std::string_view>::format(arena.View(), rContext);
+		arena.mBuffer.Append(std::string_view("("));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetX(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(","));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetY(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(","));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetZ(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(","));
+		arena.mBuffer.AppendFloat(DirectX::XMVectorGetW(rValue.vecValue), rValue.iPrecision);
+		arena.mBuffer.Append(std::string_view(")"));
+		return std::formatter<std::string_view>::format(arena.mBuffer.View(), rContext);
 	}
 };

@@ -1,10 +1,11 @@
 # Candidate scanner for /code-style-review: by default it reports candidate temporary
 # instrumentation and style-rule candidates on lines this session added, so a review never has to
 # separate them from pre-existing code by hand. The scan reports candidates only —
-# it never decides whether a hit is temporary or a row is a violation, never edits a file, and writes
-# nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is safe under a
-# read-only sandbox. Stdout carries only the result document. With -Path it instead scans every line of
-# the named tracked C++ files for the style-rule-<n> kinds only.
+# it never decides whether a hit is temporary or a row is a violation, never edits a source file, and
+# writes only the caller's -OutputPath result and one OS temp file holding the inventory, deleted before
+# it exits (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index). Stdout carries the result
+# document, or with -OutputPath one summary line. With -Path it instead scans every line of the named
+# tracked C++ files for the style-rule-<n> kinds only.
 [CmdletBinding(DefaultParameterSetName = 'Session')]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -12,7 +13,8 @@ param(
 	[Parameter(ParameterSetName = 'Session')][string] $Head,
 	[Parameter(ParameterSetName = 'Session')][switch] $IncludeUntracked,
 	[Parameter(ParameterSetName = 'Session')][string[]] $PathPrefix,
-	[Parameter(Mandatory, ParameterSetName = 'WholeFile')][string[]] $Path
+	[Parameter(Mandatory, ParameterSetName = 'WholeFile')][string[]] $Path,
+	[string] $OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,11 +22,6 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 $script:MaximumHits = 400
-# The regions cap of Get-SessionChangeInventory.ps1: an emitted row count at the cap means the scan
-# may have missed added lines the inventory dropped, so the result reports itself truncated. The
-# inventory also sheds region rows below that cap to fit its own stdout budget, so a full count above
-# the emitted count means the same thing.
-$script:InventoryRegionCap = 400
 $script:MaximumTextLength = 200
 $script:MaximumMessageLength = 256
 $script:MaximumOutputBytes = 131072
@@ -42,7 +39,7 @@ $script:CppClasses = @('cpp', 'dual-language-header')
 # list and these style-rule-<n> kinds together make the review's style mandate, and a rule is on both when
 # each covers a different form, so update step 7 when a kind changes.
 $script:ScalarType = '(?:(?:unsigned|signed)\s+)?(?:bool|char|wchar_t|short|int|long(?:\s+long)?|float|double)|unsigned|u?int(?:8|16|32|64)_t|size_t|u?intptr_t|ptrdiff_t'
-$script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)|unsigned|u?int(?:8|16|32|64)_t|ptrdiff_t'
+$script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)|unsigned|u?int(?:8|16|32|64)_t|size_t|ptrdiff_t'
 # The prose-prone kinds share style-rule-2's comment-and-string alternative, so a line holding a comment
 # or a quote character is never reported for them.
 $script:CommentOrQuote = '(?://|/\*|\*/|["''])'
@@ -79,7 +76,7 @@ $script:CandidatePatterns = @(
 	# precedes rule 11.
 	@{ Kind = 'style-rule-39'; Pattern = '\(\s*void\s*\)\s*[A-Za-z_]\w*\s*;' }
 	@{ Kind = 'style-rule-11'; Pattern = '(?<!\b(?:alignas|alignof|sizeof|decltype)\s*)\((?:const\s+)?(?:void|' + $script:ScalarType + '|[A-Za-z_][\w:]*(?=\s*(?:const\s*)?\*))(?:\s*const)?(?:\s*\*)*\s*\)\s*(?!(?:const|override|noexcept|final|volatile|mutable)\b)[\w(]'; Except = '^\s*//' }
-	@{ Kind = 'style-rule-17'; Pattern = '\b(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*\s*[={][^;]*\.size\s*\(\s*\)|\bfor\s*\(\s*(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*[^;]*;[^;]*\.size\s*\(\s*\)' }
+	@{ Kind = 'style-rule-17'; Pattern = '\b(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*\s*[={][^;]*\.size\s*\(\s*\)|\bfor\s*\(\s*(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*[^;]*;[^;]*\.size\s*\(\s*\)|\b(?!int64_t\b)(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*\s*[={][^;]*\bstd::ssize\s*\(|\bfor\s*\(\s*(?!int64_t\b)(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*[^;]*;[^;]*\bstd::ssize\s*\(' }
 	@{ Kind = 'style-rule-20'; Pattern = '^\s*(?:(?:static|inline|constexpr|const|thread_local|mutable)\s+)*(?:' + $script:ScalarType + ')\s+[A-Za-z_]\w*\s*\{' }
 	@{ Kind = 'style-rule-23'; Pattern = '\btypedef\b'; Except = $script:CommentOrQuote }
 	@{ Kind = 'style-rule-25'; Pattern = $script:CodePrefix + '\bconstexpr\b'; Except = '\b(?:static|inline)\b|\bif\s+constexpr\b|\bconstexpr\s+[^=;{]*[\w)*&>]\s*\(' }
@@ -95,6 +92,7 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'style-rule-46'; Pattern = '\bXM\w*Est\s*\(' }
 	@{ Kind = 'style-rule-54'; Pattern = '^\s*(?:(?:static|inline|const|mutable)\s+)*Vk[A-Z]\w*\s+[A-Za-z_]\w*\s*(?:[=;{]|$)'; Except = '^\s*(?:(?:static|inline|const|mutable)\s+)*Vk([A-Z]\w*)\s+[A-Za-z_]\w*Vk\1\s*(?:[=;{]|$)' }
 	@{ Kind = 'style-rule-55'; Pattern = '^\s*enum\b(?!\s+(?:class|struct)\b)'; Except = $script:CommentOrQuote }
+	@{ Kind = 'style-rule-66'; Pattern = '^\s*namespace\s*(?:\{.*)?$' }
 	# `Num` as its own word in an identifier, so Number and Enumerate stay clear; a name reached through ::, ->
 	# or . belongs to another API.
 	@{ Kind = 'style-rule-14'; Pattern = '(?<!(?:::|->|\.)\s*)\b(?:\w*[a-z0-9_])?Num(?![a-z])'; Except = $script:CommentOrQuote }
@@ -119,8 +117,14 @@ function Complete-SessionCandidates([int] $ExitCode, [string] $Status, [string] 
 	$result.status = $Status
 	$result.code = $Code
 	$result.message = if ($Message.Length -gt $script:MaximumMessageLength) { $Message.Substring(0, $script:MaximumMessageLength) } else { $Message }
+	$json = $result | ConvertTo-Json -Depth 32 -Compress
+	$text = $json
+	if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+		[IO.File]::WriteAllText($OutputPath, $json, $script:Utf8)
+		$text = "$Status $Code $($result.message) -> $OutputPath`n"
+	}
 	$stream = [Console]::OpenStandardOutput()
-	$bytes = $script:Utf8.GetBytes(($result | ConvertTo-Json -Depth 32 -Compress))
+	$bytes = $script:Utf8.GetBytes($text)
 	$stream.Write($bytes, 0, $bytes.Length)
 	$stream.Flush()
 	exit $ExitCode
@@ -160,9 +164,17 @@ function Get-InventoryDocument() {
 	if ($PathPrefix) { $arguments += @('-PathPrefix', ($PathPrefix -join ',')) }
 	$shell = [Environment]::ProcessPath
 	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
-	$run = Invoke-AgentProcess $shell $arguments $script:Root
+	# The file result is never truncated, so every added line is scanned.
+	$inventoryFile = [IO.Path]::GetTempFileName()
+	try {
+		$run = Invoke-AgentProcess $shell ($arguments + @('-OutputPath', $inventoryFile)) $script:Root
+		$text = if (Test-Path -LiteralPath $inventoryFile -PathType Leaf) { [IO.File]::ReadAllText($inventoryFile, $script:Utf8) } else { '' }
+	}
+	finally {
+		Remove-Item -LiteralPath $inventoryFile -ErrorAction SilentlyContinue
+	}
 	$document = $null
-	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) { $document = $run.Stdout | ConvertFrom-Json }
+	if (-not [string]::IsNullOrWhiteSpace($text)) { $document = $text | ConvertFrom-Json }
 	if ($run.ExitCode -ne 0 -or $null -eq $document -or $document.status -cne 'pass') {
 		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { $run.Stderr.Trim() }
 		Complete-SessionCandidates 2 'blocked' 'candidates.inventory-unavailable' "The session change inventory did not produce a scannable result: $reason"
@@ -293,9 +305,9 @@ function Test-Rule59Line([string] $Path, [int] $Line, [string] $Text) {
 }
 
 function Test-Rule62Line([string] $Path, [int] $Line, [string] $Text) {
-	# An `if` (an `else if` counts as its `if`) line breaks rule 62 when its condition, which may continue
-	# over later head-side lines until its parentheses close, has a `||` at depth one outside comments and
-	# literals, and its braced body is one `return`, `continue` or `break` statement.
+	# An `if` (an `else if` counts as its `if`) line is a rule 62 candidate when its condition, which may
+	# continue over later head-side lines until its parentheses close, has a `||` at depth one outside
+	# comments and literals, and its braced body is one `return`, `continue` or `break` statement.
 	if ($Text -cnotmatch '^\s*(?:else\s+)?if\b') { return $false }
 	$condition = Get-IfCondition $Path $Line
 	if ($null -eq $condition -or -not $condition.HasOr -or $condition.Rest.Trim().Length -gt 0) { return $false }
@@ -310,9 +322,10 @@ function Test-Rule62Line([string] $Path, [int] $Line, [string] $Text) {
 
 function Test-Rule51Line([string] $Path, [int] $Line, [string] $Text) {
 	# A line breaks rule 51 when it leaves a parenthesis open outside comments and literals and ends in `,` or
-	# `(`, so a call's or declaration's arguments wrap, unless the next non-blank head-side line starts with the
-	# `{` rule 2 puts on the next line for a lambda or struct literal argument. A line-ending `(` counts only after
-	# a word character, `>`, `]`, `)` or an operator-function name, and not after `return`, since a `(` after
+	# `(`, so a call's or declaration's arguments wrap, unless the next non-blank head-side line starts with `{`.
+	# That exempts every next-line `{`, including a one-line braced list rule 51 keeps on the call line; the
+	# code-style-review hand read of rule 51 catches that case. A line-ending `(` counts only after a word
+	# character, `>`, `]`, `)` or an operator-function name, and not after `return`, since a `(` after
 	# another operator, `=`, `(` or `,` groups an expression rather than opening an argument list.
 	if ($Text.Trim() -cmatch '^(?:#|/\*|\*)') { return $false }
 	$code = (($Text -replace '"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''', '""') -replace '//.*$', '').Trim()
@@ -353,7 +366,6 @@ try {
 		# A residue kind such as log would otherwise hide a style kind on an existing line.
 		$script:ScannedPatterns = @($script:CandidatePatterns | Where-Object { $_.Kind.StartsWith('style-rule-') })
 		$scannedLines = Get-FileLine $Path
-		$regionsCapped = $false
 		$scope = "$(@($Path).Count) named C++ file(s)"
 	}
 	else {
@@ -362,9 +374,6 @@ try {
 		}
 		$inventory = Get-InventoryDocument
 		$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
-		# A passing inventory always carries truncation.regions, so both counts are read directly.
-		$emittedRegionCount = @($inventory.regions).Count
-		$regionsCapped = $emittedRegionCount -ge $script:InventoryRegionCap -or [int] $inventory.truncation.regions.full -gt $emittedRegionCount
 		$scannedLines = Get-AddedLine $inventory
 		$scope = 'session-added C++ lines'
 	}
@@ -399,12 +408,15 @@ try {
 	$counts['style-rule-62'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-62' }).Count
 	$counts['style-rule-51'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-51' }).Count
 	$result.counts = $counts
+	# A file result has no stdout budget, so it carries every hit.
+	$toFile = -not [string]::IsNullOrWhiteSpace($OutputPath)
+	$hitLimit = if ($toFile) { $sorted.Count } else { $script:MaximumHits }
 	$emitted = [Collections.Generic.List[object]]::new()
-	foreach ($hit in ($sorted | Select-Object -First $script:MaximumHits)) { $emitted.Add($hit) }
+	foreach ($hit in ($sorted | Select-Object -First $hitLimit)) { $emitted.Add($hit) }
 	while ($true) {
 		$result.hits = [object[]] $emitted.ToArray()
-		$result.truncated = $emitted.Count -lt $sorted.Count -or $regionsCapped
-		if ($script:Utf8.GetByteCount(($result | ConvertTo-Json -Depth 32 -Compress)) -le $script:MaximumOutputBytes) { break }
+		$result.truncated = $emitted.Count -lt $sorted.Count
+		if ($toFile -or $script:Utf8.GetByteCount(($result | ConvertTo-Json -Depth 32 -Compress)) -le $script:MaximumOutputBytes) { break }
 		if ($emitted.Count -eq 0) { break }
 		$drop = [Math]::Max(1, [int] [Math]::Ceiling($emitted.Count * 0.1))
 		$emitted.RemoveRange($emitted.Count - $drop, $drop)

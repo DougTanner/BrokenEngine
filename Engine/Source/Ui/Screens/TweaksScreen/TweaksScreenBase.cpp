@@ -21,7 +21,7 @@ static common::crc_t ComputeLayoutCrc()
 	{
 		crcKeys[i] = common::Crc(sSectionDescs[i].stableKey);
 	}
-	return common::Crc(crcKeys, siSectionCount);
+	return common::Crc(std::span<const common::crc_t>(crcKeys, static_cast<size_t>(siSectionCount)));
 }
 
 // UI scale factor for TweaksScreen
@@ -145,7 +145,7 @@ bool TweaksScreenBase::BeginSubtab(const char* pcLabel, int64_t iSection, int8_t
 
 	if (bApplySavedSubtab)
 	{
-		mApplySubtab.Clear(SectionFlag(iSection));
+		mApplySubtab.Set(SectionFlag(iSection), false);
 	}
 	if (!(mApplySubtab & SectionFlag(iSection)))
 	{

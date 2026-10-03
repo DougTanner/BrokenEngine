@@ -46,7 +46,7 @@ struct ReplayStagedMeta
 // The ship ID is part of the key so a pending request clears when focus moves to another ship, even one with the same mode.
 struct WeaponModeKey
 {
-	engine::global_id_t playerId {};
+	engine::GlobalId playerId {};
 	bool bUseMissiles = false;
 
 	bool operator==(const WeaponModeKey&) const = default;
@@ -101,10 +101,10 @@ public:
 #endif
 
 	// Client player tracking (multi-player per client)
-	engine::global_id_t ClientPlayerId() const;
-	bool IsClientPlayer(engine::global_id_t id) const;
-	void AddClientPlayer(engine::global_id_t id, engine::GridCoord coord);
-	void RemoveClientPlayer(engine::global_id_t id);
+	engine::GlobalId ClientPlayerId() const;
+	bool IsClientPlayer(engine::GlobalId id) const;
+	void AddClientPlayer(engine::GlobalId id, engine::GridCoord coord);
+	void RemoveClientPlayer(engine::GlobalId id);
 	void RestoreReplayMeta(const ReplayMeta& rMeta);
 	std::optional<int64_t> ClientPlayerIndex(const PlayersPostRender& rPlayers) const;
 
@@ -128,7 +128,7 @@ public:
 
 	// In-memory mirror of ClientState.bin; loaded at startup, refreshed whenever any tracked field changes, and written on orderly exit.
 	game::FleetGuid mRememberedFleetGuid {};
-	engine::global_id_t mRememberedFocusedShipId {};
+	engine::GlobalId mRememberedFocusedShipId {};
 	float mfRememberedCameraEyeHeightTarget = engine::Camera::kfCameraEyeHeightInitial;
 
 	static constexpr float kfVisualErrorDecayRate = 15.0f;
@@ -160,12 +160,12 @@ private:
 #endif
 
 public:
-	std::vector<engine::global_id_t> mClientPlayerIds;
+	std::vector<engine::GlobalId> mClientPlayerIds;
 	std::vector<engine::GridCoord> mClientPlayerCoords;
 	float mfPreviousClientArmor = 0.0f;
-	engine::alignment_t mPlayerAlignment {};
+	engine::AlignmentIdentifier mPlayerAlignment {};
 private:
-	engine::alignment_t mEnemyAlignment {};
+	engine::AlignmentIdentifier mEnemyAlignment {};
 public:
 	engine::Alignments mAlignments {};
 

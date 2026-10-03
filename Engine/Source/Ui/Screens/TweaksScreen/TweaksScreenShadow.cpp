@@ -8,8 +8,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gShadowRegistrar
 {
 	// Quality / Perf
@@ -38,7 +36,6 @@ const TweaksSliderMapRegistrar gShadowRegistrar
 	{"Object Shadow Grow", &gObjectShadowsGrow},
 	{"Smoke Shadow Intensity", &gSmokeShadowIntensity},
 };
-}
 
 void TweaksScreenBase::RenderShadowSection()
 {

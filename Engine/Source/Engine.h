@@ -103,14 +103,14 @@
 #endif // BT_CLIENT
 
 // Formatters for engine types used by LogDifference.
-// global_id_t's formatter stays with its type in Frame/Collections/CollectionId.h.
+// GlobalId's formatter stays with its type in Frame/Collections/CollectionId.h.
 template<>
-struct std::formatter<engine::alignment_t> : std::formatter<uint32_t>
+struct std::formatter<engine::AlignmentIdentifier> : std::formatter<uint32_t>
 {
 	template<typename CONTEXT>
-	auto format(const engine::alignment_t alignment, CONTEXT& rContext) const
+	auto format(const engine::AlignmentIdentifier alignment, CONTEXT& rContext) const
 	{
-		return std::formatter<uint32_t>::format(alignment.Value(), rContext);
+		return std::formatter<uint32_t>::format(alignment.uiValue, rContext);
 	}
 };
 
@@ -133,21 +133,21 @@ struct std::formatter<engine::Alignments> : std::formatter<std::string_view>
 };
 
 template<>
-struct std::formatter<engine::uuid_t> : std::formatter<int64_t>
+struct std::formatter<engine::Uuid> : std::formatter<int64_t>
 {
 	template<typename CONTEXT>
-	auto format(const engine::uuid_t id, CONTEXT& rContext) const
+	auto format(const engine::Uuid id, CONTEXT& rContext) const
 	{
-		return std::formatter<int64_t>::format(id.Value(), rContext);
+		return std::formatter<int64_t>::format(id.iValue, rContext);
 	}
 };
 
 template<typename T>
-struct std::formatter<engine::id_t<T>> : std::formatter<int64_t>
+struct std::formatter<engine::Id<T>> : std::formatter<int64_t>
 {
 	template<typename CONTEXT>
-	auto format(const engine::id_t<T> id, CONTEXT& rContext) const
+	auto format(const engine::Id<T> id, CONTEXT& rContext) const
 	{
-		return std::formatter<int64_t>::format(id.ToUuid().Value(), rContext);
+		return std::formatter<int64_t>::format(id.uuid.iValue, rContext);
 	}
 };

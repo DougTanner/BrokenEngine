@@ -10,20 +10,17 @@
 namespace engine::ClientNetworkFixtures
 {
 
-namespace
-{
-
 struct Binding
 {
 	Client* pClient = nullptr;
-	std::weak_ptr<StaleUpdateState> staleUpdate;
-	std::weak_ptr<CancelledSubscriptionState> cancelledSubscription;
+	std::weak_ptr<StaleUpdateState> pStaleUpdate;
+	std::weak_ptr<CancelledSubscriptionState> pCancelledSubscription;
 	SubscribeAcceptResult* pSubscribeAcceptResult = nullptr;
 };
 
-Binding sBinding;
+static Binding sBinding;
 
-void Bind(Client& rClient)
+static void Bind(Client& rClient)
 {
 	if (sBinding.pClient != &rClient)
 	{
@@ -31,8 +28,6 @@ void Bind(Client& rClient)
 		sBinding.pClient = &rClient;
 	}
 }
-
-} // namespace
 
 SubscribeAcceptResult ReceiveSubscribeAccept(Client& rClient, uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord)
 {
@@ -55,30 +50,30 @@ SubscribeAcceptResult ReceiveSubscribeAccept(Client& rClient, uint8_t uiSlotInde
 void ArmStaleUpdate(Client& rClient, const std::shared_ptr<StaleUpdateState>& pState)
 {
 	Bind(rClient);
-	if (!sBinding.staleUpdate.expired())
+	if (!sBinding.pStaleUpdate.expired())
 	{
 		throw std::runtime_error("client_stale_update_fixture is already active");
 	}
-	sBinding.staleUpdate = pState;
+	sBinding.pStaleUpdate = pState;
 }
 
 void ArmCancelledSubscription(Client& rClient, const std::shared_ptr<CancelledSubscriptionState>& pState)
 {
 	Bind(rClient);
-	if (!sBinding.cancelledSubscription.expired())
+	if (!sBinding.pCancelledSubscription.expired())
 	{
 		throw std::runtime_error("client_cancelled_subscription_fixture is already active");
 	}
-	sBinding.cancelledSubscription = pState;
+	sBinding.pCancelledSubscription = pState;
 }
 
-void CaptureStaleUpdate(Client& rClient, std::span<const uint8_t> packetData, uint8_t uiSlotIndex, uint16_t uiEpoch, int64_t iTick)
+void CaptureStaleUpdate(const Client& rClient, std::span<const uint8_t> packetData, uint8_t uiSlotIndex, uint16_t uiEpoch, int64_t iTick)
 {
 	if (sBinding.pClient != &rClient)
 	{
 		return;
 	}
-	if (std::shared_ptr<StaleUpdateState> pState = sBinding.staleUpdate.lock(); pState != nullptr
+	if (std::shared_ptr<StaleUpdateState> pState = sBinding.pStaleUpdate.lock(); pState != nullptr
 	 && !(pState->flags & StaleUpdateFlags::kCaptured))
 	{
 		// Heap: the fixture owns one exact packet copy and releases it before recursive delivery.
@@ -88,7 +83,7 @@ void CaptureStaleUpdate(Client& rClient, std::span<const uint8_t> packetData, ui
 		pState->uiSlotIndex = uiSlotIndex;
 		pState->uiEpoch = uiEpoch;
 		pState->iTick = iTick;
-		pState->coord = rClient.mCoordSlots.at(uiSlotIndex).coord;
+		pState->coord = rClient.mCoordinateSlots.at(uiSlotIndex).coordinate;
 		pState->flags.Set(StaleUpdateFlags::kCaptured);
 	}
 }
@@ -99,7 +94,7 @@ std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpd
 	{
 		return nullptr;
 	}
-	std::shared_ptr<StaleUpdateState> pState = sBinding.staleUpdate.lock();
+	std::shared_ptr<StaleUpdateState> pState = sBinding.pStaleUpdate.lock();
 	if (pState == nullptr)
 	{
 		return nullptr;
@@ -108,7 +103,7 @@ std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpd
 	{
 		pState->packet.clear();
 		pState->flags.Set(StaleUpdateFlags::kBoundExpired);
-		sBinding.staleUpdate.reset();
+		sBinding.pStaleUpdate.reset();
 		return nullptr;
 	}
 	if (!(pState->flags & StaleUpdateFlags::kCaptured))
@@ -119,26 +114,26 @@ std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpd
 	{
 		return nullptr;
 	}
-	if (pState->uiSlotIndex >= rClient.mCoordSlots.size())
+	if (pState->uiSlotIndex >= std::ssize(rClient.mCoordinateSlots))
 	{
 		return nullptr;
 	}
 
-	ClientCoordSlot& rSlot = rClient.mCoordSlots.at(pState->uiSlotIndex);
+	ClientCoordSlot& rSlot = rClient.mCoordinateSlots.at(pState->uiSlotIndex);
 	CoordUpdateState coordState = pfnQueryCoordUpdateState(pState->coord, pState->iTick);
 	if (rSlot.eState != CoordSubscriptionState::kActive)
 	{
 		return nullptr;
 	}
-	if (rSlot.coord != pState->coord)
+	if (rSlot.coordinate != pState->coord)
 	{
 		return nullptr;
 	}
-	if (rSlot.ackState.uiEpoch != pState->uiEpoch)
+	if (rSlot.acknowledgementState.uiEpoch != pState->uiEpoch)
 	{
 		return nullptr;
 	}
-	if (rSlot.ackState.iAckFloor < pState->iTick)
+	if (rSlot.acknowledgementState.iAcknowledgmentFloor < pState->iTick)
 	{
 		return nullptr;
 	}
@@ -151,17 +146,17 @@ std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpd
 		return nullptr;
 	}
 
-	pState->iAckFloorBefore = rSlot.ackState.iAckFloor;
+	pState->iAckFloorBefore = rSlot.acknowledgementState.iAcknowledgmentFloor;
 	pState->iConfirmedBefore = coordState.iConfirmedTick;
 	std::vector<uint8_t> packet = std::move(pState->packet);
 	pState->packet.clear();
-	sBinding.staleUpdate.reset();
+	sBinding.pStaleUpdate.reset();
 	rClient.Receive(packet);
-	pState->iAckFloorAfter = rSlot.ackState.iAckFloor;
+	pState->iAckFloorAfter = rSlot.acknowledgementState.iAcknowledgmentFloor;
 	return pState;
 }
 
-void PollAfterDrain(Client& rClient, const std::shared_ptr<StaleUpdateState>& pState, QueryCoordUpdateState pfnQueryCoordUpdateState)
+void PollAfterDrain(const Client& rClient, const std::shared_ptr<StaleUpdateState>& pState, QueryCoordUpdateState pfnQueryCoordUpdateState)
 {
 	if (pState == nullptr)
 	{
@@ -180,7 +175,7 @@ void PollAfterDrain(Client& rClient, const std::shared_ptr<StaleUpdateState>& pS
 	pState->flags.Set(StaleUpdateFlags::kComplete);
 }
 
-bool ObserveSubscribeAcceptCleanup(Client& rClient, uint8_t uiSerializedSlot, int64_t iSerializedBytes)
+bool ObserveSubscribeAcceptCleanup(const Client& rClient, uint8_t uiSerializedSlot, int64_t iSerializedBytes)
 {
 	if (sBinding.pClient != &rClient)
 	{
@@ -196,41 +191,40 @@ bool ObserveSubscribeAcceptCleanup(Client& rClient, uint8_t uiSerializedSlot, in
 	return true;
 }
 
-void ObserveUnsubscribeAck(Client& rClient, uint8_t uiSlotIndex)
+void ObserveUnsubscribeAck(const Client& rClient, uint8_t uiSlotIndex)
 {
 	if (sBinding.pClient != &rClient)
 	{
 		return;
 	}
-	if (std::shared_ptr<CancelledSubscriptionState> pState = sBinding.cancelledSubscription.lock();
-		pState != nullptr && pState->iSlot == uiSlotIndex)
+	if (std::shared_ptr<CancelledSubscriptionState> pState = sBinding.pCancelledSubscription.lock(); pState != nullptr && pState->iSlot == uiSlotIndex)
 	{
 		pState->eOutcome = CancelledSubscriptionOutcome::kAcked;
 	}
 }
 
-void Reset(Client& rClient)
+void Reset(const Client& rClient)
 {
 	if (sBinding.pClient != &rClient)
 	{
 		return;
 	}
-	if (std::shared_ptr<StaleUpdateState> pState = sBinding.staleUpdate.lock(); pState != nullptr)
+	if (std::shared_ptr<StaleUpdateState> pState = sBinding.pStaleUpdate.lock(); pState != nullptr)
 	{
 		pState->packet.clear();
 		pState->flags.Set(StaleUpdateFlags::kReset);
-		sBinding.staleUpdate.reset();
+		sBinding.pStaleUpdate.reset();
 	}
-	if (std::shared_ptr<CancelledSubscriptionState> pState = sBinding.cancelledSubscription.lock(); pState != nullptr)
+	if (std::shared_ptr<CancelledSubscriptionState> pState = sBinding.pCancelledSubscription.lock(); pState != nullptr)
 	{
 		pState->eOutcome = CancelledSubscriptionOutcome::kReset;
-		sBinding.cancelledSubscription.reset();
+		sBinding.pCancelledSubscription.reset();
 	}
 }
 
 void Detach()
 {
-	if (std::shared_ptr<StaleUpdateState> pState = sBinding.staleUpdate.lock(); pState != nullptr)
+	if (std::shared_ptr<StaleUpdateState> pState = sBinding.pStaleUpdate.lock(); pState != nullptr)
 	{
 		pState->packet.clear();
 	}

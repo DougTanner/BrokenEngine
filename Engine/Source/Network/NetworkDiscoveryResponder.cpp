@@ -9,23 +9,23 @@ namespace engine
 
 NetworkDiscoveryResponder::NetworkDiscoveryResponder()
 {
-	mSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (mSocket == INVALID_SOCKET)
+	muiSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (muiSocket == INVALID_SOCKET)
 	{
 		LOG(kNetwork, kError, "NetworkDiscoveryResponder socket creation failed: {}", WSAGetLastError());
 	}
 
-	sockaddr_in addr {};
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(kuiDiscoveryPort);
-	addr.sin_addr.s_addr = (gLaunchOptions.flags & LaunchOptionFlags::kLoopbackOnly) ? htonl(INADDR_LOOPBACK) : INADDR_ANY;
-	if (bind(mSocket, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR)
+	sockaddr_in address {};
+	address.sin_family = AF_INET;
+	address.sin_port = htons(kuiDiscoveryPort);
+	address.sin_addr.s_addr = (gLaunchOptions.flags & LaunchOptionFlags::kLoopbackOnly) ? htonl(INADDR_LOOPBACK) : INADDR_ANY;
+	if (bind(muiSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR)
 	{
 		LOG(kNetwork, kError, "NetworkDiscoveryResponder bind failed: {}", WSAGetLastError());
 	}
 
 	u_long uiNonBlocking = 1;
-	if (ioctlsocket(mSocket, FIONBIO, &uiNonBlocking) == SOCKET_ERROR)
+	if (ioctlsocket(muiSocket, FIONBIO, &uiNonBlocking) == SOCKET_ERROR)
 	{
 		LOG(kNetwork, kError, "NetworkDiscoveryResponder ioctlsocket failed: {}", WSAGetLastError());
 	}
@@ -33,22 +33,22 @@ NetworkDiscoveryResponder::NetworkDiscoveryResponder()
 
 NetworkDiscoveryResponder::~NetworkDiscoveryResponder()
 {
-	closesocket(mSocket);
+	closesocket(muiSocket);
 }
 
 void NetworkDiscoveryResponder::Poll()
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
 
-	sockaddr_in senderAddr {};
-	int iSenderLen = sizeof(senderAddr);
+	sockaddr_in senderAddress {};
+	int iSenderLength = sizeof(senderAddress);
 	uint32_t uiMagic = 0;
 
-	int iReceived = recvfrom(mSocket, reinterpret_cast<char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&senderAddr), &iSenderLen);
+	int iReceived = recvfrom(muiSocket, reinterpret_cast<char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&senderAddress), &iSenderLength);
 	if (iReceived == sizeof(uiMagic) && uiMagic == kuiDiscoveryMagic)
 	{
 		uint32_t uiResponse = kuiDiscoveryMagic;
-		sendto(mSocket, reinterpret_cast<const char*>(&uiResponse), sizeof(uiResponse), 0, reinterpret_cast<sockaddr*>(&senderAddr), iSenderLen);
+		sendto(muiSocket, reinterpret_cast<const char*>(&uiResponse), sizeof(uiResponse), 0, reinterpret_cast<sockaddr*>(&senderAddress), iSenderLength);
 	}
 }
 

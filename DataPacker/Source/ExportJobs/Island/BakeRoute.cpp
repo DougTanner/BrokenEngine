@@ -3,14 +3,11 @@
 #include "GaeaArchetype.h"
 #include "SubdivideBeachBand.h"
 
-namespace
-{
 
 // One route cache under FileManager::mGaeaCacheDirectory holds Gaea's raw texturePixels-resolution
 // outputs, checked after baking and by IsGaeaRawDirty. Elevation.r32 is headerless IEEE FloatRaw32
 // normalized to [0,1]; ProcessBakedRegion reads it without rewriting it and writes leaf elevation
-// downsampled by kiElevationDivisor. Scale by elevationMeters and subtract Sea.Level * elevationMeters
-// (fallback kfGaeaSeaLevelDefault), giving beach Z=0 and floor -Level*elevationMeters. AO uses
+// downsampled by kiElevationDivisor. AO uses
 // UshortRaw16 matched to BC4_UNORM. Color/masks use 8-bit sRGB PNGs matched to BC7; Gaea's sRGB-in-EXR
 // convention conflicts with color decoding. Normals remain multi-channel EXR, alongside Mesher outputs.
 constexpr const char* kpcIntermediateFiles[] =
@@ -40,10 +37,7 @@ constexpr const char* kpcIntermediateFiles[] =
 constexpr int32_t kiBakeVersion = 28;
 constexpr int32_t kiSplitVersion = 8;
 
-// After Mesher load, triangles overlapping the absolute engine-Z beach band recursively split 1-to-4
-// until the longest XY edge meets kfBeachSubdivisionMaxEdgeMeters. Out-of-band neighbors absorb
-// one/two/three shared midpoints with 1-to-2/3/4 splits and no new midpoints, limiting the cascade to
-// one ring. The band straddles beach Z=0 independently of elevationMeters; its lower/upper bounds
+// The band straddles beach Z=0 independently of elevationMeters; its lower and upper bounds
 // separately control underwater and above-water coverage.
 constexpr float kfBeachSubdivisionMinMeters = -0.25f;
 constexpr float kfBeachSubdivisionMaxMeters = 0.5f;
@@ -55,7 +49,7 @@ constexpr const char* kpcSplitVersionFile = "SplitVersion.meta";
 constexpr const char* kpcPatchedArchetypeFile = "PatchedArchetype.terrain";
 constexpr const char* kpcGaeaStagingDirectory = "GaeaStaging";
 
-size_t CheckedTexturePixelCount(const std::filesystem::path& rTextureFile, int64_t iTexturePixels)
+static size_t CheckedTexturePixelCount(const std::filesystem::path& rTextureFile, int64_t iTexturePixels)
 {
 	if (iTexturePixels <= 0)
 	{
@@ -70,13 +64,13 @@ size_t CheckedTexturePixelCount(const std::filesystem::path& rTextureFile, int64
 	return uiTexturePixels * uiTexturePixels;
 }
 
-std::string ReadTextFile(const std::filesystem::path& rFile)
+static std::string ReadTextFile(const std::filesystem::path& rFile)
 {
 	std::ifstream stream(rFile, std::ios::binary);
 	return std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
 }
 
-void WriteTextFile(const std::filesystem::path& rFile, std::string_view text)
+static void WriteTextFile(const std::filesystem::path& rFile, std::string_view text)
 {
 	std::ofstream stream(rFile, std::ios::binary | std::ios::trunc);
 	stream.write(text.data(), static_cast<std::streamsize>(text.size()));
@@ -84,18 +78,18 @@ void WriteTextFile(const std::filesystem::path& rFile, std::string_view text)
 	VERIFY_SUCCESS(stream.good());
 }
 
-std::string BakeFingerprint(const IslandBakeContext& rContext, const RouteSubdivision& rRoute)
+static std::string BakeFingerprint(const IslandBakeContext& rContext, const RouteSubdivision& rRoute)
 {
 	nlohmann::json metadata;
 	metadata["version"] = kiBakeVersion;
-	metadata["island"] = gpFileManager->GetFingerprint(rContext.rIslandJsonFile, InputFingerprintMode::kTextCrLf);
-	metadata["archetype"] = gpFileManager->GetFingerprint(rContext.rArchetypeFile, InputFingerprintMode::kTextCrLf);
+	metadata["island"] = gpFileManager->mpInputFingerprintCache->Get(rContext.rIslandJsonFile, InputFingerprintMode::kTextCrLf);
+	metadata["archetype"] = gpFileManager->mpInputFingerprintCache->Get(rContext.rArchetypeFile, InputFingerprintMode::kTextCrLf);
 	metadata["route"] = rRoute.pcLabel;
 	metadata["choice"] = rRoute.iGaeaChoice;
 	return metadata.dump();
 }
 
-std::string SplitFingerprint(const RouteSubdivision& rRoute)
+static std::string SplitFingerprint(const RouteSubdivision& rRoute)
 {
 	nlohmann::json metadata;
 	metadata["version"] = kiSplitVersion;
@@ -111,7 +105,7 @@ std::string SplitFingerprint(const RouteSubdivision& rRoute)
 // metadata matches the content fingerprints of Island.json / the archetype and the route identity.
 // The post-Gaea split is checked separately
 // by AreLeavesDirty so a split-only change never trips this.
-bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, std::string_view expectedFingerprint)
+static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, std::string_view expectedFingerprint)
 {
 	for (const char* pcFile : kpcIntermediateFiles)
 	{
@@ -136,7 +130,7 @@ bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, std::s
 // True if any chunk leaf's derived split outputs are missing or stale — forces a re-split from the
 // (assumed fresh) raw Gaea output, NOT a Gaea re-export. Checks the split-version sentinel (catches
 // a kRouteSubdivisions columns/rows or ProcessBakedRegion change) and every leaf's per-region files.
-bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rCacheRouteDirectory, int64_t iLeafCount, std::string_view expectedFingerprint)
+static bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rCacheRouteDirectory, int64_t iLeafCount, std::string_view expectedFingerprint)
 {
 	std::filesystem::path splitVersionFile = rCacheRouteDirectory / kpcSplitVersionFile;
 	if (!std::filesystem::exists(splitVersionFile))
@@ -148,13 +142,13 @@ bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::fil
 		return true;
 	}
 
-	for (int64_t iLeaf = 0; iLeaf < iLeafCount; ++iLeaf)
+	for (int64_t i = 0; i < iLeafCount; ++i)
 	{
 		// An absent leaf folder is an intentionally-rejected (too-low) leaf, not a dirty one -- skip it.
 		// ProcessBakedRegion deletes rejected leaves, and the SplitVersion sentinel (checked above,
 		// stamped last) keeps a crash mid-split from looking clean. Existing folders must be complete.
-		std::filesystem::path sourceLeafDirectory = rRouteDirectory / std::to_string(iLeaf);
-		std::filesystem::path cacheLeafDirectory = rCacheRouteDirectory / std::to_string(iLeaf);
+		std::filesystem::path sourceLeafDirectory = rRouteDirectory / std::to_string(i);
+		std::filesystem::path cacheLeafDirectory = rCacheRouteDirectory / std::to_string(i);
 		if (!std::filesystem::exists(sourceLeafDirectory) && !std::filesystem::exists(cacheLeafDirectory))
 		{
 			continue;
@@ -177,15 +171,15 @@ bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::fil
 // ExportIsland::Handles. A split-version bump only rewrites retained leaves. As in BakeOne's whole-route
 // prune, collect paths before remove_all to avoid directory-iterator invalidation; preserve nonnumeric
 // metadata and indices below iLeafCount.
-void RemoveOrphanedLeafFolders(const std::filesystem::path& rRouteDir, int64_t iLeafCount)
+static void RemoveOrphanedLeafFolders(const std::filesystem::path& rRouteDirectory, int64_t iLeafCount)
 {
-	if (!std::filesystem::exists(rRouteDir))
+	if (!std::filesystem::exists(rRouteDirectory))
 	{
 		return;
 	}
 
 	std::vector<std::filesystem::path> orphanedLeafFolders;
-	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(rRouteDir))
+	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(rRouteDirectory))
 	{
 		if (!rEntry.is_directory())
 		{
@@ -196,10 +190,8 @@ void RemoveOrphanedLeafFolders(const std::filesystem::path& rRouteDir, int64_t i
 		{
 			continue;
 		}
-		// std::stoll throws std::out_of_range on an all-digit name too long for int64_t (>= 19 digits). The
-		// split loop only ever creates leaf folders for indices 0 .. iLeafCount-1, so a name with more digits
-		// than int64_t always holds (digits10 == 18) can't be one of ours — skip it rather than parse (and
-		// never remove_all a folder we can't confidently classify).
+		// std::stoll can throw when an all-digit name exceeds int64_t's range. Names longer than
+		// digits10 (18) are skipped before parsing so the sweep removes only confidently classified folders.
 		if (name.size() > static_cast<size_t>(std::numeric_limits<int64_t>::digits10))
 		{
 			continue;
@@ -220,39 +212,39 @@ void RemoveOrphanedLeafFolders(const std::filesystem::path& rRouteDir, int64_t i
 // archetype, runs Gaea.Swarm once at full texturePixels into a staging directory, then verifies the
 // staged raw outputs exist. The caller publishes them and stamps the sentinel. Called only when
 // IsGaeaRawDirty.
-void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rRoute, const std::filesystem::path& rGaeaExecutable, const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rStagingDirectory, const std::filesystem::path& rPatchedArchetypeFile)
+static void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rRoute, const std::filesystem::path& rGaeaExecutable, const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rStagingDirectory, const std::filesystem::path& rPatchedArchetypeFile)
 {
 	LOG(kDefault, kDebug, "Baking island route \"{}\" (Gaea export; archetype: \"{}\", seed: {}, texturePixels: {}, Route Choice: {})", rRouteDirectory.string(), rContext.rArchetypeFile.string(), rContext.iSeed, rContext.iTexturePixels, rRoute.iGaeaChoice);
 
 	// Strip DataPacker-owned keys; remaining keys become Gaea graph variables. routes /
 	// widthMeters / elevationMeters / seed / texturePixels are DataPacker-consumed: Gaea's
 	// --vars can't reach Terrain.{Width,Height}, the Route Choice, or per-node Seed fields.
-	nlohmann::json varsJson = rContext.rIslandJson;
+	nlohmann::json variablesJson = rContext.rIslandJson;
 	for (const char* pcKey : kpcRequiredIslandJsonKeys)
 	{
-		varsJson.erase(pcKey);
+		variablesJson.erase(pcKey);
 	}
-	varsJson.erase("meshResolution");  // DataPacker-consumed; patched into the Mesher node directly.
+	variablesJson.erase("meshResolution");  // DataPacker-consumed; patched into the Mesher node directly.
 
 	// Gaea.Swarm.exe trips on `--vars` pointing to an empty JSON object ("{}") with an opaque
 	// "System.IO.IOException: The handle is invalid" during variable load. Only emit the vars
 	// file and pass --vars when there are user variables left. Per-route temp name so concurrent
 	// routes / islands don't collide.
-	bool bHasVars = !varsJson.empty();
-	std::filesystem::path varsFile = gpFileManager->mCacheDirectory / std::format("{}-{}.gaea-vars.json", rContext.rIslandFolder.filename().string(), rRoute.pcLabel);
-	common::ScopedLambda varsFileCleanup([&varsFile, bHasVars]()
+	bool bHasVariables = !variablesJson.empty();
+	std::filesystem::path variablesFile = gpFileManager->mCacheDirectory / std::format("{}-{}.gaea-vars.json", rContext.rIslandFolder.filename().string(), rRoute.pcLabel);
+	common::ScopedLambda variablesFileCleanup([&variablesFile, bHasVariables]()
 	{
-		if (bHasVars)
+		if (bHasVariables)
 		{
-			std::filesystem::remove(varsFile);
+			std::filesystem::remove(variablesFile);
 		}
 	});
-	if (bHasVars)
+	if (bHasVariables)
 	{
-		std::ofstream varsStream(varsFile);
-		varsStream << varsJson.dump();
-		varsStream.close();
-		VERIFY_SUCCESS(varsStream.good());
+		std::ofstream variablesStream(variablesFile);
+		variablesStream << variablesJson.dump();
+		variablesStream.close();
+		VERIFY_SUCCESS(variablesStream.good());
 	}
 
 	// Copy the source archetype into this route's cache and patch the copy — the on-disk
@@ -271,9 +263,9 @@ void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rR
 	commandLine += L" --Filename \"" + rPatchedArchetypeFile.native() + L"\"";
 	commandLine += L" --buildpath \"" + rStagingDirectory.native() + L"\"";
 	commandLine += std::format(L" --resolution {}", rContext.iTexturePixels);
-	if (bHasVars)
+	if (bHasVariables)
 	{
-		commandLine += L" --vars \"" + varsFile.native() + L"\"";
+		commandLine += L" --vars \"" + variablesFile.native() + L"\"";
 	}
 
 	LOG(kDefault, kDebug, "Running: {}", commandLine);
@@ -308,9 +300,9 @@ void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivision& rR
 // such a pixel is a broken bake, not data to salvage; it would poison the elevation G-buffer and
 // vertex displacement). The full-res buffer feeds every chunk's ProcessBakedRegion crop; the raw
 // Elevation.r32 stays on disk as the bake source.
-std::vector<float> LoadElevationMeters(const std::filesystem::path& rIntermediatesDir, int64_t iTexturePixels, float fSeaLevelNormalized, float fElevationMeters)
+static std::vector<float> LoadElevationMeters(const std::filesystem::path& rIntermediatesDirectory, int64_t iTexturePixels, float fSeaLevelNormalized, float fElevationMeters)
 {
-	std::filesystem::path elevationFile = rIntermediatesDir / "Elevation.r32";
+	std::filesystem::path elevationFile = rIntermediatesDirectory / "Elevation.r32";
 	size_t uiPixelCount = CheckedTexturePixelCount(elevationFile, iTexturePixels);
 	if (uiPixelCount > std::numeric_limits<size_t>::max() / sizeof(float))
 	{
@@ -336,50 +328,49 @@ std::vector<float> LoadElevationMeters(const std::filesystem::path& rIntermediat
 	{
 		throw std::runtime_error(std::format("Failed to read complete Gaea elevation output \"{}\".", elevationFile.string()));
 	}
-	for (size_t uiPixel = 0; uiPixel < uiPixelCount; ++uiPixel)
+	for (int64_t i = 0; float& fRaw : fullElevationMeters)
 	{
-		float fRaw = fullElevationMeters[uiPixel];
 		if (!std::isfinite(fRaw) || fRaw < 0.0f || fRaw > 1.0f)
 		{
-			throw std::runtime_error(std::format("Gaea produced \"{}\" with elevation pixel {} at {}, outside the normalized [0, 1] range. Verify the archetype's Elevation Export node uses FloatRaw32 format and that the graph feeding it is clamped to [0, 1].", elevationFile.string(), uiPixel, fRaw));
+			throw std::runtime_error(std::format("Gaea produced \"{}\" with elevation pixel {} at {}, outside the normalized [0, 1] range. Verify the archetype's Elevation Export node uses FloatRaw32 format and that the graph feeding it is clamped to [0, 1].", elevationFile.string(), i, fRaw));
 		}
-		fullElevationMeters[uiPixel] = (fRaw - fSeaLevelNormalized) * fElevationMeters;
+		fRaw = (fRaw - fSeaLevelNormalized) * fElevationMeters;
+		++i;
 	}
 	return fullElevationMeters;
 }
 
 // Read raw full-resolution AmbientOcclusion (cropped per chunk in ProcessBakedRegion).
-std::vector<uint16_t> LoadAmbientOcclusion(const std::filesystem::path& rIntermediatesDir, int64_t iTexturePixels)
+static std::vector<uint16_t> LoadAmbientOcclusion(const std::filesystem::path& rIntermediatesDirectory, int64_t iTexturePixels)
 {
-	std::filesystem::path ambientOcclusionFile = rIntermediatesDir / "AmbientOcclusion.r16";
+	std::filesystem::path ambientOcclusionFile = rIntermediatesDirectory / "AmbientOcclusion.r16";
 	size_t uiPixelCount = CheckedTexturePixelCount(ambientOcclusionFile, iTexturePixels);
 	std::vector<uint16_t> fullAmbientOcclusion;
+	if (uiPixelCount > std::numeric_limits<size_t>::max() / sizeof(uint16_t))
 	{
-		if (uiPixelCount > std::numeric_limits<size_t>::max() / sizeof(uint16_t))
-		{
-			throw std::runtime_error(std::format("Gaea output \"{}\" has an ambient-occlusion extent that overflows size_t ({}x{} uint16).", ambientOcclusionFile.string(), iTexturePixels, iTexturePixels));
-		}
-		size_t uiExpectedAmbientOcclusionBytes = uiPixelCount * sizeof(uint16_t);
-		if (uiExpectedAmbientOcclusionBytes > static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max()))
-		{
-			throw std::runtime_error(std::format("Gaea output \"{}\" has an ambient-occlusion extent too large for stream reads ({}x{} uint16).", ambientOcclusionFile.string(), iTexturePixels, iTexturePixels));
-		}
-		std::ifstream readStream(ambientOcclusionFile, std::ios::binary);
-		if (!readStream)
-		{
-			throw std::runtime_error(std::format("Failed to open Gaea ambient-occlusion output \"{}\".", ambientOcclusionFile.string()));
-		}
-		uintmax_t uiActualAmbientOcclusionBytes = std::filesystem::file_size(ambientOcclusionFile);
-		if (uiActualAmbientOcclusionBytes != static_cast<uintmax_t>(uiExpectedAmbientOcclusionBytes))
-		{
-			throw std::runtime_error(std::format("Gaea produced \"{}\" at {} bytes; expected {} bytes ({}x{} uint16). Verify the archetype's AmbientOcclusion Export node uses UshortRaw16 format.", ambientOcclusionFile.string(), uiActualAmbientOcclusionBytes, uiExpectedAmbientOcclusionBytes, iTexturePixels, iTexturePixels));
-		}
-		fullAmbientOcclusion.resize(uiPixelCount);
-		if (!readStream.read(reinterpret_cast<char*>(fullAmbientOcclusion.data()), static_cast<std::streamsize>(uiExpectedAmbientOcclusionBytes)) || readStream.gcount() != static_cast<std::streamsize>(uiExpectedAmbientOcclusionBytes))
-		{
-			throw std::runtime_error(std::format("Failed to read complete Gaea ambient-occlusion output \"{}\".", ambientOcclusionFile.string()));
-		}
+		throw std::runtime_error(std::format("Gaea output \"{}\" has an ambient-occlusion extent that overflows size_t ({}x{} uint16).", ambientOcclusionFile.string(), iTexturePixels, iTexturePixels));
 	}
+	size_t uiExpectedAmbientOcclusionBytes = uiPixelCount * sizeof(uint16_t);
+	if (uiExpectedAmbientOcclusionBytes > static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max()))
+	{
+		throw std::runtime_error(std::format("Gaea output \"{}\" has an ambient-occlusion extent too large for stream reads ({}x{} uint16).", ambientOcclusionFile.string(), iTexturePixels, iTexturePixels));
+	}
+	std::ifstream readStream(ambientOcclusionFile, std::ios::binary);
+	if (!readStream)
+	{
+		throw std::runtime_error(std::format("Failed to open Gaea ambient-occlusion output \"{}\".", ambientOcclusionFile.string()));
+	}
+	uintmax_t uiActualAmbientOcclusionBytes = std::filesystem::file_size(ambientOcclusionFile);
+	if (uiActualAmbientOcclusionBytes != static_cast<uintmax_t>(uiExpectedAmbientOcclusionBytes))
+	{
+		throw std::runtime_error(std::format("Gaea produced \"{}\" at {} bytes; expected {} bytes ({}x{} uint16). Verify the archetype's AmbientOcclusion Export node uses UshortRaw16 format.", ambientOcclusionFile.string(), uiActualAmbientOcclusionBytes, uiExpectedAmbientOcclusionBytes, iTexturePixels, iTexturePixels));
+	}
+	fullAmbientOcclusion.resize(uiPixelCount);
+	if (!readStream.read(reinterpret_cast<char*>(fullAmbientOcclusion.data()), static_cast<std::streamsize>(uiExpectedAmbientOcclusionBytes)) || readStream.gcount() != static_cast<std::streamsize>(uiExpectedAmbientOcclusionBytes))
+	{
+		throw std::runtime_error(std::format("Failed to read complete Gaea ambient-occlusion output \"{}\".", ambientOcclusionFile.string()));
+	}
+	readStream.close();
 	return fullAmbientOcclusion;
 }
 
@@ -388,9 +379,9 @@ std::vector<uint16_t> LoadAmbientOcclusion(const std::filesystem::path& rInterme
 // engine Y points north and Z up. Subtract the beach offset for sea level zero; discard TEXCOORD_0
 // because runtime derives visible-area UVs from world XY. Subdivide the full mesh once;
 // ProcessBakedRegion reuses it for each crop, recenter, and write.
-void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeachOffsetMeters, const std::filesystem::path& rRouteDir, std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices)
+static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory, float fBeachOffsetMeters, const std::filesystem::path& rRouteDirectory, std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices)
 {
-	std::filesystem::path meshGltfFile = rIntermediatesDir / "Mesh.gltf";
+	std::filesystem::path meshGltfFile = rIntermediatesDirectory / "Mesh.gltf";
 	tinygltf::Model gltfModel;
 	std::string error;
 	std::string warning;
@@ -400,12 +391,12 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 	{
 		throw std::runtime_error(std::format("Failed to parse Gaea Mesher output \"{}\": {} (warning: {}). Verify the archetype has a Mesher node with Format=GLTF and that Gaea wrote both Mesh.gltf and Mesh.bin.", meshGltfFile.string(), error, warning));
 	}
-	if (gltfModel.meshes.empty() || gltfModel.meshes[0].primitives.empty())
+	if (gltfModel.meshes.empty() || gltfModel.meshes.at(0).primitives.empty())
 	{
 		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" contains no mesh primitives.", meshGltfFile.string()));
 	}
 
-	const tinygltf::Primitive& rPrimitive = gltfModel.meshes[0].primitives[0];
+	const tinygltf::Primitive& rPrimitive = gltfModel.meshes.at(0).primitives.at(0);
 	auto positionIt = rPrimitive.attributes.find("POSITION");
 	if (positionIt == rPrimitive.attributes.end() || rPrimitive.indices < 0)
 	{
@@ -416,10 +407,10 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" primitive mode is {}, not triangles ({}). Set the Mesher node's topology to triangles.", meshGltfFile.string(), rPrimitive.mode, TINYGLTF_MODE_TRIANGLES));
 	}
 
-	const tinygltf::Accessor& rPosAccessor = gltfModel.accessors.at(static_cast<size_t>(positionIt->second));
-	const tinygltf::BufferView& rPosView = gltfModel.bufferViews.at(static_cast<size_t>(rPosAccessor.bufferView));
-	const tinygltf::Buffer& rPosBuffer = gltfModel.buffers.at(static_cast<size_t>(rPosView.buffer));
-	if (rPosAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT || rPosAccessor.type != TINYGLTF_TYPE_VEC3)
+	const tinygltf::Accessor& rPositionAccessor = gltfModel.accessors.at(static_cast<size_t>(positionIt->second));
+	const tinygltf::BufferView& rPositionView = gltfModel.bufferViews.at(static_cast<size_t>(rPositionAccessor.bufferView));
+	const tinygltf::Buffer& rPositionBuffer = gltfModel.buffers.at(static_cast<size_t>(rPositionView.buffer));
+	if (rPositionAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT || rPositionAccessor.type != TINYGLTF_TYPE_VEC3)
 	{
 		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor is not float3.", meshGltfFile.string()));
 	}
@@ -427,123 +418,124 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 	// Every span check below is written as a subtraction/division against the container size rather
 	// than an addition compared to it, so no size_t sum can wrap past the limit it is tested against.
 	static constexpr size_t kuiPositionBytes = sizeof(float) * 3;
-	if (rPosView.byteOffset > rPosBuffer.data.size() || rPosView.byteLength > rPosBuffer.data.size() - rPosView.byteOffset)
+	if (rPositionView.byteOffset > rPositionBuffer.data.size() || rPositionView.byteLength > rPositionBuffer.data.size() - rPositionView.byteOffset)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION buffer view (byteOffset {}, byteLength {}) does not fit its {}-byte buffer.", meshGltfFile.string(), rPosView.byteOffset, rPosView.byteLength, rPosBuffer.data.size()));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION buffer view (byteOffset {}, byteLength {}) does not fit its {}-byte buffer.", meshGltfFile.string(), rPositionView.byteOffset, rPositionView.byteLength, rPositionBuffer.data.size()));
 	}
-	if (rPosAccessor.count < 1)
+	if (rPositionAccessor.count < 1)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor has no vertices (count {}).", meshGltfFile.string(), rPosAccessor.count));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor has no vertices (count {}).", meshGltfFile.string(), rPositionAccessor.count));
 	}
-	if (rPosAccessor.byteOffset > rPosView.byteLength || kuiPositionBytes > rPosView.byteLength - rPosAccessor.byteOffset)
+	if (rPositionAccessor.byteOffset > rPositionView.byteLength || kuiPositionBytes > rPositionView.byteLength - rPositionAccessor.byteOffset)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor byteOffset {} leaves no room for a float3 in its {}-byte buffer view.", meshGltfFile.string(), rPosAccessor.byteOffset, rPosView.byteLength));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor byteOffset {} leaves no room for a float3 in its {}-byte buffer view.", meshGltfFile.string(), rPositionAccessor.byteOffset, rPositionView.byteLength));
 	}
 	// ByteStride() is never -1 here: the float3 check above passed and tinygltf rejects a byteStride
 	// that is not a multiple of 4 while parsing.
-	size_t uiStride = static_cast<size_t>(rPosAccessor.ByteStride(rPosView));
-	if (rPosAccessor.count - 1 > (rPosView.byteLength - rPosAccessor.byteOffset - kuiPositionBytes) / uiStride)
+	size_t uiStride = static_cast<size_t>(rPositionAccessor.ByteStride(rPositionView));
+	if (rPositionAccessor.count - 1 > (rPositionView.byteLength - rPositionAccessor.byteOffset - kuiPositionBytes) / uiStride)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor count {} at stride {} runs past its buffer view (byteOffset {}, byteLength {}).", meshGltfFile.string(), rPosAccessor.count, uiStride, rPosAccessor.byteOffset, rPosView.byteLength));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION accessor count {} at stride {} runs past its buffer view (byteOffset {}, byteLength {}).", meshGltfFile.string(), rPositionAccessor.count, uiStride, rPositionAccessor.byteOffset, rPositionView.byteLength));
 	}
-	if ((rPosView.byteOffset + rPosAccessor.byteOffset) % alignof(float) != 0)
+	if ((rPositionView.byteOffset + rPositionAccessor.byteOffset) % alignof(float) != 0)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION data starts at byte {}, which is not float-aligned.", meshGltfFile.string(), rPosView.byteOffset + rPosAccessor.byteOffset));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" POSITION data starts at byte {}, which is not float-aligned.", meshGltfFile.string(), rPositionView.byteOffset + rPositionAccessor.byteOffset));
 	}
 
-	int64_t iVertexCount = static_cast<int64_t>(rPosAccessor.count);
+	int64_t iVertexCount = static_cast<int64_t>(rPositionAccessor.count);
 	rMeshPositions.resize(static_cast<size_t>(iVertexCount) * 3);
 	{
-		const std::byte* pSrc = reinterpret_cast<const std::byte*>(rPosBuffer.data.data()) + rPosView.byteOffset + rPosAccessor.byteOffset;
-		for (int64_t iVertex = 0; iVertex < iVertexCount; ++iVertex)
+		const std::byte* pSource = reinterpret_cast<const std::byte*>(rPositionBuffer.data.data()) + rPositionView.byteOffset + rPositionAccessor.byteOffset;
+		for (int64_t i = 0; i < iVertexCount; ++i)
 		{
-			const float* pfXyz = reinterpret_cast<const float*>(pSrc + static_cast<size_t>(iVertex) * uiStride);
+			const float* pfXyz = reinterpret_cast<const float*>(pSource + static_cast<size_t>(i) * uiStride);
 			if (!std::isfinite(pfXyz[0]) || !std::isfinite(pfXyz[1]) || !std::isfinite(pfXyz[2]))
 			{
-				throw std::runtime_error(std::format("Gaea Mesher output \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshGltfFile.string(), iVertex, pfXyz[0], pfXyz[1], pfXyz[2]));
+				throw std::runtime_error(std::format("Gaea Mesher output \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshGltfFile.string(), i, pfXyz[0], pfXyz[1], pfXyz[2]));
 			}
 			float fX = pfXyz[0];
 			float fY = -pfXyz[2];
 			float fZ = pfXyz[1] - fBeachOffsetMeters;
-			rMeshPositions[static_cast<size_t>(iVertex) * 3 + 0] = fX;
-			rMeshPositions[static_cast<size_t>(iVertex) * 3 + 1] = fY;
-			rMeshPositions[static_cast<size_t>(iVertex) * 3 + 2] = fZ;
+			rMeshPositions.at(static_cast<size_t>(i) * 3 + 0) = fX;
+			rMeshPositions.at(static_cast<size_t>(i) * 3 + 1) = fY;
+			rMeshPositions.at(static_cast<size_t>(i) * 3 + 2) = fZ;
 		}
 	}
 
-	const tinygltf::Accessor& rIdxAccessor = gltfModel.accessors.at(static_cast<size_t>(rPrimitive.indices));
-	const tinygltf::BufferView& rIdxView = gltfModel.bufferViews.at(static_cast<size_t>(rIdxAccessor.bufferView));
-	const tinygltf::Buffer& rIdxBuffer = gltfModel.buffers.at(static_cast<size_t>(rIdxView.buffer));
+	const tinygltf::Accessor& rIndexAccessor = gltfModel.accessors.at(static_cast<size_t>(rPrimitive.indices));
+	const tinygltf::BufferView& rIndexView = gltfModel.bufferViews.at(static_cast<size_t>(rIndexAccessor.bufferView));
+	const tinygltf::Buffer& rIndexBuffer = gltfModel.buffers.at(static_cast<size_t>(rIndexView.buffer));
 	size_t uiIndexComponentBytes = 0;
-	if (rIdxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+	if (rIndexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
 	{
 		uiIndexComponentBytes = sizeof(uint32_t);
 	}
-	else if (rIdxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+	else if (rIndexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
 	{
 		uiIndexComponentBytes = sizeof(uint16_t);
 	}
-	else if (rIdxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+	else if (rIndexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
 	{
 		uiIndexComponentBytes = sizeof(uint8_t);
 	}
 	else
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor has unsupported componentType {}.", meshGltfFile.string(), rIdxAccessor.componentType));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor has unsupported componentType {}.", meshGltfFile.string(), rIndexAccessor.componentType));
 	}
-	if (rIdxView.byteOffset > rIdxBuffer.data.size() || rIdxView.byteLength > rIdxBuffer.data.size() - rIdxView.byteOffset)
+	if (rIndexView.byteOffset > rIndexBuffer.data.size() || rIndexView.byteLength > rIndexBuffer.data.size() - rIndexView.byteOffset)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices buffer view (byteOffset {}, byteLength {}) does not fit its {}-byte buffer.", meshGltfFile.string(), rIdxView.byteOffset, rIdxView.byteLength, rIdxBuffer.data.size()));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices buffer view (byteOffset {}, byteLength {}) does not fit its {}-byte buffer.", meshGltfFile.string(), rIndexView.byteOffset, rIndexView.byteLength, rIndexBuffer.data.size()));
 	}
-	if (rIdxAccessor.byteOffset > rIdxView.byteLength || rIdxAccessor.count > (rIdxView.byteLength - rIdxAccessor.byteOffset) / uiIndexComponentBytes)
+	if (rIndexAccessor.byteOffset > rIndexView.byteLength || rIndexAccessor.count > (rIndexView.byteLength - rIndexAccessor.byteOffset) / uiIndexComponentBytes)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor (byteOffset {}, count {}, {} byte(s) per index) runs past its buffer view (byteLength {}).", meshGltfFile.string(), rIdxAccessor.byteOffset, rIdxAccessor.count, uiIndexComponentBytes, rIdxView.byteLength));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor (byteOffset {}, count {}, {} byte(s) per index) runs past its buffer view (byteLength {}).", meshGltfFile.string(), rIndexAccessor.byteOffset, rIndexAccessor.count, uiIndexComponentBytes, rIndexView.byteLength));
 	}
-	if (rIdxAccessor.count % 3 != 0)
+	if (rIndexAccessor.count % 3 != 0)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor count {} is not a multiple of three.", meshGltfFile.string(), rIdxAccessor.count));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor count {} is not a multiple of three.", meshGltfFile.string(), rIndexAccessor.count));
 	}
-	if ((rIdxView.byteOffset + rIdxAccessor.byteOffset) % uiIndexComponentBytes != 0)
+	if ((rIndexView.byteOffset + rIndexAccessor.byteOffset) % uiIndexComponentBytes != 0)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices start at byte {}, which is not aligned to the {}-byte index component.", meshGltfFile.string(), rIdxView.byteOffset + rIdxAccessor.byteOffset, uiIndexComponentBytes));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices start at byte {}, which is not aligned to the {}-byte index component.", meshGltfFile.string(), rIndexView.byteOffset + rIndexAccessor.byteOffset, uiIndexComponentBytes));
 	}
 
-	int64_t iIndexCount = static_cast<int64_t>(rIdxAccessor.count);
+	int64_t iIndexCount = static_cast<int64_t>(rIndexAccessor.count);
 	rMeshIndices.resize(static_cast<size_t>(iIndexCount));
 	{
-		const std::byte* pSrc = reinterpret_cast<const std::byte*>(rIdxBuffer.data.data()) + rIdxView.byteOffset + rIdxAccessor.byteOffset;
-		switch (rIdxAccessor.componentType)
+		const std::byte* pSource = reinterpret_cast<const std::byte*>(rIndexBuffer.data.data()) + rIndexView.byteOffset + rIndexAccessor.byteOffset;
+		switch (rIndexAccessor.componentType)
 		{
 			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-				std::memcpy(rMeshIndices.data(), pSrc, static_cast<size_t>(iIndexCount) * sizeof(uint32_t));
+				std::memcpy(rMeshIndices.data(), pSource, static_cast<size_t>(iIndexCount) * sizeof(uint32_t));
 				break;
 			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
 			{
-				const uint16_t* puiSrc = reinterpret_cast<const uint16_t*>(pSrc);
+				const uint16_t* puiSource = reinterpret_cast<const uint16_t*>(pSource);
 				for (int64_t i = 0; i < iIndexCount; ++i)
 				{
-					rMeshIndices[static_cast<size_t>(i)] = puiSrc[i];
+					rMeshIndices.at(static_cast<size_t>(i)) = puiSource[i];
 				}
 				break;
 			}
 			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
 			{
-				const uint8_t* puiSrc = reinterpret_cast<const uint8_t*>(pSrc);
+				const uint8_t* puiSource = reinterpret_cast<const uint8_t*>(pSource);
 				for (int64_t i = 0; i < iIndexCount; ++i)
 				{
-					rMeshIndices[static_cast<size_t>(i)] = puiSrc[i];
+					rMeshIndices.at(static_cast<size_t>(i)) = puiSource[i];
 				}
 				break;
 			}
 		}
 	}
 
-	for (size_t uiIndex = 0; uiIndex < rMeshIndices.size(); ++uiIndex)
+	for (int64_t i = 0; uint32_t uiIndex : rMeshIndices)
 	{
-		if (rMeshIndices[uiIndex] >= static_cast<uint32_t>(iVertexCount))
+		if (uiIndex >= static_cast<uint32_t>(iVertexCount))
 		{
-			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), uiIndex, rMeshIndices[uiIndex], iVertexCount));
+			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), i, uiIndex, iVertexCount));
 		}
+		++i;
 	}
 
 	int64_t iInitialVertexCount = iVertexCount;
@@ -556,10 +548,10 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 	// heightmap. Subdivide once over the full mesh and reuse it for chunk crops.
 	SubdivisionConfig subdivisionConfig
 	{
-		.fBandMinMeters = kfBeachSubdivisionMinMeters,
-		.fBandMaxMeters = kfBeachSubdivisionMaxMeters,
-		.fMaxEdgeMeters = kfBeachSubdivisionMaxEdgeMeters,
-		.iMaxDepth = kiBeachSubdivisionMaxDepth,
+		.fBandMinimumMeters = kfBeachSubdivisionMinMeters,
+		.fBandMaximumMeters = kfBeachSubdivisionMaxMeters,
+		.fMaximumEdgeMeters = kfBeachSubdivisionMaxEdgeMeters,
+		.iMaximumDepth = kiBeachSubdivisionMaxDepth,
 	};
 	int64_t iDepthCapHits = 0;
 	SubdivideBeachBand(rMeshPositions, rMeshIndices, subdivisionConfig, iDepthCapHits);
@@ -568,20 +560,13 @@ void LoadMesherMesh(const std::filesystem::path& rIntermediatesDir, float fBeach
 
 	if (iDepthCapHits > 0)
 	{
-		LOG(kDefault, kWarning, "Mesh \"{}\": beach subdivision hit depth cap ({}) on {} triangle(s); largest input triangles may still exceed {:.2f}m edge target AND the mesh may contain T-junction cracks where capped absorption-needing triangles were skipped (raise kiBeachSubdivisionMaxDepth or split it into separate in-band / absorption caps if observed)", rRouteDir.string(), kiBeachSubdivisionMaxDepth, iDepthCapHits, kfBeachSubdivisionMaxEdgeMeters);
+		LOG(kDefault, kWarning, "Mesh \"{}\": beach subdivision hit depth cap ({}) on {} triangle(s); largest input triangles may still exceed {:.2f}m edge target AND the mesh may contain T-junction cracks where capped absorption-needing triangles were skipped (raise kiBeachSubdivisionMaxDepth or split it into separate in-band / absorption caps if observed)", rRouteDirectory.string(), kiBeachSubdivisionMaxDepth, iDepthCapHits, kfBeachSubdivisionMaxEdgeMeters);
 	}
-	LOG(kDefault, kDebug, "Mesh \"{}\": {} -> {} vertices, {} -> {} triangles after beach subdivision (band Z=[{:.2f}, {:.2f}]m, edge target {:.2f}m)", rRouteDir.string(), iInitialVertexCount, iVertexCount, iInitialTriangleCount, iIndexCount / 3, subdivisionConfig.fBandMinMeters, subdivisionConfig.fBandMaxMeters, kfBeachSubdivisionMaxEdgeMeters);
+	LOG(kDefault, kDebug, "Mesh \"{}\": {} -> {} vertices, {} -> {} triangles after beach subdivision (band Z=[{:.2f}, {:.2f}]m, edge target {:.2f}m)", rRouteDirectory.string(), iInitialVertexCount, iVertexCount, iInitialTriangleCount, iIndexCount / 3, subdivisionConfig.fBandMinimumMeters, subdivisionConfig.fBandMaximumMeters, kfBeachSubdivisionMaxEdgeMeters);
 }
 
-} // namespace
 
-// Bakes one route of one island in two stages. STAGE 1 (Gaea raw, slow — only when IsGaeaRawDirty):
-// patch the route's Route Choice into a per-route archetype copy and run Gaea once at full
-// texturePixels into the route cache. STAGE 2 (split, fast — when IsGaeaRawDirty OR
-// AreLeavesDirty): split the raw bake into UP TO iColumns × iRows chunk leaves via ProcessBakedRegion
-// (up to 1 for 1x1, 2 for 2x1, 4 for 2x2 — chunks peaking below kfMinIslandMaxHeightMeters are rejected
-// and produce no leaf, so indices can be sparse). A split-only change re-runs Stage 2 against the
-// existing Stage-1 output — no Gaea re-export. Returns early when both stages are clean.
+// Chunks below kfMinIslandMaxHeightMeters are rejected, so leaf indices can be sparse.
 void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute)
 {
 	std::filesystem::path routeDirectory = rContext.rIslandFolder / rRoute.pcLabel;
@@ -682,17 +667,17 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 	// ProcessBakedRegion auto-crops within each, borrowing neighbour pixels across a seam for alignment.
 	BakeOutput bakeOutput {.rFullElevationMeters = fullElevationMeters, .rFullAmbientOcclusion = fullAmbientOcclusion, .fBeachOffsetMeters = fBeachOffsetMeters};
 	int64_t iWrittenLeaves = 0;
-	for (int64_t iColumn = 0; iColumn < rRoute.iColumns; ++iColumn)
+	for (int64_t i = 0; i < rRoute.iColumns; ++i)
 	{
-		for (int64_t iRow = 0; iRow < rRoute.iRows; ++iRow)
+		for (int64_t j = 0; j < rRoute.iRows; ++j)
 		{
-			int64_t iChunkIndex = iColumn * rRoute.iRows + iRow;
+			int64_t iChunkIndex = i * rRoute.iRows + j;
 			RegionBounds region
 			{
-				.iStartX = iColumn * rContext.iTexturePixels / rRoute.iColumns,
-				.iEndX = (iColumn + 1) * rContext.iTexturePixels / rRoute.iColumns,
-				.iStartY = iRow * rContext.iTexturePixels / rRoute.iRows,
-				.iEndY = (iRow + 1) * rContext.iTexturePixels / rRoute.iRows,
+				.iStartX = i * rContext.iTexturePixels / rRoute.iColumns,
+				.iEndX = (i + 1) * rContext.iTexturePixels / rRoute.iColumns,
+				.iStartY = j * rContext.iTexturePixels / rRoute.iRows,
+				.iEndY = (j + 1) * rContext.iTexturePixels / rRoute.iRows,
 			};
 			std::filesystem::path sourceLeafDirectory = routeDirectory / std::to_string(iChunkIndex);
 			std::filesystem::path cacheLeafDirectory = intermediatesDirectory / std::to_string(iChunkIndex);

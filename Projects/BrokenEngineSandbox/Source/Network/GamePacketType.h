@@ -26,7 +26,7 @@ enum class GamePacketType : uint8_t
 
 // Declarative per-packet contract for game-range client -> server packets, checked once at the ParseReceivedGamePackets
 // dispatch choke point (ServerSession.cpp). Sizes are the FULL packet including the type byte; the dispatch site strips
-// the type byte, so it compares each row against payload.size() + 1. A sentinel {} row (iMaxSize == 0) means the type is
+// the type byte, so it compares each row against payload.size() + 1. A sentinel {} row (iMaximumSize == 0) means the type is
 // not client-sendable (server->client or unknown) -> contract violation.
 constexpr engine::ClientPacketContract GetGamePacketContract(GamePacketType eType)
 {

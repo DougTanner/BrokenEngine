@@ -2,7 +2,7 @@
 
 #include "ToolCliCommon.h"
 
-#include <map>
+#include <unordered_map>
 
 namespace toolcli
 {
@@ -23,11 +23,12 @@ namespace toolcli
 	};
 
 	bool Utf8PathLess(std::wstring_view left, std::wstring_view right);
-	bool ParseCanonicalUtcTimestamp(const std::string& rValue, uint64_t& rTicks);
+	bool ParseCanonicalUtcTimestamp(std::string_view value, uint64_t& rTicks);
 	bool ReadBytes(const std::filesystem::path& rPath, std::string& rBytes);
 	bool NormalizePlanPath(std::wstring_view value, std::wstring& rPath);
-	bool BuildPlans(const std::filesystem::path& rWorktree, std::map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
-	bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_view commit, std::map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
-	bool IsBlockedByDependencies(const Plan& rPlan, const std::map<std::wstring, Plan>& rPlans);
-	void MarkCycles(std::map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
-}
+	bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
+	bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_view commit, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
+	bool IsBlockedByDependencies(const Plan& rPlan, const std::unordered_map<std::wstring, Plan>& rPlans);
+	std::vector<std::wstring> GetSortedPlanPaths(const std::unordered_map<std::wstring, Plan>& rPlans);
+	void MarkCycles(std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);
+} // namespace toolcli

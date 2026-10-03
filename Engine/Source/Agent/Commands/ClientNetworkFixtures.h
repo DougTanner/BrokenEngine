@@ -76,12 +76,12 @@ using QueryCoordUpdateState = CoordUpdateState (*)(GridCoord coord, int64_t iTic
 SubscribeAcceptResult ReceiveSubscribeAccept(Client& rClient, uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord);
 void ArmStaleUpdate(Client& rClient, const std::shared_ptr<StaleUpdateState>& pState);
 void ArmCancelledSubscription(Client& rClient, const std::shared_ptr<CancelledSubscriptionState>& pState);
-void CaptureStaleUpdate(Client& rClient, std::span<const uint8_t> packetData, uint8_t uiSlotIndex, uint16_t uiEpoch, int64_t iTick);
+void CaptureStaleUpdate(const Client& rClient, std::span<const uint8_t> packetData, uint8_t uiSlotIndex, uint16_t uiEpoch, int64_t iTick);
 std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpdateState pfnQueryCoordUpdateState);
-void PollAfterDrain(Client& rClient, const std::shared_ptr<StaleUpdateState>& pState, QueryCoordUpdateState pfnQueryCoordUpdateState);
-bool ObserveSubscribeAcceptCleanup(Client& rClient, uint8_t uiSerializedSlot, int64_t iSerializedBytes);
-void ObserveUnsubscribeAck(Client& rClient, uint8_t uiSlotIndex);
-void Reset(Client& rClient);
+void PollAfterDrain(const Client& rClient, const std::shared_ptr<StaleUpdateState>& pState, QueryCoordUpdateState pfnQueryCoordUpdateState);
+bool ObserveSubscribeAcceptCleanup(const Client& rClient, uint8_t uiSerializedSlot, int64_t iSerializedBytes);
+void ObserveUnsubscribeAck(const Client& rClient, uint8_t uiSlotIndex);
+void Reset(const Client& rClient);
 void Detach();
 
 } // namespace ClientNetworkFixtures

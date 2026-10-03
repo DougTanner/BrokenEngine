@@ -38,8 +38,9 @@ live in [`../SKILL.md`](../SKILL.md).
 5. Map:
 
    - declarations and definitions with line ranges and approximate sizes;
-   - preprocessor affinity, templates, inline code, anonymous-namespace items,
-     constants, local types, and global definitions;
+   - preprocessor affinity, templates, inline code, file-local items (`static`,
+     or inside an anonymous namespace), constants, local types, and global
+     definitions;
    - responsibility groups, call chains, and data each group reads or writes;
    - symbols shared across proposed boundaries and include/circular-dependency
      consequences.

@@ -47,7 +47,7 @@ void ServerSessionRuntime::ResetOnLastClientLeave()
 	bool bHasClients = !mpServer->mClients.empty();
 	if (mbHadClients && !bHasClients)
 	{
-		game::gpGame->mGameFlags.Clear(engine::GameFlags::kPaused);
+		game::gpGame->mGameFlags.Set(engine::GameFlags::kPaused, false);
 		if (game::gpGame->mTimeStep.miTimeMultiply != 1 || game::gpGame->mTimeStep.miTimeDivide != 1)
 		{
 			game::gpGame->mTimeStep.SetTimeScale(1, 1);
@@ -84,8 +84,8 @@ void ServerSessionRuntime::PollTickBoundary(const NetworkTimeState& rTimeState)
 
 void ServerSessionRuntime::WaitForTick(TimeStep& rTimeStep)
 {
-	std::chrono::nanoseconds tickNanoseconds = rTimeStep.SimToWall(game::NetworkSessionContract::kTickDuration);
-	std::chrono::nanoseconds tickRemainderWallNanoseconds = rTimeStep.SimToWall(rTimeStep.mTickRemainderNs);
+	std::chrono::nanoseconds tickNanoseconds = rTimeStep.SimulationToWall(game::NetworkSessionContract::kTickDuration);
+	std::chrono::nanoseconds tickRemainderWallNanoseconds = rTimeStep.SimulationToWall(rTimeStep.mTickRemainderNanoseconds);
 	static constexpr std::chrono::nanoseconds kSpinMarginNanoseconds = 500'000ns;
 	std::chrono::nanoseconds remainingNanoseconds = tickNanoseconds - tickRemainderWallNanoseconds - rTimeStep.mRealTime.GetDeltaNs();
 	std::chrono::nanoseconds sleepNanoseconds = remainingNanoseconds - kSpinMarginNanoseconds;
@@ -117,34 +117,34 @@ void ServerSessionRuntime::WaitForTick(TimeStep& rTimeStep)
 
 void ServerSessionRuntime::PreparePausedSubscriptions()
 {
-	for (const engine::PendingNewSubscription& rSub : mpServer->mPendingNewSubscriptions)
+	for (const engine::PendingNewSubscription& rSubscription : mpServer->mPendingNewSubscriptions)
 	{
-		auto it = game::gpGame->mCoordFrames.find(rSub.coord);
+		auto it = game::gpGame->mCoordFrames.find(rSubscription.coordinate);
 		if (it == game::gpGame->mCoordFrames.end())
 		{
 			continue;
 		}
 		engine::FrameStaticData& rStaticData = it->second.staticData;
-		if (!rStaticData.bNavDataBuilt)
+		if (!rStaticData.bNavigationDataBuilt)
 		{
-			// Heap: BuildCellNavData grows the navData vertex, polygon, and visibility-edge vectors, and
+			// Heap: BuildCellNavigationData grows the navigationData vertex, polygon, and visibility-edge vectors, and
 			// this path runs on the main thread inside the armed main loop
 			ScopedSuppressAllocationTracking suppress;
-			engine::BuildCellNavData(rStaticData.navData, rStaticData.islands);
-			rStaticData.bNavDataBuilt = true;
+			engine::BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
+			rStaticData.bNavigationDataBuilt = true;
 		}
 	}
 }
 
 void ServerSessionRuntime::HandleResyncRequests()
 {
-	std::vector<int64_t>& rResyncClientIds = mpServer->mPendingResyncClientIds;
+	std::vector<int64_t>& rResyncClientIds = mpServer->mPendingResynchronizationClientIds;
 	if (rResyncClientIds.empty())
 	{
 		return;
 	}
 
-	// Heap: per-resync per-slot SendCoordFullState allocates serialization buffers
+	// Heap: per-resync per-slot SendCoordinateFullState allocates serialization buffers
 	ScopedSuppressAllocationTracking suppress;
 
 	for (int64_t iClientId : rResyncClientIds)
@@ -157,33 +157,33 @@ void ServerSessionRuntime::HandleResyncRequests()
 
 		LOG(kNetwork, kWarning, "ServerSessionRuntime::HandleResyncRequests Client: {}", iClientId);
 
-		for (int64_t iSlot = 0; iSlot < std::ssize(pClient->slots); ++iSlot)
+		for (int64_t i = 0; i < std::ssize(pClient->slots); ++i)
 		{
-			if (!(pClient->slots.at(iSlot).subscription.flags & engine::SubscriptionFlags::kActive))
+			if (!(pClient->slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive))
 			{
 				continue;
 			}
 
-			engine::GridCoord coord = pClient->slots.at(iSlot).subscription.coord;
+			engine::GridCoord coord = pClient->slots.at(i).subscription.coordinate;
 
 			// A slot whose new subscription is still queued gets its full state from that entry, after its static
 			// data; a resync full state sent first would activate the client slot, which then drops the static data
-			bool bNewSubscriptionQueued = std::ranges::any_of(mpServer->mPendingNewSubscriptions, [iClientId, iSlot, coord](const engine::PendingNewSubscription& rPending)
+			bool bNewSubscriptionQueued = std::ranges::any_of(mpServer->mPendingNewSubscriptions, [iClientId, i, coord](const engine::PendingNewSubscription& rPending)
 			{
-				return rPending.iClientId == iClientId && rPending.iSlot == iSlot && rPending.coord == coord;
+				return rPending.iClientId == iClientId && rPending.iSlot == i && rPending.coordinate == coord;
 			});
 			if (bNewSubscriptionQueued)
 			{
 				continue;
 			}
 
-			auto frameIt = game::gpGame->mCoordFrames.find(coord);
-			if (frameIt == game::gpGame->mCoordFrames.end())
+			auto it = game::gpGame->mCoordFrames.find(coord);
+			if (it == game::gpGame->mCoordFrames.end())
 			{
 				continue;
 			}
 
-			mpServer->SendCoordFullState(iClientId, iSlot, game::gpGame->TickCounter(), coord, frameIt->second.pCurrent.get());
+			mpServer->SendCoordinateFullState(iClientId, i, game::gpGame->TickCounter(), coord, it->second.pCurrent.get());
 		}
 	}
 
@@ -205,25 +205,25 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rSubscription.iClientId);
 		bool bSlotStillValid = (pClient != nullptr && rSubscription.iSlot < std::ssize(pClient->slots)
 		                     && (pClient->slots.at(rSubscription.iSlot).subscription.flags & engine::SubscriptionFlags::kActive)
-		                     && pClient->slots.at(rSubscription.iSlot).subscription.coord == rSubscription.coord);
+		                     && pClient->slots.at(rSubscription.iSlot).subscription.coordinate == rSubscription.coordinate);
 		if (!bSlotStillValid)
 		{
 			return true;
 		}
 
-		auto it = game::gpGame->mCoordFrames.find(rSubscription.coord);
+		auto it = game::gpGame->mCoordFrames.find(rSubscription.coordinate);
 		if (it == game::gpGame->mCoordFrames.end())
 		{
 			return false;
 		}
 
-		if (!it->second.staticData.bNavDataBuilt)
+		if (!it->second.staticData.bNavigationDataBuilt)
 		{
 			return false;
 		}
 
-		mpServer->SendCoordStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coord, it->second.staticData);
-		mpServer->SendCoordFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->TickCounter(), rSubscription.coord, it->second.pCurrent.get());
+		mpServer->SendCoordinateStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coordinate, it->second.staticData);
+		mpServer->SendCoordinateFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->TickCounter(), rSubscription.coordinate, it->second.pCurrent.get());
 		return true;
 	});
 }
@@ -266,16 +266,16 @@ void ServerSessionRuntime::ResetTransportForLoad()
 {
 	mpServer->ClearBufferedFrames();
 	mpServer->mPendingNewSubscriptions.clear();
-	mpServer->mPendingResyncClientIds.clear();
+	mpServer->mPendingResynchronizationClientIds.clear();
 	mpServer->Flush();
 }
 
-void ServerSessionRuntime::PublishTick(int64_t iTick, const std::pair<GridCoord, GridUpdateData>* pGridUpdates, int64_t iGridUpdateCount, const std::pair<GridCoord, const game::Frame*>* pFullFrames, int64_t iFullFrameCount)
+void ServerSessionRuntime::PublishTick(int64_t iTick, std::span<const std::pair<GridCoord, GridUpdateData>> gridUpdates, std::span<const std::pair<GridCoord, const game::Frame*>> fullFrames)
 {
-	mpServer->BufferFrame(iTick, pGridUpdates, iGridUpdateCount);
-	if (iFullFrameCount > 0)
+	mpServer->BufferFrame(iTick, gridUpdates);
+	if (!fullFrames.empty())
 	{
-		mpServer->BufferFullFrame(iTick, pFullFrames, iFullFrameCount);
+		mpServer->BufferFullFrame(iTick, fullFrames);
 	}
 	for (ClientConnection& rClient : mpServer->mClients)
 	{
@@ -292,7 +292,7 @@ void ServerSessionRuntime::AddSubscribedCoords()
 		{
 			if (rClient.slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive)
 			{
-				engine::GridCoord coord = rClient.slots.at(i).subscription.coord;
+				engine::GridCoord coord = rClient.slots.at(i).subscription.coordinate;
 				if (!std::ranges::contains(game::gpGame->mActiveCoords, coord))
 				{
 					game::gpGame->mActiveCoords.push_back(coord);
@@ -304,7 +304,6 @@ void ServerSessionRuntime::AddSubscribedCoords()
 
 void ServerSessionRuntime::SyncActiveFrames()
 {
-	// Create frames at missing coordinates
 	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
 	{
 		if (!game::gpGame->mCoordFrames.contains(rCoord))
@@ -336,9 +335,9 @@ void ServerSessionRuntime::ComputeActiveSet()
 	AddSubscribedCoords();
 	mrSession.AddGameRequiredCoords();
 
-	if (!std::ranges::contains(game::gpGame->mActiveCoords, engine::kOriginCoord))
+	if (!std::ranges::contains(game::gpGame->mActiveCoords, engine::kOriginCoordinate))
 	{
-		game::gpGame->mActiveCoords.push_back(engine::kOriginCoord);
+		game::gpGame->mActiveCoords.push_back(engine::kOriginCoordinate);
 	}
 
 	SyncActiveFrames();

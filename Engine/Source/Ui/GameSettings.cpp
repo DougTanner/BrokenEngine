@@ -49,11 +49,8 @@ void SaveGameSettings()
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGameSettingsPath, gameSettings);
 }
 
-namespace
-{
-
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
-const char* FindInvalidGameSetting(const GameSettings& rGameSettings)
+static const char* FindInvalidGameSetting(const GameSettings& rGameSettings)
 {
 	if (rGameSettings.iLanguage < 0 || rGameSettings.iLanguage >= kLanguageCount)
 	{
@@ -72,8 +69,6 @@ const char* FindInvalidGameSetting(const GameSettings& rGameSettings)
 
 	return nullptr;
 }
-
-} // namespace
 
 void LoadGameSettings()
 {

@@ -18,10 +18,10 @@ scanner-extracted name list as its state.
 
 ## The decision today
 
-`.agents/skills/code-style-review/references/worker.md:74-116` (step 7)
+`.agents/skills/code-style-review/references/worker.md:66-108` (step 7)
 hand-reads rules 3, 14, 16 (including its vector `.at()` clause), 21, 49, 51,
 56, 62, and the "always write `std::`" half of 41 across every changed range,
-because the scanner emits no candidates for them. Step 6 (`worker.md:43-73`)
+because the scanner emits no candidates for them. Step 6 (`worker.md:40-65`)
 runs the judgment script as an advisory: it asks rule 49 (rule 3 is also
 asked and ignored) at a 0.7 threshold, over block text whose
 session-changed lines carry a `+ ` mark, and its flags are extra step-10
@@ -106,7 +106,7 @@ Rule 16 did not fire on the pointer-array `[iSpawnIndex]` writes in
 string (0.06). Rule 62 stayed at 0.04 on `||` in a Boolean assignment and at
 0.02 on an `&&` guard. Rule 49 caught the getter, the `Is*` with a
 composed expression, the one-call pass-through, the setter spread over two
-lines, and the real `TimeStep::ClearAccumulator` and `AbsorbUnusedTicks`
+lines, and the `TimeStep` accumulator clear and unused-tick addition examples
 (0.89 to 0.99); its one clean block over 0.5 was a two-statement bind function
 at 0.51 and 0.47 across the sweeps. Rule 51 separated the wrapped call and the
 wrapped 122-column condition from the allowed split past 140 columns (0.44 to
@@ -155,7 +155,7 @@ for the user.
 ## What still needs a full model
 
 Every fix, and the meaning-preservation decision the auto-fix requires
-(`references/worker.md:184-187`). Jev does not replace the judgment on a
+(`references/worker.md:179-182`). Jev does not replace the judgment on a
 flagged block: the worker still reads a flagged function against the guide
 before it fixes or routes anything, and it also hand-reads every range
 (decision 5), so the shape is "Jev orders the list the worker

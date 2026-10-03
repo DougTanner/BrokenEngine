@@ -136,7 +136,7 @@ void RawInputManager::Update(bool bLostFocus)
 
 	// A running agent input script relaxes the unfocused early-out so it can publish + overlay while the window is
 	// unfocused (the norm for the harness). Off the script path this stays the plain focus gate.
-	bool bScriptActive = gpAgentInput != nullptr && gpAgentInput->IsScriptActive();
+	bool bScriptActive = gpAgentInput != nullptr && gpAgentInput->mbScriptActive;
 	bool bHasFocus = mStateFlags & RawInputStateFlags::kHasFocus;
 	if (!bHasFocus && !bScriptActive)
 	{
@@ -177,7 +177,7 @@ void RawInputManager::Update(bool bLostFocus)
 	// sink deliberately does not re-add it.)
 	if (gpAgentInput != nullptr)
 	{
-		mRawInput.iScrollWheelValue += gpAgentInput->SyntheticScrollAccumulator();
+		mRawInput.iScrollWheelValue += gpAgentInput->miSyntheticScrollAccumulator;
 	}
 
 	// Game pad (only first game pad supported). Suppressed harness client skips the poll — the snapshot stays zero-initialized.
@@ -213,7 +213,7 @@ void RawInputManager::Update(bool bLostFocus)
 		{
 			if (mStateFlags & RawInputStateFlags::kGamePadConnected)
 			{
-				mStateFlags.Clear(RawInputStateFlags::kGamePadConnected);
+				mStateFlags.Set(RawInputStateFlags::kGamePadConnected, false);
 				LOG(kInput, kInfo, "Game pad disconnected");
 			}
 

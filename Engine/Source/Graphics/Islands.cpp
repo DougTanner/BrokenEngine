@@ -195,7 +195,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	// pre-fence EvictionSweep.
 	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
-		rTemplate.miRefCount = 0;
+		rTemplate.iReferenceCount = 0;
 	}
 
 	auto pSsbo = reinterpret_cast<shaders::AxisAlignedQuadLayout*>(rStorageBuffer.mpMappedMemory);
@@ -207,8 +207,8 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	// record and final stale-tail clear use the same totals that established each run's base.
 	int64_t iTemplateArrayBytes = miTemplateCount * static_cast<int64_t>(sizeof(uint32_t));
 	auto puiPerTemplateScratch = common::gpThreadLocal->mWorkbuffer.PushBuffer<uint32_t*>(4 * iTemplateArrayBytes);
-	uint32_t* puiPerTemplateMeshVisibleCount = puiPerTemplateScratch;
-	uint32_t* puiPerTemplateTotalCount = puiPerTemplateScratch + miTemplateCount;
+	uint32_t* puiPerTemplateMeshVisibleCount = puiPerTemplateScratch.mpData;
+	uint32_t* puiPerTemplateTotalCount = puiPerTemplateScratch.mpData + miTemplateCount;
 	uint32_t* puiPerTemplateBase = puiPerTemplateTotalCount + miTemplateCount;
 	uint32_t* puiPerTemplateEmitCount = puiPerTemplateBase + miTemplateCount;
 	std::memset(puiPerTemplateMeshVisibleCount, 0, static_cast<size_t>(iTemplateArrayBytes));
@@ -232,8 +232,8 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	// the camera cell once and hands it to the visibility test and the emission that consume the position.
 	auto IsMeshVisible = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, XMFLOAT2 f2Offset)
 	{
-		float fRadius = 0.5f * std::hypot(rTemplate.mfQuadFootprintX, rTemplate.mfQuadFootprintY);
-		XMFLOAT4 f4Position {rPlacement.f2WorldPos.x + f2Offset.x, rPlacement.f2WorldPos.y + f2Offset.y, 0.0f, 1.0f};
+		float fRadius = 0.5f * std::hypot(rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
+		XMFLOAT4 f4Position {rPlacement.f2WorldPosition.x + f2Offset.x, rPlacement.f2WorldPosition.y + f2Offset.y, 0.0f, 1.0f};
 		return engine::gpCamera->InVisibleArea(f4MeshVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius);
 	};
 
@@ -252,10 +252,10 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
 			IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			int64_t iTemplate = rTemplate.miTemplateArrayIndex;
+			int64_t iTemplate = rTemplate.iTemplateArrayIndex;
 			ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
-			++rTemplate.miRefCount;
-			rTemplate.muiLastUsedRenderFrame = gpGraphics->muiFrameCounter;
+			++rTemplate.iReferenceCount;
+			rTemplate.uiLastUsedRenderFrame = gpGraphics->muiFrameCounter;
 			std::ignore = gpIslandTerrain->AcquireTextureSlot(rPlacement.islandCrc);
 			++puiPerTemplateTotalCount[iTemplate];
 			if (IsMeshVisible(rPlacement, rTemplate, f2Offset))
@@ -288,7 +288,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 
 	auto EmitPlacement = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, uint32_t uiTextureSlot, XMFLOAT2 f2Offset)
 	{
-		int64_t iTemplate = rTemplate.miTemplateArrayIndex;
+		int64_t iTemplate = rTemplate.iTemplateArrayIndex;
 		ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
 		uint32_t uiSlotInTemplate = puiPerTemplateEmitCount[iTemplate];
 		uint64_t uiStorageBufferIndex = static_cast<uint64_t>(puiPerTemplateBase[iTemplate]) + uiSlotInTemplate;
@@ -302,10 +302,10 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 
 		shaders::AxisAlignedQuadLayout& rQuad = pSsbo[uiStorageBufferIndex];
 
-		rQuad.f4VertexRect.x = rPlacement.f2WorldPos.x + f2Offset.x - 0.5f * rTemplate.mfQuadFootprintX;
-		rQuad.f4VertexRect.y = rPlacement.f2WorldPos.y + f2Offset.y + 0.5f * rTemplate.mfQuadFootprintY;
-		rQuad.f4VertexRect.z = rTemplate.mfQuadFootprintX;
-		rQuad.f4VertexRect.w = -rTemplate.mfQuadFootprintY;
+		rQuad.f4VertexRect.x = rPlacement.f2WorldPosition.x + f2Offset.x - 0.5f * rTemplate.fQuadFootprintX;
+		rQuad.f4VertexRect.y = rPlacement.f2WorldPosition.y + f2Offset.y + 0.5f * rTemplate.fQuadFootprintY;
+		rQuad.f4VertexRect.z = rTemplate.fQuadFootprintX;
+		rQuad.f4VertexRect.w = -rTemplate.fQuadFootprintY;
 
 		rQuad.f4TextureRect.x = 0.0f;
 		rQuad.f4TextureRect.z = 1.0f;
@@ -336,7 +336,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
 			if (IsMeshVisible(rPlacement, rTemplate, f2Offset))
 			{
-				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.miTextureSlot), f2Offset);
+				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.iTextureSlot), f2Offset);
 			}
 		}
 	}
@@ -360,7 +360,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
 			if (!IsMeshVisible(rPlacement, rTemplate, f2Offset))
 			{
-				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.miTextureSlot), f2Offset);
+				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.iTextureSlot), f2Offset);
 			}
 		}
 	}

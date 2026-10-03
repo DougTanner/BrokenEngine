@@ -36,7 +36,7 @@ inline constexpr int64_t kiTransferGranularityBlocks = 16;
 inline constexpr int64_t kiCropAlignment = (kiBcBlockSize > kiElevationDivisor ? kiBcBlockSize : kiElevationDivisor) * kiTransferGranularityBlocks;
 
 // Single source of truth for required Island.json keys. Drives both the strict-presence check in
-// BakeOne and the varsJson strip pass in BakeRoute (remaining keys forward to Gaea as graph
+// BakeOne and the variablesJson strip pass in BakeRoute (remaining keys forward to Gaea as graph
 // variables). Adding a new DataPacker-owned key means appending here only.
 inline constexpr const char* kpcRequiredIslandJsonKeys[] = {"archetype", "seed", "widthMeters", "elevationMeters", "texturePixels", "routes"};
 
@@ -54,7 +54,7 @@ struct RouteSubdivision
 
 // Per-island bake context: everything constant for one Island.json across all of its routes.
 // Built once at the top of BakeOne and threaded into every BakeRoute / ProcessBakedRegion call.
-// All members are caller-owned references; the context outlives its consumers.
+// All reference members are caller-owned; the context outlives its consumers.
 struct IslandBakeContext
 {
 	const std::filesystem::path& rIslandFolder;

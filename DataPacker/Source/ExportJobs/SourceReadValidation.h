@@ -42,19 +42,19 @@ inline void RequireSourceExtent(uintmax_t uiFileSize, uintmax_t uiOffset, uintma
 	}
 }
 
-inline void ReadSourceBytes(std::istream& rStream, char* pData, uintmax_t uiByteCount, std::string_view context)
+inline void ReadSourceBytes(std::istream& rStream, std::span<char> data, std::string_view context)
 {
-	if (uiByteCount > static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max()))
+	if (data.size() > static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max()))
 	{
 		throw std::runtime_error(std::format("{} source read size overflow", context));
 	}
-	if (uiByteCount == 0)
+	if (data.empty())
 	{
 		return;
 	}
 
-	std::streamsize iByteCount = static_cast<std::streamsize>(uiByteCount);
-	rStream.read(pData, iByteCount);
+	std::streamsize iByteCount = static_cast<std::streamsize>(data.size());
+	rStream.read(data.data(), iByteCount);
 	if (!rStream || rStream.gcount() != iByteCount)
 	{
 		throw std::runtime_error(std::format("{} failed to read complete source file", context));

@@ -37,6 +37,7 @@ Use the following rules for C++ code
 	unsigned integer, unsigned short, byte - ui: uint16_t suiMax = 0;
 	boolean - b: bool bEnabled = true;
 	enum variable - e: CpuCounters eCpuCounter
+	Vulkan type (any Vk* type, including Vulkan enums, which take vk instead of e, and integer typedefs such as VkDeviceSize and VkBool32; after another prefix it is written Vk, and class members follow rule 54) - vk: VkBuffer vkBuffer; VkResult vkResult; VkBuffer& rVkBuffer; VkImage* pVkImage; inline constexpr VkFormat kVkFormatDepth
 	float, double - f: float fVolume = 1.0f;
 	XMFLOAT[2/3/4] - [f2/f3/f4]: XMFLOAT2 f2MousePosition {};
 	XMVector - vec: XMVECTOR vecPosition {};
@@ -55,7 +56,7 @@ Use the following rules for C++ code
 		Log("message");
 	}
 
-7. Camel case, except for template parameters. Classes and functions start with an uppercase letter, variables start with a lowercase letter.
+7. Camel case, except for template parameters. Classes and functions start with an uppercase letter, variables start with a lowercase letter. A variable holding a lambda or a std::function is named like a function, starting with an uppercase letter, or continuing uppercase after a rule 3 prefix (mGetNextTrack, rWriteBody): auto Sample = [&](int64_t iFrame) -> float { ... }; called as Sample(i).
 
 	class RenderThread
 	constexpr uint32_t kuiThreadCount
@@ -63,7 +64,7 @@ Use the following rules for C++ code
 
 8. Use i/j/k variable names in for loops, but prefer range-based for loop when possible. If a counter variable is required with a range-based for loop, use the C++20 syntax to include include an initializer statement. Use "it" for iterators.
 
-	for (size_t i = 0; i < mIslands.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(mIslands); ++i)
 
 9. Exceptions are for fatal errors only (things that would cause the program to crash), not control flow. Use standard-library exception types by default. Define a custom exception only when it adds useful functionality, such as concrete data or behavior; do not add an empty derived type merely to rename or categorize a failure.
 
@@ -89,7 +90,7 @@ Use the following rules for C++ code
 	b) The type is obvious from a template parameter to the right
 	c) It is an iterator
 	d) It is a structured binding: auto [it, bInserted] = map.try_emplace(key, value);
-	e) It is a lambda expression assigned directly to the variable: auto callback = []() {};
+	e) It is a lambda expression assigned directly to the variable: auto Callback = []() {};
 	f) It is a generic lambda parameter: [](const auto& rSource) {};
 	g) It is an explicit object (this auto&&) or abbreviated-template (auto&&) parameter, and the deduced return type, of a function returning a std::tie member list: auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.a, rSelf.b); }
 
@@ -104,7 +105,7 @@ IMPORTANT do not use auto in range-based for loops
 
 	Access std::vectors with .at(): mIslands.at(0).quad
 
-17. Use size_t for std::vector sizes and indices: for (size_t i = 0; i < vec.size(); ++i)
+17. Use int64_t (rule 13) for std::vector sizes and indices, obtaining the size with std::ssize(), unless the value's consumer requires another integer type (an API parameter or serialized field type): for (int64_t i = 0; i < std::ssize(vec); ++i)
 
 18. Use "const" for read-only reference and pointee contracts:
 	a) A pointer or reference is passed into a function and not modified: const game::MenuInput& rMenuInput
@@ -218,7 +219,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 	{
 	}
 
-51. Keep function parameters AND arguments all on the same line, regardless of line length. This applies to BOTH function declarations and function call sites. Never split a call's arguments across multiple lines just because the line is long — long is fine. The only exception is when an argument is itself a lambda or a struct/initializer-list literal, in which case the `{}` goes on the next line per rule 2 (and the other arguments still stay on the call line).
+51. Keep function parameters AND arguments all on the same line, regardless of line length. This applies to BOTH function declarations and function call sites. Never split a call's arguments across multiple lines just because the line is long — long is fine. The only exception is when an argument is itself a lambda body or a struct/initializer-list literal that spans several lines, in which case the `{}` goes on the next line per rule 2 (and the other arguments still stay on the call line). A braced initializer list written on one line stays on the call line like any other argument.
 
 	Ordinary Boolean expressions follow a length threshold instead: a Boolean assignment or initializer, an if()/while() condition, or a returned Boolean expression that joins onto one line of 140 columns or fewer stays on one line — never split it at && or ||. Past 140 columns you may split it, but you are not required to. When you do split, use as few lines as possible: fill each line with operands up to 140 columns and break only at a top-level && or ||, which then starts the next line. The parentheses of "if (", "else if (" and "while (", and a pair that encloses the whole right-hand side of an assignment or return, are the opener, so the && or || directly inside them are the top-level break points and the operand aligns after the "if (", "else if (", "while (", "= (" or "return ("; never break inside any other parentheses. Count the closing ) and any terminating ; toward the line's columns, and let a single operand that cannot fit stand alone on its line even when it passes 140. Indent each continuation line with tabs up to the statement's own indent level and then pad with spaces so its operand starts in the same column as the first operand on the opening line, with "&& " or "|| " immediately to the left of that column — tabs for indentation, spaces for alignment, tabs counting as 4 columns. The exception is the same one stated above for arguments.
 
@@ -239,6 +240,9 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 		// ...
 	});
 
+	One-line initializer list (good — stays on the call line):
+	return std::formatter<std::string_view>::format(common::FormatVector(pcBuffer, {f4.x, f4.y, f4.z, f4.w}), rContext);
+
 	Condition (bad — wrapped although it joins to 122 columns):
 	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState
 		|| rSlot.eState == CoordSubscriptionState::kSubscribing)
@@ -255,11 +259,11 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 		                   && !(mGameFlags & GameFlags::kPaused) && !gpReplay->IsRecording() && !mbReplaying
 		                   && !(mGameFlags & GameFlags::kSaveReplay);
 
-52. Put a space before "{}" universal initializers, ex: uuid_t uuid {}; XMFLOAT2 f2MousePosition {};
+52. Put a space before "{}" universal initializers, ex: Uuid uuid {}; XMFLOAT2 f2MousePosition {};
 
 53. Multiple .emplace_back() or .push_back() calls on a std::vector should be preceeded by .reserve() to avoid multiple reallocations and destructor calls
 
-54. Vulkan handle type member variables end with Vk{TypeName} suffix: VkCommandBuffer mGlobalVkCommandBuffer = VK_NULL_HANDLE;
+54. Vulkan type (any Vk* type) class member variables end with Vk{TypeName} suffix: VkCommandBuffer mGlobalVkCommandBuffer = VK_NULL_HANDLE;
 
 55. "enum class" should be used where possible, with the exception of enums created to index and count
 
@@ -273,7 +277,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
 56. Use complete words in all variable and function names. Do not abbreviate (e.g., `rReconcileContext` not `ctx`, `bufferIt` not `bufIt`, `rCommandBuffer` not `cmdBuf`). Exception: loop counters `i`/`j`/`k` and iterators `it` (per rule 8).
 
-57. Do not use "Impl", "Internal", or similar non-word suffixes on function names. If a function reconciles, name it `Reconcile()`, not `ReconcileImpl()`. Use scope (private, anonymous namespace) to distinguish internal from public versions.
+57. Do not use "Impl", "Internal", or similar non-word suffixes on function names. If a function reconciles, name it `Reconcile()`, not `ReconcileImpl()`. Use scope (a private member, or a `static` file-local function) to distinguish internal from public versions.
 
 58. Use `#if defined()` instead of `#ifdef` for preprocessor conditionals. This is more composable with logical operators:
 
@@ -306,9 +310,9 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 		break;
 	}
 
-62. Use early returns for guard and validation sequences. When several independent conditions each guard the same single-statement exit, write one "if" per condition instead of packing them into one large "if (A || B || C)" disjunction. Keep the conditions in their original order, grouped by concern; reordering them changes which condition is evaluated first:
+62. Use early returns for guard and validation sequences. When several unrelated conditions each guard the same single-statement exit, write one "if" per condition instead of packing them into one large "if (A || B || C)" disjunction. The same check over parallel values is one condition and may stay in one "if". Keep the conditions in their original order, grouped by concern; reordering them changes which condition is evaluated first:
 
-	Bad (independent guards packed into one disjunction):
+	Bad (unrelated guards packed into one disjunction):
 	if (pTarget == nullptr || !rFrame.mbSimulating || iProjectileCount == 0)
 	{
 		return;
@@ -330,9 +334,15 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 		return;
 	}
 
+	Good (the same validity check over two parallel results stays in one "if"):
+	if (!bOneValid || !bTwoValid)
+	{
+		return false;
+	}
+
 63. Do not use XMVector3Rotate() or XMVector3InverseRotate() in "DirectX Math", they return a rounding-residue W that violates the W invariant (positions W=1.0, directions W=0.0). Both raw names are compile-poisoned in ExternalHeaders.h: Use XMVector3RotateSafe(), not XMVector3Rotate()
 
-64. Comments describe the present code: the constraint, invariant, required ordering, or consequence the code as it now stands cannot say itself. Every statement a comment makes must be true of the adjacent code as it stands. Never describe the previous implementation, the change that produced the current code, or a comparison against replaced code:
+64. Comments describe the present code: the constraint, invariant, required ordering, or consequence the code as it now stands cannot say itself. Every statement a comment makes must be true of the code as it now stands, including any code elsewhere the comment names. Never describe the previous implementation, the change that produced the current code, or a comparison against replaced code:
 
 	Bad (narrates the replaced implementation):
 	// 258 XMVECTORs on the stack push this function past the 16 KiB the analysis build allows, so the origins
@@ -358,4 +368,14 @@ A comment also never restates the signature or a house pattern in template field
 	Good (only what the declaration cannot say):
 	// CreateProcessW writes into rCommandLine, so it cannot be const.
 
-What a comment should say, in the fewest sentences that carry it: an invariant, a required ordering and the consequence of breaking it, a lifetime or threading contract, a platform, driver, or toolchain workaround, or a relationship to code elsewhere the local code cannot show.
+What a comment should say, in the fewest sentences that carry it: an invariant, a required ordering and the consequence of breaking it, a lifetime or threading contract, a platform, driver, or toolchain workaround, or a relationship to code elsewhere the local code cannot show. The rule 65 named-namespace closing comment is required, so rule 64 never reports it.
+
+65. Close every named namespace with `} // namespace <name>` on its closing brace, with a nested name exactly as the opening declares it:
+
+	Good:
+	namespace engine::NetworkMessages
+	{
+	...
+	} // namespace engine::NetworkMessages
+
+66. Do not open an anonymous namespace. File-local functions, including `constexpr` functions and function templates, and file-local non-const variables are `static` in the file's named namespace, or at global scope where the file has none. File-local namespace-scope `const`/`constexpr` variables in a `.cpp` file already have internal linkage and take neither `static` nor `inline` (header globals keep rule 25's `inline constexpr`). A file-local type has external linkage, so its name must be unique among the files in the same executable and namespace.

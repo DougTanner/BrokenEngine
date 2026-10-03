@@ -66,7 +66,7 @@ void CommandBufferManager::RecordCommandBuffer(int64_t iFramebuffer)
 		return;
 	}
 	rCommandBuffers.mFlags.Set(CommandBufferFlags::kRecorded);
-	rCommandBuffers.mFlags.Clear(CommandBufferFlags::kExecuted);
+	rCommandBuffers.mFlags.Set(CommandBufferFlags::kExecuted, false);
 
 	LOG(kGraphics, kDebug, "Record command buffer: {}", iFramebuffer);
 

@@ -18,14 +18,29 @@ public:
 	static constexpr uint8_t kuiChannelReliable = 0;
 	static constexpr uint8_t kuiChannelUnreliable = 1;
 
-	static constexpr int64_t kiMaxEnetCoordSlots = 64;
-	static constexpr uint8_t kuiChannelCount = 2 + static_cast<uint8_t>(kiMaxEnetCoordSlots) * 2; // 130
+	static constexpr int64_t kiMaximumEnetCoordinateSlots = 64;
+	static constexpr uint8_t kuiChannelCount = 2 + static_cast<uint8_t>(kiMaximumEnetCoordinateSlots) * 2;
 
-	static constexpr uint8_t CoordSlotReliable(int64_t iSlot) { return static_cast<uint8_t>(2 + iSlot * 2); }
-	static constexpr uint8_t CoordSlotUnreliable(int64_t iSlot) { return static_cast<uint8_t>(2 + iSlot * 2 + 1); }
-	static constexpr int64_t ChannelToSlot(uint8_t uiChannel) { return (uiChannel - 2) / 2; }
-	static constexpr bool IsCoordChannel(uint8_t uiChannel) { return uiChannel >= 2; }
-	static constexpr bool IsUnreliableChannel(uint8_t uiChannel) { return uiChannel == kuiChannelUnreliable || (IsCoordChannel(uiChannel) && (uiChannel % 2) == 1); }
+	static constexpr uint8_t CoordinateSlotReliable(int64_t iSlot)
+	{
+		return static_cast<uint8_t>(2 + iSlot * 2);
+	}
+	static constexpr uint8_t CoordinateSlotUnreliable(int64_t iSlot)
+	{
+		return static_cast<uint8_t>(2 + iSlot * 2 + 1);
+	}
+	static constexpr int64_t ChannelToSlot(uint8_t uiChannel)
+	{
+		return (uiChannel - 2) / 2;
+	}
+	static constexpr bool IsCoordinateChannel(uint8_t uiChannel)
+	{
+		return uiChannel >= 2;
+	}
+	static constexpr bool IsUnreliableChannel(uint8_t uiChannel)
+	{
+		return uiChannel == kuiChannelUnreliable || (IsCoordinateChannel(uiChannel) && (uiChannel % 2) == 1);
+	}
 
 	static inline void SendPacket(ENetPeer* pPeer, uint8_t uiChannel, common::Workbuffer& rWorkbuffer, uint32_t uiFlags)
 	{
@@ -41,7 +56,7 @@ public:
 	}
 
 	template <typename TTYPE, typename... TARGS>
-	static void SendSimplePacket(ENetPeer* pPeer, TTYPE eType, uint8_t uiChannel, uint32_t uiFlags, const TARGS&... args)
+	static void SendSimplePacket(ENetPeer* pPeer, TTYPE eType, uint8_t uiChannel, uint32_t uiFlags, const TARGS&... rArguments)
 	{
 		static_assert(std::is_enum_v<TTYPE>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
 
@@ -49,7 +64,7 @@ public:
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 
 		rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(eType));
-		(PushSimplePacketArg(rWorkbuffer, args), ...);
+		(PushSimplePacketArgument(rWorkbuffer, rArguments), ...);
 
 		SendPacket(pPeer, uiChannel, rWorkbuffer, uiFlags);
 	}

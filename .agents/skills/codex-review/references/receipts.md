@@ -1,7 +1,7 @@
 # Codex Review Receipts
 
-Receipt fields and exit codes for the two scripts `SKILL.md` runs. `SKILL.md`
-owns the steps that consume them.
+Receipt fields and exit codes for the prompt-assembly script `SKILL.md` runs.
+`SKILL.md` owns the steps that consume them.
 
 ## Prompt assembly receipt
 
@@ -36,8 +36,3 @@ step. `prompt.execution-card-check-failed` is one of them: the checker behind
 the two execution-card codes above could not be run or returned no usable
 result, and the message carries that checker's own `code` and `message` when it
 produced them.
-
-## Review run receipt
-
-The `.codex/codex-review.ps1` `.NOTES` header documents the well-formed-result
-check, the automatic retry behind it, and every receipt field.

@@ -12,9 +12,9 @@ namespace engine
 // export tiles a ~400 m master into 1x1 (400x400 Huge), 2x1/3x1 strips (Large), mid tiles (Medium), and
 // 4x4 (100x100 Small). Area separates them where the larger dimension cannot — a 2x1 strip (200x400) and
 // the 1x1 master (400x400) share the same long edge.
-inline constexpr float kfHugeIslandAreaMeters = 120'000.0f;   // 1x1     = 400x400 = 160k
-inline constexpr float kfLargeIslandAreaMeters = 48'000.0f;   // 2x1/3x1 strips    = 53k-80k
-inline constexpr float kfMediumIslandAreaMeters = 16'000.0f;  // mid tiles; 4x4 (10k) falls below -> Small
+constexpr float kfHugeIslandAreaMeters = 120'000.0f;   // 1x1     = 400x400 = 160k
+constexpr float kfLargeIslandAreaMeters = 48'000.0f;   // 2x1/3x1 strips    = 53k-80k
+constexpr float kfMediumIslandAreaMeters = 16'000.0f;  // mid tiles; 4x4 (10k) falls below -> Small
 
 IslandTerrain::IslandTerrain()
 {
@@ -22,9 +22,6 @@ IslandTerrain::IslandTerrain()
 
 	gpIslandTerrain = this;
 
-	// Build a template entry for every kIsland chunk in the manifest. Header fields are
-	// available synchronously; heightmap pointer fills in WaitForElevationMaps once data
-	// is resident.
 	const std::unordered_map<common::crc_t, LazyChunk>& rChunkMap = gpFileManager->GetLazyChunkMap();
 	for (const auto& [rCrc, rLazyChunk] : rChunkMap)
 	{
@@ -34,16 +31,14 @@ IslandTerrain::IslandTerrain()
 		}
 
 		IslandTemplate& rTemplate = mIslands.try_emplace(rCrc).first->second;
-		rTemplate.mIslandCrc = rCrc;
-		rTemplate.mfWorldFootprintXMeters = rLazyChunk.header.islandHeader.fWorldFootprintXMeters;
-		rTemplate.mfWorldFootprintYMeters = rLazyChunk.header.islandHeader.fWorldFootprintYMeters;
-		rTemplate.mfWorldElevationMeters = rLazyChunk.header.islandHeader.fWorldElevationMeters;
-		ASSERT(rTemplate.mfWorldFootprintXMeters > 0.0f);
-		ASSERT(rTemplate.mfWorldFootprintYMeters > 0.0f);
-		rTemplate.mfQuadFootprintX = rTemplate.mfWorldFootprintXMeters;
-		rTemplate.mfQuadFootprintY = rTemplate.mfWorldFootprintYMeters;
-		// Payload-derived dimensions and counts fill in only after WaitForElevationMaps validates
-		// the resident kIsland chunk.
+		rTemplate.islandCrc = rCrc;
+		rTemplate.fWorldFootprintXMeters = rLazyChunk.header.islandHeader.fWorldFootprintXMeters;
+		rTemplate.fWorldFootprintYMeters = rLazyChunk.header.islandHeader.fWorldFootprintYMeters;
+		rTemplate.fWorldElevationMeters = rLazyChunk.header.islandHeader.fWorldElevationMeters;
+		ASSERT(rTemplate.fWorldFootprintXMeters > 0.0f);
+		ASSERT(rTemplate.fWorldFootprintYMeters > 0.0f);
+		rTemplate.fQuadFootprintX = rTemplate.fWorldFootprintXMeters;
+		rTemplate.fQuadFootprintY = rTemplate.fWorldFootprintYMeters;
 	}
 
 	// Stable, deterministic iteration order for slot assignment (Phase 3).
@@ -54,22 +49,18 @@ IslandTerrain::IslandTerrain()
 	}
 	std::sort(mIslandCrcsSorted.begin(), mIslandCrcsSorted.end());
 
-	// Assign each template its stable template-group index (drives grouping and indirect-buffer slot in
-	// Islands). Bake here, never changes after boot.
-	for (int64_t i = 0; i < static_cast<int64_t>(mIslandCrcsSorted.size()); ++i)
+	for (int64_t i = 0; i < std::ssize(mIslandCrcsSorted); ++i)
 	{
-		mIslands.at(mIslandCrcsSorted[i]).miTemplateArrayIndex = i;
+		mIslands.at(mIslandCrcsSorted.at(i)).iTemplateArrayIndex = i;
 	}
 
-	// Menu-browser order: largest footprint first (see header). Copy of the CRC-sorted list,
-	// re-sorted by area; CRC tiebreak keeps it stable. mIslandCrcsSorted order is untouched.
 	mIslandCrcsByArea = mIslandCrcsSorted;
 	std::sort(mIslandCrcsByArea.begin(), mIslandCrcsByArea.end(), [this](common::crc_t crcA, common::crc_t crcB)
 		{
 			const IslandTemplate& rTemplateA = mIslands.at(crcA);
 			const IslandTemplate& rTemplateB = mIslands.at(crcB);
-			float fAreaA = rTemplateA.mfWorldFootprintXMeters * rTemplateA.mfWorldFootprintYMeters;
-			float fAreaB = rTemplateB.mfWorldFootprintXMeters * rTemplateB.mfWorldFootprintYMeters;
+			float fAreaA = rTemplateA.fWorldFootprintXMeters * rTemplateA.fWorldFootprintYMeters;
+			float fAreaB = rTemplateB.fWorldFootprintXMeters * rTemplateB.fWorldFootprintYMeters;
 			if (fAreaA != fAreaB)
 			{
 				return fAreaA > fAreaB;
@@ -77,12 +68,10 @@ IslandTerrain::IslandTerrain()
 			return crcA < crcB;
 		});
 
-	// Bucket templates into 4 size classes by footprint area for IslandChainPlacement role selection.
-	// Iterate the already-sorted CRC list so every bucket stays in deterministic CRC order (client + server).
 	for (common::crc_t islandCrc : mIslandCrcsSorted)
 	{
 		const IslandTemplate& rTemplate = mIslands.at(islandCrc);
-		float fAreaMeters = rTemplate.mfWorldFootprintXMeters * rTemplate.mfWorldFootprintYMeters;
+		float fAreaMeters = rTemplate.fWorldFootprintXMeters * rTemplate.fWorldFootprintYMeters;
 
 		if (fAreaMeters >= kfHugeIslandAreaMeters)
 		{
@@ -126,12 +115,6 @@ IslandTerrain::IslandTerrain()
 	// Downstream (IslandChainPlacement, TextureManager slot-0 anchor) requires at least one island.
 	ASSERT(!mIslandCrcsSorted.empty());
 
-	// Open-ocean floor (outside any island) is a fixed depth below sea level. Heightmap pixel
-	// values inside islands already carry real negative depth, so this constant only fires for
-	// cells with no island placement. Unified with the elevation RTT clear value — keeping it
-	// near the per-island sea floor avoids dramatic bilinear blends at island edges in the
-	// elevation G-buffer (see Common/DataFile.h doc on kfSeaBottomMeters).
-	mfSeaFloorElevation = common::kfSeaBottomMeters;
 
 	gpFileManager->RequestChunkLoad(mIslandCrcsSorted, LoadPriority::kRealtime);
 }
@@ -145,7 +128,7 @@ IslandTerrain::~IslandTerrain()
 }
 
 #if defined(BT_SERVER)
-void IslandTerrain::WaitForElevationMaps(float fNavThreshold, float fNavClearanceMeters)
+void IslandTerrain::WaitForElevationMaps(float fNavigationThreshold, float fNavigationClearanceMeters)
 #else
 void IslandTerrain::WaitForElevationMaps()
 #endif
@@ -178,7 +161,7 @@ void IslandTerrain::WaitForElevationMaps()
 		int64_t iHeightmapBytes = static_cast<int64_t>(rIslandHeader.iHeightmapWidth) * rIslandHeader.iHeightmapHeight * static_cast<int64_t>(sizeof(uint16_t));
 		iBytesRemaining -= iHeightmapBytes;
 
-		auto consumeSection = [&iBytesRemaining](int64_t iElementCount, int64_t iElementBytes)
+		auto ConsumeSection = [&iBytesRemaining](int64_t iElementCount, int64_t iElementBytes)
 		{
 			if (iElementCount > iBytesRemaining / iElementBytes)
 			{
@@ -189,33 +172,33 @@ void IslandTerrain::WaitForElevationMaps()
 			return iSectionBytes;
 		};
 
-		[[maybe_unused]] int64_t iMeshPositionBytes = consumeSection(rIslandHeader.iMeshVertexCount, 2 * static_cast<int64_t>(sizeof(float)));
-		consumeSection(rIslandHeader.iMeshIndexCount, static_cast<int64_t>(sizeof(uint32_t)));
-		int64_t iValidAreaBytes = consumeSection(rIslandHeader.iValidAreaVertexCount, static_cast<int64_t>(sizeof(XMFLOAT2)));
+		[[maybe_unused]] int64_t iMeshPositionBytes = ConsumeSection(rIslandHeader.iMeshVertexCount, 2 * static_cast<int64_t>(sizeof(float)));
+		ConsumeSection(rIslandHeader.iMeshIndexCount, static_cast<int64_t>(sizeof(uint32_t)));
+		int64_t iValidAreaBytes = ConsumeSection(rIslandHeader.iValidAreaVertexCount, static_cast<int64_t>(sizeof(XMFLOAT2)));
 		if (iBytesRemaining != 0)
 		{
 			throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");
 		}
 		int64_t iMeshBytes = rLazyChunk.header.iSize - iHeightmapBytes - iValidAreaBytes;
 
-		rTemplate.mpHeightmapHalf = reinterpret_cast<const uint16_t*>(rLazyChunk.pData);
-		rTemplate.miHeightmapWidth = rIslandHeader.iHeightmapWidth;
-		rTemplate.miHeightmapHeight = rIslandHeader.iHeightmapHeight;
-		rTemplate.miMeshVertexCount = rIslandHeader.iMeshVertexCount;
-		rTemplate.miMeshIndexCount = rIslandHeader.iMeshIndexCount;
-		rTemplate.miValidAreaVertexCount = rIslandHeader.iValidAreaVertexCount;
+		rTemplate.puiHeightmapHalf = reinterpret_cast<const uint16_t*>(rLazyChunk.pData);
+		rTemplate.iHeightmapWidth = rIslandHeader.iHeightmapWidth;
+		rTemplate.iHeightmapHeight = rIslandHeader.iHeightmapHeight;
+		rTemplate.iMeshVertexCount = rIslandHeader.iMeshVertexCount;
+		rTemplate.iMeshIndexCount = rIslandHeader.iMeshIndexCount;
+		rTemplate.iValidAreaVertexCount = rIslandHeader.iValidAreaVertexCount;
 		const std::byte* pAfterHeightmap = rLazyChunk.pData + iHeightmapBytes;
 		// Not validated here: DataPacker's VerifyHullCcwConvex (ExportIsland.cpp) already fails the bake on a
 		// non-CCW or non-convex hull, which is what ConvexHullsOverlap's SAT requires of these vertices.
-		rTemplate.mpf2ValidAreaVertices = reinterpret_cast<const XMFLOAT2*>(pAfterHeightmap + iMeshBytes);
+		rTemplate.pf2ValidAreaVertices = reinterpret_cast<const XMFLOAT2*>(pAfterHeightmap + iMeshBytes);
 
 #if defined(BT_CLIENT)
 		// Mesh CPU pointers are client-only. The lazy-pool slice is reclaimed immediately and
 		// asynchronously restored only when this template gains a render slot.
-		rTemplate.mpfMeshPositions = reinterpret_cast<const float*>(pAfterHeightmap);
-		rTemplate.mpuiMeshIndices = reinterpret_cast<const uint32_t*>(pAfterHeightmap + iMeshPositionBytes);
+		rTemplate.pfMeshPositions = reinterpret_cast<const float*>(pAfterHeightmap);
+		rTemplate.puiMeshIndices = reinterpret_cast<const uint32_t*>(pAfterHeightmap + iMeshPositionBytes);
 		gpFileManager->DecommitChunkRange(rCrc, static_cast<uint64_t>(iHeightmapBytes), static_cast<uint64_t>(iMeshBytes));
-		rTemplate.mbMeshCpuDecommitted = true;
+		rTemplate.bMeshCpuDecommitted = true;
 #endif
 
 #if defined(BT_SERVER)
@@ -232,57 +215,50 @@ void IslandTerrain::WaitForElevationMaps()
 	ScopedBootTimer scopedTimer(kBootTimerIslands);
 	for (auto& [rCrc, rTemplate] : mIslands)
 	{
-		if (rTemplate.mpHeightmapHalf != nullptr)
+		if (rTemplate.puiHeightmapHalf != nullptr)
 		{
 			// BuildNavContour consumes full-precision floats; dequantize the R16 heightmap into a transient
 			// boot buffer (one template at a time, freed each iteration).
-			int64_t iHeightmapTexels = static_cast<int64_t>(rTemplate.miHeightmapWidth) * static_cast<int64_t>(rTemplate.miHeightmapHeight);
+			int64_t iHeightmapTexels = static_cast<int64_t>(rTemplate.iHeightmapWidth) * static_cast<int64_t>(rTemplate.iHeightmapHeight);
 			std::vector<float> heightmapFloats(static_cast<size_t>(iHeightmapTexels));
-			DirectX::PackedVector::XMConvertHalfToFloatStream(heightmapFloats.data(), sizeof(float), rTemplate.mpHeightmapHalf, sizeof(uint16_t), static_cast<size_t>(iHeightmapTexels));
-			BuildNavContour(rTemplate.mNavContour, heightmapFloats.data(), rTemplate.miHeightmapWidth, rTemplate.miHeightmapHeight, fNavThreshold, fNavClearanceMeters, rTemplate.mfQuadFootprintX, rTemplate.mfQuadFootprintY);
+			DirectX::PackedVector::XMConvertHalfToFloatStream(heightmapFloats.data(), sizeof(float), rTemplate.puiHeightmapHalf, sizeof(uint16_t), static_cast<size_t>(iHeightmapTexels));
+			BuildNavContour(rTemplate.navContour, heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fNavigationThreshold, fNavigationClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
 		}
 	}
 #endif
 }
 
-namespace
-{
-
 // Re-home a cell-local position that has stepped outside its cell onto the neighbouring cell that contains
 // it, rewriting both the coord and the local XY. GlobalElevation's callers hand in a position local to the
 // basis coord, and GlobalNormal's taps can cross the edge. Returns false when the neighbour would leave the
 // signed-int32 identity range, so an edge cell reports sea floor instead of wrapping to the far side.
-bool ResolveLocalPosition(GridCoord& rCoord, XMFLOAT4A& rf4Local)
+static bool ResolveLocalPosition(GridCoord& rCoord, XMFLOAT4A& rf4Local)
 {
-	static constexpr float fCellWidth = kfCellWidth;
-	static constexpr float fCellHeight = kfCellHeight;
-	static constexpr float fCellMinX = kfBaseAreaMinX;
-	static constexpr float fCellMinY = kfBaseAreaMinY;
 
-	int32_t iStepX = static_cast<int32_t>(std::floor((rf4Local.x - fCellMinX) / fCellWidth));
-	int32_t iStepY = static_cast<int32_t>(std::floor((rf4Local.y - fCellMinY) / fCellHeight));
+	int32_t iStepX = static_cast<int32_t>(std::floor((rf4Local.x - kfBaseAreaMinimumX) / kfCellWidth));
+	int32_t iStepY = static_cast<int32_t>(std::floor((rf4Local.y - kfBaseAreaMinimumY) / kfCellHeight));
 	if (iStepX == 0 && iStepY == 0)
 	{
 		return true;
 	}
 
-	if (!TryAddGridCoord(rCoord, iStepX, iStepY, rCoord))
+	if (!TryAddGridCoordinate(rCoord, iStepX, iStepY, rCoord))
 	{
 		return false;
 	}
 
-	rf4Local.x -= static_cast<float>(iStepX) * fCellWidth;
-	rf4Local.y -= static_cast<float>(iStepY) * fCellHeight;
+	rf4Local.x -= static_cast<float>(iStepX) * kfCellWidth;
+	rf4Local.y -= static_cast<float>(iStepY) * kfCellHeight;
 	return true;
 }
 
-template <bool kbMultiplyUV, bool kbHoistedHeightmapMax>
-bool SamplePlacementHeightmap(float fDx, float fDy, float fCos, float fSin, float fFootprintX, float fFootprintY, float fHalfX, float fHalfY, const uint16_t* pHeightmapHalf, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fInvFootprintX, float fInvFootprintY, float fHeightmapMaxU, float fHeightmapMaxV, float& rfSample)
+template <bool MULTIPLY_UV, bool HOISTED_HEIGHTMAP_MAXIMUM>
+static bool SamplePlacementHeightmap(float fDeltaX, float fDeltaY, float fCosine, float fSine, float fFootprintX, float fFootprintY, float fHalfX, float fHalfY, const uint16_t* puiHeightmapHalf, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fInverseFootprintX, float fInverseFootprintY, float fHeightmapMaximumU, float fHeightmapMaximumV, float& rfSample)
 {
-	float fLocalX = fDx * fCos - fDy * fSin;
-	float fLocalY = fDx * fSin + fDy * fCos;
+	float fLocalX = fDeltaX * fCosine - fDeltaY * fSine;
+	float fLocalY = fDeltaX * fSine + fDeltaY * fCosine;
 
-	if constexpr (kbMultiplyUV)
+	if constexpr (MULTIPLY_UV)
 	{
 		if (std::abs(fLocalX) > fHalfX || std::abs(fLocalY) > fHalfY)
 		{
@@ -297,10 +273,10 @@ bool SamplePlacementHeightmap(float fDx, float fDy, float fCos, float fSin, floa
 	// UV from local frame; V axis is world-Y inverted.
 	float fU = 0.0f;
 	float fV = 0.0f;
-	if constexpr (kbMultiplyUV)
+	if constexpr (MULTIPLY_UV)
 	{
-		fU = fLocalX * fInvFootprintX + 0.5f;
-		fV = 0.5f - fLocalY * fInvFootprintY;
+		fU = fLocalX * fInverseFootprintX + 0.5f;
+		fV = 0.5f - fLocalY * fInverseFootprintY;
 	}
 	else
 	{
@@ -310,10 +286,10 @@ bool SamplePlacementHeightmap(float fDx, float fDy, float fCos, float fSin, floa
 
 	int64_t iX = 0;
 	int64_t iY = 0;
-	if constexpr (kbHoistedHeightmapMax)
+	if constexpr (HOISTED_HEIGHTMAP_MAXIMUM)
 	{
-		iX = static_cast<int64_t>(fU * fHeightmapMaxU);
-		iY = static_cast<int64_t>(fV * fHeightmapMaxV);
+		iX = static_cast<int64_t>(fU * fHeightmapMaximumU);
+		iY = static_cast<int64_t>(fV * fHeightmapMaximumV);
 	}
 	else
 	{
@@ -323,12 +299,12 @@ bool SamplePlacementHeightmap(float fDx, float fDy, float fCos, float fSin, floa
 	iX = std::clamp(iX, static_cast<int64_t>(0), static_cast<int64_t>(iHeightmapWidth - 1));
 	iY = std::clamp(iY, static_cast<int64_t>(0), static_cast<int64_t>(iHeightmapHeight - 1));
 
-	rfSample = DirectX::PackedVector::XMConvertHalfToFloat(pHeightmapHalf[iY * iHeightmapWidth + iX]);
+	rfSample = DirectX::PackedVector::XMConvertHalfToFloat(puiHeightmapHalf[iY * iHeightmapWidth + iX]);
 	return true;
 }
 
 template <typename ELEVATION_CALLABLE>
-XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ELEVATION_CALLABLE&& rElevation)
+static XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ELEVATION_CALLABLE&& rElevation)
 {
 	auto vecTopLeft = XMVectorAdd(vecPosition, XMVectorSet(-fDistance, fDistance, 0.0f, 0.0f));
 	vecTopLeft = XMVectorSetZ(vecTopLeft, rElevation(vecTopLeft));
@@ -349,7 +325,7 @@ XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ELEVATION_C
 // island-parallel queries, avoiding per-island hashes and trig. Placement edits clear the cache, which
 // can lag RunFrameTick's rebuild by one tick; the server never builds it. Until available, reconstruct
 // each query from placement/template with inline trig and one mIslands.at lookup.
-float CellElevation(const IslandTerrain& rTerrain, const FrameStaticData& rStaticData, const XMFLOAT4A& f4Position)
+static float CellElevation(const IslandTerrain& rTerrain, const FrameStaticData& rStaticData, const XMFLOAT4A& rf4Position)
 {
 	const std::vector<IslandPlacement>& rIslands = rStaticData.islands;
 	const std::vector<IslandRenderQuery>& rQueries = rStaticData.islandRenderQueries;
@@ -358,53 +334,48 @@ float CellElevation(const IslandTerrain& rTerrain, const FrameStaticData& rStati
 	// Reused across the fallback path's iterations (every field overwritten before use each time), so the
 	// common cache-hit path constructs nothing per island.
 	IslandRenderQuery fallbackQuery;
-	float fMaxElevation = rTerrain.mfSeaFloorElevation;
-	for (size_t i = 0; i < rIslands.size(); ++i)
+	float fMaximumElevation = rTerrain.mfSeaFloorElevation;
+	for (int64_t i = 0; i < std::ssize(rIslands); ++i)
 	{
 		const IslandRenderQuery* pQuery = nullptr;
 		if (bHaveQueryCache)
 		{
-			pQuery = &rQueries[i];
+			pQuery = &rQueries.at(i);
 		}
 		else
 		{
-			const IslandPlacement& rPlacement = rIslands[i];
+			const IslandPlacement& rPlacement = rIslands.at(i);
 			const IslandTemplate& rTemplate = rTerrain.mIslands.at(rPlacement.islandCrc);
-			fallbackQuery.fCos = std::cos(-rPlacement.fRotation);
-			fallbackQuery.fSin = std::sin(-rPlacement.fRotation);
-			fallbackQuery.f2WorldPos = rPlacement.f2WorldPos;
-			fallbackQuery.fFootprintX = rTemplate.mfQuadFootprintX;
-			fallbackQuery.fFootprintY = rTemplate.mfQuadFootprintY;
-			fallbackQuery.pHeightmapHalf = rTemplate.mpHeightmapHalf;
-			fallbackQuery.iHeightmapWidth = rTemplate.miHeightmapWidth;
-			fallbackQuery.iHeightmapHeight = rTemplate.miHeightmapHeight;
+			fallbackQuery.fCosine = std::cos(-rPlacement.fRotation);
+			fallbackQuery.fSine = std::sin(-rPlacement.fRotation);
+			fallbackQuery.f2WorldPosition = rPlacement.f2WorldPosition;
+			fallbackQuery.fFootprintX = rTemplate.fQuadFootprintX;
+			fallbackQuery.fFootprintY = rTemplate.fQuadFootprintY;
+			fallbackQuery.puiHeightmapHalf = rTemplate.puiHeightmapHalf;
+			fallbackQuery.iHeightmapWidth = rTemplate.iHeightmapWidth;
+			fallbackQuery.iHeightmapHeight = rTemplate.iHeightmapHeight;
 			pQuery = &fallbackQuery;
 		}
 		const IslandRenderQuery& rQuery = *pQuery;
 
-		float fDx = f4Position.x - rQuery.f2WorldPos.x;
-		float fDy = f4Position.y - rQuery.f2WorldPos.y;
+		float fDeltaX = rf4Position.x - rQuery.f2WorldPosition.x;
+		float fDeltaY = rf4Position.y - rQuery.f2WorldPosition.y;
 		float fSample = 0.0f;
-		if (!SamplePlacementHeightmap<false, false>(fDx, fDy, rQuery.fCos, rQuery.fSin, rQuery.fFootprintX, rQuery.fFootprintY, 0.0f, 0.0f, rQuery.pHeightmapHalf, rQuery.iHeightmapWidth, rQuery.iHeightmapHeight, 0.0f, 0.0f, 0.0f, 0.0f, fSample))
+		if (!SamplePlacementHeightmap<false, false>(fDeltaX, fDeltaY, rQuery.fCosine, rQuery.fSine, rQuery.fFootprintX, rQuery.fFootprintY, 0.0f, 0.0f, rQuery.puiHeightmapHalf, rQuery.iHeightmapWidth, rQuery.iHeightmapHeight, 0.0f, 0.0f, 0.0f, 0.0f, fSample))
 		{
 			continue;
 		}
 
-		// Heightmap value is already engine-meters (DataPacker shifted Gaea's [0,1] normalized
-		// output by the per-island beach offset `Level × elevationMeters` read from the archetype
-		// Sea node). Beach = 0; negative = water; positive = land. Fold into the running max.
-		fMaxElevation = std::max(fMaxElevation, fSample);
+		fMaximumElevation = std::max(fMaximumElevation, fSample);
 	}
 
-	return fMaxElevation;
+	return fMaximumElevation;
 }
-
-} // anonymous namespace
 
 float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition) const
 {
 	// Frame Purity Constraint (IslandTerrain.h): GlobalElevation/GlobalNormal walk mCoordFrames with
-	// libm trig and must never run from frame-tick code — the sim hot path uses FrameElevation/FrameNormal.
+	// libm trig and must never run from frame-tick code — the sim hot path uses FrameElevationSampler::Sample/FrameNormal.
 	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
 
 	XMFLOAT4A f4Local {};
@@ -425,88 +396,77 @@ float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecL
 	return CellElevation(*this, it->second.staticData, f4Local);
 }
 
-namespace
-{
-
 // Splat one island placement's heightmap into the per-cell elevation grid (max-blend over the rotated
-// footprint). Pure deterministic computation — the grid feeds FrameElevation, which steers CRC'd sim
+// footprint). Pure deterministic computation — the grid feeds FrameElevationSampler::Sample, which steers CRC'd sim
 // positions, so client and server must build a bit-identical grid. Every position is centered cell-local
-// meters, so grid texel 0,0 sits at the cell's south-west corner, the constant (kfBaseAreaMinX, kfBaseAreaMinY).
-void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, std::vector<float>& rOutGrid)
+// meters, so grid texel 0,0 sits at the cell's south-west corner, the constant (kfBaseAreaMinimumX, kfBaseAreaMinimumY).
+static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, std::vector<float>& rOutGrid)
 {
-	static constexpr int64_t kiDim = kiElevationGridDim;
-	static constexpr float fCellWidth = kfCellWidth;
-	static constexpr float fCellHeight = kfCellHeight;
-	static constexpr float fCellOriginX = kfBaseAreaMinX;
-	static constexpr float fCellOriginY = kfBaseAreaMinY;
-	static constexpr float fGridPitchX = fCellWidth / static_cast<float>(kiDim);
-	static constexpr float fGridPitchY = fCellHeight / static_cast<float>(kiDim);
+	static constexpr int64_t kiGridDimension = kiElevationGridDimension;
+	static constexpr float kfGridPitchX = kfCellWidth / static_cast<float>(kiGridDimension);
+	static constexpr float kfGridPitchY = kfCellHeight / static_cast<float>(kiGridDimension);
 
-	float fFootprintX = rTemplate.mfQuadFootprintX;
-	float fFootprintY = rTemplate.mfQuadFootprintY;
+	float fFootprintX = rTemplate.fQuadFootprintX;
+	float fFootprintY = rTemplate.fQuadFootprintY;
 	float fHalfX = 0.5f * fFootprintX;
 	float fHalfY = 0.5f * fFootprintY;
 
-	// Trig is constant per placement — hoist out of the per-texel loop (GlobalElevation's per-point
-	// path recomputes std::cos / std::sin per call; this grid builder needs it only once). Negated
-	// rotation matches the inverse-rotate world->local convention used by GlobalElevation.
+	// Negated rotation maps cell-local positions into the island's local frame, matching GlobalElevation.
 	common::SinCos rotation = common::DeterministicSinCos(-rPlacement.fRotation);
-	float fCos = rotation.fCos;
-	float fSin = rotation.fSin;
+	float fCosine = rotation.fCos;
+	float fSine = rotation.fSin;
 
 	// Cell-local AABB of the rotated quad: the 4 corners of the rotated footprint, projected onto X/Y.
-	float fAbsCos = std::abs(fCos);
-	float fAbsSin = std::abs(fSin);
-	float fAabbHalfX = fAbsCos * fHalfX + fAbsSin * fHalfY;
-	float fAabbHalfY = fAbsSin * fHalfX + fAbsCos * fHalfY;
-	float fAabbMinX = rPlacement.f2WorldPos.x - fAabbHalfX;
-	float fAabbMaxX = rPlacement.f2WorldPos.x + fAabbHalfX;
-	float fAabbMinY = rPlacement.f2WorldPos.y - fAabbHalfY;
-	float fAabbMaxY = rPlacement.f2WorldPos.y + fAabbHalfY;
+	float fAbsoluteCosine = std::abs(fCosine);
+	float fAbsoluteSine = std::abs(fSine);
+	float fAxisAlignedBoundingBoxHalfX = fAbsoluteCosine * fHalfX + fAbsoluteSine * fHalfY;
+	float fAxisAlignedBoundingBoxHalfY = fAbsoluteSine * fHalfX + fAbsoluteCosine * fHalfY;
+	float fAxisAlignedBoundingBoxMinimumX = rPlacement.f2WorldPosition.x - fAxisAlignedBoundingBoxHalfX;
+	float fAxisAlignedBoundingBoxMaximumX = rPlacement.f2WorldPosition.x + fAxisAlignedBoundingBoxHalfX;
+	float fAxisAlignedBoundingBoxMinimumY = rPlacement.f2WorldPosition.y - fAxisAlignedBoundingBoxHalfY;
+	float fAxisAlignedBoundingBoxMaximumY = rPlacement.f2WorldPosition.y + fAxisAlignedBoundingBoxHalfY;
 
 	// Clamp AABB to this cell's grid index range. Texel center at (ix + 0.5) * pitch.
-	int64_t iMinGx = static_cast<int64_t>(std::floor((fAabbMinX - fCellOriginX) / fGridPitchX - 0.5f));
-	int64_t iMaxGx = static_cast<int64_t>(std::floor((fAabbMaxX - fCellOriginX) / fGridPitchX - 0.5f));
-	int64_t iMinGy = static_cast<int64_t>(std::floor((fAabbMinY - fCellOriginY) / fGridPitchY - 0.5f));
-	int64_t iMaxGy = static_cast<int64_t>(std::floor((fAabbMaxY - fCellOriginY) / fGridPitchY - 0.5f));
-	iMinGx = std::clamp(iMinGx, static_cast<int64_t>(0), kiDim - 1);
-	iMaxGx = std::clamp(iMaxGx, static_cast<int64_t>(0), kiDim - 1);
-	iMinGy = std::clamp(iMinGy, static_cast<int64_t>(0), kiDim - 1);
-	iMaxGy = std::clamp(iMaxGy, static_cast<int64_t>(0), kiDim - 1);
+	int64_t iMinimumGridX = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMinimumX - kfBaseAreaMinimumX) / kfGridPitchX - 0.5f));
+	int64_t iMaximumGridX = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMaximumX - kfBaseAreaMinimumX) / kfGridPitchX - 0.5f));
+	int64_t iMinimumGridY = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMinimumY - kfBaseAreaMinimumY) / kfGridPitchY - 0.5f));
+	int64_t iMaximumGridY = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMaximumY - kfBaseAreaMinimumY) / kfGridPitchY - 0.5f));
+	iMinimumGridX = std::clamp(iMinimumGridX, static_cast<int64_t>(0), kiGridDimension - 1);
+	iMaximumGridX = std::clamp(iMaximumGridX, static_cast<int64_t>(0), kiGridDimension - 1);
+	iMinimumGridY = std::clamp(iMinimumGridY, static_cast<int64_t>(0), kiGridDimension - 1);
+	iMaximumGridY = std::clamp(iMaximumGridY, static_cast<int64_t>(0), kiGridDimension - 1);
 
-	float fHeightmapMaxU = static_cast<float>(rTemplate.miHeightmapWidth - 1);
-	float fHeightmapMaxV = static_cast<float>(rTemplate.miHeightmapHeight - 1);
-	float fInvFootprintX = 1.0f / fFootprintX;
-	float fInvFootprintY = 1.0f / fFootprintY;
+	float fHeightmapMaximumU = static_cast<float>(rTemplate.iHeightmapWidth - 1);
+	float fHeightmapMaximumV = static_cast<float>(rTemplate.iHeightmapHeight - 1);
+	float fInverseFootprintX = 1.0f / fFootprintX;
+	float fInverseFootprintY = 1.0f / fFootprintY;
 
-	for (int64_t iGy = iMinGy; iGy <= iMaxGy; ++iGy)
+	for (int64_t j = iMinimumGridY; j <= iMaximumGridY; ++j)
 	{
-		float fTexelY = fCellOriginY + (static_cast<float>(iGy) + 0.5f) * fGridPitchY;
-		float fDy = fTexelY - rPlacement.f2WorldPos.y;
-		for (int64_t iGx = iMinGx; iGx <= iMaxGx; ++iGx)
+		float fTexelY = kfBaseAreaMinimumY + (static_cast<float>(j) + 0.5f) * kfGridPitchY;
+		float fDeltaY = fTexelY - rPlacement.f2WorldPosition.y;
+		for (int64_t i = iMinimumGridX; i <= iMaximumGridX; ++i)
 		{
-			float fTexelX = fCellOriginX + (static_cast<float>(iGx) + 0.5f) * fGridPitchX;
-			float fDx = fTexelX - rPlacement.f2WorldPos.x;
+			float fTexelX = kfBaseAreaMinimumX + (static_cast<float>(i) + 0.5f) * kfGridPitchX;
+			float fDeltaX = fTexelX - rPlacement.f2WorldPosition.x;
 			float fSample = 0.0f;
-			if (!SamplePlacementHeightmap<true, true>(fDx, fDy, fCos, fSin, fFootprintX, fFootprintY, fHalfX, fHalfY, rTemplate.mpHeightmapHalf, rTemplate.miHeightmapWidth, rTemplate.miHeightmapHeight, fInvFootprintX, fInvFootprintY, fHeightmapMaxU, fHeightmapMaxV, fSample))
+			if (!SamplePlacementHeightmap<true, true>(fDeltaX, fDeltaY, fCosine, fSine, fFootprintX, fFootprintY, fHalfX, fHalfY, rTemplate.puiHeightmapHalf, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fInverseFootprintX, fInverseFootprintY, fHeightmapMaximumU, fHeightmapMaximumV, fSample))
 			{
 				continue;
 			}
-			float& rfCell = rOutGrid[static_cast<size_t>(iGy * kiDim + iGx)];
+			float& rfCell = rOutGrid.at(static_cast<size_t>(j * kiGridDimension + i));
 			rfCell = std::max(rfCell, fSample);
 		}
 	}
 }
 
-} // anonymous namespace
-
 void XM_CALLCONV IslandTerrain::BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const
 {
-	static constexpr int64_t kiDim = kiElevationGridDim;
+	static constexpr int64_t kiGridDimension = kiElevationGridDimension;
 
 	// Sea floor everywhere first; each placement then max-blends its footprint over the top
 	// (commutative max → splat order doesn't matter, matches GlobalElevation's per-point semantics).
-	rOutGrid.assign(static_cast<size_t>(kiDim * kiDim), mfSeaFloorElevation);
+	rOutGrid.assign(static_cast<size_t>(kiGridDimension * kiGridDimension), mfSeaFloorElevation);
 
 	for (const IslandPlacement& rPlacement : rPlacements)
 	{
@@ -528,13 +488,6 @@ FrameElevationSampler XM_CALLCONV IslandTerrain::MakeFrameElevationSampler(const
 	return sampler;
 }
 
-float XM_CALLCONV IslandTerrain::FrameElevation(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const
-{
-	// Single-source-of-truth for the sim/CRC elevation lookup: FrameElevation and every batched
-	// FrameElevationSampler::Sample share one arithmetic path so they can never drift out of bit-exactness.
-	return MakeFrameElevationSampler(rStaticData).Sample(vecLocalPosition);
-}
-
 float XM_CALLCONV FrameElevationSampler::Sample(FXMVECTOR vecLocalPosition) const
 {
 	if (pGrid == nullptr)
@@ -542,38 +495,34 @@ float XM_CALLCONV FrameElevationSampler::Sample(FXMVECTOR vecLocalPosition) cons
 		return fSeaFloor;
 	}
 
-	static constexpr int64_t kiDim = kiElevationGridDim;
-	static constexpr float fCellWidth = kfCellWidth;
-	static constexpr float fCellHeight = kfCellHeight;
-	static constexpr float fCellOriginX = kfBaseAreaMinX;
-	static constexpr float fCellOriginY = kfBaseAreaMinY;
-	static constexpr float fGridPitchX = fCellWidth / static_cast<float>(kiDim);
-	static constexpr float fGridPitchY = fCellHeight / static_cast<float>(kiDim);
+	static constexpr int64_t kiGridDimension = kiElevationGridDimension;
+	static constexpr float kfGridPitchX = kfCellWidth / static_cast<float>(kiGridDimension);
+	static constexpr float kfGridPitchY = kfCellHeight / static_cast<float>(kiGridDimension);
 
 	XMFLOAT4A f4Position {};
 	XMStoreFloat4A(&f4Position, vecLocalPosition);
 
-	float fGridX = f4Position.x - fCellOriginX;
-	float fGridY = f4Position.y - fCellOriginY;
-	int64_t iGx = static_cast<int64_t>(std::floor(fGridX / fGridPitchX));
-	int64_t iGy = static_cast<int64_t>(std::floor(fGridY / fGridPitchY));
-	if (iGx < 0 || iGx >= kiDim || iGy < 0 || iGy >= kiDim)
+	float fGridX = f4Position.x - kfBaseAreaMinimumX;
+	float fGridY = f4Position.y - kfBaseAreaMinimumY;
+	int64_t iGridX = static_cast<int64_t>(std::floor(fGridX / kfGridPitchX));
+	int64_t iGridY = static_cast<int64_t>(std::floor(fGridY / kfGridPitchY));
+	if (iGridX < 0 || iGridX >= kiGridDimension || iGridY < 0 || iGridY >= kiGridDimension)
 	{
 		return fSeaFloor;
 	}
 
-	return (*pGrid)[static_cast<size_t>(iGy * kiDim + iGx)];
+	return pGrid->at(static_cast<size_t>(iGridY * kiGridDimension + iGridX));
 }
 
 XMVECTOR XM_CALLCONV IslandTerrain::FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const
 {
-	// 4-tap finite-difference over FrameElevation. Same baseline as GlobalNormal so contour-following
+	// 4-tap finite-difference over FrameElevationSampler::Sample. Same baseline as GlobalNormal so contour-following
 	// AI behaves identically — only the elevation source changes.
 	float fDistance = 2.0f;
 
 	return NormalFromElevation(vecLocalPosition, fDistance, [&](FXMVECTOR vecTap)
 	{
-		return FrameElevation(rStaticData, vecTap);
+		return MakeFrameElevationSampler(rStaticData).Sample(vecTap);
 	});
 }
 
@@ -622,11 +571,11 @@ XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(GridCoord coord, FXMVECTOR vecL
 
 SegmentHit XM_CALLCONV TracePointAgainstTerrain(const FrameStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime)
 {
-	static constexpr int64_t kiGridDimension = kiElevationGridDim;
+	static constexpr int64_t kiGridDimension = kiElevationGridDimension;
 	static constexpr float kfGridPitchX = kfCellWidth / static_cast<float>(kiGridDimension);
 	static constexpr float kfGridPitchY = kfCellHeight / static_cast<float>(kiGridDimension);
-	static constexpr float kfCellOriginX = kfBaseAreaMinX;
-	static constexpr float kfCellOriginY = kfBaseAreaMinY;
+	static constexpr float kfCellOriginX = kfBaseAreaMinimumX;
+	static constexpr float kfCellOriginY = kfBaseAreaMinimumY;
 
 	FrameElevationSampler sampler = gpIslandTerrain->MakeFrameElevationSampler(rStaticData);
 	XMFLOAT4A f4Start {};

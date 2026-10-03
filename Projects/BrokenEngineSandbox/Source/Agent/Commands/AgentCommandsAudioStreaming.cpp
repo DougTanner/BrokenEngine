@@ -12,14 +12,11 @@
 namespace game
 {
 
-namespace
-{
-
 #if defined(BT_DEBUG)
 
 constexpr uint64_t kuiAudioStreamingFixtureReadLength = 16 * 1024;
 
-const char* AudioStreamingFixturePartitionName(engine::AudioStreamingFixturePartition ePartition)
+static const char* AudioStreamingFixturePartitionName(engine::AudioStreamingFixturePartition ePartition)
 {
 	switch (ePartition)
 	{
@@ -33,7 +30,7 @@ const char* AudioStreamingFixturePartitionName(engine::AudioStreamingFixturePart
 	return "unknown";
 }
 
-const char* AudioStreamingFixturePhaseName(engine::AudioStreamingFixturePhase ePhase)
+static const char* AudioStreamingFixturePhaseName(engine::AudioStreamingFixturePhase ePhase)
 {
 	switch (ePhase)
 	{
@@ -55,7 +52,7 @@ const char* AudioStreamingFixturePhaseName(engine::AudioStreamingFixturePhase eP
 	return "unknown";
 }
 
-const char* AudioStreamingFixtureQueueStateName(engine::AudioStreamingFixtureQueueState eState)
+static const char* AudioStreamingFixtureQueueStateName(engine::AudioStreamingFixtureQueueState eState)
 {
 	switch (eState)
 	{
@@ -71,7 +68,7 @@ const char* AudioStreamingFixtureQueueStateName(engine::AudioStreamingFixtureQue
 	return "unknown";
 }
 
-const char* AudioStreamingFixtureHoldOwnerName(engine::AudioStreamingFixtureHoldOwner eOwner)
+static const char* AudioStreamingFixtureHoldOwnerName(engine::AudioStreamingFixtureHoldOwner eOwner)
 {
 	switch (eOwner)
 	{
@@ -85,7 +82,7 @@ const char* AudioStreamingFixtureHoldOwnerName(engine::AudioStreamingFixtureHold
 	return "unknown";
 }
 
-const char* AudioStreamingFixtureHoldStateName(engine::AudioStreamingFixtureHoldState eState)
+static const char* AudioStreamingFixtureHoldStateName(engine::AudioStreamingFixtureHoldState eState)
 {
 	switch (eState)
 	{
@@ -119,7 +116,7 @@ struct AudioStreamingFixtureCoexistenceState
 		{
 			if (engine::gpFileManager != nullptr)
 			{
-				engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold();
+				engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold(engine::AudioStreamingFixtureHoldOwner::kControlled);
 			}
 			if (engine::gpAudioManager != nullptr)
 			{
@@ -140,7 +137,7 @@ struct AudioStreamingFixtureStartState
 		{
 			if (engine::gpFileManager != nullptr)
 			{
-				engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold();
+				engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold(engine::AudioStreamingFixtureHoldOwner::kControlled);
 			}
 			if (engine::gpAudioManager != nullptr)
 			{
@@ -158,7 +155,7 @@ struct AudioStreamingFixtureReleaseState
 	{
 		if (engine::gpFileManager != nullptr)
 		{
-			engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold();
+			engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold(engine::AudioStreamingFixtureHoldOwner::kControlled);
 		}
 		if (engine::gpAudioManager != nullptr)
 		{
@@ -181,7 +178,7 @@ struct AudioStreamingFixtureInvalidState
 	bool bHasResult = false;
 };
 
-nlohmann::json BuildAudioStreamingFixtureVoiceSummary(const engine::AudioStreamingFixtureVoiceSummary& rSummary)
+static nlohmann::json BuildAudioStreamingFixtureVoiceSummary(const engine::AudioStreamingFixtureVoiceSummary& rSummary)
 {
 	return {
 		{"present", rSummary.flags & engine::AudioStreamingFixtureVoiceFlags::kPresent},
@@ -195,7 +192,7 @@ nlohmann::json BuildAudioStreamingFixtureVoiceSummary(const engine::AudioStreami
 	};
 }
 
-nlohmann::json BuildAudioStreamingFixtureSnapshot()
+static nlohmann::json BuildAudioStreamingFixtureSnapshot()
 {
 	engine::AudioStreamingFixtureSnapshot snapshot;
 	engine::AudioStreamingFixtureAudioSnapshot audioSnapshot;
@@ -304,7 +301,7 @@ nlohmann::json BuildAudioStreamingFixtureSnapshot()
 	return result;
 }
 
-nlohmann::json BuildAudioStreamingFixtureInvalidResult(const engine::AudioStreamingFixtureInvalidResult& rInvalid)
+static nlohmann::json BuildAudioStreamingFixtureInvalidResult(const engine::AudioStreamingFixtureInvalidResult& rInvalid)
 {
 	return {
 		{"missingCrcFailed", rInvalid.bMissingCrcFailed},
@@ -321,14 +318,14 @@ nlohmann::json BuildAudioStreamingFixtureInvalidResult(const engine::AudioStream
 	};
 }
 
-bool AudioStreamingFixtureEvidenceValid(const engine::AudioStreamingFixtureSnapshot& rSnapshot)
+static bool AudioStreamingFixtureEvidenceValid(const engine::AudioStreamingFixtureSnapshot& rSnapshot)
 {
 	return (rSnapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kCoherent)
 		 && (rSnapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kGapFree) && rSnapshot.uiMainDropped == 0
 		 && rSnapshot.uiLoader0Dropped == 0 && rSnapshot.uiLoader1Dropped == 0;
 }
 
-int64_t CountAudioStreamingFixtureRecords(const engine::AudioStreamingFixtureSnapshot& rSnapshot, engine::AudioStreamingFixturePhase ePhase, common::crc_t crc, uint64_t uiAfterSequence = 0)
+static int64_t CountAudioStreamingFixtureRecords(const engine::AudioStreamingFixtureSnapshot& rSnapshot, engine::AudioStreamingFixturePhase ePhase, common::crc_t crc, uint64_t uiAfterSequence = 0)
 {
 	int64_t iCount = 0;
 	for (int64_t i = 0; i < rSnapshot.iRecordCount; ++i)
@@ -339,7 +336,7 @@ int64_t CountAudioStreamingFixtureRecords(const engine::AudioStreamingFixtureSna
 	return iCount;
 }
 
-bool HasAudioStreamingFixtureAcknowledgement(const engine::AudioStreamingFixtureSnapshot& rSnapshot, common::crc_t crc)
+static bool HasAudioStreamingFixtureAcknowledgement(const engine::AudioStreamingFixtureSnapshot& rSnapshot, common::crc_t crc)
 {
 	for (int64_t i = 0; i < rSnapshot.iRecordCount; ++i)
 	{
@@ -368,7 +365,7 @@ struct AudioStreamingFixtureSaturationState
 		if (engine::gpFileManager != nullptr)
 		{
 			engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseSaturation();
-			engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold();
+			engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold(engine::AudioStreamingFixtureHoldOwner::kControlled);
 		}
 		if (engine::gpAudioManager != nullptr)
 		{
@@ -382,7 +379,7 @@ struct AudioStreamingFixtureSaturationState
 	float fSaturatedNewestVolume = 0.0f;
 };
 
-bool IsAudioStreamingFixtureSaturated(const engine::AudioStreamingFixtureSnapshot& rFile, const engine::AudioStreamingFixtureAudioSnapshot& rAudio)
+static bool IsAudioStreamingFixtureSaturated(const engine::AudioStreamingFixtureSnapshot& rFile, const engine::AudioStreamingFixtureAudioSnapshot& rAudio)
 {
 	if (!AudioStreamingFixtureEvidenceValid(rFile))
 	{
@@ -416,8 +413,6 @@ bool IsAudioStreamingFixtureSaturated(const engine::AudioStreamingFixtureSnapsho
 }
 
 #endif
-
-} // namespace
 
 void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
@@ -539,7 +534,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParams
 		if (action == "release_read")
 		{
 			std::shared_ptr<AudioStreamingFixtureReleaseState> pState = std::make_shared<AudioStreamingFixtureReleaseState>();
-			engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold();
+			engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold(engine::AudioStreamingFixtureHoldOwner::kControlled);
 			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
 			{
 				if (engine::gpFileManager == nullptr)
@@ -594,7 +589,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParams
 				{
 					return std::nullopt;
 				}
-				pState->flags.Clear(AudioStreamingFixtureCoexistenceFlags::kStaging);
+				pState->flags.Set(AudioStreamingFixtureCoexistenceFlags::kStaging, false);
 				engine::AudioStreamingFixtureSnapshot snapshot = engine::gpAgentCommandServer->mpAudioStreamingFixture->InspectFile();
 				if (pState->flags & AudioStreamingFixtureCoexistenceFlags::kControlled)
 				{
@@ -795,7 +790,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParams
 					{
 						return std::nullopt;
 					}
-					engine::gpAgentCommandServer->mpAudioStreamingFixture->StopPublication();
+					engine::gpAgentCommandServer->mpAudioStreamingFixture->mFlags.Set(engine::AudioStreamingFixture::Flags::kPublicationStopped);
 					if (!IsAudioStreamingFixtureSaturated(fileSnapshot, audioSnapshot))
 					{
 						return std::nullopt;
@@ -807,7 +802,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParams
 						pState->saturated = BuildAudioStreamingFixtureSnapshot();
 					}
 					engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseSaturation();
-					engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold();
+					engine::gpAgentCommandServer->mpAudioStreamingFixture->ReleaseHold(engine::AudioStreamingFixtureHoldOwner::kControlled);
 					pState->ePhase = AudioStreamingFixtureSaturationPhase::kWaitForSettled;
 					return std::nullopt;
 				case AudioStreamingFixtureSaturationPhase::kWaitForSettled:

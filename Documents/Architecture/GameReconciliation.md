@@ -141,12 +141,12 @@ sequenceDiagram
     opt kbDesyncDebugFrames enabled on client and server
         Main->>Main: Deep-copy client Frame
     end
-    Main->>Net: SendDesyncReport()
+    Main->>Net: SendDesynchronizationReport()
     Net->>Server: Desync report
 
     alt kbDesyncDebugFrames enabled on client and server
         Main->>Net: SendDebugFrameRequest()
-        Main->>Net: Set Client::mStateFlags kDesyncDebugMode
+        Main->>Net: Set Client::mStateFlags kDesynchronizationDebugMode
         Net->>Server: Debug frame request
         Note over Main: Polling and filling local slots from received state continue.<br/>ClientDesyncCore::IsStalled() gates physics,<br/>subscriptions, and reconciliation. Render and audio still run.
         alt Debug frame arrives before timeout

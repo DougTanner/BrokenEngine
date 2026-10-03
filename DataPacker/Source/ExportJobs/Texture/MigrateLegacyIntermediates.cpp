@@ -9,28 +9,27 @@
 // TextureIntermediateSuffix helper so the inverse can't drift from the forward map.
 static VkFormat IntermediateFormatFromExtension(const std::filesystem::path& rPath)
 {
-	std::string sExtension = rPath.extension().string();
-	if (sExtension == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK))
+	std::string extension = rPath.extension().string();
+	if (extension == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK))
 	{
 		return VK_FORMAT_BC4_UNORM_BLOCK;
 	}
-	if (sExtension == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK))
+	if (extension == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK))
 	{
 		return VK_FORMAT_BC5_UNORM_BLOCK;
 	}
-	if (sExtension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK))
+	if (extension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK))
 	{
 		return VK_FORMAT_BC7_UNORM_BLOCK;
 	}
-	if (sExtension == TextureIntermediateSuffix(VK_FORMAT_R16_UNORM))
+	if (extension == TextureIntermediateSuffix(VK_FORMAT_R16_UNORM))
 	{
 		return VK_FORMAT_R16_UNORM;
 	}
 	return VK_FORMAT_UNDEFINED;
 }
 
-// Decode a single mip's BCn block stream (raw, no header) to an RGBA8 byte buffer.
-// BC4 fills R only (G=B=0, A=255). BC5 fills R+G (B=0, A=255). BC7 fills RGBA verbatim.
+// Reads mip 0 from a raw BCn payload without its texture header.
 static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, int64_t iWidth, int64_t iHeight, VkFormat vkFormat)
 {
 	int64_t iBlocksX = (iWidth + 3) / 4;
@@ -42,44 +41,44 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 	{
 		for (int64_t iBlockX = 0; iBlockX < iBlocksX; ++iBlockX)
 		{
-			const std::byte* pBlock = puiEncoded + (iBlockY * iBlocksX + iBlockX) * iBlockSizeBytes;
-			uint8_t blockRgba[16 * 4] = {};
+			const std::byte* puiBlock = puiEncoded + (iBlockY * iBlocksX + iBlockX) * iBlockSizeBytes;
+			uint8_t uiBlockRgba[16 * 4] = {};
 
 			switch (vkFormat)
 			{
 				case VK_FORMAT_BC4_UNORM_BLOCK:
 				{
-					uint8_t bc4Pixels[16] = {};
-					rgbcx::unpack_bc4(pBlock, bc4Pixels, 1);
-					for (int i = 0; i < 16; ++i)
+					uint8_t uiBc4Pixels[16] = {};
+					rgbcx::unpack_bc4(puiBlock, uiBc4Pixels, 1);
+					for (int64_t i = 0; i < 16; ++i)
 					{
-						blockRgba[i * 4 + 0] = bc4Pixels[i];
-						blockRgba[i * 4 + 3] = 255;
+						uiBlockRgba[i * 4 + 0] = uiBc4Pixels[i];
+						uiBlockRgba[i * 4 + 3] = 255;
 					}
 					break;
 				}
 				case VK_FORMAT_BC5_UNORM_BLOCK:
 				{
-					uint8_t bc5Pixels[16 * 2] = {};
-					rgbcx::unpack_bc5(pBlock, bc5Pixels, 0, 1, 2);
-					for (int i = 0; i < 16; ++i)
+					uint8_t uiBc5Pixels[16 * 2] = {};
+					rgbcx::unpack_bc5(puiBlock, uiBc5Pixels, 0, 1, 2);
+					for (int64_t i = 0; i < 16; ++i)
 					{
-						blockRgba[i * 4 + 0] = bc5Pixels[i * 2 + 0];
-						blockRgba[i * 4 + 1] = bc5Pixels[i * 2 + 1];
-						blockRgba[i * 4 + 3] = 255;
+						uiBlockRgba[i * 4 + 0] = uiBc5Pixels[i * 2 + 0];
+						uiBlockRgba[i * 4 + 1] = uiBc5Pixels[i * 2 + 1];
+						uiBlockRgba[i * 4 + 3] = 255;
 					}
 					break;
 				}
 				case VK_FORMAT_BC7_UNORM_BLOCK:
 				{
 					bc7decomp::color_rgba bc7Pixels[16] = {};
-					bc7decomp::unpack_bc7(pBlock, bc7Pixels);
-					for (int i = 0; i < 16; ++i)
+					bc7decomp::unpack_bc7(puiBlock, bc7Pixels);
+					for (int64_t i = 0; i < 16; ++i)
 					{
-						blockRgba[i * 4 + 0] = bc7Pixels[i].r;
-						blockRgba[i * 4 + 1] = bc7Pixels[i].g;
-						blockRgba[i * 4 + 2] = bc7Pixels[i].b;
-						blockRgba[i * 4 + 3] = bc7Pixels[i].a;
+						uiBlockRgba[i * 4 + 0] = bc7Pixels[i].r;
+						uiBlockRgba[i * 4 + 1] = bc7Pixels[i].g;
+						uiBlockRgba[i * 4 + 2] = bc7Pixels[i].b;
+						uiBlockRgba[i * 4 + 3] = bc7Pixels[i].a;
 					}
 					break;
 				}
@@ -88,22 +87,22 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 					break;
 			}
 
-			for (int64_t by = 0; by < 4; ++by)
+			for (int64_t i = 0; i < 4; ++i)
 			{
-				for (int64_t bx = 0; bx < 4; ++bx)
+				for (int64_t j = 0; j < 4; ++j)
 				{
-					int64_t iX = iBlockX * 4 + bx;
-					int64_t iY = iBlockY * 4 + by;
+					int64_t iX = iBlockX * 4 + j;
+					int64_t iY = iBlockY * 4 + i;
 					if (iX >= iWidth || iY >= iHeight)
 					{
 						continue;
 					}
 					int64_t iDestIndex = (iY * iWidth + iX) * 4;
-					int64_t iBlockIndex = (by * 4 + bx) * 4;
-					rgba8.at(iDestIndex + 0) = blockRgba[iBlockIndex + 0];
-					rgba8.at(iDestIndex + 1) = blockRgba[iBlockIndex + 1];
-					rgba8.at(iDestIndex + 2) = blockRgba[iBlockIndex + 2];
-					rgba8.at(iDestIndex + 3) = blockRgba[iBlockIndex + 3];
+					int64_t iBlockIndex = (i * 4 + j) * 4;
+					rgba8.at(iDestIndex + 0) = uiBlockRgba[iBlockIndex + 0];
+					rgba8.at(iDestIndex + 1) = uiBlockRgba[iBlockIndex + 1];
+					rgba8.at(iDestIndex + 2) = uiBlockRgba[iBlockIndex + 2];
+					rgba8.at(iDestIndex + 3) = uiBlockRgba[iBlockIndex + 3];
 				}
 			}
 		}
@@ -112,10 +111,7 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 	return rgba8;
 }
 
-// Idempotent migration: skips files already prefixed with kiTextureIntermediateMagic.
-// For legacy raw BCn files: decodes mip 0, re-encodes with the current base codecs (Texture::Save
-// regenerates the mip chain and writes the new format with magic). For legacy raw R16 files:
-// just zlib-wraps with magic — R16 has no encoding step.
+// Magic-prefixed files are skipped. BCn migration decodes mip 0, regenerates the mip chain, and writes the current format with Texture::Save; R16 migration zlib-compresses the raw bytes and writes magic.
 static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 {
 	VkFormat vkFormat = IntermediateFormatFromExtension(rPath);
@@ -142,13 +138,13 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	{
 		return;
 	}
-	std::byte headerBytes[4 * sizeof(int64_t)] = {};
-	fileStream.read(reinterpret_cast<char*>(headerBytes), sizeof(headerBytes));
-	if (!fileStream || fileStream.gcount() != static_cast<std::streamsize>(sizeof(headerBytes)))
+	std::byte uiHeaderBytes[4 * sizeof(int64_t)] = {};
+	fileStream.read(reinterpret_cast<char*>(uiHeaderBytes), sizeof(uiHeaderBytes));
+	if (!fileStream || fileStream.gcount() != static_cast<std::streamsize>(sizeof(uiHeaderBytes)))
 	{
 		return;
 	}
-	TextureIntermediateHeader header = ReadTextureIntermediateHeader(headerBytes, static_cast<int64_t>(sizeof(headerBytes)));
+	TextureIntermediateHeader header = ReadTextureIntermediateHeader(uiHeaderBytes);
 	if (header.bHadMagic)
 	{
 		return;
@@ -225,7 +221,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	if (vkFormat == VK_FORMAT_R16_UNORM)
 	{
 		// R16 has no encoding step. Compress the raw bytes and rewrite with magic.
-		std::vector<std::byte> compressed = ZlibCompress(rawBytes.data(), iExpectedRawSize);
+		std::vector<std::byte> compressed = ZlibCompress(std::span<const std::byte>(rawBytes.data(), static_cast<size_t>(iExpectedRawSize)));
 
 		std::filesystem::remove(rPath);
 		std::fstream fileStreamOut(rPath, std::ios::out | std::ios::binary);
@@ -242,7 +238,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 		std::chrono::steady_clock::time_point tMigrateEnd = std::chrono::steady_clock::now();
 		double fMigrateSeconds = std::chrono::duration<double>(tMigrateEnd - tMigrateStart).count();
 		int64_t iSizeAfter = std::filesystem::file_size(rPath);
-		LOG(kDefault, kInfo, "Migrated R16 (zlib + magic): \"{}\" ({} -> {} bytes raw; {} -> {} bytes on-disk; {:.2f}s)", rPath.string(), iExpectedRawSize, static_cast<int64_t>(compressed.size()), iSizeBefore, iSizeAfter, fMigrateSeconds);
+		LOG(kDefault, kInfo, "Migrated R16 (zlib + magic): \"{}\" ({} -> {} bytes raw; {} -> {} bytes on-disk; {:.2f}s)", rPath.string(), iExpectedRawSize, std::ssize(compressed), iSizeBefore, iSizeAfter, fMigrateSeconds);
 		return;
 	}
 

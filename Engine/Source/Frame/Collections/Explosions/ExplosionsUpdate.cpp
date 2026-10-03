@@ -6,7 +6,7 @@ namespace engine
 
 #if defined(BT_CLIENT)
 
-// Forward declaration for shared helper (defined in Explosions.cpp)
+// Shared helper defined in Explosions.cpp.
 void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, smoke_trails_t trailId, FXMVECTOR vecPosition, float fIntensity);
 
 #endif // BT_CLIENT
@@ -16,14 +16,13 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 	ExplosionsInterpolate& rCurrent = rCurrentFrameInterpolate.explosions;
 	const ExplosionsInterpolate& rPrevious = rPreviousFrame.interpolate.explosions;
 
-	[[maybe_unused]] float fCurrentTime = rPreviousFrame.interpolate.fCurrentTime + rCurrentFrameInterpolate.fDeltaTime;
+	[[maybe_unused]] std::chrono::duration<float> currentTime(rPreviousFrame.interpolate.fCurrentTime + rCurrentFrameInterpolate.fDeltaTime);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
 		uint8_t uiTypeIndex = rPrevious.puiTypeIndices[i];
 		ExplosionFlags_t flags = rPrevious.pFlags[i];
-		float fStartTime = rPrevious.pfStartTimes[i];
+		std::chrono::duration<float> startTime(rPrevious.pfStartTimes[i]);
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 
@@ -31,10 +30,9 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 
 		int32_t iTrailCount = rPrevious.piTrailCounts[i];
 
-		// Save
 		rCurrent.puiTypeIndices[i] = uiTypeIndex;
 		rCurrent.pFlags[i] = flags;
-		rCurrent.pfStartTimes[i] = fStartTime;
+		rCurrent.pfStartTimes[i] = startTime.count();
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
 
@@ -66,33 +64,31 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 		}
 
 #if defined(BT_CLIENT)
-		// Sync trail positions with gravity
 		const ExplosionType& rType = sTypes.at(uiTypeIndex);
-		float fExplosionTime = fCurrentTime - fStartTime;
+		std::chrono::duration<float> explosionTime = currentTime - startTime;
 
-		for (int32_t j = 0; j < iTrailCount; ++j)
+		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
 			smoke_trails_t trailId = rCurrent.pTrails[j][i];
-			if (!trailId.IsValid())
+			if (!(trailId.uuid.iValue != 0))
 			{
 				continue;
 			}
 
 			// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
 			float fDurationMultiplier = (j == 0) ? sTuning.pPrimaryTrailDuration->Get() : sTuning.pSecondaryTrailDuration->Get();
-			float fEffectiveTrailTime = rCurrent.pfTrailTimes[j][i] * fDurationMultiplier;
-			float fTrailEndTime = fTimePercent * rType.fTrailDelayTime + fEffectiveTrailTime;
+			std::chrono::duration<float> effectiveTrailTime(rCurrent.pfTrailTimes[j][i] * fDurationMultiplier);
+			std::chrono::duration<float> trailEndTime = std::chrono::duration<float>(fTimePercent * rType.fTrailDelayTime) + effectiveTrailTime;
 
 			// For expired trails, sync with zero intensity (they'll be removed in Destroy phase)
-			if (fExplosionTime >= fTrailEndTime)
+			if (explosionTime.count() >= trailEndTime.count())
 			{
 				XMVECTOR vecTrailEnd = rCurrent.pVecTrailEndPositions[j][i];
 				SyncExplosionTrail(rCurrentFrameInterpolate, trailId, vecTrailEnd, 0.0f);
 				continue;
 			}
 
-			// Calculate trail position with gravity
-			float fTrailPercent = (fExplosionTime - fTimePercent * rType.fTrailDelayTime) / fEffectiveTrailTime;
+			float fTrailPercent = (explosionTime - std::chrono::duration<float>(fTimePercent * rType.fTrailDelayTime)) / effectiveTrailTime;
 			fTrailPercent = std::clamp(fTrailPercent, 0.0f, 1.0f);
 
 			XMVECTOR vecTrailStart = rCurrent.pVecTrailStartPositions[j][i];
@@ -102,7 +98,6 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 			XMVECTOR vecTrailPosition = XMVectorLerp(vecTrailStart, XMVectorSubtract(vecTrailEnd, vecGravityOffset), fTrailPercent);
 			float fTrailIntensity = (1.0f - fTrailPercent) * rCurrent.pfTrailIntensities[j][i];
 
-			// Sync trail
 			SyncExplosionTrail(rCurrentFrameInterpolate, trailId, vecTrailPosition, fTrailIntensity);
 		}
 #endif // BT_CLIENT

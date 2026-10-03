@@ -344,7 +344,7 @@ DeviceManager::~DeviceManager()
 			eVkResult = vkGetPipelineCacheData(mVkDevice, mVkPipelineCache, &uiDataSize, cacheData.data());
 			if (eVkResult == VK_SUCCESS)
 			{
-				common::crc_t uiCrc = common::Crc(cacheData.data(), static_cast<int64_t>(uiDataSize));
+				common::crc_t uiCrc = common::Crc(std::span<const uint8_t>(cacheData.data(), uiDataSize));
 				if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, "pipeline.cache", [&](std::fstream& rStream)
 				{
 					rStream.write(reinterpret_cast<const char*>(&uiCrc), static_cast<std::streamsize>(sizeof(uiCrc)));
@@ -446,7 +446,7 @@ void DeviceManager::LoadPipelineCache()
 						{
 							common::crc_t uiStoredCrc = 0;
 							std::memcpy(&uiStoredCrc, cacheData.data(), sizeof(uiStoredCrc));
-							common::crc_t uiCrc = common::Crc(cacheData.data() + sizeof(uiStoredCrc), iSize - static_cast<int64_t>(sizeof(uiStoredCrc)));
+							common::crc_t uiCrc = common::Crc(std::span<const uint8_t>(cacheData.data() + sizeof(uiStoredCrc), static_cast<size_t>(iSize) - sizeof(uiStoredCrc)));
 							if (uiCrc != uiStoredCrc)
 							{
 								LOG(kGraphics, kDebug, "Discarded pipeline cache with CRC mismatch ({} bytes)", iSize);

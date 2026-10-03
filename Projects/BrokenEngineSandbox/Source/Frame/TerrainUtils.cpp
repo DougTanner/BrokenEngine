@@ -36,7 +36,7 @@ AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::FrameStaticData& rS
 			: XMVectorSet(-fNy, fNx, 0.0f, 0.0f);
 
 		// Elevation correction: push toward preferred elevation
-		float fElevationAi = engine::gpIslandTerrain->FrameElevation(rStaticData, vecPosition);
+		float fElevationAi = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecPosition);
 		float fElevationError = fElevationAi - kfPreferredElevation;
 		XMVECTOR vecCorrection = XMVectorScale(XMVectorSet(fNx, fNy, 0.0f, 0.0f), fElevationError * kfElevationCorrectionStrength);
 
@@ -44,7 +44,7 @@ AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::FrameStaticData& rS
 
 		// Mountain look-ahead: steer faster when high terrain ahead
 		XMVECTOR vecAhead = XMVectorAdd(vecPosition, XMVectorScale(vecDirection, kfLookAheadDistance));
-		float fElevationAhead = engine::gpIslandTerrain->FrameElevation(rStaticData, vecAhead);
+		float fElevationAhead = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecAhead);
 		if (fElevationAhead > kfHighElevationThreshold)
 		{
 			fLocalSteerRate *= kfUrgentSteerMultiplier;
@@ -83,9 +83,7 @@ constexpr float kfDeltaAngleChangeAvoidTerrain = 0.995f;
 
 float XM_CALLCONV ComputeTerrainAvoidance(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDirection, float fCurrentDeltaRotation)
 {
-	// Sample terrain elevation in front and to sides. Every sample below is in this one cell's grid, so
-	// build the elevation sampler once (hoisting the per-cell origin compute + empty check out of the
-	// nested sample loop); Sample() is bit-identical to FrameElevation per sample.
+	// All samples use this cell's grid, so reuse one sampler across the nested loop.
 	engine::FrameElevationSampler sampler = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData);
 
 	XMVECTOR vecLeftDirection = XMVector3Cross(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), vecDirection);

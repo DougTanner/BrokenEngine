@@ -4,12 +4,10 @@
 
 static int64_t siNextJobId = 0;
 
-namespace
-{
 
 constexpr int64_t kiFingerprintMetadataMagic = 0x465052494E544D31;
 constexpr int64_t kiFingerprintMetadataVersion = 1;
-std::optional<std::string> ReadFingerprintMetadata(const std::filesystem::path& rPath)
+static std::optional<std::string> ReadFingerprintMetadata(const std::filesystem::path& rPath)
 {
 	std::fstream stream(rPath, std::ios::in | std::ios::binary);
 	int64_t iMagic = 0;
@@ -18,7 +16,19 @@ std::optional<std::string> ReadFingerprintMetadata(const std::filesystem::path& 
 	stream.read(reinterpret_cast<char*>(&iMagic), sizeof(iMagic));
 	stream.read(reinterpret_cast<char*>(&iVersion), sizeof(iVersion));
 	stream.read(reinterpret_cast<char*>(&iFingerprintCharacters), sizeof(iFingerprintCharacters));
-	if (!stream || iMagic != kiFingerprintMetadataMagic || iVersion != kiFingerprintMetadataVersion || iFingerprintCharacters <= 0 || iFingerprintCharacters > 1'024 * 1'024)
+	if (!stream)
+	{
+		return std::nullopt;
+	}
+	if (iMagic != kiFingerprintMetadataMagic)
+	{
+		return std::nullopt;
+	}
+	if (iVersion != kiFingerprintMetadataVersion)
+	{
+		return std::nullopt;
+	}
+	if (iFingerprintCharacters <= 0 || iFingerprintCharacters > 1'024 * 1'024)
 	{
 		return std::nullopt;
 	}
@@ -27,7 +37,7 @@ std::optional<std::string> ReadFingerprintMetadata(const std::filesystem::path& 
 	return stream ? std::optional(std::move(fingerprint)) : std::nullopt;
 }
 
-void WriteFingerprintMetadata(const std::filesystem::path& rPath, std::string_view fingerprint)
+static void WriteFingerprintMetadata(const std::filesystem::path& rPath, std::string_view fingerprint)
 {
 	std::filesystem::path temporaryPath = rPath;
 	temporaryPath += ".tmp";
@@ -46,7 +56,7 @@ void WriteFingerprintMetadata(const std::filesystem::path& rPath, std::string_vi
 // outer marker and the source fingerprint, so a same-size edit of the body would be republished into a new pack.
 // Checks identity and extent only, and returns nullptr when they hold or the reason to report. Payload bytes are
 // deliberately not covered; the runtime enforces the compressed-payload contract when the pack is loaded.
-const char* ValidateCachedChunkBody(std::span<const std::byte> body, common::crc_t crc, const std::string& rRelativeFile, bool bAllowTail)
+static const char* ValidateCachedChunkBody(std::span<const std::byte> body, common::crc_t crc, std::string_view rRelativeFile, bool bAllowTail)
 {
 	if (body.size() < static_cast<size_t>(common::kiChunkDataOffset))
 	{
@@ -62,9 +72,16 @@ const char* ValidateCachedChunkBody(std::span<const std::byte> body, common::crc
 	{
 		return "chunk header CRC mismatch";
 	}
-	// Comparing one byte past the path compares the terminator too, so this also proves the cached path is
-	// NUL-terminated where every consumer that reads pcPath as a C string expects it to end.
-	if (rRelativeFile.size() >= std::size(pHeader->pcPath) || std::memcmp(pHeader->pcPath, rRelativeFile.c_str(), rRelativeFile.size() + 1) != 0)
+	// Compare the path bytes and check the following cached byte for NUL termination.
+	if (rRelativeFile.size() >= std::size(pHeader->pcPath))
+	{
+		return "chunk header path mismatch";
+	}
+	if (std::memcmp(pHeader->pcPath, rRelativeFile.data(), rRelativeFile.size()) != 0)
+	{
+		return "chunk header path mismatch";
+	}
+	if (pHeader->pcPath[rRelativeFile.size()] != '\0')
 	{
 		return "chunk header path mismatch";
 	}
@@ -85,7 +102,6 @@ const char* ValidateCachedChunkBody(std::span<const std::byte> body, common::crc
 	return nullptr;
 }
 
-}
 
 std::optional<std::string> ExportJob::ReadMarkerFile(const std::filesystem::path& rPath)
 {
@@ -94,12 +110,11 @@ std::optional<std::string> ExportJob::ReadMarkerFile(const std::filesystem::path
 	{
 		return std::nullopt;
 	}
-	std::string fingerprint {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
+	std::string fingerprint = std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
 	return !stream.bad() ? std::optional(std::move(fingerprint)) : std::nullopt;
 }
 
-// Write-then-rename: a torn marker would otherwise read back as a fingerprint mismatch at best and a
-// truncated match at worst, adopting a half-written output set as fresh.
+// Writing to a temporary file keeps a partial fingerprint from replacing the marker.
 void ExportJob::WriteMarkerFile(const std::filesystem::path& rPath, std::string_view fingerprint)
 {
 	std::filesystem::path temporaryPath = rPath;
@@ -185,7 +200,7 @@ bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFi
 	chunkFileStream.read(reinterpret_cast<char*>(piMagicAndVersion), sizeof(piMagicAndVersion));
 	chunkFileStream.close();
 
-	if (!chunkFileStream || piMagicAndVersion[0] != kiMagic || piMagicAndVersion[1] != GetVersion())
+	if (!chunkFileStream || piMagicAndVersion[0] != kiMagic || piMagicAndVersion[1] != miVersion)
 	{
 		LOG(kDefault, kWarning, "Chunk file \"{}\" has invalid magic {:#018x} or version {}", mChunkFile.string(), piMagicAndVersion[0], piMagicAndVersion[1]);
 		mbDirty = true;
@@ -228,9 +243,9 @@ std::vector<std::byte>& ExportJob::RunExport()
 			LOG(kDefault, kWarning, "Cached chunk file \"{}\" is truncated ({} of {} bytes read); re-exporting", mChunkFile.string(), fileStream.gcount(), mHeaderAndData.size());
 			mbDirty = true;
 		}
-		else if (const char* pReason = ValidateCachedChunkBody(mHeaderAndData, mCrc, mRelativeFile, mChunkFlags & common::ChunkFlags::kScene); pReason != nullptr)
+		else if (const char* pcReason = ValidateCachedChunkBody(mHeaderAndData, mCrc, mRelativeFile, mChunkFlags & common::ChunkFlags::kScene); pcReason != nullptr)
 		{
-			LOG(kDefault, kWarning, "Cached chunk file \"{}\" failed validation ({}); re-exporting", mChunkFile.string(), pReason);
+			LOG(kDefault, kWarning, "Cached chunk file \"{}\" failed validation ({}); re-exporting", mChunkFile.string(), pcReason);
 			mbDirty = true;
 		}
 		else
@@ -271,7 +286,7 @@ std::vector<std::byte>& ExportJob::RunExport()
 	std::filesystem::remove(mCacheMetadataFile);
 
 	std::fstream fileStream(mChunkFile, std::ios::out | std::ios::binary);
-	int64_t piMagicAndVersion[2] = { kiMagic, GetVersion() };
+	int64_t piMagicAndVersion[2] = { kiMagic, miVersion };
 	fileStream.write(reinterpret_cast<char*>(piMagicAndVersion), sizeof(piMagicAndVersion));
 	fileStream.write(reinterpret_cast<char*>(mHeaderAndData.data()), mHeaderAndData.size());
 	fileStream.close();
@@ -285,5 +300,5 @@ std::vector<std::byte>& ExportJob::RunExport()
 
 std::string ExportJob::GetInputFingerprint() const
 {
-	return gpFileManager->GetFingerprint(mInputPath);
+	return gpFileManager->mpInputFingerprintCache->Get(mInputPath);
 }

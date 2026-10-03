@@ -5,29 +5,30 @@ namespace common
 
 // FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, ...) appends a trailing "\r\n" (often with a '.') and reports a
 // length that includes it; trimming keeps single-line log output clean. Also NUL-terminates at the trim point.
-static std::string_view TrimSystemMessage(char* pcBuffer, DWORD uiLength)
+static std::string_view TrimSystemMessage(std::span<char> buffer)
 {
-	while (uiLength > 0 && (pcBuffer[uiLength - 1] == '\r' || pcBuffer[uiLength - 1] == '\n' || pcBuffer[uiLength - 1] == '.' || pcBuffer[uiLength - 1] == ' '))
+	size_t uiLength = buffer.size() - 1;
+	while (uiLength > 0 && (buffer[uiLength - 1] == '\r' || buffer[uiLength - 1] == '\n' || buffer[uiLength - 1] == '.' || buffer[uiLength - 1] == ' '))
 	{
 		--uiLength;
 	}
 
-	pcBuffer[uiLength] = 0;
-	return std::string_view(pcBuffer, uiLength);
+	buffer[uiLength] = 0;
+	return std::string_view(buffer.data(), uiLength);
 }
 
 std::string LastErrorString()
 {
 	char acReturn[MAX_PATH] {};
 	DWORD uiLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), acReturn, static_cast<DWORD>(std::size(acReturn)) - 1, nullptr);
-	return std::string(TrimSystemMessage(acReturn, uiLength));
+	return std::string(TrimSystemMessage(std::span<char>(acReturn, uiLength + 1)));
 }
 
 std::string HresultToString(HRESULT hresult)
 {
 	char acReturn[MAX_PATH] {};
 	DWORD uiLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, static_cast<DWORD>(hresult), 0, acReturn, static_cast<DWORD>(std::size(acReturn) - 1), nullptr);
-	return std::string(TrimSystemMessage(acReturn, uiLength));
+	return std::string(TrimSystemMessage(std::span<char>(acReturn, uiLength + 1)));
 }
 
 int64_t LogicalCoreCount()
@@ -52,8 +53,8 @@ int64_t HardwareCoreCount()
 		return LogicalCoreCount();
 	}
 
-	LPFN_GLPI glpi = reinterpret_cast<LPFN_GLPI>(GetProcAddress(hmodule, "GetLogicalProcessorInformation"));
-	if (glpi == nullptr)
+	LPFN_GLPI pGetLogicalProcessorInformation = reinterpret_cast<LPFN_GLPI>(GetProcAddress(hmodule, "GetLogicalProcessorInformation"));
+	if (pGetLogicalProcessorInformation == nullptr)
 	{
 		LOG(kDefault, kWarning, "GetProcAddress(hmodule, \"GetLogicalProcessorInformation\") returned nullptr");
 		return LogicalCoreCount();
@@ -65,7 +66,7 @@ int64_t HardwareCoreCount()
 	BOOL bDone = FALSE;
 	while (bDone == FALSE)
 	{
-		BOOL bSuccess = glpi(buffer.data(), &uiReturnLength);
+		BOOL bSuccess = pGetLogicalProcessorInformation(buffer.data(), &uiReturnLength);
 
 		if (bSuccess == FALSE)
 		{
@@ -110,27 +111,27 @@ std::tuple<std::string, std::string> FileTimeString(const std::filesystem::file_
 	// other is UB that only works by MSVC-STL coincidence. Convert through system_clock (leap-second-naive, like
 	// FileTimeToSystemTime) and rebuild the FILETIME from its 100ns tick count since the 1601 epoch.
 	std::chrono::system_clock::time_point systemClockTime = std::chrono::clock_cast<std::chrono::system_clock>(rFileTime);
-	uint64_t uiHundredNsSince1601 = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>>(systemClockTime.time_since_epoch()).count() + 116'444'736'000'000'000);
-	const FILETIME filetime
+	uint64_t uiHundredNanosecondsSince1601 = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>>(systemClockTime.time_since_epoch()).count() + 116'444'736'000'000'000);
+	FILETIME fileTime
 	{
-		.dwLowDateTime = static_cast<DWORD>(uiHundredNsSince1601 & 0xFFFFFFFF),
-		.dwHighDateTime = static_cast<DWORD>(uiHundredNsSince1601 >> 32),
+		.dwLowDateTime = static_cast<DWORD>(uiHundredNanosecondsSince1601 & 0xFFFFFFFF),
+		.dwHighDateTime = static_cast<DWORD>(uiHundredNanosecondsSince1601 >> 32),
 	};
-	SYSTEMTIME systemtime {};
-	VERIFY_SUCCESS(FileTimeToSystemTime(&filetime, &systemtime));
-	SYSTEMTIME localSystemtime {};
-	VERIFY_SUCCESS(SystemTimeToTzSpecificLocalTime(nullptr, &systemtime, &localSystemtime));
+	SYSTEMTIME systemTime {};
+	VERIFY_SUCCESS(FileTimeToSystemTime(&fileTime, &systemTime));
+	SYSTEMTIME localSystemTime {};
+	VERIFY_SUCCESS(SystemTimeToTzSpecificLocalTime(nullptr, &systemTime, &localSystemTime));
 
-	// OS trust boundary: format failures degrade to empty display strings instead of crashing
+	// Format failures leave the display strings empty.
 	char pcDate[MAX_PATH] {};
-	int iWritten = GetDateFormat(LOCALE_USER_DEFAULT, 0, &localSystemtime, "yyyy-MM-dd", pcDate, static_cast<DWORD>(std::size(pcDate) - 1));
+	int iWritten = GetDateFormat(LOCALE_USER_DEFAULT, 0, &localSystemTime, "yyyy-MM-dd", pcDate, static_cast<DWORD>(std::size(pcDate) - 1));
 	if (iWritten == 0)
 	{
 		LOG(kDefault, kWarning, "GetDateFormat failed: {}", GetLastError());
 	}
 
 	char pcTime[MAX_PATH] {};
-	iWritten = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &localSystemtime, "h:mm tt", pcTime, static_cast<DWORD>(std::size(pcTime) - 1));
+	iWritten = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &localSystemTime, "h:mm tt", pcTime, static_cast<DWORD>(std::size(pcTime) - 1));
 	if (iWritten == 0)
 	{
 		LOG(kDefault, kWarning, "GetTimeFormat failed: {}", GetLastError());
@@ -152,31 +153,31 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 		.bInheritHandle = TRUE,
 	};
 
-	HANDLE hStdInPipeRead = nullptr;
-	HANDLE hStdInPipeWrite = nullptr;
-	if (!CreatePipe(&hStdInPipeRead, &hStdInPipeWrite, &securityAttributes, 0))
+	HANDLE hStandardInputPipeRead = nullptr;
+	HANDLE hStandardInputPipeWrite = nullptr;
+	if (!CreatePipe(&hStandardInputPipeRead, &hStandardInputPipeWrite, &securityAttributes, 0))
 	{
 		return std::nullopt;
 	}
-	ScopedHandle pStdInPipeRead(hStdInPipeRead, &CloseHandle);
-	ScopedHandle pStdInPipeWrite(hStdInPipeWrite, &CloseHandle);
+	ScopedHandle pStandardInputPipeRead(hStandardInputPipeRead, &CloseHandle);
+	ScopedHandle pStandardInputPipeWrite(hStandardInputPipeWrite, &CloseHandle);
 
-	HANDLE hStdOutPipeRead = nullptr;
-	HANDLE hStdOutPipeWrite = nullptr;
-	if (!CreatePipe(&hStdOutPipeRead, &hStdOutPipeWrite, &securityAttributes, 0))
+	HANDLE hStandardOutputPipeRead = nullptr;
+	HANDLE hStandardOutputPipeWrite = nullptr;
+	if (!CreatePipe(&hStandardOutputPipeRead, &hStandardOutputPipeWrite, &securityAttributes, 0))
 	{
 		return std::nullopt;
 	}
-	ScopedHandle pStdOutPipeRead(hStdOutPipeRead, &CloseHandle);
-	ScopedHandle pStdOutPipeWrite(hStdOutPipeWrite, &CloseHandle);
+	ScopedHandle pStandardOutputPipeRead(hStandardOutputPipeRead, &CloseHandle);
+	ScopedHandle pStandardOutputPipeWrite(hStandardOutputPipeWrite, &CloseHandle);
 
 	// Strip inheritance from parent-side pipe ends; the attribute list below only applies to the child-side two.
-	if (!SetHandleInformation(hStdInPipeWrite, HANDLE_FLAG_INHERIT, 0))
+	if (!SetHandleInformation(hStandardInputPipeWrite, HANDLE_FLAG_INHERIT, 0))
 	{
 		return std::nullopt;
 	}
 
-	if (!SetHandleInformation(hStdOutPipeRead, HANDLE_FLAG_INHERIT, 0))
+	if (!SetHandleInformation(hStandardOutputPipeRead, HANDLE_FLAG_INHERIT, 0))
 	{
 		return std::nullopt;
 	}
@@ -199,22 +200,22 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	{
 		DeleteProcThreadAttributeList(pAttributeList);
 	});
-	HANDLE inheritHandles[] = { hStdInPipeRead, hStdOutPipeWrite };
-	if (!UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, inheritHandles, sizeof(inheritHandles), nullptr, nullptr))
+	HANDLE ahHandlesToInherit[] = { hStandardInputPipeRead, hStandardOutputPipeWrite };
+	if (!UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, ahHandlesToInherit, sizeof(ahHandlesToInherit), nullptr, nullptr))
 	{
 		return std::nullopt;
 	}
 
-	STARTUPINFOEXW startupinfoex {};
-	startupinfoex.StartupInfo.cb = sizeof(STARTUPINFOEXW);
-	startupinfoex.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
-	startupinfoex.StartupInfo.hStdInput = hStdInPipeRead;
-	startupinfoex.StartupInfo.hStdOutput = hStdOutPipeWrite;
-	startupinfoex.StartupInfo.hStdError = hStdOutPipeWrite;
-	startupinfoex.lpAttributeList = pAttributeList;
+	STARTUPINFOEXW extendedStartupInfo {};
+	extendedStartupInfo.StartupInfo.cb = sizeof(STARTUPINFOEXW);
+	extendedStartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+	extendedStartupInfo.StartupInfo.hStdInput = hStandardInputPipeRead;
+	extendedStartupInfo.StartupInfo.hStdOutput = hStandardOutputPipeWrite;
+	extendedStartupInfo.StartupInfo.hStdError = hStandardOutputPipeWrite;
+	extendedStartupInfo.lpAttributeList = pAttributeList;
 
 	PROCESS_INFORMATION processInformation {};
-	if (!CreateProcessW(rExecutableFile.native().c_str(), rCommandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, nullptr, nullptr, &startupinfoex.StartupInfo, &processInformation))
+	if (!CreateProcessW(rExecutableFile.native().c_str(), rCommandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, nullptr, nullptr, &extendedStartupInfo.StartupInfo, &processInformation))
 	{
 		return std::nullopt;
 	}
@@ -223,13 +224,13 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 
 	// Close the parent's child-side pipe ends now (before the read loop, not at scope exit) so ReadFile sees
 	// EOF once the child exits; the child holds its own inherited duplicates.
-	pStdOutPipeWrite.reset();
-	pStdInPipeRead.reset();
+	pStandardOutputPipeWrite.reset();
+	pStandardInputPipeRead.reset();
 
 	std::string output;
 	char pcPipeOutput[1'024] {};
 	DWORD uiBytesRead = 0;
-	while (ReadFile(hStdOutPipeRead, pcPipeOutput, static_cast<DWORD>(sizeof(pcPipeOutput) - 1), &uiBytesRead, nullptr) == TRUE)
+	while (ReadFile(hStandardOutputPipeRead, pcPipeOutput, static_cast<DWORD>(sizeof(pcPipeOutput) - 1), &uiBytesRead, nullptr) == TRUE)
 	{
 		pcPipeOutput[uiBytesRead] = 0;
 		output.append(pcPipeOutput, &pcPipeOutput[uiBytesRead]);
@@ -248,13 +249,13 @@ ExecutableResult RunExecutableInNewConsole(const std::filesystem::path& rExecuta
 	// for tools like Gaea.Swarm.exe that throw IOException("The handle is invalid") when their
 	// console is a pipe or file. SW_HIDE keeps the new window off-screen so the bake doesn't
 	// flash UI during a build.
-	STARTUPINFOW startupinfow {};
-	startupinfow.cb = sizeof(STARTUPINFOW);
-	startupinfow.dwFlags = STARTF_USESHOWWINDOW;
-	startupinfow.wShowWindow = SW_HIDE;
+	STARTUPINFOW wideStartupInfo {};
+	wideStartupInfo.cb = sizeof(STARTUPINFOW);
+	wideStartupInfo.dwFlags = STARTF_USESHOWWINDOW;
+	wideStartupInfo.wShowWindow = SW_HIDE;
 
 	PROCESS_INFORMATION processInformation {};
-	VERIFY_SUCCESS(CreateProcessW(rExecutableFile.native().c_str(), rCommandLine.data(), nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, nullptr, &startupinfow, &processInformation));
+	VERIFY_SUCCESS(CreateProcessW(rExecutableFile.native().c_str(), rCommandLine.data(), nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, nullptr, &wideStartupInfo, &processInformation));
 
 	WaitForSingleObject(processInformation.hProcess, INFINITE);
 

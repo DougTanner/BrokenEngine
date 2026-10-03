@@ -20,13 +20,13 @@ LogGlobalBuffer gLogGlobalBuffer;
 LogAgentBuffer gLogAgentBuffer;
 
 #if defined(BT_DATA_PACKER)
-constexpr LogLevel keLogRuntimeDefault = kVerbose; // Offline tool: no agent / set_log_level, keep full verbosity (unchanged behavior)
+constexpr LogLevel keLogRuntimeDefault = kVerbose; // Offline tool: no agent / set_log_level, keep full verbosity
 #else
 constexpr LogLevel keLogRuntimeDefault = kInfo; // Documented out-of-box threshold; the agent lowers it live via set_log_level
 #endif
 std::atomic<LogLevel> gLogRuntimeLevels[kiLogCategoryCount]
 {
-	keLogRuntimeDefault, kVerbose, // [1] kTemp: transient agent/dev diagnostics — always emit (compile floor keLogLevelTemp = kVerbose)
+	keLogRuntimeDefault, kVerbose, // [1] kTemp: transient agent/dev diagnostics — always emit (compile floor keLogLevelTemporary = kVerbose)
 	keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault,
 	keLogRuntimeDefault, // [8] kReplay: compiled in at kVerbose but silent by default — the agent lowers this category alone to scrape per-tick checksums
 };
@@ -92,7 +92,7 @@ char* LogPrefix(char* pLogBuffer, char* pEnd)
 {
 	char* pWrite = pLogBuffer;
 
-	auto put = [&pWrite, pEnd](char c)
+	auto Put = [&pWrite, pEnd](char c)
 	{
 		if (pWrite < pEnd)
 		{
@@ -105,8 +105,8 @@ char* LogPrefix(char* pLogBuffer, char* pEnd)
 		int64_t iLogIndent = gpThreadLocal->miLogIndent;
 		for (int64_t i = 0; i < iLogIndent; ++i)
 		{
-			put(' ');
-			put(' ');
+			Put(' ');
+			Put(' ');
 		}
 
 		if (gpThreadLocal->miThreadId.has_value())
@@ -114,30 +114,30 @@ char* LogPrefix(char* pLogBuffer, char* pEnd)
 			std::to_chars_result threadIdResult = std::to_chars(pWrite, pEnd, gpThreadLocal->miThreadId.value());
 			pWrite = threadIdResult.ptr;
 
-			put(':');
-			put(' ');
+			Put(':');
+			Put(' ');
 		}
 
 		if (gpThreadLocal->miLogTickCounter >= 0)
 		{
-			put('[');
-			put('T');
-			put('i');
-			put('c');
-			put('k');
-			put(':');
-			put(' ');
+			Put('[');
+			Put('T');
+			Put('i');
+			Put('c');
+			Put('k');
+			Put(':');
+			Put(' ');
 			std::to_chars_result toCharsResult = std::to_chars(pWrite, pEnd, gpThreadLocal->miLogTickCounter);
 			pWrite = toCharsResult.ptr;
-			put(']');
-			put(' ');
+			Put(']');
+			Put(' ');
 		}
 	}
 	else
 	{
-		put('#');
-		put(':');
-		put(' ');
+		Put('#');
+		Put(':');
+		Put(' ');
 	}
 
 	return pWrite;
@@ -178,7 +178,7 @@ void LogWrite(char* pLogBuffer)
 
 void LogWriteRingBuffers(std::string_view logBuffer, LogCategory eCategory)
 {
-	auto copyToLine = [logBuffer](char* pLine)
+	auto CopyToLine = [logBuffer](char* pLine)
 	{
 		if (pLine == nullptr)
 		{
@@ -187,9 +187,9 @@ void LogWriteRingBuffers(std::string_view logBuffer, LogCategory eCategory)
 		std::memcpy(pLine, logBuffer.data(), logBuffer.size());
 	};
 
-	copyToLine(gLogRingBuffers[static_cast<int64_t>(eCategory)].AcquireLine());
-	copyToLine(gLogGlobalBuffer.AcquireLine());
-	copyToLine(gLogAgentBuffer.AcquireLine());
+	CopyToLine(gLogRingBuffers[static_cast<int64_t>(eCategory)].AcquireLine());
+	CopyToLine(gLogGlobalBuffer.AcquireLine());
+	CopyToLine(gLogAgentBuffer.AcquireLine());
 }
 
 void LogDumpBuffers(CrashFileWriter& rWriter)

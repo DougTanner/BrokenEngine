@@ -17,11 +17,11 @@ void ClientDesyncCore::OnDesyncDetected(ReconcileDesyncInfo&& rDesyncInfo)
 	// Heap: Network sends for desync reporting
 	ScopedSuppressAllocationTracking suppress;
 
-	game::gpClientSession->mpRuntime->mpClient->SendDesyncReport(rDesyncInfo.iDesyncTick, rDesyncInfo.desyncCoord, rDesyncInfo.desyncExpectedCrc, rDesyncInfo.desyncActualCrc);
+	game::gpClientSession->mpRuntime->mpClient->SendDesynchronizationReport(rDesyncInfo.iDesyncTick, rDesyncInfo.desyncCoord, rDesyncInfo.desyncExpectedCrc, rDesyncInfo.desyncActualCrc);
 	if constexpr (kbDesyncDebugFrames)
 	{
 		game::gpClientSession->mpRuntime->mpClient->SendDebugFrameRequest(rDesyncInfo.iDesyncTick, rDesyncInfo.desyncCoord);
-		game::gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesyncDebugMode);
+		game::gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesynchronizationDebugMode);
 
 		mDesyncDebugState.iTick = rDesyncInfo.iDesyncTick;
 		mDesyncDebugState.coord = rDesyncInfo.desyncCoord;
@@ -42,38 +42,40 @@ void ClientDesyncCore::OnDesyncDetected(ReconcileDesyncInfo&& rDesyncInfo)
 void ClientDesyncCore::PollDebugFrameResponse()
 {
 	std::unique_ptr<engine::ReceivedDebugFrame> pDebugFrame = std::move(game::gpClientSession->mpRuntime->mpClient->mpReceivedDebugFrame);
-	if (pDebugFrame != nullptr && mDesyncDebugState.pClientFrame != nullptr)
+	if (pDebugFrame == nullptr || mDesyncDebugState.pClientFrame == nullptr)
 	{
-		if (pDebugFrame->iTick != mDesyncDebugState.iTick)
+		return;
+	}
+
+	if (pDebugFrame->iTick != mDesyncDebugState.iTick)
+	{
+		LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coordinate.iX, pDebugFrame->coordinate.iY, mDesyncDebugState.iTick, mDesyncDebugState.coord.iX, mDesyncDebugState.coord.iY);
+		return;
+	}
+
+	if (pDebugFrame->coordinate != mDesyncDebugState.coord)
+	{
+		LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coordinate.iX, pDebugFrame->coordinate.iY, mDesyncDebugState.iTick, mDesyncDebugState.coord.iX, mDesyncDebugState.coord.iY);
+		return;
+	}
+
+	LOG(kNetwork, kError, "ClientDesyncCore::PollDebugFrameResponse Frame: {} Coord: ({},{}) matched, dumping diff", mDesyncDebugState.iTick, mDesyncDebugState.coord.iX, mDesyncDebugState.coord.iY);
+	game::gpClientSession->LogDesyncFrameDifferences(*mDesyncDebugState.pClientFrame, *pDebugFrame->pFrame);
+	mDesyncDebugState = {};
+
+	if constexpr (kbDesyncRecovery)
+	{
+		if constexpr (kbDebugBreak)
 		{
-			LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coord.x, pDebugFrame->coord.y, mDesyncDebugState.iTick, mDesyncDebugState.coord.x, mDesyncDebugState.coord.y);
-			return;
+			DEBUG_BREAK();
 		}
 
-		if (pDebugFrame->coord != mDesyncDebugState.coord)
-		{
-			LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coord.x, pDebugFrame->coord.y, mDesyncDebugState.iTick, mDesyncDebugState.coord.x, mDesyncDebugState.coord.y);
-			return;
-		}
-
-		LOG(kNetwork, kError, "ClientDesyncCore::PollDebugFrameResponse Frame: {} Coord: ({},{}) matched, dumping diff", mDesyncDebugState.iTick, mDesyncDebugState.coord.x, mDesyncDebugState.coord.y);
-		game::gpClientSession->LogDesyncFrameDifferences(*mDesyncDebugState.pClientFrame, *pDebugFrame->pFrame);
-		mDesyncDebugState = {};
-
-		if constexpr (kbDesyncRecovery)
-		{
-			if constexpr (kbDebugBreak)
-			{
-				DEBUG_BREAK();
-			}
-
-			RecoverFromDesync();
-		}
-		else
-		{
-			std::snprintf(game::gpGame->mModalMessage, sizeof(game::gpGame->mModalMessage), "Desynced from server");
-			game::gpClientSession->mpRuntime->mpClient->Disconnect();
-		}
+		RecoverFromDesync();
+	}
+	else
+	{
+		std::snprintf(game::gpGame->mModalMessage, sizeof(game::gpGame->mModalMessage), "Desynced from server");
+		game::gpClientSession->mpRuntime->mpClient->Disconnect();
 	}
 }
 
@@ -124,8 +126,8 @@ void ClientDesyncCore::RecoverFromDesync()
 		return;
 	}
 
-	game::gpClientSession->mpRuntime->mpClient->SendResyncRequest();
-	game::gpClientSession->mpRuntime->mpClient->mStateFlags.Clear(engine::Client::ClientStateFlags::kDesyncDebugMode);
+	game::gpClientSession->mpRuntime->mpClient->SendResynchronizationRequest();
+	game::gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesynchronizationDebugMode, false);
 	game::gpClientSession->ResetCoordStatesForResync();
 }
 
@@ -137,7 +139,7 @@ void ClientDesyncCore::Reset()
 	}
 	if (engine::gpClient != nullptr)
 	{
-		game::gpClientSession->mpRuntime->mpClient->mStateFlags.Clear(engine::Client::ClientStateFlags::kDesyncDebugMode);
+		game::gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesynchronizationDebugMode, false);
 	}
 	mDesyncDebugState = {};
 	miDesyncCount = 0;

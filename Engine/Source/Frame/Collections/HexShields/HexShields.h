@@ -20,30 +20,25 @@ struct HexShieldsType
 struct HexShieldsInterpolate : public Collection<HexShieldsInterpolate, CollectionFlags::kIdToIndex>,
 	public TypeRegistry<HexShieldsType>
 {
-	static constexpr const char* kName = "HexShields";
-	static constexpr common::crc_t kCrc = common::CrcConsteval("HexShields");
+	static constexpr const char* kpcName = "HexShields";
+	static constexpr common::crc_t kuiCrc = common::CrcConsteval("HexShields");
 
-	// Allocate and copy
-	static void AllocateAndCopy(HexShieldsInterpolate& rCurrent, const HexShieldsInterpolate& rPrevious);
-
-	// Update
 	static void Update(game::FrameInterpolate& __restrict rFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
-	// Sync data (owner-provided values written every frame)
+	// Owner-provided values consumed by Sync.
 	struct SyncData
 	{
-		XMVECTOR vecPosition;
+		XMVECTOR vecPosition {};
 		XMFLOAT4 pf4Transforms[3];
 		XMFLOAT4 pf4TransformNormals[3];
 		XMFLOAT4 pf4Directions[shaders::kiHexShieldDirections];
-		float pfVertIntensities[shaders::kiHexShieldDirections];
-		float pfFragIntensities[shaders::kiHexShieldDirections];
+		float pfVertexIntensities[shaders::kiHexShieldDirections] {};
+		float pfFragmentIntensities[shaders::kiHexShieldDirections] {};
 		float fLightingIntensity = 0.0f;
 		float fSize = 0.0f;
 		float fColorMix = 0.0f;
 	};
 
-	// Sync
 	static void Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData);
 
 	// SOA arrays (decomposed from HexShieldLayout)
@@ -52,26 +47,24 @@ struct HexShieldsInterpolate : public Collection<HexShieldsInterpolate, Collecti
 	XMFLOAT4* pf4TransformNormals[3] = {nullptr, nullptr, nullptr};
 	uint8_t* __restrict puiTypeIndices = nullptr;
 	XMFLOAT4* pf4Directions[shaders::kiHexShieldDirections] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
-	float* pfVertIntensities[shaders::kiHexShieldDirections] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
-	float* pfFragIntensities[shaders::kiHexShieldDirections] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+	float* pfVertexIntensities[shaders::kiHexShieldDirections] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+	float* pfFragmentIntensities[shaders::kiHexShieldDirections] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 	float* __restrict pfLightingIntensities = nullptr;
 	float* __restrict pfSizes = nullptr;
 	float* __restrict pfColorMixes = nullptr;
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pf4Transforms, rSelf.pf4TransformNormals, rSelf.puiTypeIndices, rSelf.pf4Directions, rSelf.pfVertIntensities, rSelf.pfFragIntensities, rSelf.pfLightingIntensities, rSelf.pfSizes, rSelf.pfColorMixes);
+		return std::tie(rSelf.pVecPositions, rSelf.pf4Transforms, rSelf.pf4TransformNormals, rSelf.puiTypeIndices, rSelf.pf4Directions, rSelf.pfVertexIntensities, rSelf.pfFragmentIntensities, rSelf.pfLightingIntensities, rSelf.pfSizes, rSelf.pfColorMixes);
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
 		return std::tie(rSelf.pVecPositions, rSelf.puiTypeIndices, rSelf.pfLightingIntensities, rSelf.pfSizes, rSelf.pfColorMixes);
 	}
 
-	// Graphics resources
 	static void GraphicsResources();
 
-	// Render
-	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords);
+	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates);
 	static void Render(const game::FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 };
@@ -79,18 +72,16 @@ using hex_shields_t = HexShieldsInterpolate::id_t;
 
 struct HexShieldsPostRender : public Collection<HexShieldsPostRender>
 {
-	// Allocate and copy
-	static void AllocateAndCopy(HexShieldsPostRender& rCurrent, const HexShieldsPostRender& rPrevious);
+	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
-	// Update
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
-
-	// Add/Remove
 	static void Add(game::Frame& __restrict rFrame, hex_shields_t& rId, uint8_t uiTypeIndex);
 	static void Remove(game::Frame& __restrict rFrame, hex_shields_t& rId);
 
-	hex_shields_t* __restrict puiIds = nullptr;
-	auto Members(this auto&& rSelf) { return std::tie(rSelf.puiIds); }
+	hex_shields_t* __restrict pIds = nullptr;
+	auto Members(this auto&& rSelf)
+	{
+		return std::tie(rSelf.pIds);
+	}
 
 };
 

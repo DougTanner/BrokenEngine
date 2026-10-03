@@ -334,7 +334,7 @@ bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::file
 	// OpenFile is called on the .tmp filename, which doesn't exist yet, so kBackup must be stripped to avoid a no-op second backup.
 	// kStreaming is added because WriteFileAtomically is the only legitimate kWrite-without-kStreaming caller.
 	FileFlags_t openFlags = rFlags;
-	openFlags.Clear(FileFlags::kBackup);
+	openFlags.Set(FileFlags::kBackup, false);
 	openFlags.Set(FileFlags::kStreaming);
 
 	std::filesystem::path tmpFilename = rFilename;

@@ -114,16 +114,16 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, float f
 	// Phase must follow the camera across a cell change, so the reductions below run on the absolute camera position,
 	// reconstructed as a double from the camera cell and the camera's local position. This is client-only CPU work:
 	// fWaterOriginX/Y above stays in the rebased frame the shaders add it back to.
-	double dCameraX = static_cast<double>(engine::gpCamera->mBasisCoord.x) * static_cast<double>(kfCellWidth) + static_cast<double>(f4CameraPos.x);
-	double dCameraY = static_cast<double>(engine::gpCamera->mBasisCoord.y) * static_cast<double>(kfCellHeight) + static_cast<double>(f4CameraPos.y);
+	double fCameraX = static_cast<double>(engine::gpCamera->mBasisCoord.iX) * static_cast<double>(kfCellWidth) + static_cast<double>(f4CameraPos.x);
+	double fCameraY = static_cast<double>(engine::gpCamera->mBasisCoord.iY) * static_cast<double>(kfCellHeight) + static_cast<double>(f4CameraPos.y);
 
 	// Rotate cameraXY by R(-theta) before fmod on the CPU: rotation is already encoded when shader fract() absorbs the integral sizeMult*10
 	// wrap. Rotating an already-reduced origin gives nonintegral wrap shifts except at multiples of pi/2, causing normal-pattern jumps at each
 	// wrap. Reuse dCos*/dSin* for pattern rotation; reduced-time accumulation separately uses dScrollCos*/dScrollSin* for gamma=phi-theta.
 	auto RotatedCamera = [&](double dCos, double dSin, double& rdOutX, double& rdOutY)
 	{
-		rdOutX = dCos * dCameraX + dSin * dCameraY;
-		rdOutY = -dSin * dCameraX + dCos * dCameraY;
+		rdOutX = dCos * fCameraX + dSin * fCameraY;
+		rdOutY = -dSin * fCameraX + dCos * fCameraY;
 	};
 	double dRotCameraXOne = 0.0;
 	double dRotCameraYOne = 0.0;
@@ -152,7 +152,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, float f
 	// fract(). Non-tenths slider values break this property and expose a seam. fWaterReducedNormalOrigin uses the same constraint with fixed
 	// per-octave multipliers.
 	double dNoiseFreq = static_cast<double>(gWaterColorNoiseFrequency.Get());
-	XMFLOAT2 f2ReducedNoiseOrigin {static_cast<float>(std::fmod(dNoiseFreq * dCameraX, 10.0)), static_cast<float>(std::fmod(dNoiseFreq * dCameraY, 10.0))};
+	XMFLOAT2 f2ReducedNoiseOrigin {static_cast<float>(std::fmod(dNoiseFreq * fCameraX, 10.0)), static_cast<float>(std::fmod(dNoiseFreq * fCameraY, 10.0))};
 	rGlobalLayout.fWaterReducedNoiseOriginX = f2ReducedNoiseOrigin.x;
 	rGlobalLayout.fWaterReducedNoiseOriginY = f2ReducedNoiseOrigin.y;
 	gPresentationContinuity.f2ReducedNoiseOrigin = f2ReducedNoiseOrigin;

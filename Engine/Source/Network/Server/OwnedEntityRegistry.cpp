@@ -9,14 +9,14 @@
 namespace engine
 {
 
-void OwnedEntityRegistry::Add(int64_t iClientId, global_id_t globalId, GridCoord coord)
+void OwnedEntityRegistry::Add(int64_t iClientId, GlobalId globalId, GridCoord coord)
 {
 	mOwned.try_emplace(iClientId).first->second.push_back({.globalId = globalId, .coord = coord});
 
 	ClientConnection* pClient = gpServer->FindClient(iClientId);
 	if (pClient != nullptr)
 	{
-		pClient->authorizedCoords.push_back(coord);
+		pClient->authorizedCoordinates.push_back(coord);
 	}
 }
 
@@ -33,11 +33,11 @@ void OwnedEntityRegistry::RemoveAt(int64_t iClientId, int64_t iIndex)
 	ClientConnection* pClient = gpServer->FindClient(iClientId);
 	if (pClient != nullptr)
 	{
-		pClient->authorizedCoords.erase(pClient->authorizedCoords.begin() + iIndex);
+		pClient->authorizedCoordinates.erase(pClient->authorizedCoordinates.begin() + iIndex);
 	}
 }
 
-void OwnedEntityRegistry::UpdateCoord(int64_t iClientId, global_id_t globalId, GridCoord newCoord)
+void OwnedEntityRegistry::UpdateCoord(int64_t iClientId, GlobalId globalId, GridCoord newCoord)
 {
 	auto it = mOwned.find(iClientId);
 	if (it == mOwned.end())
@@ -57,25 +57,10 @@ void OwnedEntityRegistry::UpdateCoord(int64_t iClientId, global_id_t globalId, G
 		ClientConnection* pClient = gpServer->FindClient(iClientId);
 		if (pClient != nullptr)
 		{
-			pClient->authorizedCoords.at(i) = newCoord;
+			pClient->authorizedCoordinates.at(i) = newCoord;
 		}
 		return;
 	}
-}
-
-std::span<const OwnedEntity> OwnedEntityRegistry::Owned(int64_t iClientId) const
-{
-	auto it = mOwned.find(iClientId);
-	if (it == mOwned.end())
-	{
-		return {};
-	}
-	return it->second;
-}
-
-void OwnedEntityRegistry::Remove(int64_t iClientId)
-{
-	mOwned.erase(iClientId);
 }
 
 void OwnedEntityRegistry::Clear(int64_t iClientId)
@@ -85,7 +70,7 @@ void OwnedEntityRegistry::Clear(int64_t iClientId)
 	ClientConnection* pClient = gpServer->FindClient(iClientId);
 	if (pClient != nullptr)
 	{
-		pClient->authorizedCoords.clear();
+		pClient->authorizedCoordinates.clear();
 	}
 }
 
@@ -96,7 +81,7 @@ void OwnedEntityRegistry::Reserve(int64_t iClientId, int64_t iCount)
 	ClientConnection* pClient = gpServer->FindClient(iClientId);
 	if (pClient != nullptr)
 	{
-		pClient->authorizedCoords.reserve(static_cast<size_t>(iCount));
+		pClient->authorizedCoordinates.reserve(static_cast<size_t>(iCount));
 	}
 }
 

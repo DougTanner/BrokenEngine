@@ -284,8 +284,8 @@ struct HexShieldLayout
 	vec4 f4Color INIT;
 	vec4 f4LightingColor INIT;
 	vec4 pf4Directions[kiHexShieldDirections] INIT;
-	float pfVertIntensities[kiHexShieldDirections] INIT;
-	float pfFragIntensities[kiHexShieldDirections] INIT;
+	float pfVertexIntensities[kiHexShieldDirections] INIT;
+	float pfFragmentIntensities[kiHexShieldDirections] INIT;
 
 	float fLightingIntensity INIT;
 	float fSize INIT;

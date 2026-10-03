@@ -35,91 +35,86 @@ enum class IslandMeshResidency : uint8_t
 // every template server-side so multi-template cells get correct nav data.
 struct IslandTemplate
 {
-	common::crc_t mIslandCrc = 0;
+	common::crc_t islandCrc = 0;
 
 	// Heightmap samples use engine meters relative to beach: zero is sea level, negative is submerged,
 	// positive is above. At export DataPacker shifts Gaea's normalized output by Sea.Level *
 	// elevationMeters (Level fallback 0.1), giving sea-floor depth -(Level * elevationMeters) without
 	// runtime conversion. The anisotropic land bounds above 1 m expand to multiples of 4 *
-	// kiElevationDivisor on both axes for BC/downsample alignment. mpHeightmapHalf aliases quantized IEEE
+	// kiElevationDivisor on both axes for BC/downsample alignment. puiHeightmapHalf aliases quantized IEEE
 	// R16 half-floats at kIsland payload offset zero; readers use
 	// DirectX::PackedVector::XMConvertHalfToFloat.
-	const uint16_t* mpHeightmapHalf = nullptr;
-	int32_t miHeightmapWidth = 0;
-	int32_t miHeightmapHeight = 0;
+	const uint16_t* puiHeightmapHalf = nullptr;
+	int32_t iHeightmapWidth = 0;
+	int32_t iHeightmapHeight = 0;
 
-	float mfWorldFootprintXMeters = 0.0f;
-	float mfWorldFootprintYMeters = 0.0f;
-	float mfWorldElevationMeters = 0.0f;
+	float fWorldFootprintXMeters = 0.0f;
+	float fWorldFootprintYMeters = 0.0f;
+	float fWorldElevationMeters = 0.0f;
 
 	// Anisotropic quad footprint in engine units (islands use 1 m = 1 engine unit), so a
-	// direct copy of mfWorldFootprint{X,Y}Meters; set in ctor.
-	float mfQuadFootprintX = 0.0f;
-	float mfQuadFootprintY = 0.0f;
+	// direct copy of fWorldFootprint{X,Y}Meters; set in ctor.
+	float fQuadFootprintX = 0.0f;
+	float fQuadFootprintY = 0.0f;
 
-	NavContour mNavContour;
+	NavContour navContour;
 
-	int64_t miTextureSlot = -1;
+	int64_t iTextureSlot = -1;
 
 	// Stable template-group index matching IslandTerrain::mIslandCrcsSorted, assigned in ctor right after
 	// the sort. Identifies the template's grouping and indirect-command slot in Islands; never changes
 	// after boot.
-	// Decoupled from miTextureSlot (which mints lazily on first visit).
-	int64_t miTemplateArrayIndex = -1;
+	// Decoupled from iTextureSlot (which mints lazily on first visit).
+	int64_t iTemplateArrayIndex = -1;
 
-	// Mesh vertex/index counts and CPU mesh data pointers (mpfMeshPositions / mpuiMeshIndices) are
+	// Mesh vertex/index counts and CPU mesh data pointers (pfMeshPositions / puiMeshIndices) are
 	// populated by WaitForElevationMaps after it validates the resident kIsland chunk payload.
-	int32_t miMeshVertexCount = 0;
-	int32_t miMeshIndexCount = 0;
+	int32_t iMeshVertexCount = 0;
+	int32_t iMeshIndexCount = 0;
 
 	// Per-island valid-area convex hull (CCW) in island-local meters, centered. Slices the kIsland
 	// chunk payload after the mesh indices (set by WaitForElevationMaps). Shared: the server packs
 	// island placements against the rotated hull (IslandChainPlacement) and the client also debug-
 	// renders it (MainUniforms DebugRenderIslandValidArea). A count < 3 (or null pointer) means no
 	// usable polygon.
-	const XMFLOAT2* mpf2ValidAreaVertices = nullptr;
-	int32_t miValidAreaVertexCount = 0;
+	const XMFLOAT2* pf2ValidAreaVertices = nullptr;
+	int32_t iValidAreaVertexCount = 0;
 
 #if defined(BT_CLIENT)
-	// Phase 5 LRU eviction state. mbGpuResident means "slot points at this template's real
+	// Phase 5 LRU eviction state. bGpuResident means "slot points at this template's real
 	// Texture*s AND those Textures have live GPU resources". False while in slot-0 fallback
 	// (the neutral placeholder textures) — covers both first-mint-pre-adopt and
-	// post-eviction-pre-restore. miRefCount is recomputed from scratch each frame in
+	// post-eviction-pre-restore. iReferenceCount is recomputed from scratch each frame in
 	// Islands::UpdateActiveIslands.
-	int64_t miRefCount = 0;
-	uint64_t muiLastUsedRenderFrame = 0;
-	bool mbGpuResident = false;
+	int64_t iReferenceCount = 0;
+	uint64_t uiLastUsedRenderFrame = 0;
+	bool bGpuResident = false;
 
 	// Gaea Mesher-baked terrain mesh in island-local meters (XY centered). CPU pointers slice into
 	// the kIsland chunk payload after the heightmap halfs (set by WaitForElevationMaps). The
 	// persistent arena is addressed through these virtual allocations; Z is not stored because
 	// Terrain.vert re-derives it from the elevation sampler.
-	const float* mpfMeshPositions = nullptr;   // interleaved XY pairs (2 floats per vertex)
-	const uint32_t* mpuiMeshIndices = nullptr;
-	VmaVirtualAllocation mMeshIndexAllocation = VK_NULL_HANDLE;
-	VmaVirtualAllocation mMeshVertexAllocation = VK_NULL_HANDLE;
-	VkDeviceSize mMeshIndexOffset = 0;
-	VkDeviceSize mMeshVertexOffset = 0;
-	IslandMeshResidency meMeshResidency = IslandMeshResidency::kNonresident;
-	uint64_t muiMeshArenaBlockedGeneration = 0;
+	const float* pfMeshPositions = nullptr;   // interleaved XY pairs (2 floats per vertex)
+	const uint32_t* puiMeshIndices = nullptr;
+	VmaVirtualAllocation meshIndexAllocation = VK_NULL_HANDLE;
+	VmaVirtualAllocation meshVertexAllocation = VK_NULL_HANDLE;
+	VkDeviceSize vkMeshIndexOffset = 0;
+	VkDeviceSize vkMeshVertexOffset = 0;
+	IslandMeshResidency eMeshResidency = IslandMeshResidency::kNonresident;
+	uint64_t uiMeshArenaBlockedGeneration = 0;
 	// True once the [positions][indices] CPU slice has been decommitted from the lazy pool.
-	bool mbMeshCpuDecommitted = false;
+	bool bMeshCpuDecommitted = false;
 
-	// Elevation R16_SFLOAT is raw-copied from mpHeightmapHalf at first mint, freed by EvictionSweep with
+	// Elevation R16_SFLOAT is raw-copied from puiHeightmapHalf at first mint, freed by EvictionSweep with
 	// color/normals/AO/masks, and recreated on the next AcquireTextureSlot first mint. The template owns it
 	// outside TextureManager::mTextureMap because elevation lives in the kIsland heightmap payload,
 	// without a standalone chunk.
-	Texture mElevationTexture;
+	Texture elevationTexture;
 #endif
 };
 
-// Precomputed per-cell elevation sampler. Hoists FrameElevation's per-cell state (grid pointer, sea floor)
-// so a batch of samples that all fall in one cell pays the empty check once, then samples by cell-local
-// position. Sample() is bit-identical to FrameElevation per sample (same float ops in the same order) —
-// this is the CRC/determinism sim path (/fp:strict), so a caller batching many samples (e.g.
-// game::ComputeTerrainAvoidance) gets results identical to calling FrameElevation directly. FrameElevation
-// is itself implemented on top of this, so the arithmetic has one home. pGrid is null when the cell has no
-// elevation grid (Sample returns fSeaFloor).
+// Batch samples reuse one cell's elevation grid and sea-floor value through the /fp:strict simulation path.
+// A null pGrid returns fSeaFloor.
 struct FrameElevationSampler
 {
 	const std::vector<float>* pGrid = nullptr;
@@ -136,7 +131,7 @@ public:
 	~IslandTerrain();
 
 #if defined(BT_SERVER)
-	void WaitForElevationMaps(float fNavThreshold, float fNavClearanceMeters);
+	void WaitForElevationMaps(float fNavigationThreshold, float fNavigationClearanceMeters);
 #else
 	void WaitForElevationMaps();
 #endif
@@ -147,26 +142,17 @@ public:
 	// caller hands its own static data in, so this never touches gpGame->mCoordFrames and never reads a
 	// neighbor cell. Builds happen at the top of RunFrameTick (see FrameBase.cpp), before any sim phase
 	// that would query.
-	[[nodiscard]] float XM_CALLCONV FrameElevation(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
 	[[nodiscard]] XMVECTOR XM_CALLCONV FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
 
-	// Build a FrameElevationSampler for one cell so a caller can batch many FrameElevation-equivalent
-	// samples without redoing the per-cell origin compute / empty check each call. Same sim/CRC path as
-	// FrameElevation (bit-identical per sample). See FrameElevationSampler above.
 	[[nodiscard]] FrameElevationSampler XM_CALLCONV MakeFrameElevationSampler(const FrameStaticData& rStaticData) const;
 
-	// Build the cell's elevation grid by splatting each placement's heightmap into the per-cell
-	// float grid (max-blend across overlapping footprints, matching the per-point semantics of
-	// GlobalElevation). Allocates rOutGrid.assign(kDim*kDim, mfSeaFloorElevation) and then
-	// stamps each island. Called once per cell at the top of RunFrameTick when the grid is empty.
-	// Takes no coord: placements are centered cell-local, so every cell's grid covers the same
-	// [-450,+450] extent.
+	// Centered cell-local grids cover [-450,+450] meters; overlapping island footprints max-blend, matching GlobalElevation.
 	void XM_CALLCONV BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
 
 	// Render path (engine client — ProjectToBaseHeight). Takes the cell the position is local to plus that
 	// local position, and iterates mCoordFrames' immutable islands list; a position (or a GlobalNormal tap)
 	// past the cell edge resolves onto the neighbouring cell. Never touches the per-cell grid, so it never
-	// races the tick-time build. MUST NOT be called from Frame-tick code; use FrameElevation/FrameNormal
+	// races the tick-time build. MUST NOT be called from Frame-tick code; use FrameElevationSampler::Sample/FrameNormal
 	// from a Frame-tick context.
 	[[nodiscard]] float XM_CALLCONV GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition) const;
 	[[nodiscard]] XMVECTOR XM_CALLCONV GlobalNormal(GridCoord coord, FXMVECTOR vecLocalPosition) const;
@@ -197,7 +183,7 @@ public:
 	// first-mint path (re-registering all five channel bindings; elevation remains at the new
 	// TextureManager placeholder until the four chunk-backed channels are ready). Required after a
 	// kSurface-tier Graphics teardown destroys TextureManager — the
-	// stale miTextureSlot >= 0 would otherwise short-circuit AcquireTextureSlot's hot path and
+	// stale iTextureSlot >= 0 would otherwise short-circuit AcquireTextureSlot's hot path and
 	// strand every island on the new placeholder forever. Called from TextureManager ctor.
 	void ResetTextureSlots();
 #endif
@@ -205,25 +191,23 @@ public:
 	std::unordered_map<common::crc_t, IslandTemplate> mIslands;
 	std::vector<common::crc_t> mIslandCrcsSorted;
 
-	// Same CRCs as mIslandCrcsSorted, ordered by footprint area (mfWorldFootprintXMeters *
-	// mfWorldFootprintYMeters) descending, CRC ascending as a stable tiebreak. Drives only the
+	// Same CRCs as mIslandCrcsSorted, ordered by footprint area (fWorldFootprintXMeters *
+	// fWorldFootprintYMeters) descending, CRC ascending as a stable tiebreak. Drives only the
 	// debug main-menu island browser (Game::BuildMenuIslandPlacement) so it cycles largest-first.
 	// Kept separate from mIslandCrcsSorted, whose CRC order is load-bearing (template slot
 	// assignment + world-gen placement RNG) and must not change.
 	std::vector<common::crc_t> mIslandCrcsByArea;
 
-	// Templates bucketed into 4 size classes by footprint AREA (mfWorldFootprintX * mfWorldFootprintY
-	// meters), classified in the ctor from manifest metadata. Area, not larger dimension: the multi-island
-	// export tiles a master into 1x1 / 2x1 / 4x4 pieces, and a 2x1 strip shares its long edge with the 1x1
-	// master, so only area separates them. Same CRCs as mIslandCrcsSorted, each bucket in sorted-CRC order
-	// (deterministic, identical client + server). Drive IslandChainPlacement role selection; any bucket may
-	// be empty for a small asset set (placement falls back through related buckets to mIslandCrcsSorted).
+	// IslandChainPlacement selects roles from size buckets in the same CRC order on client and server.
+	// Empty buckets fall back through related buckets, then mIslandCrcsSorted.
 	std::vector<common::crc_t> mHugeCrcs;      // area >= kfHugeIslandAreaMeters   (1x1 full tiles, ~400x400)
 	std::vector<common::crc_t> mLargeCrcs;     // area >= kfLargeIslandAreaMeters  (2x1 / 3x1 strips)
 	std::vector<common::crc_t> mMediumCrcs;    // area >= kfMediumIslandAreaMeters (mid tiles)
 	std::vector<common::crc_t> mSmallCrcs;     // smaller                          (4x4 tiles, ~100x100)
 
-	float mfSeaFloorElevation = 0.0f;
+	// Open-ocean samples share the elevation render target's sea-floor depth to avoid blends at island edges.
+	// Island heightmaps already store negative depths in engine meters.
+	float mfSeaFloorElevation = common::kfSeaBottomMeters;
 
 #if defined(BT_CLIENT)
 private:
@@ -248,7 +232,7 @@ private:
 	// by any real island. See TextureManager::mIslandPlaceholder* members.
 	int64_t miNextTextureSlot = 1;
 
-	// Slots reclaimed by EvictionSweep (full teardown sets the template's miTextureSlot = -1). Popped
+	// Slots reclaimed by EvictionSweep (full teardown sets the template's iTextureSlot = -1). Popped
 	// first by AcquireTextureSlot before bumping miNextTextureSlot, so a long browse / churn session
 	// reuses indices instead of marching toward the kiMaxIslands ceiling. Main-thread-only (RenderGlobal
 	// eviction and UpdateActiveIslands mint run on the same thread). Cleared in ResetTextureSlots.

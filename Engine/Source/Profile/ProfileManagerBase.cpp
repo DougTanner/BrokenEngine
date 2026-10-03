@@ -291,7 +291,7 @@ void ProfileManagerBase::LatchRawCpuTimer(int64_t iCpuTimer, bool bAccept)
 		rRawTimer.iInvocationCount = 0;
 		if (!bAccept)
 		{
-			rRawTimer.flags.Clear(RawCpuTimerStateFlags::kEventArmed);
+			rRawTimer.flags.Set(RawCpuTimerStateFlags::kEventArmed, false);
 			rRawTimer.iMinimumSampleTick = 0;
 		}
 	}
@@ -328,7 +328,7 @@ void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
 			for (int64_t i = 0; i < miCpuTimerCount; ++i)
 			{
 				RawCpuTimerState& rRawTimer = mpRawCpuTimers[static_cast<size_t>(i)];
-				rRawTimer.flags.Clear(RawCpuTimerStateFlags::kEventArmed);
+				rRawTimer.flags.Set(RawCpuTimerStateFlags::kEventArmed, false);
 				rRawTimer.iMinimumSampleTick = 0;
 			}
 		}
@@ -418,8 +418,8 @@ bool ProfileManagerBase::PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSam
 		rEvent.iInvocationCount = rRawTimer.record.iInvocationCount;
 		rEvent.iAuxiliaryCount = rRawTimer.record.iAuxiliaryCount;
 		rEvent.flags.Set(RawCpuTimerEventFlags::kAvailable);
-		rEvent.flags.Clear(RawCpuTimerEventFlags::kOverrun);
-		rRawTimer.flags.Clear(RawCpuTimerStateFlags::kEventArmed);
+		rEvent.flags.Set(RawCpuTimerEventFlags::kOverrun, false);
+		rRawTimer.flags.Set(RawCpuTimerStateFlags::kEventArmed, false);
 		rRawTimer.iMinimumSampleTick = 0;
 		return true;
 	}
@@ -614,7 +614,7 @@ void ProfileManagerBase::LogTimers()
 			for (int64_t i = 0; i < iCpuTimerCount; ++i)
 			{
 				CpuTimer& rCpuTimer = GetCpuTimer(i);
-				LOG(kDefault, kDebug, "{}: {} ({}, {}) [{}]", GetCpuTimerName(i), rCpuTimer.smoothedMicroseconds.Current(), rCpuTimer.smoothedMicroseconds.Average(), rCpuTimer.smoothedMicroseconds.Max(), rCpuTimer.smoothedAllocations.Get());
+				LOG(kDefault, kDebug, "{}: {} ({}, {}) [{}]", GetCpuTimerName(i), rCpuTimer.smoothedMicroseconds.Current(), rCpuTimer.smoothedMicroseconds.Average(), rCpuTimer.smoothedMicroseconds.Maximum(), rCpuTimer.smoothedAllocations.mSmoothedValue);
 			}
 		}
 
@@ -630,7 +630,7 @@ void ProfileManagerBase::LogTimers()
 		for (int64_t i = 0; i < kGpuTimerCount; ++i)
 		{
 			GpuTimer& rGpuTimer = mGpuTimers[i];
-			LOG(kDefault, kDebug, "{}: {} ({}, {})", kGpuTimerNames[i], rGpuTimer.smoothedMicroseconds.Current(), rGpuTimer.smoothedMicroseconds.Average(), rGpuTimer.smoothedMicroseconds.Max());
+			LOG(kDefault, kDebug, "{}: {} ({}, {})", kGpuTimerNames[i], rGpuTimer.smoothedMicroseconds.Current(), rGpuTimer.smoothedMicroseconds.Average(), rGpuTimer.smoothedMicroseconds.Maximum());
 		}
 
 		LOG(kDefault, kDebug, "");
@@ -664,7 +664,7 @@ void ProfileManagerBase::DumpTimers()
 		for (int64_t i = 0; i < kGpuTimerCount; ++i)
 		{
 			common::Smoothed<int64_t>& rMicroseconds = mGpuTimers[i].smoothedMicroseconds;
-			mpDumpLog->Write("{},gpu,{},{},{},{},{},", iMs, i, kGpuTimerNames[i], rMicroseconds.Current(), rMicroseconds.Average(), rMicroseconds.Max());
+			mpDumpLog->Write("{},gpu,{},{},{},{},{},", iMs, i, kGpuTimerNames[i], rMicroseconds.Current(), rMicroseconds.Average(), rMicroseconds.Maximum());
 		}
 
 		// Snapshot under the lock, write after: DiagnosticLog flushes per line, and dozens of flushed lines under mCpuTimerMutex would block dispatch/submit/network CpuStart/CpuStop once per second, distorting the timers being measured.
@@ -682,12 +682,12 @@ void ProfileManagerBase::DumpTimers()
 			for (int64_t i = 0; i < iCpuTimerCount; ++i)
 			{
 				CpuTimer& rCpuTimer = GetCpuTimer(i);
-				pSamples[i] = CpuTimerSample {rCpuTimer.smoothedMicroseconds.Current(), rCpuTimer.smoothedMicroseconds.Average(), rCpuTimer.smoothedMicroseconds.Max(), rCpuTimer.smoothedAllocations.Current()};
+				pSamples.mpData[i] = CpuTimerSample {rCpuTimer.smoothedMicroseconds.Current(), rCpuTimer.smoothedMicroseconds.Average(), rCpuTimer.smoothedMicroseconds.Maximum(), rCpuTimer.smoothedAllocations.Current()};
 			}
 		}
 		for (int64_t i = 0; i < iCpuTimerCount; ++i)
 		{
-			mpDumpLog->Write("{},cpu,{},{},{},{},{},{}", iMs, i, GetCpuTimerName(i), pSamples[i].iCurrentUs, pSamples[i].iAverageUs, pSamples[i].iMaxUs, pSamples[i].iAllocations);
+			mpDumpLog->Write("{},cpu,{},{},{},{},{},{}", iMs, i, GetCpuTimerName(i), pSamples.mpData[i].iCurrentUs, pSamples.mpData[i].iAverageUs, pSamples.mpData[i].iMaxUs, pSamples.mpData[i].iAllocations);
 		}
 
 		int64_t iCpuCounterCount = GetCpuCounterCount();
@@ -755,7 +755,7 @@ void ProfileManagerBase::UpdateProfileText()
 
 		if (meProfileScreen == ProfileScreen::kCpu || meProfileScreen == ProfileScreen::kGpu)
 		{
-			int64_t iTotalCpuTimeUs = GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Get();
+			int64_t iTotalCpuTimeUs = GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.mSmoothedValue;
 			FormatFpsHeader(rWorkbuffer, iTotalCpuTimeUs);
 		}
 

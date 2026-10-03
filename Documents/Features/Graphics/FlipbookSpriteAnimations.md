@@ -67,10 +67,10 @@ Changes (11 files)
 
 4. Engine/Source/Frame/Collections/Flipbooks/Flipbooks.h  [NEW]
    New client-only collection following the Puffs pattern.
-   - FlipbookType: crc (texture atlas CRC), uiColumns, uiRows,
+   - FlipbookType: uiCrc (texture atlas CRC), uiColumns, uiRows,
      uiFrameCount, fFrameRate, fSize
    - FlipbookControllerType: uiBaseTypeIndex, uiKeyframeCount,
-     pfTimes[], FlipbookKeyframe keyframes[] (fSize, fAlpha, fRotation).
+     times[], FlipbookKeyframe keyframes[] (fSize, fAlpha, fRotation).
      bDestroysSelf = true
    - FlipbooksInterpolate: Collection<FlipbooksInterpolate> with
      ControllerTypeRegistry. SOA members: puiTypeIndices,

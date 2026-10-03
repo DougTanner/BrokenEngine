@@ -27,19 +27,16 @@ void WindRadialsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load from previous frame
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		float fBaseIntensity = rCurrent.pfBaseIntensities[i];
 		float fBaseSize = rCurrent.pfBaseSizes[i];
 
-		// Interpolate controller keyframes
 		uint8_t uiControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
 		float fStartTime = rCurrent.pfStartTimes[i];
 		float fElapsedTime = fCurrentTime - fStartTime;
-		const WindRadialControllerType& rController = WindRadialsInterpolate::GetControllerType(uiControllerTypeIndex);
+		const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
 		WindRadialKeyframe interpolated = InterpolateKeyframes(rController, fElapsedTime);
 
-		// Save
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pfIntensities[i] = fBaseIntensity * interpolated.fIntensity;
 		rCurrent.pfSizes[i] = fBaseSize * interpolated.fSize;
@@ -55,18 +52,15 @@ void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rF
 	WindRadialsInterpolate& rInterpolate = rFrame.interpolate.windRadials;
 	WindRadialsPostRender& rPostRender = rFrame.postRender.windRadials;
 
-	// Get controller type
-	const WindRadialControllerType& rController = WindRadialsInterpolate::GetControllerType(uiControllerTypeIndex);
+	const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
 
 	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-	},
-	[&rInterpolate, &rPostRender]()
+	}, [&rInterpolate, &rPostRender]()
 	{
 		return AddElement(rInterpolate, rPostRender);
-	},
-	[&rInterpolate, &rController, fBaseIntensity, fBaseSize](int64_t iSpawnIndex)
+	}, [&rInterpolate, &rController, fBaseIntensity, fBaseSize](int64_t iSpawnIndex)
 	{
 		rInterpolate.pfIntensities[iSpawnIndex] = fBaseIntensity * rController.keyframes[0].fIntensity;
 		rInterpolate.pfSizes[iSpawnIndex] = fBaseSize * rController.keyframes[0].fSize;

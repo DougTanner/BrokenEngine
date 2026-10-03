@@ -62,7 +62,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 	if (menuInput.bGamepad && mMenuFlags & MenuFlags::kMouseVisible)
 	{
 		ShowCursor(FALSE);
-		mMenuFlags.Clear(MenuFlags::kMouseVisible);
+		mMenuFlags.Set(MenuFlags::kMouseVisible, false);
 	}
 	else if (!menuInput.bGamepad && !(mMenuFlags & MenuFlags::kMouseVisible))
 	{
@@ -212,7 +212,7 @@ void GameBase::ClientUpdate()
 		NetworkTimeState networkTimeState
 		{
 			.bFastForward = mTimeStep.miTimeMultiply > 1,
-			.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimToWall(game::NetworkSessionContract::kTickDuration)).count(),
+			.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimulationToWall(game::NetworkSessionContract::kTickDuration)).count(),
 			.iExpectedUpdatesPerSecond = kiTickRate * mTimeStep.miTimeMultiply / mTimeStep.miTimeDivide,
 		};
 		game::gpClientSession->mpRuntime->PollAndDrain(networkTimeState);
@@ -226,7 +226,7 @@ void GameBase::ClientUpdate()
 	int64_t iFullTicks = mTimeStep.TickRealtime();
 	if (mGameFlags & GameFlags::kPaused) [[unlikely]]
 	{
-		mTimeStep.ClearAccumulator();
+		mTimeStep.mTickRemainderNanoseconds = 0ns;
 		iFullTicks = 0;
 	}
 
@@ -234,12 +234,12 @@ void GameBase::ClientUpdate()
 	game::gpClientSession->UpdateSubscriptions();
 	PrepareActiveSet();
 
-	// Hard ceiling: clock-servo target + kiSimCeilingSlackTicks. EvaluateClock steers the
+	// Hard ceiling: clock-servo target + kiSimulationCeilingSlackTicks. EvaluateClock steers the
 	// sim toward the bare target, so this clamp engages only on genuine arrival stalls (loss bursts),
 	// not per-packet jitter, while StatusChanges still normally arrive before their tick simulates.
 	// Extreme "sim way behind target" is handled by the snap path in Reconcile.
 	const engine::ClientSessionRuntime& rRuntime = *game::gpClientSession->mpRuntime;
-	int64_t iCeiling = rRuntime.miLatestServerTick < 0 ? -1 : rRuntime.miLatestServerTick - rRuntime.miCurrentTargetBehind + engine::kiSimCeilingSlackTicks;
+	int64_t iCeiling = rRuntime.miLatestServerTick < 0 ? -1 : rRuntime.miLatestServerTick - rRuntime.miCurrentTargetBehind + engine::kiSimulationCeilingSlackTicks;
 	int64_t iAbsorbedTicks = 0;
 	if (iCeiling >= 0 && iFullTicks > 0)
 	{
@@ -247,14 +247,15 @@ void GameBase::ClientUpdate()
 		if (iFullTicks > iRoomToAdvance)
 		{
 			iAbsorbedTicks = iFullTicks - iRoomToAdvance;
-			mTimeStep.AbsorbUnusedTicks(iAbsorbedTicks);
+			// The client simulation ceiling returns unused tick time to the accumulator; TickRealtime's kiMaximumAccumulatorTicks cap bounds growth during long stalls.
+			mTimeStep.mTickRemainderNanoseconds += iAbsorbedTicks * kTickNanoseconds;
 			iFullTicks = iRoomToAdvance;
 		}
 	}
 
 	// When latestServerTick stalls (loss burst), the ceiling freezes the sim entirely, then releases
 	// the backlog as a burst — log at the transition. Frequent stalls outside loss bursts indicate a
-	// clock-servo / kiSimCeilingSlackTicks tuning problem (the servo should keep steady-state jitter
+	// clock-servo / kiSimulationCeilingSlackTicks tuning problem (the servo should keep steady-state jitter
 	// away from the ceiling).
 	{
 		static int64_t siCeilingStallFrames = 0;
@@ -300,7 +301,7 @@ void GameBase::ServerUpdate()
 	NetworkTimeState networkTimeState
 	{
 		.bFastForward = mTimeStep.miTimeMultiply > 1,
-		.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimToWall(game::NetworkSessionContract::kTickDuration)).count(),
+		.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimulationToWall(game::NetworkSessionContract::kTickDuration)).count(),
 		.iExpectedUpdatesPerSecond = kiTickRate * mTimeStep.miTimeMultiply / mTimeStep.miTimeDivide,
 	};
 	game::gpServerSession->mpRuntime->Poll(networkTimeState);
@@ -332,7 +333,7 @@ void GameBase::ServerUpdate()
 	gpServer->BroadcastTimespeedIfChanged();
 	if (mGameFlags & GameFlags::kPaused) [[unlikely]]
 	{
-		mTimeStep.ClearAccumulator();
+		mTimeStep.mTickRemainderNanoseconds = 0ns;
 		iFullTicks = 0;
 	}
 	else if (iFullTicks != 1) [[unlikely]]
@@ -412,7 +413,7 @@ void GameBase::ServerUpdate()
 		++iFinalizedTicks;
 		if (mGameFlags & GameFlags::kPaused) [[unlikely]]
 		{
-			mTimeStep.ClearAccumulator();
+			mTimeStep.mTickRemainderNanoseconds = 0ns;
 			iFullTicks = iFinalizedTicks;
 			mfLastDeltaTime = static_cast<float>(iFinalizedTicks) * kfDeltaTime;
 			break;
@@ -427,7 +428,7 @@ void GameBase::ServerUpdate()
 	}
 	if (iUnusedTicks > 0 && !(mGameFlags & GameFlags::kPaused))
 	{
-		mTimeStep.AbsorbUnusedTicks(iUnusedTicks);
+		mTimeStep.mTickRemainderNanoseconds += iUnusedTicks * kTickNanoseconds;
 	}
 	if (iFullTicks > 0)
 	{
@@ -469,7 +470,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 			CoordFrames& rFrames = mCoordFrames.at(rCoord);
 			if (rFrames.pCurrent == nullptr || rFrames.pNext == nullptr)
 			{
-				LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}", rCoord.x, rCoord.y, rFrames.pCurrent != nullptr, rFrames.pNext != nullptr);
+				LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}", rCoord.iX, rCoord.iY, rFrames.pCurrent != nullptr, rFrames.pNext != nullptr);
 				continue;
 			}
 			mActiveFrameRefs.push_back({
@@ -480,7 +481,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 			});
 		}
 	}
-	const std::vector<ActiveFrameRef>& rActiveFrameRefs = mActiveFrameRefs;
+	const std::vector<ActiveFrameReference>& rActiveFrameRefs = mActiveFrameRefs;
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameInterpolate);
 	gpProfileManager->CpuStart(game::kCpuTimerFramePostRender);
@@ -693,8 +694,8 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 		// preserves it automatically. On a single-tick commit, T advances +kfDt while mfRenderTime
 		// stays continuous, so fDt drops by kfDt and the Update(N, kfDt) ≡ Update(N+1, 0)
 		// invariant makes the handoff pixel-identical.
-		double dSimDeltaSeconds = common::NanosecondsToFloatSeconds<double>(mTimeStep.WallToSim(mRenderTimer.GetDeltaNs(true)));
-		mfLastRenderFrameSeconds = dSimDeltaSeconds;
+		double fSimDeltaSeconds = common::NanosecondsToFloatSeconds<double>(mTimeStep.WallToSimulation(mRenderTimer.GetDeltaNs(true)));
+		mfLastRenderFrameSeconds = fSimDeltaSeconds;
 		// Only advance the render clock and sample the source frame when a renderable camera coord exists.
 		// On the failed-reconnect all-empty-rings frame (bHaveRenderableCamera == false) fDeltaTime stays 0
 		// and none of mCoordFrames.at(cameraCoord) / RenderFrame(cameraCoord) / the clock math runs; the
@@ -713,7 +714,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 
 			bool bPaused = mGameFlags & GameFlags::kPaused;
 
-			fDeltaTime = AdvanceRenderClock(dT, bPaused, bHaveInterpolationWindow, dSimDeltaSeconds);
+			fDeltaTime = AdvanceRenderClock(dT, bPaused, bHaveInterpolationWindow, fSimDeltaSeconds);
 		}
 		{
 			ScopedSuppressAllocationTracking suppress;
@@ -740,7 +741,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 				if (rFrame.interpolate.iTick < rSub.iLastRenderedTick
 				 || (rFrame.interpolate.iTick == rSub.iLastRenderedTick && rFrame.interpolate.fCurrentTime < rSub.fLastRenderedTime))
 				{
-					LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {} Time: {} LastTime: {}", rCoord.x, rCoord.y, rFrame.interpolate.iTick, rSub.iLastRenderedTick, common::Wb(rFrame.interpolate.fCurrentTime, 4), common::Wb(rSub.fLastRenderedTime, 4));
+					LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {} Time: {} LastTime: {}", rCoord.iX, rCoord.iY, rFrame.interpolate.iTick, rSub.iLastRenderedTick, common::Wb(rFrame.interpolate.fCurrentTime, 4), common::Wb(rSub.fLastRenderedTime, 4));
  					DEBUG_BREAK();
 				}
 				rSub.iLastRenderedTick = rFrame.interpolate.iTick;
@@ -838,7 +839,7 @@ bool GameBase::HandleDeferredSwapchain()
 			{
 				static constexpr std::chrono::nanoseconds kMinThrottleNs = 1'000'000ns;
 				std::chrono::nanoseconds elapsedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - *mMinimizedThrottleLast);
-				std::chrono::nanoseconds budgetNs = std::clamp(mTimeStep.SimToWall(kTickNs), kMinThrottleNs, kTickNs);
+				std::chrono::nanoseconds budgetNs = std::clamp(mTimeStep.SimulationToWall(kTickNanoseconds), kMinThrottleNs, kTickNanoseconds);
 				std::chrono::nanoseconds remainingNs = budgetNs - elapsedNs;
 				if (remainingNs > 0ns)
 				{
@@ -869,7 +870,7 @@ void GameBase::Render()
 	const std::vector<GridCoord>& rActiveCoords = mActiveCoords;
 
 	// Interpolate elapsed time with the sub-step remainder for smooth rendering
-	float fCurrentTime = mfCurrentTime + std::max(0.0f, common::NanosecondsToFloatSeconds<float>(mTimeStep.mTickRemainderNs));
+	float fCurrentTime = mfCurrentTime + std::max(0.0f, common::NanosecondsToFloatSeconds<float>(mTimeStep.mTickRemainderNanoseconds));
 
 	GridCoord cameraCoord = game::gpGame->mClientGridCoord;
 	bool bHaveRenderableCamera = false;
@@ -935,9 +936,9 @@ void GameBase::CreateFrameAtCoord(GridCoord coord)
 
 	// Populate static data for this coord
 	FrameStaticData& rStaticData = rFrames.staticData;
-	rStaticData.coord = coord;
+	rStaticData.coordinate = coord;
 	GenerateIslandChain(coord, rStaticData.islands);
-	// navData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
+	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
 }
 
 void GameBase::PrepareActiveSet()

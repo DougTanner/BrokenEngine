@@ -9,7 +9,7 @@ public:
 
 	static constexpr int64_t kiCapacity = 1'024;
 
-	void Set(int64_t count = 1);
+	void Set(int64_t iCount = 1);
 	int64_t Get();
 
 private:
@@ -37,17 +37,7 @@ public:
 		miCount = std::min(miCount + 1, COUNT);
 	}
 
-	void Reset()
-	{
-		*this = Smoothed {};
-	}
-
-	VALUE_TYPE Get()
-	{
-		return mSmoothedValue;
-	}
-
-	VALUE_TYPE Max()
+	VALUE_TYPE Maximum()
 	{
 		if (miCount == 0)
 		{
@@ -60,7 +50,7 @@ public:
 			iCurrent = COUNT - 1;
 		}
 
-		VALUE_TYPE max = mpValues[iCurrent];
+		VALUE_TYPE maximum = mpValues[iCurrent];
 		int64_t iCountLeft = miCount;
 		while (iCountLeft > 0)
 		{
@@ -69,13 +59,13 @@ public:
 				iCurrent = COUNT - 1;
 			}
 
-			max = std::max(max, mpValues[iCurrent]);
+			maximum = std::max(maximum, mpValues[iCurrent]);
 
 			--iCurrent;
 			--iCountLeft;
 		}
 
-		return max;
+		return maximum;
 	}
 
 	VALUE_TYPE Current()
@@ -138,16 +128,16 @@ public:
 
 		VALUE_TYPE targetValue = Average();
 
-		VALUE_TYPE diff = targetValue - mSmoothedValue;
-		if (diff > -COUNT && diff < 0)
+		VALUE_TYPE difference = targetValue - mSmoothedValue;
+		if (difference > -COUNT && difference < 0)
 		{
-			diff = -1;
+			difference = -1;
 		}
-		else if (diff > 0 && diff < COUNT)
+		else if (difference > 0 && difference < COUNT)
 		{
-			diff = 1;
+			difference = 1;
 		}
-		mSmoothedValue += diff;
+		mSmoothedValue += difference;
 
 		return mSmoothedValue;
 	}
@@ -155,8 +145,6 @@ public:
 	VALUE_TYPE mpValues[COUNT] {};
 	int64_t miNext = 0;
 	int64_t miCount = 0;
-
-private:
 
 	VALUE_TYPE mSmoothedValue {};
 };

@@ -3,8 +3,8 @@
 namespace common
 {
 
-DiagnosticLog::DiagnosticLog(int iIndex, const char* pcFilename)
-: mFile((std::filesystem::create_directories(std::filesystem::path(pcFilename).parent_path()), pcFilename), std::ios::out | std::ios::trunc)
+DiagnosticLog::DiagnosticLog(int64_t iIndex, std::string_view filename)
+: mFile((std::filesystem::create_directories(std::filesystem::path(filename).parent_path()), std::filesystem::path(filename)), std::ios::out | std::ios::trunc)
 , miIndex(iIndex)
 {
 	ASSERT(gpDiagnosticLogs[miIndex] == nullptr);

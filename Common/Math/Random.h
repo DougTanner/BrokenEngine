@@ -48,12 +48,12 @@ void Read(std::istream& rStream, RandomEngine& rRandomEngine) = delete;
 
 inline uint64_t RandomNext(RandomEngine& rRandomEngine)
 {
-	uint64_t x = rRandomEngine.uiState;
-	x ^= x << 13;
-	x ^= x >> 7;
-	x ^= x << 17;
-	rRandomEngine.uiState = x;
-	return x;
+	uint64_t uiRandomState = rRandomEngine.uiState;
+	uiRandomState ^= uiRandomState << 13;
+	uiRandomState ^= uiRandomState >> 7;
+	uiRandomState ^= uiRandomState << 17;
+	rRandomEngine.uiState = uiRandomState;
+	return uiRandomState;
 }
 
 // High-24-bit construction — int → float cast is exact and the result is strictly < 1.0f regardless of rounding mode

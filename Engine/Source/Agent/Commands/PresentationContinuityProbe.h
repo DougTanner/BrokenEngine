@@ -5,7 +5,7 @@
 namespace engine
 {
 
-void CommandPresentationContinuityProbe(const nlohmann::json& rParams, nlohmann::json& rResult);
+void CommandPresentationContinuityProbe(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
 } // namespace engine
 

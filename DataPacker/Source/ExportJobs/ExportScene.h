@@ -49,19 +49,19 @@ private:
 	std::filesystem::path GetTextureIntermediatePath(int64_t iTextureIndex, VkFormat vkFormat) const;
 	std::filesystem::path GetTextureIntermediateStagePath(size_t uiStageIndex) const;
 
-	void PreExport(tinygltf::Model& rGltfModel);
-	void MainExport(tinygltf::Model& rGltfModel);
+	void PreExport(const tinygltf::Model& rGltfModel);
+	void MainExport(const tinygltf::Model& rGltfModel);
 
-	void ProcessTextures(tinygltf::Model& rGltfModel);
+	void ProcessTextures(const tinygltf::Model& rGltfModel);
 	void CleanupTextureAttemptFiles();
-	bool SetupSkeletonAndMaterials(tinygltf::Model& rGltfModel);
-	void LoadVerticesAndOptimizeMeshes(tinygltf::Model& rGltfModel, bool bHasSkeleton, std::vector<Material>& rMaterials, std::vector<MaterialNodeInfo>& rMaterialNodeInfos, std::vector<common::ModelVertex>& rVertices);
-	void BuildMaterialInfos(tinygltf::Model& rGltfModel, bool bHasSkeleton, const std::vector<Material>& rMaterials, const std::vector<MaterialNodeInfo>& rMaterialNodeInfos, std::vector<common::MaterialInfo>& rMaterialInfos);
+	bool SetupSkeletonAndMaterials(const tinygltf::Model& rGltfModel);
+	void LoadVerticesAndOptimizeMeshes(const tinygltf::Model& rGltfModel, bool bHasSkeleton, std::vector<Material>& rMaterials, std::vector<MaterialNodeInfo>& rMaterialNodeInfos, std::vector<common::ModelVertex>& rVertices);
+	void BuildMaterialInfos(const tinygltf::Model& rGltfModel, bool bHasSkeleton, const std::vector<Material>& rMaterials, const std::vector<MaterialNodeInfo>& rMaterialNodeInfos, std::vector<common::MaterialInfo>& rMaterialInfos);
 	void WriteModelFile(const std::vector<Material>& rMaterials, const std::vector<common::MaterialInfo>& rMaterialInfos, std::vector<common::ModelVertex>& rVertices);
 
-	void ReadMaterialInfosFromModel(const std::filesystem::path& rModelPath, size_t uiMaterialCount, uint32_t* puiIndexStarts, std::vector<common::MaterialInfo>& rMaterialInfos);
-	void FillMaterialShaderDatas(tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, common::MaterialShaderData* pMaterialShaderDatas);
-	void WriteAnimationSection(tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, common::ChunkHeader* pHeader);
+	void ReadMaterialInfosFromModel(const std::filesystem::path& rModelPath, std::span<uint32_t> indexStarts, std::vector<common::MaterialInfo>& rMaterialInfos);
+	void FillMaterialShaderDatas(const tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, std::span<common::MaterialShaderData> materialShaderDatas);
+	void WriteAnimationSection(const tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, common::ChunkHeader* pHeader);
 
 	void CleanupOnFailure() override;
 

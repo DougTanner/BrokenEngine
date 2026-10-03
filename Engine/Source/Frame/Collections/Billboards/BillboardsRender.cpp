@@ -11,19 +11,19 @@ using enum BillboardFlags;
 
 void BillboardsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kName, sizeof(shaders::BillboardLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineBillboards(kCrc, kName, sizeof(shaders::BillboardLayout));
+	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::BillboardLayout));
+	gpPipelineManager->mDynamicPipelines.CreatePipelineBillboards(kuiCrc, kpcName, sizeof(shaders::BillboardLayout));
 }
 
 static int64_t siRendered = 0;
 static int64_t siTotalCount = 0;
 
-void BillboardsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords)
+void BillboardsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
 	siTotalCount = 0;
 
-	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const BillboardsInterpolate&
+	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const BillboardsInterpolate&
 	{
 		return rInterpolate.billboards;
 	});
@@ -33,9 +33,9 @@ void BillboardsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 		return;
 	}
 
-	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kName, sizeof(shaders::BillboardLayout), iTotalCapacity, iCommandBuffer))
+	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::BillboardLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 2, pBuffer);
+		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -50,12 +50,11 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		return;
 	}
 
-	auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::BillboardLayout>(kCrc, kBufferMain, iCommandBuffer);
+	auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::BillboardLayout>(kuiCrc, kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
 		uint8_t uiTypeIndex = rCurrent.puiTypeIndices[i];
 		BillboardFlags_t flags = rCurrent.pFlags[i];
 		float fRotation = rCurrent.pfRotations[i];
@@ -74,7 +73,6 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		f4Position.z /= f4Position.w;
 		f4Position.w = 1.0f;
 
-		// Handle offscreen-only billboards (like offscreen indicators)
 		if (flags & kOffscreenOnly && !(f4Position.x < -1.0f - fExtra || f4Position.x > 1.0f + fExtra || f4Position.y > 1.0f + fExtra || f4Position.y < -1.0f - fExtra))
 		{
 			continue;
@@ -94,11 +92,10 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			fRotation = XM_PI + XM_PIDIV2 - common::RotationFromPosition(XMVector3Normalize(XMLoadFloat4A(&f4Position)));
 		}
 
-		// Populate GPU layout
 		shaders::BillboardLayout& rBillboardLayout = pLayouts[siRendered];
 		rBillboardLayout.f4Position = f4Position;
 		rBillboardLayout.fSize = fSize;
-		rBillboardLayout.fTextureIndex = static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(rType.crc));
+		rBillboardLayout.fTextureIndex = static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(rType.uiCrc));
 		rBillboardLayout.fRotation = fRotation;
 		rBillboardLayout.fAlpha = rType.fAlpha;
 
@@ -111,7 +108,7 @@ void BillboardsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	gpProfileManager->SetCount(kCpuCounterBillboards, siTotalCount);
 	gpProfileManager->SetCount(kCpuCounterBillboardsRendered, siRendered);
 
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 
 } // namespace engine

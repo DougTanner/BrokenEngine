@@ -33,7 +33,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 0.0f)));
 	}
 
-	if (!gpGame->ClientPlayerId().IsValid())
+	if (!(gpGame->ClientPlayerId().iValue != 0))
 	{
 		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 0.0f)));
 	}
@@ -41,18 +41,18 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	// The interpolate's own cell, not the client cell: its positions are local to that cell, and the camera works in
 	// that same frame, so a target taken from it needs no conversion. Reading the index from a different cell's
 	// players would pick a position a whole cell away.
-	engine::GridCoord coord = rGameInterpolate.renderBasis.coord;
+	engine::GridCoord coord = rGameInterpolate.renderBasis.coordinate;
 	auto coordIt = gpGame->mCoordFrames.find(coord);
 	bool bHasCoord = coordIt != gpGame->mCoordFrames.end() && coordIt->second.iSnapshotCount > 0;
 	std::optional<int64_t> oIdx = bHasCoord ? gpGame->ClientPlayerIndex(*gpGame->RenderFrame(coord).postRender.pPlayers) : std::nullopt;
 	if (oIdx)
 	{
-		engine::global_id_t focusedId = gpGame->ClientPlayerId();
+		engine::GlobalId focusedId = gpGame->ClientPlayerId();
 		XMVECTOR vecPlayerPos = rGameInterpolate.pPlayers->pVecPositions[*oIdx];
 
 		if (focusedId != mLastTrackedPlayerId)
 		{
-			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalPlayerId: {} Coord: ({},{}) Index: {}", focusedId, coord.x, coord.y, *oIdx);
+			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalPlayerId: {} Coord: ({},{}) Index: {}", focusedId, coord.iX, coord.iY, *oIdx);
 			mLastTrackedPlayerId = focusedId;
 		}
 
@@ -66,7 +66,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		if (bHasCoord)
 		{
 			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(coord).postRender.pPlayers;
-			LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}", gpGame->ClientPlayerId(), coord.x, coord.y, rPlayers.iCount, rGameInterpolate.pPlayers->iCount);
+			LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}", gpGame->ClientPlayerId(), coord.iX, coord.iY, rPlayers.iCount, rGameInterpolate.pPlayers->iCount);
 			for (int64_t i = 0; i < rPlayers.iCount; ++i)
 			{
 				LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalPlayerId: {}", i, rPlayers.pGlobalPlayerIds[i]);
@@ -74,7 +74,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		}
 		else
 		{
-			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientPlayerId(), coord.x, coord.y);
+			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientPlayerId(), coord.iX, coord.iY);
 		}
 	}
 

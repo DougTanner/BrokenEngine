@@ -22,10 +22,6 @@ public:
 	virtual bool CheckDirty(const std::filesystem::path& rPackFile);
 	std::vector<std::byte>& RunExport();
 
-	// Get export format version for this job type. Not virtual: the base constructor builds the cache
-	// entry names from it, where a call could not reach a derived override.
-	int64_t GetVersion() const { return miVersion; }
-
 	int64_t miId = 0;
 	int64_t miVersion = 0;
 	bool mbDirty = false;

@@ -9,20 +9,17 @@
 namespace engine
 {
 
-namespace
-{
-
-nlohmann::json OriginJson(XMFLOAT2 f2Origin)
+static nlohmann::json OriginJson(XMFLOAT2 f2Origin)
 {
 	return nlohmann::json::array({f2Origin.x, f2Origin.y});
 }
 
-nlohmann::json AreaJson(const XMFLOAT4& rf4Area)
+static nlohmann::json AreaJson(const XMFLOAT4& rf4Area)
 {
 	return nlohmann::json::array({rf4Area.x, rf4Area.y, rf4Area.z, rf4Area.w});
 }
 
-nlohmann::json RetainedAreaJson(const RetainedAreaReport& rReport)
+static nlohmann::json RetainedAreaJson(const RetainedAreaReport& rReport)
 {
 	return nlohmann::json
 	{
@@ -32,20 +29,18 @@ nlohmann::json RetainedAreaJson(const RetainedAreaReport& rReport)
 	};
 }
 
-} // namespace
-
 // presentation_continuity_probe: report what the last published render frame sent for water phase reduction and for
-// each retained-history owner, so the harness can observe continuity across a camera cell change. Schema: {}.
-void CommandPresentationContinuityProbe(const nlohmann::json& rParams, nlohmann::json& rResult)
+// each retained-history owner, so the harness can observe continuity across a camera cell change.
+void CommandPresentationContinuityProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.is_object() || !rParams.empty())
+	if (!rParameters.is_object() || !rParameters.empty())
 	{
 		throw std::runtime_error("presentation_continuity_probe requires empty params");
 	}
 
 	const PresentationContinuitySnapshot& rSnapshot = gPresentationContinuity;
 	rResult["publishedFrames"] = rSnapshot.iPublishedFrames;
-	rResult["basisCoord"] = AgentCoordJson(rSnapshot.cameraBasisCoord);
+	rResult["basisCoord"] = AgentCoordinateJson(rSnapshot.cameraBasisCoord);
 	rResult["water"] =
 	{
 		{"origin", OriginJson(rSnapshot.f2WaterOrigin)},

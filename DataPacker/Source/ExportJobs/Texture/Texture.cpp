@@ -6,13 +6,11 @@ inline constexpr uint32_t kuiBc45SearchRadius = 5;
 inline constexpr uint32_t kuiBc7MaxPartitions = 64;
 inline constexpr uint32_t kuiBc7UberLevel = 4;
 
-std::mutex Texture::sEncodeMutex;
-
 // Tracks how many threads are inside EncodeBlocks at once. The caller-held sEncodeMutex must
 // keep this at 0 or 1 — anything higher means a call site forgot to take the lock.
-static std::atomic<int> sActiveEncodeCount {0};
+static std::atomic<int> siActiveEncodeCount(0);
 
-void Texture::StaticInit()
+void Texture::StaticInitialize()
 {
 	rgbcx::init();
 	bc7enc_compress_block_init();
@@ -45,29 +43,29 @@ void Texture::LoadImage(const std::filesystem::path& rPath)
 	int iStbiWidth = 0;
 	int iStbiHeight = 0;
 	int iChannelsInFile = 0;
-	stbi_uc* pPixels = stbi_load(reinterpret_cast<const char*>(rPath.u8string().c_str()), &iStbiWidth, &iStbiHeight, &iChannelsInFile, STBI_rgb_alpha);
+	stbi_uc* puiPixels = stbi_load(reinterpret_cast<const char*>(rPath.u8string().c_str()), &iStbiWidth, &iStbiHeight, &iChannelsInFile, STBI_rgb_alpha);
 	common::ScopedLambda freeStbiPixels([=]()
 	{
-		stbi_image_free(pPixels);
+		stbi_image_free(puiPixels);
 	});
-	ASSERT(iStbiWidth != 0 && iStbiHeight != 0 && pPixels != nullptr);
+	ASSERT(iStbiWidth != 0 && iStbiHeight != 0 && puiPixels != nullptr);
 	miWidth = iStbiWidth;
 	miHeight = iStbiHeight;
 
-	stbi_uc* puiSrc = pPixels;
+	stbi_uc* puiSource = puiPixels;
 	std::vector<float>& rPixels = mData.emplace_back(4 * iStbiWidth * iStbiHeight);
-	float* pfDest = rPixels.data();
+	float* pfDestination = rPixels.data();
 	for (int64_t j = 0; j < miHeight; ++j)
 	{
 		for (int64_t i = 0; i < miWidth; ++i)
 		{
-			pfDest[0] = puiSrc[0];
-			pfDest[1] = puiSrc[1];
-			pfDest[2] = puiSrc[2];
-			pfDest[3] = puiSrc[3];
+			pfDestination[0] = puiSource[0];
+			pfDestination[1] = puiSource[1];
+			pfDestination[2] = puiSource[2];
+			pfDestination[3] = puiSource[3];
 
-			puiSrc += 4;
-			pfDest += 4;
+			puiSource += 4;
+			pfDestination += 4;
 		}
 	}
 }
@@ -78,20 +76,20 @@ void Texture::LoadFloat32(const std::filesystem::path& rPath)
 
 	std::vector<std::byte> data = common::ReadEntireFile(rPath);
 
-	float* pfSrcR = reinterpret_cast<float*>(data.data());
+	float* pfSourceRed = reinterpret_cast<float*>(data.data());
 	std::vector<float>& rPixels = mData.emplace_back(4 * miWidth * miHeight);
-	float* pfDest = rPixels.data();
+	float* pfDestination = rPixels.data();
 	for (int64_t j = 0; j < miHeight; ++j)
 	{
 		for (int64_t i = 0; i < miWidth; ++i)
 		{
-			pfDest[0] = 255.0f * pfSrcR[0];
-			pfDest[1] = 0.0f;
-			pfDest[2] = 0.0f;
-			pfDest[3] = 0.0f;
+			pfDestination[0] = 255.0f * pfSourceRed[0];
+			pfDestination[1] = 0.0f;
+			pfDestination[2] = 0.0f;
+			pfDestination[3] = 0.0f;
 
-			++pfSrcR;
-			pfDest += 4;
+			++pfSourceRed;
+			pfDestination += 4;
 		}
 	}
 }
@@ -128,55 +126,55 @@ void Texture::LoadUint16Raw(const std::filesystem::path& rPath)
 	}
 
 	std::vector<std::byte> data = common::ReadEntireFile(rPath);
-	if (data.size() != uiExpectedBytes)
+	if (static_cast<uintmax_t>(std::ssize(data)) != uiExpectedBytes)
 	{
 		throw std::runtime_error("Uint16 raw texture byte count does not match dimensions");
 	}
 
-	const uint16_t* puiSrc = reinterpret_cast<const uint16_t*>(data.data());
+	const uint16_t* puiSource = reinterpret_cast<const uint16_t*>(data.data());
 	std::vector<float>& rPixels = mData.emplace_back(4 * miWidth * miHeight);
-	float* pfDest = rPixels.data();
+	float* pfDestination = rPixels.data();
 	for (int64_t j = 0; j < miHeight; ++j)
 	{
 		for (int64_t i = 0; i < miWidth; ++i)
 		{
-			pfDest[0] = 255.0f * common::UnormToFloat<uint16_t>(puiSrc[0]);
-			pfDest[1] = 0.0f;
-			pfDest[2] = 0.0f;
-			pfDest[3] = 0.0f;
+			pfDestination[0] = 255.0f * common::UnsignedNormalizedIntegerToFloat<uint16_t>(puiSource[0]);
+			pfDestination[1] = 0.0f;
+			pfDestination[2] = 0.0f;
+			pfDestination[3] = 0.0f;
 
-			++puiSrc;
-			pfDest += 4;
+			++puiSource;
+			pfDestination += 4;
 		}
 	}
 }
 
 // OpenEXR reports every failure through a result code, so a discarded result publishes an
 // incompletely decoded image that looks valid downstream.
-static void CheckExrResult(exr_result_t exrResult, const std::filesystem::path& rPath, std::string_view call)
+static void CheckExrResult(exr_result_t iExrResult, const std::filesystem::path& rPath, std::string_view call)
 {
-	if (exrResult != EXR_ERR_SUCCESS)
+	if (iExrResult != EXR_ERR_SUCCESS)
 	{
-		throw std::runtime_error(std::format("{} failed for EXR \"{}\": {}", call, rPath.string(), exr_get_default_error_message(exrResult)));
+		throw std::runtime_error(std::format("{} failed for EXR \"{}\": {}", call, rPath.string(), exr_get_default_error_message(iExrResult)));
 	}
 }
 
 void Texture::LoadExr(const std::filesystem::path& rPath)
 {
 	exr_context_initializer_t exrContextInitializer = EXR_DEFAULT_CONTEXT_INITIALIZER;
-	exr_context_t exrContext {};
-	exr_result_t exrResult = exr_start_read(&exrContext, reinterpret_cast<const char*>(rPath.u8string().c_str()), &exrContextInitializer);
-	CheckExrResult(exrResult, rPath, "exr_start_read");
+	exr_context_t pExrContext {};
+	exr_result_t iExrResult = exr_start_read(&pExrContext, reinterpret_cast<const char*>(rPath.u8string().c_str()), &exrContextInitializer);
+	CheckExrResult(iExrResult, rPath, "exr_start_read");
 	common::ScopedLambda releaseExrContext([=]()
 	{
-		exr_context_t exrContextCopy = exrContext;
-		exr_finish(&exrContextCopy);
+		exr_context_t pExrContextCopy = pExrContext;
+		exr_finish(&pExrContextCopy);
 	});
 
 	exr_attr_box2i_t dataWindow {};
-	CheckExrResult(exr_get_data_window(exrContext, 0, &dataWindow), rPath, "exr_get_data_window");
+	CheckExrResult(exr_get_data_window(pExrContext, 0, &dataWindow), rPath, "exr_get_data_window");
 	int32_t iScansPerChunk = 0;
-	CheckExrResult(exr_get_scanlines_per_chunk(exrContext, 0, &iScansPerChunk), rPath, "exr_get_scanlines_per_chunk");
+	CheckExrResult(exr_get_scanlines_per_chunk(pExrContext, 0, &iScansPerChunk), rPath, "exr_get_scanlines_per_chunk");
 	ASSERT(iScansPerChunk == 1);
 
 	miWidth = dataWindow.max.x + 1;
@@ -185,68 +183,68 @@ void Texture::LoadExr(const std::filesystem::path& rPath)
 	std::vector<float> pixelsG(miWidth * miHeight);
 	std::vector<float> pixelsB(miWidth * miHeight);
 
-	for (int y = dataWindow.min.y; y <= dataWindow.max.y; y += iScansPerChunk)
+	for (int i = dataWindow.min.y; i <= dataWindow.max.y; i += iScansPerChunk)
 	{
 		exr_chunk_info_t exrChunkInfo {};
-		CheckExrResult(exr_read_scanline_chunk_info(exrContext, 0, y, &exrChunkInfo), rPath, "exr_read_scanline_chunk_info");
+		CheckExrResult(exr_read_scanline_chunk_info(pExrContext, 0, i, &exrChunkInfo), rPath, "exr_read_scanline_chunk_info");
 
 		exr_decode_pipeline_t decoder {};
-		CheckExrResult(exr_decoding_initialize(exrContext, 0, &exrChunkInfo, &decoder), rPath, "exr_decoding_initialize");
+		CheckExrResult(exr_decoding_initialize(pExrContext, 0, &exrChunkInfo, &decoder), rPath, "exr_decoding_initialize");
 
 		if (decoder.channel_count != 3)
 		{
-			exr_decoding_destroy(exrContext, &decoder);
+			exr_decoding_destroy(pExrContext, &decoder);
 			throw std::runtime_error(std::format("EXR \"{}\" expected 3 channels, found {}.", rPath.string(), decoder.channel_count));
 		}
 
 		decoder.channels[0].user_data_type = EXR_PIXEL_FLOAT;
-		decoder.channels[0].decode_to_ptr = reinterpret_cast<uint8_t*>(pixelsB.data() + y * miWidth);
+		decoder.channels[0].decode_to_ptr = reinterpret_cast<uint8_t*>(pixelsB.data() + i * miWidth);
 		decoder.channels[0].user_pixel_stride = 4;
 		decoder.channels[0].user_line_stride = static_cast<int32_t>(4 * miWidth);
 		decoder.channels[0].user_bytes_per_element = 4;
 
 		decoder.channels[1].user_data_type = EXR_PIXEL_FLOAT;
-		decoder.channels[1].decode_to_ptr = reinterpret_cast<uint8_t*>(pixelsG.data() + y * miWidth);
+		decoder.channels[1].decode_to_ptr = reinterpret_cast<uint8_t*>(pixelsG.data() + i * miWidth);
 		decoder.channels[1].user_pixel_stride = 4;
 		decoder.channels[1].user_line_stride = static_cast<int32_t>(4 * miWidth);
 		decoder.channels[1].user_bytes_per_element = 4;
 
 		decoder.channels[2].user_data_type = EXR_PIXEL_FLOAT;
-		decoder.channels[2].decode_to_ptr = reinterpret_cast<uint8_t*>(pixelsR.data() + y * miWidth);
+		decoder.channels[2].decode_to_ptr = reinterpret_cast<uint8_t*>(pixelsR.data() + i * miWidth);
 		decoder.channels[2].user_pixel_stride = 4;
 		decoder.channels[2].user_line_stride = static_cast<int32_t>(4 * miWidth);
 		decoder.channels[2].user_bytes_per_element = 4;
 
 		// The initialized decoder holds intermediate buffers, so it must be destroyed before either failure throws.
 		const char* pcLastCall = "exr_decoding_choose_default_routines";
-		exrResult = exr_decoding_choose_default_routines(exrContext, 0, &decoder);
-		if (exrResult == EXR_ERR_SUCCESS)
+		iExrResult = exr_decoding_choose_default_routines(pExrContext, 0, &decoder);
+		if (iExrResult == EXR_ERR_SUCCESS)
 		{
 			pcLastCall = "exr_decoding_run";
-			exrResult = exr_decoding_run(exrContext, 0, &decoder);
+			iExrResult = exr_decoding_run(pExrContext, 0, &decoder);
 		}
-		exr_decoding_destroy(exrContext, &decoder);
-		CheckExrResult(exrResult, rPath, pcLastCall);
+		exr_decoding_destroy(pExrContext, &decoder);
+		CheckExrResult(iExrResult, rPath, pcLastCall);
 	}
 
-	float* pfSrcR = pixelsR.data();
-	float* pfSrcG = pixelsG.data();
-	float* pfSrcB = pixelsB.data();
+	float* pfSourceRed = pixelsR.data();
+	float* pfSourceGreen = pixelsG.data();
+	float* pfSourceBlue = pixelsB.data();
 	std::vector<float>& rPixels = mData.emplace_back(4 * miWidth * miHeight);
-	float* pfDest = rPixels.data();
+	float* pfDestination = rPixels.data();
 	for (int64_t j = 0; j < miHeight; ++j)
 	{
 		for (int64_t i = 0; i < miWidth; ++i)
 		{
-			pfDest[0] = 255.0f * pfSrcR[0];
-			pfDest[1] = 255.0f * pfSrcG[0];
-			pfDest[2] = 255.0f * pfSrcB[0];
-			pfDest[3] = 255.0f;
+			pfDestination[0] = 255.0f * pfSourceRed[0];
+			pfDestination[1] = 255.0f * pfSourceGreen[0];
+			pfDestination[2] = 255.0f * pfSourceBlue[0];
+			pfDestination[3] = 255.0f;
 
-			++pfSrcR;
-			++pfSrcG;
-			++pfSrcB;
-			pfDest += 4;
+			++pfSourceRed;
+			++pfSourceGreen;
+			++pfSourceBlue;
+			pfDestination += 4;
 		}
 	}
 }
@@ -256,18 +254,18 @@ Texture::Texture(const std::byte* puiPixels, int64_t iWidth, int64_t iHeight, in
 , miHeight(iHeight)
 {
 	std::vector<float>& rPixels = mData.emplace_back(4 * miWidth * miHeight);
-	float* pfDest = rPixels.data();
+	float* pfDestination = rPixels.data();
 	for (int64_t j = 0; j < miHeight; ++j)
 	{
 		for (int64_t i = 0; i < miWidth; ++i)
 		{
-			pfDest[0] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[0]));
-			pfDest[1] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[1]));
-			pfDest[2] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[2]));
-			pfDest[3] = static_cast<float>(std::to_integer<uint8_t>(iStride == 4 ? puiPixels[3] : std::byte {255}));
+			pfDestination[0] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[0]));
+			pfDestination[1] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[1]));
+			pfDestination[2] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[2]));
+			pfDestination[3] = static_cast<float>(std::to_integer<uint8_t>(iStride == 4 ? puiPixels[3] : std::byte {255}));
 
 			puiPixels += iStride;
-			pfDest += 4;
+			pfDestination += 4;
 		}
 	}
 }
@@ -275,50 +273,50 @@ Texture::Texture(const std::byte* puiPixels, int64_t iWidth, int64_t iHeight, in
 void Texture::MakeMipmaps(VkFormat vkFormat, int64_t iMaxLevel, int64_t iPreviousLevel, int64_t iPreviousWidth, int64_t iPreviousHeight)
 {
 	int64_t iLevel = iPreviousLevel;
-	int64_t iSrcWidth = iPreviousWidth;
-	int64_t iSrcHeight = iPreviousHeight;
+	int64_t iSourceWidth = iPreviousWidth;
+	int64_t iSourceHeight = iPreviousHeight;
 
-	while (iSrcWidth > 1 && iSrcHeight > 1 && iLevel + 1 < iMaxLevel)
+	while (iSourceWidth > 1 && iSourceHeight > 1 && iLevel + 1 < iMaxLevel)
 	{
-		int64_t iDstWidth = std::max(iSrcWidth / 2, 1ll);
-		int64_t iDstHeight = std::max(iSrcHeight / 2, 1ll);
+		int64_t iDestinationWidth = std::max(iSourceWidth / 2, 1ll);
+		int64_t iDestinationHeight = std::max(iSourceHeight / 2, 1ll);
 
 		if (vkFormat == VK_FORMAT_BC4_UNORM_BLOCK || vkFormat == VK_FORMAT_BC5_UNORM_BLOCK || vkFormat == VK_FORMAT_BC7_UNORM_BLOCK)
 		{
-			if (iDstWidth < 4 || iDstHeight < 4)
+			if (iDestinationWidth < 4 || iDestinationHeight < 4)
 			{
 				return;
 			}
 
-			if ((iDstWidth % 4) != 0 || (iDstHeight % 4) != 0)
+			if ((iDestinationWidth % 4) != 0 || (iDestinationHeight % 4) != 0)
 			{
-				LOG(kDefault, kVerbose, "BC4/BC5/BC7 early out {} x {}", iDstWidth, iDstHeight);
+				LOG(kDefault, kVerbose, "BC4/BC5/BC7 early out {} x {}", iDestinationWidth, iDestinationHeight);
 				return;
 			}
 		}
 
-		mData.emplace_back(4 * iDstWidth * iDstHeight);
-		stbir_resize_float_linear(mData.at(iLevel).data(), static_cast<int>(iSrcWidth), static_cast<int>(iSrcHeight), static_cast<int>(4 * iSrcWidth * sizeof(float)), mData.back().data(), static_cast<int>(iDstWidth), static_cast<int>(iDstHeight), static_cast<int>(4 * iDstWidth * sizeof(float)), STBIR_4CHANNEL);
+		mData.emplace_back(4 * iDestinationWidth * iDestinationHeight);
+		stbir_resize_float_linear(mData.at(iLevel).data(), static_cast<int>(iSourceWidth), static_cast<int>(iSourceHeight), static_cast<int>(4 * iSourceWidth * sizeof(float)), mData.back().data(), static_cast<int>(iDestinationWidth), static_cast<int>(iDestinationHeight), static_cast<int>(4 * iDestinationWidth * sizeof(float)), STBIR_4CHANNEL);
 
-		iSrcWidth = iDstWidth;
-		iSrcHeight = iDstHeight;
+		iSourceWidth = iDestinationWidth;
+		iSourceHeight = iDestinationHeight;
 		++iLevel;
 	}
 }
 
 void Texture::Crop(int64_t iX, int64_t iY, int64_t iWidth, int64_t iHeight)
 {
-	ASSERT(mData.size() == 1);
+	ASSERT(std::ssize(mData) == 1);
 	ASSERT(iX >= 0 && iY >= 0 && iWidth > 0 && iHeight > 0);
 	ASSERT(iX + iWidth <= miWidth && iY + iHeight <= miHeight);
 
-	const std::vector<float>& rSrc = mData.at(0);
+	const std::vector<float>& rSource = mData.at(0);
 	std::vector<float> cropped(4 * static_cast<size_t>(iWidth) * static_cast<size_t>(iHeight));
 	for (int64_t iRow = 0; iRow < iHeight; ++iRow)
 	{
-		const float* pfSrc = &rSrc.at(4 * (static_cast<size_t>(iY + iRow) * static_cast<size_t>(miWidth) + static_cast<size_t>(iX)));
-		float* pfDst = &cropped.at(4 * static_cast<size_t>(iRow) * static_cast<size_t>(iWidth));
-		std::memcpy(pfDst, pfSrc, 4 * static_cast<size_t>(iWidth) * sizeof(float));
+		const float* pfSource = &rSource.at(4 * (static_cast<size_t>(iY + iRow) * static_cast<size_t>(miWidth) + static_cast<size_t>(iX)));
+		float* pfDestination = &cropped.at(4 * static_cast<size_t>(iRow) * static_cast<size_t>(iWidth));
+		std::memcpy(pfDestination, pfSource, 4 * static_cast<size_t>(iWidth) * sizeof(float));
 	}
 	mData.at(0) = std::move(cropped);
 	miWidth = iWidth;
@@ -327,11 +325,11 @@ void Texture::Crop(int64_t iX, int64_t iY, int64_t iWidth, int64_t iHeight)
 
 void Texture::MaskByHeightmap(const std::vector<float>& rHeightmap, int64_t iHeightmapWidth, int64_t iHeightmapHeight, int64_t iHeightmapDivisor, float fThresholdMeters, const float pfFlatValue[4])
 {
-	ASSERT(mData.size() == 1);
+	ASSERT(std::ssize(mData) == 1);
 	ASSERT(iHeightmapDivisor > 0);
 	ASSERT(miWidth == iHeightmapWidth * iHeightmapDivisor);
 	ASSERT(miHeight == iHeightmapHeight * iHeightmapDivisor);
-	ASSERT(static_cast<int64_t>(rHeightmap.size()) == iHeightmapWidth * iHeightmapHeight);
+	ASSERT(std::ssize(rHeightmap) == iHeightmapWidth * iHeightmapHeight);
 
 	std::vector<float>& rPixels = mData.at(0);
 	for (int64_t iY = 0; iY < miHeight; ++iY)
@@ -354,7 +352,7 @@ void Texture::MaskByHeightmap(const std::vector<float>& rHeightmap, int64_t iHei
 
 void Texture::Downsize(int64_t iLevels)
 {
-	ASSERT(mData.size() == 1);
+	ASSERT(std::ssize(mData) == 1);
 
 	MakeMipmaps(VK_FORMAT_R32_SFLOAT, iLevels + 1);
 
@@ -368,15 +366,15 @@ void Texture::Downsize(int64_t iLevels)
 	miHeight >>= iLevels;
 }
 
-uint32_t Texture::PixelToUint32(const std::vector<float>& rIn, int64_t iWidth, int64_t iX, int64_t iY)
+uint32_t Texture::PixelToUint32(const std::vector<float>& rInput, int64_t iWidth, int64_t iX, int64_t iY)
 {
-	return static_cast<uint32_t>(rIn.at(4 * (iY * iWidth + iX) + 3)) << 24 |
-	       static_cast<uint32_t>(rIn.at(4 * (iY * iWidth + iX) + 2)) << 16 |
-	       static_cast<uint32_t>(rIn.at(4 * (iY * iWidth + iX) + 1)) <<  8 |
-	       static_cast<uint32_t>(rIn.at(4 * (iY * iWidth + iX) + 0));
+	return static_cast<uint32_t>(rInput.at(4 * (iY * iWidth + iX) + 3)) << 24 |
+	       static_cast<uint32_t>(rInput.at(4 * (iY * iWidth + iX) + 2)) << 16 |
+	       static_cast<uint32_t>(rInput.at(4 * (iY * iWidth + iX) + 1)) <<  8 |
+	       static_cast<uint32_t>(rInput.at(4 * (iY * iWidth + iX) + 0));
 }
 
-void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, TextureOptions_t options)
+void Texture::EncodeBlocks(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, TextureOptions_t options)
 {
 	if (gpFileManager->mbForbidExpensiveExport)
 	{
@@ -384,10 +382,10 @@ void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int
 	}
 
 	// Callers must hold Texture::sEncodeMutex — this function trusts the caller's lock.
-	int iActiveEncodes = sActiveEncodeCount.fetch_add(1, std::memory_order_relaxed) + 1;
+	int iActiveEncodes = siActiveEncodeCount.fetch_add(1, std::memory_order_relaxed) + 1;
 	common::ScopedLambda decrementActive([]()
 	{
-		sActiveEncodeCount.fetch_sub(1, std::memory_order_relaxed);
+		siActiveEncodeCount.fetch_sub(1, std::memory_order_relaxed);
 	});
 	ASSERT(iActiveEncodes == 1);
 	LOG(kDefault, kVerbose, "BC encode: {}x{} (concurrent={})", iWidth, iHeight, iActiveEncodes);
@@ -402,7 +400,7 @@ void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int
 	int64_t iBlockRows = (iHeight + 3) / 4;
 	int64_t iBytesPerBlock = vkFormat == VK_FORMAT_BC4_UNORM_BLOCK ? 8 : 16;
 	std::atomic<bool> bHasAlpha(false);
-	auto encodeBlockRows = [&](int64_t iStart, int64_t iEnd)
+	auto EncodeBlockRows = [&](int64_t iStart, int64_t iEnd)
 	{
 		std::array<uint8_t, 4 * 4 * 4> pixels {};
 		for (int64_t iBlockY = iStart; iBlockY < iEnd; ++iBlockY)
@@ -415,7 +413,7 @@ void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int
 					for (int64_t iPixelX = 0; iPixelX < 4; ++iPixelX)
 					{
 						int64_t iSourceX = std::min(iBlockX * 4 + iPixelX, iWidth - 1);
-						const float* pfSource = rIn.data() + 4 * (iSourceY * iWidth + iSourceX);
+						const float* pfSource = rInput.data() + 4 * (iSourceY * iWidth + iSourceX);
 						uint8_t* puiPixel = pixels.data() + 4 * (iPixelY * 4 + iPixelX);
 						for (int64_t iChannel = 0; iChannel < 4; ++iChannel)
 						{
@@ -424,7 +422,7 @@ void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int
 					}
 				}
 
-				std::byte* puiBlock = puiOut + (iBlockY * iBlockColumns + iBlockX) * iBytesPerBlock;
+				std::byte* puiBlock = puiOutput + (iBlockY * iBlockColumns + iBlockX) * iBytesPerBlock;
 				switch (vkFormat)
 				{
 					case VK_FORMAT_BC4_UNORM_BLOCK:
@@ -445,7 +443,7 @@ void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int
 			}
 		}
 	};
-	common::gpMultithreading->Dispatch(iBlockRows, encodeBlockRows);
+	common::gpMultithreading->Dispatch(iBlockRows, EncodeBlockRows);
 
 	if ((options & TextureOptions::kVerifyNoAlpha) && vkFormat == VK_FORMAT_BC7_UNORM_BLOCK)
 	{
@@ -453,39 +451,39 @@ void Texture::EncodeBlocks(std::byte* puiOut, const std::vector<float>& rIn, int
 	}
 }
 
-void Texture::ToBc4(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)
+void Texture::ToBc4(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight)
 {
-	EncodeBlocks(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC4_UNORM_BLOCK, {});
+	EncodeBlocks(puiOutput, rInput, iWidth, iHeight, VK_FORMAT_BC4_UNORM_BLOCK, {});
 }
 
-void Texture::ToBc5(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)
+void Texture::ToBc5(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight)
 {
-	EncodeBlocks(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC5_UNORM_BLOCK, {});
+	EncodeBlocks(puiOutput, rInput, iWidth, iHeight, VK_FORMAT_BC5_UNORM_BLOCK, {});
 }
 
-void Texture::ToBc7(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight, TextureOptions_t options)
+void Texture::ToBc7(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight, TextureOptions_t options)
 {
-	EncodeBlocks(puiOut, rIn, iWidth, iHeight, VK_FORMAT_BC7_UNORM_BLOCK, options);
+	EncodeBlocks(puiOutput, rInput, iWidth, iHeight, VK_FORMAT_BC7_UNORM_BLOCK, options);
 }
 
-void Texture::ToR8G8B8A8(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)
+void Texture::ToR8G8B8A8(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight)
 {
 	for (int64_t j = 0; j < iHeight; ++j)
 	{
 		for (int64_t i = 0; i < iWidth; ++i)
 		{
-			reinterpret_cast<uint32_t*>(puiOut)[j * iWidth + i] = PixelToUint32(rIn, iWidth, i, j);
+			reinterpret_cast<uint32_t*>(puiOutput)[j * iWidth + i] = PixelToUint32(rInput, iWidth, i, j);
 		}
 	}
 }
 
-void Texture::ToR16(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)
+void Texture::ToR16(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight)
 {
 	for (int64_t j = 0; j < iHeight; ++j)
 	{
 		for (int64_t i = 0; i < iWidth; ++i)
 		{
-			float fPixel = rIn.at(4 * (j * iWidth + i)) / 255.0f;
+			float fPixel = rInput.at(4 * (j * iWidth + i)) / 255.0f;
 
 			if (fPixel > 1.0f) [[unlikely]]
 			{
@@ -504,7 +502,7 @@ void Texture::ToR16(std::byte* puiOut, const std::vector<float>& rIn, int64_t iW
 				fPixel = 0.0f;
 			}
 
-			reinterpret_cast<uint16_t*>(puiOut)[j * iWidth + i] = common::FloatToUnorm<uint16_t>(fPixel);
+			reinterpret_cast<uint16_t*>(puiOutput)[j * iWidth + i] = common::FloatToUnsignedNormalizedInteger<uint16_t>(fPixel);
 		}
 	}
 }
@@ -512,13 +510,13 @@ void Texture::ToR16(std::byte* puiOut, const std::vector<float>& rIn, int64_t iW
 // R32_SFLOAT carries raw float meters (elevation), not RGB color. The kFloat32 / kUint16Raw
 // constructors store source values scaled by 255 in the R channel; divide back here so the
 // emitted bytes are the original meters (e.g., 50.0m source → 12750.0 internal → 50.0 emitted).
-void Texture::ToR32Sfloat(std::byte* puiOut, const std::vector<float>& rIn, int64_t iWidth, int64_t iHeight)
+void Texture::ToR32Sfloat(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight)
 {
 	for (int64_t j = 0; j < iHeight; ++j)
 	{
 		for (int64_t i = 0; i < iWidth; ++i)
 		{
-			reinterpret_cast<float*>(puiOut)[j * iWidth + i] = rIn.at(4 * (j * iWidth + i)) / 255.0f;
+			reinterpret_cast<float*>(puiOutput)[j * iWidth + i] = rInput.at(4 * (j * iWidth + i)) / 255.0f;
 		}
 	}
 }
@@ -599,46 +597,46 @@ void Texture::SaveJpegSidecar(const std::filesystem::path& rPath, int iQuality, 
 	float fScale = 255.0f / fRange;
 
 	std::vector<uint8_t> bytes(static_cast<size_t>(3 * miWidth * miHeight));
-	const float* pfSrc = rPixels.data();
-	uint8_t* puiDst = bytes.data();
+	const float* pfSource = rPixels.data();
+	uint8_t* puiDestination = bytes.data();
 	for (int64_t i = 0; i < iPixelCount; ++i)
 	{
-		uint8_t uiR = static_cast<uint8_t>(std::clamp((pfSrc[0] - fMin) * fScale, 0.0f, 255.0f));
+		uint8_t uiR = static_cast<uint8_t>(std::clamp((pfSource[0] - fMin) * fScale, 0.0f, 255.0f));
 		if (bGrayscale)
 		{
-			puiDst[0] = uiR;
-			puiDst[1] = uiR;
-			puiDst[2] = uiR;
+			puiDestination[0] = uiR;
+			puiDestination[1] = uiR;
+			puiDestination[2] = uiR;
 		}
 		else
 		{
-			puiDst[0] = uiR;
-			puiDst[1] = static_cast<uint8_t>(std::clamp(pfSrc[1], 0.0f, 255.0f));
-			puiDst[2] = static_cast<uint8_t>(std::clamp(pfSrc[2], 0.0f, 255.0f));
+			puiDestination[0] = uiR;
+			puiDestination[1] = static_cast<uint8_t>(std::clamp(pfSource[1], 0.0f, 255.0f));
+			puiDestination[2] = static_cast<uint8_t>(std::clamp(pfSource[2], 0.0f, 255.0f));
 		}
-		pfSrc += 4;
-		puiDst += 3;
+		pfSource += 4;
+		puiDestination += 3;
 	}
 	int iResult = stbi_write_jpg(reinterpret_cast<const char*>(rPath.u8string().c_str()), static_cast<int>(miWidth), static_cast<int>(miHeight), 3, bytes.data(), iQuality);
 	ASSERT(iResult != 0);
 }
 
-std::vector<std::byte> ZlibCompress(const std::byte* puiSource, int64_t iSourceSize)
+std::vector<std::byte> ZlibCompress(std::span<const std::byte> source)
 {
-	uLongf uiBound = compressBound(static_cast<uLong>(iSourceSize));
+	uLongf uiBound = compressBound(static_cast<uLong>(source.size()));
 	std::vector<std::byte> compressed(uiBound);
 	uLongf uiCompressedSize = uiBound;
-	int iZlibResult = compress2(reinterpret_cast<Bytef*>(compressed.data()), &uiCompressedSize, reinterpret_cast<const Bytef*>(puiSource), static_cast<uLong>(iSourceSize), Z_BEST_COMPRESSION);
+	int iZlibResult = compress2(reinterpret_cast<Bytef*>(compressed.data()), &uiCompressedSize, reinterpret_cast<const Bytef*>(source.data()), static_cast<uLong>(source.size()), Z_BEST_COMPRESSION);
 	ASSERT(iZlibResult == Z_OK);
 	compressed.resize(uiCompressedSize);
 	return compressed;
 }
 
-std::vector<std::byte> Lz4Compress(const std::byte* puiSource, int64_t iSourceSize)
+std::vector<std::byte> Lz4Compress(std::span<const std::byte> source)
 {
-	int iBound = LZ4_compressBound(static_cast<int>(iSourceSize));
+	int iBound = LZ4_compressBound(static_cast<int>(source.size()));
 	std::vector<std::byte> compressed(static_cast<size_t>(iBound));
-	int iCompressedSize = LZ4_compress_HC(reinterpret_cast<const char*>(puiSource), reinterpret_cast<char*>(compressed.data()), static_cast<int>(iSourceSize), iBound, LZ4HC_CLEVEL_MAX);
+	int iCompressedSize = LZ4_compress_HC(reinterpret_cast<const char*>(source.data()), reinterpret_cast<char*>(compressed.data()), static_cast<int>(source.size()), iBound, LZ4HC_CLEVEL_MAX);
 	ASSERT(iCompressedSize > 0);
 	compressed.resize(static_cast<size_t>(iCompressedSize));
 	return compressed;
@@ -646,22 +644,19 @@ std::vector<std::byte> Lz4Compress(const std::byte* puiSource, int64_t iSourceSi
 
 gli::texture LoadGliFromPath(const std::filesystem::path& rPath)
 {
-	// Read via the wide-correct path stream (ReadEntireFile uses the std::filesystem::path ifstream ctor),
-	// then dispatch through gli's memory overload — the same code gli::load(path) runs after its own read,
-	// so the result is byte-identical while fixing gli's ANSI-only fopen_s path handling.
 	std::vector<std::byte> data = common::ReadEntireFile(rPath);
 	return gli::load(reinterpret_cast<const char*>(data.data()), data.size());
 }
 
-TextureIntermediateHeader ReadTextureIntermediateHeader(const std::byte* puiData, int64_t iDataSize)
+TextureIntermediateHeader ReadTextureIntermediateHeader(std::span<const std::byte> data)
 {
 	static constexpr int64_t kiQwordBytes = static_cast<int64_t>(sizeof(int64_t));
 	auto ReadQword = [=](int64_t iOffset) -> int64_t
 	{
 		int64_t iValue = 0;
-		if (iOffset >= 0 && iOffset + kiQwordBytes <= iDataSize)
+		if (iOffset >= 0 && iOffset + kiQwordBytes <= std::ssize(data))
 		{
-			std::memcpy(&iValue, puiData + iOffset, sizeof(iValue));
+			std::memcpy(&iValue, data.data() + iOffset, sizeof(iValue));
 		}
 		return iValue;
 	};
@@ -701,14 +696,14 @@ void WriteStagedIntermediate(const std::filesystem::path& rPath, const std::func
 
 	try
 	{
-		std::fstream fileStreamOut(stagingPath, std::ios::out | std::ios::binary | std::ios::trunc);
-		VERIFY_SUCCESS(fileStreamOut.is_open());
-		rWriteBody(fileStreamOut);
-		VERIFY_SUCCESS(fileStreamOut.good());
-		fileStreamOut.flush();
-		VERIFY_SUCCESS(fileStreamOut.good());
-		fileStreamOut.close();
-		VERIFY_SUCCESS(fileStreamOut.good());
+		std::fstream fileStreamOutput(stagingPath, std::ios::out | std::ios::binary | std::ios::trunc);
+		VERIFY_SUCCESS(fileStreamOutput.is_open());
+		rWriteBody(fileStreamOutput);
+		VERIFY_SUCCESS(fileStreamOutput.good());
+		fileStreamOutput.flush();
+		VERIFY_SUCCESS(fileStreamOutput.good());
+		fileStreamOutput.close();
+		VERIFY_SUCCESS(fileStreamOutput.good());
 		VERIFY_SUCCESS(MoveFileExW(stagingPath.native().c_str(), rPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
 	}
 	catch (...)
@@ -723,7 +718,7 @@ void Texture::Save(const std::filesystem::path& rPath, VkFormat vkFormat, Textur
 {
 	std::vector<std::byte> data = Export(vkFormat, options);
 
-	std::vector<std::byte> compressed = ZlibCompress(data.data(), static_cast<int64_t>(data.size()));
+	std::vector<std::byte> compressed = ZlibCompress(data);
 
 	WriteStagedIntermediate(rPath, [&](std::ostream& rStream)
 	{

@@ -1,8 +1,9 @@
 # Deterministic session change inventory shared by the review, audit, and workflow skills:
 # one read-only answer to "what changed between the session baseline and the head side, and
-# what artifact type is each change". The script writes no file and no repository metadata
-# (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is safe under a
-# read-only sandbox. Diagnostics go to stderr; stdout carries only the result document.
+# what artifact type is each change". The script writes no file except the -OutputPath result the
+# caller names, and no repository metadata (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the
+# index). Diagnostics go to stderr; stdout carries the result document, or with -OutputPath one
+# summary line.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -13,7 +14,8 @@ param(
 	[switch] $Regions,
 	[switch] $Landing,
 	[switch] $EmitTargets,
-	[switch] $EmitManifest
+	[switch] $EmitManifest,
+	[string] $OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -90,6 +92,11 @@ function Complete-SessionChangeInventory([int] $ExitCode, [string] $Status, [str
 	$result.status = $Status
 	$result.code = $Code
 	$result.message = if ($Message.Length -gt $script:MaximumMessageLength) { $Message.Substring(0, $script:MaximumMessageLength) } else { $Message }
+	if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+		[IO.File]::WriteAllText($OutputPath, ($result | ConvertTo-Json -Depth 32 -Compress), $script:Utf8)
+		Write-InventoryStream $false "$Status $Code $($result.message) -> $OutputPath`n"
+		exit $ExitCode
+	}
 	if ($EmitManifest) {
 		# Manifest consumers reserve stdout for one complete frozen-tree document. Any blocked or
 		# error result therefore uses the existing structured envelope on stderr instead.
@@ -711,8 +718,10 @@ try {
 	$manifestConflict = $EmitManifest -and ($modes.Count -gt 0 -or $PSBoundParameters.ContainsKey('Head') -or $PSBoundParameters.ContainsKey('IncludeUntracked'))
 	# Those three modes never read the filtered entries or regions, so they would silently ignore the filter.
 	$prefixConflict = $PSBoundParameters.ContainsKey('PathPrefix') -and ($Landing -or $EmitTargets -or $EmitManifest)
-	if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict) {
-		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
+	# Those three modes keep their own stdout contracts and the landing arrays' caps.
+	$outputConflict = -not [string]::IsNullOrWhiteSpace($OutputPath) -and ($Landing -or $EmitTargets -or $EmitManifest)
+	if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict -or $outputConflict) {
+		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($outputConflict) { 'The -OutputPath result file is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' $message
 	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
@@ -816,8 +825,11 @@ try {
 		$scoped = [Collections.Generic.List[object]]::new()
 		foreach ($entry in $sorted) { if (Test-InventoryPathInScope $entry.Path $prefixes) { $scoped.Add($entry) } }
 	}
+	# A file result has no stdout budget, so it carries every entry and region.
+	$toFile = -not [string]::IsNullOrWhiteSpace($OutputPath)
+	$entryLimit = if ($toFile) { $scoped.Count } else { $script:MaximumEntries }
 	$emittedEntries = [Collections.Generic.List[object]]::new()
-	foreach ($entry in ($scoped | Select-Object -First $script:MaximumEntries)) {
+	foreach ($entry in ($scoped | Select-Object -First $entryLimit)) {
 		$emittedEntries.Add([ordered]@{
 			status = $entry.Status
 			path = $entry.Path
@@ -835,7 +847,8 @@ try {
 		foreach ($region in $allRegions) { if (Test-InventoryPathInScope $region.path $prefixes) { $fullRegions.Add($region) } }
 	}
 	$emittedRegions = [Collections.Generic.List[object]]::new()
-	foreach ($region in ($fullRegions | Select-Object -First $script:MaximumRegions)) { $emittedRegions.Add($region) }
+	$regionLimit = if ($toFile) { $fullRegions.Count } else { $script:MaximumRegions }
+	foreach ($region in ($fullRegions | Select-Object -First $regionLimit)) { $emittedRegions.Add($region) }
 	$landingTruncation = $null
 	if ($Landing) {
 		$landingReference = $null
@@ -876,7 +889,7 @@ try {
 			if ($bytes -eq $truncation.outputBytes) { break }
 			$truncation.outputBytes = $bytes
 		}
-		if ($bytes -le $script:MaximumOutputBytes) { break }
+		if ($toFile -or $bytes -le $script:MaximumOutputBytes) { break }
 		if ($emittedRegions.Count -gt 0) {
 			$drop = [Math]::Max(1, [int] [Math]::Ceiling($emittedRegions.Count * 0.1))
 			$emittedRegions.RemoveRange($emittedRegions.Count - $drop, $drop)

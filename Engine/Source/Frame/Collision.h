@@ -5,7 +5,6 @@
 namespace engine
 {
 
-// Zone grid dimensions and pre-allocation size
 inline constexpr int32_t kiCollisionZonesX = 8;
 inline constexpr int32_t kiCollisionZonesY = 8;
 inline constexpr int64_t kiCollisionZonePreallocate = 2'048;
@@ -14,8 +13,8 @@ inline constexpr int64_t kiCollisionLayerPairPreallocate = 16;
 inline constexpr int64_t kiCollisionCandidatePreallocate = 512;
 inline constexpr int64_t kiCollisionResultPreallocate = 1'024;
 inline constexpr int64_t kiCollisionResultSpanPreallocate = 1'024;
+inline constexpr int64_t kiCollisionLiveDataReserveBytes = 64 * 1'024 * 1'024;
 
-// Collision Flags - Behavior modifiers
 enum class CollisionFlags : uint8_t
 {
 	kDestroyOnCollide = 0x01,
@@ -32,26 +31,23 @@ struct CollisionLayer
 	const float* pfStartTimes = nullptr;       // Normalized absolute tick time
 	const float* pfEndTimes = nullptr;         // Normalized absolute tick time
 	const float* pfMaxTimes = nullptr;         // Optional exclusive entity-collision cutoff
-	const float* pfRadii = nullptr;           // Per-object radii
-	const float* pfDamages = nullptr;         // Per-object damages
+	const float* pfRadii = nullptr;
+	const float* pfDamages = nullptr;
 	CollisionFlags_t* pFlags = nullptr;       // Per-object flags (read/write for kAlreadyCollided)
 	const XMVECTOR* pVecVelocities = nullptr; // Optional: velocity/direction per object
 	int64_t iCount = 0;
 	bool bSweptTest = false;                  // Sweep every pair involving this layer
 
-	// Per-layer constants
 	uint16_t uiCategory = 0;
 	uint16_t uiCollidesWith = 0;
 
-	// Alignment filtering
-	const alignment_t* pAlignments = nullptr;
+	const AlignmentIdentifier* pAlignments = nullptr;
 };
 
-// Collision result (by layer index)
 struct CollisionResult
 {
-	int64_t iOtherIndex = 0;                  // Index in the other layer
-	size_t uiOtherLayerIndex = 0;             // Which layer (index into sLayers)
+	int64_t iOtherIndex = 0;
+	int64_t iOtherLayerIndex = 0;             // Which layer (index into sLayers)
 	uint16_t uiOtherCategory = 0;
 	float fDamageReceived = 0.0f;
 	float fTimeOfImpact = 0.0f;
@@ -67,7 +63,6 @@ struct CollisionResultSpan
 	int64_t iCount = 0;
 };
 
-// Implementation-detail types defined in Collision.cpp
 struct ZoneRange;
 struct LayerPairZones;
 struct CollisionCandidate;
@@ -76,48 +71,47 @@ class Collision
 {
 public:
 
-	// Per-frame layer registration and binding (called in PreCollision phase)
-	static size_t AddLayer(const CollisionLayer& rLayer);
+	static inline thread_local int64_t siLayerCount = 0;
+	static inline thread_local common::StableVector<CollisionResultSpan> sResultSpans = common::StableVector<CollisionResultSpan>(kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResultSpan)));
+	static inline thread_local int64_t sLayerBaseOffsets[kiCollisionLayerPreallocate] {};
 
-	// Collision detection (called by Frame, not collections)
-	// Uses the collision groups matrix from the frame to filter group collisions
+	// Per-frame layer registration and binding (called in PreCollision phase)
+	static int64_t AddLayer(const CollisionLayer& rLayer);
+
+	// Frame drives collision detection; layer category masks and alignment pairs filter collisions.
 	static void Collide(const Alignments& rAlignments, FXMVECTOR vecArea);
 
-	// Query by layer + index
-	static bool HasCollision(size_t uiLayerIndex, int64_t iIndex);
-	static std::span<const CollisionResult> GetCollisions(size_t uiLayerIndex, int64_t iIndex);
+	static std::span<const CollisionResult> GetCollisions(int64_t iLayerIndex, int64_t iIndex);
 
-	// Clear layers for next frame (called at end of PostCollision phase)
-	static void Clear();
 
 private:
 
 	static void SetupZones(FXMVECTOR vecArea);
-	static ZoneRange CalculateZoneRange(float fMinX, float fMaxX, float fMinY, float fMaxY, float fRadius);
+	static ZoneRange CalculateZoneRange(float fMinimumX, float fMaximumX, float fMinimumY, float fMaximumY, float fRadius);
 	static ZoneRange CalculateObjectZoneRange(const CollisionLayer& rLayer, int64_t iIndex, bool bSweptPair);
 	static void InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange, bool bIsLayerA);
 	static void InsertLayerObjectsIntoZones(LayerPairZones& rPairZones, const CollisionLayer& rLayer, bool bIsLayerA, bool bSweptPair);
-	static void CollideLayerPair(const Alignments& rAlignments, LayerPairZones& rPairZones);
+	static void CollideLayerPair(const Alignments& rAlignments, const LayerPairZones& rPairZones);
 	static void CommitCandidate(const CollisionCandidate& rCandidate);
 	static void AllocateResultStorage();
 
 	// thread_local: each Dispatch worker and reconcile thread gets its own copy
-	static inline thread_local float sfAreaMinX = 0.0f;
-	static inline thread_local float sfAreaMinY = 0.0f;
+	static inline thread_local float sfAreaMinimumX = 0.0f;
+	static inline thread_local float sfAreaMinimumY = 0.0f;
 	static inline thread_local float sfZoneWidth = 0.0f;
 	static inline thread_local float sfZoneHeight = 0.0f;
 
-	static thread_local std::vector<CollisionLayer> sLayers;
-	static inline thread_local int64_t siLayerCount = 0;
+	// Default-constructed (no allocation): thread_local constructors run during
+	// mi_process_init before the allocator is ready, so pre-allocation would crash.
+	static inline thread_local std::vector<CollisionLayer> sLayers;
 
 	static thread_local common::StableVector<LayerPairZones> sLayerPairZones;
 	static inline thread_local int64_t siLayerPairCount = 0;
 
-	static thread_local common::StableVector<CollisionResult> sResultEntries;
-	static thread_local common::StableVector<CollisionResultSpan> sResultSpans;
+	// Each result and generation buffer has a fixed 64 MiB reservation ceiling; live counts determine committed storage.
+	static inline thread_local common::StableVector<CollisionResult> sResultEntries = common::StableVector<CollisionResult>(kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResult)));
 	static inline thread_local int64_t siResultSpanCount = 0;
-	static thread_local int64_t sLayerBaseOffsets[kiCollisionLayerPreallocate];
-	static thread_local common::StableVector<uint32_t> sTestedBGeneration;
+	static inline thread_local common::StableVector<uint32_t> sTestedBGeneration = common::StableVector<uint32_t>(kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(uint32_t)));
 	static inline thread_local uint32_t suiTestedBCurrentGeneration = 0;
 };
 

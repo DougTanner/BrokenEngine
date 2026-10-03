@@ -34,15 +34,13 @@ public:
 	std::filesystem::path mOutputDirectory;
 	std::filesystem::path mThirdPartyDirectory;
 	std::string mProjectName;
+	std::unique_ptr<InputFingerprintCache> mpInputFingerprintCache;
 
 	bool mbCleanExport = false;
 	bool mbForbidExpensiveExport = false;
 	bool mbForbidGaeaExport = false;
 
-	std::string GetFingerprint(const std::filesystem::path& rPath, InputFingerprintMode eMode = InputFingerprintMode::kRaw);
-	std::string GetSharedCacheFingerprint(const std::filesystem::path& rPath);
 	EnsureLocalResult EnsureLocal(OutputRoot eRoot);
-	std::filesystem::path GetAttributionDirectory() const;
 
 private:
 	enum class OutputRootState
@@ -63,12 +61,10 @@ private:
 	EnsureLocalResult InitializeWorktreeOutputs(InitializationMode eMode);
 	EnsureLocalResult ReconcileWorktreeOutput(OutputRootInfo& rRoot);
 	EnsureLocalResult MaterializeOutput(OutputRootInfo& rRoot);
-	OutputRootInfo& GetOutputRoot(OutputRoot eRoot);
 
 	OutputRootInfo mDataOutput;
 	OutputRootInfo mAttributionOutput;
 
-	std::unique_ptr<InputFingerprintCache> mpInputFingerprintCache;
 };
 
 inline FileManager* gpFileManager = nullptr;

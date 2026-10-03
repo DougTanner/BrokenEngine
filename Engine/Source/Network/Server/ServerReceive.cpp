@@ -11,22 +11,14 @@
 namespace engine
 {
 
-namespace
-{
+constexpr std::chrono::seconds kDesynchronizationDiagnosticCooldown = 2s;
 
-constexpr std::chrono::seconds kDesyncDiagnosticCooldown = 2s;
-
-// How long a full state's tick stays usable as a floor re-baseline target. A client that adopted the full state
-// has its floor frozen at that tick until the server admits the regression, so it re-sends the same floor every
-// flush and survives ACK loss; once the live ticks it keeps receiving run more than kiNetworkBufferSize past that
-// floor it disconnects itself (Client::TrackReceivedTick), so past this window no client can still need the
-// re-baseline. Doubling covers full-state delivery and the ACK trip. Bounding it matters: a slot whose client
-// never re-baselined would otherwise keep the monotonic floor guard relaxed for the life of the subscription.
+// Full-state adoption freezes the client's floor at the adopted tick; repeated flushes tolerate ACK loss.
+// Client::TrackReceivedTick disconnects when received ticks exceed that floor by more than kiNetworkBufferSize.
+// Twice that window covers full-state delivery and the ACK trip while bounding relaxation of the monotonic floor guard.
 constexpr int64_t kiPendingFullStateWindowTicks = 2 * kiNetworkBufferSize;
 
-} // namespace
-
-void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClientId)
+void Server::ClientAcknowledgementStream(std::span<const uint8_t> packetData, int64_t iClientId)
 {
 	ClientConnection* pClient = FindHandshakenClient(iClientId);
 	if (pClient == nullptr)
@@ -34,11 +26,11 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 		return;
 	}
 
-	NetworkMessages::AckStreamEntry entries[NetworkManager::kiMaxEnetCoordSlots] {};
+	NetworkMessages::AckStreamEntry entries[NetworkManager::kiMaximumEnetCoordinateSlots] {};
 	NetworkMessages::ClientAckStreamMessage message
 	{
 		.pEntries = entries,
-		.iEntryCapacity = NetworkManager::kiMaxEnetCoordSlots,
+		.iEntryCapacity = NetworkManager::kiMaximumEnetCoordinateSlots,
 	};
 	NetworkMessages::Read(packetData, message);
 
@@ -52,16 +44,15 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 	}
 
 	int64_t iFloorAdvanceCount = 0;
-	for (uint8_t i = 0; i < message.uiSlotCount; ++i)
+	for (int64_t i = 0; i < message.uiSlotCount; ++i)
 	{
 		const NetworkMessages::AckStreamEntry& rEntry = message.pEntries[i];
 		uint8_t uiSlotIndex = rEntry.uiSlotIndex;
 		uint16_t uiSlotEpoch = rEntry.uiEpoch;
-		int64_t iSlotAckFloor = rEntry.iAckFloor;
+		int64_t iSlotAcknowledgementFloor = rEntry.iAckFloor;
 		uint64_t uiSlotBitfieldLow = rEntry.uiReceivedBitfieldLow;
 		uint64_t uiSlotBitfieldHigh = rEntry.uiReceivedBitfieldHigh;
 
-		// Invalid-index or inactive slots match neither branch below; skip after the reads so the cursor stays aligned
 		if (!(uiSlotIndex < std::ssize(pClient->slots) && (pClient->slots.at(uiSlotIndex).subscription.flags & SubscriptionFlags::kActive)))
 		{
 			continue;
@@ -74,34 +65,31 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 		// the tick whose authoritative state the client now holds. The acks the client sent before it adopted still
 		// carry higher floors and satisfy the strict guard, so they cannot consume a backward target. A held restart
 		// target is consumed when an accepted ACK crosses it; a backward target is consumed by the bounded regression.
-		bool bFullStateRebaseline = rSlot.iPendingFullStateTick >= 0
-		                         && miLatestBufferedTick - rSlot.iPendingFullStateTick <= kiPendingFullStateWindowTicks
-		                         && iSlotAckFloor < rSlot.ack.iAckFloor && iSlotAckFloor >= rSlot.iPendingFullStateTick;
+		bool bFullStateRebaseline = rSlot.iPendingFullStateTick >= 0 && miLatestBufferedTick - rSlot.iPendingFullStateTick <= kiPendingFullStateWindowTicks && iSlotAcknowledgementFloor < rSlot.ack.iAcknowledgmentFloor && iSlotAcknowledgementFloor >= rSlot.iPendingFullStateTick;
 
-		if (uiSlotEpoch == rSlot.ack.uiEpoch && (iSlotAckFloor >= rSlot.ack.iAckFloor || bFullStateRebaseline))
+		if (uiSlotEpoch == rSlot.ack.uiEpoch && (iSlotAcknowledgementFloor >= rSlot.ack.iAcknowledgmentFloor || bFullStateRebaseline))
 		{
 			// Clamp to server's latest sent tick to prevent future ACK floors
-			iSlotAckFloor = std::min(iSlotAckFloor, miLatestBufferedTick);
-			AckState& rAckState = rSlot.ack;
-			bool bFullStateAck = bFullStateRebaseline
-			                  || (rSlot.bHoldUpdatesUntilFullStateAck && rSlot.iPendingFullStateTick >= 0 && rAckState.iAckFloor < rSlot.iPendingFullStateTick && iSlotAckFloor >= rSlot.iPendingFullStateTick);
+			iSlotAcknowledgementFloor = std::min(iSlotAcknowledgementFloor, miLatestBufferedTick);
+			AckState& rAcknowledgementState = rSlot.ack;
+			bool bFullStateAcknowledgement = bFullStateRebaseline || (rSlot.bHoldUpdatesUntilFullStateAck && rSlot.iPendingFullStateTick >= 0 && rAcknowledgementState.iAcknowledgmentFloor < rSlot.iPendingFullStateTick && iSlotAcknowledgementFloor >= rSlot.iPendingFullStateTick);
 			if (bFullStateRebaseline)
 			{
-				LOG(kNetwork, kDebug, "Server::ClientAckStream Full-state floor re-baseline Client: {} Slot: {} Floor: {} -> {} FullStateTick: {}", iClientId, uiSlotIndex, rAckState.iAckFloor, iSlotAckFloor, rSlot.iPendingFullStateTick);
+				LOG(kNetwork, kDebug, "Server::ClientAckStream Full-state floor re-baseline Client: {} Slot: {} Floor: {} -> {} FullStateTick: {}", iClientId, uiSlotIndex, rAcknowledgementState.iAcknowledgmentFloor, iSlotAcknowledgementFloor, rSlot.iPendingFullStateTick);
 			}
-			if (iSlotAckFloor == rAckState.iAckFloor)
+			if (iSlotAcknowledgementFloor == rAcknowledgementState.iAcknowledgmentFloor)
 			{
-				rAckState.uiReceivedBitfieldLow |= uiSlotBitfieldLow;
-				rAckState.uiReceivedBitfieldHigh |= uiSlotBitfieldHigh;
+				rAcknowledgementState.uiReceivedBitfieldLow |= uiSlotBitfieldLow;
+				rAcknowledgementState.uiReceivedBitfieldHigh |= uiSlotBitfieldHigh;
 			}
 			else
 			{
 				++iFloorAdvanceCount;
-				rAckState.iAckFloor = iSlotAckFloor;
-				rAckState.uiReceivedBitfieldLow = uiSlotBitfieldLow;
-				rAckState.uiReceivedBitfieldHigh = uiSlotBitfieldHigh;
+				rAcknowledgementState.iAcknowledgmentFloor = iSlotAcknowledgementFloor;
+				rAcknowledgementState.uiReceivedBitfieldLow = uiSlotBitfieldLow;
+				rAcknowledgementState.uiReceivedBitfieldHigh = uiSlotBitfieldHigh;
 			}
-			if (bFullStateAck)
+			if (bFullStateAcknowledgement)
 			{
 				rSlot.iPendingFullStateTick = -1;
 				rSlot.bHoldUpdatesUntilFullStateAck = false;
@@ -137,14 +125,14 @@ void Server::ClientAckStream(std::span<const uint8_t> packetData, int64_t iClien
 	}
 
 	// Pipeline RTT: store client timestamp for echo in SendUpdate (monotonically increasing to guard against out-of-order packets)
-	int64_t iClientTimestampNs = message.iTimestampNs;
-	if (iClientTimestampNs > pClient->iClientTimestampNs)
+	int64_t iClientTimestampNanoseconds = message.iTimestampNanoseconds;
+	if (iClientTimestampNanoseconds > pClient->iClientTimestampNanoseconds)
 	{
-		pClient->iClientTimestampNs = iClientTimestampNs;
+		pClient->iClientTimestampNanoseconds = iClientTimestampNanoseconds;
 	}
 }
 
-void Server::ClientDesyncReport(std::span<const uint8_t> packetData, int64_t iClientId)
+void Server::ClientDesynchronizationReport(std::span<const uint8_t> packetData, int64_t iClientId)
 {
 	ClientConnection* pClient = FindHandshakenClient(iClientId);
 	if (pClient == nullptr)
@@ -161,20 +149,20 @@ void Server::ClientDesyncReport(std::span<const uint8_t> packetData, int64_t iCl
 	}
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	if (now < pClient->desyncReportDeadline)
+	if (now < pClient->desynchronizationReportDeadline)
 	{
 		return;
 	}
-	pClient->desyncReportDeadline = now + kDesyncDiagnosticCooldown;
+	pClient->desynchronizationReportDeadline = now + kDesynchronizationDiagnosticCooldown;
 
 	int64_t iTick = message.iTick;
-	GridCoord coord = message.coord;
+	GridCoord coordinate = message.coord;
 	uint64_t uiExpectedCrc = message.uiExpectedCrc;
 	uint64_t uiActualCrc = message.uiActualCrc;
 
 	char pcExpected[20] {};
 	char pcActual[20] {};
-	LOG(kNetwork, kError, "Server::ClientDesyncReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coord.x, coord.y, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
+	LOG(kNetwork, kError, "Server::ClientDesyncReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coordinate.iX, coordinate.iY, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
 }
 
 void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPeer* pPeer, int64_t iClientId)
@@ -198,17 +186,16 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPe
 	{
 		return;
 	}
-	pClient->debugFrameRequestDeadline = now + kDesyncDiagnosticCooldown;
+	pClient->debugFrameRequestDeadline = now + kDesynchronizationDiagnosticCooldown;
 
 	if constexpr (game::NetworkSessionContract::kbDebugFrames)
 	{
 		int64_t iTick = message.iTick;
-		GridCoord coord = message.coord;
+		GridCoord coordinate = message.coord;
 
-		LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Grid: ({},{})", iTick, coord.x, coord.y);
+		LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Grid: ({},{})", iTick, coordinate.iX, coordinate.iY);
 		ScopedLogIndent scopedLogIndent;
 
-		// Find the frame in the ring buffer
 		const BufferedFullFrame* pBuffered = nullptr;
 		for (const BufferedFullFrame& rBuffered : mBufferedFullFrames)
 		{
@@ -225,10 +212,10 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPe
 			return;
 		}
 
-		auto it = pBuffered->serializedFrames.find(coord);
+		auto it = pBuffered->serializedFrames.find(coordinate);
 		if (it == pBuffered->serializedFrames.end())
 		{
-			LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Coord: ({},{}) not found", iTick, coord.x, coord.y);
+			LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Coord: ({},{}) not found", iTick, coordinate.iX, coordinate.iY);
 			return;
 		}
 
@@ -238,7 +225,7 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPe
 		ScopedSuppressAllocationTracking suppress;
 
 		// LZ4 compress (reuse persistent compression buffer)
-		int iCompressedSize = CompressToBuffer(rFrameData.data(), static_cast<int>(rFrameData.size()));
+		int iCompressedSize = CompressToBuffer(std::span<const char>(rFrameData.data(), rFrameData.size()));
 
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -246,9 +233,9 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPe
 		NetworkMessages::ServerDebugFrameMessage response
 		{
 			.iTick = iTick,
-			.coord = coord,
+			.coord = coordinate,
 			.iUncompressedSize = static_cast<int32_t>(rFrameData.size()),
-			.compressedPayload = {.pData = mCompressionBuffer.data(), .iSize = static_cast<int32_t>(iCompressedSize)},
+			.compressedPayload = {.puiData = mCompressionBuffer.data(), .iSize = static_cast<int32_t>(iCompressedSize)},
 		};
 		NetworkMessages::Write(rWorkbuffer, response);
 
@@ -283,30 +270,29 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 		return;
 	}
 
-	common::crc_t clientPackIntegrityToken = message.packIntegrityToken;
-	common::crc_t serverPackIntegrityToken = gpFileManager->GetPackIntegrityToken();
-	if (clientPackIntegrityToken != serverPackIntegrityToken)
+	common::crc_t uiClientPackIntegrityToken = message.uiPackIntegrityToken;
+	common::crc_t uiServerPackIntegrityToken = gpFileManager->GetPackIntegrityToken();
+	if (uiClientPackIntegrityToken != uiServerPackIntegrityToken)
 	{
 		char pcMessage[256] {};
-		std::snprintf(pcMessage, sizeof(pcMessage), "Pack integrity mismatch: server token is %llu, client token is %llu. Regenerate generated game data and retry.", static_cast<unsigned long long>(serverPackIntegrityToken), static_cast<unsigned long long>(clientPackIntegrityToken));
+		std::snprintf(pcMessage, sizeof(pcMessage), "Pack integrity mismatch: server token is %llu, client token is %llu. Regenerate generated game data and retry.", static_cast<unsigned long long>(uiServerPackIntegrityToken), static_cast<unsigned long long>(uiClientPackIntegrityToken));
 		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", iClientId, pcMessage);
 
 		RejectHello(pPeer, iClientId, pcMessage);
 		return;
 	}
 
-	char pcClientConfig[64] = {};
-	size_t iCopyLength = std::min(message.buildConfig.size(), sizeof(pcClientConfig) - 1);
-	std::memcpy(pcClientConfig, message.buildConfig.data(), iCopyLength);
+	char pcClientConfiguration[64] = {};
+	size_t uiCopyLength = std::min(message.buildConfiguration.size(), sizeof(pcClientConfiguration) - 1);
+	std::memcpy(pcClientConfiguration, message.buildConfiguration.data(), uiCopyLength);
 
-	if (std::strcmp(pcClientConfig, kpcBuildConfigName) != 0)
+	if (std::strcmp(pcClientConfiguration, kpcBuildConfigName) != 0)
 	{
-		LOG(kNetwork, kWarning, "Server::ClientHello Client {} build config mismatch: server is {}, client is {}", iClientId, kpcBuildConfigName, pcClientConfig);
+		LOG(kNetwork, kWarning, "Server::ClientHello Client {} build config mismatch: server is {}, client is {}", iClientId, kpcBuildConfigName, pcClientConfiguration);
 	}
 
 	ClientGuid clientGuid = message.bHasGuid ? message.guid : ClientGuid {};
 
-	// Reject a Hello for a client with no server-side connection state (never accept a ghost).
 	ClientConnection* pClient = FindClient(iClientId);
 	if (pClient == nullptr)
 	{
@@ -320,19 +306,22 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 	{
 		LOG(kNetwork, kInfo, "Server::ClientHello Replay Client: {} GUID: {} {}", iClientId, pClient->clientGuid.uiHigh, pClient->clientGuid.uiLow);
 		SendConnectionResponse(pPeer, true, nullptr, &pClient->clientGuid);
-		SendTimespeedToNewClient(pPeer);
+		SendTimespeedUpdate(pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide);
 		return;
 	}
 
 	// One live handshaken peer per GUID: fleet ownership is GUID-keyed, so a second peer must not take over the first's identity.
 	// This peer's own record is not yet handshaken (the replay branch returned otherwise), so it cannot match itself.
-	if (!clientGuid.IsEmpty())
+	if ((clientGuid.uiHigh != 0 || clientGuid.uiLow != 0))
 	{
-		auto duplicateIt = std::ranges::find_if(mClients, [&clientGuid](const ClientConnection& rOther) { return rOther.bHandshakeComplete && rOther.clientGuid == clientGuid; });
-		if (duplicateIt != mClients.end())
+		auto it = std::ranges::find_if(mClients, [&clientGuid](const ClientConnection& rOther)
+		{
+			return rOther.bHandshakeComplete && rOther.clientGuid == clientGuid;
+		});
+		if (it != mClients.end())
 		{
 			const char* pcMessage = "Duplicate client GUID: another connected client already uses this identity";
-			LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {} Existing Client: {}", iClientId, pcMessage, duplicateIt->iClientId);
+			LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {} Existing Client: {}", iClientId, pcMessage, it->iClientId);
 
 			SendConnectionResponse(pPeer, false, pcMessage, nullptr);
 			RemoveClient(iClientId);
@@ -341,11 +330,10 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 		}
 	}
 
-	// Generate GUID if client sent empty
-	if (clientGuid.IsEmpty())
+	if ((clientGuid.uiHigh == 0 && clientGuid.uiLow == 0))
 	{
 		::UUID uuid;
-		[[maybe_unused]] RPC_STATUS rpcStatus = UuidCreate(&uuid); // RPC_S_UUID_LOCAL_ONLY still yields a usable UUID
+		[[maybe_unused]] RPC_STATUS iRpcStatus = UuidCreate(&uuid); // RPC_S_UUID_LOCAL_ONLY still yields a usable UUID
 		std::memcpy(&clientGuid.uiHigh, &uuid, 8);
 		std::memcpy(&clientGuid.uiLow, reinterpret_cast<const uint8_t*>(&uuid) + 8, 8);
 	}
@@ -353,10 +341,10 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 	pClient->bHandshakeComplete = true;
 	pClient->clientGuid = clientGuid;
 
-	LOG(kNetwork, kInfo, "Server::ClientHello Accepted Client: {} Config: {} GUID: {} {}", iClientId, pcClientConfig, clientGuid.uiHigh, clientGuid.uiLow);
+	LOG(kNetwork, kInfo, "Server::ClientHello Accepted Client: {} Config: {} GUID: {} {}", iClientId, pcClientConfiguration, clientGuid.uiHigh, clientGuid.uiLow);
 	SendConnectionResponse(pPeer, true, nullptr, &clientGuid);
 
-	SendTimespeedToNewClient(pPeer);
+	SendTimespeedUpdate(pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide);
 }
 
 void Server::RejectHello(ENetPeer* pPeer, int64_t iClientId, const char* pcMessage)
@@ -367,7 +355,7 @@ void Server::RejectHello(ENetPeer* pPeer, int64_t iClientId, const char* pcMessa
 	if (const ClientConnection* pClient = FindHandshakenClient(iClientId); pClient != nullptr)
 	{
 		ScopedSuppressAllocationTracking suppress;
-		mPendingDisconnects.push_back({iClientId, pClient->clientGuid});
+		mPendingDisconnects.push_back({.iClientId = iClientId, .clientGuid = pClient->clientGuid});
 	}
 
 	RemoveClient(iClientId);
@@ -379,7 +367,7 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 	NetworkMessages::ClientSubscribeMessage message {};
 	NetworkMessages::Read(packetData, message);
 
-	GridCoord coord = message.coord;
+	GridCoord coordinate = message.coord;
 
 	ClientConnection* pClient = FindHandshakenClient(iClientId);
 	if (pClient == nullptr)
@@ -393,22 +381,21 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 	}
 
 	// Answer every subscribe exactly once: the client matches each answer to its oldest outstanding request for the coord.
-	int64_t iExistingSlot = pClient->FindSlotForCoord(coord);
+	int64_t iExistingSlot = pClient->FindSlotForCoordinate(coordinate);
 	if (iExistingSlot >= 0)
 	{
-		LOG(kNetwork, kVerbose, "Server::ClientSubscribe AlreadySubscribed Client: {} Coord: ({},{})", iClientId, coord.x, coord.y);
-		SendSubscribeAccept(*pClient, iExistingSlot, coord);
+		LOG(kNetwork, kVerbose, "Server::ClientSubscribe AlreadySubscribed Client: {} Coord: ({},{})", iClientId, coordinate.iX, coordinate.iY);
+		SendSubscribeAccept(*pClient, iExistingSlot, coordinate);
 		return;
 	}
 
-	// Validate coord is adjacent to ANY owned player's coord (3x3 grid)
-	// Origin coord is always allowed (always simulated, needed for initial fleet spawn)
-	bool bAdjacent = (coord == kOriginCoord);
-	for (const GridCoord& rOwnedCoord : pClient->authorizedCoords)
+	// The origin is always simulated and permits the initial fleet spawn.
+	bool bAdjacent = (coordinate == kOriginCoordinate);
+	for (const GridCoord& rOwnedCoordinate : pClient->authorizedCoordinates)
 	{
 		// 64-bit: the client-supplied coord is hostile input, so the difference can overflow int32 and std::abs(INT32_MIN) is undefined.
-		int64_t iDeltaX = std::abs(static_cast<int64_t>(coord.x) - static_cast<int64_t>(rOwnedCoord.x));
-		int64_t iDeltaY = std::abs(static_cast<int64_t>(coord.y) - static_cast<int64_t>(rOwnedCoord.y));
+		int64_t iDeltaX = std::abs(static_cast<int64_t>(coordinate.iX) - static_cast<int64_t>(rOwnedCoordinate.iX));
+		int64_t iDeltaY = std::abs(static_cast<int64_t>(coordinate.iY) - static_cast<int64_t>(rOwnedCoordinate.iY));
 		if (iDeltaX <= 1 && iDeltaY <= 1)
 		{
 			bAdjacent = true;
@@ -417,39 +404,42 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 	}
 	if (!bAdjacent)
 	{
-		LOG(kNetwork, kWarning, "Server::ClientSubscribe Rejected (not adjacent) Client: {} Coord: ({},{})", iClientId, coord.x, coord.y);
-		SendSubscribeAccept(*pClient, kuiSubscribeRejectSlot, coord);
+		LOG(kNetwork, kWarning, "Server::ClientSubscribe Rejected (not adjacent) Client: {} Coord: ({},{})", iClientId, coordinate.iX, coordinate.iY);
+		SendSubscribeAccept(*pClient, kuiSubscribeRejectSlot, coordinate);
 		return;
 	}
 
 	int64_t iSlot = pClient->AllocateSlot(game::NetworkSessionContract::kiCoordSlots);
 	if (iSlot < 0)
 	{
-		LOG(kNetwork, kWarning, "Server::ClientSubscribe No free slot Client: {} Coord: ({},{})", iClientId, coord.x, coord.y);
-		SendSubscribeAccept(*pClient, kuiSubscribeRejectSlot, coord);
+		LOG(kNetwork, kWarning, "Server::ClientSubscribe No free slot Client: {} Coord: ({},{})", iClientId, coordinate.iX, coordinate.iY);
+		SendSubscribeAccept(*pClient, kuiSubscribeRejectSlot, coordinate);
 		return;
 	}
 
-	pClient->slots.at(iSlot).subscription.coord = coord;
+	pClient->slots.at(iSlot).subscription.coordinate = coordinate;
 	pClient->slots.at(iSlot).subscription.flags.Set(SubscriptionFlags::kActive);
 	++pClient->slots.at(iSlot).ack.uiEpoch;
 
-	LOG(kNetwork, kDebug, "Server::ClientSubscribe Client: {} Coord: ({},{}) Slot: {}", iClientId, coord.x, coord.y, iSlot);
+	LOG(kNetwork, kDebug, "Server::ClientSubscribe Client: {} Coord: ({},{}) Slot: {}", iClientId, coordinate.iX, coordinate.iY, iSlot);
 
-	SendSubscribeAccept(*pClient, iSlot, coord);
+	SendSubscribeAccept(*pClient, iSlot, coordinate);
 
 	ScopedSuppressAllocationTracking suppress;
 	// Replace an existing pending entry for this client+slot (a subscribe->unsubscribe->subscribe
 	// cycle reuses the slot with a new coord) rather than appending a duplicate.
-	auto pendingIt = std::ranges::find_if(mPendingNewSubscriptions, [iClientId, iSlot](const PendingNewSubscription& rPending) { return rPending.iClientId == iClientId && rPending.iSlot == iSlot; });
-	if (pendingIt != mPendingNewSubscriptions.end())
+	auto it = std::ranges::find_if(mPendingNewSubscriptions, [iClientId, iSlot](const PendingNewSubscription& rPending)
 	{
-		pendingIt->coord = coord;
+		return rPending.iClientId == iClientId && rPending.iSlot == iSlot;
+	});
+	if (it != mPendingNewSubscriptions.end())
+	{
+		it->coordinate = coordinate;
 	}
 	else
 	{
 		// Heap: pending subscription entry
-		mPendingNewSubscriptions.push_back({iClientId, iSlot, coord});
+		mPendingNewSubscriptions.push_back({.iClientId = iClientId, .iSlot = iSlot, .coordinate = coordinate});
 	}
 }
 
@@ -470,10 +460,10 @@ void Server::ClientUnsubscribe(std::span<const uint8_t> packetData, int64_t iCli
 	if (uiSlotIndex < std::ssize(pClient->slots) && (pClient->slots.at(uiSlotIndex).subscription.flags & SubscriptionFlags::kActive)
 	 && pClient->slots.at(uiSlotIndex).ack.uiEpoch == uiEpoch)
 	{
-		GridCoord coord = pClient->slots.at(uiSlotIndex).subscription.coord;
+		GridCoord coordinate = pClient->slots.at(uiSlotIndex).subscription.coordinate;
 		pClient->FreeSlot(uiSlotIndex);
 
-		LOG(kNetwork, kDebug, "Server::ClientUnsubscribe Client: {} Slot: {} Coord: ({},{})", iClientId, uiSlotIndex, coord.x, coord.y);
+		LOG(kNetwork, kDebug, "Server::ClientUnsubscribe Client: {} Slot: {} Coord: ({},{})", iClientId, uiSlotIndex, coordinate.iX, coordinate.iY);
 	}
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
@@ -483,7 +473,7 @@ void Server::ClientUnsubscribe(std::span<const uint8_t> packetData, int64_t iCli
 	NetworkManager::SendPacket(pClient->pPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
-void Server::ClientResyncRequest(std::span<const uint8_t> packetData, int64_t iClientId)
+void Server::ClientResynchronizationRequest(std::span<const uint8_t> packetData, int64_t iClientId)
 {
 	NetworkMessages::ClientResyncRequestMessage message {};
 	NetworkMessages::Read(packetData, message);
@@ -496,14 +486,14 @@ void Server::ClientResyncRequest(std::span<const uint8_t> packetData, int64_t iC
 
 	LOG(kNetwork, kWarning, "Server::ClientResyncRequest Client: {}", iClientId);
 
-	if (std::ranges::contains(mPendingResyncClientIds, iClientId))
+	if (std::ranges::contains(mPendingResynchronizationClientIds, iClientId))
 	{
 		return;
 	}
 
 	// Heap: pending resync client-id vector grows on request
 	ScopedSuppressAllocationTracking suppress;
-	mPendingResyncClientIds.push_back(iClientId);
+	mPendingResynchronizationClientIds.push_back(iClientId);
 }
 
 } // namespace engine

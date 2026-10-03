@@ -53,8 +53,7 @@ extern std::recursive_mutex gDbgHelpMutex;
 // still get the full callstack even inside such a region. Increment/decrement only via ScopedExpectedThrows.
 extern thread_local int64_t giExpectedThrowDepth;
 
-// RAII guard entering an expected-throw region on the current thread — ctor increments giExpectedThrowDepth, dtor
-// decrements. Non-copyable/non-movable (scope-bound; a moved-out copy would double-decrement).
+// Scope-bound expected-throw guard for this thread; deleted copy/move operations keep each depth increment paired with one decrement.
 struct ScopedExpectedThrows
 {
 	ScopedExpectedThrows()

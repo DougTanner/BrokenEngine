@@ -28,7 +28,7 @@ public:
 	void FocusNextFleet();
 	void FocusPrevFleet();
 	const Fleet* FocusedFleet() const;
-	void SelectPlayerInFleet(engine::global_id_t memberGlobalPlayerId);
+	void SelectPlayerInFleet(engine::GlobalId memberGlobalPlayerId);
 	void SyncFleets(std::vector<Fleet>&& fleets);
 	void AutoSelectFirstAliveMember();
 	void Clear();
@@ -40,7 +40,7 @@ public:
 
 	std::vector<Fleet> mClientFleets;
 	int64_t miFocusedFleetIndex = -1;
-	engine::global_id_t mFocusedMemberGlobalId {};
+	engine::GlobalId mFocusedMemberGlobalId {};
 };
 
 } // namespace game

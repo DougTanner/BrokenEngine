@@ -45,24 +45,9 @@ struct FrameInterpolateBase
 	FrameInterpolateBase(FrameInterpolateBase&&) noexcept = default;
 	FrameInterpolateBase& operator=(FrameInterpolateBase&&) noexcept = default;
 
-	// Called on Game creation
-	static void Register();
 
-#if defined(BT_CLIENT)
-	// Called during Graphics creation
-	static void GraphicsResources();
-#endif
-
-	// Interpolate phase
 	static void AllocateAndCopy(game::FrameInterpolate& __restrict rCurrent, const game::FrameInterpolate& __restrict rPrevious);
 	static void Update(game::FrameInterpolate& __restrict rCurrent, const game::Frame& __restrict rPreviousFrame, float fDeltaTime);
-
-#if defined(BT_CLIENT)
-	// Render
-	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords);
-	static void Render(const game::FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
-	static void EndRender(int64_t iCommandBuffer);
-#endif
 
 #if defined(BT_CLIENT)
 	// Client-only: phase markers (kInterpolate/kPostRender) and the replay marker (kRecalculated).
@@ -97,29 +82,18 @@ struct FrameInterpolateBase
 	WindTrailsInterpolate windTrails {};
 #endif
 
-	// Tuple order is load-bearing for cross-collection Sync: an owner collection that Syncs
-	// into an owned collection must precede it here, because the owned collection may read
-	// its just-Synced current-frame data in the SAME phase walk. Live case: explosions
-	// (index 2) Syncs smokeTrails positions in ExplosionsInterpolate::Update (via
-	// SyncExplosionTrail), and SmokeTrailsInterpolate::Update then smooths those positions,
-	// so explosions must precede smokeTrails (index 8). Reordering looks free (the
-	// kCollectionCount / ServerCollections() static_asserts do not constrain order) but
-	// would introduce a one-frame trail lag.
+	// Collection Sync dependencies determine tuple order: consumers may read an owner's newly synced
+	// current-frame data during the same phase walk. ExplosionsInterpolate::Update calls SyncExplosionTrail
+	// to sync smokeTrails positions before SmokeTrailsInterpolate::Update smooths them, so explosions
+	// (client index 2) must precede smokeTrails (client index 8) to avoid a one-frame trail lag.
+	// The collection-count and ServerCollections() static_asserts do not verify order.
 	auto Collections(this auto&& rSelf)
 	{
-		return std::tie(
 #if defined(BT_CLIENT)
-			rSelf.areaLights, rSelf.billboards,
+		return std::tie(rSelf.areaLights, rSelf.billboards, rSelf.explosions, rSelf.hexShields, rSelf.pointLights, rSelf.puffs, rSelf.pushers, rSelf.sounds, rSelf.smokeTrails, rSelf.windRadials, rSelf.windTrails);
+#else
+		return std::tie(rSelf.explosions, rSelf.pushers);
 #endif
-			rSelf.explosions,
-#if defined(BT_CLIENT)
-			rSelf.hexShields, rSelf.pointLights, rSelf.puffs,
-#endif
-			rSelf.pushers
-#if defined(BT_CLIENT)
-			, rSelf.sounds, rSelf.smokeTrails, rSelf.windRadials, rSelf.windTrails
-#endif
-		);
 	}
 
 #if defined(BT_CLIENT)
@@ -164,15 +138,8 @@ struct FramePostRenderBase
 	FramePostRenderBase(FramePostRenderBase&&) noexcept = default;
 	FramePostRenderBase& operator=(FramePostRenderBase&&) noexcept = default;
 
-	// Post render phases
 	static void AllocateAndCopy(game::FramePostRender& __restrict rCurrent, const game::FramePostRender& __restrict rPrevious);
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const game::FrameInput& __restrict rFrameInput, const FrameStaticData& rStaticData);
-	static void PreCollision(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
-	static void PostCollision(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
-	static void AreaDamage(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
-	static void Transfer(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
-	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
-	static void Spawn(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
 
 	common::RandomEngine randomEngine {};
 	uint64_t uiNextUuid = 1;
@@ -180,23 +147,17 @@ struct FramePostRenderBase
 	uint64_t uiNextSoundUuid = 1;
 	uint64_t uiNextVisualUuid = 1;
 #endif
-	uint16_t uiFrameId = 0;
+	uint16_t uiFrameIdentifier = 0;
 
-	common::crc_t sharedCrc = 0;        // Shared CRC excluding client-only and server-only fields
+	common::crc_t uiSharedCrc = 0;        // Shared CRC excluding client-only and server-only fields
 
 	Alignments alignments {};
 
 	int64_t MakeUuid(uint64_t& ruiCounter)
 	{
 		int64_t iCounter = ruiCounter++;
-		return (static_cast<int64_t>(uiFrameId) << 48) | (iCounter & 0x0000FFFFFFFFFFFF);
+		return (static_cast<int64_t>(uiFrameIdentifier) << 48) | (iCounter & 0x0000'FFFF'FFFF'FFFF);
 	}
-
-	int64_t GenerateUuid()          { return MakeUuid(uiNextUuid); }
-#if defined(BT_CLIENT)
-	int64_t GenerateSoundUuid()     { return MakeUuid(uiNextSoundUuid); }
-	int64_t GenerateVisualUuid()    { return MakeUuid(uiNextVisualUuid); }
-#endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
 	AreaLightsPostRender areaLights {};
@@ -218,19 +179,11 @@ struct FramePostRenderBase
 
 	auto Collections(this auto&& rSelf)
 	{
-		return std::tie(
 #if defined(BT_CLIENT)
-			rSelf.areaLights, rSelf.billboards,
+		return std::tie(rSelf.areaLights, rSelf.billboards, rSelf.explosions, rSelf.hexShields, rSelf.pointLights, rSelf.puffs, rSelf.pushers, rSelf.sounds, rSelf.smokeTrails, rSelf.windRadials, rSelf.windTrails);
+#else
+		return std::tie(rSelf.explosions, rSelf.pushers);
 #endif
-			rSelf.explosions,
-#if defined(BT_CLIENT)
-			rSelf.hexShields, rSelf.pointLights, rSelf.puffs,
-#endif
-			rSelf.pushers
-#if defined(BT_CLIENT)
-			, rSelf.sounds, rSelf.smokeTrails, rSelf.windRadials, rSelf.windTrails
-#endif
-		);
 	}
 
 #if defined(BT_CLIENT)
@@ -264,19 +217,19 @@ using InterpolateTypes = TupleToTypeList_t<decltype(std::declval<FrameInterpolat
 using PostRenderBaseTypes = TupleToTypeList_t<decltype(std::declval<FramePostRenderBase>().Collections())>;
 
 // Inline definition - must be after FramePostRenderBase is complete
-inline uuid_t uuid_t::Generate(FramePostRenderBase& rFramePostRender)
+inline Uuid Uuid::Generate(FramePostRenderBase& rFramePostRender)
 {
-	return uuid_t {rFramePostRender.GenerateUuid()};
+	return Uuid {rFramePostRender.MakeUuid(rFramePostRender.uiNextUuid)};
 }
 
 #if defined(BT_CLIENT)
-inline uuid_t uuid_t::GenerateVisual(FramePostRenderBase& rFramePostRender)
+inline Uuid Uuid::GenerateVisual(FramePostRenderBase& rFramePostRender)
 {
-	return uuid_t {rFramePostRender.GenerateVisualUuid()};
+	return Uuid {rFramePostRender.MakeUuid(rFramePostRender.uiNextVisualUuid)};
 }
 #endif
 
-struct ActiveFrameRef
+struct ActiveFrameReference
 {
 	game::Frame* pNext = nullptr;
 	game::Frame* pCurrent = nullptr;
@@ -284,7 +237,6 @@ struct ActiveFrameRef
 	const FrameStaticData* pStaticData = nullptr;
 };
 
-// Runs all tick phases for a single Frame (Interpolate, PostRender, Collision, Transfer, Destroy/Spawn)
-void RunFrameTick(const ActiveFrameRef& rRef, int64_t iTickCounter, float fCurrentTime);
+void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, float fCurrentTime);
 
 } // namespace engine

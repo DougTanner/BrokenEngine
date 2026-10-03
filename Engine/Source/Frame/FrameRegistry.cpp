@@ -5,7 +5,7 @@ namespace engine
 
 // One eligible source row located by id. iEligibleIndex is the row's position in the flat scan order across
 // every bound layer, which is also its slot in RegistryQueryContext::subscriberCounts.
-struct EligibleRowRef
+struct EligibleRowReference
 {
 	const RegistrySourceLayer* pLayer = nullptr;
 	int64_t iRow = 0;
@@ -22,9 +22,9 @@ static constexpr int64_t TotalEligibleRows(std::span<const RegistrySourceLayer> 
 	return iTotal;
 }
 
-static EligibleRowRef FindEligibleRow(std::span<const RegistrySourceLayer> sourceLayers, registry_id_t id)
+static EligibleRowReference FindEligibleRow(std::span<const RegistrySourceLayer> sourceLayers, registry_id_t id)
 {
-	if (!id.IsValid())
+	if (!(id.uuid.iValue != 0))
 	{
 		return {};
 	}
@@ -34,9 +34,9 @@ static EligibleRowRef FindEligibleRow(std::span<const RegistrySourceLayer> sourc
 	{
 		for (int64_t iRow : rLayer.rows)
 		{
-			if (rLayer.puiIds[iRow] == id)
+			if (rLayer.pIds[iRow] == id)
 			{
-				return {&rLayer, iRow, iEligibleIndex};
+				return {.pLayer = &rLayer, .iRow = iRow, .iEligibleIndex = iEligibleIndex, };
 			}
 			++iEligibleIndex;
 		}
@@ -48,16 +48,16 @@ static EligibleRowRef FindEligibleRow(std::span<const RegistrySourceLayer> sourc
 static RegistryResult MakeResult(const RegistrySourceLayer& rLayer, int64_t iRow)
 {
 	RegistryResult result {};
-	result.id = rLayer.puiIds[iRow];
+	result.id = rLayer.pIds[iRow];
 	result.vecCurrentPosition = rLayer.pVecCurrentPositions[iRow];
 	result.vecPreviousPosition = rLayer.pVecPreviousPositions != nullptr ? rLayer.pVecPreviousPositions[iRow] : result.vecCurrentPosition;
 	return result;
 }
 
-static uuid_t OwnershipUuid(const RegistryOwnershipLayer& rLayer, int64_t iIndex)
+static Uuid OwnershipUuid(const RegistryOwnershipLayer& rLayer, int64_t iIndex)
 {
-	uuid_t uuid {};
-	std::memcpy(&uuid, rLayer.pIdBytes + iIndex * sizeof(uuid_t), sizeof(uuid_t));
+	Uuid uuid {};
+	std::memcpy(&uuid, rLayer.pIdBytes + iIndex * sizeof(Uuid), sizeof(Uuid));
 	return uuid;
 }
 
@@ -85,15 +85,15 @@ static void ValidateSourceLayers(std::span<const RegistrySourceLayer> sourceLaye
 	{
 		for (int64_t iRowA : rLayerA.rows)
 		{
-			registry_id_t idA = rLayerA.puiIds[iRowA];
-			ASSERT(idA.IsValid());
+			registry_id_t idA = rLayerA.pIds[iRowA];
+			ASSERT((idA.uuid.iValue != 0));
 
 			int64_t iIndexB = 0;
 			for (const RegistrySourceLayer& rLayerB : sourceLayers)
 			{
 				for (int64_t iRowB : rLayerB.rows)
 				{
-					ASSERT(iIndexB == iIndexA || rLayerB.puiIds[iRowB] != idA);
+					ASSERT(iIndexB == iIndexA || rLayerB.pIds[iRowB] != idA);
 					++iIndexB;
 				}
 			}
@@ -134,7 +134,7 @@ RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, st
 	{
 		for (int64_t iRow : rLayer.rows)
 		{
-			EligibleRowRef found = FindEligibleRow(sourceLayers, rLayer.puiTargets[iRow]);
+			EligibleRowReference found = FindEligibleRow(sourceLayers, rLayer.pTargets[iRow]);
 			if (found.pLayer != nullptr)
 			{
 				ASSERT(context.subscriberCounts[found.iEligibleIndex] < std::numeric_limits<uint16_t>::max());
@@ -155,12 +155,12 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 
 	float fRadiusSquared = fRadius * fRadius;
 
-	for (size_t uiEntry = 0; uiEntry < rBatch.rows.size(); ++uiEntry)
+	for (size_t i = 0; i < rBatch.rows.size(); ++i)
 	{
-		int64_t iConsumerRow = rBatch.rows[uiEntry];
+		int64_t iConsumerRow = rBatch.rows[i];
 		XMVECTOR vecOrigin = rBatch.pVecOrigins[iConsumerRow];
 		XMVECTOR vecDirection = rBatch.pVecDirections[iConsumerRow];
-		alignment_t consumerAlignment = rBatch.pAlignments != nullptr ? rBatch.pAlignments[iConsumerRow] : alignment_t {};
+		AlignmentIdentifier consumerAlignment = rBatch.pAlignments != nullptr ? rBatch.pAlignments[iConsumerRow] : AlignmentIdentifier {};
 
 		const RegistrySourceLayer* pBestLayer = nullptr;
 		int64_t iBestRow = 0;
@@ -202,7 +202,7 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 			}
 		}
 
-		RegistryResult& rResult = rBatch.results[uiEntry];
+		RegistryResult& rResult = rBatch.results[i];
 		rResult = pBestLayer != nullptr ? MakeResult(*pBestLayer, iBestRow) : RegistryResult {};
 		if (pBestLayer != nullptr)
 		{
@@ -211,13 +211,13 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 			++rContext.subscriberCounts[iBestEligibleIndex];
 		}
 
-		rBatch.puiTargets[iConsumerRow] = rResult.id;
+		rBatch.pTargets[iConsumerRow] = rResult.id;
 	}
 }
 
 bool ResolveRegistryHandle(const RegistryQueryContext& rContext, registry_id_t id, RegistryResult& rResult)
 {
-	EligibleRowRef found = FindEligibleRow(rContext.sourceLayers, id);
+	EligibleRowReference found = FindEligibleRow(rContext.sourceLayers, id);
 	if (found.pLayer == nullptr)
 	{
 		return false;
@@ -229,7 +229,7 @@ bool ResolveRegistryHandle(const RegistryQueryContext& rContext, registry_id_t i
 
 void ReleaseRegistryTarget(RegistryQueryContext& rContext, registry_id_t& rId)
 {
-	EligibleRowRef found = FindEligibleRow(rContext.sourceLayers, rId);
+	EligibleRowReference found = FindEligibleRow(rContext.sourceLayers, rId);
 	if (found.pLayer != nullptr)
 	{
 		ASSERT(rContext.subscriberCounts[found.iEligibleIndex] > 0);
@@ -239,12 +239,7 @@ void ReleaseRegistryTarget(RegistryQueryContext& rContext, registry_id_t& rId)
 	rId = {};
 }
 
-int64_t CountRegistryRows(const RegistryOwnershipLayer& rLayer)
-{
-	return rLayer.iCount;
-}
-
-bool AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, global_id_t globalId, const ClientGuid& rGuid)
+bool AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid)
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
 
@@ -265,7 +260,7 @@ bool AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, global_id_t 
 	return false;
 }
 
-uuid_t RegistryUuidByGlobalId(const RegistryOwnershipLayer& rLayer, global_id_t globalId)
+Uuid RegistryUuidByGlobalId(const RegistryOwnershipLayer& rLayer, GlobalId globalId)
 {
 	if (rLayer.pGlobalIds == nullptr)
 	{

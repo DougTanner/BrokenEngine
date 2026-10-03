@@ -5,4 +5,4 @@ namespace attribution
 
 bool CopyThirdPartyLicenses();
 
-}
+} // namespace attribution

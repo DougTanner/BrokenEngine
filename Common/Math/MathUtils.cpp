@@ -23,8 +23,8 @@ XMVECTOR XM_CALLCONV QuaternionFromDirection(FXMVECTOR vecDirection, FXMVECTOR v
 
 	// Tolerance test on the pre-normalized cross length: a nearly (anti-)parallel input yields a tiny cross whose
 	// normalization is a garbage axis. fDot disambiguates parallel (identity) from anti-parallel (180 deg about up).
-	static constexpr float kfParallelEpsilonSq = 1.0e-6f;
-	if (XMVectorGetX(XMVector3LengthSq(vecCross)) < kfParallelEpsilonSq)
+	static constexpr float kfParallelEpsilonSquared = 1.0e-6f;
+	if (XMVectorGetX(XMVector3LengthSq(vecCross)) < kfParallelEpsilonSquared)
 	{
 		return fDot < 0.0f ? XMQuaternionRotationNormal(vecUp, XM_PI) : XMQuaternionIdentity();
 	}
@@ -57,9 +57,9 @@ XMVECTOR XM_CALLCONV RotateTowardsPercent(FXMVECTOR vecDirection, FXMVECTOR vecT
 	return XMVector4Transform(vecDirection, XMMatrixRotationZ(fPercent * (fCrossZ > 0.0f ? -fAngle : fAngle)));
 }
 
-XMVECTOR XM_CALLCONV RandomAngleJitter(FXMVECTOR vecDirection, float fMaxJitter, RandomEngine& rRandomEngine)
+XMVECTOR XM_CALLCONV RandomAngleJitter(FXMVECTOR vecDirection, float fMaximumJitter, RandomEngine& rRandomEngine)
 {
-	float fJitter = -fMaxJitter + Random<2.0f>(rRandomEngine) * fMaxJitter;
+	float fJitter = -fMaximumJitter + Random<2.0f>(rRandomEngine) * fMaximumJitter;
 	return XMVector4Transform(vecDirection, XMMatrixRotationZ(fJitter));
 }
 
@@ -88,70 +88,69 @@ XMVECTOR XM_CALLCONV DirectionTo(FXMVECTOR vecFrom, FXMVECTOR vecTo)
 XMVECTOR XM_CALLCONV ComputeLeadPosition(FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity, float fProjectileSpeed)
 {
 	XMVECTOR vecOffset = XMVectorSubtract(vecTargetPosition, vecShooterPosition);
-	float fA = XMVectorGetX(XMVector3Dot(vecTargetVelocity, vecTargetVelocity)) - fProjectileSpeed * fProjectileSpeed;
-	float fB = 2.0f * XMVectorGetX(XMVector3Dot(vecOffset, vecTargetVelocity));
-	float fC = XMVectorGetX(XMVector3Dot(vecOffset, vecOffset));
+	float fQuadraticCoefficient = XMVectorGetX(XMVector3Dot(vecTargetVelocity, vecTargetVelocity)) - fProjectileSpeed * fProjectileSpeed;
+	float fLinearCoefficient = 2.0f * XMVectorGetX(XMVector3Dot(vecOffset, vecTargetVelocity));
+	float fConstantCoefficient = XMVectorGetX(XMVector3Dot(vecOffset, vecOffset));
 
-	float fT = -1.0f;
+	float fInterceptTime = -1.0f;
 	// Scale the degeneracy threshold by the largest coefficient for kilometer-scale coordinates. All-zero
-	// coefficients produce NaN roots, leaving fT negative and returning vecTargetPosition.
-	float fRef = std::max(std::abs(fA), std::max(std::abs(fB), std::abs(fC)));
+	// coefficients produce NaN roots, leaving fInterceptTime negative and returning vecTargetPosition.
+	float fLargestCoefficientMagnitude = std::max(std::abs(fQuadraticCoefficient), std::max(std::abs(fLinearCoefficient), std::abs(fConstantCoefficient)));
 	static constexpr float kfRelativeEpsilon = 1.0e-6f;
-	if (std::abs(fA) < kfRelativeEpsilon * fRef)
+	if (std::abs(fQuadraticCoefficient) < kfRelativeEpsilon * fLargestCoefficientMagnitude)
 	{
-		// Target speed approximately equals projectile speed: linear fallback
-		if (std::abs(fB) > kfRelativeEpsilon * fRef)
+		// Quadratic coefficient negligible against the largest coefficient, as when target speed nearly equals projectile speed: solve the linear equation
+		if (std::abs(fLinearCoefficient) > kfRelativeEpsilon * fLargestCoefficientMagnitude)
 		{
-			fT = -fC / fB;
+			fInterceptTime = -fConstantCoefficient / fLinearCoefficient;
 		}
 	}
 	else
 	{
-		float fDiscriminant = fB * fB - 4.0f * fA * fC;
+		float fDiscriminant = fLinearCoefficient * fLinearCoefficient - 4.0f * fQuadraticCoefficient * fConstantCoefficient;
 		if (fDiscriminant >= 0.0f)
 		{
-			float fSqrt = std::sqrt(fDiscriminant);
-			float fInv2A = 0.5f / fA;
-			float fT0 = (-fB - fSqrt) * fInv2A;
-			float fT1 = (-fB + fSqrt) * fInv2A;
-			// Smallest positive root
-			if (fT0 > 0.0f && fT1 > 0.0f)
+			float fSquareRoot = std::sqrt(fDiscriminant);
+			float fInverseTwiceQuadraticCoefficient = 0.5f / fQuadraticCoefficient;
+			float fFirstInterceptTime = (-fLinearCoefficient - fSquareRoot) * fInverseTwiceQuadraticCoefficient;
+			float fSecondInterceptTime = (-fLinearCoefficient + fSquareRoot) * fInverseTwiceQuadraticCoefficient;
+			if (fFirstInterceptTime > 0.0f && fSecondInterceptTime > 0.0f)
 			{
-				fT = std::min(fT0, fT1);
+				fInterceptTime = std::min(fFirstInterceptTime, fSecondInterceptTime);
 			}
-			else if (fT0 > 0.0f)
+			else if (fFirstInterceptTime > 0.0f)
 			{
-				fT = fT0;
+				fInterceptTime = fFirstInterceptTime;
 			}
-			else if (fT1 > 0.0f)
+			else if (fSecondInterceptTime > 0.0f)
 			{
-				fT = fT1;
+				fInterceptTime = fSecondInterceptTime;
 			}
 		}
 	}
 
-	if (fT <= 0.0f)
+	if (fInterceptTime <= 0.0f)
 	{
 		return vecTargetPosition;
 	}
-	return XMVectorMultiplyAdd(vecTargetVelocity, XMVectorReplicate(fT), vecTargetPosition);
+	return XMVectorMultiplyAdd(vecTargetVelocity, XMVectorReplicate(fInterceptTime), vecTargetPosition);
 }
 
-bool XM_CALLCONV AabbIntersectsArea(XMFLOAT4 f4Area, FXMVECTOR vecMin, FXMVECTOR vecMax)
+bool XM_CALLCONV AxisAlignedBoundingBoxIntersectsArea(XMFLOAT4 f4Area, FXMVECTOR vecMinimum, FXMVECTOR vecMaximum)
 {
-	float fMinX = XMVectorGetX(vecMin);
-	float fMaxX = XMVectorGetX(vecMax);
-	float fMinY = XMVectorGetY(vecMin);
-	float fMaxY = XMVectorGetY(vecMax);
+	float fMinimumX = XMVectorGetX(vecMinimum);
+	float fMaximumX = XMVectorGetX(vecMaximum);
+	float fMinimumY = XMVectorGetY(vecMinimum);
+	float fMaximumY = XMVectorGetY(vecMaximum);
 
-	return !(fMaxX < f4Area.x || fMinX > f4Area.z || fMaxY < f4Area.w || fMinY > f4Area.y);
+	return !(fMaximumX < f4Area.x || fMinimumX > f4Area.z || fMaximumY < f4Area.w || fMinimumY > f4Area.y);
 }
 
 bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, const XMFLOAT4& rf4Area)
 {
-	float fX = XMVectorGetX(vecPosition);
-	float fY = XMVectorGetY(vecPosition);
-	return fX > rf4Area.x && fX < rf4Area.z && fY < rf4Area.y && fY > rf4Area.w;
+	float fPositionX = XMVectorGetX(vecPosition);
+	float fPositionY = XMVectorGetY(vecPosition);
+	return fPositionX > rf4Area.x && fPositionX < rf4Area.z && fPositionY < rf4Area.y && fPositionY > rf4Area.w;
 }
 
 bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, FXMVECTOR vecArea)
@@ -159,10 +158,10 @@ bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, FXMVECTOR vecArea)
 	// vecArea: x=minX, y=maxY, z=maxX, w=minY
 	// Inside if: minX < posX < maxX AND minY < posY < maxY
 	// Rearranged: posX > minX AND posY > minY AND maxX > posX AND maxY > posY
-	XMVECTOR vecA = XMVectorPermute<0, 1, 6, 5>(vecPosition, vecArea);  // (posX, posY, maxX, maxY)
-	XMVECTOR vecB = XMVectorPermute<4, 7, 0, 1>(vecPosition, vecArea);  // (minX, minY, posX, posY)
-	uint32_t uiCR = XMVector4GreaterR(vecA, vecB);
-	return XMComparisonAllTrue(uiCR);
+	XMVECTOR vecPositionAndMaximum = XMVectorPermute<0, 1, 6, 5>(vecPosition, vecArea);  // (posX, posY, maxX, maxY)
+	XMVECTOR vecMinimumAndPosition = XMVectorPermute<4, 7, 0, 1>(vecPosition, vecArea);  // (minX, minY, posX, posY)
+	uint32_t uiControlResult = XMVector4GreaterR(vecPositionAndMaximum, vecMinimumAndPosition);
+	return XMComparisonAllTrue(uiControlResult);
 }
 
 XMVECTOR XM_CALLCONV ColorToVector(uint32_t uiColor)
@@ -182,9 +181,9 @@ uint32_t XM_CALLCONV ColorToUint(FXMVECTOR vecColor)
 	return static_cast<uint32_t>(kfMultiplier * f4Color.x + 0.5f) << 24 | static_cast<uint32_t>(kfMultiplier * f4Color.y + 0.5f) << 16 | static_cast<uint32_t>(kfMultiplier * f4Color.z + 0.5f) << 8 | static_cast<uint32_t>(kfMultiplier * f4Color.w + 0.5f);
 }
 
-uint32_t ColorLerp(uint32_t uiA, uint32_t uiB, float fPercent)
+uint32_t InterpolatePackedColor(uint32_t uiFirstColor, uint32_t uiSecondColor, float fPercent)
 {
-	return ColorToUint(XMVectorLerp(ColorToVector(uiA), ColorToVector(uiB), fPercent));
+	return ColorToUint(XMVectorLerp(ColorToVector(uiFirstColor), ColorToVector(uiSecondColor), fPercent));
 }
 
 } // namespace common

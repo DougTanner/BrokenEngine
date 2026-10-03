@@ -8,8 +8,6 @@
 namespace game
 {
 
-namespace
-{
 const engine::TweaksSliderMapRegistrar gLightingEffectsLightingRegistrar
 {
 	// Explosion Primary Lighting
@@ -55,7 +53,6 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsLightingRegistrar
 	{"Hit Flash Lighting Intensity One", &gHitFlashLightingIntensityOne},
 	{"Hit Flash Lighting Intensity Two", &gHitFlashLightingIntensityTwo},
 };
-}
 
 void TweaksScreen::RenderLightingEffectsLightingTab()
 {

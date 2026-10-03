@@ -40,7 +40,7 @@ enum class ReconcileScratchFlags : uint8_t
 	kCrcFastPath        = 0x01,
 	kReplayed           = 0x02,
 	kShrunkRollback     = 0x04,
-	kReSimOccurred      = 0x08,
+	kResimulationOccurred      = 0x08,
 	kSuppressRepeatLogs = 0x10,
 };
 
@@ -54,7 +54,8 @@ struct RingLayout
 constexpr RingLayout ComputeRetention(int64_t iHeadPhysical, int64_t iSnapshotCount, int64_t iConfirmedIndex)
 {
 	int64_t iHeadAdvance = std::max<int64_t>(0, iConfirmedIndex - engine::kiRenderBehindTicks);
-	return {
+	return
+	{
 		.iHead = SnapshotIndex(iHeadPhysical, iHeadAdvance),
 		.iCount = iSnapshotCount - iHeadAdvance,
 		.iConfirmedInner = iConfirmedIndex - iHeadAdvance,
@@ -93,7 +94,7 @@ struct CoordScratch
 		iInjectedBaseSlot = -1;
 		iNewConfirmedTick = -1;
 		outputLayout = {};
-		flags.ClearAll();
+		flags.meFlags = static_cast<decltype(flags.meFlags)>(0);
 		iPreReconcileTailTick = -1;
 		profiling = {};
 		iDesyncTick = -1;
@@ -132,8 +133,8 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs);
 void ReconcileInjectPendingFullState(CoordWork& rWork);
 
 void ReconcileRollbackCoord(CoordWork& rWork, int64_t iRollbackOffset);
-int64_t ReconcileFindReplayRangeCoord(CoordWork& rWork, int64_t iReplayStart);
-void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxConsecutive, float& rfTime);
+int64_t ReconcileFindReplayRangeCoord(const CoordWork& rWork, int64_t iReplayStart);
+void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaximumConsecutive, float& rfTime);
 void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick, float& rfTime);
 void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick);
 
@@ -157,17 +158,12 @@ struct ReconcileDesyncInfo
 	std::unique_ptr<game::Frame> pDesyncClientFrame;
 };
 
-// Owns the per-coord work list and runs one parallel reconcile pass over every eligible coord of the
-// game. The caller keeps the client-state, desync, and visual policy that consumes the result.
 class ReconcileDispatcher
 {
 public:
 
 	ReconcileDispatchResult Run(const ReconcileInputs& rInputs);
-	std::span<const CoordWork> ActiveWorks() const;
 	void Reset();
-
-private:
 
 	std::vector<CoordWork> mWorks;
 	int64_t miActiveCount = 0;

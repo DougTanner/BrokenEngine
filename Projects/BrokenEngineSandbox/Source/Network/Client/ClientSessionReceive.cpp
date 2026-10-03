@@ -17,9 +17,9 @@ void ClientSession::ApplyReceivedStaticData()
 	std::vector<engine::ReceivedStaticData>& rStaticDataList = mpRuntime->mpClient->mReceivedStaticData;
 	for (engine::ReceivedStaticData& rReceived : rStaticDataList)
 	{
-		engine::CoordFrames& rFrames = gpGame->mCoordFrames.try_emplace(rReceived.coord).first->second;
+		engine::CoordFrames& rFrames = gpGame->mCoordFrames.try_emplace(rReceived.coordinate).first->second;
 		rFrames.staticData = std::move(rReceived.staticData);
-		rFrames.staticData.coord = rReceived.coord;
+		rFrames.staticData.coordinate = rReceived.coordinate;
 
 		// Subscription-driven island texture loading. AcquireTextureSlot is idempotent; duplicate
 		// CRCs across placements short-circuit on the hot path. Slot mint + chunk-load request

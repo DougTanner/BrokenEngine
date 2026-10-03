@@ -16,9 +16,6 @@ engine::Wrapper gObjectShadowsLevel(int64_t {1}, std::vector<int64_t> {0, 1, 2})
 engine::Wrapper gLightingLevel(int64_t {1}, std::vector<int64_t> {0, 1, 2});
 engine::Wrapper gSmokeDetailLevel(int64_t {1}, std::vector<int64_t> {0, 1, 2});
 
-namespace
-{
-
 constexpr size_t kuiLevelCount = static_cast<size_t>(GraphicsQualityLevel::kCount);
 
 constexpr float kfTerrainShadowsRenderMultipliers[kuiLevelCount] {0.05f, 0.1f, 0.2f};
@@ -43,12 +40,10 @@ constexpr LightingLevelValues kLightingLevels[kuiLevelCount]
 
 constexpr float kfSmokeSimulationPixels[kuiLevelCount] {0.75f, 1.0f, 1.5f};
 
-size_t LevelIndex(const engine::Wrapper& rWrapper)
+static size_t LevelIndex(const engine::Wrapper& rWrapper)
 {
 	return static_cast<size_t>(std::clamp(rWrapper.Get<int64_t>(), int64_t {0}, static_cast<int64_t>(kuiLevelCount) - 1));
 }
-
-} // namespace
 
 void ApplyTerrainShadowsLevel()
 {

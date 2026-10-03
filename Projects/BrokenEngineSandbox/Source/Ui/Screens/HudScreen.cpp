@@ -9,18 +9,13 @@
 #include "Fleet.h"
 #include "Game.h"
 
-namespace
+namespace game
 {
 
 constexpr float kfHudEdgeMarginFraction = 0.05f;
 constexpr float kfHudPanelTopFraction = 0.125f;
 constexpr float kfHudPanelMaxHeightFraction = 0.75f;
 constexpr float kfForceOpenGracePeriodSeconds = 2.0f;
-
-} // namespace
-
-namespace game
-{
 
 void HudScreen::Render()
 {
@@ -43,7 +38,7 @@ void HudScreen::Render()
 	const char* pcWantReason = "fleet member present";
 	int64_t iSubscribedFrameCount = 0;
 
-	if (!gpGame->ClientPlayerId().IsValid())
+	if (!(gpGame->ClientPlayerId().iValue != 0))
 	{
 		bWantsForceOpen = true;
 		pcWantReason = "ClientPlayerId invalid";
@@ -66,7 +61,7 @@ void HudScreen::Render()
 			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(coord).postRender.pPlayers;
 			for (int64_t i = 0; i < rPlayers.iCount && !bFoundAny; ++i)
 			{
-				engine::global_id_t globalPlayerId = rPlayers.pGlobalPlayerIds[i];
+				engine::GlobalId globalPlayerId = rPlayers.pGlobalPlayerIds[i];
 				for (const FleetMember& rMember : pFleet->members)
 				{
 					if (rMember.globalPlayerId == globalPlayerId)
@@ -107,7 +102,7 @@ void HudScreen::Render()
 	// kWarning clears both the compile floor (keLogLevelDefault, kDebug) and the runtime default threshold (kInfo).
 	if (bForceOpen && !mbPreviousForceOpen)
 	{
-		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) frames: {}", pcWantReason, gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y, iSubscribedFrameCount);
+		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) frames: {}", pcWantReason, gpGame->mClientGridCoord.iX, gpGame->mClientGridCoord.iY, iSubscribedFrameCount);
 	}
 	mbPreviousForceOpen = bForceOpen;
 
@@ -271,7 +266,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 		for (int64_t i = 0; const FleetMember& rMember : pFleet->members)
 		{
-			bool bSelected = rMember.globalPlayerId.IsValid() && rMember.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
+			bool bSelected = (rMember.globalPlayerId.iValue != 0) && rMember.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
 
 			// Find coord for display
 			engine::GridCoord memberCoord {};
@@ -288,7 +283,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			if (!(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoord.x, memberCoord.y, rMember.globalPlayerId.iValue);
+				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoord.iX, memberCoord.iY, rMember.globalPlayerId.iValue);
 				if (ImGui::Selectable(pcLabel, bSelected))
 				{
 					gpGame->mFleetSelection.SelectPlayerInFleet(rMember.globalPlayerId);
@@ -414,7 +409,7 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 		ImGui::BeginDisabled(gpGame->mWeaponModeToggle.IsPending());
 		if (ImGui::Button(pLabel, vButtonSize))
 		{
-			if (gpClientSession != nullptr && gpGame->ClientPlayerId().IsValid())
+			if (gpClientSession != nullptr && (gpGame->ClientPlayerId().iValue != 0))
 			{
 				gpGame->mWeaponModeToggle.SetPending();
 				float fNavigationDelay = rPlayers.pfNavigationDelays[*oPlayerIndex];

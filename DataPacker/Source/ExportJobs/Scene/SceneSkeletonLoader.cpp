@@ -3,9 +3,9 @@
 std::unordered_map<int, int> BuildNodeParentMap(const tinygltf::Model& rModel)
 {
 	std::unordered_map<int, int> parentMap;
-	for (size_t i = 0; i < rModel.nodes.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rModel.nodes); ++i)
 	{
-		for (int iChildIndex : rModel.nodes[i].children)
+		for (int iChildIndex : rModel.nodes.at(i).children)
 		{
 			parentMap.insert_or_assign(iChildIndex, static_cast<int>(i));
 		}
@@ -24,9 +24,9 @@ void CanonicalizeSceneSkin(tinygltf::Model& rModel)
 		}
 
 		// tinygltf parses "skin" without range checking, and the glTF file is untrusted input
-		if (rNode.skin >= static_cast<int>(rModel.skins.size()))
+		if (rNode.skin >= std::ssize(rModel.skins))
 		{
-			throw std::runtime_error(std::format("ExportScene node references skin {}, but the model declares only {} skins", rNode.skin, rModel.skins.size()));
+			throw std::runtime_error(std::format("ExportScene node references skin {}, but the model declares only {} skins", rNode.skin, std::ssize(rModel.skins)));
 		}
 
 		referencedSkins.insert(rNode.skin);
@@ -67,34 +67,31 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 
 	SkeletonData skeletonData;
 	skeletonData.skeleton.uiNodeCount = static_cast<uint16_t>(rModel.nodes.size());
-	ASSERT(rModel.nodes.size() <= static_cast<size_t>(std::numeric_limits<int16_t>::max()));
+	ASSERT(std::ssize(rModel.nodes) <= std::numeric_limits<int16_t>::max());
 
-	// Load skin joint data if a skin exists. CanonicalizeSceneSkin ran before export, so slot 0 holds the skin the
-	// nodes reference; this and every other skin-0 read in the exporter depend on that.
+	// CanonicalizeSceneSkin runs before export so any node-referenced skin occupies slot 0.
 	if (!rModel.skins.empty())
 	{
-		const tinygltf::Skin& rSkin = rModel.skins[0];
+		const tinygltf::Skin& rSkin = rModel.skins.at(0);
 		skeletonData.skeleton.uiSkinJointCount = static_cast<uint16_t>(rSkin.joints.size());
-		ASSERT(rSkin.joints.size() <= skeletonData.skeleton.uiNodeCount);
+		ASSERT(std::ssize(rSkin.joints) <= skeletonData.skeleton.uiNodeCount);
 
-		// Build skin joint to node index mapping
 		skeletonData.skinJointToNode.resize(rSkin.joints.size());
-		for (size_t i = 0; i < rSkin.joints.size(); ++i)
+		for (int64_t i = 0; i < std::ssize(rSkin.joints); ++i)
 		{
-			skeletonData.skinJointToNode.at(i) = static_cast<uint16_t>(rSkin.joints[i]);
+			skeletonData.skinJointToNode.at(i) = static_cast<uint16_t>(rSkin.joints.at(i));
 		}
 
-		// Load inverse bind matrices from accessor
 		const float* pfInverseBindMatrices = nullptr;
 		if (rSkin.inverseBindMatrices != -1)
 		{
 			if (rSkin.inverseBindMatrices < 0)
 			{
-				throw std::runtime_error(std::format("ExportScene inverse-bind accessor {} is outside the model's {} accessors", rSkin.inverseBindMatrices, rModel.accessors.size()));
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor {} is outside the model's {} accessors", rSkin.inverseBindMatrices, std::ssize(rModel.accessors)));
 			}
-			if (static_cast<size_t>(rSkin.inverseBindMatrices) >= rModel.accessors.size())
+			if (rSkin.inverseBindMatrices >= std::ssize(rModel.accessors))
 			{
-				throw std::runtime_error(std::format("ExportScene inverse-bind accessor {} is outside the model's {} accessors", rSkin.inverseBindMatrices, rModel.accessors.size()));
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor {} is outside the model's {} accessors", rSkin.inverseBindMatrices, std::ssize(rModel.accessors)));
 			}
 
 			const tinygltf::Accessor& rAccessor = rModel.accessors.at(rSkin.inverseBindMatrices);
@@ -108,7 +105,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 			}
 			if (rAccessor.count < rSkin.joints.size())
 			{
-				throw std::runtime_error(std::format("ExportScene inverse-bind accessor contains {} matrices for {} skin joints", rAccessor.count, rSkin.joints.size()));
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor contains {} matrices for {} skin joints", rAccessor.count, std::ssize(rSkin.joints)));
 			}
 			if (rAccessor.sparse.isSparse)
 			{
@@ -116,21 +113,21 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 			}
 			if (rAccessor.bufferView < 0)
 			{
-				throw std::runtime_error(std::format("ExportScene inverse-bind accessor references buffer view {}, but the model declares only {} buffer views", rAccessor.bufferView, rModel.bufferViews.size()));
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor references buffer view {}, but the model declares only {} buffer views", rAccessor.bufferView, std::ssize(rModel.bufferViews)));
 			}
-			if (static_cast<size_t>(rAccessor.bufferView) >= rModel.bufferViews.size())
+			if (rAccessor.bufferView >= std::ssize(rModel.bufferViews))
 			{
-				throw std::runtime_error(std::format("ExportScene inverse-bind accessor references buffer view {}, but the model declares only {} buffer views", rAccessor.bufferView, rModel.bufferViews.size()));
+				throw std::runtime_error(std::format("ExportScene inverse-bind accessor references buffer view {}, but the model declares only {} buffer views", rAccessor.bufferView, std::ssize(rModel.bufferViews)));
 			}
 
 			const tinygltf::BufferView& rBufferView = rModel.bufferViews.at(rAccessor.bufferView);
 			if (rBufferView.buffer < 0)
 			{
-				throw std::runtime_error(std::format("ExportScene inverse-bind buffer view references buffer {}, but the model declares only {} buffers", rBufferView.buffer, rModel.buffers.size()));
+				throw std::runtime_error(std::format("ExportScene inverse-bind buffer view references buffer {}, but the model declares only {} buffers", rBufferView.buffer, std::ssize(rModel.buffers)));
 			}
-			if (static_cast<size_t>(rBufferView.buffer) >= rModel.buffers.size())
+			if (rBufferView.buffer >= std::ssize(rModel.buffers))
 			{
-				throw std::runtime_error(std::format("ExportScene inverse-bind buffer view references buffer {}, but the model declares only {} buffers", rBufferView.buffer, rModel.buffers.size()));
+				throw std::runtime_error(std::format("ExportScene inverse-bind buffer view references buffer {}, but the model declares only {} buffers", rBufferView.buffer, std::ssize(rModel.buffers)));
 			}
 			if (rBufferView.byteStride != 0)
 			{
@@ -186,7 +183,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 		}
 
 		skeletonData.inverseBindMatrices.resize(rSkin.joints.size());
-		for (size_t i = 0; i < rSkin.joints.size(); ++i)
+		for (int64_t i = 0; i < std::ssize(rSkin.joints); ++i)
 		{
 			if (pfInverseBindMatrices != nullptr)
 			{
@@ -209,14 +206,12 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 
 	LOG(kDefault, kDebug, "  Total nodes: {}", skeletonData.skeleton.uiNodeCount);
 
-	// Process ALL nodes
 	skeletonData.nodes.resize(rModel.nodes.size());
-	for (size_t i = 0; i < rModel.nodes.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rModel.nodes); ++i)
 	{
 		common::ModelNode& rNode = skeletonData.nodes.at(i);
-		const tinygltf::Node& rGltfNode = rModel.nodes[i];
+		const tinygltf::Node& rGltfNode = rModel.nodes.at(i);
 
-		// Set parent index directly (node index)
 		rNode.iParentIndex = -1;
 		auto parentIt = parentMap.find(static_cast<int>(i));
 		if (parentIt != parentMap.end())
@@ -231,40 +226,38 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 			rNode.iParentIndex = static_cast<int16_t>(parentIt->second);
 		}
 
-		// Load bind pose TRS
-		if (rGltfNode.translation.size() == 3)
+		if (std::ssize(rGltfNode.translation) == 3)
 		{
-			rNode.f4BindTranslation = XMFLOAT4(static_cast<float>(rGltfNode.translation[0]), static_cast<float>(rGltfNode.translation[1]), static_cast<float>(rGltfNode.translation[2]), 0.0f);
+			rNode.f4BindTranslation = XMFLOAT4(static_cast<float>(rGltfNode.translation.at(0)), static_cast<float>(rGltfNode.translation.at(1)), static_cast<float>(rGltfNode.translation.at(2)), 0.0f);
 		}
 		else
 		{
 			rNode.f4BindTranslation = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
 		}
 
-		if (rGltfNode.rotation.size() == 4)
+		if (std::ssize(rGltfNode.rotation) == 4)
 		{
-			rNode.f4BindRotation = XMFLOAT4(static_cast<float>(rGltfNode.rotation[0]), static_cast<float>(rGltfNode.rotation[1]), static_cast<float>(rGltfNode.rotation[2]), static_cast<float>(rGltfNode.rotation[3]));
+			rNode.f4BindRotation = XMFLOAT4(static_cast<float>(rGltfNode.rotation.at(0)), static_cast<float>(rGltfNode.rotation.at(1)), static_cast<float>(rGltfNode.rotation.at(2)), static_cast<float>(rGltfNode.rotation.at(3)));
 		}
 		else
 		{
 			rNode.f4BindRotation = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
 		}
 
-		if (rGltfNode.scale.size() == 3)
+		if (std::ssize(rGltfNode.scale) == 3)
 		{
-			rNode.f4BindScale = XMFLOAT4(static_cast<float>(rGltfNode.scale[0]), static_cast<float>(rGltfNode.scale[1]), static_cast<float>(rGltfNode.scale[2]), 1.0f);
+			rNode.f4BindScale = XMFLOAT4(static_cast<float>(rGltfNode.scale.at(0)), static_cast<float>(rGltfNode.scale.at(1)), static_cast<float>(rGltfNode.scale.at(2)), 1.0f);
 		}
 		else
 		{
 			rNode.f4BindScale = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 		}
 
-		// Load node matrix (identity if not present)
-		if (rGltfNode.matrix.size() == 16)
+		if (std::ssize(rGltfNode.matrix) == 16)
 		{
 			// glTF stores matrices in column-major order, DirectXMath uses row-major
 			// Loading column-major data as row-major puts translation into row 3, which is correct for DirectXMath
-			XMMATRIX matNode = XMMATRIX(static_cast<float>(rGltfNode.matrix[0]), static_cast<float>(rGltfNode.matrix[1]), static_cast<float>(rGltfNode.matrix[2]), static_cast<float>(rGltfNode.matrix[3]), static_cast<float>(rGltfNode.matrix[4]), static_cast<float>(rGltfNode.matrix[5]), static_cast<float>(rGltfNode.matrix[6]), static_cast<float>(rGltfNode.matrix[7]), static_cast<float>(rGltfNode.matrix[8]), static_cast<float>(rGltfNode.matrix[9]), static_cast<float>(rGltfNode.matrix[10]), static_cast<float>(rGltfNode.matrix[11]), static_cast<float>(rGltfNode.matrix[12]), static_cast<float>(rGltfNode.matrix[13]), static_cast<float>(rGltfNode.matrix[14]), static_cast<float>(rGltfNode.matrix[15]));
+			XMMATRIX matNode = XMMATRIX(static_cast<float>(rGltfNode.matrix.at(0)), static_cast<float>(rGltfNode.matrix.at(1)), static_cast<float>(rGltfNode.matrix.at(2)), static_cast<float>(rGltfNode.matrix.at(3)), static_cast<float>(rGltfNode.matrix.at(4)), static_cast<float>(rGltfNode.matrix.at(5)), static_cast<float>(rGltfNode.matrix.at(6)), static_cast<float>(rGltfNode.matrix.at(7)), static_cast<float>(rGltfNode.matrix.at(8)), static_cast<float>(rGltfNode.matrix.at(9)), static_cast<float>(rGltfNode.matrix.at(10)), static_cast<float>(rGltfNode.matrix.at(11)), static_cast<float>(rGltfNode.matrix.at(12)), static_cast<float>(rGltfNode.matrix.at(13)), static_cast<float>(rGltfNode.matrix.at(14)), static_cast<float>(rGltfNode.matrix.at(15)));
 			XMStoreFloat4x4(&rNode.f4x4BindMatrix, matNode);
 		}
 		else

@@ -156,7 +156,7 @@ public:
 	float* __restrict pfHealths = nullptr;
 	float* __restrict pfDestroyedExplosionTimes = nullptr;
 	float* __restrict pfNextBlasterSpawnTimes = nullptr;
-	engine::alignment_t* __restrict pAlignments = nullptr;
+	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	float* __restrict pfArrivalGracePeriods = nullptr;
 	// All fields are shared; Members() forwards SharedMembers() so CRC and server reads use the explicit shared
 	// subset. Client-only fields belong in ClientMembers() outside CRC; server kbServerMembersParity asserts
@@ -178,7 +178,7 @@ public:
 		XMVECTOR vecPosition = DirectX::XMVectorZero();
 		XMVECTOR vecDirection = DirectX::XMVectorZero();
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
-		engine::alignment_t alignment {};
+		engine::AlignmentIdentifier alignment {};
 		float fHealth = 0.0f;
 		float fNextBlasterSpawnTime = 0.0f;
 		float fArrivalGracePeriod = 0.0f;

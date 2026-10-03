@@ -337,15 +337,15 @@ int MainThread(HINSTANCE hinstance)
 	{
 		// Heap: operator[] may insert default element
 		ScopedSuppressAllocationTracking suppress;
-		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolates.try_emplace(kOriginCoord).first->second, pGame->RenderFrame(pGame->mClientGridCoord).interpolate);
+		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolates.try_emplace(kOriginCoordinate).first->second, pGame->RenderFrame(pGame->mClientGridCoord).interpolate);
 	}
-	gpCamera->Update(pGame->mRenderInterpolates.at(kOriginCoord), static_cast<float>(pGame->mfLastRenderFrameSeconds));
+	gpCamera->Update(pGame->mRenderInterpolates.at(kOriginCoordinate), static_cast<float>(pGame->mfLastRenderFrameSeconds));
 
 	// Render and present once per framebuffer, then show window. An iteration whose head check recreates or defers the
 	// swapchain is skipped, not retried; the count is captured first because a swapchain-tier Destroy() resets the
 	// command buffer manager.
 	gpProfileManager->BootStart(kBootTimerRenderPresent);
-	std::vector<GridCoord> bootActiveCoords = {kOriginCoord};
+	std::vector<GridCoord> bootActiveCoords = {kOriginCoordinate};
 	size_t uiBootFramebufferCount = gpCommandBufferManager->mPerFramebufferCommandBuffers.size();
 	for (size_t i = 0; i < uiBootFramebufferCount; ++i)
 	{
@@ -354,7 +354,7 @@ int MainThread(HINSTANCE hinstance)
 			continue;
 		}
 		gpGraphics->RenderGlobal(pGame->RenderFrame(pGame->mClientGridCoord).interpolate.fCurrentTime);
-		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoords, kOriginCoord, pGame->RenderFrame(pGame->mClientGridCoord).interpolate.fCurrentTime);
+		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoords, kOriginCoordinate, pGame->RenderFrame(pGame->mClientGridCoord).interpolate.fCurrentTime);
 	}
 	gpProfileManager->BootStop(kBootTimerRenderPresent);
 

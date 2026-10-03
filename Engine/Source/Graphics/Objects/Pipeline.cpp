@@ -11,19 +11,16 @@ namespace engine
 using enum DescriptorFlags;
 using enum PipelineFlags;
 
-namespace
-{
-
 // Always pushes the default 16-byte PushConstantsLayout range; callers guard that the pipeline uses the default range
 // (iPushConstantBytes == 0), since a sub-16-byte override would overflow the layout's reserved push-constant range.
-void RecordPushConstants(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkShaderStageFlags stageFlags, const XMFLOAT4& f4PushConstants)
+static void RecordPushConstants(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkShaderStageFlags stageFlags, const XMFLOAT4& f4PushConstants)
 {
 	shaders::PushConstantsLayout pushConstantsLayout {};
 	pushConstantsLayout.f4Pipeline = f4PushConstants;
 	vkCmdPushConstants(vkCommandBuffer, vkPipelineLayout, stageFlags, 0, sizeof(pushConstantsLayout), &pushConstantsLayout);
 }
 
-void BindGraphicsDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkDescriptorSetLayout vkExternalLayout, int64_t iDescriptorSetIndex, const std::vector<VkDescriptorSet>& rDescriptorSets)
+static void BindGraphicsDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkDescriptorSetLayout vkExternalLayout, int64_t iDescriptorSetIndex, const std::vector<VkDescriptorSet>& rDescriptorSets)
 {
 	if (vkExternalLayout != VK_NULL_HANDLE)
 	{
@@ -35,8 +32,6 @@ void BindGraphicsDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayou
 		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, 1, &rDescriptorSets[iDescriptorSetIndex], 0, nullptr);
 	}
 }
-
-} // namespace
 
 void BindComputeDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkDescriptorSetLayout vkExternalLayout, int64_t iCommandBuffer, int64_t iDescriptorSetIndex, const std::vector<VkDescriptorSet>& rDescriptorSets)
 {

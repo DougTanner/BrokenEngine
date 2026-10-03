@@ -31,7 +31,7 @@ public:
 	void CompleteUpdate(int64_t iFullTicks, int64_t iTick);
 	void SendNewSubscriptionFullStates();
 	void ResetTransportForLoad();
-	void PublishTick(int64_t iTick, const std::pair<GridCoord, GridUpdateData>* pGridUpdates, int64_t iGridUpdateCount, const std::pair<GridCoord, const game::Frame*>* pFullFrames, int64_t iFullFrameCount);
+	void PublishTick(int64_t iTick, std::span<const std::pair<GridCoord, GridUpdateData>> gridUpdates, std::span<const std::pair<GridCoord, const game::Frame*>> fullFrames);
 	void ComputeActiveSet();
 
 	game::ServerSession& mrSession;
@@ -45,7 +45,6 @@ private:
 	void HandleResyncRequests();
 	void ResetOnLastClientLeave();
 
-	// ComputeActiveSet helpers
 	void AddSubscribedCoords();
 	void SyncActiveFrames();
 

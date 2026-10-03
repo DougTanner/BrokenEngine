@@ -8,10 +8,7 @@
 namespace engine
 {
 
-namespace
-{
-
-common::LogLevel ParseLogLevel(std::string_view name)
+static common::LogLevel ParseLogLevel(std::string_view name)
 {
 	if (name == "Verbose")
 	{
@@ -36,7 +33,7 @@ common::LogLevel ParseLogLevel(std::string_view name)
 	throw std::runtime_error("unknown log level");
 }
 
-const char* LogLevelName(common::LogLevel eLevel)
+static const char* LogLevelName(common::LogLevel eLevel)
 {
 	switch (eLevel)
 	{
@@ -49,7 +46,7 @@ const char* LogLevelName(common::LogLevel eLevel)
 	return "Info";
 }
 
-common::LogCategory ParseLogCategory(std::string_view name)
+static common::LogCategory ParseLogCategory(std::string_view name)
 {
 	for (int64_t i = 0; i < common::kiLogCategoryCount; ++i)
 	{
@@ -64,22 +61,22 @@ common::LogCategory ParseLogCategory(std::string_view name)
 // Collects up to iCount log lines from rBuffer into rLines. When bPattern, the whole buffer is scanned and the
 // regex is applied per line before the count limit, so the last iCount *matching* lines are returned (chronological).
 template <typename BUFFER>
-void CollectLogLines(const BUFFER& rBuffer, int64_t iCount, bool bPattern, const std::regex& rPattern, nlohmann::json& rLines)
+static void CollectLogLines(const BUFFER& rBuffer, int64_t iCount, bool bPattern, const std::regex& rPattern, nlohmann::json& rLines)
 {
 	_Analysis_assume_(iCount >= 0);
-	const char* pLines[BUFFER::kiLineCount] {};
+	const char* pcLines[BUFFER::kiLineCount] {};
 	int64_t iScan = bPattern ? BUFFER::kiLineCount : iCount;
-	int64_t iFilled = rBuffer.Tail(pLines, iScan);
+	int64_t iFilled = rBuffer.Tail(pcLines, iScan);
 	_Analysis_assume_(iFilled >= 0 && iFilled <= BUFFER::kiLineCount);
 
-	const char* pMatching[BUFFER::kiLineCount] {};
+	const char* pcMatching[BUFFER::kiLineCount] {};
 	int64_t iMatchCount = 0;
 	for (int64_t i = 0; i < iFilled; ++i)
 	{
-		_Analysis_assume_(pLines[i] != nullptr);
-		if (!bPattern || std::regex_search(pLines[i], rPattern))
+		_Analysis_assume_(pcLines[i] != nullptr);
+		if (!bPattern || std::regex_search(pcLines[i], rPattern))
 		{
-			pMatching[iMatchCount++] = pLines[i];
+			pcMatching[iMatchCount++] = pcLines[i];
 		}
 	}
 
@@ -87,8 +84,8 @@ void CollectLogLines(const BUFFER& rBuffer, int64_t iCount, bool bPattern, const
 	_Analysis_assume_(iStart >= 0 && iStart <= iMatchCount && iMatchCount <= BUFFER::kiLineCount);
 	for (int64_t i = iStart; i < iMatchCount; ++i)
 	{
-		_Analysis_assume_(pMatching[i] != nullptr);
-		std::string_view line(pMatching[i]);
+		_Analysis_assume_(pcMatching[i] != nullptr);
+		std::string_view line(pcMatching[i]);
 		if (!line.empty() && line.back() == '\n')
 		{
 			line.remove_suffix(1);
@@ -97,7 +94,7 @@ void CollectLogLines(const BUFFER& rBuffer, int64_t iCount, bool bPattern, const
 	}
 }
 
-void CommandPing([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult, int64_t iGameTick)
+static void CommandPing([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult, int64_t iGameTick)
 {
 #if defined(BT_CLIENT)
 	rResult["build"] = "client";
@@ -107,28 +104,28 @@ void CommandPing([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json&
 	rResult["tick"] = iGameTick;
 }
 
-void CommandQuit([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandQuit([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	rResult = nlohmann::json::object();
 	engine::RequestQuit();
 }
 
-void CommandGetLogs(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandGetLogs(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	// .contains() is null-safe (false for a non-object params); .at().get() throws on a mistyped count (designed error path).
-	int64_t iCount = rParams.contains("count") ? rParams.at("count").get<int64_t>() : 64;
+	int64_t iCount = rParameters.contains("count") ? rParameters.at("count").get<int64_t>() : 64;
 	if (iCount < 0)
 	{
 		iCount = 0;
 	}
 
-	bool bPattern = rParams.contains("pattern");
+	bool bPattern = rParameters.contains("pattern");
 	std::regex pattern;
 	if (bPattern)
 	{
 		try
 		{
-			pattern.assign(rParams.at("pattern").get<std::string>(), std::regex::ECMAScript);
+			pattern.assign(rParameters.at("pattern").get<std::string>(), std::regex::ECMAScript);
 		}
 		catch (const std::regex_error&)
 		{
@@ -137,9 +134,9 @@ void CommandGetLogs(const nlohmann::json& rParams, nlohmann::json& rResult)
 	}
 
 	nlohmann::json lines = nlohmann::json::array();
-	if (rParams.contains("category"))
+	if (rParameters.contains("category"))
 	{
-		common::LogCategory eCategory = ParseLogCategory(rParams.at("category").get<std::string>());
+		common::LogCategory eCategory = ParseLogCategory(rParameters.at("category").get<std::string>());
 		CollectLogLines(common::gLogRingBuffers[static_cast<int64_t>(eCategory)], iCount, bPattern, pattern, lines);
 	}
 	else
@@ -151,19 +148,19 @@ void CommandGetLogs(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["lines"] = std::move(lines);
 }
 
-void CommandSetLogLevel(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandSetLogLevel(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.contains("level"))
+	if (!rParameters.contains("level"))
 	{
 		throw std::runtime_error("set_log_level requires 'level'");
 	}
-	common::LogLevel eLevel = ParseLogLevel(rParams.at("level").get<std::string>());
+	common::LogLevel eLevel = ParseLogLevel(rParameters.at("level").get<std::string>());
 
 	rResult = nlohmann::json::object();
 
 	// LOG() compile-eliminates any line below a category's compile-time floor (keLogLevels), so storing a runtime
 	// level below that floor can never actually emit. Clamp to the floor and report the effective level(s) back.
-	auto applyClamped = [eLevel](common::LogCategory eCategory) -> common::LogLevel
+	auto ApplyClamped = [eLevel](common::LogCategory eCategory) -> common::LogLevel
 	{
 		common::LogLevel eFloor = keLogLevels[static_cast<int64_t>(eCategory)];
 		common::LogLevel eEffective = eLevel < eFloor ? eFloor : eLevel;
@@ -171,25 +168,23 @@ void CommandSetLogLevel(const nlohmann::json& rParams, nlohmann::json& rResult)
 		return eEffective;
 	};
 
-	if (rParams.contains("category"))
+	if (rParameters.contains("category"))
 	{
-		common::LogCategory eCategory = ParseLogCategory(rParams.at("category").get<std::string>());
-		rResult["effective"] = LogLevelName(applyClamped(eCategory));
+		common::LogCategory eCategory = ParseLogCategory(rParameters.at("category").get<std::string>());
+		rResult["effective"] = LogLevelName(ApplyClamped(eCategory));
 	}
 	else
 	{
 		nlohmann::json effective = nlohmann::json::object();
 		for (int64_t i = 0; i < common::kiLogCategoryCount; ++i)
-			effective[common::kpcLogCategoryNames[i]] = LogLevelName(applyClamped(static_cast<common::LogCategory>(i)));
+			effective[common::kpcLogCategoryNames[i]] = LogLevelName(ApplyClamped(static_cast<common::LogCategory>(i)));
 		rResult["effective"] = std::move(effective);
 	}
 }
 
-} // namespace
-
-nlohmann::json AgentCoordJson(GridCoord coord)
+nlohmann::json AgentCoordinateJson(GridCoord coordinate)
 {
-	return nlohmann::json::array({coord.x, coord.y});
+	return nlohmann::json::array({coordinate.iX, coordinate.iY});
 }
 
 nlohmann::json AgentLocalPositionJson(FXMVECTOR vecLocalPosition)
@@ -197,7 +192,7 @@ nlohmann::json AgentLocalPositionJson(FXMVECTOR vecLocalPosition)
 	return nlohmann::json::array({XMVectorGetX(vecLocalPosition), XMVectorGetY(vecLocalPosition), XMVectorGetZ(vecLocalPosition)});
 }
 
-int32_t AgentGridCoordValue(const nlohmann::json& rValue, std::string_view name)
+int32_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view name)
 {
 	if (!rValue.is_number_integer())
 	{
@@ -222,31 +217,31 @@ int32_t AgentGridCoordValue(const nlohmann::json& rValue, std::string_view name)
 	return static_cast<int32_t>(iValue);
 }
 
-bool ExecuteSharedAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult, int64_t iGameTick)
+bool ExecuteSharedAgentCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult, int64_t iGameTick)
 {
-	if (cmd == "ping")
+	if (command == "ping")
 	{
-		CommandPing(rParams, rResult, iGameTick);
+		CommandPing(rParameters, rResult, iGameTick);
 	}
-	else if (cmd == "quit")
+	else if (command == "quit")
 	{
-		CommandQuit(rParams, rResult);
+		CommandQuit(rParameters, rResult);
 	}
-	else if (cmd == "get_logs")
+	else if (command == "get_logs")
 	{
-		CommandGetLogs(rParams, rResult);
+		CommandGetLogs(rParameters, rResult);
 	}
-	else if (cmd == "set_log_level")
+	else if (command == "set_log_level")
 	{
-		CommandSetLogLevel(rParams, rResult);
+		CommandSetLogLevel(rParameters, rResult);
 	}
-	else if (cmd == "crash_report_fixture")
+	else if (command == "crash_report_fixture")
 	{
-		CommandCrashReportFixture(rParams, rResult);
+		CommandCrashReportFixture(rParameters, rResult);
 	}
-	else if (cmd == "cell_coordinate_probe")
+	else if (command == "cell_coordinate_probe")
 	{
-		CommandCellCoordinateProbe(rParams, rResult);
+		CommandCellCoordinateProbe(rParameters, rResult);
 	}
 	else
 	{

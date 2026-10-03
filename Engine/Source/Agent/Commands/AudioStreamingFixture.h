@@ -7,6 +7,9 @@
 namespace engine
 {
 
+class AudioStreamingFixture;
+inline std::atomic<AudioStreamingFixture*> gpAttachedAudioStreamingFixture = nullptr;
+
 class PackChunks;
 class StreamingVoice;
 
@@ -195,14 +198,13 @@ public:
 	bool Begin(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
 	bool Play(common::crc_t crc);
 	void Clear();
-	void StopPublication();
 	void ReleaseControls();
 	AudioStreamingFixtureAudioSnapshot InspectAudio() const;
 
 	bool BeginHistory();
 	AudioStreamingFixtureSnapshot InspectFile() const;
-	bool ArmHold(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
-	void ReleaseHold();
+	bool ArmHold(AudioStreamingFixtureHoldOwner eOwner, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
+	void ReleaseHold(AudioStreamingFixtureHoldOwner eOwner);
 	void StartCoexistence(common::crc_t realtimeCrc, common::crc_t normalCrc);
 	bool FinishCoexistence();
 	void ReleaseCoexistence();
@@ -214,21 +216,13 @@ public:
 	AudioStreamingFixtureCommandFlags_t mCommandFlags;
 
 	static void Record(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, uint32_t uiPoolIndex, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, AudioStreamingFixtureQueueState eState, uint64_t uiGeneration, bool bCancelAcknowledged);
-	static void RecordMain(AudioStreamingFixturePhase ePhase, uint32_t uiPoolIndex, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, AudioStreamingFixtureQueueState eState, uint64_t uiGeneration, bool bCancelAcknowledged);
 	static bool HoldAudioRead(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, uint32_t uiIndex, uint64_t uiGeneration);
 	static void CompleteAudioRead(bool bHeld);
 	static void CountRetry();
-	static bool LoadersStaged();
 	static void PrepareLoaderDrain();
-	static bool SuppressTrackTransition();
-	static bool AllowCurrentRequests();
-	static bool AllowNewestFadeRequests();
 	static bool AllowOlderFadeRequests();
 	static AudioStreamingVoiceControl* CreateVoiceControl(StreamingVoice& rVoice);
-	static void RetireVoiceControl(AudioStreamingVoiceControl* pControl);
-
-private:
-	static AudioStreamingFixture* TryGet();
+	static void RetireVoiceControl(const AudioStreamingVoiceControl* pControl);
 
 	enum class Flags : uint8_t
 	{
@@ -247,6 +241,10 @@ private:
 		kSaturation,
 	};
 
+	Flags_t mFlags;
+	std::atomic<StagingOwner> meStagingOwner {StagingOwner::kNone};
+
+private:
 	struct HistoryEntry
 	{
 		AudioStreamingFixtureRecord record {};
@@ -261,13 +259,9 @@ private:
 		std::atomic<uint32_t> uiDropped {0};
 	};
 
-	bool ArmHold(AudioStreamingFixtureHoldOwner eOwner, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
-	void ReleaseHold(AudioStreamingFixtureHoldOwner eOwner);
 	void ResetHistory();
 	void RecordEntry(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, uint32_t uiPoolIndex, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, AudioStreamingFixtureQueueState eState, uint64_t uiGeneration, bool bCancelAcknowledged);
-	PackChunks* GetPackChunks() const;
 
-	Flags_t mFlags;
 	std::vector<std::unique_ptr<AudioStreamingVoiceControl>> mVoiceControls;
 	std::atomic<uint64_t> muiScenarioGate {0};
 	std::atomic<uint64_t> muiActiveWriters {0};
@@ -285,7 +279,6 @@ private:
 	std::atomic<uint64_t> muiHoldLength {0};
 	std::atomic<uint32_t> muiHeldIndex {std::numeric_limits<uint32_t>::max()};
 	std::atomic<uint64_t> muiHeldGeneration {0};
-	std::atomic<StagingOwner> meStagingOwner {StagingOwner::kNone};
 	ChunkReadRequest mInvalidRequest;
 	std::array<std::byte, 16 * 1'024> mInvalidBuffer {};
 	common::crc_t mInvalidCrc = 0;

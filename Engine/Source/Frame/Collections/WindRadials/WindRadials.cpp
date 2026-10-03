@@ -8,22 +8,12 @@ namespace engine
 template struct Collection<WindRadialsInterpolate>;
 template struct Collection<WindRadialsPostRender>;
 
-void WindRadialsInterpolate::AllocateAndCopy(WindRadialsInterpolate& rCurrent, const WindRadialsInterpolate& rPrevious)
-{
-	AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
-void WindRadialsPostRender::AllocateAndCopy(WindRadialsPostRender& rCurrent, const WindRadialsPostRender& rPrevious)
-{
-	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
 void WindRadialsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
-	DestroyExpiredControlled(rFrame.interpolate.windRadials, rFrame.postRender.windRadials, rFrame.interpolate.fCurrentTime, [](WindRadialsInterpolate& rI, WindRadialsPostRender& rPR, int64_t& i)
+	DestroyExpiredControlled(rFrame.interpolate.windRadials, rFrame.postRender.windRadials, rFrame.interpolate.fCurrentTime, [](WindRadialsInterpolate& rInterpolate, WindRadialsPostRender& rPostRender, int64_t& riIndex)
 	{
-		DestroyElement(rI, rPR, i, rI.Members(), rPR.Members());
-		--i;
+		DestroyElement(rInterpolate, rPostRender, riIndex, rInterpolate.Members(), rPostRender.Members());
+		--riIndex;
 	});
 }
 

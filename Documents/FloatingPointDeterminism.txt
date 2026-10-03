@@ -141,7 +141,7 @@ indices, not hash-based containers.
 
 8. No Address-Dependent Ordering
 ---------------------------------
-Entity identity uses uuid_t (int64_t counter), not memory addresses.
+Entity identity uses Uuid (int64_t counter), not memory addresses.
 No pointer-based sorting or pointer-derived hash keys exist in
 simulation code.
 

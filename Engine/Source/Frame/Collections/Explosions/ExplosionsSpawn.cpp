@@ -22,9 +22,9 @@ void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, s
 
 #endif // BT_CLIENT
 
-bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentTime, const SpawnInfo& rInfo)
+bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation)
 {
-	if (!common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()))
+	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalFrameArea()))
 	{
 		return false;
 	}
@@ -32,24 +32,23 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 	ExplosionsInterpolate& rInterpolate = rFrame.interpolate.explosions;
 	ExplosionsPostRender& rPostRender = rFrame.postRender.explosions;
 
-	common::ValidateVector<true >(rInfo.vecPosition);
-	common::ValidateVector<false>(rInfo.vecDirection);
+	common::ValidateVector<true >(rSpawnInformation.vecPosition);
+	common::ValidateVector<false>(rSpawnInformation.vecDirection);
 
-	const ExplosionType& rType = ExplosionsInterpolate::sTypes.at(rInfo.uiTypeIndex);
+	const ExplosionType& rType = ExplosionsInterpolate::sTypes.at(rSpawnInformation.uiTypeIndex);
 
 	GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	int64_t iSpawnIndex = AddElement(rInterpolate, rPostRender);
 
-	// Initialize explosion data
-	rInterpolate.puiTypeIndices[iSpawnIndex] = rInfo.uiTypeIndex;
-	rInterpolate.pFlags[iSpawnIndex] = rInfo.flags;
-	rInterpolate.pfStartTimes[iSpawnIndex] = fCurrentTime;
-	rInterpolate.pVecPositions[iSpawnIndex] = rInfo.vecPosition;
-	rInterpolate.pVecDirections[iSpawnIndex] = rInfo.vecDirection;
+	rInterpolate.puiTypeIndices[iSpawnIndex] = rSpawnInformation.uiTypeIndex;
+	rInterpolate.pFlags[iSpawnIndex] = rSpawnInformation.flags;
+	rInterpolate.pfStartTimes[iSpawnIndex] = currentTime.count();
+	rInterpolate.pVecPositions[iSpawnIndex] = rSpawnInformation.vecPosition;
+	rInterpolate.pVecDirections[iSpawnIndex] = rSpawnInformation.vecDirection;
 
-	rInterpolate.pfTimePercents[iSpawnIndex] = rInfo.fTimePercent;
+	rInterpolate.pfTimePercents[iSpawnIndex] = rSpawnInformation.fTimePercent;
 
-	rInterpolate.piTrailCounts[iSpawnIndex] = static_cast<int32_t>(std::min(rInfo.uiTrailCount, static_cast<uint32_t>(kiMaxExplosionTrails)));
+	rInterpolate.piTrailCounts[iSpawnIndex] = static_cast<int32_t>(std::min(rSpawnInformation.uiTrailCount, static_cast<uint32_t>(kiMaxExplosionTrails)));
 
 	// Initialize trail arrays to invalid
 	for (int64_t j = 0; j < kiMaxExplosionTrails; ++j)
@@ -70,7 +69,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 #if defined(BT_CLIENT)
 	if (rType.uiPrimaryLightControllerTypeIndex != kuiInvalidControllerType)
 	{
-		PointLightsPostRender::AddControlled(rFrame, fCurrentTime, rType.uiPrimaryLightControllerTypeIndex, rInfo.vecPosition, fPrimaryRotation);
+		PointLightsPostRender::AddControlled(rFrame, currentTime, rType.uiPrimaryLightControllerTypeIndex, rSpawnInformation.vecPosition, fPrimaryRotation);
 	}
 #endif
 
@@ -78,37 +77,34 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 #if defined(BT_CLIENT)
 	if (rType.uiPrimaryPuffControllerTypeIndex != kuiInvalidControllerType)
 	{
-		PuffsPostRender::AddControlled(rFrame, fCurrentTime, rType.uiPrimaryPuffControllerTypeIndex, rInfo.vecPosition);
+		PuffsPostRender::AddControlled(rFrame, currentTime, rType.uiPrimaryPuffControllerTypeIndex, rSpawnInformation.vecPosition);
 	}
 #endif
 
 	// Fire-and-forget effects: Secondary explosions (staggered)
 	int64_t iSecondaryExplosions = static_cast<int64_t>(rType.uiSecondaryExplosionCount);
-	float fDelayDelta = iSecondaryExplosions > 0 ? (0.75f * rInfo.fTimePercent * rType.fPrimaryTime) / static_cast<float>(iSecondaryExplosions) : 0.0f;
-	float fDelay = fDelayDelta;
+	std::chrono::duration<float> durationDelayDelta(iSecondaryExplosions > 0 ? (0.75f * rSpawnInformation.fTimePercent * rType.fPrimaryTime) / static_cast<float>(iSecondaryExplosions) : 0.0f);
+	std::chrono::duration<float> durationDelay = durationDelayDelta;
 
-	for (int64_t k = 0; k < iSecondaryExplosions; ++k, fDelay += fDelayDelta)
+	for (int64_t k = 0; k < iSecondaryExplosions; ++k, durationDelay += durationDelayDelta)
 	{
-		// Calculate secondary explosion position
-		XMVECTOR vecSecondaryOffset = XMVector3RotateSafe(XMVectorSet(rType.fSecondaryPositionMin + std::pow(rInfo.fSizePercent, 1.5f) * common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fSecondaryPositionJitter, 0.0f, 0.0f, 0.0f), XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, common::Random<XM_2PI>(rFrame.postRender.randomEngine)));
-		[[maybe_unused]] XMVECTOR vecSecondaryPosition = XMVectorAdd(vecSecondaryOffset, rInfo.vecPosition);
+		XMVECTOR vecSecondaryOffset = XMVector3RotateSafe(XMVectorSet(rType.fSecondaryPositionMinimum + std::pow(rSpawnInformation.fSizePercent, 1.5f) * common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fSecondaryPositionJitter, 0.0f, 0.0f, 0.0f), XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, common::Random<XM_2PI>(rFrame.postRender.randomEngine)));
+		[[maybe_unused]] XMVECTOR vecSecondaryPosition = XMVectorAdd(vecSecondaryOffset, rSpawnInformation.vecPosition);
 
 		// Consume random unconditionally to keep random engine in sync across client/server
 		[[maybe_unused]] float fSecondaryRotation = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
 
-		// Secondary light
 #if defined(BT_CLIENT)
 		if (rType.uiSecondaryLightControllerTypeIndex != kuiInvalidControllerType)
 		{
-			PointLightsPostRender::AddControlled(rFrame, fCurrentTime + fDelay, rType.uiSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
+			PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(currentTime.count() + durationDelay.count()), rType.uiSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
 		}
 #endif
 
-		// Secondary puff
 #if defined(BT_CLIENT)
 		if (rType.uiSecondaryPuffControllerTypeIndex != kuiInvalidControllerType)
 		{
-			PuffsPostRender::AddControlled(rFrame, fCurrentTime + fDelay, rType.uiSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
+			PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(currentTime.count() + durationDelay.count()), rType.uiSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
 		}
 #endif
 	}
@@ -117,47 +113,46 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 #if defined(BT_CLIENT)
 	if (rType.uiWindRadialControllerTypeIndex != kuiInvalidControllerType)
 	{
-		float fWindSizePercent = std::sqrt(rInfo.fSizePercent);
-		WindRadialsPostRender::AddControlled(rFrame, fCurrentTime, rType.uiWindRadialControllerTypeIndex, rInfo.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->Get() * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->Get() * fWindSizePercent);
+		float fWindSizePercent = std::sqrt(rSpawnInformation.fSizePercent);
+		WindRadialsPostRender::AddControlled(rFrame, currentTime.count(), rType.uiWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->Get() * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->Get() * fWindSizePercent);
 	}
 #endif
 
-	// Create trails
-	XMVECTOR vecDirection2dNormal = XMVector3Normalize(XMVectorMultiply(XMVectorSet(1.0f, 1.0f, 0.0f, 0.0f), rInfo.vecDirection));
-	int32_t iTrailCount = rInterpolate.piTrailCounts[iSpawnIndex];
+	XMVECTOR vecDirection2dNormal = XMVector3Normalize(XMVectorMultiply(XMVectorSet(1.0f, 1.0f, 0.0f, 0.0f), rSpawnInformation.vecDirection));
+	int64_t iTrailCount = rInterpolate.piTrailCounts[iSpawnIndex];
 
-	for (int32_t j = 0; j < iTrailCount; ++j)
+	for (int64_t j = 0; j < iTrailCount; ++j)
 	{
-		float fTrailTime = rInfo.fTimePercent * (rType.fTrailTimeMin + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailTimeRandom);
-		[[maybe_unused]] float fTrailIntensity = rInfo.fSmokePercent * (rType.fTrailIntensityMin + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailIntensityRandom);
+		std::chrono::duration<float> durationTrailTime(rSpawnInformation.fTimePercent * (rType.fTrailTimeMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailTimeRandom));
+		[[maybe_unused]] float fTrailIntensity = rSpawnInformation.fSmokePercent * (rType.fTrailIntensityMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailIntensityRandom);
 
 		XMVECTOR vecTrailDirection = vecDirection2dNormal;
 		if (j != 0)
 		{
-			vecTrailDirection = XMVector3RotateSafe(vecTrailDirection, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, rInfo.fTrailAngle * (common::Random(rFrame.postRender.randomEngine) - 0.5f)));
+			vecTrailDirection = XMVector3RotateSafe(vecTrailDirection, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, rSpawnInformation.fTrailAngle * (common::Random(rFrame.postRender.randomEngine) - 0.5f)));
 		}
 
-		[[maybe_unused]] XMVECTOR vecTrailStart = XMVectorMultiplyAdd(vecTrailDirection, XMVectorReplicate(rType.fTrailStart), rInfo.vecPosition);
-		[[maybe_unused]] float fTrailLength = rType.fTrailLengthMin + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailLengthRandom;
+		[[maybe_unused]] XMVECTOR vecTrailStart = XMVectorMultiplyAdd(vecTrailDirection, XMVectorReplicate(rType.fTrailStart), rSpawnInformation.vecPosition);
+		[[maybe_unused]] float fTrailLength = rType.fTrailLengthMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailLengthRandom;
 
-		rInterpolate.pfTrailTimes[j][iSpawnIndex] = fTrailTime;
+		rInterpolate.pfTrailTimes[j][iSpawnIndex] = durationTrailTime.count();
 
 #if defined(BT_CLIENT)
 		// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
 		bool bPrimary = (j == 0);
-		float fLengthMul = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailLength->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailLength->Get();
-		float fDurationMul = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->Get();
+		float fLengthMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailLength->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailLength->Get();
+		float fDurationMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->Get();
 		fTrailIntensity *= bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailIntensity->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailIntensity->Get();
 		// Scaling the head's travel distance by Duration keeps head speed constant when Update later scales
 		// pfTrailTimes by the same Duration multiplier — so increasing Duration extends both space and time
 		// in lockstep rather than slowing the head into the engine's smoke-decay window.
-		fTrailLength *= fLengthMul * fDurationMul;
+		fTrailLength *= fLengthMultiplier * fDurationMultiplier;
 
-		XMVECTOR vecTrailEnd = XMVectorMultiplyAdd(vecTrailDirection, XMVectorReplicate(fTrailLength), rInfo.vecPosition);
+		XMVECTOR vecTrailEnd = XMVectorMultiplyAdd(vecTrailDirection, XMVectorReplicate(fTrailLength), rSpawnInformation.vecPosition);
 
-		// Create trail in SmokeTrails collection (start at full intensity, will fade over time in Sync)
+		// Update fades the trail from its configured starting intensity.
 		smoke_trails_t trailId;
-		SmokeTrailsPostRender::Add(rFrame, trailId, ExplosionsInterpolate::GetTrailTypeIndex());
+		SmokeTrailsPostRender::Add(rFrame, trailId, ExplosionsInterpolate::suiExplosionTrailTypeIndex);
 
 		rInterpolate.pTrails[j][iSpawnIndex] = trailId;
 		rInterpolate.pfTrailIntensities[j][iSpawnIndex] = fTrailIntensity;
@@ -169,11 +164,13 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 #endif // BT_CLIENT
 	}
 
-	// Spawn GPU particles
-	uint32_t uiTotalParticles = rInfo.uiParticleCount + rType.uiBaseParticleCount;
+	int64_t iTotalParticles = rSpawnInformation.uiParticleCount + rType.uiBaseParticleCount;
 
 	// Per-type tweak multipliers (Particles tab). Null on server, optional on client.
-	auto Scale = [](const Wrapper* pWrapper) { return pWrapper != nullptr ? pWrapper->Get() : 1.0f; };
+	auto Scale = [](const Wrapper* pWrapper)
+	{
+		return pWrapper != nullptr ? pWrapper->Get() : 1.0f;
+	};
 	float fPositionJitterScale         = Scale(rType.pParticlePositionJitterScale);
 	float fVelocityBaseScale           = Scale(rType.pParticleVelocityBaseScale);
 	float fVelocitySpreadScale         = Scale(rType.pParticleVelocitySpreadScale);
@@ -189,35 +186,33 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, float fCurrentT
 	[[maybe_unused]] float fIntensityDecayScale = Scale(rType.pParticleIntensityDecayScale);
 	[[maybe_unused]] float fIntensityPowerScale = Scale(rType.pParticleIntensityPowerScale);
 
-	for (uint32_t p = 0; p < uiTotalParticles; ++p)
+	for (int64_t i = 0; i < iTotalParticles; ++i)
 	{
 		XMFLOAT4A f4Position {};
-		XMVECTOR vecParticlePosition = common::RandomPositionJitter(rInfo.vecPosition, rType.fParticlePositionJitter * fPositionJitterScale, rFrame.postRender.randomEngine);
+		XMVECTOR vecParticlePosition = common::RandomPositionJitter(rSpawnInformation.vecPosition, rType.fParticlePositionJitter * fPositionJitterScale, rFrame.postRender.randomEngine);
 		XMStoreFloat4A(&f4Position, vecParticlePosition);
 
-		float fVelocityMag = rType.fParticleVelocityMin * fVelocityBaseScale + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleVelocityRandom * fVelocitySpreadScale;
-		XMVECTOR vecVelocity = XMVectorMultiply(XMVectorReplicate(fVelocityMag), vecDirection2dNormal);
-		vecVelocity = XMVector3RotateSafe(vecVelocity, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, -0.5f * rInfo.fParticleAngle + rInfo.fParticleAngle * common::Random(rFrame.postRender.randomEngine)));
-		vecVelocity = XMVectorSetZ(vecVelocity, rType.fParticleVerticalVelocityMin * fVerticalVelocityBaseScale + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleVerticalVelocityRandom * fVerticalVelocitySpreadScale);
+		float fVelocityMagnitude = rType.fParticleVelocityMinimum * fVelocityBaseScale + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleVelocityRandom * fVelocitySpreadScale;
+		XMVECTOR vecVelocity = XMVectorMultiply(XMVectorReplicate(fVelocityMagnitude), vecDirection2dNormal);
+		vecVelocity = XMVector3RotateSafe(vecVelocity, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, -0.5f * rSpawnInformation.fParticleAngle + rSpawnInformation.fParticleAngle * common::Random(rFrame.postRender.randomEngine)));
+		vecVelocity = XMVectorSetZ(vecVelocity, rType.fParticleVerticalVelocityMinimum * fVerticalVelocityBaseScale + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleVerticalVelocityRandom * fVerticalVelocitySpreadScale);
 		XMFLOAT4A f4Velocity {};
 		XMStoreFloat4A(&f4Velocity, vecVelocity);
 
-		// Calculate particle color based on flags
 		[[maybe_unused]] uint32_t uiParticleColor = rType.uiParticleColor;
-		if (rInfo.flags & kYellow)
+		if (rSpawnInformation.flags & kYellow)
 		{
 			uiParticleColor |= ((100 + common::Random(25u, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25u, rFrame.postRender.randomEngine)) << 8);
 		}
-		else if (rInfo.flags & kRed)
+		else if (rSpawnInformation.flags & kRed)
 		{
 			uiParticleColor |= ((50 + common::Random(25u, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25u, rFrame.postRender.randomEngine)) << 8);
 		}
 
-		[[maybe_unused]] float fParticleIntensity = (rType.fParticleIntensityMin + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleIntensityRandom * fIntensitySpreadScale) * fVisibleIntensityScale;
+		[[maybe_unused]] float fParticleIntensity = (rType.fParticleIntensityMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleIntensityRandom * fIntensitySpreadScale) * fVisibleIntensityScale;
 
-		// Per-particle length jitter — multiplicative spread driven by LengthSpread wrapper.
 		// Random consumed unconditionally to keep stream in sync across builds.
-		[[maybe_unused]] const float fLengthJitter = common::Random<1.0f>(rFrame.postRender.randomEngine);
+		[[maybe_unused]] float fLengthJitter = common::Random<1.0f>(rFrame.postRender.randomEngine);
 
 #if defined(BT_CLIENT)
 		if (!(rFrame.interpolate.frameFlags & FrameFlags::kRecalculated))

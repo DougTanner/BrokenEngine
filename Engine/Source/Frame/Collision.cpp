@@ -11,16 +11,16 @@ struct PendingCollisionResult
 {
 	int64_t iLayerIndex = 0;
 	int64_t iObjectIndex = 0;
-	CollisionResult result;
+	CollisionResult result {};
 };
 
 // Candidate event collected across every active layer pair before any collision flags mutate.
 struct CollisionCandidate
 {
 	float fTimeOfImpact = 0.0f;
-	size_t uiLayerA = 0;
+	int64_t iLayerA = 0;
 	int64_t iObjectA = 0;
-	size_t uiLayerB = 0;
+	int64_t iLayerB = 0;
 	int64_t iObjectB = 0;
 	XMVECTOR vecContactPoint {};
 	XMVECTOR vecPositionA {};
@@ -33,29 +33,27 @@ struct CollisionPairContext
 	const Alignments& rAlignments;
 	const CollisionLayer& rLayerA;
 	const CollisionLayer& rLayerB;
-	size_t uiLayerA = 0;
-	size_t uiLayerB = 0;
+	int64_t iLayerA = 0;
+	int64_t iLayerB = 0;
 	bool bSweptPair = false;
 };
 
 struct CollisionEventScratch
 {
 	// Reserved counts live here rather than at the growth sites because the owner is default-constructed
-	common::StableVector<CollisionCandidate> candidates {64 * kiCollisionCandidatePreallocate};
-	common::StableVector<PendingCollisionResult> pendingResults {64 * kiCollisionResultPreallocate};
+	common::StableVector<CollisionCandidate> candidates = common::StableVector<CollisionCandidate>(64 * kiCollisionCandidatePreallocate);
+	common::StableVector<PendingCollisionResult> pendingResults = common::StableVector<PendingCollisionResult>(64 * kiCollisionResultPreallocate);
 	int64_t iCandidateCount = 0;
 	int64_t iPendingResultCount = 0;
 };
 
 static CollisionEventScratch& GetCollisionEventScratch()
 {
-	// Function-local TLS defers construction until first use; construction only records the reserved
-	// counts and makes no OS call, so it is safe even before allocator startup completes.
+	// Function-local TLS defers construction until first use; StableVector constructors record reservation sizes without allocating.
 	static thread_local CollisionEventScratch sScratch;
 	return sScratch;
 }
 
-// Zone range for spatial partitioning
 struct ZoneRange
 {
 	int32_t iStartX = 0;
@@ -64,21 +62,19 @@ struct ZoneRange
 	int32_t iEndY = 0;
 };
 
-// Per-zone storage for a layer pair
 struct ZonePair
 {
 	// Reserved counts live here rather than at the growth sites because the owner is default-constructed
-	common::StableVector<int64_t> indicesA {4 * kiCollisionZonePreallocate};  // Object indices from layer A
-	common::StableVector<int64_t> indicesB {4 * kiCollisionZonePreallocate};  // Object indices from layer B
+	common::StableVector<int64_t> indicesA = common::StableVector<int64_t>(4 * kiCollisionZonePreallocate);  // Object indices from layer A
+	common::StableVector<int64_t> indicesB = common::StableVector<int64_t>(4 * kiCollisionZonePreallocate);  // Object indices from layer B
 	int64_t iCountA = 0;
 	int64_t iCountB = 0;
 };
 
-// Grid of zones for one layer pair
 struct LayerPairZones
 {
-	size_t uiLayerA = 0;
-	size_t uiLayerB = 0;
+	int64_t iLayerA = 0;
+	int64_t iLayerB = 0;
 	ZonePair zones[kiCollisionZonesY][kiCollisionZonesX];
 
 	LayerPairZones()
@@ -94,103 +90,87 @@ struct LayerPairZones
 	}
 };
 
-// Default-constructed (no allocation): thread_local constructors run during
-// mi_process_init before the allocator is ready, so pre-allocation would crash.
-// The existing growth code handles lazy initialization on first use.
-thread_local std::vector<CollisionLayer> Collision::sLayers;
-
 // StableVector construction only records the reserved count, so these reserve no address space and make
 // no OS call until their first Resize; growth then commits more of that reservation without moving.
-thread_local common::StableVector<LayerPairZones> Collision::sLayerPairZones {64 * kiCollisionLayerPairPreallocate};
-
-// These three are first sized from live data rather than from a pre-allocate constant, so each reserves
-// a fixed live-data ceiling instead of a multiple of one.
-static constexpr int64_t kiCollisionLiveDataReserveBytes = 64 * 1'024 * 1'024;
-thread_local common::StableVector<CollisionResult> Collision::sResultEntries {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResult))};
-thread_local common::StableVector<CollisionResultSpan> Collision::sResultSpans {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResultSpan))};
-thread_local int64_t Collision::sLayerBaseOffsets[kiCollisionLayerPreallocate] {};
-thread_local common::StableVector<uint32_t> Collision::sTestedBGeneration {kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(uint32_t))};
+thread_local common::StableVector<LayerPairZones> Collision::sLayerPairZones(64 * kiCollisionLayerPairPreallocate);
 
 using enum CollisionFlags;
 
-size_t Collision::AddLayer(const CollisionLayer& rLayer)
+int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 {
-	// Lazy pre-allocation: thread_local vectors start empty to avoid allocating
-	// during mi_process_init (before the allocator is ready)
 	if (sLayers.empty())
 	{
-		// Heap: one-time per-thread pre-allocation (thread_local vectors start empty to avoid allocating during mi_process_init)
 		ScopedSuppressAllocationTracking suppress;
 		sLayers.resize(kiCollisionLayerPreallocate);
 	}
 
-	size_t uiLayerIndex = static_cast<size_t>(siLayerCount);
+	int64_t iLayerIndex = siLayerCount;
 	// Growing past the pre-allocation would overrun the fixed sLayerBaseOffsets array; layer count is
 	// compile-time-determined by the registering collections, so overflow is a developer error — fail loud
-	if (siLayerCount >= static_cast<int64_t>(sLayers.size()))
+	if (siLayerCount >= std::ssize(sLayers))
 	{
-		LOG(kDefault, kError, "Collision: sLayers overflow (count: {}, capacity: {}). Increase kiCollisionLayerPreallocate in Collision.h", siLayerCount, sLayers.size());
+		LOG(kDefault, kError, "Collision: sLayers overflow (count: {}, capacity: {}). Increase kiCollisionLayerPreallocate in Collision.h", siLayerCount, std::ssize(sLayers));
 		ASSERT(false);
 	}
-	sLayers.at(uiLayerIndex) = rLayer;
+	sLayers.at(iLayerIndex) = rLayer;
 	++siLayerCount;
-	return uiLayerIndex;
+	return iLayerIndex;
 }
 
-ZoneRange Collision::CalculateZoneRange(float fMinX, float fMaxX, float fMinY, float fMaxY, float fRadius)
+ZoneRange Collision::CalculateZoneRange(float fMinimumX, float fMaximumX, float fMinimumY, float fMaximumY, float fRadius)
 {
 	return
 	{
-		.iStartX = std::clamp(static_cast<int32_t>((fMinX - fRadius - sfAreaMinX) / sfZoneWidth), 0, kiCollisionZonesX - 1),
-		.iEndX = std::clamp(static_cast<int32_t>((fMaxX + fRadius - sfAreaMinX) / sfZoneWidth), 0, kiCollisionZonesX - 1),
-		.iStartY = std::clamp(static_cast<int32_t>((fMinY - fRadius - sfAreaMinY) / sfZoneHeight), 0, kiCollisionZonesY - 1),
-		.iEndY = std::clamp(static_cast<int32_t>((fMaxY + fRadius - sfAreaMinY) / sfZoneHeight), 0, kiCollisionZonesY - 1),
+		.iStartX = std::clamp(static_cast<int32_t>((fMinimumX - fRadius - sfAreaMinimumX) / sfZoneWidth), 0, kiCollisionZonesX - 1),
+		.iEndX = std::clamp(static_cast<int32_t>((fMaximumX + fRadius - sfAreaMinimumX) / sfZoneWidth), 0, kiCollisionZonesX - 1),
+		.iStartY = std::clamp(static_cast<int32_t>((fMinimumY - fRadius - sfAreaMinimumY) / sfZoneHeight), 0, kiCollisionZonesY - 1),
+		.iEndY = std::clamp(static_cast<int32_t>((fMaximumY + fRadius - sfAreaMinimumY) / sfZoneHeight), 0, kiCollisionZonesY - 1),
 	};
 }
 
 ZoneRange Collision::CalculateObjectZoneRange(const CollisionLayer& rLayer, int64_t iIndex, bool bSweptPair)
 {
-	float fMinX = 0.0f, fMaxX = 0.0f, fMinY = 0.0f, fMaxY = 0.0f;
+	float fMinimumX = 0.0f, fMaximumX = 0.0f, fMinimumY = 0.0f, fMaximumY = 0.0f;
 	if (bSweptPair)
 	{
-		XMVECTOR vecMin = XMVectorMin(rLayer.pVecStartPositions[iIndex], rLayer.pVecEndPositions[iIndex]);
-		XMVECTOR vecMax = XMVectorMax(rLayer.pVecStartPositions[iIndex], rLayer.pVecEndPositions[iIndex]);
-		XMFLOAT4A f4Min {};
-		XMFLOAT4A f4Max {};
-		XMStoreFloat4A(&f4Min, vecMin);
-		XMStoreFloat4A(&f4Max, vecMax);
-		fMinX = f4Min.x;
-		fMaxX = f4Max.x;
-		fMinY = f4Min.y;
-		fMaxY = f4Max.y;
+		XMVECTOR vecMinimum = XMVectorMin(rLayer.pVecStartPositions[iIndex], rLayer.pVecEndPositions[iIndex]);
+		XMVECTOR vecMaximum = XMVectorMax(rLayer.pVecStartPositions[iIndex], rLayer.pVecEndPositions[iIndex]);
+		XMFLOAT4A f4Minimum {};
+		XMFLOAT4A f4Maximum {};
+		XMStoreFloat4A(&f4Minimum, vecMinimum);
+		XMStoreFloat4A(&f4Maximum, vecMaximum);
+		fMinimumX = f4Minimum.x;
+		fMaximumX = f4Maximum.x;
+		fMinimumY = f4Minimum.y;
+		fMaximumY = f4Maximum.y;
 	}
 	else
 	{
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, rLayer.pVecEndPositions[iIndex]);
-		fMinX = f4Position.x;
-		fMaxX = f4Position.x;
-		fMinY = f4Position.y;
-		fMaxY = f4Position.y;
+		fMinimumX = f4Position.x;
+		fMaximumX = f4Position.x;
+		fMinimumY = f4Position.y;
+		fMaximumY = f4Position.y;
 	}
-	return CalculateZoneRange(fMinX, fMaxX, fMinY, fMaxY, rLayer.pfRadii[iIndex]);
+	return CalculateZoneRange(fMinimumX, fMaximumX, fMinimumY, fMaximumY, rLayer.pfRadii[iIndex]);
 }
 
 void Collision::InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange, bool bIsLayerA)
 {
-	for (int32_t y = rRange.iStartY; y <= rRange.iEndY; ++y)
+	for (int64_t i = rRange.iStartY; i <= rRange.iEndY; ++i)
 	{
-		for (int32_t x = rRange.iStartX; x <= rRange.iEndX; ++x)
+		for (int64_t j = rRange.iStartX; j <= rRange.iEndX; ++j)
 		{
-			ZonePair& rZonePair = rPairZones.zones[y][x];
+			ZonePair& rZonePair = rPairZones.zones[i][j];
 			common::StableVector<int64_t>& rIndices = bIsLayerA ? rZonePair.indicesA : rZonePair.indicesB;
 			int64_t& riCount = bIsLayerA ? rZonePair.iCountA : rZonePair.iCountB;
 			if (riCount >= rIndices.Size())
 			{
 				// sLayers lookups feed only this rare overflow LOG, so fetch them here, not every zone iteration
-				const CollisionLayer& rLayerA = sLayers.at(rPairZones.uiLayerA);
-				const CollisionLayer& rLayerB = sLayers.at(rPairZones.uiLayerB);
-				LOG(kDefault, kWarning, "Collision: ZonePair.indices{} overflow (count: {}, capacity: {}) pair A={}(cat={},total={}) B={}(cat={},total={}) zone=({},{}). Increase kiCollisionZonePreallocate in Collision.h", bIsLayerA ? 'A' : 'B', riCount, rIndices.Size(), rPairZones.uiLayerA, rLayerA.uiCategory, rLayerA.iCount, rPairZones.uiLayerB, rLayerB.uiCategory, rLayerB.iCount, x, y);
+				const CollisionLayer& rLayerA = sLayers.at(rPairZones.iLayerA);
+				const CollisionLayer& rLayerB = sLayers.at(rPairZones.iLayerB);
+				LOG(kDefault, kWarning, "Collision: ZonePair.indices{} overflow (count: {}, capacity: {}) pair A={}(cat={},total={}) B={}(cat={},total={}) zone=({},{}). Increase kiCollisionZonePreallocate in Collision.h", bIsLayerA ? 'A' : 'B', riCount, rIndices.Size(), rPairZones.iLayerA, rLayerA.uiCategory, rLayerA.iCount, rPairZones.iLayerB, rLayerB.uiCategory, rLayerB.iCount, j, i);
 				DEBUG_BREAK();
 				rIndices.Resize(riCount * 2);
 			}
@@ -233,7 +213,6 @@ static bool XM_CALLCONV SweptSphereTest(FXMVECTOR vecStartA, FXMVECTOR vecEndA, 
 	XMVECTOR vecRelativeDelta = XMVectorSubtract(XMVectorSubtract(vecEndB, vecStartB), XMVectorSubtract(vecEndA, vecStartA));
 	float fCombinedRadius = fRadiusA + fRadiusB;
 
-	// Quadratic coefficients for swept intersection
 	float fQuadraticConstant = XMVectorGetX(XMVector3Dot(vecRelativeStart, vecRelativeStart)) - fCombinedRadius * fCombinedRadius;
 	if (fQuadraticConstant <= 0.0f)
 	{
@@ -281,12 +260,12 @@ void Collision::SetupZones(FXMVECTOR vecArea)
 	// Compute zone dimensions from vecArea (x=minX, y=maxY, z=maxX, w=minY)
 	XMFLOAT4A f4Area {};
 	XMStoreFloat4A(&f4Area, vecArea);
-	sfAreaMinX = f4Area.x;
-	sfAreaMinY = f4Area.w;
+	sfAreaMinimumX = f4Area.x;
+	sfAreaMinimumY = f4Area.w;
 	sfZoneWidth = (f4Area.z - f4Area.x) / kiCollisionZonesX;
 	sfZoneHeight = (f4Area.y - f4Area.w) / kiCollisionZonesY;
 
-	// Reset zone counts instead of clearing
+	// Reset counts while retaining zone storage.
 	for (int64_t i = 0; i < siLayerPairCount; ++i)
 	{
 		LayerPairZones& rPairZones = sLayerPairZones[i];
@@ -301,22 +280,19 @@ void Collision::SetupZones(FXMVECTOR vecArea)
 	}
 
 	// Same-layer collision is unsupported; each layer's collision mask must exclude its own category.
-	for (int64_t iLayer = 0; iLayer < siLayerCount; ++iLayer)
+	for (int64_t i = 0; i < siLayerCount; ++i)
 	{
-		ASSERT((sLayers.at(static_cast<size_t>(iLayer)).uiCollidesWith & sLayers.at(static_cast<size_t>(iLayer)).uiCategory) == 0 && "Same-layer collision not implemented");
+		ASSERT((sLayers.at(static_cast<size_t>(i)).uiCollidesWith & sLayers.at(static_cast<size_t>(i)).uiCategory) == 0 && "Same-layer collision not implemented");
 	}
 
-	// Determine active layer pairs and build zones for each
-	size_t uiPairIndex = 0;
-	for (int64_t iLayerA = 0; iLayerA < siLayerCount; ++iLayerA)
+	int64_t iPairIndex = 0;
+	for (int64_t i = 0; i < siLayerCount; ++i)
 	{
-		for (int64_t iLayerB = iLayerA + 1; iLayerB < siLayerCount; ++iLayerB)
+		for (int64_t j = i + 1; j < siLayerCount; ++j)
 		{
-			// Check if layers can collide with each other
-			bool bACollidesWithB = (sLayers.at(static_cast<size_t>(iLayerA)).uiCollidesWith & sLayers.at(static_cast<size_t>(iLayerB)).uiCategory) != 0;
-			bool bBCollidesWithA = (sLayers.at(static_cast<size_t>(iLayerB)).uiCollidesWith & sLayers.at(static_cast<size_t>(iLayerA)).uiCategory) != 0;
+			bool bACollidesWithB = (sLayers.at(static_cast<size_t>(i)).uiCollidesWith & sLayers.at(static_cast<size_t>(j)).uiCategory) != 0;
+			bool bBCollidesWithA = (sLayers.at(static_cast<size_t>(j)).uiCollidesWith & sLayers.at(static_cast<size_t>(i)).uiCategory) != 0;
 
-			// Assert bi-directionality: if either direction allows collision, both should
 			ASSERT(bACollidesWithB == bBCollidesWithA && "Collision masks must be bi-directional");
 
 			if (!bACollidesWithB)
@@ -324,29 +300,28 @@ void Collision::SetupZones(FXMVECTOR vecArea)
 				continue;
 			}
 
-			// Reuse existing entry or grow if needed
-			if (static_cast<int64_t>(uiPairIndex) >= sLayerPairZones.Size())
+			if (iPairIndex >= sLayerPairZones.Size())
 			{
-				LOG(kDefault, kWarning, "Collision: sLayerPairZones overflow (index: {}, capacity: {}). Increase kiCollisionLayerPairPreallocate in Collision.h", uiPairIndex, sLayerPairZones.Size());
+				LOG(kDefault, kWarning, "Collision: sLayerPairZones overflow (index: {}, capacity: {}). Increase kiCollisionLayerPairPreallocate in Collision.h", iPairIndex, sLayerPairZones.Size());
 				DEBUG_BREAK();
-				sLayerPairZones.Resize(static_cast<int64_t>(uiPairIndex) * 2);
+				sLayerPairZones.Resize(iPairIndex * 2);
 			}
-			LayerPairZones& rPairZones = sLayerPairZones[static_cast<int64_t>(uiPairIndex)];
-			rPairZones.uiLayerA = static_cast<size_t>(iLayerA);
-			rPairZones.uiLayerB = static_cast<size_t>(iLayerB);
+			LayerPairZones& rPairZones = sLayerPairZones[iPairIndex];
+			rPairZones.iLayerA = i;
+			rPairZones.iLayerB = j;
 
-			const CollisionLayer& rLayerA = sLayers.at(static_cast<size_t>(iLayerA));
-			const CollisionLayer& rLayerB = sLayers.at(static_cast<size_t>(iLayerB));
+			const CollisionLayer& rLayerA = sLayers.at(static_cast<size_t>(i));
+			const CollisionLayer& rLayerB = sLayers.at(static_cast<size_t>(j));
 			bool bSweptPair = rLayerA.bSweptTest || rLayerB.bSweptTest;
 
 			// Insert both layers' objects into the zone grid (skip already-collided destroy-on-collide objects)
 			InsertLayerObjectsIntoZones(rPairZones, rLayerA, true, bSweptPair);
 			InsertLayerObjectsIntoZones(rPairZones, rLayerB, false, bSweptPair);
 
-			++uiPairIndex;
+			++iPairIndex;
 		}
 	}
-	siLayerPairCount = static_cast<int64_t>(uiPairIndex);
+	siLayerPairCount = iPairIndex;
 }
 
 void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
@@ -369,19 +344,15 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 	}
 	rScratch.iPendingResultCount = 0;
 
-	// Process all layer pair zones
 	for (int64_t i = 0; i < siLayerPairCount; ++i)
 	{
 		CollideLayerPair(rAlignments, sLayerPairZones[i]);
 	}
 
-	// One global sort, not per layer pair. The trailing layer/object keys are load-bearing: for the fixed
-	// layer-registration order client and server share, they make the equal-time order total and reproducible.
-	// Sorting by fTimeOfImpact alone leaves equal-time candidates in an arbitrary order and desyncs client and server.
+	// Client and server share layer-registration order; sorting globally by time and layer/object keys gives equal-time events a reproducible total order.
 	std::sort(rScratch.candidates.Data(), rScratch.candidates.Data() + rScratch.iCandidateCount, [](const CollisionCandidate& rLeftCandidate, const CollisionCandidate& rRightCandidate)
 	{
-		return std::tie(rLeftCandidate.fTimeOfImpact, rLeftCandidate.uiLayerA, rLeftCandidate.iObjectA, rLeftCandidate.uiLayerB, rLeftCandidate.iObjectB) <
-		       std::tie(rRightCandidate.fTimeOfImpact, rRightCandidate.uiLayerA, rRightCandidate.iObjectA, rRightCandidate.uiLayerB, rRightCandidate.iObjectB);
+		return std::tie(rLeftCandidate.fTimeOfImpact, rLeftCandidate.iLayerA, rLeftCandidate.iObjectA, rLeftCandidate.iLayerB, rLeftCandidate.iObjectB) < std::tie(rRightCandidate.fTimeOfImpact, rRightCandidate.iLayerA, rRightCandidate.iObjectA, rRightCandidate.iLayerB, rRightCandidate.iObjectB);
 	});
 
 	// Commit accepted candidates into retained pending-result scratch.
@@ -390,10 +361,8 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 		CommitCandidate(rScratch.candidates[i]);
 	}
 
-	// Bucket pending results into flat contiguous storage
 	AllocateResultStorage();
 
-	// Pass 1: Count results per key
 	for (int64_t i = 0; i < rScratch.iPendingResultCount; ++i)
 	{
 		const PendingCollisionResult& rPending = rScratch.pendingResults[i];
@@ -401,7 +370,7 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 		++sResultSpans[iSpanIndex].iCount;
 	}
 
-	// Prefix sum: assign offsets, reset counts for fill pass
+	// Counts become fill cursors after offsets are assigned.
 	int64_t iTotalResults = 0;
 	for (int64_t i = 0; i < siResultSpanCount; ++i)
 	{
@@ -414,7 +383,6 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 		}
 	}
 
-	// Grow result entries if needed
 	if (iTotalResults > 0)
 	{
 		if (sResultEntries.Size() == 0)
@@ -426,7 +394,6 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 			sResultEntries.Resize(iTotalResults);
 		}
 	}
-	// Pass 2: Fill results at their assigned offsets
 	for (int64_t i = 0; i < rScratch.iPendingResultCount; ++i)
 	{
 		const PendingCollisionResult& rPending = rScratch.pendingResults[i];
@@ -440,7 +407,6 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 
 void Collision::AllocateResultStorage()
 {
-	// Compute layer base offsets (prefix sum of layer counts)
 	int64_t iTotal = 0;
 	for (int64_t i = 0; i < siLayerCount; ++i)
 	{
@@ -449,7 +415,6 @@ void Collision::AllocateResultStorage()
 	}
 	siResultSpanCount = iTotal;
 
-	// Lazy pre-allocate spans
 	if (sResultSpans.Size() == 0)
 	{
 		sResultSpans.Resize(std::max(kiCollisionResultSpanPreallocate, iTotal));
@@ -459,7 +424,6 @@ void Collision::AllocateResultStorage()
 		sResultSpans.Resize(iTotal);
 	}
 
-	// Reset all active spans
 	for (int64_t i = 0; i < iTotal; ++i)
 	{
 		sResultSpans[i] = {.iOffset = -1, .iCount = 0};
@@ -467,7 +431,7 @@ void Collision::AllocateResultStorage()
 }
 
 // Record one side of a bidirectional collision: self receives the other side's damage and velocity.
-static void XM_CALLCONV RecordCollision(const CollisionCandidate& rCandidate, FXMVECTOR vecSelfPosition, int64_t iSelf, size_t uiSelfLayer, CollisionLayer& rOtherLayer, int64_t iOther, size_t uiOtherLayer)
+static void XM_CALLCONV RecordCollision(const CollisionCandidate& rCandidate, FXMVECTOR vecSelfPosition, int64_t iSelf, int64_t iSelfLayer, const CollisionLayer& rOtherLayer, int64_t iOther, int64_t iOtherLayer)
 {
 	CollisionEventScratch& rScratch = GetCollisionEventScratch();
 	if (rScratch.iPendingResultCount >= rScratch.pendingResults.Size()) [[unlikely]]
@@ -478,12 +442,12 @@ static void XM_CALLCONV RecordCollision(const CollisionCandidate& rCandidate, FX
 	}
 	rScratch.pendingResults[rScratch.iPendingResultCount] =
 	{
-		.iLayerIndex = static_cast<int64_t>(uiSelfLayer),
+		.iLayerIndex = iSelfLayer,
 		.iObjectIndex = iSelf,
 		.result =
 		{
 			.iOtherIndex = iOther,
-			.uiOtherLayerIndex = uiOtherLayer,
+			.iOtherLayerIndex = iOtherLayer,
 			.uiOtherCategory = rOtherLayer.uiCategory,
 			.fDamageReceived = rOtherLayer.pfDamages[iOther],
 			.fTimeOfImpact = rCandidate.fTimeOfImpact,
@@ -497,15 +461,15 @@ static void XM_CALLCONV RecordCollision(const CollisionCandidate& rCandidate, FX
 
 void Collision::CommitCandidate(const CollisionCandidate& rCandidate)
 {
-	CollisionLayer& rLayerA = Collision::sLayers.at(rCandidate.uiLayerA);
-	CollisionLayer& rLayerB = Collision::sLayers.at(rCandidate.uiLayerB);
+	CollisionLayer& rLayerA = Collision::sLayers.at(rCandidate.iLayerA);
+	CollisionLayer& rLayerB = Collision::sLayers.at(rCandidate.iLayerB);
 	if ((rLayerA.pFlags[rCandidate.iObjectA] & kAlreadyCollided) || (rLayerB.pFlags[rCandidate.iObjectB] & kAlreadyCollided))
 	{
 		return;
 	}
 
-	RecordCollision(rCandidate, rCandidate.vecPositionA, rCandidate.iObjectA, rCandidate.uiLayerA, rLayerB, rCandidate.iObjectB, rCandidate.uiLayerB);
-	RecordCollision(rCandidate, rCandidate.vecPositionB, rCandidate.iObjectB, rCandidate.uiLayerB, rLayerA, rCandidate.iObjectA, rCandidate.uiLayerA);
+	RecordCollision(rCandidate, rCandidate.vecPositionA, rCandidate.iObjectA, rCandidate.iLayerA, rLayerB, rCandidate.iObjectB, rCandidate.iLayerB);
+	RecordCollision(rCandidate, rCandidate.vecPositionB, rCandidate.iObjectB, rCandidate.iLayerB, rLayerA, rCandidate.iObjectA, rCandidate.iLayerA);
 
 	// Mutate flags only after both result sides are committed.
 	if (rLayerA.pFlags[rCandidate.iObjectA] & kDestroyOnCollide)
@@ -518,18 +482,16 @@ void Collision::CommitCandidate(const CollisionCandidate& rCandidate)
 	}
 }
 
-// Test one A object against one B object and collect a globally sortable event. The caller handles
-// the per-B tested-this-A-object dedup.
+// The caller deduplicates each B object for the current A object.
 static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t i, int64_t j)
 {
 	const Alignments& rAlignments = rPairContext.rAlignments;
 	const CollisionLayer& rLayerA = rPairContext.rLayerA;
 	const CollisionLayer& rLayerB = rPairContext.rLayerB;
-	size_t uiLayerA = rPairContext.uiLayerA;
-	size_t uiLayerB = rPairContext.uiLayerB;
+	int64_t iLayerA = rPairContext.iLayerA;
+	int64_t iLayerB = rPairContext.iLayerB;
 	bool bSweptPair = rPairContext.bSweptPair;
 
-	// Skip if alignments don't allow collision
 	if (!rAlignments.CanCollide(rLayerA.pAlignments[i], rLayerB.pAlignments[j]))
 	{
 		return;
@@ -584,9 +546,9 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 
 	}
 
-	float fMaxTimeA = rLayerA.pfMaxTimes != nullptr ? rLayerA.pfMaxTimes[i] : std::numeric_limits<float>::max();
-	float fMaxTimeB = rLayerB.pfMaxTimes != nullptr ? rLayerB.pfMaxTimes[j] : std::numeric_limits<float>::max();
-	if (fTimeOfImpact >= fMaxTimeA || fTimeOfImpact >= fMaxTimeB)
+	float fMaximumTimeA = rLayerA.pfMaxTimes != nullptr ? rLayerA.pfMaxTimes[i] : std::numeric_limits<float>::max();
+	float fMaximumTimeB = rLayerB.pfMaxTimes != nullptr ? rLayerB.pfMaxTimes[j] : std::numeric_limits<float>::max();
+	if (fTimeOfImpact >= fMaximumTimeA || fTimeOfImpact >= fMaximumTimeB)
 	{
 		return;
 	}
@@ -609,9 +571,9 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 	rScratch.candidates[rScratch.iCandidateCount] =
 	{
 		.fTimeOfImpact = fTimeOfImpact,
-		.uiLayerA = uiLayerA,
+		.iLayerA = iLayerA,
 		.iObjectA = i,
-		.uiLayerB = uiLayerB,
+		.iLayerB = iLayerB,
 		.iObjectB = j,
 		.vecContactPoint = vecContactPoint,
 		.vecPositionA = vecImpactA,
@@ -620,13 +582,13 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 	++rScratch.iCandidateCount;
 }
 
-void Collision::CollideLayerPair(const Alignments& rAlignments, LayerPairZones& rPairZones)
+void Collision::CollideLayerPair(const Alignments& rAlignments, const LayerPairZones& rPairZones)
 {
-	size_t uiLayerA = rPairZones.uiLayerA;
-	size_t uiLayerB = rPairZones.uiLayerB;
+	int64_t iLayerA = rPairZones.iLayerA;
+	int64_t iLayerB = rPairZones.iLayerB;
 
-	CollisionLayer& rLayerA = sLayers.at(uiLayerA);
-	CollisionLayer& rLayerB = sLayers.at(uiLayerB);
+	const CollisionLayer& rLayerA = sLayers.at(iLayerA);
+	const CollisionLayer& rLayerB = sLayers.at(iLayerB);
 
 	bool bSweptPair = rLayerA.bSweptTest || rLayerB.bSweptTest;
 	CollisionPairContext pairContext
@@ -634,8 +596,8 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, LayerPairZones& 
 		.rAlignments = rAlignments,
 		.rLayerA = rLayerA,
 		.rLayerB = rLayerB,
-		.uiLayerA = uiLayerA,
-		.uiLayerB = uiLayerB,
+		.iLayerA = iLayerA,
+		.iLayerB = iLayerB,
 		.bSweptPair = bSweptPair,
 	};
 
@@ -647,7 +609,6 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, LayerPairZones& 
 
 	for (int64_t i = 0; i < rLayerA.iCount; ++i)
 	{
-		// Skip if already collided this frame (for destroy-on-collide objects)
 		if (rLayerA.pFlags[i] & kAlreadyCollided)
 		{
 			continue;
@@ -656,7 +617,7 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, LayerPairZones& 
 		// Calculate A's zone range with clamping (expand to swept AABB if swept)
 		ZoneRange range = CalculateObjectZoneRange(rLayerA, i, bSweptPair);
 
-		// Increment generation counter instead of memset per A object
+		// A generation identifies B objects tested for one A object; clear stored generations only on wraparound.
 		++suiTestedBCurrentGeneration;
 		if (suiTestedBCurrentGeneration == 0)
 		{
@@ -664,48 +625,35 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, LayerPairZones& 
 			suiTestedBCurrentGeneration = 1;
 		}
 
-		// Iterate zones in A's range
-		for (int32_t y = range.iStartY; y <= range.iEndY; ++y)
+		for (int64_t j = range.iStartY; j <= range.iEndY; ++j)
 		{
-			for (int32_t x = range.iStartX; x <= range.iEndX; ++x)
+			for (int64_t k = range.iStartX; k <= range.iEndX; ++k)
 			{
-				ZonePair& rZonePair = rPairZones.zones[y][x];
+				const ZonePair& rZonePair = rPairZones.zones[j][k];
 				if (rZonePair.iCountB == 0)
 				{
 					continue;
 				}
 
-				// Check all B objects in this zone (no layer filtering needed)
-				for (int64_t k = 0; k < rZonePair.iCountB; ++k)
+				// Layer filtering is complete before object pairs are tested.
+				for (int64_t iOther : std::span(rZonePair.indicesB.Data(), static_cast<size_t>(rZonePair.iCountB)))
 				{
-					int64_t j = rZonePair.indicesB[k];
-					// Skip if already tested this B object
-					if (sTestedBGeneration[j] == suiTestedBCurrentGeneration)
+					if (sTestedBGeneration[iOther] == suiTestedBCurrentGeneration)
 					{
 						continue;
 					}
-					sTestedBGeneration[j] = suiTestedBCurrentGeneration;
+					sTestedBGeneration[iOther] = suiTestedBCurrentGeneration;
 
-					TestAndCollectPair(pairContext, i, j);
+					TestAndCollectPair(pairContext, i, iOther);
 				}
 			}
 		}
 	}
 }
 
-void Collision::Clear()
+std::span<const CollisionResult> Collision::GetCollisions(int64_t iLayerIndex, int64_t iIndex)
 {
-	siLayerCount = 0;
-}
-
-bool Collision::HasCollision(size_t uiLayerIndex, int64_t iIndex)
-{
-	return sResultSpans[sLayerBaseOffsets[uiLayerIndex] + iIndex].iCount > 0;
-}
-
-std::span<const CollisionResult> Collision::GetCollisions(size_t uiLayerIndex, int64_t iIndex)
-{
-	const CollisionResultSpan& rSpan = sResultSpans[sLayerBaseOffsets[uiLayerIndex] + iIndex];
+	const CollisionResultSpan& rSpan = sResultSpans[sLayerBaseOffsets[iLayerIndex] + iIndex];
 	if (rSpan.iCount > 0)
 	{
 		return {sResultEntries.Data() + rSpan.iOffset, static_cast<size_t>(rSpan.iCount)};

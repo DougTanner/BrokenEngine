@@ -4,7 +4,7 @@ namespace common
 {
 
 // Zero-allocation hex conversion. Writes "0x" + uppercase hex digits + null terminator.
-// Returns buffer data pointer for convenience. Fixed-extent span enables compile-time size verification.
+// Returns buffer data pointer for convenience.
 template<std::unsigned_integral T, size_t N>
 char* ToHex(std::span<char, N> pcBuffer, T uiValue)
 {

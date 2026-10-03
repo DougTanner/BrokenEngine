@@ -18,7 +18,6 @@ enum class AgentScriptKind : uint8_t
 	kMouse,
 };
 
-// mouse command sub-action.
 enum class AgentMouseAction : uint8_t
 {
 	kMove,
@@ -51,17 +50,17 @@ struct AgentScript
 
 	char pcValueText[32] {}; // set_slider value text (ASCII, typed via ImGui temp-input)
 
-	int32_t iTimeoutFrames = 120; // stabilization timeout (click / hover / set_slider)
-	int32_t iHoldFrames = 2;      // hover / key hold duration
+	int64_t iTimeoutFrames = 120; // stabilization timeout (click / hover / set_slider)
+	int64_t iHoldFrames = 2;      // hover / key hold duration
 
-	int32_t iKeyVk = 0; // key command: Win32 VK code driven through the RawInput overlay
+	int32_t iVirtualKey = 0; // key command: Win32 VK code driven through the RawInput overlay
 
 	AgentMouseAction eMouseAction = AgentMouseAction::kMove;
 	int32_t iImGuiMouseButton = 0; // 0 left / 1 right / 2 middle (ImGui IO button index)
 	uint32_t uiOverlayMouseButtonBit = 0; // engine::MouseButtons bit for the RawInput overlay
 	int32_t iWheelNotches = 0;
-	float f2CoordPixels[2] {}; // mouse command raw pixel coords
-	bool bHasCoord = false;
+	float f2CoordinatePixels[2] {}; // mouse command raw pixel coords
+	bool bHasCoordinate = false;
 };
 
 // Frame-stepped synthetic-input engine. Advanced one step per rendered frame at the client drain point
@@ -79,11 +78,14 @@ public:
 
 	// Start a script. Returns false if one is already running (caller answers "busy").
 	bool BeginScript(const AgentScript& rScript);
-	bool IsScriptActive() const { return mbScriptActive; }
+	bool mbScriptActive = false;
 
 	// True while a synthetic ImGui mouse pos is pinned (persists across a script's completion; cleared in BeginScript).
 	// Consulted by input-suppression so the no-mouse sentinel is issued only when no synthetic pin already owns io.MousePos.
-	bool ImGuiMousePosPinned() const { return mbImGuiMousePosPinned; }
+	// ImGui-IO mouse-pos pin (UI sink), separate from the overlay pos flag (game-world sink): the last synthetic
+	// ImGui pos, re-issued after the Win32 backend in ImGuiManager::Prepare so it wins last-writer-wins. Cleared in
+	// BeginScript only (never Finish) so it persists across a script's completion until the next script re-seeds it.
+	bool mbImGuiMousePositionPinned = false;
 
 	// At the client main-thread drain point before GameBase::Render and ImGui::NewFrame, advance the active script and
 	// queue this frame's ImGui IO. The call is unconditional, so minimized frames still advance while Render takes the
@@ -92,24 +94,24 @@ public:
 
 	// End of RawInputManager::Update: OR the synthetic key / mouse-button / mouse-pos state onto the just-published
 	// snapshot so game edge-detection fires as with hardware. The scroll accumulator is NOT added here — it is a
-	// lifetime accumulator folded into iScrollWheelValue on every publish (see SyntheticScrollAccumulator()).
+	// lifetime accumulator folded into iScrollWheelValue on every publish (see miSyntheticScrollAccumulator).
 	void Overlay(RawInput& rRawInput);
 
 	// Called by ImGuiManager::Prepare between the Win32 backend NewFrame and ImGui::NewFrame: if a synthetic ImGui mouse
 	// pos is pinned, re-issue it so it is the frame's last mouse-pos event (the physical cursor would otherwise win
 	// last-writer-wins in ImGui::NewFrame). Pin-valid gate lives inside the function.
-	void ReissueImGuiMousePos();
+	void ReissueImGuiMousePosition();
 
 	// Persistent synthetic scroll offset added into the published lifetime iScrollWheelValue on EVERY publish (script
 	// active or not) — consumers diff iScrollWheelValue, so the offset must never drop out of the published value.
-	int SyntheticScrollAccumulator() const { return miSyntheticScrollAccumulator; }
+	int miSyntheticScrollAccumulator = 0;
 
 	// True when the notch count's wheel product fits int32_t and adding it to the lifetime accumulator stays representable.
 	bool WheelNotchesFit(int64_t iNotches) const;
 
-	// Deferred-response poll accessors (valid once ScriptStatus() != kPending).
-	AgentScriptStatus ScriptStatus() const { return meStatus; }
-	bool ResolvedDisabled() const { return mbResolvedDisabled; }
+	// Deferred responses poll meStatus; mbResolvedDisabled is read after successful completion.
+	AgentScriptStatus meStatus = AgentScriptStatus::kPending;
+	bool mbResolvedDisabled = false;
 
 private:
 
@@ -117,20 +119,17 @@ private:
 	// Resolve the target label to this frame's rect and drive the stabilization loop. Returns true once stable;
 	// on not-found / ambiguous / timeout it calls Finish() and returns false.
 	bool StabilizeTarget();
-	void IssueImGuiMousePos(float fX, float fY);
+	void IssueImGuiMousePosition(float fX, float fY);
 
-	bool mbScriptActive = false;
 	AgentScript mScript {};
-	AgentScriptStatus meStatus = AgentScriptStatus::kPending;
 
-	int32_t miPhase = 0;
-	int32_t miPhaseFrame = 0;
-	int32_t miElapsedFrames = 0;
-	int32_t miStableCount = 0;
-	XMFLOAT4 mf4LastRect {};
-	bool mbHaveLastRect = false;
+	int64_t miPhase = 0;
+	int64_t miPhaseFrame = 0;
+	int64_t miElapsedFrames = 0;
+	int64_t miStableCount = 0;
+	XMFLOAT4 mf4LastRectangle {};
+	bool mbHaveLastRectangle = false;
 
-	bool mbResolvedDisabled = false;
 	int32_t miResolvedStatusFlags = 0; // resolved target's ImGuiItemStatusFlags (set_slider Inputable pre-validation)
 	float mf2TargetCenter[2] {}; // resolved rect center, re-pinned into ImGui each frame
 
@@ -139,12 +138,7 @@ private:
 	uint32_t muiSyntheticMouseButtons = 0;
 	bool mbSyntheticMousePosValid = false;
 	float mf2SyntheticMousePixels[2] {};
-	int miSyntheticScrollAccumulator = 0;
 
-	// ImGui-IO mouse-pos pin (UI sink), separate from the overlay pos flag above (game-world sink): the last synthetic
-	// ImGui pos, re-issued after the Win32 backend in ImGuiManager::Prepare so it wins last-writer-wins. Cleared in
-	// BeginScript only (never Finish) so it persists across a script's completion until the next script re-seeds it.
-	bool mbImGuiMousePosPinned = false;
 	float mf2ImGuiPinnedPixels[2] {};
 };
 

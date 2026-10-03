@@ -467,7 +467,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Common\Math\Random.cpp" />
     <ClCompile Include="..\..\..\..\Common\Log\DiagnosticLog.cpp" />
     <ClCompile Include="..\..\..\..\Common\Log\Log.cpp" />
-    <ClCompile Include="..\..\..\..\Common\Log\LogDifference.cpp" />
     <ClCompile Include="..\..\..\..\Common\Smoothed.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\File\GridSave.cpp" />

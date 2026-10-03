@@ -18,9 +18,6 @@
 namespace game
 {
 
-namespace
-{
-
 struct ServerSimulationFixtureState
 {
 	ServerSession* pSession = nullptr;
@@ -28,9 +25,9 @@ struct ServerSimulationFixtureState
 	std::unordered_map<engine::GridCoord, std::vector<StatusChange>> replayTransferFixtures;
 };
 
-ServerSimulationFixtureState sFixture;
+static ServerSimulationFixtureState sFixture;
 
-void Bind(ServerSession& rSession)
+static void Bind(ServerSession& rSession)
 {
 	if (sFixture.pSession != &rSession)
 	{
@@ -39,19 +36,19 @@ void Bind(ServerSession& rSession)
 	}
 }
 
-bool IsCoordActive(engine::GridCoord coord)
+static bool IsCoordActive(engine::GridCoord coord)
 {
 	return std::find(gpGame->mActiveCoords.begin(), gpGame->mActiveCoords.end(), coord) != gpGame->mActiveCoords.end();
 }
 
-bool AreAdjacent(engine::GridCoord source, engine::GridCoord destination)
+static bool AreAdjacent(engine::GridCoord source, engine::GridCoord destination)
 {
-	int64_t iDeltaX = static_cast<int64_t>(destination.x) - source.x;
-	int64_t iDeltaY = static_cast<int64_t>(destination.y) - source.y;
+	int64_t iDeltaX = static_cast<int64_t>(destination.iX) - source.iX;
+	int64_t iDeltaY = static_cast<int64_t>(destination.iY) - source.iY;
 	return (iDeltaX != 0 || iDeltaY != 0) && std::abs(iDeltaX) <= 1 && std::abs(iDeltaY) <= 1;
 }
 
-void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
 	// SaveLoadReplay/SyncReplayTick are compiled out under !kbDebugInput, so the flag would never be consumed.
 	if constexpr (!kbDebugInput)
@@ -90,9 +87,9 @@ void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe
 			if (!engine::gpReplay->IsRecording())
 			{
 				sFixture.replayTransferFixtures.clear();
-				engine::ReplayFixtures::RecordingStartCancelled(*engine::gpReplay);
+				engine::ReplayFixtures::Reset(*engine::gpReplay);
 			}
-			gpGame->mGameFlags.Clear(engine::GameFlags::kSaveReplay);
+			gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
 			rResult["pending"] = false;
 		}
 		else
@@ -103,7 +100,7 @@ void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, [[maybe
 	}
 }
 
-void CommandReplayPlay([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandReplayPlay([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -121,7 +118,7 @@ void CommandReplayPlay([[maybe_unused]] const nlohmann::json& rParams, [[maybe_u
 	}
 }
 
-void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -149,7 +146,7 @@ void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& rParams
 	}
 }
 
-void CommandReplayDropRetainedEndFrame([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandReplayDropRetainedEndFrame([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -168,12 +165,12 @@ void CommandReplayDropRetainedEndFrame([[maybe_unused]] const nlohmann::json& rP
 			throw std::runtime_error("replay_drop_retained_end_frame requires a retained terminal frame for 'coord'");
 		}
 
-		rResult["coord"] = {coord.x, coord.y};
+		rResult["coord"] = {coord.iX, coord.iY};
 		rResult["dropped"] = true;
 	}
 }
 
-void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -255,12 +252,12 @@ void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json
 		rResult["stage"] = stage;
 		if (bRequiresCoord)
 		{
-			rResult["coord"] = {coord.x, coord.y};
+			rResult["coord"] = {coord.iX, coord.iY};
 		}
 		rResult["armed"] = true;
 	}
 }
-void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -378,8 +375,8 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 				{
 					XMVECTOR vecCandidate = XMVectorSet(f4Area.x + (static_cast<float>(iGridX) + 0.5f) * fPitchX, f4Area.w + (static_cast<float>(iGridY) + 0.5f) * fPitchY, engine::gBaseHeight.Get(), 1.0f);
 					XMVECTOR vecNextCandidate = XMVectorSet(XMVectorGetX(vecCandidate) + engine::kfDeltaTime, XMVectorGetY(vecCandidate), engine::gBaseHeight.Get(), 1.0f);
-					if (engine::gpIslandTerrain->FrameElevation(rDestinationStaticData, vecCandidate) < engine::gBaseHeight.Get()
-					 && engine::gpIslandTerrain->FrameElevation(rDestinationStaticData, vecNextCandidate) < engine::gBaseHeight.Get())
+					if (engine::gpIslandTerrain->MakeFrameElevationSampler(rDestinationStaticData).Sample(vecCandidate) < engine::gBaseHeight.Get()
+					 && engine::gpIslandTerrain->MakeFrameElevationSampler(rDestinationStaticData).Sample(vecNextCandidate) < engine::gBaseHeight.Get())
 					{
 						vecPosition = vecCandidate;
 						bFoundTerrainClearPosition = true;
@@ -403,7 +400,7 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 			.fShield = 1.0f,
 			.uiTypeIndex = PlayersInterpolate::suiBlasterTypeIndex,
 			.fDeltaRotationMax = eType == StatusChangeType::kTransferMissile ? 2.0f : 0.0f,
-			.globalPlayerId = engine::global_id_t {eType == StatusChangeType::kTransferPlayer ? gpGame->GenerateGlobalId() : 0},
+			.globalPlayerId = engine::GlobalId {eType == StatusChangeType::kTransferPlayer ? gpGame->GenerateGlobalId() : 0},
 			.fleetWantedCoord = destination,
 		};
 		StatusChange transfer {.eType = eType, .data = std::move(data)};
@@ -417,13 +414,13 @@ void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann::json&
 		}
 
 		rResult["type"] = type;
-		rResult["source"] = {source.x, source.y};
-		rResult["destination"] = {destination.x, destination.y};
+		rResult["source"] = {source.iX, source.iY};
+		rResult["destination"] = {destination.iX, destination.iY};
 		rResult["pauseAfterWriterInput"] = bPauseAfterWriterInput;
 	}
 }
 
-int64_t PlayerUuidFromParam(const nlohmann::json& rChange)
+static int64_t PlayerUuidFromParam(const nlohmann::json& rChange)
 {
 	if (!rChange.contains("playerUuid"))
 	{
@@ -433,7 +430,7 @@ int64_t PlayerUuidFromParam(const nlohmann::json& rChange)
 }
 
 // Rejects a delay the wire would reject, so an injected player never holds an out-of-range delay.
-float NavigationDelayFromParam(const nlohmann::json& rChange)
+static float NavigationDelayFromParam(const nlohmann::json& rChange)
 {
 	float fDelay = rChange.contains("navigationDelay") ? rChange.at("navigationDelay").get<float>() : 60.0f;
 	if (!PlayersPostRender::IsNavigationDelayInRange(fDelay))
@@ -445,7 +442,7 @@ float NavigationDelayFromParam(const nlohmann::json& rChange)
 
 // Build one injectable StatusChange from a change entry, minting a global id at inject-time for SpawnPlayer
 // (pushed into rGlobalIds). Only SpawnPlayer/DestroyPlayer/UpdatePlayer/UpdateFleet accepted; others rejected.
-std::pair<engine::GridCoord, StatusChange> BuildInjectedChange(const nlohmann::json& rChange, nlohmann::json& rGlobalIds)
+static std::pair<engine::GridCoord, StatusChange> BuildInjectedChange(const nlohmann::json& rChange, nlohmann::json& rGlobalIds)
 {
 	engine::GridCoord coord = CoordFromParam(rChange);
 	if (!IsCoordActive(coord))
@@ -520,7 +517,7 @@ std::pair<engine::GridCoord, StatusChange> BuildInjectedChange(const nlohmann::j
 	return {coord, change};
 }
 
-void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!rParams.is_object())
 	{
@@ -680,7 +677,7 @@ void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::json& r
 	}
 }
 
-void CommandSpawnPlayers(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandSpawnPlayers(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (gpGame->mbReplaying)
 	{
@@ -725,7 +722,7 @@ void CommandSpawnPlayers(const nlohmann::json& rParams, nlohmann::json& rResult)
 // Seeds one synthetic Player arrival near the requested edge and lets the unchanged transfer pipeline carry it
 // back out: SpawnTransfer's post-arrival lock skips navigation and acceleration, so the arrival coasts at the
 // velocity chosen here until PostCollision sees it leave the cell.
-void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -807,7 +804,7 @@ void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json&
 			// A zero-armor arrival is flagged exploding on its first tick instead of transferring.
 			.fHealth = 1.0f,
 			.fShield = 1.0f,
-			.globalPlayerId = engine::global_id_t {iGlobalId},
+			.globalPlayerId = engine::GlobalId {iGlobalId},
 			// Seeded cell: no fleet override fights the coast once the transfer lock expires.
 			.fleetWantedCoord = coord,
 		};
@@ -821,8 +818,6 @@ void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann::json&
 		rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
 	}
 }
-
-} // namespace
 
 bool ExecuteServerSimulationFixtureCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
 {

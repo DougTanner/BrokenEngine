@@ -8,9 +8,6 @@ namespace engine
 using enum TextureFlags;
 using enum TextureLayout;
 
-namespace
-{
-
 struct LayoutMapping
 {
 	VkImageLayout vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -18,7 +15,7 @@ struct LayoutMapping
 	VkPipelineStageFlags stageFlags = 0;
 };
 
-static constexpr LayoutMapping kLayoutMappings[]
+constexpr LayoutMapping kLayoutMappings[]
 {
 	// kUndefined
 	{VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_NONE_KHR, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT},
@@ -41,17 +38,12 @@ static constexpr LayoutMapping kLayoutMappings[]
 };
 static_assert(std::size(kLayoutMappings) == static_cast<size_t>(TextureLayout::kTransferSource) + 1);
 
-} // namespace
-
 VkImageLayout ToVkImageLayout(TextureLayout eLayout)
 {
 	return kLayoutMappings[static_cast<int>(eLayout)].vkImageLayout;
 }
 
-namespace
-{
-
-void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bCheckRenderPass, VkImageView& rVkImageView)
+static void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bCheckRenderPass, VkImageView& rVkImageView)
 {
 	VkComponentMapping vkComponentMapping {.r = VK_COMPONENT_SWIZZLE_R, .g = VK_COMPONENT_SWIZZLE_G, .b = VK_COMPONENT_SWIZZLE_B, .a = VK_COMPONENT_SWIZZLE_A};
 	if ((!bCheckRenderPass || !(rInfo.textureFlags & kRenderPass)) && rInfo.format == VK_FORMAT_BC4_UNORM_BLOCK)
@@ -72,8 +64,6 @@ void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bCheckRende
 	CHECK_VK(vkCreateImageView(gpDeviceManager->mVkDevice, &vkImageViewCreateInfo, nullptr, &rVkImageView));
 	VkName(VK_OBJECT_TYPE_IMAGE_VIEW, rVkImageView, rInfo.name.data());
 }
-
-} // namespace
 
 void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPass vkRenderPass, VkFramebuffer vkFramebuffer, VkExtent2D vkExtent2D, VkClearColorValue vkClearColorValue, RenderPassFlags_t renderPassFlags, VkSubpassContents vkSubpassContents)
 {

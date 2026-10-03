@@ -13,7 +13,7 @@ struct FrameInput;
 struct FrameInterpolate;
 struct FramePostRender;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -25,48 +25,48 @@ struct GridCoord;
 
 // Computes ordered-fold CRC of multiple member arrays for deterministic replay validation.
 template <typename TUPLE>
-common::crc_t MultiCrc(int64_t iCount, TUPLE&& members)
+common::crc_t MultiCrc(int64_t iCount, const TUPLE& rMembers)
 {
-	common::crc_t checksum = 0;
-	// Zero-capacity member pointers may be null, and Crc(pointer, 0) returns the seeded empty-input hash;
+	common::crc_t uiChecksum = 0;
+	// Zero-capacity member pointers may be null, and Crc(empty span) returns the seeded empty-input hash;
 	// skip the fold to preserve the collection's zero checksum.
 	if (iCount > 0)
 	{
-		std::apply([&](auto&... memberPtrRefs)
+		std::apply([&](const auto&... rMemberPointers)
 		{
-			(ForEachMemberPointer(memberPtrRefs, [&](auto& elementPtrRef)
+			(ForEachMemberPointer(rMemberPointers, [&](const auto& rpElementPointer)
 			{
-				checksum = (checksum ^ common::Crc(elementPtrRef, iCount)) * common::kCrcMultiplier;
+				uiChecksum = (uiChecksum ^ common::Crc(std::span<const std::remove_pointer_t<std::remove_reference_t<decltype(rpElementPointer)>>>(rpElementPointer, static_cast<size_t>(iCount)))) * common::kCrcMultiplier;
 			}), ...);
-		}, std::forward<TUPLE>(members));
+		}, rMembers);
 	}
-	return checksum;
+	return uiChecksum;
 }
 
 // Serializes multiple member arrays to stream in order.
 template <typename TUPLE>
-void MultiWrite(std::ostream& rStream, int64_t iCount, TUPLE&& members)
+void MultiWrite(std::ostream& rStream, int64_t iCount, const TUPLE& rMembers)
 {
-	std::apply([&](auto&... memberPtrRefs)
+	std::apply([&](const auto&... rMemberPointers)
 	{
-		(ForEachMemberPointer(memberPtrRefs, [&](auto& elementPtrRef)
+		(ForEachMemberPointer(rMemberPointers, [&](const auto& rpElementPointer)
 		{
-			common::Write(rStream, elementPtrRef, iCount);
+			common::Write(rStream, std::span<const std::remove_pointer_t<std::remove_reference_t<decltype(rpElementPointer)>>>(rpElementPointer, static_cast<size_t>(iCount)));
 		}), ...);
-	}, std::forward<TUPLE>(members));
+	}, rMembers);
 }
 
 // Deserializes multiple member arrays from stream (must match write order). Arrays must already be allocated.
 template <typename TUPLE>
-void MultiRead(std::istream& rStream, int64_t iCount, TUPLE&& members)
+void MultiRead(std::istream& rStream, int64_t iCount, const TUPLE& rMembers)
 {
-	std::apply([&](auto&... memberPtrRefs)
+	std::apply([&](const auto&... rMemberPointers)
 	{
-		(ForEachMemberPointer(memberPtrRefs, [&](auto& elementPtrRef)
+		(ForEachMemberPointer(rMemberPointers, [&](const auto& rpElementPointer)
 		{
-			common::Read(rStream, elementPtrRef, iCount);
+			common::Read(rStream, std::span(rpElementPointer, static_cast<size_t>(iCount)));
 		}), ...);
-	}, std::forward<TUPLE>(members));
+	}, rMembers);
 }
 
 template <typename STRUCT>
@@ -82,42 +82,38 @@ void ValidateAfterRead(std::istream& rStream, STRUCT& rStruct)
 	}
 }
 
-// Allocates collection storage and reads data from stream. Used internally by CollectionRead().
 template <typename STRUCT, typename TUPLE>
-void AllocateAndRead(STRUCT& rStruct, std::istream& rStream, TUPLE&& members)
+void AllocateAndRead(STRUCT& rStruct, std::istream& rStream, TUPLE&& rMembers)
 {
 	if (rStruct.iCapacity > 0)
 	{
-		AllocateAndAssign(rStruct, rStruct.iCapacity, members);
+		AllocateAndAssign(rStruct, rStruct.iCapacity, rMembers);
 	}
 	else
 	{
-		ResetDataToNull(rStruct, members);
+		ResetDataToNull(rStruct, rMembers);
 	}
 
-	MultiRead(rStream, rStruct.iCount, std::forward<TUPLE>(members));
+	MultiRead(rStream, rStruct.iCount, std::forward<TUPLE>(rMembers));
 	ValidateAfterRead(rStream, rStruct);
 }
 
-// Collection configuration flags
 enum class CollectionFlags : uint32_t
 {
-	kIdToIndex = 0x0001,   // Enable ID-to-index mapping
+	kIdToIndex = 0x0001,
 };
 using CollectionFlags_t = common::Flags<CollectionFlags>;
 
 #if defined(BT_CLIENT)
 // Request lazy-load of a texture chunk by CRC (implemented in the FileManager subsystem)
-void RequestTextureChunkLoad(common::crc_t crc);
+void RequestTextureChunkLoad(common::crc_t uiCrc);
 
 // Register a CRC for pre-blur (implemented in TextureManager.cpp)
-void RegisterLightingTextureCrc(common::crc_t crc);
+void RegisterLightingTextureCrc(common::crc_t uiCrc);
 #endif
 
-// Mixin providing static type registry for collections with type-based configuration sharing.
-// Type is passed as template parameter (must be defined before collection).
-// Threading contract: registration is startup-only (single-threaded, before Dispatch() workers fan out);
-// sTypes is immutable afterward, so parallel frame-tick .at() reads need no synchronization.
+// Define TYPE before its collection and register types single-threaded before Dispatch() starts workers.
+// sTypes is immutable during parallel frame ticks, so registry reads need no synchronization.
 template <typename TYPE>
 struct TypeRegistry
 {
@@ -127,17 +123,17 @@ struct TypeRegistry
 	static void RegisterType(uint8_t& ruiIndex, const TYPE& rType)
 	{
 		ASSERT(ruiIndex == kuiInvalidTypeIndex);
-		ASSERT(sTypes.size() < kuiInvalidTypeIndex);
+		ASSERT(std::ssize(sTypes) < kuiInvalidTypeIndex);
 		ruiIndex = static_cast<uint8_t>(sTypes.size());
 		sTypes.push_back(rType);
 
-		if constexpr (requires { rType.crc; })
+		if constexpr (requires { rType.uiCrc; })
 		{
-			if (rType.crc != 0)
+			if (rType.uiCrc != 0)
 			{
 #if defined(BT_CLIENT)
-				RequestTextureChunkLoad(rType.crc);
-				RegisterLightingTextureCrc(rType.crc);
+				RequestTextureChunkLoad(rType.uiCrc);
+				RegisterLightingTextureCrc(rType.uiCrc);
 #endif
 			}
 		}
@@ -154,45 +150,33 @@ struct TypeRegistry
 		}
 	}
 
-	static const TYPE& GetType(uint8_t uiIndex)
-	{
-		return sTypes.at(uiIndex);
-	}
 };
 
-// Non-indexable version (zero overhead)
 template <typename T, common::Flags<CollectionFlags> FLAGS>
 struct OptionalIdToIndex
 {
 };
 
-// Indexable version with strong-typed id_t and ID-to-index mapping.
 template <typename T, common::Flags<CollectionFlags> FLAGS>
 	requires (FLAGS & CollectionFlags::kIdToIndex)
 struct OptionalIdToIndex<T, FLAGS>
 {
-	using id_t = engine::id_t<T>;
+	using id_t = engine::Id<T>;
 
 	std::unordered_map<id_t, int64_t> idToIndexMap;
 
-	inline int64_t IdToIndex(id_t id) const
-	{
-		return idToIndexMap.at(id);
-	}
-
 	inline void Write(std::ostream& rStream) const
 	{
-		// Heap: GetSortedKeys() builds a temporary vector of all map keys for deterministic write ordering.
-		// Could use workbuffer, but save/replay is infrequent so the simplicity of std::vector wins here.
+		// Infrequent save/replay writes allocate a temporary key vector for deterministic ordering.
 		ScopedSuppressAllocationTracking suppress;
 		int64_t iSize = idToIndexMap.size();
 		common::Write(rStream, iSize);
 
 		std::vector<id_t> vecKeys = GetSortedKeys();
-		for (const id_t& key : vecKeys)
+		for (const id_t& rKey : vecKeys)
 		{
-			key.Write(rStream);
-			common::Write(rStream, idToIndexMap.at(key));
+			rKey.Write(rStream);
+			common::Write(rStream, idToIndexMap.at(rKey));
 		}
 	}
 
@@ -201,9 +185,7 @@ struct OptionalIdToIndex<T, FLAGS>
 	// so a hostile stream cannot leave a live row unindexed or alias two rows to one index.
 	inline void Read(std::istream& rStream, int64_t iCount)
 	{
-		// Heap: unordered_map::reserve and unordered_map::try_emplace allocate buckets and nodes
-		// to rebuild the map from file.
-		// The map must persist across frames for stable ID lookups, so workbuffer and static arrays are not viable.
+		// Rebuilding the map allocates buckets and nodes that persist across frames for stable ID lookups.
 		ScopedSuppressAllocationTracking suppress;
 		int64_t iSize = 0;
 		common::Read(rStream, iSize);
@@ -219,8 +201,8 @@ struct OptionalIdToIndex<T, FLAGS>
 
 		// Index-distinctness bitmap over [0, iCount): proves the values are a permutation, not merely in range.
 		int64_t iWordCount = (iCount + 63) / 64;
-		auto pSeenAlloc = common::gpThreadLocal->mWorkbuffer.PushBuffer<uint64_t*>(iWordCount * sizeof(uint64_t));
-		uint64_t* pSeen = static_cast<uint64_t*>(pSeenAlloc);
+		auto seenAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<uint64_t*>(iWordCount * sizeof(uint64_t));
+		uint64_t* pSeen = static_cast<uint64_t*>(seenAllocation.mpData);
 		std::memset(pSeen, 0, iWordCount * sizeof(uint64_t));
 
 		for (int64_t i = 0; i < iSize; ++i)
@@ -249,29 +231,26 @@ struct OptionalIdToIndex<T, FLAGS>
 
 	inline common::crc_t Crc() const
 	{
-		common::crc_t checksum = 0;
-		checksum = (checksum ^ common::Crc(static_cast<int64_t>(idToIndexMap.size()))) * common::kCrcMultiplier;
+		common::crc_t uiChecksum = 0;
+		uiChecksum = (uiChecksum ^ common::Crc(static_cast<int64_t>(idToIndexMap.size()))) * common::kCrcMultiplier;
 
-		// Sort the raw int64 key values, not id_t objects: id_t/uuid_t defaulted <=> reduces to comparing
-		// the single int64_t iValue, so int64 order is identical to id_t order (byte-for-byte CRC), while
-		// the comparator collapses to a single integer compare instead of the un-inlined id_t/uuid_t stack.
+		// id_t/Uuid ordering compares only iValue, so sorting raw int64_t keys preserves CRC byte order.
 		int64_t iKeyCount = static_cast<int64_t>(idToIndexMap.size());
-		auto pKeysAlloc = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>(iKeyCount * sizeof(int64_t));
-		int64_t* pKeys = static_cast<int64_t*>(pKeysAlloc);
-		int64_t i = 0;
-		for (const auto& [key, value] : idToIndexMap)
+		auto keysAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>(iKeyCount * sizeof(int64_t));
+		int64_t* pKeys = static_cast<int64_t*>(keysAllocation.mpData);
+		for (int64_t i = 0; const auto& [rKey, riValue] : idToIndexMap)
 		{
-			pKeys[i++] = key.ToUuid().Value();
+			pKeys[i++] = rKey.uuid.iValue;
 		}
 		std::sort(pKeys, pKeys + iKeyCount);
 
 		for (int64_t j = 0; j < iKeyCount; ++j)
 		{
-			checksum = (checksum ^ common::Crc(pKeys[j])) * common::kCrcMultiplier;
-			checksum = (checksum ^ common::Crc(idToIndexMap.at(id_t {uuid_t {pKeys[j]}}))) * common::kCrcMultiplier;
+			uiChecksum = (uiChecksum ^ common::Crc(pKeys[j])) * common::kCrcMultiplier;
+			uiChecksum = (uiChecksum ^ common::Crc(idToIndexMap.at(id_t {Uuid {pKeys[j]}}))) * common::kCrcMultiplier;
 		}
 
-		return checksum;
+		return uiChecksum;
 	}
 
 private:
@@ -280,15 +259,14 @@ private:
 	{
 		std::vector<id_t> vecKeys;
 		vecKeys.reserve(idToIndexMap.size());
-		for (const auto& [key, value] : idToIndexMap)
+		for (const auto& [rKey, riValue] : idToIndexMap)
 		{
-			vecKeys.push_back(key);
+			vecKeys.push_back(rKey);
 		}
-		// Order by the raw int64 key value: id_t/uuid_t defaulted <=> reduces to comparing iValue, so this
-		// yields the identical order as the default id_t comparator while collapsing to one integer compare.
+		// id_t/Uuid ordering compares only iValue; this comparator preserves serialized key order.
 		std::sort(vecKeys.begin(), vecKeys.end(), [](const id_t& rLeft, const id_t& rRight)
 		{
-			return rLeft.ToUuid().Value() < rRight.ToUuid().Value();
+			return rLeft.uuid.iValue < rRight.uuid.iValue;
 		});
 		return vecKeys;
 	}
@@ -309,13 +287,6 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 		return bEqual;
 	}
 
-	// Row bound for difference logging: unequal counts are a reportable difference, so a row loop must
-	// stop at the shorter side rather than index rOther's member arrays past its last row.
-	inline int64_t CommonRowCount(const Collection& rOther) const
-	{
-		return std::min(iCount, rOther.iCount);
-	}
-
 	inline void Write(std::ostream& rStream) const
 	{
 		common::Write(rStream, iCount);
@@ -330,12 +301,9 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 	{
 		common::Read(rStream, iCount);
 		common::Read(rStream, iCapacity);
-		// Trust boundary (save / replay / network full-state): reject an inverted or oversized
-		// count/capacity before MultiRead writes iCount elements into the iCapacity-sized buffer or
-		// MakeAligned allocates iCapacity. Member stride is unknown here, so bound iCount with the
-		// minimal stride of 1; the buffer-overrun and unbounded-alloc cases are covered by
-		// iCount <= iCapacity <= kiMaxDeserializedCapacity. The 256 MiB byte ceiling is enforced
-		// downstream in AllocateAndAssign, where the real per-element stride is known.
+		// Save, replay, and network full-state reads require iCount <= iCapacity <= kiMaxDeserializedCapacity
+		// to bound writes and allocation. With member stride unknown, validation uses a minimum stride of 1;
+		// AllocateAndAssign enforces the 256 MiB ceiling using the actual member stride.
 		common::ValidateDeserializedCountCapacity(iCount, iCapacity, 1, rStream, "Collection::Read");
 		if constexpr (FLAGS & CollectionFlags::kIdToIndex)
 		{
@@ -346,14 +314,14 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 
 	inline common::crc_t Crc() const
 	{
-		common::crc_t checksum = 0;
+		common::crc_t uiChecksum = 0;
 		if constexpr (FLAGS & CollectionFlags::kIdToIndex)
 		{
-			checksum = (checksum ^ static_cast<const OptionalIdToIndex<T, FLAGS>&>(*this).Crc()) * common::kCrcMultiplier;
+			uiChecksum = (uiChecksum ^ static_cast<const OptionalIdToIndex<T, FLAGS>&>(*this).Crc()) * common::kCrcMultiplier;
 		}
-		checksum = (checksum ^ common::Crc(iCount)) * common::kCrcMultiplier;
-		checksum = (checksum ^ common::Crc(iCapacity)) * common::kCrcMultiplier;
-		return checksum;
+		uiChecksum = (uiChecksum ^ common::Crc(iCount)) * common::kCrcMultiplier;
+		uiChecksum = (uiChecksum ^ common::Crc(iCapacity)) * common::kCrcMultiplier;
+		return uiChecksum;
 	}
 
 	int64_t iCount = 0;
@@ -366,21 +334,19 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 
 // Computes complete CRC of collection (metadata + all member arrays) for deterministic replay validation.
 template <typename STRUCT, typename TUPLE>
-inline common::crc_t CollectionCrc(const STRUCT& rCurrent, TUPLE&& members)
+inline common::crc_t CollectionCrc(const STRUCT& rCurrent, const TUPLE& rMembers)
 {
-	common::crc_t checksum = 0;
-	checksum = (checksum ^ rCurrent.Crc()) * common::kCrcMultiplier;
-	checksum = (checksum ^ engine::MultiCrc(rCurrent.iCount, std::forward<TUPLE>(members))) * common::kCrcMultiplier;
-	return checksum;
+	common::crc_t uiChecksum = 0;
+	uiChecksum = (uiChecksum ^ rCurrent.Crc()) * common::kCrcMultiplier;
+	uiChecksum = (uiChecksum ^ engine::MultiCrc(rCurrent.iCount, rMembers)) * common::kCrcMultiplier;
+	return uiChecksum;
 }
 
 template <typename T>
-concept HasSharedMembers = requires(const T t) { t.SharedMembers(); };
+concept HasSharedMembers = requires(const T value) { value.SharedMembers(); };
 
-// Server-build wire/CRC parity: the server broadcasts collections by walking Members() while clients
-// deserialize SharedMembers() (SharedCollectionRead below), so a shared collection's server-build
-// Members() must be the identical tuple. There is no separate wire serializer — the broadcast streams
-// the save-format Write walk (CollectionWrite with cols.Members() in FrameBase.cpp / Frame.cpp).
+// Server broadcasts use the save-format Members() tuple; clients deserialize SharedMembers().
+// Server Members() and SharedMembers() must have identical tuple types for wire/CRC parity.
 template <typename STRUCT>
 inline constexpr bool kbServerMembersParity = std::is_same_v<
 	decltype(std::declval<const STRUCT&>().Members()),
@@ -429,7 +395,7 @@ inline std::istream& SharedCollectionRead(std::istream& rStream, STRUCT& rCurren
 #if defined(BT_SERVER)
 		static_assert(kbServerMembersParity<STRUCT>, "Server-build Members() must be identical to SharedMembers() — wire format / CRC parity");
 #endif
-		// A shared member missing from Members() would have no allocated storage to read into
+		// Every shared member requires storage allocated through Members().
 		ASSERT(IsMemberTupleSubset(rCurrent.SharedMembers(), rCurrent.Members()));
 		MultiRead(rStream, rCurrent.iCount, rCurrent.SharedMembers());
 	}
@@ -445,27 +411,26 @@ inline std::istream& SharedCollectionRead(std::istream& rStream, STRUCT& rCurren
 
 // Writes complete collection to stream (metadata + all member arrays) for save file serialization.
 template <typename STRUCT, typename TUPLE>
-inline std::ostream& CollectionWrite(std::ostream& rStream, const STRUCT& rCurrent, TUPLE&& members)
+inline std::ostream& CollectionWrite(std::ostream& rStream, const STRUCT& rCurrent, const TUPLE& rMembers)
 {
 	rCurrent.Write(rStream);
-	engine::MultiWrite(rStream, rCurrent.iCount, std::forward<TUPLE>(members));
+	engine::MultiWrite(rStream, rCurrent.iCount, rMembers);
 	return rStream;
 }
 
 // Reads complete collection from stream (metadata + all member arrays) to restore from save files.
 template <typename STRUCT, typename TUPLE>
-inline std::istream& CollectionRead(std::istream& rStream, STRUCT& rCurrent, TUPLE&& members)
+inline std::istream& CollectionRead(std::istream& rStream, STRUCT& rCurrent, TUPLE&& rMembers)
 {
 	rCurrent.Read(rStream);
-	engine::AllocateAndRead(rCurrent, rStream, std::forward<TUPLE>(members));
+	engine::AllocateAndRead(rCurrent, rStream, std::forward<TUPLE>(rMembers));
 	return rStream;
 }
 
 #if defined(BT_CLIENT)
-// Accumulates total capacity across all active coords for a collection's BeginRender phase.
-// ACCESSOR: callable returning a const reference to the collection from a FrameInterpolate.
+// BeginRender capacity spans all active coordinates; Accessor returns a const collection reference from FrameInterpolate.
 template <typename ACCESSOR>
-int64_t AccumulateRenderCapacity(const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR accessor)
+int64_t AccumulateRenderCapacity(const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR Accessor)
 {
 	int64_t iTotalCapacity = 0;
 	for (const GridCoord& rCoord : rActiveCoords)
@@ -473,25 +438,25 @@ int64_t AccumulateRenderCapacity(const std::unordered_map<GridCoord, game::Frame
 		auto it = rRenderInterpolates.find(rCoord);
 		if (it != rRenderInterpolates.end())
 		{
-			iTotalCapacity += accessor(it->second).iCapacity;
+			iTotalCapacity += Accessor(it->second).iCapacity;
 		}
 	}
 	return iTotalCapacity;
 }
 
 // Erases entries from a render state map whose IDs are no longer present in any active collection.
-// ACCESSOR: callable returning the collection's idToIndexMap from a FrameInterpolate reference.
+// Accessor returns the collection's idToIndexMap from a FrameInterpolate reference.
 template <typename MAP_TYPE, typename ACCESSOR>
-void EraseStaleRenderState(MAP_TYPE& rRenderStateMap, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR accessor)
+void EraseStaleRenderState(MAP_TYPE& rRenderStateMap, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR Accessor)
 {
 	// Heap: unordered_map erase for stale render state entries
 	ScopedSuppressAllocationTracking suppress;
-	std::erase_if(rRenderStateMap, [&rRenderInterpolates, &rActiveCoords, &accessor](const typename MAP_TYPE::value_type& pair)
+	std::erase_if(rRenderStateMap, [&rRenderInterpolates, &rActiveCoords, &Accessor](const typename MAP_TYPE::value_type& rPair)
 	{
 		for (const GridCoord& rCoord : rActiveCoords)
 		{
 			auto it = rRenderInterpolates.find(rCoord);
-			if (it != rRenderInterpolates.end() && accessor(it->second).contains(pair.first))
+			if (it != rRenderInterpolates.end() && Accessor(it->second).contains(rPair.first))
 			{
 				return false;
 			}

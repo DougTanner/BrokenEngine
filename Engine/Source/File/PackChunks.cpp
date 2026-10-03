@@ -14,35 +14,30 @@ namespace engine
 {
 
 #if defined(BT_CLIENT)
-namespace
-{
-
 constexpr uint64_t kuiAudioReadStateMask = 0x3;
 static_assert(static_cast<uint64_t>(AudioChunkReadState::kFree) == 0);
 static_assert(static_cast<uint64_t>(AudioChunkReadState::kReady) == kuiAudioReadStateMask);
 
-constexpr uint64_t PackAudioReadOwnership(AudioChunkReadState eState, uint64_t uiGeneration)
+static constexpr uint64_t PackAudioReadOwnership(AudioChunkReadState eState, uint64_t uiGeneration)
 {
 	return (uiGeneration << 2) | static_cast<uint64_t>(eState);
 }
 
-constexpr AudioChunkReadState AudioReadState(uint64_t uiOwnership)
+static constexpr AudioChunkReadState AudioReadState(uint64_t uiOwnership)
 {
 	return static_cast<AudioChunkReadState>(uiOwnership & kuiAudioReadStateMask);
 }
 
-constexpr uint64_t AudioReadGeneration(uint64_t uiOwnership)
+static constexpr uint64_t AudioReadGeneration(uint64_t uiOwnership)
 {
 	return uiOwnership >> 2;
 }
 
-uint64_t NextAudioReadGeneration(uint64_t uiGeneration)
+static uint64_t NextAudioReadGeneration(uint64_t uiGeneration)
 {
 	ASSERT(uiGeneration != (std::numeric_limits<uint64_t>::max() >> 2));
 	return uiGeneration + 1;
 }
-
-} // namespace
 #endif // BT_CLIENT
 
 PackChunks::PackChunks(const std::filesystem::path& rDataDirectory)
@@ -315,7 +310,7 @@ void PackChunks::LoadPackFiles()
 		if (static_cast<data::DataTypes>(i) == data::kDataTypeIslands)
 		{
 			const std::vector<common::ChunkLocation>& rChunkLocations = mChunkLocations[i];
-			mPackIntegrityToken = rChunkLocations.empty() ? common::kCrcSeed : common::Crc(rChunkLocations.data(), static_cast<int64_t>(rChunkLocations.size()));
+			mPackIntegrityToken = rChunkLocations.empty() ? common::kCrcSeed : common::Crc(std::span<const common::ChunkLocation>(rChunkLocations.data(), rChunkLocations.size()));
 		}
 		manifestStream.close();
 
@@ -823,7 +818,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 
 		std::memcpy(buffer.data(), rEntry.data.data(), rEntry.uiLength);
 #if defined(BT_DEBUG)
-		AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kRefillReady, rRequest.uiEntryIndex, crc, uiOffset, rEntry.uiLength, AudioStreamingFixtureQueueState::kReady, rRequest.uiGeneration, false);
+		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillReady, rRequest.uiEntryIndex, crc, uiOffset, rEntry.uiLength, AudioStreamingFixtureQueueState::kReady, rRequest.uiGeneration, false);
 #endif
 		uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.uiGeneration);
 		if (!rEntry.uiOwnership.compare_exchange_strong(uiOwnership, uiFreeOwnership, std::memory_order_acq_rel))
@@ -909,7 +904,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			continue;
 		}
 #if defined(BT_DEBUG)
-		AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kRefillQueued, uiIndex, crc, uiOffset, buffer.size(), AudioStreamingFixtureQueueState::kQueued, uiGeneration, false);
+		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillQueued, uiIndex, crc, uiOffset, buffer.size(), AudioStreamingFixtureQueueState::kQueued, uiGeneration, false);
 #endif
 		mLoader.PublishWake();
 		return ChunkReadResult::kPending;
@@ -950,7 +945,7 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 		if (rEntry.uiOwnership.compare_exchange_weak(uiOwnership, uiCancelledOwnership, std::memory_order_acq_rel))
 		{
 #if defined(BT_DEBUG)
-			AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kRefillCancelled, rRequest.uiEntryIndex, rRequest.crc, rRequest.uiOffset, rRequest.uiLength, static_cast<AudioStreamingFixtureQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+			AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillCancelled, rRequest.uiEntryIndex, rRequest.crc, rRequest.uiOffset, rRequest.uiLength, static_cast<AudioStreamingFixtureQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
 #endif
 			break;
 		}

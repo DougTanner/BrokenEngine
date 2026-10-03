@@ -12,7 +12,7 @@ void SoundsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restri
 void SoundsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData)
 {
 	SoundsInterpolate& rSounds = rFrameInterpolate.sounds;
-	int64_t iIndex = rSounds.IdToIndex(id);
+	int64_t iIndex = rSounds.idToIndexMap.at(id);
 
 	rSounds.pVecPositions[iIndex] = XMVectorSetW(rData.vecPosition, 1.0f);
 	rSounds.pVecVelocities[iIndex] = rData.vecVelocity;
@@ -28,7 +28,7 @@ void SoundsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [
 
 void SoundsPostRender::Add(game::Frame& __restrict rFrame, sound_t& rId)
 {
-	ASSERT(!rId.IsValid());
+	ASSERT(!(rId.uuid.iValue != 0));
 
 	SoundsInterpolate& rInterpolate = rFrame.interpolate.sounds;
 	SoundsPostRender& rPostRender = rFrame.postRender.sounds;
@@ -36,19 +36,11 @@ void SoundsPostRender::Add(game::Frame& __restrict rFrame, sound_t& rId)
 	GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	auto [iSpawnIndex, newId] = AddGeneratedIndexableElement(rInterpolate, rPostRender, [&rFrame]()
 	{
-		return sound_t {uuid_t {rFrame.postRender.GenerateSoundUuid()}};
+		return sound_t {Uuid {rFrame.postRender.MakeUuid(rFrame.postRender.uiNextSoundUuid)}};
 	});
 	rId = newId;
-	rPostRender.puiIds[iSpawnIndex] = newId;
+	rPostRender.pIds[iSpawnIndex] = newId;
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
-}
-
-void SoundsPostRender::Remove(game::Frame& __restrict rFrame, sound_t& rId)
-{
-	SoundsInterpolate& rInterpolate = rFrame.interpolate.sounds;
-	SoundsPostRender& rPostRender = rFrame.postRender.sounds;
-
-	RemoveIndexableElementAndClearHandle(rInterpolate, rPostRender, rId, rInterpolate.Members(), rPostRender.Members());
 }
 
 } // namespace engine

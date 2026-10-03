@@ -3,8 +3,8 @@
 namespace common
 {
 
-// Serializes the three fault-path handlers below via try_to_lock — an un-acquirable lock means another thread is mid-handler, so the handler bails (the cross-thread guard, which is the only intended use).
-// Deliberately a plain std::mutex, NOT recursive like gDbgHelpMutex: the bail-on-owned-re-entry behavior is intentional. A nested same-thread fault must NOT re-run a handler (each ends in throw, so re-running risks std::terminate). An owned re-entry technically makes try_lock formal UB ([thread.mutex.requirements.mutex]), but is benign on MSVC — the SRWLOCK-backed try_lock returns false on an already-owned lock, i.e. the desired bail.
+// The intended use is cross-thread serialization for the three fault-path handlers below; a failed try_to_lock makes the current handler bail.
+// Same-thread re-entry formally makes std::mutex::try_lock undefined, but MSVC's SRWLOCK-backed implementation returns false for an already-owned lock.
 static std::mutex sMutex;
 
 std::recursive_mutex gDbgHelpMutex;

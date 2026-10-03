@@ -16,13 +16,13 @@ namespace engine
 
 enum class SubscriptionFlags : uint8_t
 {
-	kActive            = 1 << 0,
-	kFirstUpdateLogged = 1 << 1,
+	kActive            = 1u << 0,
+	kFirstUpdateLogged = 1u << 1,
 };
 
 struct ClientCoordSubscription
 {
-	GridCoord coord {};
+	GridCoord coordinate {};
 	common::Flags<SubscriptionFlags> flags;
 };
 
@@ -36,12 +36,12 @@ struct PendingNewSubscription
 {
 	int64_t iClientId = 0;
 	int64_t iSlot = 0;
-	GridCoord coord {};
+	GridCoord coordinate {};
 };
 
 struct GridUpdateData
 {
-	common::crc_t sharedCrc = 0;
+	common::crc_t uiSharedCrc = 0;
 	std::span<const game::StatusChange> statusChanges;
 };
 

@@ -50,7 +50,7 @@ void main()
 	{
 		float fDot = dot(f3Normal, pHexShields[i].pf4Directions[j].xyz);
 		float fFalloff = max(pow(0.6f + 0.4f * fDot, mainLayout.fHexShieldDirectionFalloffPower), 0.0f);
-		f4OutColor.a += mainLayout.fHexShieldDirectionMultiplier * pHexShields[i].pfFragIntensities[j] * fFalloff;
+		f4OutColor.a += mainLayout.fHexShieldDirectionMultiplier * pHexShields[i].pfFragmentIntensities[j] * fFalloff;
 	}
 
 	// Edge

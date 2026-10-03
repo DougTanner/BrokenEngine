@@ -15,7 +15,7 @@ enum class LogLevel : int8_t
 
 // Log categories — dense 0-based indices used directly as array subscripts (gLogRingBuffers, kpcLogCategoryNames,
 // keLogLevels). Append new categories immediately before kCount; never reorder or leave gaps.
-enum class LogCategory : int8_t
+enum class LogCategory : int64_t
 {
 	kDefault  = 0,
 	kTemp     = 1,
@@ -34,14 +34,13 @@ inline constexpr int64_t kiLogCategoryCount = static_cast<int64_t>(LogCategory::
 
 } // namespace common
 
-// Level aliases
 inline constexpr common::LogLevel kVerbose = common::LogLevel::kVerbose;
 inline constexpr common::LogLevel kDebug   = common::LogLevel::kDebug;
 inline constexpr common::LogLevel kInfo    = common::LogLevel::kInfo;
 inline constexpr common::LogLevel kWarning = common::LogLevel::kWarning;
 inline constexpr common::LogLevel kError   = common::LogLevel::kError;
 
-// Category aliases (ChunkFlags uses kChunkAudio to avoid collision with kAudio here)
+// kAudio is the log category; ChunkFlags::kChunkAudio is the audio chunk flag.
 inline constexpr common::LogCategory kDefault  = common::LogCategory::kDefault;
 inline constexpr common::LogCategory kTemp     = common::LogCategory::kTemp;
 

@@ -11,11 +11,8 @@ namespace game
 
 #if defined(BT_SERVER)
 
-namespace
-{
-
 // Nav direction to coord offset mapping (0=+Y, 1=-Y, 2=+X, 3=-X)
-engine::GridCoord NavDirectionOffset(int8_t iNavDirection)
+static engine::GridCoord NavDirectionOffset(int8_t iNavDirection)
 {
 	switch (iNavDirection)
 	{
@@ -27,8 +24,6 @@ engine::GridCoord NavDirectionOffset(int8_t iNavDirection)
 	}
 }
 
-} // namespace
-
 void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets, common::RandomEngine& rRandom)
 {
 	for (auto& [rGuid, rFleetVec] : rFleets)
@@ -36,7 +31,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 		for (Fleet& rFleet : rFleetVec)
 		{
 			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-			if (!rFleet.flagshipGlobalPlayerId.IsValid() || flagshipIt == rFleet.members.end())
+			if (!(rFleet.flagshipGlobalPlayerId.iValue != 0) || flagshipIt == rFleet.members.end())
 			{
 				continue;
 			}
@@ -96,7 +91,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			int8_t iDirection = static_cast<int8_t>(common::Random(3u, rRandom));
 			engine::GridCoord offset = NavDirectionOffset(iDirection);
 			engine::GridCoord destination {};
-			if (!engine::TryAddGridCoord(rFlagship.coord, offset.x, offset.y, destination)) [[unlikely]]
+			if (!engine::TryAddGridCoordinate(rFlagship.coord, offset.iX, offset.iY, destination)) [[unlikely]]
 			{
 				// A flagship at a numeric coordinate edge has no neighbour that way, so this move never happens
 				// rather than wrapping to the far side of the grid. wantedCoord already equals the flagship coord,
@@ -110,7 +105,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			rFleet.uiPendingFleetWantedCoordTicks = uiPendingTicks;
 			rFleet.fFrameChangeTimer = rFleet.fNavigationDelay;
 			mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoord = destination, .uiPendingFleetWantedCoordTicks = uiPendingTicks});
-			LOG(kNetwork, kVerbose, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{})", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.x, destination.y);
+			LOG(kNetwork, kVerbose, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{})", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.iX, destination.iY);
 		}
 	}
 }
@@ -132,7 +127,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 		}
 		const Fleet& rFleet = *matchIt;
 
-		if (!rFleet.flagshipGlobalPlayerId.IsValid() || !std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId))
+		if (!(rFleet.flagshipGlobalPlayerId.iValue != 0) || !std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId))
 		{
 			continue;
 		}
@@ -164,7 +159,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 			{
 				if (rPlayers.pGlobalPlayerIds[k] == rMember.globalPlayerId)
 				{
-					int64_t iPlayerUuid = rPlayers.puiIds[k].ToUuid().Value();
+					int64_t iPlayerUuid = rPlayers.pIds[k].uuid.iValue;
 					frameInputIt->second.statusChanges.push_back({
 						.eType = StatusChangeType::kUpdateFleet,
 						.data = UpdateFleetData {
@@ -179,7 +174,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 				}
 			}
 		}
-		LOG(kNetwork, kVerbose, "FleetNavigationController::ProcessFlagshipUpdates Guid: ({},{}) FleetGuid: ({},{}) MembersUpdated: {} WantedCoord: ({},{})", rUpdate.clientGuid.uiHigh, rUpdate.clientGuid.uiLow, rUpdate.fleetGuid.uiHigh, rUpdate.fleetGuid.uiLow, iMembersUpdated, rUpdate.newWantedCoord.x, rUpdate.newWantedCoord.y);
+		LOG(kNetwork, kVerbose, "FleetNavigationController::ProcessFlagshipUpdates Guid: ({},{}) FleetGuid: ({},{}) MembersUpdated: {} WantedCoord: ({},{})", rUpdate.clientGuid.uiHigh, rUpdate.clientGuid.uiLow, rUpdate.fleetGuid.uiHigh, rUpdate.fleetGuid.uiLow, iMembersUpdated, rUpdate.newWantedCoord.iX, rUpdate.newWantedCoord.iY);
 	}
 	mPendingFlagshipUpdates.clear();
 }

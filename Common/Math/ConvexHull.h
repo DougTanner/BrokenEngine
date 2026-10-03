@@ -10,82 +10,79 @@ namespace common
 struct ConvexHull2D
 {
 	const XMFLOAT2* pVertices = nullptr;
-	int32_t iVertexCount = 0;
+	int64_t iVertexCount = 0;
 	XMFLOAT2 f2AabbMin {};
 	XMFLOAT2 f2AabbMax {};
 };
 
-// Rotate a CCW island-local hull (centered at origin) by the rotation whose precomputed (fCos, fSin)
-// pair is passed in (CCW, matching GlobalElevation's convention) and translate to f2WorldPos, writing
-// the world-space verts into rOutVertices (caller scratch, >= iLocalCount entries). Returns a
-// ConvexHull2D over rOutVertices with its AABB filled. Takes (fCos, fSin) rather than an angle so no
-// libm trig runs here — results feed CRC-verified placement; derive via common::DeterministicSinCos.
-inline ConvexHull2D BuildWorldHull(const XMFLOAT2* pLocalVertices, int32_t iLocalCount, XMFLOAT2 f2WorldPos, float fCos, float fSin, XMFLOAT2* rOutVertices)
+// Input vertices are CCW and centered at the origin; (fCos, fSin) follows GlobalElevation's CCW
+// convention. The output storage holds at least the input vertex count. Derive (fCos, fSin) with
+// common::DeterministicSinCos because this math feeds CRC-verified placement.
+inline ConvexHull2D BuildWorldHull(std::span<const XMFLOAT2> localVertices, XMFLOAT2 f2WorldPosition, float fCos, float fSin, std::span<XMFLOAT2> outputVertices)
 {
 	XMFLOAT2 f2Min {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
 	XMFLOAT2 f2Max {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
-	for (int32_t i = 0; i < iLocalCount; ++i)
+	for (int64_t i = 0; i < static_cast<int64_t>(localVertices.size()); ++i)
 	{
-		float fLocalX = pLocalVertices[i].x;
-		float fLocalY = pLocalVertices[i].y;
-		float fWorldX = f2WorldPos.x + fLocalX * fCos - fLocalY * fSin;
-		float fWorldY = f2WorldPos.y + fLocalX * fSin + fLocalY * fCos;
-		rOutVertices[i] = {fWorldX, fWorldY};
+		float fLocalX = localVertices[i].x;
+		float fLocalY = localVertices[i].y;
+		float fWorldX = f2WorldPosition.x + fLocalX * fCos - fLocalY * fSin;
+		float fWorldY = f2WorldPosition.y + fLocalX * fSin + fLocalY * fCos;
+		outputVertices[i] = {fWorldX, fWorldY};
 		f2Min.x = std::min(f2Min.x, fWorldX);
 		f2Min.y = std::min(f2Min.y, fWorldY);
 		f2Max.x = std::max(f2Max.x, fWorldX);
 		f2Max.y = std::max(f2Max.y, fWorldY);
 	}
 
-	return {.pVertices = rOutVertices, .iVertexCount = iLocalCount, .f2AabbMin = f2Min, .f2AabbMax = f2Max};
+	return {.pVertices = outputVertices.data(), .iVertexCount = static_cast<int64_t>(localVertices.size()), .f2AabbMin = f2Min, .f2AabbMax = f2Max};
 }
 
-// Broadphase: do the two hulls' precomputed AABBs overlap? Strict < so edge-touching AABBs count as
-// non-overlapping (lets islands pack flush).
-inline bool AabbsOverlap2D(const ConvexHull2D& rA, const ConvexHull2D& rB)
+// Strict inequalities let edge-touching AABBs pack flush.
+inline bool AabbsOverlap2D(const ConvexHull2D& rFirstHull, const ConvexHull2D& rSecondHull)
 {
-	return rA.f2AabbMin.x < rB.f2AabbMax.x && rB.f2AabbMin.x < rA.f2AabbMax.x && rA.f2AabbMin.y < rB.f2AabbMax.y
-	    && rB.f2AabbMin.y < rA.f2AabbMax.y;
+	return rFirstHull.f2AabbMin.x < rSecondHull.f2AabbMax.x && rSecondHull.f2AabbMin.x < rFirstHull.f2AabbMax.x && rFirstHull.f2AabbMin.y < rSecondHull.f2AabbMax.y
+	    && rSecondHull.f2AabbMin.y < rFirstHull.f2AabbMax.y;
 }
 
 // Separating Axis Theorem for two CCW convex polygons. True iff they share interior area; edge-
 // touching returns false so placement can pack hulls flush without registering overlap. Scale-
 // invariant (axes are un-normalized edge normals). Deterministic: fixed axis order (A's edges then
 // B's, ascending index) and pure scalar float math.
-inline bool ConvexHullsOverlap(const ConvexHull2D& rA, const ConvexHull2D& rB)
+inline bool ConvexHullsOverlap(const ConvexHull2D& rFirstHull, const ConvexHull2D& rSecondHull)
 {
-	if (!AabbsOverlap2D(rA, rB))
+	if (!AabbsOverlap2D(rFirstHull, rSecondHull))
 	{
 		return false;
 	}
 
-	for (int32_t k = 0; k < 2; ++k)
+	for (int64_t k = 0; k < 2; ++k)
 	{
-		const ConvexHull2D& rEdgeHull = (k == 0) ? rA : rB;
-		for (int32_t i = 0; i < rEdgeHull.iVertexCount; ++i)
+		const ConvexHull2D& rEdgeHull = (k == 0) ? rFirstHull : rSecondHull;
+		for (int64_t i = 0; i < rEdgeHull.iVertexCount; ++i)
 		{
-			const XMFLOAT2& rV0 = rEdgeHull.pVertices[i];
-			const XMFLOAT2& rV1 = rEdgeHull.pVertices[(i + 1) % rEdgeHull.iVertexCount];
+			const XMFLOAT2& rStartVertex = rEdgeHull.pVertices[i];
+			const XMFLOAT2& rEndVertex = rEdgeHull.pVertices[(i + 1) % rEdgeHull.iVertexCount];
 			// Outward normal of the CCW edge (v1 - v0) is (edge.y, -edge.x).
-			float fAxisX = rV1.y - rV0.y;
-			float fAxisY = rV0.x - rV1.x;
+			float fAxisX = rEndVertex.y - rStartVertex.y;
+			float fAxisY = rStartVertex.x - rEndVertex.x;
 
 			float fMinA = std::numeric_limits<float>::max();
 			float fMaxA = std::numeric_limits<float>::lowest();
-			for (int32_t j = 0; j < rA.iVertexCount; ++j)
+			for (int64_t j = 0; j < rFirstHull.iVertexCount; ++j)
 			{
-				float fProj = rA.pVertices[j].x * fAxisX + rA.pVertices[j].y * fAxisY;
-				fMinA = std::min(fMinA, fProj);
-				fMaxA = std::max(fMaxA, fProj);
+				float fProjection = rFirstHull.pVertices[j].x * fAxisX + rFirstHull.pVertices[j].y * fAxisY;
+				fMinA = std::min(fMinA, fProjection);
+				fMaxA = std::max(fMaxA, fProjection);
 			}
 
 			float fMinB = std::numeric_limits<float>::max();
 			float fMaxB = std::numeric_limits<float>::lowest();
-			for (int32_t j = 0; j < rB.iVertexCount; ++j)
+			for (int64_t j = 0; j < rSecondHull.iVertexCount; ++j)
 			{
-				float fProj = rB.pVertices[j].x * fAxisX + rB.pVertices[j].y * fAxisY;
-				fMinB = std::min(fMinB, fProj);
-				fMaxB = std::max(fMaxB, fProj);
+				float fProjection = rSecondHull.pVertices[j].x * fAxisX + rSecondHull.pVertices[j].y * fAxisY;
+				fMinB = std::min(fMinB, fProjection);
+				fMaxB = std::max(fMaxB, fProjection);
 			}
 
 			if (fMaxA <= fMinB || fMaxB <= fMinA)
@@ -98,27 +95,24 @@ inline bool ConvexHullsOverlap(const ConvexHull2D& rA, const ConvexHull2D& rB)
 	return true;
 }
 
-// Returns true if the polygon's vertices wind counter-clockwise (positive signed area, i.e. shoelace
-// sum > 0, in the y-up world frame). ConvexHullsOverlap (SAT) requires CCW input and its producers
-// assert against this. Nav's assertion is a truncation tripwire, not a requirement: the nav
-// point-in-polygon test is a nonzero-winding test and is therefore orientation-agnostic, and the
-// world-space polygons it actually runs against are wound clockwise, because BuildCellNavData mirrors
-// Y when it maps a UV-space template contour into the cell. Single-sourced so the runtime predicate
-// and the offline (DataPacker) bake-time verification can't drift. Degenerate (< 3 vertices) polygons
-// are the caller's responsibility to exclude.
-inline bool IsPolygonCcw(const XMFLOAT2* pVertices, int32_t iVertexCount)
+// The shoelace sum is positive for CCW polygons in the y-up frame. ConvexHullsOverlap requires CCW
+// input, and its producers assert this. Nav's nonzero-winding test is orientation-agnostic; its
+// assertion is a truncation tripwire because BuildCellNavigationData mirrors Y, making those polygons
+// clockwise. Runtime and bake-time checks use this shared predicate; callers exclude polygons with
+// fewer than three vertices.
+inline bool IsPolygonCcw(std::span<const XMFLOAT2> vertices)
 {
-	const XMFLOAT2& rOrigin = pVertices[0];
+	const XMFLOAT2& rOrigin = vertices[0];
 	float fSignedArea = 0.0f;
-	for (int32_t i = 0; i < iVertexCount; ++i)
+	for (int64_t i = 0; i < static_cast<int64_t>(vertices.size()); ++i)
 	{
-		const XMFLOAT2& rA = pVertices[i];
-		const XMFLOAT2& rB = pVertices[(i + 1) % iVertexCount];
-		float fAx = rA.x - rOrigin.x;
-		float fAy = rA.y - rOrigin.y;
-		float fBx = rB.x - rOrigin.x;
-		float fBy = rB.y - rOrigin.y;
-		fSignedArea += fAx * fBy - fBx * fAy;
+		const XMFLOAT2& rCurrentVertex = vertices[i];
+		const XMFLOAT2& rNextVertex = vertices[(i + 1) % vertices.size()];
+		float fCurrentVertexX = rCurrentVertex.x - rOrigin.x;
+		float fCurrentVertexY = rCurrentVertex.y - rOrigin.y;
+		float fNextVertexX = rNextVertex.x - rOrigin.x;
+		float fNextVertexY = rNextVertex.y - rOrigin.y;
+		fSignedArea += fCurrentVertexX * fNextVertexY - fNextVertexX * fCurrentVertexY;
 	}
 	return fSignedArea > 0.0f;
 }

@@ -98,16 +98,13 @@ void SaveGraphicsSettings()
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGraphicsSettingsPath, graphicsSettings);
 }
 
-namespace
-{
-
-bool IsValidGraphicsQualityLevel(uint8_t uiLevel)
+static bool IsValidGraphicsQualityLevel(uint8_t uiLevel)
 {
 	return uiLevel < static_cast<uint8_t>(GraphicsQualityLevel::kCount);
 }
 
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
-const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings)
+static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings)
 {
 	if (!std::ranges::contains(gSampleCount.mAllowed, static_cast<float>(rGraphicsSettings.eSampleCount)))
 	{
@@ -172,13 +169,11 @@ const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings
 	return nullptr;
 }
 
-void LoadGraphicsQualityLevel(Wrapper& rLevel, uint8_t uiLevel)
+static void LoadGraphicsQualityLevel(Wrapper& rLevel, uint8_t uiLevel)
 {
 	// Reset, not Set: loading is initialization, so no consumer should see this as a pending change.
 	rLevel.Reset<int64_t>(uiLevel);
 }
-
-} // namespace
 
 bool LoadGraphicsSettings()
 {

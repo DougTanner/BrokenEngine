@@ -12,13 +12,8 @@
 namespace game
 {
 
-namespace
-{
-
-ClientSession* spSession = nullptr;
-std::vector<uint8_t> sArmedPacketFault;
-
-} // namespace
+static ClientSession* spSession = nullptr;
+static std::vector<uint8_t> sArmedPacketFault;
 
 void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
@@ -73,7 +68,7 @@ void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rPar
 			throw std::runtime_error("client_packet_fault_fixture requires a connected client");
 		}
 
-		std::vector<uint8_t> packet = {static_cast<uint8_t>(engine::PacketType::kServerCoordFullState), 0, 0};
+		std::vector<uint8_t> packet = {static_cast<uint8_t>(engine::PacketType::kServerCoordinateFullState), 0, 0};
 
 		rResult["case"] = caseName;
 		rResult["type"] = packet.front();

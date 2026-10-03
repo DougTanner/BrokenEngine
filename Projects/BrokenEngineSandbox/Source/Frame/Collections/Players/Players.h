@@ -265,9 +265,9 @@ private:
 
 public:
 
-	player_t* __restrict puiIds = nullptr;
+	player_t* __restrict pIds = nullptr;
 	PlayerFlags_t* __restrict pFlags = nullptr;
-	engine::alignment_t* __restrict pAlignments = nullptr;
+	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	float* __restrict pfNextBlasterFireTimes = nullptr;
 	float* __restrict pfNextSecondarySpawnTimes = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
@@ -283,7 +283,7 @@ public:
 	float* __restrict pfFrameChangeTimers = nullptr;
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
 	engine::ClientGuid* __restrict pClientGuids = nullptr;
-	engine::global_id_t* __restrict pGlobalPlayerIds = nullptr;
+	engine::GlobalId* __restrict pGlobalPlayerIds = nullptr;
 	float* __restrict pfNavigationDelays = nullptr;
 	engine::GridCoord* __restrict pFleetWantedCoords = nullptr;
 	uint8_t* __restrict puiPendingFleetWantedCoordTicks = nullptr;
@@ -294,7 +294,7 @@ public:
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoords, rSelf.puiPendingFleetWantedCoordTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoords, rSelf.puiPendingFleetWantedCoordTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -312,13 +312,13 @@ public:
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiIds, rSelf.pAlignments, rSelf.pClientGuids, rSelf.pGlobalPlayerIds);
+		return std::tie(rSelf.pIds, rSelf.pAlignments, rSelf.pClientGuids, rSelf.pGlobalPlayerIds);
 	}
 
 	// CRC-only subset: excludes pClientGuids and pGlobalPlayerIds which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoords, rSelf.puiPendingFleetWantedCoordTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoords, rSelf.puiPendingFleetWantedCoordTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 
 	// Utility
@@ -330,7 +330,7 @@ public:
 		XMVECTOR vecPosition = DirectX::XMVectorZero();
 		XMVECTOR vecDirection = DirectX::XMVectorZero();
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
-		engine::alignment_t alignment {};
+		engine::AlignmentIdentifier alignment {};
 		float fArmor = 0.0f;
 		float fShield = 0.0f;
 		float fNextBlasterFireTime = 0.0f;
@@ -345,7 +345,7 @@ public:
 		float fArrivalGracePeriod = 0.0f;
 		float fFrameChangeTimer = 0.0f;
 		float fNavigationDelay = 60.0f;
-		engine::global_id_t globalPlayerId {};
+		engine::GlobalId globalPlayerId {};
 		engine::ClientGuid clientGuid {};
 		engine::GridCoord fleetWantedCoord {};
 		uint8_t uiPendingFleetWantedCoordTicks = 0;

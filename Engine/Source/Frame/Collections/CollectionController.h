@@ -7,13 +7,11 @@ namespace engine
 class Wrapper;
 #endif
 
-// Collection controller types provide time-based keyframe interpolation.
 
-inline constexpr int64_t kMaxControllerKeyframes = 4;
+inline constexpr int64_t kiMaximumControllerKeyframes = 4;
 inline constexpr uint8_t kuiInvalidTypeIndex = 0xFF;
 inline constexpr uint8_t kuiInvalidControllerType = kuiInvalidTypeIndex;
 
-// Keyframe state with lerp-able properties for light animation
 struct ControllerKeyframe
 {
 	float fVisibleArea = 0.0f;
@@ -22,7 +20,7 @@ struct ControllerKeyframe
 	float fLightingIntensity = 0.0f;
 	float fRotation = 0.0f;
 
-	static ControllerKeyframe Lerp(const ControllerKeyframe& rA, const ControllerKeyframe& rB, float fPercent)
+	static ControllerKeyframe Interpolate(const ControllerKeyframe& rA, const ControllerKeyframe& rB, float fPercent)
 	{
 		return
 		{
@@ -37,86 +35,80 @@ struct ControllerKeyframe
 	bool operator==(const ControllerKeyframe& rOther) const = default;
 };
 
-// Controller type defining animation behavior
 struct ControllerType
 {
 	uint8_t uiBaseTypeIndex = 0;                                // Base Type for color/texture
 	uint8_t uiKeyframeCount = 2;                                // Actual keyframes used (2-4)
 	bool bDestroysSelf = true;                                  // Auto-remove when animation ends
-	float pfTimes[kMaxControllerKeyframes] {};                  // Keyframe times (relative to start)
-	ControllerKeyframe keyframes[kMaxControllerKeyframes] {};   // Keyframe states (normalized when wrappers present)
+	std::chrono::duration<float> times[kiMaximumControllerKeyframes] {};                  // Keyframe times (relative to start)
+	ControllerKeyframe keyframes[kiMaximumControllerKeyframes] {};   // Keyframe states (normalized when wrappers present)
 
 #if defined(BT_CLIENT)
 	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.Get() at interpolation time
-	Wrapper* ppVisibleAreaScales[kMaxControllerKeyframes] {};
-	Wrapper* ppVisibleIntensityScales[kMaxControllerKeyframes] {};
-	Wrapper* ppLightingAreaScales[kMaxControllerKeyframes] {};
-	Wrapper* ppLightingIntensityScales[kMaxControllerKeyframes] {};
+	Wrapper* ppVisibleAreaScales[kiMaximumControllerKeyframes] {};
+	Wrapper* ppVisibleIntensityScales[kiMaximumControllerKeyframes] {};
+	Wrapper* ppLightingAreaScales[kiMaximumControllerKeyframes] {};
+	Wrapper* ppLightingIntensityScales[kiMaximumControllerKeyframes] {};
 #endif
 
 	bool operator==(const ControllerType& rOther) const = default;
 };
 
-// Interpolates between keyframes based on elapsed time
 template <typename CONTROLLER_TYPE>
 inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime)
 {
 	using KeyframeType = std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)>;
 	int64_t iKeyframeCount = rController.uiKeyframeCount;
 
-	if (fElapsedTime <= rController.pfTimes[0])
+	if (fElapsedTime <= rController.times[0].count())
 	{
 		return rController.keyframes[0];
 	}
 	// NOLINTNEXTLINE(clang-analyzer-security.ArrayBound) — registered controllers always have uiKeyframeCount >= 2; the analyzer's count==0 path cannot occur
-	if (fElapsedTime >= rController.pfTimes[iKeyframeCount - 1])
+	if (fElapsedTime >= rController.times[iKeyframeCount - 1].count())
 	{
 		return rController.keyframes[iKeyframeCount - 1];
 	}
 
 	for (int64_t j = 1; j < iKeyframeCount; ++j)
 	{
-		if (fElapsedTime < rController.pfTimes[j])
+		if (fElapsedTime < rController.times[j].count())
 		{
-			float fPreviousTime = rController.pfTimes[j - 1];
-			float fPercent = (fElapsedTime - fPreviousTime) / (rController.pfTimes[j] - fPreviousTime);
-			return KeyframeType::Lerp(rController.keyframes[j - 1], rController.keyframes[j], fPercent);
+			float fPreviousTime = rController.times[j - 1].count();
+			float fPercent = (fElapsedTime - fPreviousTime) / (rController.times[j].count() - fPreviousTime);
+			return KeyframeType::Interpolate(rController.keyframes[j - 1], rController.keyframes[j], fPercent);
 		}
 	}
 
 	return rController.keyframes[iKeyframeCount - 1];
 }
 
-// Scales a controller's keyframes before interpolation without modifying its registered definition.
 template <typename CONTROLLER_TYPE, typename SCALE_FUNCTION>
-inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateScaledKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime, SCALE_FUNCTION scaleFunction)
+inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateScaledKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime, SCALE_FUNCTION ScaleFunction)
 {
 	CONTROLLER_TYPE scaledController = rController;
 	for (int64_t j = 0; j < rController.uiKeyframeCount; ++j)
 	{
-		scaleFunction(scaledController, rController, j);
+		ScaleFunction(scaledController, rController, j);
 	}
 	return InterpolateKeyframes(scaledController, fElapsedTime);
 }
 
 // Spawns a paired controlled element while leaving collection-specific seeding to the caller.
 template <typename INTERPOLATE, typename POST_RENDER, typename GROW_FUNCTION, typename ADD_FUNCTION, typename SEED_FUNCTION>
-void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_RENDER& rPostRender, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION growFunction, ADD_FUNCTION addFunction, SEED_FUNCTION seedFunction)
+void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_RENDER& rPostRender, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION GrowFunction, ADD_FUNCTION AddFunction, SEED_FUNCTION SeedFunction)
 {
-	growFunction();
-	int64_t iSpawnIndex = addFunction();
+	GrowFunction();
+	int64_t iSpawnIndex = AddFunction();
 
 	rInterpolate.pVecPositions[iSpawnIndex] = XMVectorSetW(vecPosition, 1.0f);
-	seedFunction(iSpawnIndex);
+	SeedFunction(iSpawnIndex);
 	rInterpolate.puiControllerTypeIndices[iSpawnIndex] = uiControllerTypeIndex;
 	rInterpolate.pfStartTimes[iSpawnIndex] = fCurrentTime;
 }
 
-// Mixin providing static controller type registry for collections with keyframe animation.
-// CONTROLLER_TYPE defaults to ControllerType for standard keyframe animation (PointLights).
-// Collections with custom keyframes (Puffs) can specify their own controller type.
-// Threading contract: registration is startup-only (single-threaded, before Dispatch() workers fan out);
-// sControllerTypes is immutable afterward, so parallel frame-tick .at() reads need no synchronization.
+// PointLights use ControllerType; Puffs use a custom controller type.
+// Registration occurs on one thread before Dispatch() workers start; controller types remain immutable during frame ticks.
 template <typename COLLECTION, typename CONTROLLER_TYPE = ControllerType>
 struct ControllerTypeRegistry
 {
@@ -125,27 +117,22 @@ struct ControllerTypeRegistry
 	static void RegisterControllerType(uint8_t& ruiIndex, const CONTROLLER_TYPE& rType)
 	{
 		ASSERT(ruiIndex == kuiInvalidTypeIndex);
-		ASSERT(sControllerTypes.size() < kuiInvalidTypeIndex);
+		ASSERT(std::ssize(sControllerTypes) < kuiInvalidTypeIndex);
 		ASSERT(rType.uiKeyframeCount >= 2);
-		ASSERT(rType.uiKeyframeCount <= kMaxControllerKeyframes);
+		ASSERT(rType.uiKeyframeCount <= kiMaximumControllerKeyframes);
 		for (int64_t i = 1; i < rType.uiKeyframeCount; ++i)
 		{
-			ASSERT(rType.pfTimes[i] >= rType.pfTimes[i - 1]);
+			ASSERT(rType.times[i] >= rType.times[i - 1]);
 		}
-		ruiIndex = static_cast<uint8_t>(sControllerTypes.size());
+		ruiIndex = static_cast<uint8_t>(std::ssize(sControllerTypes));
 		sControllerTypes.push_back(rType);
 	}
 
-	static const CONTROLLER_TYPE& GetControllerType(uint8_t uiIndex)
-	{
-		return sControllerTypes.at(uiIndex);
-	}
 };
 
-// Removes controlled elements whose keyframe animation has expired.
-// removeFn signature: void(INTERPOLATE&, POST_RENDER&, int64_t& i)
-template <typename INTERPOLATE, typename POST_RENDER, typename REMOVE_FN>
-void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, float fCurrentTime, REMOVE_FN removeFn)
+// The removal callback takes the loop index by reference.
+template <typename INTERPOLATE, typename POST_RENDER, typename REMOVE_FUNCTION>
+void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, float fCurrentTime, REMOVE_FUNCTION RemoveFunction)
 {
 	for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 	{
@@ -155,16 +142,16 @@ void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRende
 			continue;
 		}
 
-		const auto& rController = INTERPOLATE::GetControllerType(uiControllerTypeIndex);
+		const typename decltype(INTERPOLATE::sControllerTypes)::value_type& rController = INTERPOLATE::sControllerTypes.at(uiControllerTypeIndex);
 		if (!rController.bDestroysSelf)
 		{
 			continue;
 		}
 
 		float fElapsedTime = fCurrentTime - rInterpolate.pfStartTimes[i];
-		if (fElapsedTime > rController.pfTimes[rController.uiKeyframeCount - 1]) [[unlikely]]
+		if (fElapsedTime > rController.times[rController.uiKeyframeCount - 1].count()) [[unlikely]]
 		{
-			removeFn(rInterpolate, rPostRender, i);
+			RemoveFunction(rInterpolate, rPostRender, i);
 		}
 	}
 }

@@ -16,9 +16,9 @@ class ServerSessionRuntime;
 struct PendingUpdatePlayerRequest
 {
 	int64_t iClientId = 0;
-	engine::global_id_t globalId {};
+	engine::GlobalId globalId {};
 	bool bUseMissiles = false;
-	float fNavigationDelay = 60.0f;
+	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 };
 
 class ServerBroadcaster
@@ -26,16 +26,12 @@ class ServerBroadcaster
 public:
 
 	void BuildFrameInputs();
-	void BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, common::ScopedWorkbufferArena& rPublicationArena);
+	void BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, const common::ScopedWorkbufferArena& rPublicationArena);
 	void ProcessUpdatePlayerRequests();
 
-	void QueueUpdatePlayerRequest(const PendingUpdatePlayerRequest& rRequest);
-	void ClearPendingRequests();
 	void ResetState();
 
 	std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>> mBroadcastStatusChanges;
-
-private:
 
 	std::vector<PendingUpdatePlayerRequest> mPendingUpdatePlayerRequests;
 };

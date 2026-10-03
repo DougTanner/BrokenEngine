@@ -2,8 +2,6 @@
 
 #include "DiagnosticReporter.h"
 
-namespace
-{
 
 using ScopedHandle = std::unique_ptr<void, decltype(&CloseHandle)>;
 
@@ -20,13 +18,13 @@ struct SymbolicLinkReparseDataBuffer
 	WCHAR cPathBuffer[1];
 };
 
-std::filesystem::path PathFromUtf8(std::string_view utf8Value)
+static std::filesystem::path PathFromUtf8(std::string_view utf8Value)
 {
 	std::u8string value(reinterpret_cast<const char8_t*>(utf8Value.data()), utf8Value.size());
 	return std::filesystem::path(value);
 }
 
-std::optional<std::filesystem::path> FindExecutableOnPath(const wchar_t* pcExecutable)
+static std::optional<std::filesystem::path> FindExecutableOnPath(const wchar_t* pcExecutable)
 {
 	DWORD uiCharacters = SearchPathW(nullptr, pcExecutable, nullptr, 0, nullptr, nullptr);
 	if (uiCharacters == 0)
@@ -35,14 +33,14 @@ std::optional<std::filesystem::path> FindExecutableOnPath(const wchar_t* pcExecu
 	}
 	std::vector<wchar_t> path(uiCharacters);
 	DWORD uiWritten = SearchPathW(nullptr, pcExecutable, nullptr, static_cast<DWORD>(path.size()), path.data(), nullptr);
-	if (uiWritten == 0 || uiWritten >= path.size())
+	if (uiWritten == 0 || static_cast<int64_t>(uiWritten) >= std::ssize(path))
 	{
 		return std::nullopt;
 	}
 	return std::filesystem::path(std::wstring(path.data(), uiWritten));
 }
 
-std::string TrimLine(std::string value)
+static std::string TrimLine(std::string value)
 {
 	while (!value.empty() && (value.back() == '\r' || value.back() == '\n' || value.back() == '\0'))
 	{
@@ -51,7 +49,7 @@ std::string TrimLine(std::string value)
 	return value;
 }
 
-std::optional<std::filesystem::path> RunGit(const std::filesystem::path& rGit, const std::filesystem::path& rRoot, const wchar_t* pcArguments)
+static std::optional<std::filesystem::path> RunGit(const std::filesystem::path& rGit, const std::filesystem::path& rRoot, const wchar_t* pcArguments)
 {
 	std::wstring parameters = L" -C \"" + rRoot.native() + L"\" " + pcArguments;
 	std::optional<common::ExecutableResult> result = common::RunExecutable(rGit, parameters);
@@ -72,30 +70,30 @@ std::optional<std::filesystem::path> RunGit(const std::filesystem::path& rGit, c
 	return std::filesystem::absolute(PathFromUtf8(output)).lexically_normal();
 }
 
-bool PathEqual(const std::filesystem::path& rLeft, const std::filesystem::path& rRight)
+static bool PathEqual(const std::filesystem::path& rLeft, const std::filesystem::path& rRight)
 {
 	return CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, TRUE) == CSTR_EQUAL;
 }
 
-bool PathLess(const std::filesystem::path& rLeft, const std::filesystem::path& rRight)
+static bool PathLess(const std::filesystem::path& rLeft, const std::filesystem::path& rRight)
 {
 	int iResult = CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, TRUE);
 	return iResult == CSTR_LESS_THAN || (iResult == CSTR_EQUAL && CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, FALSE) == CSTR_LESS_THAN);
 }
 
-bool IsOrdinaryDirectory(const std::filesystem::path& rPath)
+static bool IsOrdinaryDirectory(const std::filesystem::path& rPath)
 {
 	DWORD uiAttributes = GetFileAttributesW(rPath.native().c_str());
 	return uiAttributes != INVALID_FILE_ATTRIBUTES && (uiAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && (uiAttributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
 }
 
-bool IsReparsePoint(const std::filesystem::path& rPath)
+static bool IsReparsePoint(const std::filesystem::path& rPath)
 {
 	DWORD uiAttributes = GetFileAttributesW(rPath.native().c_str());
 	return uiAttributes != INVALID_FILE_ATTRIBUTES && (uiAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
-std::filesystem::path GetRepositoryRootFromExecutable()
+static std::filesystem::path GetRepositoryRootFromExecutable()
 {
 	std::wstring executableBuffer(32'768, L'\0');
 	DWORD uiLength = GetModuleFileNameW(nullptr, executableBuffer.data(), static_cast<DWORD>(executableBuffer.size()));
@@ -131,7 +129,7 @@ std::filesystem::path GetRepositoryRootFromExecutable()
 	return repositoryRoot;
 }
 
-void EstablishOutputDestinationParent(const std::filesystem::path& rDestination)
+static void EstablishOutputDestinationParent(const std::filesystem::path& rDestination)
 {
 	const std::filesystem::path& rParent = rDestination.parent_path();
 	std::filesystem::create_directories(rParent);
@@ -141,7 +139,7 @@ void EstablishOutputDestinationParent(const std::filesystem::path& rDestination)
 	}
 }
 
-bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::filesystem::path& rExpected)
+static bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::filesystem::path& rExpected)
 {
 	ScopedHandle link(CreateFileW(rLink.native().c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr), CloseHandle);
 	if (link.get() == nullptr || link.get() == INVALID_HANDLE_VALUE)
@@ -174,7 +172,7 @@ bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::filesyst
 	return PathEqual(targetPath, expectedPath);
 }
 
-uint64_t AddChecked(uint64_t uiLeft, uint64_t uiRight)
+static uint64_t AddChecked(uint64_t uiLeft, uint64_t uiRight)
 {
 	if (uiLeft > std::numeric_limits<uint64_t>::max() - uiRight)
 	{
@@ -190,7 +188,7 @@ struct LinkedWorktreeIdentity
 };
 
 template <typename TREJECT>
-std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::filesystem::path& rRepositoryRoot, std::string_view projectName, const std::filesystem::path& rOutputDirectory, const TREJECT& rReject)
+static std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::filesystem::path& rRepositoryRoot, std::string_view projectName, const std::filesystem::path& rOutputDirectory, const TREJECT& rReject)
 {
 	std::optional<std::filesystem::path> git = FindExecutableOnPath(L"git.exe");
 	if (!git)
@@ -234,8 +232,7 @@ std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::
 	std::filesystem::path expected = (rRepositoryRoot / "Projects" / std::string(projectName) / "Platforms/VisualStudio2026/Output/Data").lexically_normal();
 	if (!PathEqual(expected, rOutputDirectory))
 	{
-		// Exporting a linked worktree anywhere else leaves ThirdParty and the output roots on unvalidated
-		// worktree symlinks, which only fails hours later in attribution collection.
+		// The canonical output root anchors the ThirdParty and attribution paths validated below.
 		throw std::runtime_error(std::format("Linked worktree must export into its canonical output directory: supplied {}, expected {}", rOutputDirectory.string(), expected.string()));
 	}
 	return LinkedWorktreeIdentity { .primaryRoot = std::move(primaryRoot), .expectedOutput = std::move(expected), };
@@ -244,11 +241,11 @@ std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::
 struct MaterializationInventory
 {
 	std::vector<std::filesystem::path> files;
-	std::vector<size_t> order;
+	std::vector<int64_t> order;
 	uint64_t uiAllocation = 0;
 };
 
-MaterializationInventory BuildMaterializationInventory(const std::filesystem::path& rSource, const std::filesystem::path& rDestination)
+static MaterializationInventory BuildMaterializationInventory(const std::filesystem::path& rSource, const std::filesystem::path& rDestination)
 {
 	MaterializationInventory inventory {};
 	DWORD uiSectorsPerCluster = 0;
@@ -280,16 +277,16 @@ MaterializationInventory BuildMaterializationInventory(const std::filesystem::pa
 	}
 	inventory.order.resize(inventory.files.size());
 	std::iota(inventory.order.begin(), inventory.order.end(), 0);
-	std::sort(inventory.order.begin(), inventory.order.end(), [&inventory, &rSource](size_t uiLeftIndex, size_t uiRightIndex)
+	std::sort(inventory.order.begin(), inventory.order.end(), [&inventory, &rSource](int64_t iLeftIndex, int64_t iRightIndex)
 	{
-		return PathLess(std::filesystem::relative(inventory.files.at(uiLeftIndex), rSource), std::filesystem::relative(inventory.files.at(uiRightIndex), rSource));
+		return PathLess(std::filesystem::relative(inventory.files.at(iLeftIndex), rSource), std::filesystem::relative(inventory.files.at(iRightIndex), rSource));
 	});
 	return inventory;
 }
 
-std::filesystem::path AcquireMaterializationStaging(const std::filesystem::path& rDestination)
+static std::filesystem::path AcquireMaterializationStaging(const std::filesystem::path& rDestination)
 {
-	for (uint32_t i = 0; i <= 15; ++i)
+	for (int64_t i = 0; i <= 15; ++i)
 	{
 		std::filesystem::path staging = rDestination;
 		staging += std::format(".materializing.{}.{}", GetCurrentProcessId(), i);
@@ -302,13 +299,13 @@ std::filesystem::path AcquireMaterializationStaging(const std::filesystem::path&
 	throw std::runtime_error("Unable to create unique output staging directory");
 }
 
-void PublishMaterializedOutput(const std::filesystem::path& rSource, const std::filesystem::path& rDestination, const std::vector<std::filesystem::path>& rFiles, const std::vector<size_t>& rOrder, const std::filesystem::path& rStaging, bool bRecognizedPrimaryLink)
+static void PublishMaterializedOutput(const std::filesystem::path& rSource, const std::filesystem::path& rDestination, const std::vector<std::filesystem::path>& rFiles, const std::vector<int64_t>& rOrder, const std::filesystem::path& rStaging, bool bRecognizedPrimaryLink)
 {
 	try
 	{
-		for (size_t uiIndex : rOrder)
+		for (int64_t iIndex : rOrder)
 		{
-			const std::filesystem::path& rSourceFile = rFiles.at(uiIndex);
+			const std::filesystem::path& rSourceFile = rFiles.at(iIndex);
 			std::filesystem::path destination = rStaging / std::filesystem::relative(rSourceFile, rSource);
 			std::filesystem::create_directories(destination.parent_path());
 			std::filesystem::copy_file(rSourceFile, destination);
@@ -340,7 +337,6 @@ void PublishMaterializedOutput(const std::filesystem::path& rSource, const std::
 	}
 }
 
-}
 
 FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitializationResult, InitializationMode eMode)
 {
@@ -373,7 +369,7 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 	mpInputDirectories[0] = std::filesystem::canonical(mpInputDirectories[0]);
 	mpInputDirectories[1] = std::filesystem::canonical(mpInputDirectories[1]);
 
-	// Repo ThirdParty dir, derived from the canonical engine-data dir (<repo>/Engine/Data) rather than a fragile output-relative .. chain
+	// The canonical Engine/Data path identifies the repository root for ThirdParty lookup.
 	mThirdPartyDirectory = mpInputDirectories[0].parent_path().parent_path() / "ThirdParty";
 	VERIFY_SUCCESS(std::filesystem::exists(mThirdPartyDirectory));
 
@@ -404,14 +400,14 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 	// %LOCALAPPDATA%\Temp files by last-access age, which would delete long-lived Gaea bake payloads even
 	// while their always-read .meta sidecars stay fresh, producing a cache that looks warm but is empty.
 	PWSTR pWideChar = nullptr;
-	HRESULT hresult = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
-	std::filesystem::path localAppData = SUCCEEDED(hresult) && pWideChar != nullptr ? std::filesystem::path(pWideChar) : std::filesystem::path {};
+	HRESULT iHresult = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
+	std::filesystem::path localAppData = SUCCEEDED(iHresult) && pWideChar != nullptr ? std::filesystem::path(pWideChar) : std::filesystem::path {};
 	CoTaskMemFree(pWideChar);
 	if (localAppData.empty())
 	{
 		// No fallback: a relocated cache root is indistinguishable from a cold one and costs a 3+ hour
 		// Gaea re-bake, so fail the run rather than silently exporting everything somewhere else.
-		throw std::runtime_error(std::format("SHGetKnownFolderPath(FOLDERID_LocalAppData) failed (hresult {})", static_cast<int32_t>(hresult)));
+		throw std::runtime_error(std::format("SHGetKnownFolderPath(FOLDERID_LocalAppData) failed (hresult {})", static_cast<int32_t>(iHresult)));
 	}
 	mCacheDirectory = localAppData / "BrokenEngine" / "DataPackerCache" / mProjectName;
 	std::filesystem::create_directories(mCacheDirectory);
@@ -524,19 +520,9 @@ FileManager::EnsureLocalResult FileManager::ReconcileWorktreeOutput(OutputRootIn
 	return EnsureLocalResult::kAlreadyLocal;
 }
 
-FileManager::OutputRootInfo& FileManager::GetOutputRoot(OutputRoot eRoot)
-{
-	return eRoot == OutputRoot::kData ? mDataOutput : mAttributionOutput;
-}
-
-std::filesystem::path FileManager::GetAttributionDirectory() const
-{
-	return mAttributionOutput.destination;
-}
-
 FileManager::EnsureLocalResult FileManager::EnsureLocal(OutputRoot eRoot)
 {
-	OutputRootInfo& rRoot = GetOutputRoot(eRoot);
+	OutputRootInfo& rRoot = eRoot == OutputRoot::kData ? mDataOutput : mAttributionOutput;
 	if (rRoot.eState == OutputRootState::kLocal)
 	{
 		return EnsureLocalResult::kAlreadyLocal;
@@ -593,15 +579,6 @@ FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rR
 	return EnsureLocalResult::kMaterialized;
 }
 
-std::string FileManager::GetFingerprint(const std::filesystem::path& rPath, InputFingerprintMode eMode)
-{
-	return mpInputFingerprintCache->Get(rPath, eMode);
-}
-
-std::string FileManager::GetSharedCacheFingerprint(const std::filesystem::path& rPath)
-{
-	return mpInputFingerprintCache->GetPersistent(rPath);
-}
 
 FileManager::~FileManager()
 {

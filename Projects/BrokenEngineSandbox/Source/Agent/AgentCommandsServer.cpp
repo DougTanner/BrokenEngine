@@ -15,17 +15,14 @@
 namespace game
 {
 
-namespace
-{
-
 // UTF-8 filesystem path -> UTF-8 std::string for JSON result echoing (no heap-narrow-conversion surprises).
-std::string PathToUtf8(const std::filesystem::path& rPath)
+static std::string PathToUtf8(const std::filesystem::path& rPath)
 {
 	std::u8string u8String = rPath.u8string();
 	return std::string(reinterpret_cast<const char*>(u8String.c_str()), u8String.size());
 }
 
-bool IsWindowsReservedDeviceBasename(std::string_view utf8)
+static bool IsWindowsReservedDeviceBasename(std::string_view utf8)
 {
 	std::string basename(utf8.substr(0, utf8.find('.')));
 	// Win32 strips trailing spaces and dots from a final path component, so "NUL " or "NUL ." still
@@ -60,7 +57,7 @@ bool IsWindowsReservedDeviceBasename(std::string_view utf8)
 
 // The agent-supplied save/load filename lands in the user's appdata directory. Reject anything
 // but a bare filename (no path separators, no "..") and Windows reserved device basenames.
-std::filesystem::path BareFilenameParam(const nlohmann::json& rValue)
+static std::filesystem::path BareFilenameParam(const nlohmann::json& rValue)
 {
 	std::string utf8 = rValue.get<std::string>(); // throws on a non-string
 	if (utf8.empty())
@@ -82,7 +79,7 @@ std::filesystem::path BareFilenameParam(const nlohmann::json& rValue)
 	return std::filesystem::path(reinterpret_cast<const char8_t*>(utf8.c_str()));
 }
 
-void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	rResult["tick"] = gpGame->TickCounter();
 	rResult["paused"] = gpGame->mGameFlags & engine::GameFlags::kPaused;
@@ -102,7 +99,7 @@ void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::jso
 	nlohmann::json activeCoords = nlohmann::json::array();
 	for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
 	{
-		activeCoords.push_back({rCoord.x, rCoord.y});
+		activeCoords.push_back({rCoord.iX, rCoord.iY});
 	}
 	rResult["activeCoords"] = std::move(activeCoords);
 
@@ -113,7 +110,7 @@ void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::jso
 	rResult["pendingAgentStatusChangeCount"] = CountPendingAgentStatusChanges(*gpServerSession);
 }
 
-void CommandPause(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandPause(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!rParams.contains("paused") || !rParams.at("paused").is_boolean())
 	{
@@ -124,7 +121,7 @@ void CommandPause(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["paused"] = bPaused;
 }
 
-void CommandTimescale(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandTimescale(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!rParams.contains("faster") || !rParams.at("faster").is_boolean())
 	{
@@ -136,7 +133,7 @@ void CommandTimescale(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["denominator"] = gpGame->mTimeStep.miTimeDivide;
 }
 
-void CommandSave(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandSave(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	std::filesystem::path file = rParams.contains("file") ? BareFilenameParam(rParams.at("file")) : gpGame->QuicksaveFile();
 	if (!gpGame->mGameSaveLoad.ServerSave(file))
@@ -146,7 +143,7 @@ void CommandSave(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["file"] = PathToUtf8(file);
 }
 
-void CommandLoad(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandLoad(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (rParams.contains("pauseAfterLoad") && !rParams.at("pauseAfterLoad").is_boolean())
 	{
@@ -173,13 +170,13 @@ void CommandLoad(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["pendingFlagshipUpdateCount"] = std::ssize(gpServerSession->mpFleetManager->mNavigation.mPendingFlagshipUpdates);
 }
 
-void CommandReset([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandReset([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	gpGame->mGameSaveLoad.ServerReset();
 	rResult = nlohmann::json::object();
 }
 
-void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if (!rParams.is_object())
 	{
@@ -229,7 +226,7 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 			timer["name"] = std::string(gpProfileManager->GetCpuTimerName(i));
 			timer["currentUs"] = rTimer.smoothedMicroseconds.Current();
 			timer["averageUs"] = rTimer.smoothedMicroseconds.Average();
-			timer["maxUs"] = rTimer.smoothedMicroseconds.Max();
+			timer["maxUs"] = rTimer.smoothedMicroseconds.Maximum();
 			timer["allocations"] = rTimer.smoothedAllocations.Current();
 			timer["threads"] = rTimer.iThreads;
 			if constexpr (kbProfiling)
@@ -280,8 +277,6 @@ void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["counters"] = std::move(counters);
 }
 
-} // namespace
-
 // Shared agent helpers validate agent parameters and throw on a bad one.
 
 // Parse a [x,y] JSON array into a GridCoord; each element must be an integer that fits int32_t.
@@ -296,7 +291,7 @@ engine::GridCoord CoordFromParam(const nlohmann::json& rParams, std::string_view
 	}
 	const nlohmann::json& rCoord = rParams.at(std::string(key));
 	std::string name = std::format("'{}'", key);
-	return engine::GridCoord {engine::AgentGridCoordValue(rCoord.at(0), name), engine::AgentGridCoordValue(rCoord.at(1), name)};
+	return engine::GridCoord {engine::AgentGridCoordinateValue(rCoord.at(0), name), engine::AgentGridCoordinateValue(rCoord.at(1), name)};
 }
 
 bool ExecuteAgentCommandServer(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)

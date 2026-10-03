@@ -11,18 +11,17 @@ void PointLightsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 {
 	PointLightsInterpolate& __restrict rCurrent = rFrameInterpolate.pointLights;
 	const PointLightsInterpolate& rPrevious = rPreviousFrame.interpolate.pointLights;
-	float fCurrentTime = rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime;
+	std::chrono::duration<float> currentTime(rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime);
 
 	if (rCurrent.iCount == 0)
 	{
 		return;
 	}
 
-	// Note: Owner is responsible for writing position each frame via IdToIndex
+	// Note: Owner is responsible for writing position each frame via idToIndexMap.at()
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		float fRotation = rPrevious.pfRotations[i];
 		float fVisibleArea = rPrevious.pfVisibleAreas[i];
@@ -30,18 +29,17 @@ void PointLightsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 		float fLightingArea = rPrevious.pfLightingAreas[i];
 		float fLightingIntensity = rPrevious.pfLightingIntensities[i];
 
-		// Load controller fields (copied in AllocateAndCopy)
+		// AllocateAndCopy preserves controller type, start time, and base rotation.
 		uint8_t uiControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
-		float fStartTime = rCurrent.pfStartTimes[i];
+		std::chrono::duration<float> startTime(rCurrent.pfStartTimes[i]);
 		float fBaseRotation = rCurrent.pfBaseRotations[i];
 
-		// Apply controller interpolation if this is a controlled light
 		if (uiControllerTypeIndex != kuiInvalidControllerType)
 		{
-			float fElapsedTime = fCurrentTime - fStartTime;
+			std::chrono::duration<float> elapsedTime = currentTime - startTime;
 			const ControllerType& rController = sControllerTypes.at(uiControllerTypeIndex);
 
-			ControllerKeyframe interpolated = InterpolateScaledKeyframes(rController, fElapsedTime, [](ControllerType& rScaledController, const ControllerType& rOriginalController, int64_t j)
+			ControllerKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime.count(), [](ControllerType& rScaledController, const ControllerType& rOriginalController, int64_t j)
 			{
 				if (rOriginalController.ppVisibleAreaScales[j] != nullptr)
 				{
@@ -68,7 +66,6 @@ void PointLightsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 			fRotation = fBaseRotation + interpolated.fRotation;
 		}
 
-		// Save
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pfRotations[i] = fRotation;
 		rCurrent.pfVisibleAreas[i] = fVisibleArea;
@@ -81,7 +78,7 @@ void PointLightsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 void PointLightsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData)
 {
 	PointLightsInterpolate& rPointLights = rFrameInterpolate.pointLights;
-	int64_t iIndex = rPointLights.IdToIndex(id);
+	int64_t iIndex = rPointLights.idToIndexMap.at(id);
 
 	rPointLights.pVecPositions[iIndex] = XMVectorSetW(rData.vecPosition, 1.0f);
 	rPointLights.pfVisibleAreas[iIndex] = rData.fVisibleArea;
@@ -97,47 +94,38 @@ void PointLightsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFra
 
 void PointLightsPostRender::Add(game::Frame& __restrict rFrame, point_lights_t& rId, uint8_t uiTypeIndex)
 {
-	ASSERT(!rId.IsValid());
+	ASSERT(!(rId.uuid.iValue != 0));
 
 	PointLightsInterpolate& rInterpolate = rFrame.interpolate.pointLights;
 	PointLightsPostRender& rPostRender = rFrame.postRender.pointLights;
 
 	GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-	auto [uiSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
+	auto [iSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
 	rId = newId;
-	rPostRender.puiIds[uiSpawnIndex] = newId;
+	rPostRender.pIds[iSpawnIndex] = newId;
 
-	ZeroMemberRow(uiSpawnIndex, rInterpolate.Members());
-	rInterpolate.pVecPositions[uiSpawnIndex] = XMVectorSetW(XMVectorZero(), 1.0f);
-	rInterpolate.puiTypeIndices[uiSpawnIndex] = uiTypeIndex;
-	rInterpolate.puiControllerTypeIndices[uiSpawnIndex] = kuiInvalidControllerType;
+	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
+	rInterpolate.pVecPositions[iSpawnIndex] = XMVectorSetW(XMVectorZero(), 1.0f);
+	rInterpolate.puiTypeIndices[iSpawnIndex] = uiTypeIndex;
+	rInterpolate.puiControllerTypeIndices[iSpawnIndex] = kuiInvalidControllerType;
 }
 
-void PointLightsPostRender::Remove(game::Frame& __restrict rFrame, point_lights_t& rId)
+void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, float fRotation)
 {
 	PointLightsInterpolate& rInterpolate = rFrame.interpolate.pointLights;
 	PointLightsPostRender& rPostRender = rFrame.postRender.pointLights;
 
-	RemoveIndexableElementAndClearHandle(rInterpolate, rPostRender, rId, rInterpolate.Members(), rPostRender.Members());
-}
-
-void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, float fRotation)
-{
-	PointLightsInterpolate& rInterpolate = rFrame.interpolate.pointLights;
-	PointLightsPostRender& rPostRender = rFrame.postRender.pointLights;
-
-	// Get controller type and base type
 	const ControllerType& rController = PointLightsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
 
-	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	AddControlledElement(rInterpolate, rPostRender, currentTime.count(), uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	},
 	[&rInterpolate, &rPostRender, &rFrame]()
 	{
-		auto [uiSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
-		rPostRender.puiIds[uiSpawnIndex] = newId;
-		return uiSpawnIndex;
+		auto [iSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
+		rPostRender.pIds[iSpawnIndex] = newId;
+		return iSpawnIndex;
 	},
 	[&rInterpolate, &rController, fRotation](int64_t iSpawnIndex)
 	{

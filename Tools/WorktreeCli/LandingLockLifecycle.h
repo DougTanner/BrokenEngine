@@ -3,6 +3,7 @@
 #include "CoordinationStore.h"
 #include "ToolCliCommon.h"
 
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -17,15 +18,15 @@ namespace toolcli::landing
 		std::string claimedAt;
 		std::string heartbeatAt;
 		std::string expiresAt;
-		int64_t iDurationSeconds = 0;
+		std::chrono::seconds duration {};
 		uint64_t uiClaimedTicks = 0;
 		uint64_t uiHeartbeatTicks = 0;
 		uint64_t uiExpiresTicks = 0;
 	};
 
-	bool IsValidLeaseDuration(int64_t iLeaseSeconds);
-	nlohmann::json NewLandingMetadata(const coordination::Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds);
+	bool IsValidLeaseDuration(std::chrono::seconds leaseDuration);
+	nlohmann::json NewLandingMetadata(const coordination::Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, std::chrono::seconds leaseDuration);
 	std::optional<LandingLease> ValidateLandingLease(const nlohmann::json& rMetadata, const coordination::Locator& rLocator, uint64_t uiCurrentTicks);
 	nlohmann::json LandingStatus(const nlohmann::json& rMetadata, const coordination::Locator& rLocator);
 	bool AllRegisteredWorktreesClear(const coordination::Locator& rLocator);
-}
+} // namespace toolcli::landing

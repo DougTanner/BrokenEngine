@@ -18,7 +18,7 @@ public:
 	{
 	}
 
-	virtual ~ExportModel() = default;
+	~ExportModel() override = default;
 
 protected:
 

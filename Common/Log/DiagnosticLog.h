@@ -9,7 +9,7 @@ class DiagnosticLog
 {
 public:
 
-	DiagnosticLog(int iIndex, const char* pcFilename);
+	DiagnosticLog(int64_t iIndex, std::string_view filename);
 	~DiagnosticLog();
 
 	DiagnosticLog(const DiagnosticLog&) = delete;
@@ -38,7 +38,7 @@ private:
 
 	std::ofstream mFile;
 	std::mutex mMutex;
-	int miIndex = 0;
+	int64_t miIndex = 0;
 };
 
 inline constexpr int64_t kDiagnosticLogCount = 4;

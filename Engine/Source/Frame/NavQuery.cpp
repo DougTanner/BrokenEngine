@@ -8,25 +8,25 @@ namespace engine
 {
 
 // Conservative edge-CSR AABB buckets and DDA traversal of every clipped-segment cell test all real
-// crossings; the boolean OR is order-independent. Callers require gridMin/gridMax and edge CSR from
-// BuildNavAcceleration on nonempty vertices. NavQueryDirection checks empty vertices; NavCellData runs
+// crossings; the boolean OR is order-independent. Callers require f2GridMinimum/f2GridMaximum and edge CSR from
+// BuildNavigationAcceleration on nonempty vertices. NavQueryDirection checks empty vertices; NavCellData runs
 // visibility only for a nonempty cell after building acceleration. Both share this definition through
 // NavBuildInternal.h to agree on blocked paths.
 bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVertices, const NavData& rNavData)
 {
-	float fMinX = rNavData.gridMin.x;
-	float fMinY = rNavData.gridMin.y;
-	float fMaxX = rNavData.gridMax.x;
-	float fMaxY = rNavData.gridMax.y;
+	float fMinX = rNavData.f2GridMinimum.x;
+	float fMinY = rNavData.f2GridMinimum.y;
+	float fMaxX = rNavData.f2GridMaximum.x;
+	float fMaxY = rNavData.f2GridMaximum.y;
 
-	float fDx = f2B.x - f2A.x;
-	float fDy = f2B.y - f2A.y;
+	float fDeltaX = f2B.x - f2A.x;
+	float fDeltaY = f2B.y - f2A.y;
 
 	// Obstacle edges live strictly inside the grid domain, so an intersection can only occur there.
 	// Slab-clip the query segment to [min,max] (parametric range [fT0,fT1] over A->B).
 	float fT0 = 0.0f;
 	float fT1 = 1.0f;
-	if (std::abs(fDx) < 1e-20f)
+	if (std::abs(fDeltaX) < 1e-20f)
 	{
 		if (f2A.x < fMinX || f2A.x > fMaxX)
 		{
@@ -35,19 +35,19 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	}
 	else
 	{
-		float fInv = 1.0f / fDx;
-		float fTa = (fMinX - f2A.x) * fInv;
-		float fTb = (fMaxX - f2A.x) * fInv;
+		float fInverseDelta = 1.0f / fDeltaX;
+		float fTa = (fMinX - f2A.x) * fInverseDelta;
+		float fTb = (fMaxX - f2A.x) * fInverseDelta;
 		if (fTa > fTb)
 		{
-			float fTmp = fTa;
+			float fTemporary = fTa;
 			fTa = fTb;
-			fTb = fTmp;
+			fTb = fTemporary;
 		}
 		fT0 = std::max(fT0, fTa);
 		fT1 = std::min(fT1, fTb);
 	}
-	if (std::abs(fDy) < 1e-20f)
+	if (std::abs(fDeltaY) < 1e-20f)
 	{
 		if (f2A.y < fMinY || f2A.y > fMaxY)
 		{
@@ -56,14 +56,14 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	}
 	else
 	{
-		float fInv = 1.0f / fDy;
-		float fTa = (fMinY - f2A.y) * fInv;
-		float fTb = (fMaxY - f2A.y) * fInv;
+		float fInverseDelta = 1.0f / fDeltaY;
+		float fTa = (fMinY - f2A.y) * fInverseDelta;
+		float fTb = (fMaxY - f2A.y) * fInverseDelta;
 		if (fTa > fTb)
 		{
-			float fTmp = fTa;
+			float fTemporary = fTa;
 			fTa = fTb;
-			fTb = fTmp;
+			fTb = fTemporary;
 		}
 		fT0 = std::max(fT0, fTa);
 		fT1 = std::min(fT1, fTb);
@@ -74,10 +74,10 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	}
 
 	// Clipped endpoints (both inside the grid domain).
-	float fP0x = f2A.x + fT0 * fDx;
-	float fP0y = f2A.y + fT0 * fDy;
-	float fP1x = f2A.x + fT1 * fDx;
-	float fP1y = f2A.y + fT1 * fDy;
+	float fP0x = f2A.x + fT0 * fDeltaX;
+	float fP0y = f2A.y + fT0 * fDeltaY;
+	float fP1x = f2A.x + fT1 * fDeltaX;
+	float fP1y = f2A.y + fT1 * fDeltaY;
 
 	float fCellSizeX = (fMaxX - fMinX) / static_cast<float>(kiNavZonesX);
 	float fCellSizeY = (fMaxY - fMinY) / static_cast<float>(kiNavZonesY);
@@ -87,10 +87,10 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	int32_t iEndX = NavGridCell(fP1x, fMinX, fMaxX, kiNavZonesX);
 	int32_t iEndY = NavGridCell(fP1y, fMinY, fMaxY, kiNavZonesY);
 
-	float fSegDx = fP1x - fP0x;
-	float fSegDy = fP1y - fP0y;
-	int32_t iStepX = (fSegDx > 0.0f) ? 1 : ((fSegDx < 0.0f) ? -1 : 0);
-	int32_t iStepY = (fSegDy > 0.0f) ? 1 : ((fSegDy < 0.0f) ? -1 : 0);
+	float fSegmentDeltaX = fP1x - fP0x;
+	float fSegmentDeltaY = fP1y - fP0y;
+	int64_t iStepX = (fSegmentDeltaX > 0.0f) ? 1 : ((fSegmentDeltaX < 0.0f) ? -1 : 0);
+	int64_t iStepY = (fSegmentDeltaY > 0.0f) ? 1 : ((fSegmentDeltaY < 0.0f) ? -1 : 0);
 
 	// Amanatides-Woo parametric crossing distances (in segment-t units).
 	float fTMaxX = std::numeric_limits<float>::max();
@@ -98,27 +98,27 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	if (iStepX != 0 && fCellSizeX > 1e-6f)
 	{
 		float fBoundaryX = fMinX + static_cast<float>(iX + (iStepX > 0 ? 1 : 0)) * fCellSizeX;
-		fTMaxX = (fBoundaryX - fP0x) / fSegDx;
-		fTDeltaX = fCellSizeX / std::abs(fSegDx);
+		fTMaxX = (fBoundaryX - fP0x) / fSegmentDeltaX;
+		fTDeltaX = fCellSizeX / std::abs(fSegmentDeltaX);
 	}
 	float fTMaxY = std::numeric_limits<float>::max();
 	float fTDeltaY = std::numeric_limits<float>::max();
 	if (iStepY != 0 && fCellSizeY > 1e-6f)
 	{
 		float fBoundaryY = fMinY + static_cast<float>(iY + (iStepY > 0 ? 1 : 0)) * fCellSizeY;
-		fTMaxY = (fBoundaryY - fP0y) / fSegDy;
-		fTDeltaY = fCellSizeY / std::abs(fSegDy);
+		fTMaxY = (fBoundaryY - fP0y) / fSegmentDeltaY;
+		fTDeltaY = fCellSizeY / std::abs(fSegmentDeltaY);
 	}
 
 	// Walk cells along the clipped segment. Bounded by the grid extent; the step guard prevents any
 	// runaway from float drift.
-	int32_t iMaxSteps = 2 * (kiNavZonesX + kiNavZonesY);
-	for (int32_t iStep = 0; iStep <= iMaxSteps; ++iStep)
+	int64_t iMaxSteps = 2 * (kiNavZonesX + kiNavZonesY);
+	for (int64_t i = 0; i <= iMaxSteps; ++i)
 	{
-		int32_t iCell = iY * kiNavZonesX + iX;
+		int64_t iCell = iY * kiNavZonesX + iX;
 		int32_t iBegin = rNavData.gridEdgeOffsets.at(static_cast<size_t>(iCell));
 		int32_t iStop = rNavData.gridEdgeOffsets.at(static_cast<size_t>(iCell) + 1);
-		for (int32_t k = iBegin; k < iStop; ++k)
+		for (int64_t k = iBegin; k < iStop; ++k)
 		{
 			int32_t iEdge = rNavData.gridEdges.at(static_cast<size_t>(k));
 			if (SegmentsIntersect(f2A, f2B, pVertices[rNavData.edgeA.at(static_cast<size_t>(iEdge))], pVertices[rNavData.edgeB.at(static_cast<size_t>(iEdge))]))
@@ -134,12 +134,12 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 
 		if (fTMaxX < fTMaxY)
 		{
-			iX += iStepX;
+			iX += static_cast<int32_t>(iStepX);
 			fTMaxX += fTDeltaX;
 		}
 		else
 		{
-			iY += iStepY;
+			iY += static_cast<int32_t>(iStepY);
 			fTMaxY += fTDeltaY;
 		}
 
@@ -155,20 +155,20 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 // the builder through NavBuildInternal.h.
 bool PointInAnyPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, const NavData& rNavData)
 {
-	for (size_t iPoly = 0; iPoly < rNavData.polygonOffsets.size(); ++iPoly)
+	for (int64_t i = 0; i < std::ssize(rNavData.polygonOffsets); ++i)
 	{
 		// Broad phase: a point outside the polygon's AABB cannot be inside the polygon.
-		const XMFLOAT2& rMin = rNavData.polygonMin.at(iPoly);
-		const XMFLOAT2& rMax = rNavData.polygonMax.at(iPoly);
+		const XMFLOAT2& rMin = rNavData.polygonMinimum.at(i);
+		const XMFLOAT2& rMax = rNavData.polygonMaximum.at(i);
 		if (f2Point.x < rMin.x || f2Point.x > rMax.x || f2Point.y < rMin.y || f2Point.y > rMax.y)
 		{
 			continue;
 		}
 
-		auto [iStart, iEnd] = PolygonRange(rNavData.polygonOffsets, iPoly, static_cast<int32_t>(rNavData.vertices.size()));
+		auto [iStart, iEnd] = PolygonRange(rNavData.polygonOffsets, i, static_cast<int32_t>(rNavData.vertices.size()));
 		int32_t iCount = iEnd - iStart;
 
-		if (PointInPolygon(f2Point, &pVertices[iStart], iCount))
+		if (iCount > 0 && PointInPolygon(f2Point, std::span<const XMFLOAT2>(&pVertices[iStart], static_cast<size_t>(iCount))))
 		{
 			return true;
 		}
@@ -176,62 +176,58 @@ bool PointInAnyPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, const NavDat
 	return false;
 }
 
-namespace
+static float Distance(XMFLOAT2 f2A, XMFLOAT2 f2B)
 {
-
-float Distance(XMFLOAT2 f2A, XMFLOAT2 f2B)
-{
-	float fDx = f2B.x - f2A.x;
-	float fDy = f2B.y - f2A.y;
-	return std::sqrt(fDx * fDx + fDy * fDy);
+	float fDeltaX = f2B.x - f2A.x;
+	float fDeltaY = f2B.y - f2A.y;
+	return std::sqrt(fDeltaX * fDeltaX + fDeltaY * fDeltaY);
 }
 
-// Find the nearest point on any polygon edge to the given position
-XMFLOAT2 NearestPolygonEdgePoint(XMFLOAT2 f2Position, const XMFLOAT2* pVertices, const NavData& rNavData)
+static XMFLOAT2 NearestPolygonEdgePoint(XMFLOAT2 f2Position, const XMFLOAT2* pVertices, const NavData& rNavData)
 {
-	float fBestDistSq = std::numeric_limits<float>::max();
+	float fBestDistanceSquared = std::numeric_limits<float>::max();
 	XMFLOAT2 f2BestPoint = f2Position;
 
-	for (size_t iPoly = 0; iPoly < rNavData.polygonOffsets.size(); ++iPoly)
+	for (int64_t j = 0; j < std::ssize(rNavData.polygonOffsets); ++j)
 	{
 		// Broad phase: skip a polygon whose AABB is already farther than the best edge found so far.
-		// Index iteration order is preserved so the strict-less-than tie-break below is unchanged.
-		const XMFLOAT2& rMin = rNavData.polygonMin.at(iPoly);
-		const XMFLOAT2& rMax = rNavData.polygonMax.at(iPoly);
-		float fAabbDx = (f2Position.x < rMin.x) ? (rMin.x - f2Position.x) : ((f2Position.x > rMax.x) ? (f2Position.x - rMax.x) : 0.0f);
-		float fAabbDy = (f2Position.y < rMin.y) ? (rMin.y - f2Position.y) : ((f2Position.y > rMax.y) ? (f2Position.y - rMax.y) : 0.0f);
-		if (fAabbDx * fAabbDx + fAabbDy * fAabbDy > fBestDistSq)
+		// Equal distances retain the first edge in index order.
+		const XMFLOAT2& rMin = rNavData.polygonMinimum.at(j);
+		const XMFLOAT2& rMax = rNavData.polygonMaximum.at(j);
+		float fBoundingBoxDeltaX = (f2Position.x < rMin.x) ? (rMin.x - f2Position.x) : ((f2Position.x > rMax.x) ? (f2Position.x - rMax.x) : 0.0f);
+		float fBoundingBoxDeltaY = (f2Position.y < rMin.y) ? (rMin.y - f2Position.y) : ((f2Position.y > rMax.y) ? (f2Position.y - rMax.y) : 0.0f);
+		if (fBoundingBoxDeltaX * fBoundingBoxDeltaX + fBoundingBoxDeltaY * fBoundingBoxDeltaY > fBestDistanceSquared)
 		{
 			continue;
 		}
 
-		auto [iStart, iEnd] = PolygonRange(rNavData.polygonOffsets, iPoly, static_cast<int32_t>(rNavData.vertices.size()));
-		int32_t iCount = iEnd - iStart;
+		auto [iStart, iEnd] = PolygonRange(rNavData.polygonOffsets, j, static_cast<int32_t>(rNavData.vertices.size()));
+		int64_t iCount = iEnd - iStart;
 
-		for (int32_t i = 0; i < iCount; ++i)
+		for (int64_t i = 0; i < iCount; ++i)
 		{
-			int32_t iNext = (i + 1) % iCount;
+			int64_t iNext = (i + 1) % iCount;
 			XMFLOAT2 f2A = pVertices[iStart + i];
 			XMFLOAT2 f2B = pVertices[iStart + iNext];
 
-			float fEdgeDx = f2B.x - f2A.x;
-			float fEdgeDy = f2B.y - f2A.y;
-			float fEdgeLenSq = fEdgeDx * fEdgeDx + fEdgeDy * fEdgeDy;
+			float fEdgeDeltaX = f2B.x - f2A.x;
+			float fEdgeDeltaY = f2B.y - f2A.y;
+			float fEdgeLengthSquared = fEdgeDeltaX * fEdgeDeltaX + fEdgeDeltaY * fEdgeDeltaY;
 
 			float fT = 0.0f;
-			if (fEdgeLenSq > 1e-10f)
+			if (fEdgeLengthSquared > 1e-10f)
 			{
-				fT = std::clamp(((f2Position.x - f2A.x) * fEdgeDx + (f2Position.y - f2A.y) * fEdgeDy) / fEdgeLenSq, 0.0f, 1.0f);
+				fT = std::clamp(((f2Position.x - f2A.x) * fEdgeDeltaX + (f2Position.y - f2A.y) * fEdgeDeltaY) / fEdgeLengthSquared, 0.0f, 1.0f);
 			}
 
-			XMFLOAT2 f2Closest {f2A.x + fT * fEdgeDx, f2A.y + fT * fEdgeDy};
-			float fDx = f2Closest.x - f2Position.x;
-			float fDy = f2Closest.y - f2Position.y;
-			float fDistSq = fDx * fDx + fDy * fDy;
+			XMFLOAT2 f2Closest {f2A.x + fT * fEdgeDeltaX, f2A.y + fT * fEdgeDeltaY};
+			float fDeltaX = f2Closest.x - f2Position.x;
+			float fDeltaY = f2Closest.y - f2Position.y;
+			float fDistanceSquared = fDeltaX * fDeltaX + fDeltaY * fDeltaY;
 
-			if (fDistSq < fBestDistSq)
+			if (fDistanceSquared < fBestDistanceSquared)
 			{
-				fBestDistSq = fDistSq;
+				fBestDistanceSquared = fDistanceSquared;
 				f2BestPoint = f2Closest;
 			}
 		}
@@ -240,18 +236,17 @@ XMFLOAT2 NearestPolygonEdgePoint(XMFLOAT2 f2Position, const XMFLOAT2* pVertices,
 	return f2BestPoint;
 }
 
-// Snap a point inside a polygon to just outside the nearest edge
-XMFLOAT2 SnapOutsidePolygon(XMFLOAT2 f2Position, const XMFLOAT2* pVertices, const NavData& rNavData)
+static XMFLOAT2 SnapOutsidePolygon(XMFLOAT2 f2Position, const XMFLOAT2* pVertices, const NavData& rNavData)
 {
 	static constexpr float kfSnapOffset = 0.5f;
 	XMFLOAT2 f2EdgePoint = NearestPolygonEdgePoint(f2Position, pVertices, rNavData);
-	float fDx = f2EdgePoint.x - f2Position.x;
-	float fDy = f2EdgePoint.y - f2Position.y;
-	float fLen = std::sqrt(fDx * fDx + fDy * fDy);
-	if (fLen > 1e-6f)
+	float fDeltaX = f2EdgePoint.x - f2Position.x;
+	float fDeltaY = f2EdgePoint.y - f2Position.y;
+	float fLength = std::sqrt(fDeltaX * fDeltaX + fDeltaY * fDeltaY);
+	if (fLength > 1e-6f)
 	{
-		f2EdgePoint.x += (fDx / fLen) * kfSnapOffset;
-		f2EdgePoint.y += (fDy / fLen) * kfSnapOffset;
+		f2EdgePoint.x += (fDeltaX / fLength) * kfSnapOffset;
+		f2EdgePoint.y += (fDeltaY / fLength) * kfSnapOffset;
 	}
 	return f2EdgePoint;
 }
@@ -265,7 +260,7 @@ struct AStarMemory
 	bool* pClosed = nullptr;
 	bool* pStartVisible = nullptr;
 	int32_t* pOpenSet = nullptr;  // binary min-heap of node indices
-	int32_t* pHeapPos = nullptr;  // per-node position in pOpenSet (-1 = not in heap)
+	int32_t* pHeapPosition = nullptr;  // per-node position in pOpenSet (-1 = not in heap)
 };
 
 struct AStarMemoryLayout
@@ -280,7 +275,7 @@ struct AStarMemoryLayout
 	int64_t iByteCount = 0;
 };
 
-constexpr AStarMemoryLayout ComputeAStarMemoryLayout(int32_t iTotalNodes, int32_t iVertexCount)
+static constexpr AStarMemoryLayout ComputeAStarMemoryLayout(int32_t iTotalNodes, int32_t iVertexCount)
 {
 	// Layout: all 4-byte types first (float, int32_t), then bool arrays last to avoid alignment issues
 	AStarMemoryLayout layout {};
@@ -294,7 +289,7 @@ constexpr AStarMemoryLayout ComputeAStarMemoryLayout(int32_t iTotalNodes, int32_
 	return layout;
 }
 
-AStarMemory BindAStarMemory(std::byte* pMemory, const AStarMemoryLayout& rLayout)
+static AStarMemory BindAStarMemory(std::byte* pMemory, const AStarMemoryLayout& rLayout)
 {
 	AStarMemory memory
 	{
@@ -304,18 +299,18 @@ AStarMemory BindAStarMemory(std::byte* pMemory, const AStarMemoryLayout& rLayout
 		.pClosed = reinterpret_cast<bool*>(pMemory + rLayout.iClosedOffset),
 		.pStartVisible = reinterpret_cast<bool*>(pMemory + rLayout.iStartVisibleOffset),
 		.pOpenSet = reinterpret_cast<int32_t*>(pMemory + rLayout.iOpenSetOffset),
-		.pHeapPos = reinterpret_cast<int32_t*>(pMemory + rLayout.iHeapPositionOffset),
+		.pHeapPosition = reinterpret_cast<int32_t*>(pMemory + rLayout.iHeapPositionOffset),
 	};
 	return memory;
 }
 
 // Indexed binary min-heap over A* open-set node indices, keyed by (fCost, node index). The index
-// tie-break makes pop order a total order, so the search is deterministic across builds. pHeapPos
+// tie-break makes pop order a total order, so the search is deterministic across builds. pHeapPosition
 // enables O(log n) decrease-key. Operates in place on the AStarMemory scratch arrays.
 struct AStarHeap
 {
 	int32_t* pOpenSet = nullptr;
-	int32_t* pHeapPos = nullptr;
+	int32_t* pHeapPosition = nullptr;
 	const float* pFCost = nullptr;
 	int32_t iHeapCount = 0;
 
@@ -336,8 +331,8 @@ struct AStarHeap
 		int32_t iNodeB = pOpenSet[iIndexB];
 		pOpenSet[iIndexA] = iNodeB;
 		pOpenSet[iIndexB] = iNodeA;
-		pHeapPos[iNodeA] = iIndexB;
-		pHeapPos[iNodeB] = iIndexA;
+		pHeapPosition[iNodeA] = iIndexB;
+		pHeapPosition[iNodeB] = iIndexA;
 	}
 
 	void SiftUp(int32_t iIndex)
@@ -381,7 +376,7 @@ struct AStarHeap
 	void Push(int32_t iNode)
 	{
 		pOpenSet[iHeapCount] = iNode;
-		pHeapPos[iNode] = iHeapCount;
+		pHeapPosition[iNode] = iHeapCount;
 		++iHeapCount;
 		SiftUp(iHeapCount - 1);
 	}
@@ -389,12 +384,12 @@ struct AStarHeap
 	int32_t Pop()
 	{
 		int32_t iTop = pOpenSet[0];
-		pHeapPos[iTop] = -1;
+		pHeapPosition[iTop] = -1;
 		--iHeapCount;
 		if (iHeapCount > 0)
 		{
 			pOpenSet[0] = pOpenSet[iHeapCount];
-			pHeapPos[pOpenSet[0]] = 0;
+			pHeapPosition[pOpenSet[0]] = 0;
 			SiftDown(0);
 		}
 		return iTop;
@@ -403,31 +398,30 @@ struct AStarHeap
 
 // A* pathfinding on the visibility graph with temporary start/end nodes
 // Returns the direction toward the first waypoint, or zero vector if no path found
-XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, const NavData& rNavData, const AStarMemory& rMemory, float fBaseHeight, XMVECTOR* pOutNextWaypoint)
+static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, const NavData& rNavData, const AStarMemory& rMemory, float fBaseHeight, XMVECTOR* pOutNextWaypoint)
 {
 	int32_t iVertexCount = static_cast<int32_t>(rNavData.vertices.size());
 	int32_t iStartNode = iVertexCount;
 	int32_t iEndNode = iVertexCount + 1;
 	int32_t iTotalNodes = iVertexCount + 2;
 
-	for (int32_t i = 0; i < iTotalNodes; ++i)
+	for (int64_t i = 0; i < iTotalNodes; ++i)
 	{
 		rMemory.pGCost[i] = std::numeric_limits<float>::max();
 		rMemory.pFCost[i] = std::numeric_limits<float>::max();
 		rMemory.pParent[i] = -1;
 		rMemory.pClosed[i] = false;
-		rMemory.pHeapPos[i] = -1;
+		rMemory.pHeapPosition[i] = -1;
 	}
 
 	// Eagerly compute start visibility to all obstacle vertices (fully consumed when the start node pops).
 	// End visibility is computed lazily per expanded vertex at the consumption site below: A* usually
 	// terminates after a small frontier, and the closed-set guarantees each vertex expands at most once.
-	for (int32_t i = 0; i < iVertexCount; ++i)
+	for (int64_t i = 0; i < iVertexCount; ++i)
 	{
 		rMemory.pStartVisible[i] = !SegmentBlockedByObstacle(f2Start, pVertices[i], pVertices, rNavData);
 	}
 
-	// Vertex position lookup (including temporary nodes)
 	auto GetPosition = [&](int32_t iNode) -> XMFLOAT2
 	{
 		if (iNode == iStartNode)
@@ -441,11 +435,8 @@ XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, 
 		return pVertices[iNode];
 	};
 
-	// Binary min-heap open set (see AStarHeap above): keyed by (fCost, node index) with an index
-	// tie-break for deterministic pop order; pHeapPos enables O(log n) decrease-key.
-	AStarHeap heap {.pOpenSet = rMemory.pOpenSet, .pHeapPos = rMemory.pHeapPos, .pFCost = rMemory.pFCost, .iHeapCount = 0};
+	AStarHeap heap {.pOpenSet = rMemory.pOpenSet, .pHeapPosition = rMemory.pHeapPosition, .pFCost = rMemory.pFCost, .iHeapCount = 0};
 
-	// Initialize start node
 	rMemory.pGCost[iStartNode] = 0.0f;
 	rMemory.pFCost[iStartNode] = Distance(f2Start, f2End);
 	heap.Push(iStartNode);
@@ -456,7 +447,6 @@ XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, 
 
 		if (iCurrent == iEndNode)
 		{
-			// Reconstruct path: find first waypoint
 			int32_t iNode = iEndNode;
 			while (rMemory.pParent[iNode] != iStartNode && rMemory.pParent[iNode] != -1)
 			{
@@ -474,7 +464,6 @@ XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, 
 
 		rMemory.pClosed[iCurrent] = true;
 
-		// Expand neighbors
 		auto TryNeighbor = [&](int32_t iNeighbor)
 		{
 			if (rMemory.pClosed[iNeighbor])
@@ -492,9 +481,9 @@ XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, 
 				rMemory.pFCost[iNeighbor] = fTentativeG + Distance(f2Neighbor, f2End);
 				rMemory.pParent[iNeighbor] = iCurrent;
 
-				if (rMemory.pHeapPos[iNeighbor] >= 0)
+				if (rMemory.pHeapPosition[iNeighbor] >= 0)
 				{
-					heap.SiftUp(rMemory.pHeapPos[iNeighbor]); // fCost decreased -> may move up
+					heap.SiftUp(rMemory.pHeapPosition[iNeighbor]); // fCost decreased -> may move up
 				}
 				else
 				{
@@ -517,11 +506,11 @@ XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, 
 		else if (iCurrent < iVertexCount)
 		{
 			// Visibility-graph + polygon-perimeter neighbors, precomputed into one adjacency span.
-			int32_t iBegin = rNavData.adjOffsets.at(static_cast<size_t>(iCurrent));
-			int32_t iStop = rNavData.adjOffsets.at(static_cast<size_t>(iCurrent) + 1);
-			for (int32_t k = iBegin; k < iStop; ++k)
+			int32_t iBegin = rNavData.adjacencyOffsets.at(static_cast<size_t>(iCurrent));
+			int32_t iStop = rNavData.adjacencyOffsets.at(static_cast<size_t>(iCurrent) + 1);
+			for (int64_t k = iBegin; k < iStop; ++k)
 			{
-				TryNeighbor(rNavData.adjNeighbors.at(static_cast<size_t>(k)));
+				TryNeighbor(rNavData.adjacencyNeighbors.at(static_cast<size_t>(k)));
 			}
 
 			// Lazy end-visibility: computed only for the vertices A* actually expands (each expands at most once).
@@ -540,14 +529,9 @@ XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, 
 	return XMVectorZero();
 }
 
-// A*-miss fallback: slide along the nearest obstacle boundary rather than steer at an obstacle vertex.
-// Steering at a vertex sits the unit on a point attractor — it enters the polygon, the start-inside
-// branch pushes it back out, and the pair cycles forever. The tangent below is biased outward, so the
-// result always carries a strictly positive component along the outward normal of the *nearest*
-// boundary and can never drive the unit into it.
-// Returns zero when the position sits on that boundary (no defined outward normal); the callers' own
-// straight-line fallback then runs.
-XMVECTOR NavMissFallbackDirection(XMFLOAT2 f2Position, XMFLOAT2 f2Destination, const XMFLOAT2* pVertices, const NavData& rNavData)
+// The nearest-boundary tangent has a positive outward component to avoid the vertex-attractor escape cycle.
+// A near-zero outward normal returns zero, letting callers use their straight-line fallback.
+static XMVECTOR NavMissFallbackDirection(XMFLOAT2 f2Position, XMFLOAT2 f2Destination, const XMFLOAT2* pVertices, const NavData& rNavData)
 {
 	static constexpr float kfNavFallbackOutwardBias = 0.25f;
 
@@ -570,8 +554,6 @@ XMVECTOR NavMissFallbackDirection(XMFLOAT2 f2Position, XMFLOAT2 f2Destination, c
 
 	return XMVector3Normalize(XMVectorSet(fTangentX * fSign + fOutwardX * kfNavFallbackOutwardBias, fTangentY * fSign + fOutwardY * kfNavFallbackOutwardBias, 0.0f, 0.0f));
 }
-
-} // anonymous namespace
 
 bool XM_CALLCONV NavQueryPointBlocked(FXMVECTOR vecPosition, const NavData& rNavData)
 {
@@ -607,11 +589,11 @@ XMVECTOR XM_CALLCONV NavQuerySnapToNavigable(FXMVECTOR vecPosition, const NavDat
 	return XMVectorSet(f2BestPoint.x, f2BestPoint.y, fBaseHeight, 1.0f);
 }
 
-XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR* pOutNextWaypoint
 #if defined(BT_SERVER)
-	, bool* pOutEnteredAStar
+XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR* pOutNextWaypoint, bool* pOutEnteredAStar)
+#else
+XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR* pOutNextWaypoint)
 #endif // BT_SERVER
-)
 {
 #if defined(BT_SERVER)
 	if constexpr (kbProfiling)
@@ -627,9 +609,7 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 	ASSERT(XMVectorGetZ(vecPosition) == fBaseHeight);
 	ASSERT(XMVectorGetZ(vecDestination) == fBaseHeight);
 
-	// Default waypoint = destination (W=1.0 position). Later paths may overwrite with a refined
-	// intermediate waypoint, but this guarantees the out-param is always a valid W=1 position
-	// even when early-out branches (zero-delta, empty navData, A*-miss) skip the explicit writes.
+	// Seed the waypoint with the destination and W=1 before early exits; successful paths replace it.
 	if (pOutNextWaypoint != nullptr)
 	{
 		*pOutNextWaypoint = XMVectorSetW(vecDestination, 1.0f);
@@ -654,7 +634,7 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	auto pMemory = rWorkbuffer.PushBuffer<std::byte*>(aStarMemoryLayout.iByteCount);
-	AStarMemory aStarMemory = BindAStarMemory(pMemory, aStarMemoryLayout);
+	AStarMemory aStarMemory = BindAStarMemory(pMemory.mpData, aStarMemoryLayout);
 
 	const XMFLOAT2* pVertices = rNavData.vertices.data();
 
@@ -684,13 +664,11 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 		f2Position = f2SnapPoint;
 	}
 
-	// If destination is inside an obstacle, snap it to nearest navigable point
 	if (PointInAnyPolygon(f2Destination, pVertices, rNavData))
 	{
 		f2Destination = SnapOutsidePolygon(f2Destination, pVertices, rNavData);
 	}
 
-	// Fast path: direct line of sight
 	if (!SegmentBlockedByObstacle(f2Position, f2Destination, pVertices, rNavData))
 	{
 		if (pOutNextWaypoint != nullptr)
@@ -701,7 +679,6 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 	}
 	else
 	{
-		// A* pathfinding on visibility graph
 #if defined(BT_SERVER)
 		if constexpr (kbProfiling)
 		{

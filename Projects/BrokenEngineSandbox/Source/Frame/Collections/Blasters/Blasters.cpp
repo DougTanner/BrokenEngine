@@ -44,7 +44,7 @@ void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 	BlastersInterpolate& rBlasters = *rFrame.interpolate.pBlasters;
 
 	// Add client-only owned objects
-	const BlastersType& rType = GetType(rBlasters.puiTypeIndices[iIndex]);
+	const BlastersType& rType = sTypes.at(rBlasters.puiTypeIndices[iIndex]);
 
 	rBlasters.puiAreaLights[iIndex] = {};
 	rBlasters.puiPointLights[iIndex] = {};
@@ -77,10 +77,10 @@ void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 	}
 
 	// Sync light
-	if (rBlasters.puiPointLights[iIndex].IsValid())
+	if ((rBlasters.puiPointLights[iIndex].uuid.iValue != 0))
 	{
 		float fSize = rType.f2Size.x;
-		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::GetType(rType.uiPointLightTypeIndex);
+		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(rType.uiPointLightTypeIndex);
 		engine::PointLightsInterpolate::Sync(rFrame.interpolate, rBlasters.puiPointLights[iIndex],
 		{
 			.vecPosition = rBlasters.pVecPositions[iIndex],
@@ -157,17 +157,17 @@ bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] BlastersInterpolate& rCurrentInterpolate, [[maybe_unused]] int64_t i)
 {
 #if defined(BT_CLIENT)
-	if (rCurrentInterpolate.puiPointLights[i].IsValid())
+	if ((rCurrentInterpolate.puiPointLights[i].uuid.iValue != 0))
 	{
-		engine::PointLightsPostRender::Remove(rFrame, rCurrentInterpolate.puiPointLights[i]);
+		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rCurrentInterpolate.puiPointLights[i], rFrame.interpolate.pointLights.Members(), rFrame.postRender.pointLights.Members());
 	}
 	else
 	{
-		rFrame.postRender.areaLights.Remove(rFrame, rCurrentInterpolate.puiAreaLights[i]);
+		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.areaLights, rFrame.postRender.areaLights, rCurrentInterpolate.puiAreaLights[i], rFrame.interpolate.areaLights.Members(), rFrame.postRender.areaLights.Members());
 	}
-	if (rCurrentInterpolate.puiWindTrails[i].IsValid())
+	if ((rCurrentInterpolate.puiWindTrails[i].uuid.iValue != 0))
 	{
-		engine::WindTrailsPostRender::Remove(rFrame, rCurrentInterpolate.puiWindTrails[i]);
+		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.windTrails, rFrame.postRender.windTrails, rCurrentInterpolate.puiWindTrails[i], rFrame.interpolate.windTrails.Members(), rFrame.postRender.windTrails.Members());
 	}
 #endif // BT_CLIENT
 }
@@ -201,7 +201,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 		};
 		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{
-			LOG(kDefault, kError, "Blaster Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) TypeIndex: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coord.x, rStaticData.coord.y, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), static_cast<int32_t>(rCurrentInterpolate.puiTypeIndices[i]), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Blaster Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) TypeIndex: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), static_cast<int32_t>(rCurrentInterpolate.puiTypeIndices[i]), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		PushTransferRequest(rFrame.postRender, request);
@@ -235,11 +235,11 @@ bool BlastersInterpolate::LogDifferences(const BlastersInterpolate& rOther) cons
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
-	for (int64_t i = 0; i < CommonRowCount(rOther); ++i)
+	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
 		bEqual &= common::LogDifference<"puiTypeIndices">(i, puiTypeIndices[i], rOther.puiTypeIndices[i]);
-		bEqual &= common::LogDifference_Vec("pVecPositions", i, pVecPositions[i], rOther.pVecPositions[i]);
-		bEqual &= common::LogDifference_Vec("pVecDirections", i, pVecDirections[i], rOther.pVecDirections[i]);
+		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
+		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 	}
 
 	return bEqual;
@@ -251,10 +251,10 @@ bool BlastersPostRender::LogDifferences(const BlastersPostRender& rOther) const
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
-	for (int64_t i = 0; i < CommonRowCount(rOther); ++i)
+	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
-		bEqual &= common::LogDifference_Vec("pVecVelocities", i, pVecVelocities[i], rOther.pVecVelocities[i]);
+		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 	}
 

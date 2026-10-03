@@ -81,14 +81,14 @@ inline constexpr bool kbShowProfileTextByDefault = false;
 
 #include "Log/LogTypes.h"
 
-inline constexpr LogLevel keLogLevelTemp = kVerbose;
+inline constexpr LogLevel keLogLevelTemporary = kVerbose;
 inline constexpr LogLevel keLogLevelReplay = kVerbose; // Keeps the per-tick replay checksum lines in the binary; their runtime level stays default-silent
 
 inline constexpr LogLevel keLogLevelDefault = kDebug; // Compile floor; runtime threshold (gLogRuntimeLevels, default kInfo) gates emission live via set_log_level
 inline constexpr LogLevel keLogLevelAudio = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelGraphics = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelLoading = keLogLevelDefault;
-inline constexpr LogLevel keLogLevelNavData = keLogLevelDefault;
+inline constexpr LogLevel keLogLevelNavigationData = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelNetwork = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelInput = keLogLevelDefault;
 

@@ -40,27 +40,21 @@ struct TransferCaptureSnapshot
 };
 
 void Attach(Replay& rReplay);
-void Detach(Replay& rReplay);
+void Detach(const Replay& rReplay);
 void Reset(Replay& rReplay);
-void RecordingInvalidated(Replay& rReplay);
-void RecordingStartFailed(Replay& rReplay);
-void RecordingStartCancelled(Replay& rReplay);
-void RecordingStarted(Replay& rReplay);
+void RecordingStarted(const Replay& rReplay);
 void RecordingStopped(Replay& rReplay, bool bPersistenceSucceeded);
-void PlaybackAborted(Replay& rReplay);
-void PlaybackAdoptionFailed(Replay& rReplay);
 void PlaybackAdopted(Replay& rReplay, const TransferCaptureSnapshot& rRecordingSnapshot);
 
-[[nodiscard]] TransferCaptureSnapshot CaptureSnapshot(Replay& rReplay);
-[[nodiscard]] bool DropRetainedEndFrame(Replay& rReplay, GridCoord coord);
-[[nodiscard]] bool ArmPersistenceFailure(Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coord = {});
-[[nodiscard]] bool ConsumePersistenceFailure(Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coord = {}, int64_t iActivationTick = -1);
-[[nodiscard]] bool IsWriterPauseArmed(Replay& rReplay);
-void ArmPauseAfterNextWriterInput(Replay& rReplay, bool bPendingRecordingStart);
-[[nodiscard]] bool ObserveWriterInput(Replay& rReplay, int64_t iTick);
-[[nodiscard]] bool ConsumeTransferCaptureFailure(Replay& rReplay);
-void ObserveAcceptedTransfers(Replay& rReplay, int64_t iEventTick, std::span<const game::StatusChange> sortedTransfers);
-void ObservePlaybackEvent(Replay& rReplay, int64_t iEventTick);
+[[nodiscard]] TransferCaptureSnapshot CaptureSnapshot(const Replay& rReplay);
+[[nodiscard]] bool DropRetainedEndFrame(Replay& rReplay, GridCoord coordinate);
+[[nodiscard]] bool ArmPersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coordinate = {});
+[[nodiscard]] bool ConsumePersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coordinate = {}, int64_t iActivationTick = -1);
+[[nodiscard]] bool IsWriterPauseArmed(const Replay& rReplay);
+void ArmPauseAfterNextWriterInput(const Replay& rReplay, bool bPendingRecordingStart);
+[[nodiscard]] bool ObserveWriterInput(const Replay& rReplay, int64_t iTick);
+void ObserveAcceptedTransfers(const Replay& rReplay, int64_t iEventTick, std::span<const game::StatusChange> sortedTransfers);
+void ObservePlaybackEvent(const Replay& rReplay, int64_t iEventTick);
 
 } // namespace ReplayFixtures
 

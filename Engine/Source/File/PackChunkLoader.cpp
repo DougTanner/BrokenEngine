@@ -91,7 +91,7 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 				if (common::gpMultithreading->IsMainThread())
 				{
-					AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kExistingQueued, std::numeric_limits<uint32_t>::max(), crc, 0, rLazyChunk.iDataSize, AudioStreamingFixtureQueueState::kQueued, 0, false);
+					AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kExistingQueued, std::numeric_limits<uint32_t>::max(), crc, 0, rLazyChunk.iDataSize, AudioStreamingFixtureQueueState::kQueued, 0, false);
 				}
 #endif
 				bAddedAny = true;
@@ -259,7 +259,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 			bool bAudioWork = false;
 #endif
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-			if (AudioStreamingFixture::LoadersStaged())
+			if (AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire); pFixture != nullptr && pFixture->meStagingOwner.load(std::memory_order_seq_cst) != AudioStreamingFixture::StagingOwner::kNone)
 			{
 				bExistingWork = false;
 				bRealtimeWork = false;

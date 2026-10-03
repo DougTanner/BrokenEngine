@@ -16,12 +16,9 @@
 
 namespace toolcli::coordination
 {
-	namespace
+	static std::string FailureReasonFor(DWORD uiError)
 	{
-		std::string FailureReasonFor(DWORD uiError)
-		{
-			return uiError == ERROR_SHARING_VIOLATION || uiError == ERROR_LOCK_VIOLATION ? "timed out" : "Windows error " + std::to_string(uiError);
-		}
+		return uiError == ERROR_SHARING_VIOLATION || uiError == ERROR_LOCK_VIOLATION ? "timed out" : "Windows error " + std::to_string(uiError);
 	}
 
 	Guard::Guard(const std::filesystem::path& rPath, bool& rbContentionObserved, std::string& rFailureReason, int64_t iMaximumWaitMilliseconds, int64_t iMaximumDeniedAccessMilliseconds) :
@@ -41,6 +38,7 @@ namespace toolcli::coordination
 			mhFile.Reset(::CreateFileW(mPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, nullptr));
 			if (mhFile.IsValid())
 			{
+				mbValid = true;
 				return;
 			}
 			DWORD uiLastError = ::GetLastError();
@@ -86,11 +84,6 @@ namespace toolcli::coordination
 			// Best effort: a waiter that reopened the guard first keeps it alive and deletes it on its own release.
 			::DeleteFileW(mPath.c_str());
 		}
-	}
-
-	bool Guard::IsValid() const
-	{
-		return mhFile.IsValid();
 	}
 
 	std::string CurrentUtcTimestamp()
@@ -287,7 +280,11 @@ namespace toolcli::coordination
 	{
 		std::optional<std::string> hash = HashSha256(WideToUtf8(logicalKey));
 		std::filesystem::path localApplicationData = GetLocalApplicationDataPath();
-		if (!hash || localApplicationData.empty())
+		if (!hash)
+		{
+			return std::nullopt;
+		}
+		if (localApplicationData.empty())
 		{
 			return std::nullopt;
 		}
@@ -331,11 +328,11 @@ namespace toolcli::coordination
 
 	bool StageBytesAtomic(const std::filesystem::path& rPath, std::string_view contents, std::filesystem::path& rStagedPath)
 	{
-		// Every staged write in the process shares this sequence, so a temporary still waiting to be committed can
-		// never be overwritten by a later write to the same path.
-		static uint32_t suiSequence = 0;
+		// The process-wide sequence gives sequential staged writes distinct temporary suffixes until it wraps.
+		static int64_t siSequence = 0;
 		std::filesystem::path temporaryPath = ExtendedLengthPath(rPath);
-		temporaryPath += L".tmp." + std::to_wstring(::GetCurrentProcessId()) + L"." + std::to_wstring(++suiSequence);
+		siSequence = (siSequence + 1) % 4'294'967'296;
+		temporaryPath += L".tmp." + std::to_wstring(::GetCurrentProcessId()) + L"." + std::to_wstring(siSequence);
 		Handle hFile(::CreateFileW(temporaryPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_TEMPORARY, nullptr));
 		if (!hFile.IsValid())
 		{
@@ -409,7 +406,7 @@ namespace toolcli::coordination
 		}
 		uint64_t uiClaimedTicks = 0;
 		uint64_t uiHeartbeatTicks = 0;
-		const std::optional<int64_t> claimantPid = rMetadata.contains("claimantPid") ? JsonInt64(rMetadata["claimantPid"]) : std::nullopt;
+		std::optional<int64_t> claimantPid = rMetadata.contains("claimantPid") ? JsonInt64(rMetadata["claimantPid"]) : std::nullopt;
 		return rMetadata.contains("schemaVersion") && JsonIntegerEquals(rMetadata["schemaVersion"], iExpectedSchemaVersion)
 		    && rMetadata.contains("domain") && rMetadata["domain"].is_string()
 		    && rMetadata["domain"].get<std::string>() == WideToUtf8(rLocator.domain) && rMetadata.contains("logicalKey")
@@ -422,7 +419,8 @@ namespace toolcli::coordination
 	nlohmann::json NewMetadata(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree)
 	{
 		std::string timestamp = CurrentUtcTimestamp();
-		return {
+		return
+		{
 			{ "schemaVersion", kiSchemaVersion },
 			{ "domain", WideToUtf8(rLocator.domain) },
 			{ "logicalKey", WideToUtf8(rLocator.logicalKey) },
@@ -434,4 +432,4 @@ namespace toolcli::coordination
 			{ "heartbeatAt", timestamp },
 		};
 	}
-}
+} // namespace toolcli::coordination

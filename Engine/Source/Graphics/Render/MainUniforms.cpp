@@ -75,14 +75,14 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 		for (const IslandPlacement& rPlacement : it->second.staticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			float fHalfX = 0.5f * rTemplate.mfQuadFootprintX;
-			float fHalfY = 0.5f * rTemplate.mfQuadFootprintY;
+			float fHalfX = 0.5f * rTemplate.fQuadFootprintX;
+			float fHalfY = 0.5f * rTemplate.fQuadFootprintY;
 			float fCos = std::cos(rPlacement.fRotation);
 			float fSin = std::sin(rPlacement.fRotation);
 
 			auto rotate = [&](float fLocalX, float fLocalY)
 			{
-				return XMFLOAT3A {rPlacement.f2WorldPos.x + f2Offset.x + fLocalX * fCos - fLocalY * fSin, rPlacement.f2WorldPos.y + f2Offset.y + fLocalX * fSin + fLocalY * fCos, fZ};
+				return XMFLOAT3A {rPlacement.f2WorldPosition.x + f2Offset.x + fLocalX * fCos - fLocalY * fSin, rPlacement.f2WorldPosition.y + f2Offset.y + fLocalX * fSin + fLocalY * fCos, fZ};
 			};
 
 			XMFLOAT3A f3C0 = rotate(-fHalfX, -fHalfY);
@@ -125,7 +125,7 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 		for (const IslandPlacement& rPlacement : it->second.staticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			if (rTemplate.mpf2ValidAreaVertices == nullptr || rTemplate.miValidAreaVertexCount < 3)
+			if (rTemplate.pf2ValidAreaVertices == nullptr || rTemplate.iValidAreaVertexCount < 3)
 			{
 				continue;
 			}
@@ -135,14 +135,14 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 
 			auto rotate = [&](const XMFLOAT2& rVert)
 			{
-				return XMFLOAT3A {rPlacement.f2WorldPos.x + f2Offset.x + rVert.x * fCos - rVert.y * fSin, rPlacement.f2WorldPos.y + f2Offset.y + rVert.x * fSin + rVert.y * fCos, fZ};
+				return XMFLOAT3A {rPlacement.f2WorldPosition.x + f2Offset.x + rVert.x * fCos - rVert.y * fSin, rPlacement.f2WorldPosition.y + f2Offset.y + rVert.x * fSin + rVert.y * fCos, fZ};
 			};
 
-			int32_t iCount = rTemplate.miValidAreaVertexCount;
+			int32_t iCount = rTemplate.iValidAreaVertexCount;
 			for (int32_t i = 0; i < iCount; ++i)
 			{
-				const XMFLOAT2& rA = rTemplate.mpf2ValidAreaVertices[i];
-				const XMFLOAT2& rB = rTemplate.mpf2ValidAreaVertices[(i + 1) % iCount];
+				const XMFLOAT2& rA = rTemplate.pf2ValidAreaVertices[i];
+				const XMFLOAT2& rB = rTemplate.pf2ValidAreaVertices[(i + 1) % iCount];
 				DebugRender::Line(rotate(rA), rotate(rB), kf4ValidAreaColor);
 			}
 		}
@@ -168,7 +168,7 @@ static void DebugRenderNavData(const std::vector<GridCoord>& rActiveCoords, Grid
 			continue;
 		}
 
-		const NavData& rNav = it->second.staticData.navData;
+		const NavData& rNav = it->second.staticData.navigationData;
 		// Nav vertices are local to this cell; the two draw sites below are this helper's conversion point.
 		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
 
@@ -427,8 +427,8 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	// absolute camera position for the wave phase to be continuous: reconstruct it as a double from the camera cell
 	// and the camera's local position, exactly as the reduced water origins do. CPU only — the uploaded phase is
 	// already reduced modulo 2*pi.
-	double dWaveCameraX = static_cast<double>(engine::gpCamera->mBasisCoord.x) * static_cast<double>(kfCellWidth) + static_cast<double>(f4WaveCameraPos.x);
-	double dWaveCameraY = static_cast<double>(engine::gpCamera->mBasisCoord.y) * static_cast<double>(kfCellHeight) + static_cast<double>(f4WaveCameraPos.y);
+	double fWaveCameraX = static_cast<double>(engine::gpCamera->mBasisCoord.iX) * static_cast<double>(kfCellWidth) + static_cast<double>(f4WaveCameraPos.x);
+	double fWaveCameraY = static_cast<double>(engine::gpCamera->mBasisCoord.iY) * static_cast<double>(kfCellHeight) + static_cast<double>(f4WaveCameraPos.y);
 
 	// Fade geometric wave amplitudes by camera eye height — per-stack Start/End sliders (1.0 at ≤ Start, 0.0 at ≥ End, linear between).
 	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;
@@ -439,7 +439,7 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.Get();
 	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraEyeHeight) / std::max(fMediumFadeEnd - fMediumFadeStart, 1e-3f), 0.0f, 1.0f);
 
-	PopulateGerstnerLowWaves(rMainLayout, dWaveTime, dWaveCameraX, dWaveCameraY, fLowAmplitudeScale);
+	PopulateGerstnerLowWaves(rMainLayout, dWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale);
 
 	if (eWaterLevel == GraphicsQualityLevel::kMedium)
 	{
@@ -447,7 +447,7 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 		return;
 	}
 
-	PopulateGerstnerMediumWaves(rMainLayout, dWaveTime, dWaveCameraX, dWaveCameraY, fMediumAmplitudeScale);
+	PopulateGerstnerMediumWaves(rMainLayout, dWaveTime, fWaveCameraX, fWaveCameraY, fMediumAmplitudeScale);
 }
 
 // Hex shield
@@ -475,7 +475,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		// Nothing renderable: an all-rings-empty frame (e.g. a failed reconnect to a dead local server; GameBase::Render
 		// leaves mRenderInterpolates renderable-only, so a missing cameraCoord entry means the whole map is empty), or
 		// an empty rActiveCoords, which is defensive only (Game::ComputeActiveSet and Game::Reset always add
-		// mClientGridCoord; boot prerender seeds {kOriginCoord}). Run the SAME Begin/EndRender as the normal path with
+		// mClientGridCoord; boot prerender seeds {kOriginCoordinate}). Run the SAME Begin/EndRender as the normal path with
 		// no per-coord Render between them, so every indirect count and per-transaction profile counter is written as
 		// 0 and nothing ghost-draws, then bail before touching cameraCoord's absent interpolate. Every collection
 		// BeginRender walks rActiveCoords behind an rRenderInterpolates find-guard (or is a no-op), never .at().

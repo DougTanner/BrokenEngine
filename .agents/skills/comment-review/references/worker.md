@@ -7,32 +7,21 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 
 1. Fix the review scope.
    - When the caller supplies a scope, use exactly those files and directories;
-     otherwise take the session-changed C++ and shader files from the read-only
-     inventory: `pwsh -NoProfile -File
-     .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
-     repository toplevel>' -Baseline <full 40-character SHA> -Regions`, adding
-     `-IncludeUntracked <comma-separated paths>` when the caller supplied
-     untracked paths, and keeping the `entries` rows whose `class` is `cpp`,
+     otherwise create `Temp/` if absent, in a call of its own, then take the
+     session-changed C++ and shader files from the read-only inventory:
+     `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
+     -RepositoryRoot '<absolute repository toplevel>' -Baseline <full
+     40-character SHA> -Regions -OutputPath Temp/comment-review-inventory.json`,
+     adding `-IncludeUntracked <comma-separated paths>` when the caller
+     supplied untracked paths. The run prints one summary line naming its
+     status, code, and message; read the object from that file only after this
+     run printed that line, keeping the `entries` rows whose `class` is `cpp`,
      `dual-language-header`, or `glsl` plus their `regions`.
-   - Only `status` `pass` with `truncated` false is usable. On `pass` with a
-     true `truncated`, split the session into disjoint parts by top-level
-     directory and rerun the same command once per part with `-PathPrefix
-     <comma-separated prefixes>`, splitting any still-truncated part into
-     subdirectories or single files, until every run reports `pass` with
-     `truncated` false. Take the paths to split from the first run's `entries`
-     when its `truncation.entries.emitted` equals `truncation.entries.full`,
-     otherwise from the repository's top-level directories.
-   - The split is complete only when, for each of `cpp`,
-     `dual-language-header`, and `glsl`, the parts' `entries` rows of that
-     class add up to that class's total in `counts`, which every run reports
-     for the whole session; the scope is then the union of the parts' kept
-     entries and regions.
-   - Any other status, a single file whose run still truncates, or a class sum
-     that misses its `counts` total means the ranges are unavailable — report
-     that instead of enumerating hunks inline.
+   - Only `status` `pass` is usable; any other status, or no summary line from
+     the run, means the ranges are unavailable — report that instead of
+     enumerating hunks inline.
    - Done when the scope is fixed and stated as session-changed or
-     caller-supplied, from one run or from complete split runs, or the
-     unavailability is reported.
+     caller-supplied, or the unavailability is reported.
 2. Run the bundled scanner: `pwsh -NoProfile -File
    .agents/skills/comment-review/scripts/Find-CommentBlocks.ps1 -Path <paths>`,
    using `pwsh -NoProfile -Command "&

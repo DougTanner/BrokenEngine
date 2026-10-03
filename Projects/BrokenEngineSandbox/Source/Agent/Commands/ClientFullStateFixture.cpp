@@ -12,9 +12,6 @@
 namespace game
 {
 
-namespace
-{
-
 struct FullStateFixtureState
 {
 	ClientSession* pSession = nullptr;
@@ -23,14 +20,14 @@ struct FullStateFixtureState
 	bool bArmed = false;
 };
 
-FullStateFixtureState sFixture;
+static FullStateFixtureState sFixture;
 
-bool IsFixtureStalled(const engine::ClientDesyncCore& rCore)
+static bool IsFixtureStalled(const engine::ClientDesyncCore& rCore)
 {
 	return sFixture.bArmed && sFixture.pSession != nullptr && sFixture.pSession->mpDesyncCore.get() == &rCore;
 }
 
-void ClearFixture()
+static void ClearFixture()
 {
 	ClientSession* pSession = sFixture.pSession;
 	sFixture = {};
@@ -42,13 +39,13 @@ void ClearFixture()
 	engine::ClientDesyncCore& rCore = *pSession->mpDesyncCore;
 	rCore.mpfnAdditionalStall = nullptr;
 	rCore.mpfnResetObserver = nullptr;
-	if (pSession->mpRuntime->mpClient != nullptr && rCore.GetDesyncTick() < 0)
+	if (pSession->mpRuntime->mpClient != nullptr && rCore.mDesyncDebugState.iTick < 0)
 	{
-		pSession->mpRuntime->mpClient->mStateFlags.Clear(engine::Client::ClientStateFlags::kDesyncDebugMode);
+		pSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesynchronizationDebugMode, false);
 	}
 }
 
-void ResetFixture(engine::ClientDesyncCore& rCore)
+static void ResetFixture(engine::ClientDesyncCore& rCore)
 {
 	if (sFixture.pSession != nullptr && sFixture.pSession->mpDesyncCore.get() == &rCore)
 	{
@@ -56,10 +53,10 @@ void ResetFixture(engine::ClientDesyncCore& rCore)
 	}
 }
 
-nlohmann::json BuildCoordState(engine::GridCoord coord)
+static nlohmann::json BuildCoordState(engine::GridCoord coord)
 {
 	nlohmann::json result;
-	result["coord"] = {coord.x, coord.y};
+	result["coord"] = {coord.iX, coord.iY};
 
 	auto coordIt = gpGame->mCoordFrames.find(coord);
 	if (coordIt == gpGame->mCoordFrames.end())
@@ -125,12 +122,12 @@ nlohmann::json BuildCoordState(engine::GridCoord coord)
 	return result;
 }
 
-nlohmann::json BuildState()
+static nlohmann::json BuildState()
 {
 	nlohmann::json result;
 	result["clientTick"] = gpGame->TickCounter();
 	result["stalled"] = gpClientSession->mpDesyncCore->IsStalled();
-	result["desyncTick"] = gpClientSession->mpDesyncCore->GetDesyncTick();
+	result["desyncTick"] = gpClientSession->mpDesyncCore->mDesyncDebugState.iTick;
 	result["syntheticStall"] = sFixture.bArmed && sFixture.pSession == gpClientSession;
 	result["armedTick"] = sFixture.iTick;
 	result["timeMultiply"] = gpGame->mTimeStep.miTimeMultiply;
@@ -147,7 +144,7 @@ nlohmann::json BuildState()
 	return result;
 }
 
-void ExerciseMatchingTick(engine::GridCoord coord, nlohmann::json& rResult, bool& rbClockForced)
+static void ExerciseMatchingTick(engine::GridCoord coord, nlohmann::json& rResult, bool& rbClockForced)
 {
 	auto coordIt = gpGame->mCoordFrames.find(coord);
 	if (coordIt == gpGame->mCoordFrames.end())
@@ -188,7 +185,7 @@ void ExerciseMatchingTick(engine::GridCoord coord, nlohmann::json& rResult, bool
 	rbClockForced = true;
 	gpGame->SetTickCounter(iPendingTick);
 	gpGame->SetCurrentTime(fPendingTime);
-	gpGame->mTimeStep.ClearAccumulator();
+	gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
 	engine::ReconcileDesyncInfo injectionDesync = gpClientSession->mpReconciler->Run();
 
 	nlohmann::json afterInjection = BuildCoordState(coord);
@@ -212,8 +209,6 @@ void ExerciseMatchingTick(engine::GridCoord coord, nlohmann::json& rResult, bool
 	rResult["confirmedTick"] = rFrames.iConfirmedTick;
 	rResult["confirmedOffset"] = rFrames.iConfirmedOffset;
 }
-
-} // namespace
 
 void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
@@ -270,9 +265,9 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		}
 
 		engine::GridCoord coord = gpGame->mClientGridCoord;
-		bool bActive = std::ranges::any_of(gpClientSession->mpRuntime->mpClient->mCoordSlots, [coord](const engine::ClientCoordSlot& rSlot)
+		bool bActive = std::ranges::any_of(gpClientSession->mpRuntime->mpClient->mCoordinateSlots, [coord](const engine::ClientCoordSlot& rSlot)
 		{
-			return rSlot.eState == engine::CoordSubscriptionState::kActive && rSlot.coord == coord;
+			return rSlot.eState == engine::CoordSubscriptionState::kActive && rSlot.coordinate == coord;
 		});
 		auto coordIt = gpGame->mCoordFrames.find(coord);
 		if (!bActive)
@@ -295,8 +290,8 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		sFixture = {.pSession = gpClientSession, .iTick = gpGame->TickCounter(), .coord = coord, .bArmed = true};
 		gpClientSession->mpDesyncCore->mpfnAdditionalStall = &IsFixtureStalled;
 		gpClientSession->mpDesyncCore->mpfnResetObserver = &ResetFixture;
-		gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesyncDebugMode);
-		gpClientSession->mpRuntime->mpClient->SendResyncRequest();
+		gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesynchronizationDebugMode);
+		gpClientSession->mpRuntime->mpClient->SendResynchronizationRequest();
 		rResult = BuildState();
 		return;
 	}
@@ -388,7 +383,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		float fPendingTime = rFrames.pendingFullState->pFrame->interpolate.fCurrentTime;
 		gpGame->SetTickCounter(iPendingTick);
 		gpGame->SetCurrentTime(fPendingTime);
-		gpGame->mTimeStep.ClearAccumulator();
+		gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
 		engine::ReconcileDesyncInfo adoptionDesync = gpClientSession->mpReconciler->Run();
 
 		nlohmann::json afterAdoption = BuildCoordState(coord);

@@ -16,19 +16,19 @@ public:
 	void Poll();
 
 	bool IsScanning();
-	bool IsFound() const { return mFlags & DiscoveryScannerFlags::kFound; }
-	const char* GetFoundAddress() const { return mpcFoundAddress; }
-
-private:
-
 	enum class DiscoveryScannerFlags : uint8_t
 	{
 		kStarted = 1 << 0,
 		kFound   = 1 << 1,
 	};
 
-	SOCKET mSocket = INVALID_SOCKET;
+private:
+
+	SOCKET muiSocket = INVALID_SOCKET;
 	common::Timer mTimer;
+
+public:
+
 	common::Flags<DiscoveryScannerFlags> mFlags;
 	char mpcFoundAddress[16] {};
 };

@@ -71,7 +71,7 @@ void ExportAudio::Export()
 	// scales naturally through resampling; loop assets resample whole-buffer (seam no longer sample-exact).
 	audiorepair::Resample(fSamples, pWaveformatex->nChannels, pWaveformatex->nSamplesPerSec, audiorepair::kiAudioExportSampleRate, mRelativeFile);
 
-	// Single conversion to int16 — the only clamp in the pipeline. lround (not truncation) is
+	// Convert once to int16; clamp here to the int16 range. lround (not truncation) is
 	// required for the bit-exact 16-bit round-trip; clamp floor -32768 so a full-scale negative
 	// source sample survives
 	std::vector<int16_t> pcmSamples(fSamples.size());

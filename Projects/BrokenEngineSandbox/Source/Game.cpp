@@ -26,7 +26,7 @@ static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<engine::IslandP
 {
 	rOut.clear();
 	common::crc_t islandCrc = engine::gpIslandTerrain->mIslandCrcsByArea.at(static_cast<size_t>(iIndex));
-	rOut.push_back({.islandCrc = islandCrc, .f2WorldPos = {0.0f, 0.0f}, .fRotation = 0.0f});
+	rOut.push_back({.islandCrc = islandCrc, .f2WorldPosition = {0.0f, 0.0f}, .fRotation = 0.0f});
 }
 
 Game::Game()
@@ -39,9 +39,9 @@ Game::Game()
 
 	// Set up alignments
 	uint32_t uiNextAlignment = 1;
-	mPlayerAlignment = engine::alignment_t {uiNextAlignment++};
-	mEnemyAlignment = engine::alignment_t {uiNextAlignment++};
-	mAlignments.AddAlignment(mPlayerAlignment, mEnemyAlignment, engine::AlignmentFlags::kEnemies);
+	mPlayerAlignment = engine::AlignmentIdentifier {uiNextAlignment++};
+	mEnemyAlignment = engine::AlignmentIdentifier {uiNextAlignment++};
+	mAlignments.AddAlignment(mPlayerAlignment, mEnemyAlignment, engine::AlignmentFlags::kuiEnemies);
 
 	// Allocate frames
 #if defined(BT_SERVER)
@@ -71,15 +71,15 @@ Game::Game()
 
 }
 
-engine::global_id_t Game::ClientPlayerId() const
+engine::GlobalId Game::ClientPlayerId() const
 {
 #if defined(BT_CLIENT)
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
-		engine::global_id_t focusedMemberGlobalId = mFleetSelection.mFocusedMemberGlobalId;
+		engine::GlobalId focusedMemberGlobalId = mFleetSelection.mFocusedMemberGlobalId;
 		auto memberIt = std::ranges::find(pFleet->members, focusedMemberGlobalId, &FleetMember::globalPlayerId);
-		if (focusedMemberGlobalId.IsValid() && memberIt != pFleet->members.end() && !(memberIt->flags & FleetMemberFlags::kIsDead))
+		if ((focusedMemberGlobalId.iValue != 0) && memberIt != pFleet->members.end() && !(memberIt->flags & FleetMemberFlags::kIsDead))
 		{
 			return memberIt->globalPlayerId;
 		}
@@ -88,12 +88,12 @@ engine::global_id_t Game::ClientPlayerId() const
 	return {};
 }
 
-bool Game::IsClientPlayer(engine::global_id_t id) const
+bool Game::IsClientPlayer(engine::GlobalId id) const
 {
-	return id.IsValid() && std::ranges::contains(mClientPlayerIds, id);
+	return (id.iValue != 0) && std::ranges::contains(mClientPlayerIds, id);
 }
 
-void Game::AddClientPlayer(engine::global_id_t id, engine::GridCoord coord)
+void Game::AddClientPlayer(engine::GlobalId id, engine::GridCoord coord)
 {
 	// Heap: mClientPlayerIds / mClientPlayerCoords push_back may grow vectors
 	ScopedSuppressAllocationTracking suppress;
@@ -101,7 +101,7 @@ void Game::AddClientPlayer(engine::global_id_t id, engine::GridCoord coord)
 	mClientPlayerCoords.push_back(coord);
 }
 
-void Game::RemoveClientPlayer(engine::global_id_t id)
+void Game::RemoveClientPlayer(engine::GlobalId id)
 {
 	for (int64_t i = 0; i < std::ssize(mClientPlayerIds); ++i)
 	{
@@ -117,8 +117,8 @@ void Game::RemoveClientPlayer(engine::global_id_t id)
 
 std::optional<int64_t> Game::ClientPlayerIndex(const PlayersPostRender& rPlayers) const
 {
-	engine::global_id_t focusedId = ClientPlayerId();
-	if (focusedId.IsValid())
+	engine::GlobalId focusedId = ClientPlayerId();
+	if ((focusedId.iValue != 0))
 	{
 		for (int64_t i = 0; i < rPlayers.iCount; ++i)
 		{
@@ -186,7 +186,7 @@ void Game::ComputeActiveSet()
 		}
 
 		miVisibleNeighborCount = 0;
-		if (ClientPlayerId().IsValid())
+		if ((ClientPlayerId().iValue != 0))
 		{
 			// Camera-zoom-dependent VisibleArea: f4LargeVisibleArea packs (minX, maxY, maxX, minY).
 			const XMFLOAT4& f4Visible = engine::gpCamera->f4LargeVisibleArea;
@@ -226,7 +226,7 @@ void Game::ComputeActiveSet()
 					// A cell at the numeric edge of the grid has no neighbour in that direction; skip it rather than
 					// wrap to the opposite end.
 					engine::GridCoord neighbor {};
-					if (!engine::TryAddGridCoord(mClientGridCoord, i, j, neighbor))
+					if (!engine::TryAddGridCoordinate(mClientGridCoord, i, j, neighbor))
 					{
 						continue;
 					}
@@ -278,10 +278,10 @@ void Game::UpdateActiveIslands()
 		auto it = mCoordFrames.find(rCoord);
 		if (it != mCoordFrames.end() && (it->second.iConfirmedTick >= 0 || rCoord == mClientGridCoord))
 		{
-			subscribedArena.PushBack<engine::GridCoord>(rCoord);
+			subscribedArena.mBuffer.PushBack<engine::GridCoord>(rCoord);
 		}
 	}
-	engine::gpIslands->UpdateActiveIslands(mCoordFrames, subscribedArena.Span<const engine::GridCoord>());
+	engine::gpIslands->UpdateActiveIslands(mCoordFrames, subscribedArena.mBuffer.Span<const engine::GridCoord>());
 }
 #endif // BT_CLIENT
 
@@ -329,7 +329,7 @@ void Game::BuildFrameInputs()
 		int64_t iTailPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
 		pTailFrame = it->second.snapshots[iTailPhysical].get();
 	}
-	if (ClientPlayerId().IsValid() && pTailFrame != nullptr)
+	if ((ClientPlayerId().iValue != 0) && pTailFrame != nullptr)
 	{
 		const Frame& rCurrentFrame = *pTailFrame;
 		const PlayersPostRender& rPlayersPostRender = *rCurrentFrame.postRender.pPlayers;
@@ -396,26 +396,26 @@ void Game::Reset()
 
 #if defined(BT_SERVER)
 	engine::gpReplay->ResetStreams();
-	mGameFlags.Clear(engine::GameFlags::kSaveReplay);
+	mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
 	engine::gpCamera->ResetForSession();
 	engine::gbSmokeClear = true;
 	engine::gpParticleManager->mbReset = true;
-	engine::WindTrailsInterpolate::ResetRenderState();
+	engine::WindTrailsInterpolate::sPreviousPositions.clear();
 	mVecVisualErrorOffset = {};
 	mWeaponModeToggle.Reset();
 #endif // BT_CLIENT
 
-	mGameFlags.Clear(engine::GameFlags::kPaused);
+	mGameFlags.Set(engine::GameFlags::kPaused, false);
 	mClientPlayerIds.clear();
 	mClientPlayerCoords.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
 #endif
 	mfPreviousClientArmor = 0.0f;
-	SetClientGridCoord(engine::kOriginCoord);
+	SetClientGridCoord(engine::kOriginCoordinate);
 	mActiveCoords.clear();
 	mActiveCoords.push_back(mClientGridCoord);
 }
@@ -427,7 +427,7 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 	ScopedSuppressAllocationTracking suppress;
 
 	mCoordFrames.clear();
-	engine::CoordFrames& rFrames = mCoordFrames.try_emplace(engine::kOriginCoord).first->second;
+	engine::CoordFrames& rFrames = mCoordFrames.try_emplace(engine::kOriginCoordinate).first->second;
 #if defined(BT_CLIENT)
 	rFrames.iSnapshotHead = 0;
 	rFrames.iSnapshotCount = 1;
@@ -442,7 +442,7 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 
 	// Populate static data for origin coord (used as the main-menu cell)
 	engine::FrameStaticData& rStaticData = rFrames.staticData;
-	rStaticData.coord = engine::kOriginCoord;
+	rStaticData.coordinate = engine::kOriginCoordinate;
 	// Debug builds turn the main-menu cell into a single centered island browser ('E' cycles it);
 	// release builds keep the procedural island chain. Gameplay cells always use the chain.
 	bool bMenuBrowse = false;
@@ -456,9 +456,9 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 	}
 	else
 	{
-		engine::GenerateIslandChain(engine::kOriginCoord, rStaticData.islands);
+		engine::GenerateIslandChain(engine::kOriginCoordinate, rStaticData.islands);
 	}
-	// navData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
+	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
 
 #if defined(BT_SERVER)
 	rFrames.pNext = std::make_unique<Frame>();
@@ -641,7 +641,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		if (bCycleMenuIslandPressed && InMainMenu())
 		{
 			miMenuIslandIndex = (miMenuIslandIndex + 1) % std::ssize(engine::gpIslandTerrain->mIslandCrcsByArea);
-			auto it = mCoordFrames.find(engine::kOriginCoord);
+			auto it = mCoordFrames.find(engine::kOriginCoordinate);
 			BuildMenuIslandPlacement(miMenuIslandIndex, it->second.staticData.islands);
 			// Cycling rewrites the placement list on an existing cell — drop the derived elevation grid
 			// and the render-path query cache so RunFrameTick rebuilds both from the new placements
@@ -667,7 +667,7 @@ void Game::CaptureClientStateIfChanged()
 	// When no fleet is focused (boot before first sync, or post-disconnect cleared fleets), preserve the remembered fleet/ship —
 	// don't overwrite the just-loaded saved state with zeros. The next valid focus (user click or post-sync auto-activate) updates it.
 	game::FleetGuid newFleetGuid = mRememberedFleetGuid;
-	engine::global_id_t newShipId = mRememberedFocusedShipId;
+	engine::GlobalId newShipId = mRememberedFocusedShipId;
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
@@ -707,7 +707,7 @@ common::crc_t Game::GetNextMusicTrack()
 
 void Game::InitFramePostRender(Frame& rFrame)
 {
-	rFrame.postRender.uiFrameId = GenerateFrameId();
+	rFrame.postRender.uiFrameIdentifier = GenerateFrameId();
 	rFrame.postRender.randomEngine.TimeSeed();
 	rFrame.postRender.playerAlignment = mPlayerAlignment;
 	rFrame.postRender.enemyAlignment = mEnemyAlignment;
@@ -719,7 +719,7 @@ void Game::RestoreReplayMeta(const ReplayMeta& rMeta)
 	SetClientGridCoord(rMeta.clientGridCoord);
 	if (rMeta.iClientPlayerIdValue != 0)
 	{
-		engine::global_id_t globalId {rMeta.iClientPlayerIdValue};
+		engine::GlobalId globalId {rMeta.iClientPlayerIdValue};
 		AddClientPlayer(globalId, rMeta.clientGridCoord);
 	}
 	mfPreviousClientArmor = rMeta.fPreviousClientArmor;

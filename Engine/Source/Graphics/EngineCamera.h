@@ -17,11 +17,11 @@ constexpr RenderBasis MakeRenderBasis(GridCoord coord, GridCoord cameraCoord)
 {
 	return RenderBasis
 	{
-		.coord = coord,
+		.coordinate = coord,
 		.f2Offset =
 		{
-			static_cast<float>(static_cast<int64_t>(coord.x) - static_cast<int64_t>(cameraCoord.x)) * kfCellWidth,
-			static_cast<float>(static_cast<int64_t>(coord.y) - static_cast<int64_t>(cameraCoord.y)) * kfCellHeight,
+			static_cast<float>(static_cast<int64_t>(coord.iX) - static_cast<int64_t>(cameraCoord.iX)) * kfCellWidth,
+			static_cast<float>(static_cast<int64_t>(coord.iY) - static_cast<int64_t>(cameraCoord.iY)) * kfCellHeight,
 		},
 	};
 }

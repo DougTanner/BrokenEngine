@@ -11,29 +11,24 @@
 namespace engine
 {
 
-namespace
-{
-
 constexpr std::chrono::seconds kSubscriptionTransitionTimeout = 5s;
 
-} // namespace
-
-void SubscribeRequests::Add(GridCoord coord)
+void SubscribeRequests::Add(GridCoord coordinate)
 {
 	// Heap: subscribe request list grows on subscribe (SynchronizeSubscriptions suppresses tracking)
-	mRecords.push_back({.coord = coord, .startTime = std::chrono::steady_clock::now()});
+	mRecords.push_back({.coordinate = coordinate, .startTime = std::chrono::steady_clock::now()});
 }
 
-void SubscribeRequests::Cancel(GridCoord coord)
+void SubscribeRequests::Cancel(GridCoord coordinate)
 {
 	for (SubscribeRequest& rRecord : mRecords)
 	{
-		if (rRecord.coord == coord)
+		if (rRecord.coordinate == coordinate)
 		{
 			rRecord.flags.Set(SubscribeRequestFlags::kCancelled);
 		}
 	}
-	LOG(kNetwork, kVerbose, "SubscribeRequests::Cancel Coord: ({},{}) Records: {}", coord.x, coord.y, mRecords.size());
+	LOG(kNetwork, kVerbose, "SubscribeRequests::Cancel Coord: ({},{}) Records: {}", coordinate.iX, coordinate.iY, std::ssize(mRecords));
 }
 
 void SubscribeRequests::WarnTimedOut(std::chrono::steady_clock::time_point now)
@@ -56,13 +51,13 @@ void SubscribeRequests::WarnTimedOut(std::chrono::steady_clock::time_point now)
 		}
 
 		rRecord.flags.Set(SubscribeRequestFlags::kTimeoutWarned);
-		LOG(kNetwork, kWarning, "SubscribeRequests::WarnTimedOut unanswered subscribe Coord: ({},{})", rRecord.coord.x, rRecord.coord.y);
+		LOG(kNetwork, kWarning, "SubscribeRequests::WarnTimedOut unanswered subscribe Coord: ({},{})", rRecord.coordinate.iX, rRecord.coordinate.iY);
 	}
 }
 
-bool SubscribeRequests::TakeAnswer(GridCoord coord)
+bool SubscribeRequests::TakeAnswer(GridCoord coordinate)
 {
-	auto it = std::ranges::find(mRecords, coord, &SubscribeRequest::coord);
+	auto it = std::ranges::find(mRecords, coordinate, &SubscribeRequest::coordinate);
 	if (it == mRecords.end())
 	{
 		return false;
@@ -72,38 +67,28 @@ bool SubscribeRequests::TakeAnswer(GridCoord coord)
 	return bLive;
 }
 
-bool SubscribeRequests::IsLive(GridCoord coord) const
+bool SubscribeRequests::IsLive(GridCoord coordinate) const
 {
-	return std::ranges::any_of(mRecords, [coord](const SubscribeRequest& rRecord)
+	return std::ranges::any_of(mRecords, [coordinate](const SubscribeRequest& rRecord)
 	{
-		return rRecord.coord == coord && !(rRecord.flags & SubscribeRequestFlags::kCancelled);
+		return rRecord.coordinate == coordinate && !(rRecord.flags & SubscribeRequestFlags::kCancelled);
 	});
 }
 
-std::span<const SubscribeRequest> SubscribeRequests::Records() const
-{
-	return mRecords;
-}
-
-void SubscribeRequests::Clear()
-{
-	mRecords.clear();
-}
-
-Client::Client(const char* pServerAddress, uint16_t uiPort, int64_t iCoordSlots, const ClientGuid& rGuid, GuidAssignedCallback pfnGuidAssigned)
+Client::Client(const char* pcServerAddress, uint16_t uiPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback)
 {
 	ASSERT(gpClient == nullptr);
 
 	gpClient = this;
 
 	mClientGuid = rGuid;
-	mpfnGuidAssigned = pfnGuidAssigned;
+	mpGuidAssignedCallback = pGuidAssignedCallback;
 
 	ScopedSuppressAllocationTracking suppress;
 
-	mReceivedCoordUpdates.resize(iCoordSlots);
-	mCoordSlots.resize(iCoordSlots);
-	mStatusChangeScratch.resize(kiMaxStatusChangesPerCell);
+	mReceivedCoordinateUpdates.resize(iCoordinateSlotCount);
+	mCoordinateSlots.resize(iCoordinateSlotCount);
+	mStatusChangeScratch.resize(kiMaximumStatusChangesPerCell);
 	ENetAddress localAddress {};
 	localAddress.host = htonl(INADDR_LOOPBACK);
 	// Heap: ENet allocates host data internally
@@ -119,7 +104,7 @@ Client::Client(const char* pServerAddress, uint16_t uiPort, int64_t iCoordSlots,
 	enet_socket_set_option(mpHost->socket, ENET_SOCKOPT_RCVBUF, 1'024 * 1'024);
 
 	ENetAddress address {};
-	enet_address_set_host(&address, pServerAddress);
+	enet_address_set_host(&address, pcServerAddress);
 	address.port = uiPort;
 
 	// Heap: ENet allocates peer data internally
@@ -164,33 +149,33 @@ Client::~Client()
 
 void Client::FreeSlot(int64_t iSlot)
 {
-	ClientCoordSlot& rSlot = mCoordSlots.at(iSlot);
+	ClientCoordSlot& rSlot = mCoordinateSlots.at(iSlot);
 	// Reset slot state but retain the epoch of the subscription being cleared, so a packet still in
 	// flight from that subscription can be recognized as stale before the slot is admitted again
-	uint16_t uiEpoch = rSlot.ackState.uiEpoch;
+	uint16_t uiEpoch = rSlot.acknowledgementState.uiEpoch;
 	rSlot = {};
-	rSlot.ackState.uiEpoch = uiEpoch;
+	rSlot.acknowledgementState.uiEpoch = uiEpoch;
 }
 
 void Client::ResetAllSlots()
 {
 	ClientNetworkFixtures::Reset(*this);
-	for (int64_t i = 0; i < std::ssize(mCoordSlots); ++i)
+	for (int64_t i = 0; i < std::ssize(mCoordinateSlots); ++i)
 	{
 		FreeSlot(i);
 	}
-	mSubscribeRequests.Clear();
+	mSubscribeRequests.mRecords.clear();
 }
 
 void Client::RecoverTimedOutSubscriptions()
 {
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	mSubscribeRequests.WarnTimedOut(now);
-	// kWaitingFullState has no timeout: the server keeps an accepted subscription queued until the coord has a frame with
-	// navigation data built, which during replay waits for the coord's recorded activation
-	for (int64_t i = 0; i < std::ssize(mCoordSlots); ++i)
+	// kWaitingFullState has no timeout: the server keeps an accepted subscription queued until the coordinate has a frame with
+	// navigation data built, which during replay waits for the coordinate's recorded activation
+	for (int64_t i = 0; i < std::ssize(mCoordinateSlots); ++i)
 	{
-		const ClientCoordSlot& rSlot = mCoordSlots.at(i);
+		const ClientCoordSlot& rSlot = mCoordinateSlots.at(i);
 		if (rSlot.eState == CoordSubscriptionState::kUnsubscribing && now - rSlot.transitionStartTime >= kSubscriptionTransitionTimeout)
 		{
 			FreeSlot(i);
@@ -208,7 +193,7 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 		return;
 	}
 
-	for (std::vector<ReceivedCoordUpdate>& rSlotUpdates : mReceivedCoordUpdates)
+	for (std::vector<ReceivedCoordUpdate>& rSlotUpdates : mReceivedCoordinateUpdates)
 	{
 		rSlotUpdates.clear();
 	}
@@ -247,7 +232,7 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 						mDelayedPackets.erase(it);
 					}
 				}
-				mStateFlags.Clear(ClientStateFlags::kConnected);
+				mStateFlags.Set(ClientStateFlags::kConnected, false);
 				mStateFlags.Set(ClientStateFlags::kDisconnectedEvent);
 				mpServerPeer = nullptr;
 				LOG(kNetwork, kInfo, "ENET_EVENT_TYPE_DISCONNECT");
@@ -269,21 +254,20 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 		});
 	}
 
-	// Track bandwidth deltas from host-level cumulative counters
 	uint32_t uiReceivedData = mpHost->totalReceivedData;
 	uint32_t uiSentData = mpHost->totalSentData;
-	mBytesInPerSecond.Set(static_cast<int64_t>(uiReceivedData - muiPrevReceivedData));
-	mBytesOutPerSecond.Set(static_cast<int64_t>(uiSentData - muiPrevSentData));
-	muiPrevReceivedData = uiReceivedData;
-	muiPrevSentData = uiSentData;
+	mBytesInPerSecond.Set(static_cast<int64_t>(uiReceivedData - muiPreviousReceivedData));
+	mBytesOutPerSecond.Set(static_cast<int64_t>(uiSentData - muiPreviousSentData));
+	muiPreviousReceivedData = uiReceivedData;
+	muiPreviousSentData = uiSentData;
 }
 
 void Client::DispatchIncoming(ENetEvent& rEvent, bool bFastForward)
 {
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		static constexpr NetworkSimulationConfig kSimConfig = GetNetworkSimulationConfig(keNetworkSimulation);
-		NetworkSimulation::DispatchOrEnqueue(mDelayedPackets, mNetworkSimState, kSimConfig, bFastForward, rEvent, [this](ENetEvent& rInner)
+		static constexpr NetworkSimulationConfig kSimulationConfiguration = GetNetworkSimulationConfiguration(keNetworkSimulation);
+		NetworkSimulation::DispatchOrEnqueue(mDelayedPackets, mNetworkSimulationState, kSimulationConfiguration, bFastForward, rEvent, [this](ENetEvent& rInner)
 		{
 			Receive(rInner);
 		});
@@ -313,17 +297,17 @@ void Client::Receive(std::span<const uint8_t> packetData)
 	{
 		switch (eType)
 		{
-			case PacketType::kServerCoordFullState:
-				ServerCoordFullState(packetData);
+			case PacketType::kServerCoordinateFullState:
+				ServerCoordinateFullState(packetData);
 				break;
-			case PacketType::kServerCoordStaticData:
-				ServerCoordStaticData(packetData);
+			case PacketType::kServerCoordinateStaticData:
+				ServerCoordinateStaticData(packetData);
 				break;
-			case PacketType::kServerCoordUpdate:
-				ServerCoordUpdateOrResend(packetData, true);
+			case PacketType::kServerCoordinateUpdate:
+				ServerCoordinateUpdateOrResend(packetData, true);
 				break;
-			case PacketType::kServerCoordResend:
-				ServerCoordUpdateOrResend(packetData, false);
+			case PacketType::kServerCoordinateResend:
+				ServerCoordinateUpdateOrResend(packetData, false);
 				break;
 			case PacketType::kServerDebugFrame:
 				ServerDebugFrame(packetData);
@@ -335,7 +319,7 @@ void Client::Receive(std::span<const uint8_t> packetData)
 				ServerSubscribeAccept(packetData);
 				break;
 			case PacketType::kServerUnsubscribeAck:
-				ServerUnsubscribeAck(packetData);
+				ServerUnsubscribeAcknowledgement(packetData);
 				break;
 			case PacketType::kServerLoadNotification:
 				ServerLoadNotification(packetData);
@@ -370,28 +354,28 @@ void Client::Receive(std::span<const uint8_t> packetData)
 
 void Client::TrackReceivedTick(int64_t iSlot, int64_t iTick)
 {
-	if (mStateFlags & ClientStateFlags::kDesyncDebugMode)
+	if (mStateFlags & ClientStateFlags::kDesynchronizationDebugMode)
 	{
 		return;
 	}
 
-	AckState& rAck = mCoordSlots.at(iSlot).ackState;
+	AckState& rAcknowledgementState = mCoordinateSlots.at(iSlot).acknowledgementState;
 
 	// First frame received, initialize the ACK floor
-	if (rAck.iAckFloor < 0)
+	if (rAcknowledgementState.iAcknowledgmentFloor < 0)
 	{
-		rAck.iAckFloor = iTick;
+		rAcknowledgementState.iAcknowledgmentFloor = iTick;
 		mFramesReceived.Set(1);
 		return;
 	}
 
 	// Already acknowledged
-	if (iTick <= rAck.iAckFloor)
+	if (iTick <= rAcknowledgementState.iAcknowledgmentFloor)
 	{
 		return;
 	}
 
-	int64_t iBitIndex = iTick - rAck.iAckFloor - 1;
+	int64_t iBitIndex = iTick - rAcknowledgementState.iAcknowledgmentFloor - 1;
 	if (iBitIndex >= kiNetworkBufferSize)
 	{
 		LOG(kNetwork, kWarning, "Client::TrackReceivedTick Too many missing frames, disconnecting Slot: {} Gap: {}", iSlot, iBitIndex + 1);
@@ -402,28 +386,28 @@ void Client::TrackReceivedTick(int64_t iSlot, int64_t iTick)
 	// Mark this frame as received and advance the floor past any contiguous run
 	if (iBitIndex < 64)
 	{
-		rAck.uiReceivedBitfieldLow |= (1ULL << iBitIndex);
+		rAcknowledgementState.uiReceivedBitfieldLow |= (1ULL << iBitIndex);
 	}
 	else
 	{
-		rAck.uiReceivedBitfieldHigh |= (1ULL << (iBitIndex - 64));
+		rAcknowledgementState.uiReceivedBitfieldHigh |= (1ULL << (iBitIndex - 64));
 	}
 	mFramesReceived.Set(1);
 
-	int64_t iPreviousFloor = rAck.iAckFloor;
-	while ((rAck.uiReceivedBitfieldLow & 1ULL) != 0u)
+	int64_t iPreviousFloor = rAcknowledgementState.iAcknowledgmentFloor;
+	while ((rAcknowledgementState.uiReceivedBitfieldLow & 1ULL) != 0u)
 	{
-		++rAck.iAckFloor;
-		rAck.uiReceivedBitfieldLow >>= 1;
-		if ((rAck.uiReceivedBitfieldHigh & 1ULL) != 0u)
+		++rAcknowledgementState.iAcknowledgmentFloor;
+		rAcknowledgementState.uiReceivedBitfieldLow >>= 1;
+		if ((rAcknowledgementState.uiReceivedBitfieldHigh & 1ULL) != 0u)
 		{
-			rAck.uiReceivedBitfieldLow |= (1ULL << 63);
+			rAcknowledgementState.uiReceivedBitfieldLow |= (1ULL << 63);
 		}
-		rAck.uiReceivedBitfieldHigh >>= 1;
+		rAcknowledgementState.uiReceivedBitfieldHigh >>= 1;
 	}
-	if (rAck.iAckFloor != iPreviousFloor && rAck.iAckFloor - iPreviousFloor > 50)
+	if (rAcknowledgementState.iAcknowledgmentFloor != iPreviousFloor && rAcknowledgementState.iAcknowledgmentFloor - iPreviousFloor > 50)
 	{
-		LOG(kNetwork, kVerbose, "Client::TrackReceivedTick FloorAdvance Slot: {} Floor: {} -> {} Delta: {}", iSlot, iPreviousFloor, rAck.iAckFloor, rAck.iAckFloor - iPreviousFloor);
+		LOG(kNetwork, kVerbose, "Client::TrackReceivedTick FloorAdvance Slot: {} Floor: {} -> {} Delta: {}", iSlot, iPreviousFloor, rAcknowledgementState.iAcknowledgmentFloor, rAcknowledgementState.iAcknowledgmentFloor - iPreviousFloor);
 	}
 }
 
@@ -443,7 +427,7 @@ void Client::Disconnect()
 		// Heap: ENet may queue a peer disconnect packet
 		ScopedSuppressAllocationTracking suppress;
 		enet_peer_disconnect(mpServerPeer, 0);
-		mStateFlags.Clear(ClientStateFlags::kConnected);
+		mStateFlags.Set(ClientStateFlags::kConnected, false);
 	}
 }
 

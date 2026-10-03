@@ -4,12 +4,9 @@
 
 std::atomic<int64_t> giAllocationsThisFrame = 0;
 
-namespace
-{
+static std::atomic<bool> sbTrackingReady = false;
 
-std::atomic<bool> sbTrackingReady = false;
-
-void TrackAllocation()
+static void TrackAllocation()
 {
 	if constexpr (kbProfiling)
 	{
@@ -24,8 +21,6 @@ void TrackAllocation()
 	// Heap allocation during main loop, use Workbuffer or filter out with ScopedSuppressAllocationTracking
 	DEBUG_BREAK();
 }
-
-} // namespace
 
 void EnableAllocationTracking(bool bEnable)
 {

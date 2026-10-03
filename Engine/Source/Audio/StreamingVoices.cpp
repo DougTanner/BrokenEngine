@@ -73,7 +73,8 @@ void StreamingVoices::Update(float fDeltaTime)
 	if (mpCurrentStream != nullptr)
 	{
 #if defined(BT_DEBUG)
-		mpCurrentStream->UpdateRequests(AudioStreamingFixture::AllowCurrentRequests());
+		AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire);
+		mpCurrentStream->UpdateRequests(pFixture == nullptr || !(pFixture->mFlags & AudioStreamingFixture::Flags::kPublicationStopped));
 #else
 		mpCurrentStream->UpdateRequests(true);
 #endif
@@ -81,7 +82,8 @@ void StreamingVoices::Update(float fDeltaTime)
 	if (!mPreviousStreams.empty())
 	{
 #if defined(BT_DEBUG)
-		mPreviousStreams.back()->UpdateRequests(AudioStreamingFixture::AllowNewestFadeRequests());
+		AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire);
+		mPreviousStreams.back()->UpdateRequests(pFixture == nullptr || !(pFixture->mFlags & AudioStreamingFixture::Flags::kControlledPublication));
 #else
 		mPreviousStreams.back()->UpdateRequests(true);
 #endif
@@ -190,7 +192,7 @@ void StreamingVoices::CreateStream(common::crc_t uiAudioCrc)
 		mpCurrentStream = std::make_unique<StreamingVoice>(mpAudioEngine, pVoice, &rLazyChunk);
 #if defined(BT_DEBUG)
 		mpCurrentStream->mpAudioStreamingControl = AudioStreamingFixture::CreateVoiceControl(*mpCurrentStream);
-		AudioStreamingFixture::RecordMain(AudioStreamingFixturePhase::kStartup, std::numeric_limits<uint32_t>::max(), uiAudioCrc, 0, static_cast<uint64_t>(rLazyChunk.header.iSize), AudioStreamingFixtureQueueState::kFree, 0, false);
+		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kStartup, std::numeric_limits<uint32_t>::max(), uiAudioCrc, 0, static_cast<uint64_t>(rLazyChunk.header.iSize), AudioStreamingFixtureQueueState::kFree, 0, false);
 #endif
 	}
 	else

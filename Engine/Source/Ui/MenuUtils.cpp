@@ -12,9 +12,9 @@ common::ScopedWorkbufferAllocation<char*> AppendUtf8(common::Workbuffer& rWorkbu
 {
 	// Reserve the worst case (4 UTF-8 bytes per code point + the null terminator), encode in a single pass, then
 	// shrink to the actual length. The returned move-only handle owns the frame, so the bytes stay valid through
-	// the caller's full-expression (the implicit const char* hands straight to the consuming ImGui call).
+	// the caller's full-expression, including the consuming ImGui call's read through mpData.
 	common::ScopedWorkbufferAllocation<char*> scopedAllocation = rWorkbuffer.PushBuffer<char*>(static_cast<int64_t>(u32String.size()) * 4 + 1);
-	char* const pcBase = scopedAllocation;
+	char* const pcBase = scopedAllocation.mpData;
 	char* pcWrite = pcBase;
 	for (char32_t cCodePoint : u32String)
 	{
@@ -163,9 +163,6 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float f
 
 #if defined(BT_CLIENT)
 
-namespace
-{
-
 constexpr float kfActivationDistancePixels = 350.0f;
 constexpr float kfSlideRate = 8.0f;
 constexpr float kfPanelRounding = 8.0f;
@@ -218,23 +215,21 @@ constexpr MenuChrome kMenuChromes[]
 };
 static_assert(std::size(kMenuChromes) == static_cast<size_t>(engine::UiTheme::kCount));
 
-const MenuChrome& GetMenuChrome()
+static const MenuChrome& GetMenuChrome()
 {
 	return kMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
 }
 
-ImVec4 LerpColor(const ImVec4& rf4A, const ImVec4& rf4B, float fT)
+static ImVec4 LerpColor(const ImVec4& rf4A, const ImVec4& rf4B, float fT)
 {
 	return ImVec4(std::lerp(rf4A.x, rf4B.x, fT), std::lerp(rf4A.y, rf4B.y, fT), std::lerp(rf4A.z, rf4B.z, fT), std::lerp(rf4A.w, rf4B.w, fT));
 }
 
 // GetColorU32 additionally multiplies by style.Alpha, so BeginDisabled dims custom chrome like stock widgets
-ImU32 ChromeColor(const ImVec4& rf4Color, float fAlphaScale = 1.0f)
+static ImU32 ChromeColor(const ImVec4& rf4Color, float fAlphaScale = 1.0f)
 {
 	return ImGui::GetColorU32(ImVec4(rf4Color.x, rf4Color.y, rf4Color.z, rf4Color.w * fAlphaScale));
 }
-
-} // namespace
 
 float ComputeMouseOpennessTarget(ImVec2 vFixedExtent, ImVec2 vAnchor, float fPivotX)
 {
@@ -293,7 +288,7 @@ float MenuButtonsWidth(std::initializer_list<std::u32string_view> aLabels)
 	float fWidth = 0.0f;
 	for (std::u32string_view u32Label : aLabels)
 	{
-		fWidth = std::max(fWidth, ImGui::CalcTextSize(AppendUtf8(rWorkbuffer, u32Label)).x);
+		fWidth = std::max(fWidth, ImGui::CalcTextSize(AppendUtf8(rWorkbuffer, u32Label).mpData).x);
 	}
 	return fWidth + ImGui::GetStyle().FramePadding.x * 4.0f;
 }

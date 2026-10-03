@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -56,9 +57,9 @@ namespace toolcli
 		bool bKillOnJobClose = false;
 		bool bNoWindow = false;
 		// When set, each read chunk goes to the sink instead of ProcessResult::output.
-		std::function<void(const char*, size_t)> outputSink;
+		std::function<void(std::span<const char>)> OutputSink;
 		// When set, receives the composed failure text; null stays silent.
-		std::function<void(std::string_view)> failureSink;
+		std::function<void(std::string_view)> FailureSink;
 	};
 
 	// pExecutable may be null to search PATH using the first argument.

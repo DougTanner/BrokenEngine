@@ -136,7 +136,7 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 #if defined(BT_CLIENT)
 	engine::sound_t* __restrict puiSounds = nullptr;
 #endif
-	engine::alignment_t* __restrict pAlignments = nullptr;
+	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecExplosionDirections, rSelf.pVecStoredDirections, rSelf.puiRegistryTargets, rSelf.pfTimes, rSelf.pfDeltaRotationDelays, rSelf.pfDeltaRotations, rSelf.pfNextJitter, rSelf.pfDeltaRotationMax, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pfExhaustLengths, rSelf.pAlignments); }
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf) { return std::tie(rSelf.puiSounds); }
@@ -173,7 +173,7 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 		engine::registry_id_t uiTarget;
 		float fAcceleration = 0.0f;
 		MissileFlags_t flags;
-		engine::alignment_t alignment {};
+		engine::AlignmentIdentifier alignment {};
 		float fDeltaRotationDelay = 0.0f;
 		float fDeltaRotation = 0.0f;
 		float fDeltaRotationMax = 0.0f;

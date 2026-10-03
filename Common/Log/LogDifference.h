@@ -26,10 +26,15 @@ struct ScopedLogDifferenceContext
 
 inline constexpr int kiLogDifferencePrecision = 3;
 
-// Routes a difference value into the allocation-free Wb/WbV* formatters (the no-float-format rule) so a float-bearing
-// field diff never reaches the default heap-allocating std::format path; non-float types pass through unchanged.
 template <typename T>
-inline auto WrapLogDifferenceValue(const T& rValue)
+using LogDifferenceValue = std::conditional_t<std::is_same_v<T, float> || std::is_same_v<T, double>, Wb,
+	std::conditional_t<std::is_same_v<T, XMFLOAT2>, WbV2,
+	std::conditional_t<std::is_same_v<T, XMFLOAT3>, WbV3,
+	std::conditional_t<std::is_same_v<T, XMFLOAT4> || std::is_same_v<T, XMFLOAT4A> || std::is_same_v<T, XMVECTOR>, WbV4, std::decay_t<const T&>>>>>;
+
+// Keeps float-bearing diffs on the allocation-free Wb/WbV* formatters instead of the default heap-allocating std::format path.
+template <typename T>
+inline LogDifferenceValue<T> WrapLogDifferenceValue(const T& rValue)
 {
 	if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
 	{
@@ -51,6 +56,10 @@ inline auto WrapLogDifferenceValue(const T& rValue)
 	{
 		return WbV4(XMLoadFloat4A(&rValue), kiLogDifferencePrecision);
 	}
+	else if constexpr (std::is_same_v<T, XMVECTOR>)
+	{
+		return WbV4(rValue, kiLogDifferencePrecision);
+	}
 	else
 	{
 		return rValue;
@@ -62,7 +71,7 @@ template <FixedString NAME, typename T>
 inline bool LogDifference(const T& rOne, const T& rTwo)
 {
 	bool bEqual = false;
-	if constexpr (std::is_same_v<T, XMFLOAT2> || std::is_same_v<T, XMFLOAT3> || std::is_same_v<T, XMFLOAT4> || std::is_same_v<T, XMFLOAT4A>)
+	if constexpr (std::is_same_v<T, XMFLOAT2> || std::is_same_v<T, XMFLOAT3> || std::is_same_v<T, XMFLOAT4> || std::is_same_v<T, XMFLOAT4A> || std::is_same_v<T, XMVECTOR>)
 	{
 		bEqual = std::memcmp(&rOne, &rTwo, sizeof(T)) == 0;
 	}
@@ -84,7 +93,7 @@ template <FixedString NAME, typename T>
 inline bool LogDifference(int64_t iIndex, const T& rOne, const T& rTwo)
 {
 	bool bEqual = false;
-	if constexpr (std::is_same_v<T, XMFLOAT2> || std::is_same_v<T, XMFLOAT3> || std::is_same_v<T, XMFLOAT4> || std::is_same_v<T, XMFLOAT4A>)
+	if constexpr (std::is_same_v<T, XMFLOAT2> || std::is_same_v<T, XMFLOAT3> || std::is_same_v<T, XMFLOAT4> || std::is_same_v<T, XMFLOAT4A> || std::is_same_v<T, XMVECTOR>)
 	{
 		bEqual = std::memcmp(&rOne, &rTwo, sizeof(T)) == 0;
 	}
@@ -100,9 +109,5 @@ inline bool LogDifference(int64_t iIndex, const T& rOne, const T& rTwo)
 
 	return bEqual;
 }
-
-// XMVECTOR overloads (declared here, defined in LogDifference.cpp)
-bool XM_CALLCONV LogDifference_Vec(std::string_view name, FXMVECTOR rOne, FXMVECTOR rTwo);
-bool XM_CALLCONV LogDifference_Vec(std::string_view name, int64_t iIndex, FXMVECTOR rOne, FXMVECTOR rTwo);
 
 } // namespace common

@@ -5,11 +5,8 @@
 namespace engine
 {
 
-namespace
-{
-
 template <typename KEYFRAME>
-void FindKeyframePair(const KEYFRAME* pKeyframes, uint32_t uiKeyframeCount, float fTime, uint32_t& ruiKeyframe0, uint32_t& ruiKeyframe1)
+static void FindKeyframePair(const KEYFRAME* pKeyframes, uint32_t uiKeyframeCount, float fTime, uint32_t& ruiKeyframe0, uint32_t& ruiKeyframe1)
 {
 	if (fTime <= pKeyframes[0].fTime)
 	{
@@ -33,8 +30,6 @@ void FindKeyframePair(const KEYFRAME* pKeyframes, uint32_t uiKeyframeCount, floa
 	ruiKeyframe0 = uiUpperIndex > 0 ? uiUpperIndex - 1 : 0;
 	ruiKeyframe1 = uiUpperIndex < uiKeyframeCount ? uiUpperIndex : uiKeyframeCount - 1;
 }
-
-} // namespace
 
 void AnimationData::Load(const std::byte* pAnimationData, int64_t iAnimationBytes, common::crc_t crc)
 {
@@ -215,11 +210,11 @@ int64_t AnimationData::SkinnedMaterialCount(uint32_t uiMaterialCount) const
 void AnimationData::EvaluateAnimation(int64_t iAnimationIndex, float fTime, uint32_t uiMaterialCount, common::MeshData* pMeshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const
 {
 	auto pWorldMatrices = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMMATRIX*>(mHeader.skeleton.uiNodeCount * static_cast<int64_t>(sizeof(XMMATRIX)));
-	EvaluateWorldMatrices(iAnimationIndex, fTime, pWorldMatrices);
+	EvaluateWorldMatrices(iAnimationIndex, fTime, pWorldMatrices.mpData);
 
 	for (uint32_t uiMaterialIndex = 0; uiMaterialIndex < uiMaterialCount; ++uiMaterialIndex)
 	{
-		EvaluateMaterial(uiMaterialIndex, pWorldMatrices, pMeshData + uiMaterialIndex, pJointMatrices, iJointMatrixOffset);
+		EvaluateMaterial(uiMaterialIndex, pWorldMatrices.mpData, pMeshData + uiMaterialIndex, pJointMatrices, iJointMatrixOffset);
 
 		const common::MaterialInfo& rMaterialInfo = mpMaterialInfos[uiMaterialIndex];
 		if (rMaterialInfo.flags & common::MaterialFlags::kSkinned)
@@ -336,7 +331,7 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 	int64_t iTotalSize = 3 * iVecSize;
 
 	auto pBufferAlloc = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(iTotalSize);
-	std::byte* pBuffer = static_cast<std::byte*>(pBufferAlloc);
+	std::byte* pBuffer = static_cast<std::byte*>(pBufferAlloc.mpData);
 	XMVECTOR* pTranslations = reinterpret_cast<XMVECTOR*>(pBuffer);
 	XMVECTOR* pRotations    = reinterpret_cast<XMVECTOR*>(pBuffer + iVecSize);
 	XMVECTOR* pScales       = reinterpret_cast<XMVECTOR*>(pBuffer + 2 * iVecSize);

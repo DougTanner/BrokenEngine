@@ -232,6 +232,7 @@
   {
     "id": "v56-abbreviations",
     "expected": [
+      "rule3",
       "rule56"
     ],
     "code": [

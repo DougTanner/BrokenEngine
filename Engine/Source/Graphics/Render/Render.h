@@ -61,8 +61,8 @@ struct RetainedAreaBasis
 
 	[[nodiscard]] std::optional<XMFLOAT2> Advance(GridCoord cameraCoord)
 	{
-		int64_t iStepX = static_cast<int64_t>(cameraCoord.x) - static_cast<int64_t>(coord.x);
-		int64_t iStepY = static_cast<int64_t>(cameraCoord.y) - static_cast<int64_t>(coord.y);
+		int64_t iStepX = static_cast<int64_t>(cameraCoord.iX) - static_cast<int64_t>(coord.iX);
+		int64_t iStepY = static_cast<int64_t>(cameraCoord.iY) - static_cast<int64_t>(coord.iY);
 		XMFLOAT2 f2Offset = MakeRenderBasis(coord, cameraCoord).f2Offset;
 		coord = cameraCoord;
 		if (iStepX < -1 || iStepX > 1 || iStepY < -1 || iStepY > 1)

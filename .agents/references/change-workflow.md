@@ -29,7 +29,7 @@ This table is the authoritative spawned-agent routing policy; role definitions a
 - Host plan mode never substitutes for Change Workflow steps: a plan produced there still gets Step 3's `/plan-audit` (and the Tier-3 additions) before implementation
 - Every independent findings-only review or audit the table above assigns to `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including `/next-plan-review`, which runs directly in one fresh reviewer. `/comment-review` remains the `mechanic` exception; same-context `/implement-plan` and `/update-claude-docs` audits remain with their implementer; and `/coherence-review` may make only the narrow caller-authorized meaning-preserving wording and formatting fixes its worker contract allows, followed by that contract's self-check. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
 
-ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-5.6-sol medium); Sonnet -> Luna (gpt-5.6-luna max).
+ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max).
 OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no effort mapping.
 
 ## Main-session conduct

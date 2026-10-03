@@ -24,6 +24,7 @@ enum Threads
 };
 
 class ThreadLocal;
+template <typename FUNCTION> struct ThreadLocalEntry;
 inline thread_local ThreadLocal* gpThreadLocal = nullptr;
 
 // Note: "4096 - sizeof(DWORD)" is max length for OutputDebugString()
@@ -44,13 +45,14 @@ public:
 	// process entry), builds that thread's ThreadLocal and then invokes function with the callable's arguments.
 	// The requires-clause keeps std::jthread's stop_token detection working; decltype(auto) keeps reference results.
 	template <typename FUNCTION>
-	static auto Entry(FUNCTION&& function, int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true)
+	static ThreadLocalEntry<std::decay_t<FUNCTION>> Entry(FUNCTION&& function, int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true)
 	{
-		return [function = std::forward<FUNCTION>(function), iWorkbufferSize, iThreadId, bSetupExceptionHandling]<typename... ARGS>(ARGS&&... args) mutable -> decltype(auto)
-			requires std::invocable<std::decay_t<FUNCTION>&, ARGS...>
+		return
 		{
-			ThreadLocal threadLocal(iWorkbufferSize, iThreadId, bSetupExceptionHandling);
-			return std::invoke(function, std::forward<ARGS>(args)...);
+			.function = std::forward<FUNCTION>(function),
+			.iWorkbufferSize = iWorkbufferSize,
+			.iThreadId = iThreadId,
+			.bSetupExceptionHandling = bSetupExceptionHandling,
 		};
 	}
 
@@ -69,6 +71,8 @@ public:
 
 private:
 
+	template <typename> friend struct ThreadLocalEntry;
+
 	// iWorkbufferReserveSize is the workbuffer's address-space ceiling in bytes; 0 means 64x the initial size with that
 	// size floored at 64 KiB first, so a thread constructed with a small initial workbuffer still has room to grow into.
 	ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true, int64_t iWorkbufferReserveSize = 0);
@@ -81,6 +85,22 @@ public:
 
 	char* mpLogBuffer = nullptr;
 	Workbuffer mWorkbuffer;
+};
+
+template <typename FUNCTION>
+struct ThreadLocalEntry
+{
+	FUNCTION function;
+	int64_t iWorkbufferSize = 0;
+	std::optional<int64_t> iThreadId;
+	bool bSetupExceptionHandling = true;
+
+	template <typename... ARGS> requires std::invocable<FUNCTION&, ARGS...>
+	decltype(auto) operator()(ARGS&&... arguments)
+	{
+		ThreadLocal threadLocal(iWorkbufferSize, iThreadId, bSetupExceptionHandling);
+		return std::invoke(function, std::forward<ARGS>(arguments)...);
+	}
 };
 
 class LogTickScope

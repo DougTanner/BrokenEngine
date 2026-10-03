@@ -1,9 +1,11 @@
 <#
 .SYNOPSIS
-	Run a Broken Engine review or researcher assignment on Codex headless and capture its result.
+	Run one Claude Code task on Codex headless in a worktree and capture its result.
 
-	Explicit /codex-review calls default to the Sol role. Claude Code /plan-alternatives dispatches
-	may select the Opus role for blind researcher assignments. Codex uses its normal role dispatch.
+	-Agent selects a .codex/agents/<agent>.toml preset for model and reasoning effort (default sol);
+	-Model and -Effort override that preset's values. -Sandbox read-only (default) lets Codex only
+	read the worktree; workspace-write also lets it edit files there. The skill's -Sandbox input owns
+	the resources neither mode reaches, and its Rules route tasks needing them to Claude roles.
 
 .NOTES
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
@@ -14,22 +16,27 @@
 	Codex warns and runs standard.
 
 	One-call contract: a launch call (-Worktree/-PromptFile/-OutFile) starts Codex detached, then
-	waits up to 540 seconds for it and returns a single-line JSON receipt (schema
-	broken-engine-codex-review/v3) naming the run identifier and its status. A completed receipt is
-	followed by the line `--- findings ---` and then the out-file's bytes verbatim, so the findings
-	need no separate read. If the budget expires with the run still alive the receipt reports
-	running, and one further -Wait <run identifier> call resumes the same bounded wait. Every call
-	stays well below the caller's command timeout, and because the run is detached a killed call
-	never kills the review.
+	waits up to 540 seconds for it and returns a single-line JSON receipt naming the run identifier
+	and its status. A completed receipt is followed by the line `--- findings ---` and then the
+	out-file's bytes verbatim, so the result needs no separate read. If the budget expires with the
+	run still alive the receipt reports running, and one further -Wait <run identifier> call resumes
+	the same bounded wait. Every call stays well below the caller's command timeout, and because the
+	run is detached a killed call never kills the run.
+
+	Receipt fields: schemaVersion (broken-engine-codex-run/v1); status (completed, malformed,
+	failed, or running); runId; outFile (absolute out-file path, null when no run record exists);
+	exitCode (Codex's exit code, null while running or when unavailable); retried (true when a
+	second attempt ran); reason (null, or the malformed or failed cause).
 
 	Shape check and retry: a Codex exit of 0 whose result does not end in the verdict line every
-	prompt mandates (PASS, CHANGES-REQUIRED: <n>, or BLOCKED: <reason>) is malformed. The detached
-	run then feeds the same unchanged prompt to Codex a second time, publishing the first attempt's
-	bytes to the <out> sibling ending in -attempt1. Only the final attempt's bytes reach <out>. A
-	receipt reports retried, and status malformed when the final attempt still lacks that line;
-	a malformed receipt carries no separator and no findings, so drafting notes never reach the
-	caller. -NoRetry makes the run perform exactly one attempt, which is how a caller spends its own
-	single re-dispatch.
+	prompt mandates (PASS, CHANGES-REQUIRED: <n>, or BLOCKED: <reason>) is malformed. A read-only
+	detached run then feeds the same unchanged prompt to Codex a second time, publishing the first
+	attempt's bytes to the <out> sibling ending in -attempt1. Only the final attempt's bytes reach
+	<out>. A receipt reports retried, and status malformed when the final attempt still lacks that
+	line; a malformed receipt carries no separator and no result, so drafting notes never reach the
+	caller. -NoRetry makes the run perform exactly one attempt. A workspace-write run always
+	performs exactly one attempt, because a second attempt would start from the first attempt's
+	edits.
 
 	Exit codes: 0 for every wait whatever its status;
 	126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, any other
@@ -37,17 +44,17 @@
 	the failed receipt's reason carries its last non-empty stderr line capped at 200 characters, with
 	the full stderr retained as <runId>.stderr.txt beside the run records; when the CLI printed
 	nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed or
-	malformed status is `.agents/skills/codex-review/SKILL.md`, `### Fallback`.
+	malformed status is `.agents/skills/claude-to-codex/SKILL.md`, `## Rules`.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Launch')]
 param(
 	[Parameter(Mandatory, ParameterSetName = 'Launch')]
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
-	[string] $Worktree,                                   # session worktree checkout to review in (codex -C)
+	[string] $Worktree,                                   # session worktree checkout Codex runs in (codex -C)
 
 	[Parameter(Mandatory, ParameterSetName = 'Launch')]
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
-	[string] $PromptFile,                                 # file holding the assembled review prompt (fed on stdin)
+	[string] $PromptFile,                                 # file holding the caller-written prompt (fed on stdin)
 
 	[Parameter(Mandatory, ParameterSetName = 'Launch')]
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
@@ -59,8 +66,24 @@ param(
 
 	[Parameter(ParameterSetName = 'Launch')]
 	[Parameter(ParameterSetName = 'InternalRun')]
-	[ValidateSet('sol', 'opus')]
-	[string] $Agent = 'sol',                              # repository role configuration used for model and effort
+	[ValidateSet('fable', 'opus', 'sol', 'sonnet')]
+	[string] $Agent = 'sol',                              # .codex/agents preset used for model and effort
+
+	# The value rides the detached run's pre-quoted argument line, so a double quote is refused.
+	[Parameter(ParameterSetName = 'Launch')]
+	[Parameter(ParameterSetName = 'InternalRun')]
+	[ValidatePattern('^[^\s"]+$')]
+	[string] $Model,                                      # overrides the preset's model
+
+	[Parameter(ParameterSetName = 'Launch')]
+	[Parameter(ParameterSetName = 'InternalRun')]
+	[ValidatePattern('^[a-z][a-z0-9_-]*$')]
+	[string] $Effort,                                     # overrides the preset's model_reasoning_effort
+
+	[Parameter(ParameterSetName = 'Launch')]
+	[Parameter(ParameterSetName = 'InternalRun')]
+	[ValidateSet('read-only', 'workspace-write')]
+	[string] $Sandbox = 'read-only',                      # codex --sandbox; workspace-write never retries
 
 	[Parameter(Mandatory, ParameterSetName = 'Wait')]
 	[string] $Wait,                                       # run identifier from a running receipt
@@ -72,10 +95,10 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # Run records outlive the launching shell, so they live outside the repository.
-$recordDirectory = Join-Path ([System.IO.Path]::GetTempPath()) 'broken-engine-codex-review'
+$recordDirectory = Join-Path ([System.IO.Path]::GetTempPath()) 'broken-engine-codex-run'
 $temporaryDirectory = [System.IO.Path]::GetTempPath()
 
-# One wait stays 60 seconds under the caller's 600000 ms command cap; a longer review resumes with -Wait.
+# One wait stays 60 seconds under the caller's 600000 ms command cap; a longer run resumes with -Wait.
 $waitBudgetSeconds = 540
 $waitSleepSeconds = 5
 
@@ -118,7 +141,7 @@ function Get-AgentConfiguration([string] $RepositoryRoot, [string] $AgentName)
 function Write-Receipt([hashtable] $Fields)
 {
 	Write-Output ([ordered]@{
-		schemaVersion = 'broken-engine-codex-review/v3'
+		schemaVersion = 'broken-engine-codex-run/v1'
 		status = $Fields.status
 		runId = $Fields.runId
 		outFile = $Fields.outFile
@@ -139,7 +162,7 @@ function Get-DoneRecordPath([string] $RunId)
 	return (Join-Path $recordDirectory "$RunId.done.json")
 }
 
-# The one output contract shared by every routed review: the mandated final verdict line. Nothing
+# The one output contract shared by every run: the mandated final verdict line. Nothing
 # else about the result is judged here, so caller judgment stays the backstop for what this accepts.
 function Test-CodexVerdictLine([string] $Text)
 {
@@ -185,7 +208,7 @@ function Invoke-CodexAttempt([string] $StagingPath)
 	Get-Content -LiteralPath $PromptFile -Raw | & $codex.Source `
 		-a never `
 		exec `
-		--sandbox read-only `
+		--sandbox $Sandbox `
 		-C $Worktree `
 		-m $agentConfiguration.Model `
 		-c "model_reasoning_effort=`"$($agentConfiguration.ReasoningEffort)`"" `
@@ -221,7 +244,7 @@ function Wait-Run([string] $RunId)
 				else
 				{
 					Write-Receipt @{ status = 'completed'; runId = $RunId; outFile = $done.outFile; exitCode = 0; retried = $retried; reason = $null }
-					# The findings ride this call's own stdout, so a successful review needs no separate read.
+					# The result rides this call's own stdout, so a successful run needs no separate read.
 					Write-Output '--- findings ---'
 					# Console.Out keeps the out-file's bytes verbatim; the pipeline would append a trailing newline.
 					[Console]::Out.Write([string](Get-Content -LiteralPath $done.outFile -Raw -ErrorAction SilentlyContinue))
@@ -294,6 +317,15 @@ if (-not $codex)
 }
 
 $agentConfiguration = Get-AgentConfiguration $Worktree $Agent
+if ($Model)
+{
+	$agentConfiguration.Model = $Model
+}
+
+if ($Effort)
+{
+	$agentConfiguration.ReasoningEffort = $Effort
+}
 
 if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 {
@@ -302,7 +334,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$absolutePrompt = [System.IO.Path]::GetFullPath($PromptFile)
 	$absoluteOutput = [System.IO.Path]::GetFullPath($OutFile)
 	$runId = [guid]::NewGuid().ToString('N')
-	$detachedPrompt = Join-Path $temporaryDirectory "broken-engine-codex-review-$runId.prompt.md"
+	$detachedPrompt = Join-Path $temporaryDirectory "broken-engine-codex-run-$runId.prompt.md"
 
 	New-Item -ItemType Directory -Path $recordDirectory -Force | Out-Null
 	# Records are kept for repeat waits, so a launch is what bounds the directory.
@@ -320,7 +352,9 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$powershell = (Get-Process -Id $PID).Path
 	# One pre-quoted command line: an argument array would be re-escaped and would split these paths.
 	$noRetryArgument = if ($NoRetry) { ' -NoRetry' } else { '' }
-	$arguments = "-NoProfile -NonInteractive -File `"$PSCommandPath`" -InternalRunId `"$runId`" -Worktree `"$absoluteWorktree`" -PromptFile `"$detachedPrompt`" -OutFile `"$absoluteOutput`" -Agent `"$Agent`"$noRetryArgument"
+	$modelArgument = if ($Model) { " -Model `"$Model`"" } else { '' }
+	$effortArgument = if ($Effort) { " -Effort `"$Effort`"" } else { '' }
+	$arguments = "-NoProfile -NonInteractive -File `"$PSCommandPath`" -InternalRunId `"$runId`" -Worktree `"$absoluteWorktree`" -PromptFile `"$detachedPrompt`" -OutFile `"$absoluteOutput`" -Agent `"$Agent`" -Sandbox `"$Sandbox`"$modelArgument$effortArgument$noRetryArgument"
 	$detached = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru
 
 	[ordered]@{
@@ -336,8 +370,8 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 }
 
 # Detached-run mode: the caller is already gone, so the result reaches it only through the records below.
-$stagingOutput = Join-Path $temporaryDirectory "broken-engine-codex-review-$InternalRunId.output.md"
-$retryStagingOutput = Join-Path $temporaryDirectory "broken-engine-codex-review-$InternalRunId.output-retry.md"
+$stagingOutput = Join-Path $temporaryDirectory "broken-engine-codex-run-$InternalRunId.output.md"
+$retryStagingOutput = Join-Path $temporaryDirectory "broken-engine-codex-run-$InternalRunId.output-retry.md"
 $pendingOutput = Join-Path ([System.IO.Path]::GetDirectoryName($OutFile)) "$InternalRunId.partial.md"
 # Retained beside the run records: both attempts truncate and rewrite it, so it always holds the
 # stderr of the attempt whose exit code is reported.
@@ -355,7 +389,8 @@ try
 	if ($exitCode -eq 0)
 	{
 		$malformed = -not (Test-CodexVerdictLine ([string](Get-Content -LiteralPath $stagingOutput -Raw -ErrorAction SilentlyContinue)))
-		if ($malformed -and (-not $NoRetry))
+		# A workspace-write retry would start from the first attempt's edits, so only read-only retries.
+		if ($malformed -and (-not $NoRetry) -and ($Sandbox -ceq 'read-only'))
 		{
 			# The first attempt's bytes are the only evidence of what went wrong, so they are kept
 			# beside the result before the second attempt takes over the caller's out-file. An

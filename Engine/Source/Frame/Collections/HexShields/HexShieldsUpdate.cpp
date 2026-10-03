@@ -21,8 +21,8 @@ void HexShieldsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 		for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 		{
 			rCurrent.pf4Directions[j][i] = rPrevious.pf4Directions[j][i];
-			rCurrent.pfVertIntensities[j][i] = rPrevious.pfVertIntensities[j][i];
-			rCurrent.pfFragIntensities[j][i] = rPrevious.pfFragIntensities[j][i];
+			rCurrent.pfVertexIntensities[j][i] = rPrevious.pfVertexIntensities[j][i];
+			rCurrent.pfFragmentIntensities[j][i] = rPrevious.pfFragmentIntensities[j][i];
 		}
 	}
 }
@@ -30,9 +30,8 @@ void HexShieldsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 void HexShieldsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData)
 {
 	HexShieldsInterpolate& rHexShields = rFrameInterpolate.hexShields;
-	int64_t iIndex = rHexShields.IdToIndex(id);
+	int64_t iIndex = rHexShields.idToIndexMap.at(id);
 
-	// Write all owner-provided fields
 	rHexShields.pVecPositions[iIndex] = XMVectorSetW(rData.vecPosition, 1.0f);
 	rHexShields.pf4Transforms[0][iIndex] = rData.pf4Transforms[0];
 	rHexShields.pf4Transforms[1][iIndex] = rData.pf4Transforms[1];
@@ -43,33 +42,33 @@ void HexShieldsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t
 	for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 	{
 		rHexShields.pf4Directions[j][iIndex] = rData.pf4Directions[j];
-		rHexShields.pfVertIntensities[j][iIndex] = rData.pfVertIntensities[j];
-		rHexShields.pfFragIntensities[j][iIndex] = rData.pfFragIntensities[j];
+		rHexShields.pfVertexIntensities[j][iIndex] = rData.pfVertexIntensities[j];
+		rHexShields.pfFragmentIntensities[j][iIndex] = rData.pfFragmentIntensities[j];
 	}
 	rHexShields.pfLightingIntensities[iIndex] = rData.fLightingIntensity;
 	rHexShields.pfSizes[iIndex] = rData.fSize;
 	rHexShields.pfColorMixes[iIndex] = rData.fColorMix;
 }
 
-void HexShieldsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
+void HexShieldsPostRender::Update([[maybe_unused]] const game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
 {
 }
 
 void HexShieldsPostRender::Add(game::Frame& __restrict rFrame, hex_shields_t& rId, uint8_t uiTypeIndex)
 {
-	ASSERT(!rId.IsValid());
+	ASSERT(!(rId.uuid.iValue != 0));
 
 	HexShieldsInterpolate& rInterpolate = rFrame.interpolate.hexShields;
 	HexShieldsPostRender& rPostRender = rFrame.postRender.hexShields;
 
 	GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-	auto [uiSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
+	auto [iSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
 	rId = newId;
-	rPostRender.puiIds[uiSpawnIndex] = newId;
+	rPostRender.pIds[iSpawnIndex] = newId;
 
-	ZeroMemberRow(uiSpawnIndex, rInterpolate.Members());
-	rInterpolate.pVecPositions[uiSpawnIndex] = XMVectorSetW(XMVectorZero(), 1.0f);
-	rInterpolate.puiTypeIndices[uiSpawnIndex] = uiTypeIndex;
+	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
+	rInterpolate.pVecPositions[iSpawnIndex] = XMVectorSetW(XMVectorZero(), 1.0f);
+	rInterpolate.puiTypeIndices[iSpawnIndex] = uiTypeIndex;
 }
 
 void HexShieldsPostRender::Remove(game::Frame& __restrict rFrame, hex_shields_t& rId)

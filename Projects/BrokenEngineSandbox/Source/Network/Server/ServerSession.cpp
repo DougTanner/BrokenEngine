@@ -112,11 +112,11 @@ void ServerSession::ParseReceivedGamePackets()
 				{
 					// 8B global player ID + 1B bUseMissiles + 4B fNavigationDelay = 13 bytes (type byte already stripped)
 					const uint8_t* pCursor = rPacket.payload.data();
-					engine::global_id_t globalId {};
+					engine::GlobalId globalId {};
 					globalId.iValue = engine::ReadInt64(pCursor);
 					bool bUseMissiles = ReadBoolByte(pCursor);
 					float fNavigationDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
-					mpBroadcaster->QueueUpdatePlayerRequest({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .fNavigationDelay = fNavigationDelay});
+					mpBroadcaster->mPendingUpdatePlayerRequests.push_back({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay)});
 					break;
 				}
 				case GamePacketType::kClientCreateFleetRequest:
@@ -151,7 +151,7 @@ void ServerSession::ParseReceivedGamePackets()
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					engine::global_id_t memberGlobalPlayerId {engine::ReadInt64(pCursor)};
+					engine::GlobalId memberGlobalPlayerId {engine::ReadInt64(pCursor)};
 					mpFleetManager->QueueRespawnRequest({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .memberGlobalPlayerId = memberGlobalPlayerId});
 					break;
 				}
@@ -247,7 +247,7 @@ void ServerSession::ParseReceivedGamePackets()
 			// engine Server::Receive — so an uncaught throw would tear down ServerUpdate. Drop the single
 			// packet and continue, parity with Server::Receive/Client::Receive.
 			LOG(kNetwork, kDebug, "ServerSession::ParseReceivedGamePackets dropped corrupt packet (type {}) Client: {}: {}", static_cast<uint8_t>(eType), rPacket.iClientId, rException.what());
-			engine::gpServer->RecordGamePacketHandlerThrow(rPacket);
+			engine::gpServer->RecordContractViolation(rPacket.iClientId, engine::ContractViolationKind::kCorrupt, "game packet handler threw", rPacket.uiPacketType, std::ssize(rPacket.payload) + 1);
 		}
 	}
 }
@@ -258,7 +258,7 @@ void ServerSession::BeforeNetworkPoll()
 	// injected player requests, so retain them; a positive delta keeps their existing one-update lifetime.
 	if (gpGame->mfLastDeltaTime > 0.0f)
 	{
-		mpBroadcaster->ClearPendingRequests();
+		mpBroadcaster->mPendingUpdatePlayerRequests.clear();
 	}
 	// Fleet request queues drain inside their own Process*Requests, so there is nothing left to clear here.
 }
@@ -306,7 +306,7 @@ void ServerSession::OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<gam
 	engine::gpReplay->RetireCoordinate(coord, std::move(pFrame));
 }
 
-void ServerSession::SendAssignPlayer(int64_t iClientId, engine::global_id_t globalId, engine::GridCoord coord)
+void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coord)
 {
 	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
 	if (pClient == nullptr)
@@ -332,7 +332,7 @@ void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWire
 	}
 
 	const GameMessages::PlayerStateDescriptor& rDescriptor = GameMessages::GetPlayerStateDescriptor(eWireType);
-	LOG(kNetwork, kInfo, "ServerSession::SendPlayerState State: {} Client: {} GlobalPlayer: {} Grid: ({},{})", rDescriptor.pcName, iClientId, iGlobalPlayerId, coord.x, coord.y);
+	LOG(kNetwork, kInfo, "ServerSession::SendPlayerState State: {} Client: {} GlobalPlayer: {} Grid: ({},{})", rDescriptor.pcName, iClientId, iGlobalPlayerId, coord.iX, coord.iY);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -380,7 +380,7 @@ void ServerSession::ResetClientsForLoad()
 {
 	mpRuntime->mpServer->AdvanceLoadGeneration();
 	LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad");
-	// Heap: re-link rebuilds registry entries and authorizedCoords; pending state cleared across managers
+	// Heap: re-link rebuilds registry entries and authorizedCoordinates; pending state cleared across managers
 	ScopedSuppressAllocationTracking suppress;
 
 	mpRuntime->mpServer->BroadcastLoadNotification();
@@ -426,7 +426,7 @@ void ServerSession::ResetClientsForLoad()
 
 int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientGuid& rGuid, RelinkContext eContext)
 {
-	if (rGuid.IsEmpty())
+	if ((rGuid.uiHigh == 0 && rGuid.uiLow == 0))
 	{
 		return 0;
 	}
@@ -459,11 +459,11 @@ int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientG
 		SendPlayerState(iClientId, PlayerStateWireType::kSpawned, rEntry.globalId.iValue, rEntry.coord);
 		if (eContext == RelinkContext::kConnect)
 		{
-			LOG(kNetwork, kVerbose, "ServerClientManager::NewClients Re-linked Client: {} GlobalPlayer: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.x, rEntry.coord.y);
+			LOG(kNetwork, kVerbose, "ServerClientManager::NewClients Re-linked Client: {} GlobalPlayer: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.iX, rEntry.coord.iY);
 		}
 		else
 		{
-			LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad Re-linked Client: {} GlobalPlayer: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.x, rEntry.coord.y);
+			LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad Re-linked Client: {} GlobalPlayer: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.iX, rEntry.coord.iY);
 		}
 	}
 

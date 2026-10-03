@@ -19,7 +19,7 @@ using BillboardFlags_t = common::Flags<BillboardFlags>;
 
 struct BillboardsType
 {
-	common::crc_t crc = 0;
+	common::crc_t uiCrc = 0;
 	float fSize = 1.0f;
 	float fAlpha = 1.0f;
 	uint8_t uiGameType = 0;
@@ -28,16 +28,13 @@ struct BillboardsType
 struct BillboardsInterpolate : public Collection<BillboardsInterpolate, CollectionFlags::kIdToIndex>,
 	public TypeRegistry<BillboardsType>
 {
-	static constexpr const char* kName = "Billboards";
-	static constexpr common::crc_t kCrc = common::CrcConsteval("Billboards");
-
-	// Allocate and copy
-	static void AllocateAndCopy(BillboardsInterpolate& rCurrent, const BillboardsInterpolate& rPrevious);
+	static constexpr const char* kpcName = "Billboards";
+	static constexpr common::crc_t kuiCrc = common::CrcConsteval("Billboards");
 
 	// SyncData for parent-provided values
 	struct SyncData
 	{
-		XMVECTOR vecPosition;
+		XMVECTOR vecPosition {};
 		uint8_t uiTypeIndex = 0;
 		BillboardFlags_t flags;
 		float fRotation = 0.0f;
@@ -47,21 +44,21 @@ struct BillboardsInterpolate : public Collection<BillboardsInterpolate, Collecti
 	// Sync owned billboard with parent-provided data
 	static void Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData);
 
-	// Interpolate
-	static void Update(game::FrameInterpolate& __restrict rFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
+	static void Update(const game::FrameInterpolate& __restrict rFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
 	uint8_t* __restrict puiTypeIndices = nullptr;
 	BillboardFlags_t* __restrict pFlags = nullptr;
 	float* __restrict pfRotations = nullptr;
 	float* __restrict pfExtra = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
-	auto Members(this auto&& rSelf) { return std::tie(rSelf.puiTypeIndices, rSelf.pFlags, rSelf.pfRotations, rSelf.pfExtra, rSelf.pVecPositions); }
+	auto Members(this auto&& rSelf)
+	{
+		return std::tie(rSelf.puiTypeIndices, rSelf.pFlags, rSelf.pfRotations, rSelf.pfExtra, rSelf.pVecPositions);
+	}
 
-	// Graphics resources
 	static void GraphicsResources();
 
-	// Render
-	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords);
+	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates);
 	static void Render(const game::FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 };
@@ -69,17 +66,15 @@ using billboard_t = BillboardsInterpolate::id_t;
 
 struct BillboardsPostRender : public Collection<BillboardsPostRender>
 {
-	// Allocate and copy
-	static void AllocateAndCopy(BillboardsPostRender& rCurrent, const BillboardsPostRender& rPrevious);
-
-	// Update
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 	static void Add(game::Frame& __restrict rFrame, billboard_t&& rId, uint8_t) = delete;
 	static void Add(game::Frame& __restrict rFrame, billboard_t& rId, uint8_t uiTypeIndex);
-	static void Remove(game::Frame& __restrict rFrame, billboard_t& rId);
 
-	billboard_t* __restrict puiIds = nullptr;
-	auto Members(this auto&& rSelf) { return std::tie(rSelf.puiIds); }
+	billboard_t* __restrict pIds = nullptr;
+	auto Members(this auto&& rSelf)
+	{
+		return std::tie(rSelf.pIds);
+	}
 
 };
 

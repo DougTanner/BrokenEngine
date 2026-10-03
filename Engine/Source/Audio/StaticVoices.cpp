@@ -161,14 +161,14 @@ void StaticVoices::BeginFadeOut(StaticVoice& rVoice)
 
 void StaticVoices::EndFadeOut(StaticVoice& rVoice)
 {
-	rVoice.mFlags.Clear(StaticVoiceFlags::kFadingOut);
+	rVoice.mFlags.Set(StaticVoiceFlags::kFadingOut, false);
 	--miFadeOutCount;
 }
 
 void StaticVoices::ActivateVoice(StaticVoice& rVoice, IXAudio2SourceVoice* pVoice)
 {
 	rVoice.mpVoice = pVoice;
-	rVoice.mFlags.Clear(StaticVoiceFlags::kInactive);
+	rVoice.mFlags.Set(StaticVoiceFlags::kInactive, false);
 }
 
 void StaticVoices::RetireVoice(StaticVoice& rVoice)
@@ -304,15 +304,15 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 	// RAII handle keeps the workbuffer frame alive; raw pointer below avoids
 	// std::sort deducing _RanIt from the ScopedWorkbufferAllocation type.
 	auto pPriorityScratch = rWorkbuffer.PushBuffer<PriorityEntry*>(iSoundCount * static_cast<int64_t>(sizeof(PriorityEntry)));
-	PriorityEntry* pPriority = pPriorityScratch;
+	PriorityEntry* pPriority = pPriorityScratch.mpData;
 
 	// Hysteresis floor: candidates below 0.8 * cull never enter the priority list,
 	// so a sound oscillating around the boundary doesn't toggle slots each frame.
 	int64_t iCandidateCount = 0;
 	for (int64_t i = 0; i < iSoundCount; ++i)
 	{
-		sound_t id = rSoundsPostRender.puiIds[i];
-		int64_t iIndex = rSoundsInterpolate.IdToIndex(id);
+		sound_t id = rSoundsPostRender.pIds[i];
+		int64_t iIndex = rSoundsInterpolate.idToIndexMap.at(id);
 		float fSoundVolume = rSoundsInterpolate.pfVolumes[iIndex];
 		float fDistance = common::Distance(Rebase(emitterBasis, rSoundsInterpolate.pVecPositions[iIndex]), mVecListenerPosition);
 		float fAttenuated = ComputeAttenuatedVolume(fDistance, fSoundVolume);
@@ -334,8 +334,8 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 	{
 		float fAttenuated = pPriority[iSlot].fAttenuated;
 		int64_t i = pPriority[iSlot].iSoundIndex;
-		sound_t id = rSoundsPostRender.puiIds[i];
-		int64_t iIndex = rSoundsInterpolate.IdToIndex(id);
+		sound_t id = rSoundsPostRender.pIds[i];
+		int64_t iIndex = rSoundsInterpolate.idToIndexMap.at(id);
 		float fSoundVolume = rSoundsInterpolate.pfVolumes[iIndex];
 		float fPitch = rSoundsInterpolate.pfPitches[iIndex];
 		XMVECTOR vecPosition = Rebase(emitterBasis, rSoundsInterpolate.pVecPositions[iIndex]);
@@ -475,7 +475,7 @@ void StaticVoices::DeactivationPass()
 		// guards so it never persists to the next frame even if PriorityPass's marking
 		// conditions change.
 		bool bActivated = (rVoice.mFlags & StaticVoiceFlags::kActivatedThisFrame);
-		rVoice.mFlags.Clear(StaticVoiceFlags::kActivatedThisFrame);
+		rVoice.mFlags.Set(StaticVoiceFlags::kActivatedThisFrame, false);
 
 		if (rVoice.mFlags & StaticVoiceFlags::kInactive)
 		{

@@ -10,7 +10,7 @@
 namespace game
 {
 
-void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rData, engine::alignment_t playerAlignment)
+void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rData, engine::AlignmentIdentifier playerAlignment)
 {
 	switch (eType)
 	{

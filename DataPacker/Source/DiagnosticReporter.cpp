@@ -3,18 +3,16 @@
 namespace diagnostic
 {
 
-namespace
-{
 
-std::atomic<bool> sbValidatedLinkedWorktree = false;
+static std::atomic<bool> sbValidatedLinkedWorktree = false;
 
-std::string PathToUtf8(const std::filesystem::path& rPath)
+static std::string PathToUtf8(const std::filesystem::path& rPath)
 {
-	const std::u8string value = rPath.u8string();
+	std::u8string value = rPath.u8string();
 	return std::string(reinterpret_cast<const char*>(value.data()), value.size());
 }
 
-std::wstring Utf8ToWide(std::string_view value)
+static std::wstring Utf8ToWide(std::string_view value)
 {
 	if (value.empty())
 	{
@@ -33,9 +31,9 @@ std::wstring Utf8ToWide(std::string_view value)
 	return wideValue;
 }
 
-std::string NormalizeUtf8(std::string_view value)
+static std::string NormalizeUtf8(std::string_view value)
 {
-	const std::wstring wideValue = Utf8ToWide(value);
+	std::wstring wideValue = Utf8ToWide(value);
 	if (wideValue.empty())
 	{
 		return {};
@@ -46,7 +44,7 @@ std::string NormalizeUtf8(std::string_view value)
 	return utf8Value;
 }
 
-std::string BuildModalText(const Record& rRecord)
+static std::string BuildModalText(const Record& rRecord)
 {
 	if (rRecord.exportFailures.empty())
 	{
@@ -72,7 +70,6 @@ std::string BuildModalText(const Record& rRecord)
 	return text;
 }
 
-} // namespace
 
 void MarkValidatedLinkedWorktree()
 {
@@ -90,9 +87,7 @@ ButtonResult Report(const Record& rRecord)
 	{
 		LOG(kDefault, kWarning, "{}: {}", rRecord.title, text);
 	}
-	// An automated run has no human to click the modal, so it must end with an exit code instead of blocking forever. The
-	// cost is that an OK/Cancel prompt, such as a pack file locked by a running client, now cancels and fails that asset
-	// type rather than waiting for the lock to clear.
+	// Automated runs skip modal input; cancelling a locked pack prompt fails the affected asset type.
 	static const bool sbNoninteractiveEnvironment = []()
 	{
 		wchar_t pcNoninteractive[2] {};

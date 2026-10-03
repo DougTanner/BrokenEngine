@@ -5,117 +5,116 @@
 
 #include <filesystem>
 #include <iostream>
+#include <iterator>
 #include <optional>
+#include <span>
 
 namespace toolcli
 {
-	namespace
+	using coordination::CurrentUtcTimestamp;
+	using coordination::Guard;
+	using coordination::HasOwner;
+	using coordination::Locator;
+	using coordination::NewMetadata;
+	using coordination::PrintMetadata;
+	using coordination::ReadMetadata;
+	using coordination::ValidateMetadataEnvelope;
+	using coordination::WriteMetadataAtomic;
+
+	static std::optional<Locator> MakeHarnessLocator(std::wstring_view key)
 	{
-		using coordination::CurrentUtcTimestamp;
-		using coordination::Guard;
-		using coordination::HasOwner;
-		using coordination::Locator;
-		using coordination::NewMetadata;
-		using coordination::PrintMetadata;
-		using coordination::ReadMetadata;
-		using coordination::ValidateMetadataEnvelope;
-		using coordination::WriteMetadataAtomic;
-
-		std::optional<Locator> MakeHarnessLocator(std::wstring_view key)
+		std::optional<std::wstring> logicalKey = coordination::NormalizeRelativeKey(key);
+		if (!logicalKey)
 		{
-			std::optional<std::wstring> logicalKey = coordination::NormalizeRelativeKey(key);
-			if (!logicalKey)
-			{
-				Fail("invalid harness lock key");
-				return std::nullopt;
-			}
-
-			std::optional<Locator> locator = coordination::MakeLocator(L"harness", *logicalKey);
-			if (!locator)
-			{
-				Fail("could not resolve harness lock storage");
-			}
-			return locator;
+			Fail("invalid harness lock key");
+			return std::nullopt;
 		}
 
-		std::optional<Locator> ParseLocator(int iArgumentCount, wchar_t* pArgumentValues[], int iStartIndex, std::wstring& rOwner, std::wstring& rExpectedOwner, std::wstring& rSession, std::wstring& rWorktree)
+		std::optional<Locator> locator = coordination::MakeLocator(L"harness", *logicalKey);
+		if (!locator)
 		{
-			std::wstring key;
-			for (int i = iStartIndex; i < iArgumentCount; ++i)
-			{
-				std::wstring_view argument = pArgumentValues[i];
-				std::wstring* pDestination = nullptr;
-				if (argument == L"--key")
-				{
-					pDestination = &key;
-				}
-				else if (argument == L"--owner")
-				{
-					pDestination = &rOwner;
-				}
-				else if (argument == L"--expect")
-				{
-					pDestination = &rExpectedOwner;
-				}
-				else if (argument == L"--session")
-				{
-					pDestination = &rSession;
-				}
-				else if (argument == L"--worktree")
-				{
-					pDestination = &rWorktree;
-				}
-				else
-				{
-					Fail("unknown lock argument: " + WideToUtf8(argument));
-					return std::nullopt;
-				}
-				if (++i >= iArgumentCount)
-				{
-					Fail("lock option requires a value");
-					return std::nullopt;
-				}
-				*pDestination = pArgumentValues[i];
-			}
-			if (key.empty())
-			{
-				Fail("harness lock requires --key");
-				return std::nullopt;
-			}
-			// WideToUtf8 rejects malformed UTF-16 instead of substituting, so an empty result for a nonempty value means the
-			// conversion failed. These values reach the lock path and metadata, so reject them before anything is written.
-			// --expect is only compared against stored metadata and never persisted, so a failed conversion there just fails the match.
-			for (const std::wstring* pValue : {&key, &rOwner, &rSession, &rWorktree})
-			{
-				if (!pValue->empty() && WideToUtf8(*pValue).empty())
-				{
-					Fail("lock option value is not valid text");
-					return std::nullopt;
-				}
-			}
-			return MakeHarnessLocator(key);
+			Fail("could not resolve harness lock storage");
 		}
-
-		bool StampHarnessHeartbeat(const std::filesystem::path& rPath, nlohmann::json& rMetadata)
-		{
-			rMetadata["heartbeatAt"] = CurrentUtcTimestamp();
-			rMetadata["heartbeatPid"] = ::GetCurrentProcessId();
-			return WriteMetadataAtomic(rPath, rMetadata);
-		}
-
+		return locator;
 	}
 
-	int RunHarnessLockCommand(int iArgumentCount, wchar_t* pArgumentValues[])
+	static std::optional<Locator> ParseLocator(std::span<const wchar_t* const> argumentValues, int iStartIndex, std::wstring& rOwner, std::wstring& rExpectedOwner, std::wstring& rSession, std::wstring& rWorktree)
 	{
-		if (iArgumentCount < 3)
+		std::wstring key;
+		for (int i = iStartIndex; i < std::ssize(argumentValues); ++i)
+		{
+			std::wstring_view argument = argumentValues[i];
+			std::wstring* pDestination = nullptr;
+			if (argument == L"--key")
+			{
+				pDestination = &key;
+			}
+			else if (argument == L"--owner")
+			{
+				pDestination = &rOwner;
+			}
+			else if (argument == L"--expect")
+			{
+				pDestination = &rExpectedOwner;
+			}
+			else if (argument == L"--session")
+			{
+				pDestination = &rSession;
+			}
+			else if (argument == L"--worktree")
+			{
+				pDestination = &rWorktree;
+			}
+			else
+			{
+				Fail("unknown lock argument: " + WideToUtf8(argument));
+				return std::nullopt;
+			}
+			if (++i >= std::ssize(argumentValues))
+			{
+				Fail("lock option requires a value");
+				return std::nullopt;
+			}
+			*pDestination = argumentValues[i];
+		}
+		if (key.empty())
+		{
+			Fail("harness lock requires --key");
+			return std::nullopt;
+		}
+		// WideToUtf8 rejects malformed UTF-16 instead of substituting, so an empty result for a nonempty value means the
+		// conversion failed. These values reach the lock path and metadata, so reject them before anything is written.
+		// --expect is only compared against stored metadata and never persisted, so a failed conversion there just fails the match.
+		for (const std::wstring* pValue : {&key, &rOwner, &rSession, &rWorktree})
+		{
+			if (!pValue->empty() && WideToUtf8(*pValue).empty())
+			{
+				Fail("lock option value is not valid text");
+				return std::nullopt;
+			}
+		}
+		return MakeHarnessLocator(key);
+	}
+
+	static bool StampHarnessHeartbeat(const std::filesystem::path& rPath, nlohmann::json& rMetadata)
+	{
+		rMetadata["heartbeatAt"] = CurrentUtcTimestamp();
+		rMetadata["heartbeatPid"] = ::GetCurrentProcessId();
+		return WriteMetadataAtomic(rPath, rMetadata);
+	}
+
+
+	int RunHarnessLockCommand(std::span<const wchar_t* const> argumentValues)
+	{
+		if (std::ssize(argumentValues) < 3)
 		{
 			Fail("lock requires token, claim, status, release, steal, or heartbeat");
 			return kiExitFailure;
 		}
-		std::wstring verb = ToLowerInvariant(pArgumentValues[2]);
+		std::wstring verb = ToLowerInvariant(argumentValues[2]);
 		if (verb == L"token")
 		{
-			if (iArgumentCount != 3)
+			if (std::ssize(argumentValues) != 3)
 			{
 				Fail("lock token accepts no arguments");
 				return kiExitFailure;
@@ -132,7 +131,7 @@ namespace toolcli
 		std::wstring expectedOwner;
 		std::wstring session;
 		std::wstring worktree;
-		std::optional<Locator> locator = ParseLocator(iArgumentCount, pArgumentValues, 3, owner, expectedOwner, session, worktree);
+		std::optional<Locator> locator = ParseLocator(argumentValues, 3, owner, expectedOwner, session, worktree);
 		if (!locator)
 		{
 			return kiExitFailure;
@@ -161,7 +160,7 @@ namespace toolcli
 		bool bContentionObserved = false;
 		std::string failureReason;
 		Guard guard(locator->path.wstring() + L".guard", bContentionObserved, failureReason);
-		if (!guard.IsValid())
+		if (!guard.mbValid)
 		{
 			Fail("could not acquire lock transition guard (" + failureReason + ")");
 			return kiExitFailure;
@@ -212,16 +211,19 @@ namespace toolcli
 			PrintMetadata(metadata);
 			return kiExitOk;
 		}
-		if (!bExists || ((verb == L"release" || verb == L"heartbeat") && !HasOwner(metadata, owner)) || (verb == L"steal" && !HasOwner(metadata, expectedOwner)))
+		if (!bExists)
 		{
-			if (bExists)
-			{
-				PrintMetadata(metadata);
-			}
-			else
-			{
-				std::cout << "{\"held\":false}\n";
-			}
+			std::cout << "{\"held\":false}\n";
+			return kiExitStateConflict;
+		}
+		if ((verb == L"release" || verb == L"heartbeat") && !HasOwner(metadata, owner))
+		{
+			PrintMetadata(metadata);
+			return kiExitStateConflict;
+		}
+		if (verb == L"steal" && !HasOwner(metadata, expectedOwner))
+		{
+			PrintMetadata(metadata);
 			return kiExitStateConflict;
 		}
 		if (verb == L"release")
@@ -264,7 +266,7 @@ namespace toolcli
 		bool bContentionObserved = false;
 		std::string failureReason;
 		Guard guard(locator->path.wstring() + L".guard", bContentionObserved, failureReason, iMaximumWaitMilliseconds);
-		if (!guard.IsValid())
+		if (!guard.mbValid)
 		{
 			return false;
 		}

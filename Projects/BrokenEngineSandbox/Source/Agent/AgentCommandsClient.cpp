@@ -26,7 +26,7 @@ int32_t ClientGridCoordValue(const nlohmann::json& rValue, std::string_view comm
 
 	// Every signed-int32 coordinate identifies a usable cell, so the only rejected integers are the ones a
 	// GridCoord cannot hold. The 3x3 neighbour ring and server adjacency deltas use checked addition
-	// (engine::TryAddGridCoord), which omits the neighbours a numeric-edge cell cannot represent.
+	// (engine::TryAddGridCoordinate), which omits the neighbours a numeric-edge cell cannot represent.
 	if (rValue.is_number_unsigned())
 	{
 		uint64_t uiValue = rValue.get<uint64_t>();
@@ -45,12 +45,9 @@ int32_t ClientGridCoordValue(const nlohmann::json& rValue, std::string_view comm
 	return static_cast<int32_t>(iValue);
 }
 
-namespace
-{
-
 // set_client_grid_coord: move the client's grid cell so automation can drive the cross-cell subscribe and
 // full-state adoption path. Schema: {"coord":[x,y]}.
-void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohmann::json& rResult)
+static void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	// Heap: validation errors and JSON result
 	ScopedSuppressAllocationTracking suppress;
@@ -97,7 +94,7 @@ void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohmann::json
 	{
 		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
 	}
-	if (!gpGame->ClientPlayerId().IsValid())
+	if (!(gpGame->ClientPlayerId().iValue != 0))
 	{
 		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
 	}
@@ -106,10 +103,8 @@ void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohmann::json
 	gpGame->SetClientGridCoord(coord);
 	gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kPollTick);
 
-	rResult["clientGridCoord"] = {coord.x, coord.y};
+	rResult["clientGridCoord"] = {coord.iX, coord.iY};
 }
-
-} // namespace
 
 bool ExecuteAgentCommandClient(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
 {

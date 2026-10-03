@@ -3,23 +3,17 @@
 #include "Agent/AgentCommandServer.h"
 
 #include "Agent/AgentCommands.h"
-#if defined(BT_CLIENT) && defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingFixture.h"
-#endif
 
 namespace engine
 {
 
 // Bounds dormant agent-command connection latency to 20 wakes per second; dtor notification does not depend on this cadence.
-static constexpr std::chrono::milliseconds kListenerRetryInterval = 50ms;
+constexpr std::chrono::milliseconds kListenerRetryInterval = 50ms;
 // A response that has been moved out of the shared slot is flushed as one frame during shutdown, but never longer
 // than this deadline. The same 50 ms readiness cadence keeps stop/join bounded while a peer is not reading.
-static constexpr std::chrono::seconds kResponseFlushTimeout = 3s;
+constexpr std::chrono::seconds kResponseFlushTimeout = 3s;
 
 AgentCommandServer::AgentCommandServer(int64_t iPort)
-#if defined(BT_CLIENT) && defined(BT_DEBUG)
-	: mpAudioStreamingFixture(std::make_unique<AudioStreamingFixture>())
-#endif
 {
 	// WSAStartup is guaranteed by NetworkManager (enet_initialize), constructed before this.
 
@@ -29,64 +23,61 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 	address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	address.sin_port = htons(static_cast<uint16_t>(iPort));
 
-	// A rapid agent relaunch can find the previous listen port still in TIME_WAIT (Windows default ~120 s), which
-	// fails bind() with WSAEADDRINUSE. SO_REUSEADDR lets the new listener rebind the recycling port immediately; it
-	// is safe on this loopback channel because it already trusts every local process, so there is no foreign socket
-	// that could steal the address. Accepted tradeoff: a duplicate launch on the same port also binds successfully
-	// (dual listeners, nondeterministic connection routing) instead of failing fast with WSAEADDRINUSE — the harness
-	// quit-and-wait-for-exact-PID relaunch rule is the guard against that misuse. If the port is still momentarily
-	// held, fall back to a bounded blocking retry (startup thread, off the main loop) before failing fast.
-	static constexpr int64_t kiMaxBindAttempts = 10;
-	static constexpr DWORD kuiBindRetryMilliseconds = 250; // ~2.5 s worst case across the attempts
-	for (int64_t iAttempt = 0; ; ++iAttempt)
+	// SO_REUSEADDR permits rebinding a port in TIME_WAIT after rapid relaunches (Windows default ~120 s).
+	// The loopback channel trusts local processes; duplicate listeners can bind the same port and route connections nondeterministically.
+	// The harness must quit and wait for the exact PID before relaunching.
+	// WSAEADDRINUSE retries are bounded and block only the startup thread, outside the main loop.
+	static constexpr int64_t kiMaximumBindAttempts = 10;
+	static constexpr std::chrono::milliseconds kBindRetryInterval = 250ms; // ~2.5 s worst case across the attempts
+	for (int64_t i = 0; ; ++i)
 	{
-		mListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (mListenSocket == INVALID_SOCKET)
+		muiListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (muiListenSocket == INVALID_SOCKET)
 		{
 			LOG(kNetwork, kError, "AgentCommandServer socket creation failed: {}", WSAGetLastError());
 			throw std::runtime_error("agent socket creation failed");
 		}
 
 		BOOL bReuseAddress = TRUE;
-		setsockopt(mListenSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&bReuseAddress), sizeof(bReuseAddress));
+		setsockopt(muiListenSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&bReuseAddress), sizeof(bReuseAddress));
 
-		if (bind(mListenSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != SOCKET_ERROR)
+		if (bind(muiListenSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != SOCKET_ERROR)
 		{
 			break;
 		}
 
 		int iBindError = WSAGetLastError();
-		closesocket(mListenSocket); // a failed bind leaves the socket unusable; recreate (and re-arm SO_REUSEADDR) next attempt
-		mListenSocket = INVALID_SOCKET;
+		closesocket(muiListenSocket); // a failed bind leaves the socket unusable; recreate (and re-arm SO_REUSEADDR) next attempt
+		muiListenSocket = INVALID_SOCKET;
 
-		// Only a TIME_WAIT address collision is retryable; every other bind failure is a hard startup error.
-		if (iBindError != WSAEADDRINUSE || iAttempt + 1 >= kiMaxBindAttempts)
+		// Only WSAEADDRINUSE is retryable; other bind errors fail startup immediately.
+		if (iBindError != WSAEADDRINUSE || i + 1 >= kiMaximumBindAttempts)
 		{
 			LOG(kNetwork, kError, "AgentCommandServer bind to 127.0.0.1:{} failed: {}", iPort, iBindError);
 			throw std::runtime_error("agent bind failed");
 		}
 
-		if (iAttempt == 0)
+		if (i == 0)
 		{
-			LOG(kNetwork, kWarning, "AgentCommandServer bind to 127.0.0.1:{} in use (WSAEADDRINUSE), retrying up to {} attempts", iPort, kiMaxBindAttempts);
+			LOG(kNetwork, kWarning, "AgentCommandServer bind to 127.0.0.1:{} in use (WSAEADDRINUSE), retrying up to {} attempts", iPort, kiMaximumBindAttempts);
 		}
-		Sleep(kuiBindRetryMilliseconds);
+		Sleep(static_cast<DWORD>(kBindRetryInterval.count()));
 	}
 
-	if (listen(mListenSocket, 1) == SOCKET_ERROR) // backlog 1 — a single connection at a time
+	if (listen(muiListenSocket, 1) == SOCKET_ERROR) // backlog 1 — a single connection at a time
 	{
 		LOG(kNetwork, kError, "AgentCommandServer listen on 127.0.0.1:{} failed: {}", iPort, WSAGetLastError());
-		closesocket(mListenSocket);
-		mListenSocket = INVALID_SOCKET;
+		closesocket(muiListenSocket);
+		muiListenSocket = INVALID_SOCKET;
 		throw std::runtime_error("agent listen failed");
 	}
 
 	u_long uiNonBlocking = 1;
-	if (ioctlsocket(mListenSocket, FIONBIO, &uiNonBlocking) == SOCKET_ERROR)
+	if (ioctlsocket(muiListenSocket, FIONBIO, &uiNonBlocking) == SOCKET_ERROR)
 	{
 		LOG(kNetwork, kError, "AgentCommandServer listener non-blocking configuration failed: {}", WSAGetLastError());
-		closesocket(mListenSocket);
-		mListenSocket = INVALID_SOCKET;
+		closesocket(muiListenSocket);
+		muiListenSocket = INVALID_SOCKET;
 		throw std::runtime_error("agent listener non-blocking configuration failed");
 	}
 
@@ -115,10 +106,10 @@ AgentCommandServer::~AgentCommandServer()
 	{
 		std::unique_lock lock(mMutex);
 		mListenerThread.request_stop();
-		if (mListenSocket != INVALID_SOCKET)
+		if (muiListenSocket != INVALID_SOCKET)
 		{
-			closesocket(mListenSocket);
-			mListenSocket = INVALID_SOCKET;
+			closesocket(muiListenSocket);
+			muiListenSocket = INVALID_SOCKET;
 		}
 	}
 	mResponseReady.notify_all();
@@ -127,7 +118,7 @@ AgentCommandServer::~AgentCommandServer()
 void AgentCommandServer::ClearDeferredResponse()
 {
 	mDeferredPoll = nullptr;
-	mDeferredId = nullptr;
+	mDeferredIdentifier = nullptr;
 	mbResponseDeferred = false;
 	muiDeferredGeneration = 0;
 	miDeferredDrainCount = 0;
@@ -140,16 +131,21 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 
 	while (true)
 	{
-		SOCKET clientSocket = INVALID_SOCKET;
+		SOCKET uiClientSocket = INVALID_SOCKET;
 		{
 			std::unique_lock lock(mMutex);
-			if (stopToken.stop_requested() || mListenSocket == INVALID_SOCKET)
+			if (stopToken.stop_requested())
 			{
 				break;
 			}
 
-			clientSocket = accept(mListenSocket, nullptr, nullptr);
-			if (clientSocket == INVALID_SOCKET)
+			if (muiListenSocket == INVALID_SOCKET)
+			{
+				break;
+			}
+
+			uiClientSocket = accept(muiListenSocket, nullptr, nullptr);
+			if (uiClientSocket == INVALID_SOCKET)
 			{
 				int iAcceptError = WSAGetLastError();
 				if (iAcceptError == WSAEWOULDBLOCK)
@@ -171,10 +167,10 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 		}
 
 		u_long uiNonBlocking = 1;
-		if (ioctlsocket(clientSocket, FIONBIO, &uiNonBlocking) == SOCKET_ERROR)
+		if (ioctlsocket(uiClientSocket, FIONBIO, &uiNonBlocking) == SOCKET_ERROR)
 		{
 			LOG(kNetwork, kError, "AgentCommandServer accepted socket non-blocking configuration failed: {}", WSAGetLastError());
-			closesocket(clientSocket);
+			closesocket(uiClientSocket);
 			continue;
 		}
 
@@ -182,13 +178,13 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 			std::unique_lock lock(mMutex);
 			if (stopToken.stop_requested())
 			{
-				closesocket(clientSocket);
+				closesocket(uiClientSocket);
 				break;
 			}
-			mActiveSocket = clientSocket;
+			muiActiveSocket = uiClientSocket;
 		}
 
-		ServeConnection(clientSocket, stopToken);
+		ServeConnection(uiClientSocket, stopToken);
 
 		// ServeConnection has returned, so the listener exclusively owns the final active-socket close. Bump the
 		// generation so any response still deferred from this connection is discarded
@@ -199,27 +195,27 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 			std::unique_lock lock(mMutex);
 			++muiConnectionGeneration;
 			mPendingResponse.reset();
-			if (mActiveSocket != INVALID_SOCKET)
+			if (muiActiveSocket != INVALID_SOCKET)
 			{
-				closesocket(mActiveSocket);
-				mActiveSocket = INVALID_SOCKET;
+				closesocket(muiActiveSocket);
+				muiActiveSocket = INVALID_SOCKET;
 			}
 		}
 	}
 }
 
-void AgentCommandServer::ServeConnection(SOCKET clientSocket, const std::stop_token& rStopToken)
+void AgentCommandServer::ServeConnection(SOCKET uiClientSocket, const std::stop_token& rStopToken)
 {
 	while (!rStopToken.stop_requested())
 	{
 		// Read the 4-byte little-endian length prefix (x64 host is little-endian — use the bytes directly).
 		uint32_t uiLength = 0;
-		if (!ReadExact(clientSocket, reinterpret_cast<uint8_t*>(&uiLength), sizeof(uiLength), rStopToken))
+		if (!ReadExact(uiClientSocket, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&uiLength), sizeof(uiLength)), rStopToken))
 		{
 			return; // peer closed or socket error
 		}
 
-		if (uiLength > kuiMaxRequestBytes)
+		if (uiLength > kuiMaximumRequestBytes)
 		{
 			LOG(kNetwork, kWarning, "AgentCommandServer request frame too large ({} bytes), closing connection", uiLength);
 			return;
@@ -227,7 +223,7 @@ void AgentCommandServer::ServeConnection(SOCKET clientSocket, const std::stop_to
 
 		std::string payload;
 		payload.resize(uiLength);
-		if (uiLength > 0 && !ReadExact(clientSocket, reinterpret_cast<uint8_t*>(payload.data()), static_cast<int64_t>(uiLength), rStopToken))
+		if (uiLength > 0 && !ReadExact(uiClientSocket, std::span<uint8_t>(reinterpret_cast<uint8_t*>(payload.data()), uiLength), rStopToken))
 		{
 			return;
 		}
@@ -266,7 +262,7 @@ void AgentCommandServer::ServeConnection(SOCKET clientSocket, const std::stop_to
 			{
 				lock.unlock();
 				char cPeekByte = 0;
-				int iPeeked = recv(clientSocket, &cPeekByte, 1, MSG_PEEK);
+				int iPeeked = recv(uiClientSocket, &cPeekByte, 1, MSG_PEEK);
 				if (iPeeked == 0 || (iPeeked == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK))
 				{
 					return; // peer closed or reset; teardown bumps the generation so its response is dropped
@@ -281,7 +277,7 @@ void AgentCommandServer::ServeConnection(SOCKET clientSocket, const std::stop_to
 			mPendingResponse.reset();
 		}
 
-		if (!SendFrame(clientSocket, response))
+		if (!SendFrame(uiClientSocket, response))
 		{
 			return;
 		}
@@ -316,7 +312,7 @@ void AgentCommandServer::Drain()
 		}
 
 		nlohmann::json response;
-		response["id"] = mDeferredId;
+		response["id"] = mDeferredIdentifier;
 
 		// Liveness timeout: a capture request lost to device-loss Graphics recreation (mailboxes wiped) never
 		// resolves — bound the wait and publish a failure so the channel isn't deadlocked forever.
@@ -382,10 +378,10 @@ void AgentCommandServer::Drain()
 	{
 		response["id"] = request.request.contains("id") ? request.request["id"] : nlohmann::json(nullptr);
 
-		// Reject an unknown top-level envelope key before dispatch (before mDeferredId is armed) so a typo'd field
+		// Reject an unknown top-level envelope key before dispatch (before mDeferredIdentifier is armed) so a typo'd field
 		// can never be silently ignored. Only id/cmd/params are legitimate; the first offending key is reported.
 		bool bUnknownKey = false;
-		for (auto& [rKey, rValue] : request.request.items())
+		for (const auto& [rKey, rValue] : request.request.items())
 		{
 			if (rKey != "cmd" && rKey != "params" && rKey != "id")
 			{
@@ -397,17 +393,17 @@ void AgentCommandServer::Drain()
 		}
 		if (!bUnknownKey)
 		{
-			std::string cmd = request.request["cmd"].get<std::string>();
-			const nlohmann::json& rParams = request.request.contains("params") ? request.request["params"] : nlohmann::json::object();
+			std::string command = request.request["cmd"].get<std::string>();
+			const nlohmann::json& rParameters = request.request.contains("params") ? request.request["params"] : nlohmann::json::object();
 
 			// A handler may call DeferResponse() to complete asynchronously; record the id it must echo first.
-			mDeferredId = response["id"];
+			mDeferredIdentifier = response["id"];
 			mbResponseDeferred = false;
 			try
 			{
 				common::ScopedExpectedThrows scopedExpectedThrows; // validation throws here are a designed error path — keep them off the VEH crash-diagnostic walk
 				nlohmann::json result;
-				game::ExecuteAgentCommand(cmd, rParams, result);
+				game::ExecuteAgentCommand(command, rParameters, result);
 				if (mbResponseDeferred)
 				{
 					return; // response published later by the deferred-poll path above
@@ -428,9 +424,9 @@ void AgentCommandServer::Drain()
 	PublishResponse(std::move(response));
 }
 
-void AgentCommandServer::DeferResponse(std::function<std::optional<nlohmann::json>()> poll)
+void AgentCommandServer::DeferResponse(std::function<std::optional<nlohmann::json>()> Poll)
 {
-	mDeferredPoll = std::move(poll);
+	mDeferredPoll = std::move(Poll);
 	mbResponseDeferred = true;
 	miDeferredDrainCount = 0;
 }
@@ -438,7 +434,7 @@ void AgentCommandServer::DeferResponse(std::function<std::optional<nlohmann::jso
 void AgentCommandServer::PublishResponse(nlohmann::json response)
 {
 	std::string responseString = response.dump();
-	if (static_cast<int64_t>(responseString.size()) > kiMaxResponseBytes)
+	if (static_cast<int64_t>(responseString.size()) > kiMaximumResponseBytes)
 	{
 		LOG(kNetwork, kError, "AgentCommandServer response exceeds cap ({} bytes), replacing with error", responseString.size());
 		nlohmann::json capped;
@@ -459,10 +455,10 @@ void AgentCommandServer::PublishResponse(nlohmann::json response)
 	mResponseReady.notify_one();
 }
 
-bool AgentCommandServer::ReadExact(SOCKET clientSocket, uint8_t* pBuffer, int64_t iBytes, const std::stop_token& rStopToken)
+bool AgentCommandServer::ReadExact(SOCKET uiClientSocket, std::span<uint8_t> buffer, const std::stop_token& rStopToken)
 {
 	int64_t iTotal = 0;
-	while (iTotal < iBytes)
+	while (iTotal < std::ssize(buffer))
 	{
 		if (rStopToken.stop_requested())
 		{
@@ -471,7 +467,7 @@ bool AgentCommandServer::ReadExact(SOCKET clientSocket, uint8_t* pBuffer, int64_
 
 		fd_set readSet {};
 		FD_ZERO(&readSet);
-		FD_SET(clientSocket, &readSet);
+		FD_SET(uiClientSocket, &readSet);
 		timeval timeout {};
 		timeout.tv_sec = static_cast<long>(kListenerRetryInterval.count() / 1'000);
 		timeout.tv_usec = static_cast<long>((kListenerRetryInterval.count() % 1'000) * 1'000);
@@ -489,7 +485,7 @@ bool AgentCommandServer::ReadExact(SOCKET clientSocket, uint8_t* pBuffer, int64_
 			return false;
 		}
 
-		int iReceived = recv(clientSocket, reinterpret_cast<char*>(pBuffer + iTotal), static_cast<int>(iBytes - iTotal), 0);
+		int iReceived = recv(uiClientSocket, reinterpret_cast<char*>(buffer.data() + iTotal), static_cast<int>(std::ssize(buffer) - iTotal), 0);
 		if (iReceived > 0)
 		{
 			iTotal += iReceived;
@@ -506,10 +502,10 @@ bool AgentCommandServer::ReadExact(SOCKET clientSocket, uint8_t* pBuffer, int64_
 
 // ServeConnection moved the response out of the shared slot before calling SendFrame, so this frame must flush
 // despite stop. rDeadline bounds the detached flush.
-bool AgentCommandServer::SendExact(SOCKET clientSocket, const uint8_t* pBuffer, int64_t iBytes, const std::chrono::steady_clock::time_point& rDeadline)
+bool AgentCommandServer::SendExact(SOCKET uiClientSocket, std::span<const uint8_t> buffer, const std::chrono::steady_clock::time_point& rDeadline)
 {
 	int64_t iTotal = 0;
-	while (iTotal < iBytes)
+	while (iTotal < std::ssize(buffer))
 	{
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 		if (now >= rDeadline)
@@ -527,7 +523,7 @@ bool AgentCommandServer::SendExact(SOCKET clientSocket, const uint8_t* pBuffer, 
 
 		fd_set writeSet {};
 		FD_ZERO(&writeSet);
-		FD_SET(clientSocket, &writeSet);
+		FD_SET(uiClientSocket, &writeSet);
 		timeval timeout {};
 		timeout.tv_sec = static_cast<long>(waitDuration.count() / 1'000'000);
 		timeout.tv_usec = static_cast<long>(waitDuration.count() % 1'000'000);
@@ -541,7 +537,7 @@ bool AgentCommandServer::SendExact(SOCKET clientSocket, const uint8_t* pBuffer, 
 			continue;
 		}
 
-		int iSent = send(clientSocket, reinterpret_cast<const char*>(pBuffer + iTotal), static_cast<int>(iBytes - iTotal), 0);
+		int iSent = send(uiClientSocket, reinterpret_cast<const char*>(buffer.data() + iTotal), static_cast<int>(std::ssize(buffer) - iTotal), 0);
 		if (iSent > 0)
 		{
 			iTotal += iSent;
@@ -556,15 +552,15 @@ bool AgentCommandServer::SendExact(SOCKET clientSocket, const uint8_t* pBuffer, 
 	return true;
 }
 
-bool AgentCommandServer::SendFrame(SOCKET clientSocket, std::string_view payload)
+bool AgentCommandServer::SendFrame(SOCKET uiClientSocket, std::string_view payload)
 {
 	uint32_t uiLength = static_cast<uint32_t>(payload.size());
 	std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + kResponseFlushTimeout;
-	if (!SendExact(clientSocket, reinterpret_cast<const uint8_t*>(&uiLength), sizeof(uiLength), deadline))
+	if (!SendExact(uiClientSocket, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&uiLength), sizeof(uiLength)), deadline))
 	{
 		return false;
 	}
-	return SendExact(clientSocket, reinterpret_cast<const uint8_t*>(payload.data()), static_cast<int64_t>(payload.size()), deadline);
+	return SendExact(uiClientSocket, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()), deadline);
 }
 
 } // namespace engine

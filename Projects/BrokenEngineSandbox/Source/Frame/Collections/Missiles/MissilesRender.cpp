@@ -19,23 +19,20 @@ static int64_t siRendered = 0;
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
 static std::atomic<bool> sbRenderActive = false;
 
-namespace
-{
 // RAII tripwire guard: sets sbRenderActive on entry, clears it on scope exit — so an exception between the
 // capacity ASSERT and the slab writes unwinds it instead of wedging it true (every later Render would else false-assert).
-struct RenderActiveGuard
+struct MissilesRenderActiveGuard
 {
-	RenderActiveGuard()
+	MissilesRenderActiveGuard()
 	{
 		ASSERT(!sbRenderActive.exchange(true));
 	}
 
-	~RenderActiveGuard()
+	~MissilesRenderActiveGuard()
 	{
 		sbRenderActive.store(false);
 	}
 };
-} // namespace
 
 void MissilesInterpolate::GraphicsResources()
 {
@@ -80,7 +77,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		return;
 	}
 
-	RenderActiveGuard renderActiveGuard;
+	MissilesRenderActiveGuard renderActiveGuard;
 
 	static const XMMATRIX sMatPreMove = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
 	static const XMMATRIX sMatPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationZ(XM_PIDIV2);

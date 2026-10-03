@@ -9,8 +9,8 @@ namespace engine
 
 NetworkDiscoveryScanner::NetworkDiscoveryScanner()
 {
-	mSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (mSocket == INVALID_SOCKET)
+	muiSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (muiSocket == INVALID_SOCKET)
 	{
 		LOG(kNetwork, kError, "NetworkDiscoveryScanner socket creation failed: {}", WSAGetLastError());
 	}
@@ -20,7 +20,7 @@ NetworkDiscoveryScanner::NetworkDiscoveryScanner()
 		sockaddr_in address {};
 		address.sin_family = AF_INET;
 		address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-		if (bind(mSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR)
+		if (bind(muiSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR)
 		{
 			LOG(kNetwork, kError, "NetworkDiscoveryScanner bind failed: {}", WSAGetLastError());
 		}
@@ -28,14 +28,14 @@ NetworkDiscoveryScanner::NetworkDiscoveryScanner()
 	else
 	{
 		BOOL bBroadcast = TRUE;
-		if (setsockopt(mSocket, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&bBroadcast), sizeof(bBroadcast)) == SOCKET_ERROR)
+		if (setsockopt(muiSocket, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&bBroadcast), sizeof(bBroadcast)) == SOCKET_ERROR)
 		{
 			LOG(kNetwork, kError, "NetworkDiscoveryScanner setsockopt SO_BROADCAST failed: {}", WSAGetLastError());
 		}
 	}
 
 	u_long uiNonBlocking = 1;
-	if (ioctlsocket(mSocket, FIONBIO, &uiNonBlocking) == SOCKET_ERROR)
+	if (ioctlsocket(muiSocket, FIONBIO, &uiNonBlocking) == SOCKET_ERROR)
 	{
 		LOG(kNetwork, kError, "NetworkDiscoveryScanner ioctlsocket failed: {}", WSAGetLastError());
 	}
@@ -43,28 +43,26 @@ NetworkDiscoveryScanner::NetworkDiscoveryScanner()
 
 NetworkDiscoveryScanner::~NetworkDiscoveryScanner()
 {
-	closesocket(mSocket);
+	closesocket(muiSocket);
 }
 
 void NetworkDiscoveryScanner::StartScan()
 {
 	uint32_t uiMagic = kuiDiscoveryMagic;
 
-	// Send to localhost first (zero latency, always arrives first if local server exists)
 	sockaddr_in localAddress {};
 	localAddress.sin_family = AF_INET;
 	localAddress.sin_port = htons(kuiDiscoveryPort);
 	localAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	sendto(mSocket, reinterpret_cast<const char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&localAddress), sizeof(localAddress));
+	sendto(muiSocket, reinterpret_cast<const char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&localAddress), sizeof(localAddress));
 
 	if (!(gLaunchOptions.flags & LaunchOptionFlags::kLoopbackOnly))
 	{
-		// Then broadcast to LAN
 		sockaddr_in broadcastAddress {};
 		broadcastAddress.sin_family = AF_INET;
 		broadcastAddress.sin_port = htons(kuiDiscoveryPort);
 		broadcastAddress.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-		sendto(mSocket, reinterpret_cast<const char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&broadcastAddress), sizeof(broadcastAddress));
+		sendto(muiSocket, reinterpret_cast<const char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&broadcastAddress), sizeof(broadcastAddress));
 	}
 
 	mTimer.Reset();
@@ -75,14 +73,14 @@ void NetworkDiscoveryScanner::Poll()
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
 
-	sockaddr_in senderAddr {};
-	int iSenderLen = sizeof(senderAddr);
+	sockaddr_in senderAddress {};
+	int iSenderLength = sizeof(senderAddress);
 	uint32_t uiMagic = 0;
 
-	int iReceived = recvfrom(mSocket, reinterpret_cast<char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&senderAddr), &iSenderLen);
+	int iReceived = recvfrom(muiSocket, reinterpret_cast<char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&senderAddress), &iSenderLength);
 	if (iReceived == sizeof(uiMagic) && uiMagic == kuiDiscoveryMagic)
 	{
-		uint8_t* pBytes = reinterpret_cast<uint8_t*>(&senderAddr.sin_addr);
+		uint8_t* pBytes = reinterpret_cast<uint8_t*>(&senderAddress.sin_addr);
 		std::snprintf(mpcFoundAddress, sizeof(mpcFoundAddress), "%u.%u.%u.%u", pBytes[0], pBytes[1], pBytes[2], pBytes[3]);
 		mFlags.Set(DiscoveryScannerFlags::kFound);
 	}

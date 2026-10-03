@@ -60,7 +60,7 @@ Add to ClientConnection struct (after coordAckStates, line 25):
 
 Initialize in Server::Connect() (resize calls at Server.cpp:129-132), add after coordAckStates resize:
 
-    connection.coordFecStates.resize(NetworkManager::kiMaxEnetCoordSlots);
+    connection.coordFecStates.resize(NetworkManager::kiMaximumEnetCoordinateSlots);
 
 Reset FEC state in ClientConnection::FreeSlot() (Server.h line 56-62), add:
 
@@ -141,7 +141,7 @@ Add new methods at end of file (before the closing namespace brace, line 301):
         // Heap: ENet allocates packet data internally
         ScopedSuppressAllocationTracking suppress;
         ENetPacket* pPacket = enet_packet_create(packetSpan.data(), packetSpan.size(), 0);
-        enet_peer_send(rClient.pPeer, NetworkManager::CoordSlotUnreliable(iSlot), pPacket);
+        enet_peer_send(rClient.pPeer, NetworkManager::CoordinateSlotUnreliable(iSlot), pPacket);
 
         rWorkbuffer.Pop();
     }
@@ -171,31 +171,31 @@ Add private method declaration to Client class (after line 109):
 
 5. Engine/Source/Network/Client/Client.cpp
 ------------------------------------------
-Add case to Client::Receive() switch (line 157-190), after kServerCoordResend case (line 174):
+Add case to Client::Receive() switch (line 157-190), after kServerCoordinateResend case (line 174):
 
     case PacketType::kServerFecParity:
         ServerFecParity(pData);
         break;
 
-Modify the kServerCoordUpdate case to also feed FEC accumulation. In
-Client::Receive() (line 170-171), after the ServerCoordUpdateOrResend call:
+Modify the kServerCoordinateUpdate case to also feed FEC accumulation. In
+Client::Receive() (line 170-171), after the ServerCoordinateUpdateOrResend call:
 
     // Note: FEC accumulation for received data packets is handled inside
-    // ServerCoordUpdateOrResend, which calls FecAccumulateReceived.
+    // ServerCoordinateUpdateOrResend, which calls FecAccumulateReceived.
 
-Actually, cleaner: add FecAccumulateReceived call inside ServerCoordUpdateOrResend.
+Actually, cleaner: add FecAccumulateReceived call inside ServerCoordinateUpdateOrResend.
 
 
 6. Engine/Source/Network/Client/ClientReceive.cpp
 -------------------------------------------------
-In Client::ServerCoordUpdateOrResend() (line 107-167):
+In Client::ServerCoordinateUpdateOrResend() (line 107-167):
 
-After the mReceivedCoordUpdates push_back (line 161), before the TrackReceivedTick
-call (line 164), add FEC accumulation for kServerCoordUpdate packets only (not resends):
+After the mReceivedCoordinateUpdates push_back (line 161), before the TrackReceivedTick
+call (line 164), add FEC accumulation for kServerCoordinateUpdate packets only (not resends):
 
     // FEC: accumulate received data packet for parity reconstruction
     // Only accumulate fresh updates, not resends (resends fill gaps outside FEC groups)
-    if (bProcessRtt)  // bProcessRtt is true only for kServerCoordUpdate, false for resends
+    if (bProcessRoundTripTime)  // bProcessRoundTripTime is true only for kServerCoordinateUpdate, false for resends
     {
         FecAccumulateReceived(uiSlotIndex, iTick, std::span<const uint8_t>(pData, pCursor - pData));
     }
@@ -204,7 +204,7 @@ Add new methods at end of file (before closing namespace brace, line 283):
 
     void Client::FecAccumulateReceived(int64_t iSlot, int64_t iTick, std::span<const uint8_t> packetData)
     {
-        ClientCoordSlot& rSlot = mCoordSlots.at(iSlot);
+        ClientCoordSlot& rSlot = mCoordinateSlots.at(iSlot);
         FecReceiveState& rFec = rSlot.fecReceive;
 
         // If we don't know the group size yet (set when parity arrives), just XOR in
@@ -244,12 +244,12 @@ Add new methods at end of file (before closing namespace brace, line 283):
         int32_t iParitySize = ReadInt32(pCursor);
         const uint8_t* pParityData = pCursor;
 
-        if (uiSlotIndex >= std::ssize(mCoordSlots))
+        if (uiSlotIndex >= std::ssize(mCoordinateSlots))
         {
             return;
         }
-        ClientCoordSlot& rSlot = mCoordSlots.at(uiSlotIndex);
-        if (rSlot.eState != CoordSubscriptionState::kActive || uiEpoch != rSlot.ackState.uiEpoch)
+        ClientCoordSlot& rSlot = mCoordinateSlots.at(uiSlotIndex);
+        if (rSlot.eState != CoordSubscriptionState::kActive || uiEpoch != rSlot.acknowledgementState.uiEpoch)
         {
             return;
         }
@@ -287,13 +287,13 @@ Add new methods at end of file (before closing namespace brace, line 283):
             for (int64_t iOffset = 0; iOffset < uiGroupSize; ++iOffset)
             {
                 int64_t iTick = iGroupStartTick + iOffset;
-                int64_t iBitIndex = iTick - rSlot.ackState.iAckFloor - 1;
-                bool bReceived = (iTick <= rSlot.ackState.iAckFloor) ||
-                                 (iBitIndex >= 0 && iBitIndex < 64 && (rSlot.ackState.uiReceivedBitfield & (1ULL << iBitIndex)));
+                int64_t iBitIndex = iTick - rSlot.acknowledgementState.iAcknowledgmentFloor - 1;
+                bool bReceived = (iTick <= rSlot.acknowledgementState.iAcknowledgmentFloor) ||
+                                 (iBitIndex >= 0 && iBitIndex < 64 && (rSlot.acknowledgementState.uiReceivedBitfield & (1ULL << iBitIndex)));
                 if (!bReceived)
                 {
                     // Parse the recovered packet as a coord update
-                    ServerCoordUpdateOrResend(recovered.data(), false);
+                    ServerCoordinateUpdateOrResend(recovered.data(), false);
                     break;
                 }
             }
@@ -309,7 +309,7 @@ Add new methods at end of file (before closing namespace brace, line 283):
 
 7. Engine/Source/Network/Server/ServerReceive.cpp
 -------------------------------------------------
-Adaptive FEC group sizing. In Server::ClientAckStream() (epoch/ack logic at ~lines 44-73):
+Adaptive FEC group sizing. In Server::ClientAcknowledgementStream() (epoch/ack logic at ~lines 44-73):
 
 After updating the ACK state, compute per-slot loss rate from the bitfield
 and adjust FEC group size:
@@ -343,17 +343,17 @@ DESIGN NOTES
 =============
 
 1. FEC parity packets use the same unreliable coord slot channel as data packets
-   (NetworkManager::CoordSlotUnreliable). This means they share ordering with
+   (NetworkManager::CoordinateSlotUnreliable). This means they share ordering with
    data packets on that slot, which is fine since ENet unreliable channels have
    no ordering guarantees anyway.
 
 2. The FEC accumulator on the client XORs raw packet bytes (including the header).
    This means the recovered packet will have a valid header and can be fed directly
-   to ServerCoordUpdateOrResend(). The packet type byte will be kServerCoordUpdate
+   to ServerCoordinateUpdateOrResend(). The packet type byte will be kServerCoordinateUpdate
    (recovered via XOR), so the parse path is the same.
 
-3. FEC only protects kServerCoordUpdate packets. Resends (kServerCoordResend) and
-   full state (kServerCoordFullState) are not FEC-protected because:
+3. FEC only protects kServerCoordinateUpdate packets. Resends (kServerCoordinateResend) and
+   full state (kServerCoordinateFullState) are not FEC-protected because:
    - Resends are already the fallback for lost packets
    - Full state uses reliable delivery
 

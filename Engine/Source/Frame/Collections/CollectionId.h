@@ -7,122 +7,115 @@ struct FramePostRenderBase;
 
 // Stable entity identity across transfers and reconnects
 // Assigned by server at first spawn, carried in TransferData
-struct global_id_t
+struct GlobalId
 {
 	int64_t iValue = 0;
-	constexpr bool IsValid() const { return iValue != 0; }
-	bool operator==(const global_id_t&) const = default;
+	bool operator==(const GlobalId&) const = default;
 };
 
 // Global unique identifier with counter stored in FramePostRenderBase
 // 0 = invalid/uninitialized, counter starts at 1
-struct uuid_t
+struct Uuid
 {
 	int64_t iValue = 0;
 
-	constexpr uuid_t() = default;
-	constexpr explicit uuid_t(int64_t iVal) : iValue(iVal) {}
+	constexpr Uuid() = default;
+	constexpr explicit Uuid(int64_t iInitialValue) : iValue(iInitialValue)
+	{
+	}
 
-	// Generate next unique ID (counter stored in FramePostRenderBase)
-	static uuid_t Generate(FramePostRenderBase& rFramePostRender);
+	static Uuid Generate(FramePostRenderBase& rFramePostRender);
 #if defined(BT_CLIENT)
-	static uuid_t GenerateVisual(FramePostRenderBase& rFramePostRender);
+	static Uuid GenerateVisual(FramePostRenderBase& rFramePostRender);
 #endif
 
-	constexpr bool IsValid() const
+	constexpr bool operator==(const Uuid& rOther) const = default;
+	constexpr std::strong_ordering operator<=>(const Uuid& rOther) const = default;
+
+	void Write(std::ostream& rStream) const
 	{
-		return iValue != 0;
+		common::Write(rStream, iValue);
 	}
-
-	constexpr int64_t Value() const
+	void Read(std::istream& rStream)
 	{
-		return iValue;
+		common::Read(rStream, iValue);
 	}
-
-	constexpr bool operator==(const uuid_t& other) const = default;
-	constexpr std::strong_ordering operator<=>(const uuid_t& other) const = default;
-
-	void Write(std::ostream& stream) const { common::Write(stream, iValue); }
-	void Read(std::istream& stream) { common::Read(stream, iValue); }
 };
 
-// Strong-typed ID wrapper preventing implicit conversions between different collection types
-// Tag parameter ensures AreaLights::id_t cannot be mixed with Sounds::id_t
 template <typename T>
-struct id_t
+struct Id
 {
-	uuid_t uuid {};
+	Uuid uuid {};
 
-	constexpr id_t() = default;
-	constexpr explicit id_t(uuid_t u)
-	: uuid(u)
+	constexpr Id() = default;
+	constexpr explicit Id(Uuid uuidValue)
+	: uuid(uuidValue)
 	{
 	}
 
-	// Generate next unique ID (counter stored in FramePostRenderBase)
-	static id_t Generate(FramePostRenderBase& rFramePostRender)
+	static Id Generate(FramePostRenderBase& rFramePostRender)
 	{
-		return id_t {uuid_t::Generate(rFramePostRender)};
+		return Id {Uuid::Generate(rFramePostRender)};
 	}
 
 #if defined(BT_CLIENT)
-	static id_t GenerateVisual(FramePostRenderBase& rFramePostRender)
+	static Id GenerateVisual(FramePostRenderBase& rFramePostRender)
 	{
-		return id_t {uuid_t::GenerateVisual(rFramePostRender)};
+		return Id {Uuid::GenerateVisual(rFramePostRender)};
 	}
 #endif
 
-	constexpr bool IsValid() const { return uuid.IsValid(); }
+	constexpr bool operator==(const Id& rOther) const = default;
+	constexpr std::strong_ordering operator<=>(const Id& rOther) const = default;
 
-	// Explicit conversion to uuid_t for generic comparisons
-	constexpr uuid_t ToUuid() const { return uuid; }
-
-	constexpr bool operator==(const id_t& other) const = default;
-	constexpr std::strong_ordering operator<=>(const id_t& other) const = default;
-
-	void Write(std::ostream& stream) const { uuid.Write(stream); }
-	void Read(std::istream& stream) { uuid.Read(stream); }
+	void Write(std::ostream& rStream) const
+	{
+		uuid.Write(rStream);
+	}
+	void Read(std::istream& rStream)
+	{
+		uuid.Read(rStream);
+	}
 };
 
 } // namespace engine
 
-// Hash specializations in std namespace for unordered_map support
 namespace std
 {
 
 template <>
-struct hash<engine::uuid_t>
+struct hash<engine::Uuid>
 {
-	size_t operator()(const engine::uuid_t& id) const noexcept
+	std::size_t operator()(const engine::Uuid& rId) const noexcept
 	{
-		return std::hash<int64_t>{}(id.iValue);
+		return std::hash<int64_t> {}(rId.iValue);
 	}
 };
 
 template <typename T>
-struct hash<engine::id_t<T>>
+struct hash<engine::Id<T>>
 {
-	size_t operator()(const engine::id_t<T>& id) const noexcept
+	std::size_t operator()(const engine::Id<T>& rId) const noexcept
 	{
-		return std::hash<engine::uuid_t>{}(id.uuid);
+		return std::hash<engine::Uuid> {}(rId.uuid);
 	}
 };
 
-// Renders global_id_t in logs; prints "(none)" for the 0 sentinel (see global_id_t::IsValid).
+// Zero denotes an absent global identity.
 template <>
-struct formatter<engine::global_id_t> : formatter<std::string_view>
+struct formatter<engine::GlobalId> : std::formatter<std::string_view>
 {
 	template <typename CONTEXT>
-	typename CONTEXT::iterator format(const engine::global_id_t id, CONTEXT& rContext) const
+	typename CONTEXT::iterator format(const engine::GlobalId id, CONTEXT& rContext) const
 	{
 		if (id.iValue == 0)
 		{
-			return formatter<std::string_view>::format("(none)", rContext);
+			return std::formatter<std::string_view>::format("(none)", rContext);
 		}
 
 		char pcBuffer[24];
 		char* pWrite = std::to_chars(pcBuffer, pcBuffer + sizeof(pcBuffer), id.iValue).ptr;
-		return formatter<std::string_view>::format(std::string_view(pcBuffer, pWrite - pcBuffer), rContext);
+		return std::formatter<std::string_view>::format(std::string_view(pcBuffer, pWrite - pcBuffer), rContext);
 	}
 };
 

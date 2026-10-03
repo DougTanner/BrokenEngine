@@ -11,19 +11,19 @@ namespace engine
 
 void PuffsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineSmokeAxisAligned(kCrc, kName, sizeof(shaders::AxisAlignedQuadLayout));
+	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreatePipelineSmokeAxisAligned(kCrc, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
 }
 
 static int64_t siRendered = 0;
 static int64_t siTotalCount = 0;
 
-void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords)
+void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
 	siTotalCount = 0;
 
-	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const PuffsInterpolate&
+	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const PuffsInterpolate&
 	{
 		return rInterpolate.puffs;
 	});
@@ -33,7 +33,7 @@ void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, cons
 		return;
 	}
 
-	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer))
+	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
 		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
 	}
@@ -55,29 +55,26 @@ void PuffsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __r
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load. Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
+		// Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
 		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
-		const PuffsType& rType = PuffsInterpolate::GetType(rCurrent.puiTypeIndices[i]);
+		const PuffsType& rType = PuffsInterpolate::sTypes.at(rCurrent.puiTypeIndices[i]);
 		float fIntensity = rCurrent.pfIntensities[i];
 		float fArea = rCurrent.pfAreas[i];
 		float fRotation = rCurrent.pfRotations[i];
 
-		// Visibility culling
 		XMFLOAT4A f4Position {};
 		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
 		{
 			continue;
 		}
 
-		// Project to base height
 		XMStoreFloat4A(&f4Position, ProjectToBaseHeight(vecLocalPosition, rBasis));
 
-		// Build AxisAlignedQuadLayout
-		XMFLOAT4A f4Params {};
-		f4Params.x = fIntensity;  // Smoke.frag uses this as intensity multiplier
-		f4Params.y = fIntensity;  // Smoke.frag uses pow(f4Params.y, globalLayout.fSmokeIntensityFalloff)
-		f4Params.w = fRotation;   // Smoke.frag uses this for Rotate()
-		BuildAxisAlignedQuad(pPuffsLayouts[siRendered], f4Position, fArea, f4Params, rType.uiColor);
+		XMFLOAT4A f4Parameters {};
+		f4Parameters.x = fIntensity;  // Smoke.frag uses this as intensity multiplier
+		f4Parameters.y = fIntensity;  // Smoke.frag uses pow(max(0.0f, f4InParams.y), globalLayout.fSmokeIntensityFalloff).
+		f4Parameters.w = fRotation;   // Smoke.frag uses this for Rotate()
+		BuildAxisAlignedQuad(pPuffsLayouts[siRendered], f4Position, fArea, f4Parameters, rType.uiColor);
 
 		++siRendered;
 	}

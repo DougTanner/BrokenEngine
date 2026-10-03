@@ -40,7 +40,7 @@ bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFile
 			engine::GridCoord coord = engine::GridCoord::FromKey(uiKey);
 			coord.Write(fileStream);
 			// NavData is rebuilt lazily on first RunFrameTick — don't persist it.
-			game::gpGame->mCoordFrames.at(coord).staticData.Write(fileStream, /*bIncludeNavData=*/false);
+			game::gpGame->mCoordFrames.at(coord).staticData.Write(fileStream, /*bIncludeNavigationData=*/false);
 			fileStream << *game::gpGame->mCoordFrames.at(coord).pCurrent;
 		}
 	});
@@ -114,8 +114,8 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			}
 
 			engine::CoordFrames& rSub = itFrames->second;
-			rSub.staticData.Read(fileStream, /*bIncludeNavData=*/false);
-			rSub.staticData.coord = coord;
+			rSub.staticData.Read(fileStream, /*bIncludeNavigationData=*/false);
+			rSub.staticData.coordinate = coord;
 			// Trust boundary (save file): generation places only loaded templates with centers inside the cell's base
 			// area. The center tests are range tests, so NaN and both infinities fail them too.
 			for (const IslandPlacement& rPlacement : rSub.staticData.islands)
@@ -124,8 +124,8 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 				{
 					throw std::ios_base::failure("island placement template");
 				}
-				if (!(rPlacement.f2WorldPos.x >= kfBaseAreaMinX && rPlacement.f2WorldPos.x <= kfBaseAreaMaxX)
-				 || !(rPlacement.f2WorldPos.y >= kfBaseAreaMinY && rPlacement.f2WorldPos.y <= kfBaseAreaMaxY))
+				if (!(rPlacement.f2WorldPosition.x >= kfBaseAreaMinimumX && rPlacement.f2WorldPosition.x <= kfBaseAreaMaximumX)
+				 || !(rPlacement.f2WorldPosition.y >= kfBaseAreaMinimumY && rPlacement.f2WorldPosition.y <= kfBaseAreaMaximumY))
 				{
 					throw std::ios_base::failure("island placement center");
 				}
@@ -143,7 +143,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			float fCurrentTime = rSub.pCurrent->interpolate.fCurrentTime;
 			if (!bHasLoadedClock)
 			{
-				if (iTick < 0 || iTick > std::numeric_limits<int64_t>::max() - engine::TimeStep::kiMaxAccumulatorTicks || !std::isfinite(fCurrentTime))
+				if (iTick < 0 || iTick > std::numeric_limits<int64_t>::max() - engine::TimeStep::kiMaximumAccumulatorTicks || !std::isfinite(fCurrentTime))
 				{
 					throw std::ios_base::failure("invalid frame clock");
 				}

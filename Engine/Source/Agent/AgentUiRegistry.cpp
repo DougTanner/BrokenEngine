@@ -7,71 +7,54 @@
 namespace engine
 {
 
-namespace
+// Bounded copy into a fixed char buffer, always null-terminated. pcSource may be null.
+static void CopyTruncate(std::span<char> destination, const char* pcSource)
 {
-
-// Bounded copy into a fixed char buffer, always null-terminated. pcSrc may be null.
-void CopyTruncate(char* pcDst, int64_t iDstSize, const char* pcSrc)
-{
-	if (pcSrc == nullptr)
+	if (pcSource == nullptr)
 	{
-		pcDst[0] = '\0';
+		destination[0] = '\0';
 		return;
 	}
 	int64_t i = 0;
-	for (; i < iDstSize - 1 && pcSrc[i] != '\0'; ++i)
+	for (; i < std::ssize(destination) - 1 && pcSource[i] != '\0'; ++i)
 	{
-		pcDst[i] = pcSrc[i];
+		destination[i] = pcSource[i];
 	}
-	pcDst[i] = '\0';
+	destination[i] = '\0';
 }
 
 // Length of the display portion of an ImGui label — everything before the "##" id separator (or the whole string).
-int64_t DisplayLength(const char* pcLabel)
+static int64_t DisplayLength(std::string_view label)
 {
-	for (int64_t i = 0; pcLabel[i] != '\0'; ++i)
-	{
-		if (pcLabel[i] == '#' && pcLabel[i + 1] == '#')
-		{
-			return i;
-		}
-	}
-	int64_t iLength = 0;
-	while (pcLabel[iLength] != '\0')
-	{
-		++iLength;
-	}
-	return iLength;
+	size_t uiSeparator = label.find("##");
+	return static_cast<int64_t>(uiSeparator == std::string_view::npos ? label.size() : uiSeparator);
 }
 
-constexpr char LowerAscii(char cChar)
+static constexpr char LowerAscii(char cChar)
 {
 	return (cChar >= 'A' && cChar <= 'Z') ? static_cast<char>(cChar - 'A' + 'a') : cChar;
 }
 
-// Case-insensitive substring test: is pcNeedle contained in pcHaystack?
-bool ContainsCaseInsensitive(const char* pcHaystack, const char* pcNeedle)
+static bool ContainsCaseInsensitive(std::string_view haystack, std::string_view needle)
 {
-	if (pcNeedle[0] == '\0')
+	if (needle.empty())
 	{
 		return true;
 	}
-	for (int64_t i = 0; pcHaystack[i] != '\0'; ++i)
+	for (int64_t i = 0; i < std::ssize(haystack); ++i)
 	{
 		int64_t j = 0;
-		while (pcNeedle[j] != '\0' && LowerAscii(pcHaystack[i + j]) == LowerAscii(pcNeedle[j]))
+		while (j < std::ssize(needle) && i + j < std::ssize(haystack) && LowerAscii(haystack[i + j]) == LowerAscii(needle[j]))
 		{
 			++j;
 		}
-		if (pcNeedle[j] == '\0')
+		if (j == std::ssize(needle))
 		{
 			return true;
 		}
 	}
 	return false;
 }
-
-} // namespace
 
 AgentUiRegistry::AgentUiRegistry()
 {
@@ -87,11 +70,11 @@ AgentUiRegistry::~AgentUiRegistry()
 	}
 }
 
-int64_t AgentUiRegistry::FindPendingLabel(ImGuiID uiId) const
+int64_t AgentUiRegistry::FindPendingLabel(ImGuiID uiIdentifier) const
 {
 	for (int64_t i = 0; i < miPendingLabelCount; ++i)
 	{
-		if (mPendingLabels[i].uiId == uiId)
+		if (mPendingLabels[i].uiIdentifier == uiIdentifier)
 		{
 			return i;
 		}
@@ -109,11 +92,11 @@ void AgentUiRegistry::RemovePendingLabel(int64_t iIndex)
 	mPendingLabels[miPendingLabelCount] = {};
 }
 
-void AgentUiRegistry::HookItemAdd(ImGuiID uiId, const XMFLOAT4& rf4Rect, const char* pcWindow, bool bDisabled, bool bVisible)
+void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Rectangle, const char* pcWindow, bool bDisabled, bool bVisible)
 {
-	int64_t iPendingLabel = FindPendingLabel(uiId);
-	bool bEmptyRect = rf4Rect.x >= rf4Rect.z || rf4Rect.y >= rf4Rect.w;
-	if (iPendingLabel >= 0 && bEmptyRect)
+	int64_t iPendingLabel = FindPendingLabel(uiIdentifier);
+	bool bEmptyRectangle = rf4Rectangle.x >= rf4Rectangle.z || rf4Rectangle.y >= rf4Rectangle.w;
+	if (iPendingLabel >= 0 && bEmptyRectangle)
 	{
 		// A tab reports a zero-size layout placeholder after its label and before its real tab rectangle.
 		return;
@@ -125,33 +108,33 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiId, const XMFLOAT4& rf4Rect, const c
 		return; // capacity bound — silently drop overflow (registry is best-effort snapshot)
 	}
 	AgentUiItem& rItem = mItems[miWrite][riCount];
-	rItem.uiId = uiId;
-	rItem.f4Rect = rf4Rect;
+	rItem.uiIdentifier = uiIdentifier;
+	rItem.f4Rectangle = rf4Rectangle;
 	rItem.iStatusFlags = bVisible ? static_cast<int32_t>(ImGuiItemStatusFlags_Visible) : 0;
 	rItem.bDisabled = bDisabled;
 	rItem.pcLabel[0] = '\0';
 	rItem.pcValue[0] = '\0';
-	CopyTruncate(rItem.pcWindow, sizeof(rItem.pcWindow), pcWindow);
+	CopyTruncate(rItem.pcWindow, pcWindow);
 	if (iPendingLabel >= 0)
 	{
-		CopyTruncate(rItem.pcLabel, sizeof(rItem.pcLabel), mPendingLabels[iPendingLabel].pcLabel);
+		CopyTruncate(rItem.pcLabel, mPendingLabels[iPendingLabel].pcLabel);
 		RemovePendingLabel(iPendingLabel);
 	}
 	++riCount;
 }
 
-void AgentUiRegistry::HookItemInfo(ImGuiID uiId, const char* pcLabel, int32_t iStatusFlags)
+void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, int32_t iStatusFlags)
 {
-	// ItemInfo fires immediately after ItemAdd for the same id — search backward from the tail.
+	// Search newest records first; tabs can emit ItemInfo before their ItemAdd.
 	int64_t iCount = miItemCount[miWrite];
 	for (int64_t i = iCount - 1; i >= 0; --i)
 	{
 		AgentUiItem& rItem = mItems[miWrite][i];
-		if (rItem.uiId == uiId)
+		if (rItem.uiIdentifier == uiIdentifier)
 		{
 			if (pcLabel != nullptr && pcLabel[0] != '\0')
 			{
-				CopyTruncate(rItem.pcLabel, sizeof(rItem.pcLabel), pcLabel);
+				CopyTruncate(rItem.pcLabel, pcLabel);
 			}
 			rItem.iStatusFlags |= iStatusFlags;
 			return;
@@ -163,7 +146,7 @@ void AgentUiRegistry::HookItemInfo(ImGuiID uiId, const char* pcLabel, int32_t iS
 		return;
 	}
 
-	int64_t iPendingLabel = FindPendingLabel(uiId);
+	int64_t iPendingLabel = FindPendingLabel(uiIdentifier);
 	if (iPendingLabel < 0)
 	{
 		if (miPendingLabelCount >= kiMaxPendingLabels)
@@ -171,33 +154,33 @@ void AgentUiRegistry::HookItemInfo(ImGuiID uiId, const char* pcLabel, int32_t iS
 			return; // capacity bound — silently drop overflow (registry is best-effort snapshot)
 		}
 		iPendingLabel = miPendingLabelCount++;
-		mPendingLabels[iPendingLabel].uiId = uiId;
+		mPendingLabels[iPendingLabel].uiIdentifier = uiIdentifier;
 	}
 	// The pre-ItemAdd status belongs to the prior item for tabs; only the label crosses into pending state.
-	CopyTruncate(mPendingLabels[iPendingLabel].pcLabel, sizeof(mPendingLabels[iPendingLabel].pcLabel), pcLabel);
+	CopyTruncate(mPendingLabels[iPendingLabel].pcLabel, pcLabel);
 }
 
-void AgentUiRegistry::RecordItemValue(ImGuiID uiId, const char* pcValue)
+void AgentUiRegistry::RecordItemValue(ImGuiID uiIdentifier, const char* pcValue)
 {
 	int64_t iCount = miItemCount[miWrite];
 	for (int64_t i = iCount - 1; i >= 0; --i)
 	{
 		AgentUiItem& rItem = mItems[miWrite][i];
-		if (rItem.uiId == uiId)
+		if (rItem.uiIdentifier == uiIdentifier)
 		{
-			CopyTruncate(rItem.pcValue, sizeof(rItem.pcValue), pcValue);
+			CopyTruncate(rItem.pcValue, pcValue);
 			return;
 		}
 	}
 }
 
-void AgentUiRegistry::RecordItemChecked(ImGuiID uiId, bool bChecked)
+void AgentUiRegistry::RecordItemChecked(ImGuiID uiIdentifier, bool bChecked)
 {
 	int64_t iCount = miItemCount[miWrite];
 	for (int64_t i = iCount - 1; i >= 0; --i)
 	{
 		AgentUiItem& rItem = mItems[miWrite][i];
-		if (rItem.uiId == uiId)
+		if (rItem.uiIdentifier == uiIdentifier)
 		{
 			rItem.iStatusFlags |= static_cast<int32_t>(ImGuiItemStatusFlags_Checkable);
 			if (bChecked)
@@ -232,8 +215,8 @@ void AgentUiRegistry::Swap()
 				break;
 			}
 			AgentUiWindow& rWindow = mWindows[miWrite][riWindowCount];
-			CopyTruncate(rWindow.pcName, sizeof(rWindow.pcName), pWindow->Name);
-			rWindow.f4Rect = XMFLOAT4(pWindow->Pos.x, pWindow->Pos.y, pWindow->Pos.x + pWindow->Size.x, pWindow->Pos.y + pWindow->Size.y);
+			CopyTruncate(rWindow.pcName, pWindow->Name);
+			rWindow.f4Rectangle = XMFLOAT4(pWindow->Pos.x, pWindow->Pos.y, pWindow->Pos.x + pWindow->Size.x, pWindow->Pos.y + pWindow->Size.y);
 			rWindow.bFocused = (pContext->NavWindow == pWindow);
 			++riWindowCount;
 		}
@@ -255,9 +238,9 @@ int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow)
 	int64_t iNeedleDisplay = DisplayLength(pcLabel);
 
 	// Three resolution tiers, tried in order; the first tier with any match decides (single -> hit, multiple -> ambiguous).
-	for (int64_t iTier = 0; iTier < 3; ++iTier)
+	for (int64_t k = 0; k < 3; ++k)
 	{
-		int64_t iFound = kNotFound;
+		int64_t iFound = kiNotFound;
 		int64_t iMatches = 0;
 		for (int64_t i = 0; i < iCount; ++i)
 		{
@@ -272,11 +255,11 @@ int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow)
 			}
 
 			bool bMatch = false;
-			if (iTier == 0)
+			if (k == 0)
 			{
 				bMatch = std::strcmp(rItem.pcLabel, pcLabel) == 0;
 			}
-			else if (iTier == 1)
+			else if (k == 1)
 			{
 				int64_t iItemDisplay = DisplayLength(rItem.pcLabel);
 				bMatch = iItemDisplay == iNeedleDisplay && std::strncmp(rItem.pcLabel, pcLabel, static_cast<size_t>(iNeedleDisplay)) == 0;
@@ -299,11 +282,11 @@ int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow)
 		}
 		if (iMatches > 1)
 		{
-			return kAmbiguous;
+			return kiAmbiguous;
 		}
 	}
 
-	return kNotFound;
+	return kiNotFound;
 }
 
 } // namespace engine
@@ -313,43 +296,41 @@ int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow)
 // enables item hooks for the agent layer. Client hooks forward to AgentUiRegistry, while the server links the same
 // ImGui code and supplies no-op hooks in AgentUiRegistryServerStubs.cpp.
 
-void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb, [[maybe_unused]] const ImGuiLastItemData* item_data)
+void ImGuiTestEngineHook_ItemAdd(ImGuiContext* pContext, ImGuiID uiIdentifier, const ImRect& rBoundingBox, [[maybe_unused]] const ImGuiLastItemData* pItemData)
 {
 	if (engine::gpAgentUiRegistry == nullptr)
 	{
 		return;
 	}
-	const char* pcWindow = (ctx->CurrentWindow != nullptr) ? ctx->CurrentWindow->Name : "";
-	bool bDisabled = (ctx->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
+	const char* pcWindow = (pContext->CurrentWindow != nullptr) ? pContext->CurrentWindow->Name : "";
+	bool bDisabled = (pContext->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
 	// ItemAdd invokes this hook before it sets LastItemData.Visible; use its exact rectangle/clip predicate here.
-	bool bVisible = ctx->CurrentWindow != nullptr && bb.Overlaps(ctx->CurrentWindow->ClipRect);
-	engine::gpAgentUiRegistry->HookItemAdd(id, XMFLOAT4(bb.Min.x, bb.Min.y, bb.Max.x, bb.Max.y), pcWindow, bDisabled, bVisible);
+	bool bVisible = pContext->CurrentWindow != nullptr && rBoundingBox.Overlaps(pContext->CurrentWindow->ClipRect);
+	engine::gpAgentUiRegistry->HookItemAdd(uiIdentifier, XMFLOAT4(rBoundingBox.Min.x, rBoundingBox.Min.y, rBoundingBox.Max.x, rBoundingBox.Max.y), pcWindow, bDisabled, bVisible);
 }
 
-void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* label, ImGuiItemStatusFlags flags)
+void ImGuiTestEngineHook_ItemInfo(ImGuiContext* pContext, ImGuiID uiIdentifier, const char* pcLabel, ImGuiItemStatusFlags iStatusFlags)
 {
 	if (engine::gpAgentUiRegistry == nullptr)
 	{
 		return;
 	}
-	// Begin() self-registers each window (ITEM_ADD + ITEM_INFO with the window name, imgui.cpp:7764-7765) with flags that
-	// never include ImGuiItemStatusFlags_Visible (only widget ItemAdd sets it) — recording that label would make on-screen
-	// windows read visible:false in describe_ui and window-name clicks fail kClipped; window names stay queryable via the
-	// windows snapshot. The window pseudo-item keeps an empty label, so it is filtered from describe_ui items and unresolvable
-	// by label (kNotFound) — intended.
-	if (ctx->CurrentWindow != nullptr && id == ctx->CurrentWindow->ID)
+	// Begin() registers window pseudo-items without ImGuiItemStatusFlags_Visible.
+	// Empty labels omit them from describe_ui and label lookup (kiNotFound), avoiding visible:false entries and kClipped window-label clicks.
+	// Window names remain queryable through the window snapshot.
+	if (pContext->CurrentWindow != nullptr && uiIdentifier == pContext->CurrentWindow->ID)
 	{
 		return;
 	}
-	engine::gpAgentUiRegistry->HookItemInfo(id, label, static_cast<int32_t>(flags));
+	engine::gpAgentUiRegistry->HookItemInfo(uiIdentifier, pcLabel, static_cast<int32_t>(iStatusFlags));
 }
 
-void ImGuiTestEngineHook_Log([[maybe_unused]] ImGuiContext* ctx, [[maybe_unused]] const char* fmt, ...)
+void ImGuiTestEngineHook_Log([[maybe_unused]] ImGuiContext* pContext, [[maybe_unused]] const char* pcFormat, ...)
 {
 	// No-op: the registry needs item rects/labels only, not the test-engine log stream.
 }
 
-const char* ImGuiTestEngine_FindItemDebugLabel([[maybe_unused]] ImGuiContext* ctx, [[maybe_unused]] ImGuiID id)
+const char* ImGuiTestEngine_FindItemDebugLabel([[maybe_unused]] ImGuiContext* pContext, [[maybe_unused]] ImGuiID uiIdentifier)
 {
 	return nullptr;
 }

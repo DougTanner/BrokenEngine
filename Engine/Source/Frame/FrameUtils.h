@@ -24,8 +24,8 @@ template<bool kbBlendVelocityToDirection = false>
 	XMVECTOR vecResult = XMVectorMultiply(XMVectorReplicate(common::ExponentialDecay(fDrag, fDeltaTime)), vecVelocity);
 
 	float fSpeed = XMVectorGetX(XMVector3Length(vecResult));
-	float fAccelScale = 1.0f - std::min(fSpeed / fMaxSpeed, 1.0f);
-	vecResult = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * fAcceleration * fAccelScale), vecDirection, vecResult);
+	float fAccelerationScale = 1.0f - std::min(fSpeed / fMaxSpeed, 1.0f);
+	vecResult = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * fAcceleration * fAccelerationScale), vecDirection, vecResult);
 
 	if constexpr (kbBlendVelocityToDirection)
 	{
@@ -56,7 +56,8 @@ struct SegmentHit
 inline FrameBounds XM_CALLCONV ComputeFrameBounds(FXMVECTOR vecArea)
 {
 	// vecArea: x=minX, y=maxY, z=maxX, w=minY
-	return {
+	return
+	{
 		.fMinX = XMVectorGetX(vecArea),
 		.fMinY = XMVectorGetW(vecArea),
 		.fMaxX = XMVectorGetZ(vecArea),
@@ -119,16 +120,16 @@ inline SegmentHit XM_CALLCONV TracePointToFrameExit(FXMVECTOR vecArea, FXMVECTOR
 // identity only and never scales an edge. Lanes follow the convention ComputeFrameBounds reads.
 inline XMVECTOR XM_CALLCONV LocalFrameArea()
 {
-	return XMVectorSet(kfBaseAreaMinX, kfBaseAreaMaxY, kfBaseAreaMaxX, kfBaseAreaMinY);
+	return XMVectorSet(kfBaseAreaMinimumX, kfBaseAreaMaximumY, kfBaseAreaMaximumX, kfBaseAreaMinimumY);
 }
 
-// Neighbour and transfer-destination coordinate arithmetic. Returns false and leaves rOutCoord untouched when
+// Neighbour and transfer-destination coordinate arithmetic. Returns false and leaves rOutputCoordinate untouched when
 // the sum leaves the signed-int32 identity range, so a cell at a numeric edge omits that neighbour instead of
 // wrapping to the opposite end of the grid.
-[[nodiscard]] inline bool TryAddGridCoord(GridCoord coord, int32_t iDeltaX, int32_t iDeltaY, GridCoord& rOutCoord)
+[[nodiscard]] inline bool TryAddGridCoordinate(GridCoord coordinate, int32_t iDeltaX, int32_t iDeltaY, GridCoord& rOutputCoordinate)
 {
-	int64_t iSumX = static_cast<int64_t>(coord.x) + static_cast<int64_t>(iDeltaX);
-	int64_t iSumY = static_cast<int64_t>(coord.y) + static_cast<int64_t>(iDeltaY);
+	int64_t iSumX = static_cast<int64_t>(coordinate.iX) + static_cast<int64_t>(iDeltaX);
+	int64_t iSumY = static_cast<int64_t>(coordinate.iY) + static_cast<int64_t>(iDeltaY);
 	if (iSumX < std::numeric_limits<int32_t>::min() || iSumX > std::numeric_limits<int32_t>::max())
 	{
 		return false;
@@ -138,7 +139,7 @@ inline XMVECTOR XM_CALLCONV LocalFrameArea()
 		return false;
 	}
 
-	rOutCoord = {static_cast<int32_t>(iSumX), static_cast<int32_t>(iSumY)};
+	rOutputCoordinate = {.iX = static_cast<int32_t>(iSumX), .iY = static_cast<int32_t>(iSumY)};
 	return true;
 }
 
@@ -152,20 +153,17 @@ inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecP
 	return !(fPositionX > rBounds.fMinX && fPositionX < rBounds.fMaxX && fPositionY > rBounds.fMinY && fPositionY < rBounds.fMaxY);
 }
 
-inline void XM_CALLCONV ComputeTransferDelta(const FrameBounds& rBounds, FXMVECTOR vecPosition, int8_t& rDeltaX, int8_t& rDeltaY)
+inline void XM_CALLCONV ComputeTransferDelta(const FrameBounds& rBounds, FXMVECTOR vecPosition, int8_t& riDeltaX, int8_t& riDeltaY)
 {
 	float fPositionX = XMVectorGetX(vecPosition);
 	float fPositionY = XMVectorGetY(vecPosition);
-	rDeltaX = static_cast<int8_t>((fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX <= rBounds.fMinX) ? -1 : 0);
-	rDeltaY = static_cast<int8_t>((fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY <= rBounds.fMinY) ? -1 : 0);
+	riDeltaX = static_cast<int8_t>((fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX <= rBounds.fMinX) ? -1 : 0);
+	riDeltaY = static_cast<int8_t>((fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY <= rBounds.fMinY) ? -1 : 0);
 }
 
-// Type list for fold expression iteration
 template<typename... TS>
 struct TypeList {};
 
-// Convert std::tuple<T1&, T2&, ...> to TypeList<T1, T2, ...>
-// Strips references from tuple element types
 template<typename TUPLE>
 struct TupleToTypeList;
 
@@ -178,7 +176,6 @@ struct TupleToTypeList<std::tuple<TS...>>
 template<typename TUPLE>
 using TupleToTypeList_t = typename TupleToTypeList<TUPLE>::type;
 
-// ForEach helpers for collection iteration via fold expressions
 template<typename... TS>
 void ForEachInterpolateUpdate(TypeList<TS...>, game::FrameInterpolate& __restrict rCurrent, const game::Frame& __restrict rPreviousFrame)
 {
@@ -331,36 +328,46 @@ void ForEachPostRenderSpawn(TypeList<TS...>, game::Frame& __restrict rFrame, con
 	}(), ...);
 }
 
-// AllocateAndCopy helper using tuple and index sequence
 template<typename TUPLE_CURRENT, typename TUPLE_PREVIOUS, size_t... INDICES>
-void AllocateAndCopyCollections(TUPLE_CURRENT&& current, TUPLE_PREVIOUS&& previous, std::index_sequence<INDICES...>)
+void AllocateAndCopyCollections(TUPLE_CURRENT&& rCurrent, const TUPLE_PREVIOUS& rPrevious, std::index_sequence<INDICES...>)
 {
-	(std::remove_reference_t<std::tuple_element_t<INDICES, std::remove_cvref_t<TUPLE_CURRENT>>>::AllocateAndCopy(std::get<INDICES>(current), std::get<INDICES>(previous)), ...);
+	([](auto& rCurrentCollection, const auto& rPreviousCollection)
+	{
+		using CollectionType = std::remove_cvref_t<decltype(rCurrentCollection)>;
+		if constexpr (requires { CollectionType::AllocateAndCopy(rCurrentCollection, rPreviousCollection); })
+		{
+			CollectionType::AllocateAndCopy(rCurrentCollection, rPreviousCollection);
+		}
+		else
+		{
+			engine::AllocateAndCopyMembers(rCurrentCollection, rPreviousCollection);
+		}
+	}(std::get<INDICES>(rCurrent), std::get<INDICES>(rPrevious)), ...);
 }
 
-// LogDifferences helper using tuple and index sequence; left-to-right, never short-circuits (every collection logs)
+// Every collection logs in tuple order; the fold never short-circuits.
 template<typename TUPLE_CURRENT, typename TUPLE_OTHER, size_t... INDICES>
-bool LogDifferencesCollections(TUPLE_CURRENT&& current, TUPLE_OTHER&& other, std::index_sequence<INDICES...>)
+bool LogDifferencesCollections(const TUPLE_CURRENT& rCurrent, const TUPLE_OTHER& rOther, std::index_sequence<INDICES...>)
 {
 	bool bEqual = true;
-	((bEqual &= std::get<INDICES>(current).LogDifferences(std::get<INDICES>(other))), ...);
+	((bEqual &= std::get<INDICES>(rCurrent).LogDifferences(std::get<INDICES>(rOther))), ...);
 	return bEqual;
 }
 
 // Reverse walk over a paired collection, releasing every element the predicate selects.
 // Reverse order keeps swap-and-pop removal safe: the row swapped in from the tail has already been visited,
-// so release must not disturb the loop index.
+// so Release must not disturb the loop index.
 template <typename INTERPOLATE, typename POST_RENDER, typename PREDICATE, typename RELEASE>
-void DestroySweep(INTERPOLATE& rInterpolate, [[maybe_unused]] POST_RENDER& rPostRender, PREDICATE predicate, RELEASE release)
+void DestroySweep(const INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_RENDER& rPostRender, PREDICATE Predicate, RELEASE Release)
 {
 	for (int64_t i = rInterpolate.iCount - 1; i >= 0; --i)
 	{
-		if (!predicate(i)) [[likely]]
+		if (!Predicate(i)) [[likely]]
 		{
 			continue;
 		}
 
-		release(i);
+		Release(i);
 	}
 }
 
@@ -388,41 +395,41 @@ void ValidateCollectionPairs(const INTERPOLATE_TUPLE& rInterpolateCollections, c
 
 // Collection tuple folds: left-to-right over the tuple, so CRC mixing and byte order follow tuple order
 template <typename TUPLE>
-common::crc_t CollectionsCrc(common::crc_t sharedCrc, TUPLE&& collections)
+common::crc_t CollectionsCrc(common::crc_t uiSharedCrc, const TUPLE& rCollections)
 {
-	std::apply([&](const auto&... cols)
+	std::apply([&](const auto&... rCollection)
 	{
-		((sharedCrc = (sharedCrc ^ SharedCollectionCrc(cols)) * common::kCrcMultiplier), ...);
-	}, collections);
+		((uiSharedCrc = (uiSharedCrc ^ SharedCollectionCrc(rCollection)) * common::kCrcMultiplier), ...);
+	}, rCollections);
 
-	return sharedCrc;
+	return uiSharedCrc;
 }
 
 template <typename TUPLE>
-void CollectionsWrite(std::ostream& rStream, TUPLE&& collections)
+void CollectionsWrite(std::ostream& rStream, const TUPLE& rCollections)
 {
-	std::apply([&](const auto&... cols)
+	std::apply([&](const auto&... rCollection)
 	{
-		(CollectionWrite(rStream, cols, cols.Members()), ...);
-	}, collections);
+		(CollectionWrite(rStream, rCollection, rCollection.Members()), ...);
+	}, rCollections);
 }
 
 template <typename TUPLE>
-void CollectionsRead(std::istream& rStream, TUPLE&& collections)
+void CollectionsRead(std::istream& rStream, TUPLE&& rCollections)
 {
-	std::apply([&](auto&... cols)
+	std::apply([&](auto&... rCollection)
 	{
-		(CollectionRead(rStream, cols, cols.Members()), ...);
-	}, collections);
+		(CollectionRead(rStream, rCollection, rCollection.Members()), ...);
+	}, rCollections);
 }
 
 template <typename TUPLE>
-void SharedCollectionsRead(std::istream& rStream, TUPLE&& collections)
+void SharedCollectionsRead(std::istream& rStream, TUPLE&& rCollections)
 {
-	std::apply([&](auto&... cols)
+	std::apply([&](auto&... rCollection)
 	{
-		(SharedCollectionRead(rStream, cols), ...);
-	}, collections);
+		(SharedCollectionRead(rStream, rCollection), ...);
+	}, rCollections);
 }
 
 } // namespace engine

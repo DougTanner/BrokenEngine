@@ -30,14 +30,14 @@ public:
 	inline std::chrono::nanoseconds GetDeltaNs(bool bReset = false)
 	{
 		std::chrono::steady_clock::time_point currentTimePoint = std::chrono::steady_clock::now();
-		std::chrono::nanoseconds elapsedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTimePoint - mLastTimePoint);
+		std::chrono::nanoseconds elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTimePoint - mLastTimePoint);
 
 		if (bReset)
 		{
 			mLastTimePoint = currentTimePoint;
 		}
 
-		return elapsedNs;
+		return elapsedNanoseconds;
 	}
 
 private:

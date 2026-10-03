@@ -45,13 +45,13 @@ struct LogBuffer
 	_Ret_range_(0, LINE_COUNT)
 	int64_t Tail(_Out_writes_to_(LINE_COUNT, return) const char** ppLines, int64_t iMaxLines) const
 	{
-		int64_t iWritePos = iWritePosition.load(std::memory_order_relaxed);
-		int64_t iAvailable = std::min(iWritePos, kiLineCount);
+		int64_t iCurrentWritePosition = iWritePosition.load(std::memory_order_relaxed);
+		int64_t iAvailable = std::min(iCurrentWritePosition, kiLineCount);
 		int64_t iCount = std::min(iAvailable, iMaxLines);
 		int64_t iFilled = 0;
 		if constexpr (WRAP)
 		{
-			int64_t iFirst = iWritePos - iCount;
+			int64_t iFirst = iCurrentWritePosition - iCount;
 			for (int64_t i = 0; i < iCount; ++i)
 			{
 				const char* pLine = pcLines[(iFirst + i) % kiLineCount];
@@ -78,11 +78,11 @@ struct LogBuffer
 
 	void Dump(CrashFileWriter& rWriter) const
 	{
-		int64_t iWritePos = iWritePosition.load(std::memory_order_relaxed);
+		int64_t iCurrentWritePosition = iWritePosition.load(std::memory_order_relaxed);
 		if constexpr (WRAP)
 		{
-			int64_t iCount = std::min(iWritePos, kiLineCount);
-			int64_t iStart = (iWritePos >= kiLineCount) ? (iWritePos % kiLineCount) : 0;
+			int64_t iCount = std::min(iCurrentWritePosition, kiLineCount);
+			int64_t iStart = (iCurrentWritePosition >= kiLineCount) ? (iCurrentWritePosition % kiLineCount) : 0;
 			for (int64_t i = 0; i < iCount; ++i)
 			{
 				const char* pLine = pcLines[(iStart + i) % kiLineCount];
@@ -94,7 +94,7 @@ struct LogBuffer
 		}
 		else
 		{
-			int64_t iCount = std::min(iWritePos, kiLineCount);
+			int64_t iCount = std::min(iCurrentWritePosition, kiLineCount);
 			for (int64_t i = 0; i < iCount; ++i)
 			{
 				if (pcLines[i][0] != '\0')
@@ -204,8 +204,8 @@ using common::ScopedLogIndent;
 // Per-category compile-time thresholds (keLogLevel* defined in each project's Pch.h before Common.h)
 inline constexpr LogLevel keLogLevels[]
 {
-	keLogLevelDefault, keLogLevelTemp,
-	keLogLevelAudio, keLogLevelGraphics, keLogLevelLoading, keLogLevelNavData, keLogLevelNetwork, keLogLevelInput, keLogLevelReplay,
+	keLogLevelDefault, keLogLevelTemporary,
+	keLogLevelAudio, keLogLevelGraphics, keLogLevelLoading, keLogLevelNavigationData, keLogLevelNetwork, keLogLevelInput, keLogLevelReplay,
 };
 static_assert(std::size(keLogLevels) == common::kiLogCategoryCount, "keLogLevels out of sync with LogCategory");
 

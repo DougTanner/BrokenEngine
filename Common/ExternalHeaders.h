@@ -162,14 +162,14 @@ inline constexpr float XM_PIDIV128 = XM_PI / 128.0f;
 // The SDK rotate functions return the raw quaternion product, so W is a rounding residue that only cancels
 // algebraically - it violates the repository W invariant for directions. Re-zero W exactly. The raw names are
 // poisoned below, so these wrappers must stay above those defines to keep calling the real SDK functions.
-inline XMVECTOR XM_CALLCONV XMVector3RotateSafe(FXMVECTOR V, FXMVECTOR RotationQuaternion)
+inline XMVECTOR XM_CALLCONV XMVector3RotateSafe(FXMVECTOR vecDirection, FXMVECTOR vecRotationQuaternion)
 {
-	return XMVectorSetW(XMVector3Rotate(V, RotationQuaternion), 0.0f);
+	return XMVectorSetW(XMVector3Rotate(vecDirection, vecRotationQuaternion), 0.0f);
 }
 
-inline XMVECTOR XM_CALLCONV XMVector3InverseRotateSafe(FXMVECTOR V, FXMVECTOR RotationQuaternion)
+inline XMVECTOR XM_CALLCONV XMVector3InverseRotateSafe(FXMVECTOR vecDirection, FXMVECTOR vecRotationQuaternion)
 {
-	return XMVectorSetW(XMVector3InverseRotate(V, RotationQuaternion), 0.0f);
+	return XMVectorSetW(XMVector3InverseRotate(vecDirection, vecRotationQuaternion), 0.0f);
 }
 
 }
@@ -178,7 +178,7 @@ using namespace DirectX;
 inline constexpr float kfEpsilon = 1.192092896e-7f; // g_XMEpsilon
 
 // NaN/Inf bit tests. Free functions (not macros) for single-evaluation and no strict-aliasing UB: std::bit_cast
-// (constexpr, <bit>) replaces the type-punning reinterpret_cast. Named XmIsNan/XmIsInf to avoid colliding with
+// (constexpr, <bit>) avoids type-punning. Named XmIsNan/XmIsInf to avoid colliding with
 // DirectXMath's own XMISNAN/XMISINF macros. Owned by ExternalHeaders.h by design.
 inline constexpr bool XmIsNan(float fValue)
 {

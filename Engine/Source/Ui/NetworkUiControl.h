@@ -21,7 +21,7 @@ public:
 		{
 			if (currentState != mStateWhenRequested)
 			{
-				mFlags.Clear(NetworkUiControlFlags::kPending);
+				mFlags.Set(NetworkUiControlFlags::kPending, false);
 			}
 		}
 		else
@@ -42,7 +42,7 @@ public:
 
 	void Reset()
 	{
-		mFlags.ClearAll();
+		mFlags.meFlags = static_cast<decltype(mFlags.meFlags)>(0);
 		mStateWhenRequested = T {};
 	}
 

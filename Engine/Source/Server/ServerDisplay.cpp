@@ -145,8 +145,8 @@ bool ServerDisplayContentChanged()
 
 	for (const GridCoord& rCoord : game::gpGame->mActiveCoords)
 	{
-		Mix(rCoord.x);
-		Mix(rCoord.y);
+		Mix(rCoord.iX);
+		Mix(rCoord.iY);
 
 		// Mix each count separately — summing would alias conversions (e.g. spaceship death -1 spaceship
 		// +1 explosion leaves the sum unchanged) and skip a repaint whose displayed numbers did change.
@@ -162,18 +162,18 @@ bool ServerDisplayContentChanged()
 	Mix(static_cast<int64_t>(rClients.size()));
 	for (const ClientConnection& rClient : rClients)
 	{
-		for (const GridCoord& rOwnedCoord : rClient.authorizedCoords)
+		for (const GridCoord& rOwnedCoord : rClient.authorizedCoordinates)
 		{
-			Mix(rOwnedCoord.x);
-			Mix(rOwnedCoord.y);
+			Mix(rOwnedCoord.iX);
+			Mix(rOwnedCoord.iY);
 		}
 
 		for (int64_t i = 0; i < std::ssize(rClient.slots); ++i)
 		{
 			if (rClient.slots.at(i).subscription.flags & SubscriptionFlags::kActive)
 			{
-				Mix(rClient.slots.at(i).subscription.coord.x);
-				Mix(rClient.slots.at(i).subscription.coord.y);
+				Mix(rClient.slots.at(i).subscription.coordinate.iX);
+				Mix(rClient.slots.at(i).subscription.coordinate.iY);
 			}
 		}
 	}
@@ -203,17 +203,17 @@ static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMap
 	}
 
 	// Compute grid bounds with 1-cell padding
-	int32_t iMinX = game::gpGame->mActiveCoords.at(0).x;
+	int32_t iMinX = game::gpGame->mActiveCoords.at(0).iX;
 	int32_t iMaxX = iMinX;
-	int32_t iMinY = game::gpGame->mActiveCoords.at(0).y;
+	int32_t iMinY = game::gpGame->mActiveCoords.at(0).iY;
 	int32_t iMaxY = iMinY;
 
 	for (const GridCoord& rCoord : game::gpGame->mActiveCoords)
 	{
-		iMinX = std::min(iMinX, rCoord.x);
-		iMaxX = std::max(iMaxX, rCoord.x);
-		iMinY = std::min(iMinY, rCoord.y);
-		iMaxY = std::max(iMaxY, rCoord.y);
+		iMinX = std::min(iMinX, rCoord.iX);
+		iMaxX = std::max(iMaxX, rCoord.iX);
+		iMinY = std::min(iMinY, rCoord.iY);
+		iMaxY = std::max(iMaxY, rCoord.iY);
 	}
 
 	iMinX -= 1;
@@ -262,7 +262,7 @@ static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMap
 
 			for (const ClientConnection& rClient : rClients)
 			{
-				for (const GridCoord& rOwnedCoord : rClient.authorizedCoords)
+				for (const GridCoord& rOwnedCoord : rClient.authorizedCoordinates)
 				{
 					if (rOwnedCoord == coord)
 					{
@@ -270,7 +270,7 @@ static void PaintGridMap(HDC hdcBuffer, char* pcLine, size_t iLineSize, int iMap
 					}
 				}
 
-				if (!bIsSubscribed && rClient.FindSlotForCoord(coord) >= 0)
+				if (!bIsSubscribed && rClient.FindSlotForCoordinate(coord) >= 0)
 				{
 					bIsSubscribed = true;
 				}
@@ -575,7 +575,7 @@ void PaintServerDisplay(HWND hWnd)
 	SetBkMode(hdcBuffer, TRANSPARENT);
 
 	// Read frame data from origin coord
-	game::ServerCellStats originStats = game::GetServerCellStats(game::gpGame->CurrentFrame(kOriginCoord));
+	game::ServerCellStats originStats = game::GetServerCellStats(game::gpGame->CurrentFrame(kOriginCoordinate));
 	int64_t iTick = originStats.iTick;
 	float fCurrentTime = originStats.fCurrentTime;
 

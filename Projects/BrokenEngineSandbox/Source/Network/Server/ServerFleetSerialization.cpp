@@ -38,8 +38,8 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	int64_t iMemberCount = std::ssize(rFleet.members);
 	common::Write(rFileStream, iMemberCount);
 	common::Write(rFileStream, rFleet.flagshipGlobalPlayerId.iValue);
-	common::Write(rFileStream, rFleet.wantedCoord.x);
-	common::Write(rFileStream, rFleet.wantedCoord.y);
+	common::Write(rFileStream, rFleet.wantedCoord.iX);
+	common::Write(rFileStream, rFleet.wantedCoord.iY);
 	common::Write(rFileStream, rFleet.uiPendingFleetWantedCoordTicks);
 	common::Write(rFileStream, rFleet.fNavigationDelay);
 	common::Write(rFileStream, rFleet.fFrameChangeTimer);
@@ -47,8 +47,8 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	{
 		common::Write(rFileStream, rMember.globalPlayerId.iValue);
 		rMember.flags.Write(rFileStream);
-		common::Write(rFileStream, rMember.coord.x);
-		common::Write(rFileStream, rMember.coord.y);
+		common::Write(rFileStream, rMember.coord.iX);
+		common::Write(rFileStream, rMember.coord.iY);
 	}
 }
 
@@ -56,7 +56,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 {
 	common::Read(rFileStream, rFleet.guid.uiHigh);
 	common::Read(rFileStream, rFleet.guid.uiLow);
-	if (rFleet.guid.IsEmpty())
+	if ((rFleet.guid.uiHigh == 0 && rFleet.guid.uiLow == 0))
 	{
 		throw std::ios_base::failure("Fleet FleetGuid");
 	}
@@ -96,8 +96,8 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		flags.Read(rFileStream);
 		// Trust boundary (save / replay file): kIsDead is the only member flag.
 		FleetMemberFlags_t unknownFlags = flags;
-		unknownFlags.Clear(FleetMemberFlags::kIsDead);
-		if (!unknownFlags.Empty())
+		unknownFlags.Set(FleetMemberFlags::kIsDead, false);
+		if (std::to_underlying(unknownFlags.meFlags) != 0)
 		{
 			throw std::ios_base::failure("Fleet member flags");
 		}
@@ -105,20 +105,20 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		int32_t iCoordY = 0;
 		common::Read(rFileStream, iCoordX);
 		common::Read(rFileStream, iCoordY);
-		rMember = FleetMember {.globalPlayerId = engine::global_id_t {iGlobalPlayerId}, .flags = flags, .coord = engine::GridCoord {iCoordX, iCoordY}};
+		rMember = FleetMember {.globalPlayerId = engine::GlobalId {iGlobalPlayerId}, .flags = flags, .coord = engine::GridCoord {iCoordX, iCoordY}};
 	}
 	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, so each member ID
 	// must be valid and unique within its fleet, and the flagship must name a member ({} only for an empty fleet).
 	for (int64_t k = 0; k < iMemberCount; ++k)
 	{
-		engine::global_id_t memberGlobalPlayerId = rFleet.members.at(static_cast<size_t>(k)).globalPlayerId;
-		if (!memberGlobalPlayerId.IsValid() || std::ranges::contains(rFleet.members.begin(), rFleet.members.begin() + k, memberGlobalPlayerId, &FleetMember::globalPlayerId))
+		engine::GlobalId memberGlobalPlayerId = rFleet.members.at(static_cast<size_t>(k)).globalPlayerId;
+		if (!(memberGlobalPlayerId.iValue != 0) || std::ranges::contains(rFleet.members.begin(), rFleet.members.begin() + k, memberGlobalPlayerId, &FleetMember::globalPlayerId))
 		{
 			throw std::ios_base::failure("Fleet member global ID");
 		}
 	}
 	bool bFlagshipValid = rFleet.members.empty()
-		? !rFleet.flagshipGlobalPlayerId.IsValid()
+		? !(rFleet.flagshipGlobalPlayerId.iValue != 0)
 		: std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
 	if (!bFlagshipValid)
 	{
@@ -177,7 +177,7 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 		common::Read(rFileStream, uiGuidHigh);
 		common::Read(rFileStream, uiGuidLow);
 		engine::ClientGuid guid {uiGuidHigh, uiGuidLow};
-		if (guid.IsEmpty())
+		if ((guid.uiHigh == 0 && guid.uiLow == 0))
 		{
 			throw std::ios_base::failure("Fleet owner ClientGuid");
 		}

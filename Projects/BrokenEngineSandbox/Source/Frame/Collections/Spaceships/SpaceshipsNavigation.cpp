@@ -52,12 +52,12 @@ void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4>
 	}
 	else if (fPlayerDistance > kfSpaceshipFleeEndDistance)
 	{
-		rFlags.Clear(kFleePlayer);
+		rFlags.Set(kFleePlayer, false);
 	}
 
 	if (islandCandidates.empty())
 	{
-		rFlags.Clear(kReturnToIslandCenter);
+		rFlags.Set(kReturnToIslandCenter, false);
 		if (bPlayerAlive)
 		{
 			XMVECTOR vecToDestinationNormal = XMVector3Normalize(XMVectorSubtract(vecNearestPlayer, vecPosition));
@@ -95,7 +95,7 @@ void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4>
 	}
 	else if (fDistanceFromIslandCenter < kfSpaceshipReturnedDistance)
 	{
-		rFlags.Clear(kReturnToIslandCenter);
+		rFlags.Set(kReturnToIslandCenter, false);
 	}
 
 	XMVECTOR vecDestination = bPlayerAlive ? vecNearestPlayer : vecIslandCenter;
@@ -139,7 +139,7 @@ void XM_CALLCONV SpaceshipsPostRender::ApplyPusherResponse(Frame& __restrict rFr
 
 void SpaceshipsPostRender::ApplyTerrainBounce(const engine::FrameStaticData& rStaticData, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, float fDeltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity)
 {
-	float fTerrainElevation = engine::gpIslandTerrain->FrameElevation(rStaticData, rCurrentInterpolate.pVecPositions[i]);
+	float fTerrainElevation = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(rCurrentInterpolate.pVecPositions[i]);
 	if (fTerrainElevation >= XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 	{
 		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->FrameNormal(rStaticData, rCurrentInterpolate.pVecPositions[i]), 0.0f));
@@ -194,7 +194,7 @@ void SpaceshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFram
 		rCurrentInterpolate.pfDeltaRotations[i] = ComputeTerrainAvoidance(rStaticData, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], rCurrentInterpolate.pfDeltaRotations[i]);
 
 		// Clamp delta rotation
-		rCurrentInterpolate.pfDeltaRotations[i] = common::MinAbs(rCurrentInterpolate.pfDeltaRotations[i], kfSpaceshipMaxTurnRate);
+		rCurrentInterpolate.pfDeltaRotations[i] = common::ClampMagnitude(rCurrentInterpolate.pfDeltaRotations[i], kfSpaceshipMaxTurnRate);
 	}
 }
 

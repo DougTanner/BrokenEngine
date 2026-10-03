@@ -11,15 +11,10 @@
 namespace engine
 {
 
-namespace
-{
-
-void CenterMenuItem(float fContentStartX, float fContentWidth, float fItemWidth)
+static void CenterMenuItem(float fContentStartX, float fContentWidth, float fItemWidth)
 {
 	ImGui::SetCursorPosX(fContentStartX + (fContentWidth - fItemWidth) * 0.5f);
 }
-
-} // namespace
 
 void MainMenuScreen::Render()
 {
@@ -112,7 +107,7 @@ void MainMenuScreen::Render()
 		if (model.state & StandardMenuState::kServerDiscovered)
 		{
 			CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-			if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringLocalServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
+			if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringLocalServer)).mpData, ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[0]))
 			{
 				game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kConnectToDiscoveredServer);
 			}
@@ -131,13 +126,13 @@ void MainMenuScreen::Render()
 	{
 		ImGui::BeginDisabled();
 		CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-		MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringRemoteServer)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]);
+		MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringRemoteServer)).mpData, ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[1]);
 		ImGui::EndDisabled();
 	}
 
 	// Graphics button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGraphics)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGraphics)).mpData, ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[2]))
 	{
 		game::gpGame->meUiState = UiState::kGraphicsSettings;
 		gSunAngleOverride.Set(gpCamera->RawSunAngle());
@@ -145,21 +140,21 @@ void MainMenuScreen::Render()
 
 	// Audio button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)).mpData, ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[3]))
 	{
 		game::gpGame->meUiState = UiState::kSound;
 	}
 
 	// Game Settings button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGameSettings)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGameSettings)).mpData, ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[4]))
 	{
 		game::gpGame->meUiState = UiState::kGameSettings;
 	}
 
 	// Quit button
 	CenterMenuItem(fContentStartX, fContentWidth, fButtonWidth);
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringQuit)), ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringQuit)).mpData, ImVec2(fButtonWidth, 0.0f), mfButtonHoverAnims[5]))
 	{
 		game::gpGame->mGameFlags.Set(GameFlags::kQuit);
 	}

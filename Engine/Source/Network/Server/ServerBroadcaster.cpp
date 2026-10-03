@@ -23,7 +23,6 @@ void ServerBroadcaster::BuildFrameInputs()
 	game::gpGame->mFrameInputs.clear();
 	mBroadcastStatusChanges.clear();
 
-	// Initialize FrameInputs for all active coordinates
 	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
 	{
 		game::gpGame->mFrameInputs.try_emplace(rCoord);
@@ -34,7 +33,7 @@ void ServerBroadcaster::BuildFrameInputs()
 	{
 		std::erase_if(game::gpServerSession->mpClientManager->mClientsWaitingForSpawn, [&](const game::ClientSpawnInfo& rClientSpawnInformation)
 		{
-			if (rClientSpawnInformation.fleetGuid.IsEmpty())
+			if ((rClientSpawnInformation.fleetGuid.uiHigh == 0 && rClientSpawnInformation.fleetGuid.uiLow == 0))
 			{
 				return false;
 			}
@@ -82,13 +81,13 @@ void ServerBroadcaster::BuildFrameInputs()
 	}
 }
 
-void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, [[maybe_unused]] common::ScopedWorkbufferArena& rPublicationArena)
+void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, [[maybe_unused]] const common::ScopedWorkbufferArena& rPublicationArena)
 {
 	const std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>>& rTransfers = game::gpServerSession->mpTransferManager->mTransfers;
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	bool bReplaying = game::gpGame->mbReplaying;
-	auto ForEachPublicationCoord = [&](auto&& rCallback)
+	auto ForEachPublicationCoord = [&](const auto& rCallback)
 	{
 		if (!bReplaying)
 		{
@@ -153,7 +152,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 
 	// One allocation keeps every publication view stable until PublishTick finishes consuming it.
 	auto publicationAllocation = rWorkbuffer.PushBuffer<std::byte*>(iPublicationBytes);
-	std::byte* pPublicationBytes = publicationAllocation;
+	std::byte* pPublicationBytes = publicationAllocation.mpData;
 	engine::GridCoord* pPublicationCoords = reinterpret_cast<engine::GridCoord*>(pPublicationBytes);
 	std::pair<engine::GridCoord, engine::GridUpdateData>* pGridUpdates = reinterpret_cast<std::pair<engine::GridCoord, engine::GridUpdateData>*>(pPublicationBytes + iGridUpdatesOffset);
 	game::StatusChange* pStatusChanges = reinterpret_cast<game::StatusChange*>(pPublicationBytes + iStatusChangesOffset);
@@ -170,7 +169,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	for (const engine::GridCoord& rCoord : publicationCoords)
 	{
 		engine::GridUpdateData updateData {};
-		updateData.sharedCrc = game::gpGame->CurrentFrame(rCoord).postRender.sharedCrc;
+		updateData.uiSharedCrc = game::gpGame->CurrentFrame(rCoord).postRender.uiSharedCrc;
 		int64_t iRunStart = iStatusChangeIndex;
 		if (auto it = mBroadcastStatusChanges.find(rCoord); it != mBroadcastStatusChanges.end())
 		{
@@ -190,7 +189,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 		if (iRunCount > 0)
 		{
 			updateData.statusChanges = {pStatusChanges + iRunStart, static_cast<size_t>(iRunCount)};
-			LOG(kNetwork, kVerbose, "ServerBroadcaster::BuildTickPublication Coord: ({},{}) Tick: {} StatusChanges: {}", rCoord.x, rCoord.y, iTick, iRunCount);
+			LOG(kNetwork, kVerbose, "ServerBroadcaster::BuildTickPublication Coord: ({},{}) Tick: {} StatusChanges: {}", rCoord.iX, rCoord.iY, iTick, iRunCount);
 		}
 		pGridUpdates[iGridUpdateIndex++] = {rCoord, updateData};
 	}
@@ -203,11 +202,11 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 		{
 			pFullFrames[iFullFrameCount++] = {rCoord, &game::gpGame->CurrentFrame(rCoord)};
 		}
-		rRuntime.PublishTick(iTick, pGridUpdates, iGridUpdateIndex, pFullFrames, iFullFrameCount);
+		rRuntime.PublishTick(iTick, {pGridUpdates, static_cast<size_t>(iGridUpdateIndex)}, {pFullFrames, static_cast<size_t>(iFullFrameCount)});
 	}
 	else
 	{
-		rRuntime.PublishTick(iTick, pGridUpdates, iGridUpdateIndex, nullptr, 0);
+		rRuntime.PublishTick(iTick, {pGridUpdates, static_cast<size_t>(iGridUpdateIndex)}, {});
 	}
 
 	// Keep replay/live transfer state alive through PublishTick so the publication can consume it, then retire
@@ -227,13 +226,13 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 		{
 			continue;
 		}
-		std::span<const engine::OwnedEntity> ownedPlayers = game::gpServerSession->mClientPlayers.Owned(pClient->iClientId);
+		auto ownedIt = game::gpServerSession->mClientPlayers.mOwned.find(pClient->iClientId);
+		std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != game::gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
 		if (ownedPlayers.empty())
 		{
 			continue;
 		}
 
-		// Find the coord for this global player ID in the client's owned list
 		engine::GridCoord updateCoord {};
 		bool bFound = false;
 		for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
@@ -250,39 +249,28 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 			continue;
 		}
 
-		auto frameInputIt = game::gpGame->mFrameInputs.find(updateCoord);
-		if (frameInputIt == game::gpGame->mFrameInputs.end())
+		auto it = game::gpGame->mFrameInputs.find(updateCoord);
+		if (it == game::gpGame->mFrameInputs.end())
 		{
 			continue;
 		}
 
-		// Find the frame-local player ID for this global player ID
 		if (!game::gpGame->mCoordFrames.contains(updateCoord))
 		{
 			continue;
 		}
-		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer(game::gpGame->CurrentFrame(updateCoord)), rRequest.globalId).Value();
+		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer(game::gpGame->CurrentFrame(updateCoord)), rRequest.globalId).iValue;
 		if (iPlayerUuid == 0)
 		{
 			continue;
 		}
 
 		uint8_t uiPendingWeaponModeTicks = static_cast<uint8_t>(engine::kiTickRate);
-		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData{.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .fNavigationDelay = rRequest.fNavigationDelay, .uiPendingWeaponModeTicks = uiPendingWeaponModeTicks}};
-		frameInputIt->second.statusChanges.push_back(updateChange);
+		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData{.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .fNavigationDelay = rRequest.navigationDelaySeconds.count(), .uiPendingWeaponModeTicks = uiPendingWeaponModeTicks}};
+		it->second.statusChanges.push_back(updateChange);
 
-		LOG(kNetwork, kDebug, "ServerBroadcaster::ProcessUpdatePlayerRequests Client: {} GlobalPlayer: {} PlayerUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iPlayerUuid, updateCoord.x, updateCoord.y, rRequest.bUseMissiles, common::Wb(rRequest.fNavigationDelay, 3));
+		LOG(kNetwork, kDebug, "ServerBroadcaster::ProcessUpdatePlayerRequests Client: {} GlobalPlayer: {} PlayerUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iPlayerUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
 	}
-}
-
-void ServerBroadcaster::QueueUpdatePlayerRequest(const PendingUpdatePlayerRequest& rRequest)
-{
-	mPendingUpdatePlayerRequests.push_back(rRequest);
-}
-
-void ServerBroadcaster::ClearPendingRequests()
-{
-	mPendingUpdatePlayerRequests.clear();
 }
 
 void ServerBroadcaster::ResetState()

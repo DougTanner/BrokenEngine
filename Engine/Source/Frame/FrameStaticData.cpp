@@ -5,48 +5,48 @@
 namespace engine
 {
 
-void FrameStaticData::Write(std::ostream& rStream, bool bIncludeNavData) const
+void FrameStaticData::Write(std::ostream& rStream, bool bIncludeNavigationData) const
 {
 	common::Write(rStream, static_cast<int32_t>(islands.size()));
 	for (const IslandPlacement& rPlacement : islands)
 	{
 		common::Write(rStream, rPlacement.islandCrc);
-		common::Write(rStream, rPlacement.f2WorldPos);
+		common::Write(rStream, rPlacement.f2WorldPosition);
 		common::Write(rStream, rPlacement.fRotation);
 	}
-	if (bIncludeNavData)
+	if (bIncludeNavigationData)
 	{
-		navData.Write(rStream);
+		navigationData.Write(rStream);
 	}
 }
 
-void FrameStaticData::Read(std::istream& rStream, bool bIncludeNavData)
+void FrameStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
 {
 	int32_t iCount = 0;
 	common::Read(rStream, iCount);
 	// Trust boundary (save / network full-state): enforce the generated per-cell contract and bound the count
 	// against the stream before resize.
-	common::ValidateDeserializedCountCapacity(iCount, kiMaxIslandsPerCell, sizeof(IslandPlacement::islandCrc) + sizeof(IslandPlacement::f2WorldPos) + sizeof(IslandPlacement::fRotation), rStream, "FrameStaticData::Read");
+	common::ValidateDeserializedCountCapacity(iCount, kiMaximumIslandsPerCell, sizeof(IslandPlacement::islandCrc) + sizeof(IslandPlacement::f2WorldPosition) + sizeof(IslandPlacement::fRotation), rStream, "FrameStaticData::Read");
 	islands.resize(iCount);
-	for (int32_t i = 0; i < iCount; ++i)
+	for (IslandPlacement& rPlacement : islands)
 	{
-		common::Read(rStream, islands.at(i).islandCrc);
-		common::Read(rStream, islands.at(i).f2WorldPos);
-		common::Read(rStream, islands.at(i).fRotation);
+		common::Read(rStream, rPlacement.islandCrc);
+		common::Read(rStream, rPlacement.f2WorldPosition);
+		common::Read(rStream, rPlacement.fRotation);
 	}
-	if (bIncludeNavData)
+	if (bIncludeNavigationData)
 	{
-		navData.Read(rStream);
-		// Wire-received navData is authoritative (client never rebuilds — server-only NavContour), so mark it
+		navigationData.Read(rStream);
+		// Wire-received navigationData is authoritative (client never rebuilds — server-only NavContour), so mark it
 		// built regardless of vertex count.
-		bNavDataBuilt = true;
+		bNavigationDataBuilt = true;
 	}
 	else
 	{
-		navData = {};
-		// Save-load only (the network-receive path takes the if-branch above with bIncludeNavData true): clear so
-		// RunFrameTick (server) rebuilds navData via BuildCellNavData from the freshly-read placements.
-		bNavDataBuilt = false;
+		navigationData = {};
+		// Save-load only (the network-receive path takes the if-branch above with bIncludeNavigationData true): clear so
+		// RunFrameTick (server) rebuilds navigationData via BuildCellNavigationData from the freshly-read placements.
+		bNavigationDataBuilt = false;
 	}
 	// Never serialized — purely local derived data. Clear so a network resend / save-load
 	// forces RunFrameTick to rebuild from the freshly-read placements.
@@ -57,23 +57,23 @@ void FrameStaticData::Read(std::istream& rStream, bool bIncludeNavData)
 void FrameStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const
 {
 	islandRenderQueries.resize(islands.size());
-	for (size_t i = 0; i < islands.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(islands); ++i)
 	{
-		const IslandPlacement& rPlacement = islands[i];
+		const IslandPlacement& rPlacement = islands.at(i);
 		const IslandTemplate& rTemplate = rIslandTerrain.mIslands.at(rPlacement.islandCrc);
-		IslandRenderQuery& rQuery = islandRenderQueries[i];
+		IslandRenderQuery& rQuery = islandRenderQueries.at(i);
 
-		// Negated rotation matches GlobalElevation's inverse-rotate world->local convention. Deterministic
-		// sin/cos (as BlendPlacementIntoGrid hoists) — render-only, so libm-vs-polynomial ulp drift is fine.
-		common::SinCos sinCos = common::DeterministicSinCos(-rPlacement.fRotation);
-		rQuery.fCos = sinCos.fCos;
-		rQuery.fSin = sinCos.fSin;
-		rQuery.f2WorldPos = rPlacement.f2WorldPos;
-		rQuery.fFootprintX = rTemplate.mfQuadFootprintX;
-		rQuery.fFootprintY = rTemplate.mfQuadFootprintY;
-		rQuery.pHeightmapHalf = rTemplate.mpHeightmapHalf;
-		rQuery.iHeightmapWidth = rTemplate.miHeightmapWidth;
-		rQuery.iHeightmapHeight = rTemplate.miHeightmapHeight;
+		// Negated rotation matches GlobalElevation's world-to-local convention and BlendPlacementIntoGrid.
+		// The uncached render path uses library trigonometry, so its results can differ slightly from this cache.
+		common::SinCos rotation = common::DeterministicSinCos(-rPlacement.fRotation);
+		rQuery.fCosine = rotation.fCos;
+		rQuery.fSine = rotation.fSin;
+		rQuery.f2WorldPosition = rPlacement.f2WorldPosition;
+		rQuery.fFootprintX = rTemplate.fQuadFootprintX;
+		rQuery.fFootprintY = rTemplate.fQuadFootprintY;
+		rQuery.puiHeightmapHalf = rTemplate.puiHeightmapHalf;
+		rQuery.iHeightmapWidth = rTemplate.iHeightmapWidth;
+		rQuery.iHeightmapHeight = rTemplate.iHeightmapHeight;
 	}
 }
 

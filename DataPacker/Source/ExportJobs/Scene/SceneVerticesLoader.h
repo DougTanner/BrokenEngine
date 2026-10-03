@@ -20,7 +20,7 @@ struct Material
 
 struct Parent
 {
-	Parent* pParent = nullptr;
+	const Parent* pParent = nullptr;
 	XMMATRIX matNode {};
 	int iNodeIndex = -1;
 };
@@ -37,8 +37,8 @@ struct MaterialNodeInfo
 XMMATRIX ComputeNodeWorldTransform(int iNodeIndex, const tinygltf::Model& rModel, const std::unordered_map<int, int>& rNodeParentMap);
 
 // Per-scene state threaded through every recursive LoadVertices call.
-// rMaterialNodeMap: tracks (originalMaterial, nodeIndex, hasSkinning) -> effectiveMaterialIndex for handling primitives that share a material but come from
-// different mesh nodes; the deformation bit is part of the identity because one draw must not mix deformation modes
+// rMaterialNodeMap keys entries by glTF material, mesh node, and skinning mode,
+// so each draw uses one mesh transform and one deformation path.
 struct LoadVerticesContext
 {
 	std::vector<common::ModelVertex>& rVertices;
@@ -48,7 +48,7 @@ struct LoadVerticesContext
 	bool bHasSkeleton = false;
 };
 
-void LoadVertices(Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& rNode, const tinygltf::Model& rModel, LoadVerticesContext& rContext);
+void LoadVertices(const Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& rNode, const tinygltf::Model& rModel, LoadVerticesContext& rContext);
 
 bool IsNonOcclusionUse(int64_t iIndex, const tinygltf::Material& rMaterial);
 bool IsOcclusion(int64_t iIndex, const tinygltf::Material& rMaterial);

@@ -61,8 +61,8 @@ void ClientSession::ProcessReceivedGamePackets()
 	{
 		common::ScopedWorkbufferArena playerEventsArena = common::gpThreadLocal->mWorkbuffer.Push();
 		ParsePlayerEvents(mpRuntime->mpClient->mReceivedGamePackets, playerEventsArena);
-		const ReceivedPlayerEvent* pPlayerEvents = playerEventsArena.Data<ReceivedPlayerEvent>();
-		int64_t iPlayerEventCount = playerEventsArena.Count<ReceivedPlayerEvent>();
+		const ReceivedPlayerEvent* pPlayerEvents = playerEventsArena.mBuffer.Data<ReceivedPlayerEvent>();
+		int64_t iPlayerEventCount = playerEventsArena.mBuffer.Count<ReceivedPlayerEvent>();
 		for (int64_t i = 0; i < iPlayerEventCount; ++i)
 		{
 			ApplyPlayerEvent(pPlayerEvents[i]);
@@ -115,7 +115,7 @@ void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
 		case PlayerEventType::kAssigned:
 			if (!gpGame->IsClientPlayer(rEvent.globalPlayerId))
 			{
-				LOG(kNetwork, kVerbose, "PlayerEvent kAssigned NewGlobalPlayerId: {} NewCoord: ({},{}) FocusedGlobalPlayerId: {} FocusedCoord: ({},{})", rEvent.globalPlayerId, rEvent.coord.x, rEvent.coord.y, gpGame->ClientPlayerId(), gpGame->mClientGridCoord.x, gpGame->mClientGridCoord.y);
+				LOG(kNetwork, kVerbose, "PlayerEvent kAssigned NewGlobalPlayerId: {} NewCoord: ({},{}) FocusedGlobalPlayerId: {} FocusedCoord: ({},{})", rEvent.globalPlayerId, rEvent.coord.iX, rEvent.coord.iY, gpGame->ClientPlayerId(), gpGame->mClientGridCoord.iX, gpGame->mClientGridCoord.iY);
 				gpGame->AddClientPlayer(rEvent.globalPlayerId, rEvent.coord);
 			}
 			UpdateDesiredCoords(SubscriptionChangeReason::kAssigned);
@@ -148,7 +148,7 @@ void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
 	}
 }
 
-void ClientSession::UpdatePlayerCoord(engine::global_id_t globalPlayerId, engine::GridCoord coord)
+void ClientSession::UpdatePlayerCoord(engine::GlobalId globalPlayerId, engine::GridCoord coord)
 {
 	for (int64_t i = 0; i < std::ssize(gpGame->mClientPlayerIds); ++i)
 	{
@@ -209,7 +209,7 @@ void ClientSession::OnConnectionAccepted()
 	{
 		gpGame->StartGameMusic();
 		gpGame->CreateNewFrame(GameFlags::kGame);
-		gpGame->mGameFlags.Clear(engine::GameFlags::kMainMenu);
+		gpGame->mGameFlags.Set(engine::GameFlags::kMainMenu, false);
 		gpGame->Reset();
 		gpGame->meUiState = engine::UiState::kNone;
 	}
@@ -237,7 +237,7 @@ void ClientSession::OnServerLoad()
 
 	// Reset tick counter and time step — server tick resets to the saved value
 	gpGame->SetTickCounter(0);
-	gpGame->mTimeStep.ClearAccumulator();
+	gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
 	gpGame->mTimeStep.mRealTime.Reset();
 	gpGame->ResetRenderClock();
 
@@ -313,7 +313,7 @@ void ClientSession::SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid)
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow);
 }
 
-void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::global_id_t memberGlobalPlayerId)
+void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId)
 {
 	mpRuntime->SendGameRequest(GamePacketType::kClientRespawnInFleetRequest, [&]
 	{

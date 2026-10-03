@@ -7,89 +7,85 @@
 namespace engine
 {
 
-namespace
+struct MeshRange
 {
-	struct MeshRange
+	uint64_t uiOffset = 0;
+	uint64_t uiLength = 0;
+	VkDeviceSize vkIndexSize = 0;
+	VkDeviceSize vkVertexSize = 0;
+};
+
+static MeshRange GetMeshRange(const IslandTemplate& rTemplate)
+{
+	MeshRange range {};
+	range.uiOffset = static_cast<uint64_t>(rTemplate.iHeightmapWidth) * static_cast<uint64_t>(rTemplate.iHeightmapHeight) * sizeof(uint16_t);
+	range.vkVertexSize = static_cast<VkDeviceSize>(rTemplate.iMeshVertexCount) * 2 * sizeof(float);
+	range.vkIndexSize = static_cast<VkDeviceSize>(rTemplate.iMeshIndexCount) * sizeof(uint32_t);
+	range.uiLength = static_cast<uint64_t>(range.vkVertexSize + range.vkIndexSize);
+	return range;
+}
+
+static void ReleaseMeshCpuRange(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const MeshRange& rRange)
+{
+	gpFileManager->DecommitChunkRange(uiIslandCrc, rRange.uiOffset, rRange.uiLength);
+	rTemplate.bMeshCpuDecommitted = true;
+	gpFileManager->ResetChunkRangeReloadState(uiIslandCrc, rRange.uiOffset, rRange.uiLength);
+}
+
+static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate)
+{
+	if (rTemplate.bGpuResident || rTemplate.iTextureSlot < 0)
 	{
-		uint64_t uiOffset = 0;
-		uint64_t uiLength = 0;
-		VkDeviceSize vkIndexSize = 0;
-		VkDeviceSize vkVertexSize = 0;
+		return false;
+	}
+	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(uiIslandCrc);
+	common::crc_t residencyCrcs[4] =
+	{
+		rLazyChunk.header.islandHeader.colorsCrc,
+		rLazyChunk.header.islandHeader.normalsCrc,
+		rLazyChunk.header.islandHeader.ambientOcclusionCrc,
+		rLazyChunk.header.islandHeader.masksCrc,
 	};
-
-	MeshRange GetMeshRange(const IslandTemplate& rTemplate)
+	for (common::crc_t uiTextureCrc : residencyCrcs)
 	{
-		MeshRange range {};
-		range.uiOffset = static_cast<uint64_t>(rTemplate.miHeightmapWidth) * static_cast<uint64_t>(rTemplate.miHeightmapHeight) * sizeof(uint16_t);
-		range.vkVertexSize = static_cast<VkDeviceSize>(rTemplate.miMeshVertexCount) * 2 * sizeof(float);
-		range.vkIndexSize = static_cast<VkDeviceSize>(rTemplate.miMeshIndexCount) * sizeof(uint32_t);
-		range.uiLength = static_cast<uint64_t>(range.vkVertexSize + range.vkIndexSize);
-		return range;
-	}
-
-	void ReleaseMeshCpuRange(common::crc_t islandCrc, IslandTemplate& rTemplate, const MeshRange& range)
-	{
-		gpFileManager->DecommitChunkRange(islandCrc, range.uiOffset, range.uiLength);
-		rTemplate.mbMeshCpuDecommitted = true;
-		gpFileManager->ResetChunkRangeReloadState(islandCrc, range.uiOffset, range.uiLength);
-	}
-
-	bool IsTextureRestorationPending(common::crc_t islandCrc, const IslandTemplate& rTemplate)
-	{
-		if (rTemplate.mbGpuResident || rTemplate.miTextureSlot < 0)
+		if (!gpFileManager->IsChunkReady(uiTextureCrc))
 		{
 			return false;
 		}
-		const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(islandCrc);
-		common::crc_t residencyCrcs[4] =
-		{
-			rLazyChunk.header.islandHeader.colorsCrc,
-			rLazyChunk.header.islandHeader.normalsCrc,
-			rLazyChunk.header.islandHeader.ambientOcclusionCrc,
-			rLazyChunk.header.islandHeader.masksCrc,
-		};
-		for (common::crc_t textureCrc : residencyCrcs)
-		{
-			if (!gpFileManager->IsChunkReady(textureCrc))
-			{
-				return false;
-			}
-		}
-		return true;
 	}
-
-	// Upload an island's heightmap into its template-owned mElevationTexture as an R16_SFLOAT image (raw
-	// byte-copy — the resident heightmap is already R16 half-float, matching the image's texel size).
-	// Reused at first-mint and on device-loss re-Create. Descriptor patching is deferred to
-	// RestorationSweep so it lands inside RenderGlobal's post-fence-wait descriptor-patch window.
-	void CreateElevationTextureFromHeightmap(IslandTemplate& rTemplate, std::string_view name)
-	{
-		// Boot ordering invariant: WaitForElevationMaps (called once at startup) is the only writer of
-		// mpHeightmapHalf. AcquireTextureSlot must never run before it.
-		ASSERT(rTemplate.mpHeightmapHalf != nullptr);
-		// Heap: Texture::Create allocates GPU resources and uses a OneShotCommandBuffer.
-		ScopedSuppressAllocationTracking suppress;
-		rTemplate.mElevationTexture.Create(TextureInfo
-		{
-			.name = name,
-			.format = shaders::keElevationFormat,
-			.extent = {static_cast<uint32_t>(rTemplate.miHeightmapWidth), static_cast<uint32_t>(rTemplate.miHeightmapHeight), 1u},
-			.mipLevels = 1u,
-			.arrayLayers = 1u,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.eTextureLayout = TextureLayout::kShaderReadOnly,
-		},
-		[&rTemplate](void* pData, int64_t iPosition, int64_t iSize)
-		{
-			std::memcpy(pData, reinterpret_cast<const std::byte*>(rTemplate.mpHeightmapHalf) + iPosition, static_cast<size_t>(iSize));
-		});
-	}
+	return true;
 }
 
-int64_t IslandTerrain::FirstMintTextureSlot(common::crc_t islandCrc, IslandTemplate& rTemplate, const common::crc_t (&textureCrcs)[4], std::string_view name)
+// Upload an island's heightmap into its template-owned elevationTexture as an R16_SFLOAT image (raw
+// byte-copy — the resident heightmap is already R16 half-float, matching the image's texel size).
+// Reused at first-mint and on device-loss re-Create. Descriptor patching is deferred to
+// RestorationSweep so it lands inside RenderGlobal's post-fence-wait descriptor-patch window.
+static void CreateElevationTextureFromHeightmap(IslandTemplate& rTemplate, std::string_view name)
+{
+	// Boot ordering invariant: WaitForElevationMaps (called once at startup) is the only writer of
+	// puiHeightmapHalf. AcquireTextureSlot must never run before it.
+	ASSERT(rTemplate.puiHeightmapHalf != nullptr);
+	// Heap: Texture::Create allocates GPU resources and uses a OneShotCommandBuffer.
+	ScopedSuppressAllocationTracking suppress;
+	rTemplate.elevationTexture.Create(TextureInfo
+	{
+		.name = name,
+		.format = shaders::keElevationFormat,
+		.extent = {static_cast<uint32_t>(rTemplate.iHeightmapWidth), static_cast<uint32_t>(rTemplate.iHeightmapHeight), 1u},
+		.mipLevels = 1u,
+		.arrayLayers = 1u,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		.viewType = VK_IMAGE_VIEW_TYPE_2D,
+		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
+	}, [&rTemplate](void* pData, int64_t iPosition, int64_t iSize)
+	{
+		std::memcpy(pData, reinterpret_cast<const std::byte*>(rTemplate.puiHeightmapHalf) + iPosition, static_cast<size_t>(iSize));
+	});
+}
+
+int64_t IslandTerrain::FirstMintTextureSlot(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const common::crc_t (&rTextureCrcs)[4], std::string_view name)
 {
 	// First-mint. Slot 0 stays the neutral placeholder anchor (no real island ever maps there).
 	// Reuse a slot reclaimed by a prior eviction before extending the high-water mark, so churn
@@ -106,42 +102,42 @@ int64_t IslandTerrain::FirstMintTextureSlot(common::crc_t islandCrc, IslandTempl
 		mFreeTextureSlots.pop_back();
 	}
 	ASSERT(iSlot >= 1 && iSlot < shaders::kiMaxIslands);
-	rTemplate.miTextureSlot = iSlot;
+	rTemplate.iTextureSlot = iSlot;
 
 	// Elevation: uploaded directly from the in-memory heightmap into the template-owned
-	// mElevationTexture. Descriptor patching deferred to RestorationSweep (safety window).
+	// elevationTexture. Descriptor patching deferred to RestorationSweep (safety window).
 	CreateElevationTextureFromHeightmap(rTemplate, name);
 
-	gpTextureManager->mTextureDescriptors.MintIslandSlot(iSlot, islandCrc, rTemplate.mElevationTexture, textureCrcs);
+	gpTextureManager->mTextureDescriptors.MintIslandSlot(iSlot, uiIslandCrc, rTemplate.elevationTexture, rTextureCrcs);
 
-	rTemplate.mbGpuResident = false;
-	gpFileManager->RequestChunkLoad(textureCrcs, LoadPriority::kRealtime);
-	LOG(kGraphics, kVerbose, "First-mint slot={} islandCrc={}", iSlot, islandCrc);
+	rTemplate.bGpuResident = false;
+	gpFileManager->RequestChunkLoad(rTextureCrcs, LoadPriority::kRealtime);
+	LOG(kGraphics, kVerbose, "First-mint slot={} islandCrc={}", iSlot, uiIslandCrc);
 
 	return iSlot;
 }
 
-int64_t IslandTerrain::AcquireTextureSlot(common::crc_t islandCrc)
+int64_t IslandTerrain::AcquireTextureSlot(common::crc_t uiIslandCrc)
 {
-	IslandTemplate& rTemplate = mIslands.at(islandCrc);
+	IslandTemplate& rTemplate = mIslands.at(uiIslandCrc);
 
-	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(islandCrc);
-	if (rTemplate.meMeshResidency == IslandMeshResidency::kNonresident)
+	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(uiIslandCrc);
+	if (rTemplate.eMeshResidency == IslandMeshResidency::kNonresident)
 	{
 		MeshRange range = GetMeshRange(rTemplate);
-		gpFileManager->RequestChunkRangeReload(islandCrc, range.uiOffset, range.uiLength, LoadPriority::kRealtime);
-		rTemplate.meMeshResidency = IslandMeshResidency::kAsyncPending;
+		gpFileManager->RequestChunkRangeReload(uiIslandCrc, range.uiOffset, range.uiLength, LoadPriority::kRealtime);
+		rTemplate.eMeshResidency = IslandMeshResidency::kAsyncPending;
 	}
 
 	// Hot path still starts a mesh reload when a device recreation or earlier full teardown made
 	// the mesh nonresident; texture residency itself remains unchanged.
-	if (rTemplate.miTextureSlot >= 0 && rTemplate.mbGpuResident)
+	if (rTemplate.iTextureSlot >= 0 && rTemplate.bGpuResident)
 	{
-		return rTemplate.miTextureSlot;
+		return rTemplate.iTextureSlot;
 	}
 
 	// Color / Normals / AO / Masks ship as standalone lazy-texture chunks. Elevation lives on the template
-	// (mElevationTexture) and is uploaded directly from the in-memory heightmap — no chunk, no CRC.
+	// (elevationTexture) and is uploaded directly from the in-memory heightmap — no chunk, no CRC.
 	common::crc_t textureCrcs[4] =
 	{
 		rLazyChunk.header.islandHeader.colorsCrc,
@@ -150,17 +146,17 @@ int64_t IslandTerrain::AcquireTextureSlot(common::crc_t islandCrc)
 		rLazyChunk.header.islandHeader.masksCrc,
 	};
 
-	if (rTemplate.miTextureSlot < 0)
+	if (rTemplate.iTextureSlot < 0)
 	{
-		return FirstMintTextureSlot(islandCrc, rTemplate, textureCrcs, rLazyChunk.header.pcPath);
+		return FirstMintTextureSlot(uiIslandCrc, rTemplate, textureCrcs, rLazyChunk.header.pcPath);
 	}
 
 	// A freshly minted slot stays in slot-0 fallback while chunks load, until RestorationSweep patches it.
-	// Eviction and device-loss ResetTextureSlots set miTextureSlot negative, so the next use re-enters
-	// first mint and recreates mElevationTexture.
+	// Eviction and device-loss ResetTextureSlots set iTextureSlot negative, so the next use re-enters
+	// first mint and recreates elevationTexture.
 	gpFileManager->RequestChunkLoad(textureCrcs, LoadPriority::kRealtime);
-	LOG(kLoading, kVerbose, "Re-acquire islandCrc={} slot={}, requesting chunk loads", islandCrc, rTemplate.miTextureSlot);
-	return rTemplate.miTextureSlot;
+	LOG(kLoading, kVerbose, "Re-acquire islandCrc={} slot={}, requesting chunk loads", uiIslandCrc, rTemplate.iTextureSlot);
+	return rTemplate.iTextureSlot;
 }
 
 bool IslandTerrain::AnyEvictionPending() const
@@ -197,26 +193,26 @@ bool IslandTerrain::AnyRestorationPending() const
 
 bool IslandTerrain::IsEvictionPending(const IslandTemplate& rTemplate) const
 {
-	return rTemplate.miTextureSlot != 0 && rTemplate.mbGpuResident && rTemplate.miRefCount == 0
-	    && (gpGraphics->muiFrameCounter - rTemplate.muiLastUsedRenderFrame) > kuiGraceRenderFrames;
+	return rTemplate.iTextureSlot != 0 && rTemplate.bGpuResident && rTemplate.iReferenceCount == 0
+	    && (gpGraphics->muiFrameCounter - rTemplate.uiLastUsedRenderFrame) > kuiGraceRenderFrames;
 }
 
-bool IslandTerrain::IsRestorationPending(common::crc_t islandCrc, const IslandTemplate& rTemplate) const
+bool IslandTerrain::IsRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate) const
 {
-	if (IsTextureRestorationPending(islandCrc, rTemplate))
+	if (IsTextureRestorationPending(uiIslandCrc, rTemplate))
 	{
 		return true;
 	}
 
 	MeshRange range = GetMeshRange(rTemplate);
-	switch (rTemplate.meMeshResidency)
+	switch (rTemplate.eMeshResidency)
 	{
 		case IslandMeshResidency::kAsyncPending:
-			return gpFileManager->GetChunkRangeReloadState(islandCrc, range.uiOffset, range.uiLength) != ChunkRangeReloadState::kPending;
+			return gpFileManager->GetChunkRangeReloadState(uiIslandCrc, range.uiOffset, range.uiLength) != ChunkRangeReloadState::kPending;
 		case IslandMeshResidency::kCpuReady:
-			return rTemplate.mbGpuResident;
+			return rTemplate.bGpuResident;
 		case IslandMeshResidency::kArenaBlocked:
-			return rTemplate.mbGpuResident && (gpIslands->muiMeshArenaCapacityGeneration != rTemplate.muiMeshArenaBlockedGeneration || HasArenaEvictionCandidate(islandCrc));
+			return rTemplate.bGpuResident && (gpIslands->muiMeshArenaCapacityGeneration != rTemplate.uiMeshArenaBlockedGeneration || HasArenaEvictionCandidate(uiIslandCrc));
 		case IslandMeshResidency::kNonresident:
 		case IslandMeshResidency::kFailed:
 		case IslandMeshResidency::kResident:
@@ -225,11 +221,11 @@ bool IslandTerrain::IsRestorationPending(common::crc_t islandCrc, const IslandTe
 	return false;
 }
 
-bool IslandTerrain::HasArenaEvictionCandidate(common::crc_t excludedCrc) const
+bool IslandTerrain::HasArenaEvictionCandidate(common::crc_t uiExcludedCrc) const
 {
 	for (const auto& [rCrc, rTemplate] : mIslands)
 	{
-		if (rCrc != excludedCrc && rTemplate.meMeshResidency == IslandMeshResidency::kResident && rTemplate.mbGpuResident && rTemplate.miRefCount == 0)
+		if (rCrc != uiExcludedCrc && rTemplate.eMeshResidency == IslandMeshResidency::kResident && rTemplate.bGpuResident && rTemplate.iReferenceCount == 0)
 		{
 			return true;
 		}
@@ -237,16 +233,15 @@ bool IslandTerrain::HasArenaEvictionCandidate(common::crc_t excludedCrc) const
 	return false;
 }
 
-bool IslandTerrain::EvictTemplate(common::crc_t islandCrc, IslandTemplate& rTemplate, MeshEvictionReason eReason)
+bool IslandTerrain::EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, MeshEvictionReason eReason)
 {
-	bool bEligible = eReason == MeshEvictionReason::kGrace ? IsEvictionPending(rTemplate)
-		: rTemplate.miTextureSlot != 0 && rTemplate.mbGpuResident && rTemplate.meMeshResidency == IslandMeshResidency::kResident && rTemplate.miRefCount == 0;
+	bool bEligible = eReason == MeshEvictionReason::kGrace ? IsEvictionPending(rTemplate) : rTemplate.iTextureSlot != 0 && rTemplate.bGpuResident && rTemplate.eMeshResidency == IslandMeshResidency::kResident && rTemplate.iReferenceCount == 0;
 	if (!bEligible)
 	{
 		return false;
 	}
 
-	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(islandCrc);
+	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(uiIslandCrc);
 	// The 4 chunk-backed channels (color/normals/AO/masks). Elevation is template-owned (no chunk
 	// CRC) and is evicted separately below, via the template's own image rather than the chunk pool.
 	common::crc_t evictCrcs[4] =
@@ -257,41 +252,41 @@ bool IslandTerrain::EvictTemplate(common::crc_t islandCrc, IslandTemplate& rTemp
 		rLazyChunk.header.islandHeader.masksCrc,
 	};
 
-	LOG(kGraphics, kVerbose, "Evicting islandCrc={} slot={} (refCount=0, framesSinceUse={})", islandCrc, rTemplate.miTextureSlot, gpGraphics->muiFrameCounter - rTemplate.muiLastUsedRenderFrame);
+	LOG(kGraphics, kVerbose, "Evicting islandCrc={} slot={} (refCount=0, framesSinceUse={})", uiIslandCrc, rTemplate.iTextureSlot, gpGraphics->muiFrameCounter - rTemplate.uiLastUsedRenderFrame);
 
-	int64_t iSlot = rTemplate.miTextureSlot;
+	int64_t iSlot = rTemplate.iTextureSlot;
 	// Redirect every live descriptor to placeholders and retire its five generation records before
 	// freeing any image view. A recycled slot cannot observe a destroyed prior occupant this way.
-	gpTextureManager->mTextureDescriptors.EvictIslandSlot(iSlot, islandCrc, evictCrcs);
+	gpTextureManager->mTextureDescriptors.EvictIslandSlot(iSlot, uiIslandCrc, evictCrcs);
 
-	for (common::crc_t textureCrc : evictCrcs)
+	for (common::crc_t uiTextureCrc : evictCrcs)
 	{
-		gpTextureManager->mTextureMap.at(textureCrc).FreeGpuResources();
+		gpTextureManager->mTextureMap.at(uiTextureCrc).FreeGpuResources();
 	}
-	rTemplate.mElevationTexture.FreeGpuResources();
+	rTemplate.elevationTexture.FreeGpuResources();
 
 	MeshRange range = GetMeshRange(rTemplate);
-	switch (rTemplate.meMeshResidency)
+	switch (rTemplate.eMeshResidency)
 	{
 		case IslandMeshResidency::kResident:
 			// Indirect count must be zero in every framebuffer before the virtual ranges can be reused.
-			gpIslands->WriteMeshIndirect(rTemplate.miTemplateArrayIndex, 0, 0, 0);
-			gpIslands->FreeMeshRanges(rTemplate.mMeshIndexAllocation, rTemplate.mMeshVertexAllocation);
-			rTemplate.mMeshIndexAllocation = VK_NULL_HANDLE;
-			rTemplate.mMeshVertexAllocation = VK_NULL_HANDLE;
-			rTemplate.mMeshIndexOffset = 0;
-			rTemplate.mMeshVertexOffset = 0;
-			rTemplate.muiMeshArenaBlockedGeneration = 0;
-			rTemplate.meMeshResidency = IslandMeshResidency::kNonresident;
+			gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, 0, 0, 0);
+			gpIslands->FreeMeshRanges(rTemplate.meshIndexAllocation, rTemplate.meshVertexAllocation);
+			rTemplate.meshIndexAllocation = VK_NULL_HANDLE;
+			rTemplate.meshVertexAllocation = VK_NULL_HANDLE;
+			rTemplate.vkMeshIndexOffset = 0;
+			rTemplate.vkMeshVertexOffset = 0;
+			rTemplate.uiMeshArenaBlockedGeneration = 0;
+			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 			break;
 		case IslandMeshResidency::kCpuReady:
 		case IslandMeshResidency::kArenaBlocked:
-			ReleaseMeshCpuRange(islandCrc, rTemplate, range);
-			rTemplate.meMeshResidency = IslandMeshResidency::kNonresident;
+			ReleaseMeshCpuRange(uiIslandCrc, rTemplate, range);
+			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 			break;
 		case IslandMeshResidency::kFailed:
-			ReleaseMeshCpuRange(islandCrc, rTemplate, range);
-			rTemplate.meMeshResidency = IslandMeshResidency::kNonresident;
+			ReleaseMeshCpuRange(uiIslandCrc, rTemplate, range);
+			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 			break;
 		case IslandMeshResidency::kAsyncPending:
 		case IslandMeshResidency::kNonresident:
@@ -303,12 +298,12 @@ bool IslandTerrain::EvictTemplate(common::crc_t islandCrc, IslandTemplate& rTemp
 		ScopedSuppressAllocationTracking suppress;
 		mFreeTextureSlots.push_back(iSlot);
 	}
-	rTemplate.miTextureSlot = -1;
+	rTemplate.iTextureSlot = -1;
 
 	gpFileManager->ResetTextureChunkStates(evictCrcs);
-	rTemplate.mbGpuResident = false;
+	rTemplate.bGpuResident = false;
 
-	LOG(kLoading, kVerbose, "Reset chunk states for evicted islandCrc={} evictCrcs=[{},{},{},{}]", islandCrc, evictCrcs[0], evictCrcs[1], evictCrcs[2], evictCrcs[3]);
+	LOG(kLoading, kVerbose, "Reset chunk states for evicted islandCrc={} evictCrcs=[{},{},{},{}]", uiIslandCrc, evictCrcs[0], evictCrcs[1], evictCrcs[2], evictCrcs[3]);
 	return true;
 }
 
@@ -343,17 +338,17 @@ void IslandTerrain::RestorationSweep()
 			// RenderGlobal post-fence-wait). The Texture's real VkImageView was created at first-mint
 			// but the per-pipeline array descriptor still points at the slot-0 placeholder snapshot
 			// taken at RegisterTextureBinding time. islandCrc was used as the binding key (the
-			// template-owned mElevationTexture has no chunk CRC).
+			// template-owned elevationTexture has no chunk CRC).
 			gpTextureManager->mTextureDescriptors.RestoreIslandSlot(rCrc);
-			rTemplate.mbGpuResident = true;
-			LOG(kGraphics, kVerbose, "Island resident islandCrc={} slot={}", rCrc, rTemplate.miTextureSlot);
+			rTemplate.bGpuResident = true;
+			LOG(kGraphics, kVerbose, "Island resident islandCrc={} slot={}", rCrc, rTemplate.iTextureSlot);
 		}
 	}
 
 	for (auto& [rCrc, rTemplate] : mIslands)
 	{
 		MeshRange range = GetMeshRange(rTemplate);
-		if (rTemplate.meMeshResidency == IslandMeshResidency::kAsyncPending)
+		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
 		{
 			ChunkRangeReloadState eRangeState = gpFileManager->GetChunkRangeReloadState(rCrc, range.uiOffset, range.uiLength);
 			if (eRangeState == ChunkRangeReloadState::kPending)
@@ -363,98 +358,98 @@ void IslandTerrain::RestorationSweep()
 			if (eRangeState == ChunkRangeReloadState::kFailed)
 			{
 				LOG(kGraphics, kError, "Island mesh async reload failed: crc={}", rCrc);
-				gpIslands->WriteMeshIndirect(rTemplate.miTemplateArrayIndex, 0, 0, 0);
+				gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, 0, 0, 0);
 				ReleaseMeshCpuRange(rCrc, rTemplate, range);
-				if (rTemplate.miTextureSlot < 0)
+				if (rTemplate.iTextureSlot < 0)
 				{
-					rTemplate.meMeshResidency = IslandMeshResidency::kNonresident;
+					rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 				}
 				else
 				{
-					rTemplate.meMeshResidency = IslandMeshResidency::kFailed;
+					rTemplate.eMeshResidency = IslandMeshResidency::kFailed;
 				}
 				continue;
 			}
 			ASSERT(eRangeState == ChunkRangeReloadState::kReady);
-			rTemplate.mbMeshCpuDecommitted = false;
-			rTemplate.meMeshResidency = IslandMeshResidency::kCpuReady;
-			if (rTemplate.miTextureSlot < 0)
+			rTemplate.bMeshCpuDecommitted = false;
+			rTemplate.eMeshResidency = IslandMeshResidency::kCpuReady;
+			if (rTemplate.iTextureSlot < 0)
 			{
 				ReleaseMeshCpuRange(rCrc, rTemplate, range);
-				rTemplate.meMeshResidency = IslandMeshResidency::kNonresident;
+				rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 				continue;
 			}
 		}
 
-		if (rTemplate.meMeshResidency == IslandMeshResidency::kArenaBlocked)
+		if (rTemplate.eMeshResidency == IslandMeshResidency::kArenaBlocked)
 		{
-			if (rTemplate.miTextureSlot < 0)
+			if (rTemplate.iTextureSlot < 0)
 			{
 				continue;
 			}
-			if (gpIslands->muiMeshArenaCapacityGeneration == rTemplate.muiMeshArenaBlockedGeneration && !HasArenaEvictionCandidate(rCrc))
+			if (gpIslands->muiMeshArenaCapacityGeneration == rTemplate.uiMeshArenaBlockedGeneration && !HasArenaEvictionCandidate(rCrc))
 			{
 				continue;
 			}
-			rTemplate.meMeshResidency = IslandMeshResidency::kCpuReady;
+			rTemplate.eMeshResidency = IslandMeshResidency::kCpuReady;
 		}
 
-		if (rTemplate.meMeshResidency != IslandMeshResidency::kCpuReady)
+		if (rTemplate.eMeshResidency != IslandMeshResidency::kCpuReady)
 		{
 			continue;
 		}
-		if (rTemplate.miTextureSlot < 0)
+		if (rTemplate.iTextureSlot < 0)
 		{
 			continue;
 		}
-		if (!rTemplate.mbGpuResident)
+		if (!rTemplate.bGpuResident)
 		{
 			continue;
 		}
 
-		while (!gpIslands->AllocateMeshRanges(range.vkIndexSize, range.vkVertexSize, rTemplate.mMeshIndexAllocation, rTemplate.mMeshIndexOffset, rTemplate.mMeshVertexAllocation, rTemplate.mMeshVertexOffset))
+		while (!gpIslands->AllocateMeshRanges(range.vkIndexSize, range.vkVertexSize, rTemplate.meshIndexAllocation, rTemplate.vkMeshIndexOffset, rTemplate.meshVertexAllocation, rTemplate.vkMeshVertexOffset))
 		{
-			common::crc_t evictCrc = 0;
+			common::crc_t uiEvictCrc = 0;
 			IslandTemplate* pEvictTemplate = nullptr;
 			for (auto& [rCandidateCrc, rCandidate] : mIslands)
 			{
-				if (rCandidateCrc != rCrc && rCandidate.meMeshResidency == IslandMeshResidency::kResident && rCandidate.mbGpuResident
-				 && rCandidate.miRefCount == 0
-				 && (pEvictTemplate == nullptr || rCandidate.muiLastUsedRenderFrame < pEvictTemplate->muiLastUsedRenderFrame))
+				if (rCandidateCrc != rCrc && rCandidate.eMeshResidency == IslandMeshResidency::kResident && rCandidate.bGpuResident
+				 && rCandidate.iReferenceCount == 0
+				 && (pEvictTemplate == nullptr || rCandidate.uiLastUsedRenderFrame < pEvictTemplate->uiLastUsedRenderFrame))
 				{
-					evictCrc = rCandidateCrc;
+					uiEvictCrc = rCandidateCrc;
 					pEvictTemplate = &rCandidate;
 				}
 			}
 			if (pEvictTemplate == nullptr)
 			{
-				rTemplate.muiMeshArenaBlockedGeneration = gpIslands->muiMeshArenaCapacityGeneration;
-				rTemplate.meMeshResidency = IslandMeshResidency::kArenaBlocked;
-				gpIslands->WriteMeshIndirect(rTemplate.miTemplateArrayIndex, 0, 0, 0);
+				rTemplate.uiMeshArenaBlockedGeneration = gpIslands->muiMeshArenaCapacityGeneration;
+				rTemplate.eMeshResidency = IslandMeshResidency::kArenaBlocked;
+				gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, 0, 0, 0);
 				LOG(kGraphics, kWarning, "Island mesh arena exhausted: crc={}", rCrc);
 				break;
 			}
-			ASSERT(EvictTemplate(evictCrc, *pEvictTemplate, MeshEvictionReason::kArenaExhaustion));
+			ASSERT(EvictTemplate(uiEvictCrc, *pEvictTemplate, MeshEvictionReason::kArenaExhaustion));
 		}
-		if (rTemplate.meMeshResidency != IslandMeshResidency::kCpuReady)
+		if (rTemplate.eMeshResidency != IslandMeshResidency::kCpuReady)
 		{
 			continue;
 		}
 
-		ASSERT(rTemplate.mpfMeshPositions != nullptr);
-		ASSERT(rTemplate.mpuiMeshIndices != nullptr);
-		ASSERT(rTemplate.miMeshVertexCount > 0);
-		ASSERT(rTemplate.miMeshIndexCount > 0);
+		ASSERT(rTemplate.pfMeshPositions != nullptr);
+		ASSERT(rTemplate.puiMeshIndices != nullptr);
+		ASSERT(rTemplate.iMeshVertexCount > 0);
+		ASSERT(rTemplate.iMeshIndexCount > 0);
 		{
 			// Heap: UploadMesh creates transient VMA staging allocations in the RenderGlobal residency sweep.
 			ScopedSuppressAllocationTracking suppress;
-			gpIslands->UploadMesh(rTemplate.mMeshIndexOffset, rTemplate.mpuiMeshIndices, range.vkIndexSize, rTemplate.mMeshVertexOffset, rTemplate.mpfMeshPositions, range.vkVertexSize);
+			gpIslands->UploadMesh(rTemplate.vkMeshIndexOffset, rTemplate.puiMeshIndices, range.vkIndexSize, rTemplate.vkMeshVertexOffset, rTemplate.pfMeshPositions, range.vkVertexSize);
 		}
 		ReleaseMeshCpuRange(rCrc, rTemplate, range);
-		gpIslands->WriteMeshIndirect(rTemplate.miTemplateArrayIndex, rTemplate.mMeshIndexOffset, rTemplate.mMeshVertexOffset, static_cast<uint32_t>(rTemplate.miMeshIndexCount));
-		rTemplate.muiMeshArenaBlockedGeneration = 0;
-		rTemplate.meMeshResidency = IslandMeshResidency::kResident;
-		LOG(kGraphics, kDebug, "Restored island mesh: crc={} vertices={} indices={}", rCrc, rTemplate.miMeshVertexCount, rTemplate.miMeshIndexCount);
+		gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, rTemplate.vkMeshIndexOffset, rTemplate.vkMeshVertexOffset, static_cast<uint32_t>(rTemplate.iMeshIndexCount));
+		rTemplate.uiMeshArenaBlockedGeneration = 0;
+		rTemplate.eMeshResidency = IslandMeshResidency::kResident;
+		LOG(kGraphics, kDebug, "Restored island mesh: crc={} vertices={} indices={}", rCrc, rTemplate.iMeshVertexCount, rTemplate.iMeshIndexCount);
 	}
 }
 
@@ -462,27 +457,24 @@ void IslandTerrain::ReleaseGpuResources()
 {
 	for (auto& [rCrc, rTemplate] : mIslands)
 	{
-		rTemplate.mMeshIndexAllocation = VK_NULL_HANDLE;
-		rTemplate.mMeshVertexAllocation = VK_NULL_HANDLE;
-		rTemplate.mMeshIndexOffset = 0;
-		rTemplate.mMeshVertexOffset = 0;
-		if (rTemplate.meMeshResidency == IslandMeshResidency::kResident)
+		rTemplate.meshIndexAllocation = VK_NULL_HANDLE;
+		rTemplate.meshVertexAllocation = VK_NULL_HANDLE;
+		rTemplate.vkMeshIndexOffset = 0;
+		rTemplate.vkMeshVertexOffset = 0;
+		if (rTemplate.eMeshResidency == IslandMeshResidency::kResident)
 		{
-			rTemplate.meMeshResidency = IslandMeshResidency::kNonresident;
+			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 		}
-		else if (rTemplate.meMeshResidency == IslandMeshResidency::kArenaBlocked)
+		else if (rTemplate.eMeshResidency == IslandMeshResidency::kArenaBlocked)
 		{
-			rTemplate.meMeshResidency = IslandMeshResidency::kCpuReady;
+			rTemplate.eMeshResidency = IslandMeshResidency::kCpuReady;
 		}
-		// mElevationTexture is template-owned (no mTextureMap entry), so TextureManager's wholesale
+		// elevationTexture is template-owned (no mTextureMap entry), so TextureManager's wholesale
 		// destroy doesn't touch it — release here. On device-loss recovery the
-		// TextureManager ctor's ResetTextureSlots forces miTextureSlot < 0 for every template, so the
-		// next AcquireTextureSlot re-Creates mElevationTexture via the first-mint path.
-		rTemplate.mElevationTexture.FreeGpuResources();
-		// Clear residency so no template is left marked resident across the GPU-resource release. The
-		// full miTextureSlot reset that re-points the dangling color/normals/AO mRenderTargetTextures
-		// slots (and forces first-mint) happens in ResetTextureSlots, which TextureManager's ctor calls.
-		rTemplate.mbGpuResident = false;
+		// TextureManager ctor's ResetTextureSlots forces iTextureSlot < 0 for every template, so the
+		// next AcquireTextureSlot re-Creates elevationTexture via the first-mint path.
+		rTemplate.elevationTexture.FreeGpuResources();
+		rTemplate.bGpuResident = false;
 	}
 }
 
@@ -490,7 +482,7 @@ void IslandTerrain::ResetTextureSlots()
 {
 	for (auto& [rCrc, rTemplate] : mIslands)
 	{
-		if (rTemplate.meMeshResidency == IslandMeshResidency::kAsyncPending)
+		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
 		{
 			MeshRange range = GetMeshRange(rTemplate);
 			if (gpFileManager->GetChunkRangeReloadState(rCrc, range.uiOffset, range.uiLength) == ChunkRangeReloadState::kFailed)
@@ -498,17 +490,17 @@ void IslandTerrain::ResetTextureSlots()
 				// Teardown can run after the File-owned async request failed but before RestorationSweep
 				// promoted this template state. Consume that destroyed-lifecycle failure so re-mint can retry.
 				ReleaseMeshCpuRange(rCrc, rTemplate, range);
-				rTemplate.meMeshResidency = IslandMeshResidency::kNonresident;
+				rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 			}
 		}
-		else if (rTemplate.meMeshResidency == IslandMeshResidency::kFailed)
+		else if (rTemplate.eMeshResidency == IslandMeshResidency::kFailed)
 		{
-			rTemplate.meMeshResidency = IslandMeshResidency::kNonresident;
+			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 		}
-		rTemplate.miTextureSlot = -1;
-		rTemplate.mbGpuResident = false;
-		rTemplate.miRefCount = 0;
-		rTemplate.muiLastUsedRenderFrame = 0;
+		rTemplate.iTextureSlot = -1;
+		rTemplate.bGpuResident = false;
+		rTemplate.iReferenceCount = 0;
+		rTemplate.uiLastUsedRenderFrame = 0;
 	}
 	miNextTextureSlot = 1;
 	// Device-loss resets the high-water mark to 1; stale recycled indices would collide with the

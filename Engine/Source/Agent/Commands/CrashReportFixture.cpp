@@ -10,7 +10,7 @@ namespace engine
 // Writes a real crash report through the production handler (no exception object, so its text is the deterministic
 // "Unknown exception") and then exits. The exit is deliberate and intentionally leaves the request unanswered: the
 // harness observes transport loss plus exit code 0, so no response is built here.
-void CommandCrashReportFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+void CommandCrashReportFixture([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -18,11 +18,11 @@ void CommandCrashReportFixture([[maybe_unused]] const nlohmann::json& rParams, [
 	}
 	else
 	{
-		if (!rParams.is_object())
+		if (!rParameters.is_object())
 		{
 			throw std::runtime_error("crash_report_fixture requires empty params");
 		}
-		if (!rParams.empty())
+		if (!rParameters.empty())
 		{
 			throw std::runtime_error("crash_report_fixture requires empty params");
 		}

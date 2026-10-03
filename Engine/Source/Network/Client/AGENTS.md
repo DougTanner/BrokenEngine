@@ -10,7 +10,7 @@ Server updates use separate delta, full-state, static-data, debug-frame, and loa
 
 ## Subscription Receive Invariants
 
-`ClientReceive.cpp` centralizes full-state, coord-update, and subscribe-accept decisions in `ClassifyFullState`, `ClassifyCoordUpdate`, and `ClassifySubscribeAccept`; static data applies the same checks inline.
+`ClientReceive.cpp` centralizes full-state, coord-update, and subscribe-accept decisions in `ClassifyFullState`, `ClassifyCoordinateUpdate`, and `ClassifySubscribeAccept`; static data applies the same checks inline.
 
 - Seed the current load generation from the first accepted connection response. Load notification processing commits the newest generation and resets the old world before normal subscription updates run. Incoming load-scoped subscription traffic with any other generation logs a Network warning and returns before slot, epoch, cancellation, ACK, timing, receive-buffer, or game-state mutation ([Network architecture](../../../../Documents/Architecture/Network.md#debug-load-generation)).
 - Exact epoch checks apply only after the server assigns an epoch. Slot clearing retains the last assigned epoch for the connection lifetime; a `kUnsubscribed` slot admits subscribe accepts, and a `kUnsubscribed` or `kUnsubscribing` slot admits out-of-order full/static state for a coord with a live subscribe request, only when their epoch is wrap-aware newer than the retained one. This prevents retired traffic from reactivating a slot.
@@ -19,7 +19,7 @@ Server updates use separate delta, full-state, static-data, debug-frame, and loa
 - Static data requires matching coord identity and exact epoch on `kWaitingFullState`, and a live record plus a newer retained epoch on `kUnsubscribed` or `kUnsubscribing`. A coord mismatch drops silently because full state owns ghost unsubscribe. Static data buffers without slot mutation. The payload carries no frame area; every consumer reads the one constant area ([Frame](../../Frame/AGENTS.md)).
 - `kWaitingFullState` accepts deltas without advancing the ACK floor; only `kActive` tracks received ticks. A gap beyond `kiNetworkBufferSize` disconnects.
 - Active-slot resync full state commits only on matching coord and epoch, resets the ACK floor, and buffers the new frame; mismatched active state, and `kUnsubscribing` state whose coord has no live record, is dropped. Resync is server full-state replacement; reconciliation is client rollback/replay ([Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md)).
-- A non-reject subscribe-accept slot outside the client pool immediately unsubscribes so the server slot cannot leak. Full-state activation in `Client::ServerCoordFullState` and runtime adoption/game hydration must complete in the same frame because `Client::Poll` clears receive buffers at its next entry; skipping adoption loses the frame after activating the slot.
+- A non-reject subscribe-accept slot outside the client pool immediately unsubscribes so the server slot cannot leak. Full-state activation in `Client::ServerCoordinateFullState` and runtime adoption/game hydration must complete in the same frame because `Client::Poll` clears receive buffers at its next entry; skipping adoption loses the frame after activating the slot.
 
 ## Transport Timing Inputs
 

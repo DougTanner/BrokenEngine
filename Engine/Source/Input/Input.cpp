@@ -29,7 +29,7 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 
 	if (bKeyboardMouse)
 	{
-		mStateFlags.Clear(InputStateFlags::kGamepadMode);
+		mStateFlags.Set(InputStateFlags::kGamepadMode, false);
 	}
 	else if (std::abs(rRawInput.f2LeftThumbstick.x) + std::abs(rRawInput.f2LeftThumbstick.y) > kfGamepadThreshold || std::abs(rRawInput.f2RightThumbstick.x) + std::abs(rRawInput.f2RightThumbstick.y) > kfGamepadThreshold)
 	{
@@ -37,7 +37,7 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	}
 	else if (!::operator==(rRawInput.f2MousePosition, mPreviousRawInput.f2MousePosition))
 	{
-		mStateFlags.Clear(InputStateFlags::kGamepadMode);
+		mStateFlags.Set(InputStateFlags::kGamepadMode, false);
 	}
 
 	rMenuInput.bGamepad = mStateFlags & InputStateFlags::kGamepadMode;

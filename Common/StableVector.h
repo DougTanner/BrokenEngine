@@ -8,7 +8,7 @@ namespace common
 // Grow-only storage whose base address never moves: one address-space reservation is taken on first use and every
 // later growth commits more pages inside that same reservation, so every pointer, span, view, or RAII handle into
 // the storage stays valid across a grow. The reservation is a hard ceiling — exceeding it asserts rather than
-// relocating — and it charges no committed memory until a page is written, so a generous reserve is cheap.
+// relocating — and reserving it consumes no commit charge, so a generous reserve is cheap.
 // The constructor makes no OS call, which is what lets a thread_local instance be constructed before the process
 // allocator is initialized.
 template <typename T>

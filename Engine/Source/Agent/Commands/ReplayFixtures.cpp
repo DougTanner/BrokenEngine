@@ -9,35 +9,22 @@
 namespace engine::ReplayFixtures
 {
 
-namespace
-{
-
 struct Binding
 {
 	Replay* pReplay = nullptr;
 	TransferCaptureSnapshot capture;
 	PersistenceFailurePoint ePersistenceFailurePoint = PersistenceFailurePoint::kNone;
-	GridCoord persistenceFailureCoord {};
+	GridCoord persistenceFailureCoordinate {};
 	int64_t iPersistenceFailureActivationTick = -1;
 	int64_t iPauseAfterWriterInputCount = -1;
 };
 
-Binding sBinding;
+static Binding sBinding;
 
-Binding* FindBinding(Replay& rReplay)
+static Binding* FindBinding(const Replay& rReplay)
 {
 	return sBinding.pReplay == &rReplay ? &sBinding : nullptr;
 }
-
-void Clear(Replay& rReplay)
-{
-	if (sBinding.pReplay == &rReplay)
-	{
-		sBinding = {.pReplay = &rReplay};
-	}
-}
-
-} // namespace
 
 void Attach(Replay& rReplay)
 {
@@ -47,7 +34,7 @@ void Attach(Replay& rReplay)
 	}
 }
 
-void Detach(Replay& rReplay)
+void Detach(const Replay& rReplay)
 {
 	if (sBinding.pReplay == &rReplay)
 	{
@@ -57,25 +44,13 @@ void Detach(Replay& rReplay)
 
 void Reset(Replay& rReplay)
 {
-	Clear(rReplay);
+	if (sBinding.pReplay == &rReplay)
+	{
+		sBinding = {.pReplay = &rReplay};
+	}
 }
 
-void RecordingInvalidated(Replay& rReplay)
-{
-	Clear(rReplay);
-}
-
-void RecordingStartFailed(Replay& rReplay)
-{
-	Clear(rReplay);
-}
-
-void RecordingStartCancelled(Replay& rReplay)
-{
-	Clear(rReplay);
-}
-
-void RecordingStarted(Replay& rReplay)
+void RecordingStarted(const Replay& rReplay)
 {
 	if (Binding* pBinding = FindBinding(rReplay); pBinding != nullptr)
 	{
@@ -87,26 +62,16 @@ void RecordingStopped(Replay& rReplay, bool bPersistenceSucceeded)
 {
 	if (!bPersistenceSucceeded)
 	{
-		Clear(rReplay);
+		Reset(rReplay);
 		return;
 	}
 	if (Binding* pBinding = FindBinding(rReplay); pBinding != nullptr)
 	{
 		pBinding->ePersistenceFailurePoint = PersistenceFailurePoint::kNone;
-		pBinding->persistenceFailureCoord = {};
+		pBinding->persistenceFailureCoordinate = {};
 		pBinding->iPersistenceFailureActivationTick = -1;
 		pBinding->iPauseAfterWriterInputCount = -1;
 	}
-}
-
-void PlaybackAborted(Replay& rReplay)
-{
-	Clear(rReplay);
-}
-
-void PlaybackAdoptionFailed(Replay& rReplay)
-{
-	Clear(rReplay);
 }
 
 void PlaybackAdopted(Replay& rReplay, const TransferCaptureSnapshot& rRecordingSnapshot)
@@ -121,7 +86,7 @@ void PlaybackAdopted(Replay& rReplay, const TransferCaptureSnapshot& rRecordingS
 	}
 }
 
-TransferCaptureSnapshot CaptureSnapshot(Replay& rReplay)
+TransferCaptureSnapshot CaptureSnapshot(const Replay& rReplay)
 {
 	if (Binding* pBinding = FindBinding(rReplay); pBinding != nullptr)
 	{
@@ -130,9 +95,9 @@ TransferCaptureSnapshot CaptureSnapshot(Replay& rReplay)
 	return {};
 }
 
-bool DropRetainedEndFrame(Replay& rReplay, GridCoord coord)
+bool DropRetainedEndFrame(Replay& rReplay, GridCoord coordinate)
 {
-	auto it = rReplay.mReplayWriters.find(coord);
+	auto it = rReplay.mReplayWriters.find(coordinate);
 	if (it == rReplay.mReplayWriters.end())
 	{
 		return false;
@@ -143,7 +108,7 @@ bool DropRetainedEndFrame(Replay& rReplay, GridCoord coord)
 	}
 
 	std::vector<Replay::ReplayWriterState>& rWriterGenerations = it->second;
-	if (!rWriterGenerations.back().bTerminal && rWriterGenerations.size() < 2)
+	if (!rWriterGenerations.back().bTerminal && std::ssize(rWriterGenerations) < 2)
 	{
 		return false;
 	}
@@ -157,7 +122,7 @@ bool DropRetainedEndFrame(Replay& rReplay, GridCoord coord)
 	return true;
 }
 
-bool ArmPersistenceFailure(Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coord)
+bool ArmPersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coordinate)
 {
 	Binding* pBinding = FindBinding(rReplay);
 	if (pBinding == nullptr)
@@ -166,7 +131,7 @@ bool ArmPersistenceFailure(Replay& rReplay, PersistenceFailurePoint eFailurePoin
 	}
 	if (eFailurePoint == PersistenceFailurePoint::kCoordinateWriter || eFailurePoint == PersistenceFailurePoint::kFullFramesRecord)
 	{
-		auto it = rReplay.mReplayWriters.find(coord);
+		auto it = rReplay.mReplayWriters.find(coordinate);
 		if (it == rReplay.mReplayWriters.end())
 		{
 			return false;
@@ -201,11 +166,11 @@ bool ArmPersistenceFailure(Replay& rReplay, PersistenceFailurePoint eFailurePoin
 	}
 
 	pBinding->ePersistenceFailurePoint = eFailurePoint;
-	pBinding->persistenceFailureCoord = coord;
+	pBinding->persistenceFailureCoordinate = coordinate;
 	return true;
 }
 
-bool ConsumePersistenceFailure(Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coord, int64_t iActivationTick)
+bool ConsumePersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coordinate, int64_t iActivationTick)
 {
 	Binding* pBinding = FindBinding(rReplay);
 	if (pBinding == nullptr)
@@ -218,7 +183,7 @@ bool ConsumePersistenceFailure(Replay& rReplay, PersistenceFailurePoint eFailure
 	}
 	if (eFailurePoint == PersistenceFailurePoint::kCoordinateWriter || eFailurePoint == PersistenceFailurePoint::kFullFramesRecord)
 	{
-		if (pBinding->persistenceFailureCoord != coord)
+		if (pBinding->persistenceFailureCoordinate != coordinate)
 		{
 			return false;
 		}
@@ -229,18 +194,18 @@ bool ConsumePersistenceFailure(Replay& rReplay, PersistenceFailurePoint eFailure
 	}
 
 	pBinding->ePersistenceFailurePoint = PersistenceFailurePoint::kNone;
-	pBinding->persistenceFailureCoord = {};
+	pBinding->persistenceFailureCoordinate = {};
 	pBinding->iPersistenceFailureActivationTick = -1;
 	return true;
 }
 
-bool IsWriterPauseArmed(Replay& rReplay)
+bool IsWriterPauseArmed(const Replay& rReplay)
 {
 	const Binding* pBinding = FindBinding(rReplay);
 	return pBinding != nullptr && pBinding->iPauseAfterWriterInputCount != -1;
 }
 
-void ArmPauseAfterNextWriterInput(Replay& rReplay, bool bPendingRecordingStart)
+void ArmPauseAfterNextWriterInput(const Replay& rReplay, bool bPendingRecordingStart)
 {
 	if (Binding* pBinding = FindBinding(rReplay); pBinding != nullptr)
 	{
@@ -249,7 +214,7 @@ void ArmPauseAfterNextWriterInput(Replay& rReplay, bool bPendingRecordingStart)
 	}
 }
 
-bool ObserveWriterInput(Replay& rReplay, int64_t iTick)
+bool ObserveWriterInput(const Replay& rReplay, int64_t iTick)
 {
 	Binding* pBinding = FindBinding(rReplay);
 	if (pBinding == nullptr)
@@ -269,12 +234,7 @@ bool ObserveWriterInput(Replay& rReplay, int64_t iTick)
 	return true;
 }
 
-bool ConsumeTransferCaptureFailure(Replay& rReplay)
-{
-	return ConsumePersistenceFailure(rReplay, PersistenceFailurePoint::kTransferCapture);
-}
-
-void ObserveAcceptedTransfers(Replay& rReplay, int64_t iEventTick, std::span<const game::StatusChange> sortedTransfers)
+void ObserveAcceptedTransfers(const Replay& rReplay, int64_t iEventTick, std::span<const game::StatusChange> sortedTransfers)
 {
 	Binding* pBinding = FindBinding(rReplay);
 	if (pBinding == nullptr)
@@ -291,7 +251,7 @@ void ObserveAcceptedTransfers(Replay& rReplay, int64_t iEventTick, std::span<con
 	game::CountCapturedReplayTransfers(sortedTransfers, rEvents.back().transferCounts);
 }
 
-void ObservePlaybackEvent(Replay& rReplay, int64_t iEventTick)
+void ObservePlaybackEvent(const Replay& rReplay, int64_t iEventTick)
 {
 	Binding* pBinding = FindBinding(rReplay);
 	if (pBinding == nullptr)

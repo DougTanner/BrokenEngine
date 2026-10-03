@@ -93,8 +93,8 @@ void Camera::ShiftToRenderedCell(GridCoord cameraCoord)
 		return;
 	}
 
-	int64_t iStepX = static_cast<int64_t>(cameraCoord.x) - static_cast<int64_t>(mBasisCoord.x);
-	int64_t iStepY = static_cast<int64_t>(cameraCoord.y) - static_cast<int64_t>(mBasisCoord.y);
+	int64_t iStepX = static_cast<int64_t>(cameraCoord.iX) - static_cast<int64_t>(mBasisCoord.iX);
+	int64_t iStepY = static_cast<int64_t>(cameraCoord.iY) - static_cast<int64_t>(mBasisCoord.iY);
 	// Z and W stay zero: the step is planar, and the cached values it moves are homogeneous points.
 	RenderBasis previousBasis = MakeRenderBasis(mBasisCoord, cameraCoord);
 	XMVECTOR vecShift = XMVectorSet(previousBasis.f2Offset.x, previousBasis.f2Offset.y, 0.0f, 0.0f);
@@ -130,7 +130,7 @@ void Camera::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaT
 
 	// Before any position is read or written this frame: the camera lives in its own cell's local frame, so a change
 	// of rendered cell must move every cached position into the new frame first.
-	ShiftToRenderedCell(rFrameInterpolate.renderBasis.coord);
+	ShiftToRenderedCell(rFrameInterpolate.renderBasis.coordinate);
 
 	// Decay camera shake using sim-scaled render time
 	mfShake = std::max(mfShake - fDeltaTime * 2.0f, 0.0f);

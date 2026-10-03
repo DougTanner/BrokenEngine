@@ -74,11 +74,10 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 
    - `LogDifferences()` coverage may intentionally differ from CRC membership,
      so follow the collection's live diagnostic intent.
-   - Use `common::LogDifference<"name">` for scalar-like values and
-     `common::LogDifference_Vec` for vectors.
+   - Use `common::LogDifference<"name">` for scalar-like and vector values.
    - Client-only collections may have no difference logger.
 
-   Done when the column is either logged through the matching helper or
+   Done when the column is either logged through `common::LogDifference` or
    deliberately left out.
 
 ### Carry, initialize, and propagate

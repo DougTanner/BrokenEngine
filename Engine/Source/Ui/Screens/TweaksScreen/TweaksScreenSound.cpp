@@ -8,8 +8,6 @@
 namespace engine
 {
 
-namespace
-{
 const TweaksSliderMapRegistrar gSoundRegistrar
 {
 	{"Master Volume", &gMasterVolume},
@@ -36,7 +34,6 @@ const TweaksSliderMapRegistrar gSoundRegistrar
 	{"Listener Audible Floor Low", &gListenerAudibleFloor.Low},
 	{"Listener Audible Floor High", &gListenerAudibleFloor.High},
 };
-}
 
 void TweaksScreenBase::RenderSoundSection()
 {

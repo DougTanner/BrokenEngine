@@ -21,52 +21,49 @@ inline constexpr int32_t kiNavZonesY = 64;
 
 // Map a world coordinate to a nav-grid cell index on one axis. Shared by the builder and the query so
 // bucketing and lookup always agree. Degenerate (near-zero) extent collapses to cell 0.
-inline int32_t NavGridCell(float fValue, float fMin, float fMax, int32_t iZones)
+inline int32_t NavGridCell(float fValue, float fMinimum, float fMaximum, int32_t iZones)
 {
-	float fExtent = fMax - fMin;
-	if (fExtent <= 1e-6f)
+	float fExtent = fMaximum - fMinimum;
+	if (fExtent <= 1.0e-6f)
 	{
 		return 0;
 	}
-	int32_t iCell = static_cast<int32_t>((fValue - fMin) / fExtent * static_cast<float>(iZones));
+	int32_t iCell = static_cast<int32_t>((fValue - fMinimum) / fExtent * static_cast<float>(iZones));
 	return std::clamp(iCell, 0, iZones - 1);
 }
 
-// Per-cell navigation data in world space, stored in FrameStaticData
+// Cell-local navigation data stored in FrameStaticData.
 struct NavData
 {
-	// --- Serialized (logical) content. Bump kiNavDataVersion if this layout changes. visEdgeA/visEdgeB
-	// are the whole-cell world-space visibility graph BuildCellNavData computes over every polygon in the
-	// cell (server-built, shipped to clients); templates carry contour geometry only. ---
+	// Serialized content; layout changes require a kiNavDataVersion bump.
+	// BuildCellNavigationData builds the whole-cell visibility graph on the server and ships it to clients;
+	// island templates carry contour geometry only.
 	std::vector<XMFLOAT2> vertices;
 	std::vector<int32_t> polygonOffsets;
-	std::vector<int32_t> visEdgeA;
-	std::vector<int32_t> visEdgeB;
+	std::vector<int32_t> visibilityEdgeA;
+	std::vector<int32_t> visibilityEdgeB;
 
-	// --- Derived broad-phase acceleration, rebuilt by BuildNavAcceleration from the vertices above on
-	// both sides (server: end of BuildCellNavData; client/load: end of Read). NOT serialized, so it never
-	// affects kiNavDataVersion. ---
-	std::vector<XMFLOAT2> polygonMin;     // per polygon: AABB min (xy)
-	std::vector<XMFLOAT2> polygonMax;     // per polygon: AABB max (xy)
+	// Derived acceleration is rebuilt by BuildNavigationAcceleration after server cell construction and
+	// client/load deserialization. It is not serialized and does not change kiNavDataVersion.
+	std::vector<XMFLOAT2> polygonMinimum;     // per polygon: AABB min (xy)
+	std::vector<XMFLOAT2> polygonMaximum;     // per polygon: AABB max (xy)
 	std::vector<int32_t> edgeA;           // obstacle perimeter edges: endpoint vertex indices
 	std::vector<int32_t> edgeB;
 	std::vector<int32_t> gridEdgeOffsets; // CSR offsets, size kiNavZonesX*kiNavZonesY + 1
 	std::vector<int32_t> gridEdges;       // CSR payload: edge indices bucketed per grid cell
-	std::vector<int32_t> adjOffsets;      // CSR offsets per vertex, size vertices.size() + 1
-	std::vector<int32_t> adjNeighbors;    // CSR payload: neighbor vertex indices (visibility + polygon)
-	XMFLOAT2 gridMin {};                  // global vertex AABB min (grid origin)
-	XMFLOAT2 gridMax {};                  // global vertex AABB max
+	std::vector<int32_t> adjacencyOffsets;      // CSR offsets per vertex, size vertices.size() + 1
+	std::vector<int32_t> adjacencyNeighbors;    // CSR payload: neighbor vertex indices (visibility + polygon)
+	XMFLOAT2 f2GridMinimum {};                  // global vertex AABB min (grid origin)
+	XMFLOAT2 f2GridMaximum {};                  // global vertex AABB max
 
 	void Write(std::ostream& rStream) const;
 	void Read(std::istream& rStream);
 };
 
-void BuildNavContour(NavContour& rContour, const float* pfHeightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters);
-void BuildCellNavData(NavData& rNavData, const std::vector<IslandPlacement>& rPlacements);
+void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters);
+void BuildCellNavigationData(NavData& rNavData, const std::vector<IslandPlacement>& rPlacements);
 
-// Rebuild the derived broad-phase acceleration (polygon AABBs, explicit edges, edge grid, per-vertex
-// adjacency) from the serialized vertices/polygons/visibility edges. Deterministic — both client and
-// server derive identical structures from identical input.
-void BuildNavAcceleration(NavData& rNavData);
+// Client and server must derive identical acceleration structures from identical serialized input.
+void BuildNavigationAcceleration(NavData& rNavData);
 
 } // namespace engine
