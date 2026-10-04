@@ -550,11 +550,6 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 		ASSERT(mVkPhysicalDeviceFeatures2.features.shaderInt64 == VK_TRUE);
 	}
 	ASSERT(mVkPhysicalDeviceFeatures2.features.textureCompressionBC == VK_TRUE);
-#if !defined(ENABLE_32_BIT_BOOL)
-	ASSERT(mVkPhysicalDevice16BitStorageFeatures.storageBuffer16BitAccess == VK_TRUE);
-	ASSERT(mVkPhysicalDevice16BitStorageFeatures.uniformAndStorageBuffer16BitAccess == VK_TRUE);
-	ASSERT(mVkPhysicalDeviceFeatures2.features.shaderInt16 == VK_TRUE);
-#endif
 	mMaxMultisampleCountVkSampleCountFlagBits = SelectSampleCount(mVkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & mVkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts);
 	LOG(kGraphics, kInfo, "  Max multisample count: {}\n", static_cast<int64_t>(mMaxMultisampleCountVkSampleCountFlagBits));
 	ASSERT(mMaxMultisampleCountVkSampleCountFlagBits > VK_SAMPLE_COUNT_1_BIT);

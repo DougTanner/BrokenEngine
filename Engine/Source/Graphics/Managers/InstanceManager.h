@@ -24,15 +24,10 @@ public:
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR,
 		.pNext = nullptr,
 	};
-	VkPhysicalDevice16BitStorageFeatures mVkPhysicalDevice16BitStorageFeatures =
-	{
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
-		.pNext = kbShaderRealtimeClock ? &mVkPhysicalDeviceShaderClockFeaturesKHR : nullptr,
-	};
 	VkPhysicalDeviceVulkan12Features mVkPhysicalDeviceVulkan12Features
 	{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-		.pNext = &mVkPhysicalDevice16BitStorageFeatures,
+		.pNext = kbShaderRealtimeClock ? &mVkPhysicalDeviceShaderClockFeaturesKHR : nullptr,
 	};
 	VkPhysicalDeviceFeatures2 mVkPhysicalDeviceFeatures2 = 
 	{

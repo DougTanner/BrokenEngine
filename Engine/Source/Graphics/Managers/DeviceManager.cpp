@@ -134,19 +134,10 @@ DeviceManager::DeviceManager()
 		pFeatureChainTail = &vkPhysicalDeviceLineRasterizationFeaturesEXT;
 	}
 
-	VkPhysicalDevice16BitStorageFeatures vkPhysicalDevice16BitStorageFeatures =
-	{
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
-		.pNext = pFeatureChainTail,
-		.storageBuffer16BitAccess = VK_TRUE,
-		.uniformAndStorageBuffer16BitAccess = VK_TRUE,
-		.storagePushConstant16 = VK_FALSE,
-		.storageInputOutput16 = VK_FALSE,
-	};
 	VkPhysicalDeviceVulkan12Features vkPhysicalDeviceVulkan12Features
 	{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-		.pNext = &vkPhysicalDevice16BitStorageFeatures,
+		.pNext = pFeatureChainTail,
 		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
 		.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
 		.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE,
@@ -204,9 +195,6 @@ DeviceManager::DeviceManager()
 		.textureCompressionBC = VK_TRUE,
 		.shaderStorageImageExtendedFormats = VK_TRUE,
 		.shaderInt64 = kbShaderRealtimeClock ? VK_TRUE : VK_FALSE,
-	#if !defined(ENABLE_32_BIT_BOOL)
-		.shaderInt16 = VK_TRUE,
-	#endif
 	};
 	vkPhysicalDeviceFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	if (mCapabilities & DeviceCapabilityFlags::kWideLinesEnabled)
