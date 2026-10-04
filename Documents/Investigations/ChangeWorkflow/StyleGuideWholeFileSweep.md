@@ -84,9 +84,11 @@ resumes where it stopped.
    the prompt corrections the stage's Plan names, which the brief cites as that
    Plan's path and section. It returns the four paths written. Main never reads
    the appendix.
-2. Open SmartGit on the worktree (`smartgit.exe --open <worktree root>`). The
-   user browses the uncommitted changes there, so the session makes no commit
-   before landing.
+2. Open SmartGit on the worktree: start
+   `C:\Program Files\SmartGit\bin\smartgit.exe` (the default install path; use
+   `smartgit.exe` from PATH when SmartGit is installed elsewhere) with the
+   arguments `--open <worktree root>`. The user browses the uncommitted changes
+   there, so the session makes no commit before landing.
 3. `pwsh -NoProfile -File Temp/StyleSweep/Run-Sweep.ps1 -List` prints every
    batch name (`Engine_Source_Agent`, ..., `Engine`,
    `Projects_BrokenEngineSandbox_Source_Agent`, ..., `Projects`) with its unit
