@@ -88,7 +88,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				continue;
 			}
 
-			int64_t iDirection = common::Random(3u, rRandom);
+			int64_t iDirection = common::Random(3ui32, rRandom);
 			engine::GridCoord offset = NavigationDirectionOffset(iDirection);
 			engine::GridCoord destination {};
 			if (!engine::TryAddGridCoordinate(rFlagship.coordinate, offset.iX, offset.iY, destination)) [[unlikely]]

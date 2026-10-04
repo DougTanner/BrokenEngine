@@ -28,7 +28,7 @@ static void WriteReplayManifestValue(std::ostream& rStream, TYPE value)
 	UnsignedType uiValue = std::bit_cast<UnsignedType>(value);
 	for (int64_t i = 0; i < static_cast<int64_t>(sizeof(TYPE)); ++i)
 	{
-		rStream.put(static_cast<char>((uiValue >> (i * 8)) & 0xFFu));
+		rStream.put(static_cast<char>((uiValue >> (i * 8)) & 0xFFui32));
 	}
 }
 
@@ -131,7 +131,7 @@ static bool AppendReplayManifestPayload(const ReplayManifest& rManifest, std::ve
 		UnsignedType uiValue = std::bit_cast<UnsignedType>(value);
 		for (int64_t i = 0; i < static_cast<int64_t>(sizeof(TYPE)); ++i)
 		{
-			rPayload.push_back(static_cast<std::byte>((uiValue >> (i * 8)) & 0xFFu));
+			rPayload.push_back(static_cast<std::byte>((uiValue >> (i * 8)) & 0xFFui32));
 		}
 	};
 
@@ -173,7 +173,7 @@ static bool ComputeReplayGenerationDigest(const ReplayManifest& rManifest, std::
 	rootPreimage.reserve(sizeof(uint32_t) + kReplayManifestGenerationDomain.size() + payload.size());
 	for (int64_t i = 0; i < static_cast<int64_t>(sizeof(uint32_t)); ++i)
 	{
-		rootPreimage.push_back(static_cast<std::byte>((static_cast<uint32_t>(kReplayManifestGenerationDomain.size()) >> (i * 8)) & 0xFFu));
+		rootPreimage.push_back(static_cast<std::byte>((static_cast<uint32_t>(kReplayManifestGenerationDomain.size()) >> (i * 8)) & 0xFFui32));
 	}
 	rootPreimage.insert(rootPreimage.end(), reinterpret_cast<const std::byte*>(kReplayManifestGenerationDomain.data()), reinterpret_cast<const std::byte*>(kReplayManifestGenerationDomain.data() + kReplayManifestGenerationDomain.size()));
 	rootPreimage.insert(rootPreimage.end(), payload.begin(), payload.end());

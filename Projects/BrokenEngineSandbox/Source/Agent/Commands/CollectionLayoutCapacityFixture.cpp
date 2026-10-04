@@ -18,7 +18,7 @@ static constexpr float MissileSharedRowScalar(int64_t i, int64_t iSeed, int64_t 
 
 static constexpr MissileFlags_t MissileSharedRowFlags(int64_t i, int64_t iSeed)
 {
-	return ((static_cast<uint64_t>(i + iSeed) & 1ULL) != 0) ? MissileFlags_t {MissileFlags::kTransfer} : MissileFlags_t {MissileFlags::kExploding};
+	return ((static_cast<uint64_t>(i + iSeed) & 1ui64) != 0) ? MissileFlags_t {MissileFlags::kTransfer} : MissileFlags_t {MissileFlags::kExploding};
 }
 
 static constexpr engine::AlignmentIdentifier MissileSharedRowAlignment(int64_t i, int64_t iSeed)
@@ -124,7 +124,7 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		{
 			for (int64_t i = 0; i < destination.iPhysicalLayoutCapacity; ++i)
 			{
-				destination.puiSounds[i] = engine::sound_t {engine::Uuid {0x7fff'ffff'ffff'ffffLL}};
+				destination.puiSounds[i] = engine::sound_t {engine::Uuid {0x7fff'ffff'ffff'ffffi64}};
 			}
 		};
 		auto CountNonZeroSounds = [&]() -> int64_t

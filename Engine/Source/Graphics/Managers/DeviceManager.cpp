@@ -488,7 +488,7 @@ void DeviceManager::ProbeTransferQueueOwnershipTransfer(bool bMaintenance9Availa
 	// Both indices must identify valid queue families; InstanceManager falls back to the graphics family when no transfer family is available.
 	ASSERT(iTransferFamily < uiQueueFamilyCount && uiGraphicsFamily < uiQueueFamilyCount);
 	uint32_t uiOptimalMask = queueFamilyOwnershipTransferProperties.at(iTransferFamily).optimalImageTransferToQueueFamilies;
-	mCapabilities.Set(DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional, (uiOptimalMask & (1u << uiGraphicsFamily)) != 0);
+	mCapabilities.Set(DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional, (uiOptimalMask & (1ui32 << uiGraphicsFamily)) != 0);
 	LOG(kGraphics, kDebug, "Transfer->Graphics QFOT optional: {} (transfer family {} optimal mask {}, graphics family {})", static_cast<bool>(mCapabilities & DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional), iTransferFamily, uiOptimalMask, uiGraphicsFamily);
 }
 

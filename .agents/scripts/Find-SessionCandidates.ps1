@@ -60,6 +60,7 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'style-rule-18'; Pattern = '^\s*const\s+(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*[={(]'; Except = '^\s*const\s+[^=({;<]*(?:<[^;]*>)?[^=({;<]*[&*]' }
 	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|\btypename(?:\.\.\.)?\s+[A-Z]*[a-z])' }
 	@{ Kind = 'style-rule-27'; Pattern = $script:CodePrefix + '(?:\b\d+\.(?:\d+(?:[eE][-+]?\d+)?)?(?:[^\w.]|$)|\b\d+\.f\b|(?<![\w.])\.\d+(?:f|\b))' }
+	@{ Kind = 'style-rule-68'; Pattern = $script:CodePrefix + '(?:\bstatic_cast\s*<\s*(?:std::)?(?:u?int(?:16|32|64)_t|uint8_t)\s*>\s*\(\s*-?(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)\s*\)|(?<![\w:])(?:std::)?(?:u?int(?:16|32|64)_t|uint8_t)\s*\{\s*-?(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)\s*\}|(?<![\w.''])(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)(?:[uU]?(?:ll|LL)|(?:ll|LL)[uU]|[uU])\b)' }
 	@{ Kind = 'style-rule-28'; Pattern = $script:CodePrefix + '\bNULL\b' }
 	@{ Kind = 'style-rule-29'; Pattern = '\bvirtual\b.*\)\s*(?:const\s*)?(?:noexcept\s*)?;'; Except = '\boverride\b|\bfinal\b' }
 	@{ Kind = 'style-rule-32'; Pattern = '\bstd::map\s*<' }

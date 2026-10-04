@@ -217,7 +217,7 @@ void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 			int64_t iElapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(now - pState->startTimePoint).count();
 			rCpuTimer.iTotalFrameTimeNanoseconds += iElapsedNanoseconds;
 			pState->startTimePoint = std::chrono::steady_clock::time_point();
-			rCpuTimer.iAllocationsThisFrame += std::max(static_cast<int64_t>(0), iAllocations - pState->iStartAllocations);
+			rCpuTimer.iAllocationsThisFrame += std::max(0i64, iAllocations - pState->iStartAllocations);
 
 #if defined(BT_SERVER)
 			if constexpr (kbProfiling)

@@ -51,8 +51,8 @@ int64_t ComputeImageByteSize(VkFormat vkFormat, int64_t iWidth, int64_t iHeight,
 	for (int64_t i = 0; i < iMipLevels; ++i)
 	{
 		iTotalSize += iArrayLayers * iDepth * SizeInBytes(vkFormat, iMipWidth, iMipHeight);
-		iMipWidth = std::max(iMipWidth / 2, static_cast<int64_t>(1));
-		iMipHeight = std::max(iMipHeight / 2, static_cast<int64_t>(1));
+		iMipWidth = std::max(iMipWidth / 2, 1i64);
+		iMipHeight = std::max(iMipHeight / 2, 1i64);
 	}
 	return iTotalSize;
 }

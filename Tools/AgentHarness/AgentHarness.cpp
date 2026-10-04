@@ -21,8 +21,8 @@
 
 namespace toolcli
 {
-	constexpr uint32_t kuiMaxRequestBytes = 1u * 1'024u * 1'024u;
-	constexpr uint32_t kuiMaxResponseBytes = 16u * 1'024u * 1'024u;
+	constexpr uint32_t kuiMaxRequestBytes = 1ui32 * 1'024ui32 * 1'024ui32;
+	constexpr uint32_t kuiMaxResponseBytes = 16ui32 * 1'024ui32 * 1'024ui32;
 	constexpr int64_t kiConnectAttemptTimeoutMilliseconds = 500; // per connect try; retried until the --timeout-ms deadline
 	constexpr int64_t kiConnectRetrySleepMilliseconds = 150; // brief pause between connect tries
 	constexpr int64_t kiDefaultResponseTimeoutMilliseconds = 15'000;
@@ -563,10 +563,10 @@ namespace toolcli
 		uint32_t uiPayloadLength = static_cast<uint32_t>(request.size());
 		unsigned char pLengthPrefix[4] =
 		{
-			static_cast<unsigned char>(uiPayloadLength & 0xffu),
-			static_cast<unsigned char>((uiPayloadLength >> 8) & 0xffu),
-			static_cast<unsigned char>((uiPayloadLength >> 16) & 0xffu),
-			static_cast<unsigned char>((uiPayloadLength >> 24) & 0xffu),
+			static_cast<unsigned char>(uiPayloadLength & 0xffui32),
+			static_cast<unsigned char>((uiPayloadLength >> 8) & 0xffui32),
+			static_cast<unsigned char>((uiPayloadLength >> 16) & 0xffui32),
+			static_cast<unsigned char>((uiPayloadLength >> 24) & 0xffui32),
 		};
 		SocketOperationResult eSendResult = SendAll(rSocket.mSocket, std::span<const char>(reinterpret_cast<const char*>(pLengthPrefix), sizeof(pLengthPrefix)), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 		if (eSendResult == SocketOperationResult::kSuccess)

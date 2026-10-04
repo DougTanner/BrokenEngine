@@ -30,7 +30,7 @@ namespace toolcli::landing
 		metadata["leaseDurationSeconds"] = leaseDuration.count();
 		uint64_t uiHeartbeatTicks = 0;
 		ParseUtcTimestamp(metadata["heartbeatAt"].get<std::string>(), uiHeartbeatTicks);
-		uint64_t uiExpiresTicks = uiHeartbeatTicks + static_cast<uint64_t>(leaseDuration.count()) * 10'000'000ull;
+		uint64_t uiExpiresTicks = uiHeartbeatTicks + static_cast<uint64_t>(leaseDuration.count()) * 10'000'000ui64;
 		metadata["expiresAt"] = FormatUtcTimestamp(uiExpiresTicks);
 		return metadata;
 	}
@@ -65,8 +65,8 @@ namespace toolcli::landing
 		{
 			return std::nullopt;
 		}
-		if (lease.uiHeartbeatTicks > (std::numeric_limits<uint64_t>::max)() - static_cast<uint64_t>(lease.duration.count()) * 10'000'000ull
-		 || lease.uiExpiresTicks != lease.uiHeartbeatTicks + static_cast<uint64_t>(lease.duration.count()) * 10'000'000ull)
+		if (lease.uiHeartbeatTicks > (std::numeric_limits<uint64_t>::max)() - static_cast<uint64_t>(lease.duration.count()) * 10'000'000ui64
+		 || lease.uiExpiresTicks != lease.uiHeartbeatTicks + static_cast<uint64_t>(lease.duration.count()) * 10'000'000ui64)
 		{
 			return std::nullopt;
 		}

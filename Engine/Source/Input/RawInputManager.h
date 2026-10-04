@@ -7,25 +7,25 @@ inline constexpr int64_t kiKeyboardKeyCount = 0xFF;
 
 enum class MouseButtons : uint32_t
 {
-	kMouseButtonLeft     = 1u << 0,
-	kMouseButtonMiddle   = 1u << 1,
-	kMouseButtonRight    = 1u << 2,
-	kMouseButtonExtraOne = 1u << 3,
-	kMouseButtonExtraTwo = 1u << 4,
+	kMouseButtonLeft     = 1ui32 << 0,
+	kMouseButtonMiddle   = 1ui32 << 1,
+	kMouseButtonRight    = 1ui32 << 2,
+	kMouseButtonExtraOne = 1ui32 << 3,
+	kMouseButtonExtraTwo = 1ui32 << 4,
 };
 
 enum class GamepadButtons : uint32_t
 {
-	kGamepadButtonA       = 1u << 0,
-	kGamepadButtonB       = 1u << 1,
-	kGamepadButtonX       = 1u << 2,
-	kGamepadButtonY       = 1u << 3,
+	kGamepadButtonA       = 1ui32 << 0,
+	kGamepadButtonB       = 1ui32 << 1,
+	kGamepadButtonX       = 1ui32 << 2,
+	kGamepadButtonY       = 1ui32 << 3,
 
-	kGamepadLeftShoulder  = 1u << 4,
-	kGamepadRightShoulder = 1u << 5,
+	kGamepadLeftShoulder  = 1ui32 << 4,
+	kGamepadRightShoulder = 1ui32 << 5,
 
-	kGamepadStart         = 1u << 6,
-	kGamepadMenu          = 1u << 7,
+	kGamepadStart         = 1ui32 << 6,
+	kGamepadMenu          = 1ui32 << 7,
 };
 
 struct RawInput

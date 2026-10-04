@@ -69,8 +69,8 @@ private:
 	static bool SendExact(SOCKET uiClientSocket, std::span<const uint8_t> buffer, const std::chrono::steady_clock::time_point& rDeadline);
 	static bool SendFrame(SOCKET uiClientSocket, std::string_view payload);
 
-	static constexpr uint32_t kuiMaximumRequestBytes = 1u * 1'024u * 1'024u; // 1 MiB — larger request frames are rejected
-	static constexpr int64_t kiMaximumResponseBytes = 16ll * 1'024ll * 1'024ll; // 16 MiB response cap
+	static constexpr uint32_t kuiMaximumRequestBytes = 1ui32 * 1'024ui32 * 1'024ui32; // 1 MiB — larger request frames are rejected
+	static constexpr int64_t kiMaximumResponseBytes = 16i64 * 1'024i64 * 1'024i64; // 16 MiB response cap
 
 	SOCKET muiListenSocket = INVALID_SOCKET;
 	SOCKET muiActiveSocket = INVALID_SOCKET; // current connection; final close is owned by ListenerLoop after I/O exits

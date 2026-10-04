@@ -126,7 +126,7 @@ ButtonResult Report(const Record& rRecord)
 
 DiskSpaceDecision ReportMaterializationDiskSpace(uint64_t uiAllocation, uint64_t uiAvailable, const std::filesystem::path& rSource, const std::filesystem::path& rDestination)
 {
-	uint64_t uiReserve = (std::max)(1ull << 30, (uiAllocation * 5 + 99) / 100);
+	uint64_t uiReserve = (std::max)(1ui64 << 30, (uiAllocation * 5 + 99) / 100);
 	uint64_t uiRequired = uiAllocation + uiReserve;
 	if (uiRequired > uiAvailable)
 	{
@@ -143,7 +143,7 @@ DiskSpaceDecision ReportMaterializationDiskSpace(uint64_t uiAllocation, uint64_t
 	}
 
 	uint64_t uiProjected = uiAvailable - uiAllocation;
-	uint64_t uiWarning = 10ull << 30;
+	uint64_t uiWarning = 10ui64 << 30;
 	if (uiProjected < uiWarning)
 	{
 		Record record

@@ -77,8 +77,8 @@ void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExt
 			vkCmdCopyImageToBuffer(oneShotCommandBuffer.mVkCommandBuffer, vkSourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer.vkStagingBuffer, 1, &vkBufferImageCopy);
 
 			vkOffset += common::SizeInBytes(vkFormat, iMipmapWidth, iMipmapHeight);
-			iMipmapWidth = std::max(iMipmapWidth / 2, 1ll);
-			iMipmapHeight = std::max(iMipmapHeight / 2, 1ll);
+			iMipmapWidth = std::max(iMipmapWidth / 2, 1i64);
+			iMipmapHeight = std::max(iMipmapHeight / 2, 1i64);
 		}
 	}
 
@@ -100,7 +100,7 @@ void TextureCache::GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistr
 	if constexpr (kbRandomlyInvalidatePhysicallyBasedRenderingCubemapCache)
 	{
 		common::RandomEngine randomEngine(static_cast<uint32_t>(std::chrono::steady_clock::now().time_since_epoch().count()));
-		if (common::Random(10u, randomEngine) == 0)
+		if (common::Random(10ui32, randomEngine) == 0)
 		{
 			LOG(kGraphics, kDebug, "Randomly invalidating GLTF BRDF LUT cache");
 			gpFileManager->RemoveFile({FileFlags::kAppDataDirectory}, "BrdfLut.cache");

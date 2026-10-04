@@ -249,8 +249,8 @@ void Texture::UploadImageData(const std::function<void(std::span<std::byte>, int
 			vkBufferImageCopy.bufferOffset = uiOffset;
 
 			uiOffset += common::SizeInBytes(mInfo.vkFormat, uiWidth, uiHeight);
-			uiWidth = std::max(1u, uiWidth / 2);
-			uiHeight = std::max(1u, uiHeight / 2);
+			uiWidth = std::max(1ui32, uiWidth / 2);
+			uiHeight = std::max(1ui32, uiHeight / 2);
 
 			vkCmdCopyBufferToImage(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkStagingBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 		}

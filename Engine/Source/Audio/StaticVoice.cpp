@@ -52,7 +52,7 @@ bool StaticVoice::LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2Sour
 		.PlayLength = 0,
 		.LoopBegin = 0,
 		.LoopLength = 0,
-		.LoopCount = bOneShot ? 0u : XAUDIO2_LOOP_INFINITE,
+		.LoopCount = bOneShot ? 0ui32 : XAUDIO2_LOOP_INFINITE,
 		.pContext = nullptr,
 	};
 	CHECK_HRESULT(rpVoice->SubmitSourceBuffer(&xaudio2Buffer));

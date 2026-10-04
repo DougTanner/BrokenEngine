@@ -141,7 +141,7 @@ namespace toolcli
 			}
 			while (!data.empty())
 			{
-				DWORD uiChunk = static_cast<DWORD>(std::min<size_t>(data.size(), 1u << 20));
+				DWORD uiChunk = static_cast<DWORD>(std::min<size_t>(data.size(), 1ui32 << 20));
 				DWORD uiWritten = 0;
 				if (::WriteFile(mhFile.Get(), data.data(), uiChunk, &uiWritten, nullptr) == FALSE || uiWritten == 0)
 				{

@@ -198,7 +198,7 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 			throw std::ios_base::failure("duplicate Fleet owner ClientGuid");
 		}
 		// All loaded fleets start as disconnected
-		rGuidToClientId.insert_or_assign(guid, static_cast<int64_t>(0));
+		rGuidToClientId.insert_or_assign(guid, 0i64);
 	}
 
 	uint64_t uiRandomState = 0;

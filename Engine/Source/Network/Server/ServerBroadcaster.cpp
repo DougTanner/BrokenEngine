@@ -137,14 +137,14 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	});
 
 	int64_t iPublicationCoordsBytes = iPublicationCoordCount * static_cast<int64_t>(sizeof(engine::GridCoord));
-	int64_t iGridUpdatesOffset = common::RoundUp(iPublicationCoordsBytes, static_cast<int64_t>(16));
+	int64_t iGridUpdatesOffset = common::RoundUp(iPublicationCoordsBytes, 16i64);
 	int64_t iGridUpdatesBytes = iPublicationCoordCount * static_cast<int64_t>(sizeof(std::pair<engine::GridCoord, engine::GridUpdateData>));
-	int64_t iStatusChangesOffset = common::RoundUp(iGridUpdatesOffset + iGridUpdatesBytes, static_cast<int64_t>(16));
+	int64_t iStatusChangesOffset = common::RoundUp(iGridUpdatesOffset + iGridUpdatesBytes, 16i64);
 	int64_t iStatusChangesBytes = iStatusChangeCount * static_cast<int64_t>(sizeof(game::StatusChange));
-	int64_t iFullFramesOffset = common::RoundUp(iStatusChangesOffset + iStatusChangesBytes, static_cast<int64_t>(16));
+	int64_t iFullFramesOffset = common::RoundUp(iStatusChangesOffset + iStatusChangesBytes, 16i64);
 	int64_t iFullFramesBytes = kbDesynchronizationDebugFrames ? iPublicationCoordCount * static_cast<int64_t>(sizeof(std::pair<engine::GridCoord, const game::Frame*>)) : 0;
 	int64_t iPublicationBytes = kbDesynchronizationDebugFrames ? iFullFramesOffset + iFullFramesBytes : iStatusChangesOffset + iStatusChangesBytes;
-	int64_t iPublicationHighWaterBytes = common::RoundUp(iPublicationBytes, static_cast<int64_t>(16)) + engine::kiMaxCompressStatusChangeWorkbufferBytes;
+	int64_t iPublicationHighWaterBytes = common::RoundUp(iPublicationBytes, 16i64) + engine::kiMaxCompressStatusChangeWorkbufferBytes;
 	// Grow before any publication pointer exists, then retain that capacity for nested status compression.
 	{
 		[[maybe_unused]] auto highWaterAllocation = rWorkbuffer.PushBuffer<std::byte*>(iPublicationHighWaterBytes);

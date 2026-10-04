@@ -43,7 +43,7 @@ std::tuple<int64_t, int64_t> TextureManager::LightingDetailTextureSize(float fMu
 	auto [iBaseX, iBaseY] = DetailTextureSize(fMultiplier);
 	int64_t iLimit = static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D);
 	int64_t iX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * engine::Camera::kfLightingHeadroomMultiplier)), iLimit);
-	iX &= ~1ll;
+	iX &= ~1i64;
 	int64_t iY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * engine::Camera::kfLightingHeadroomMultiplier)), iLimit);
 	return std::make_tuple(iX, iY);
 }
@@ -134,24 +134,24 @@ TextureManager::TextureManager()
 
 	CreatePlaceholderTexture(mIslandPlaceholderColor, "IslandPlaceholderColor", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*reinterpret_cast<uint32_t*>(data.data()) = 0xFF808080u;
+		*reinterpret_cast<uint32_t*>(data.data()) = 0xFF808080ui32;
 	});
 
 	CreatePlaceholderTexture(mIslandPlaceholderNormals, "IslandPlaceholderNormals", 0, VK_FORMAT_R8G8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*reinterpret_cast<uint16_t*>(data.data()) = 0x8080u;
+		*reinterpret_cast<uint16_t*>(data.data()) = 0x8080ui32;
 	});
 
 	CreatePlaceholderTexture(mIslandPlaceholderAmbientOcclusion, "IslandPlaceholderAmbientOcclusion", 0, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*reinterpret_cast<uint8_t*>(data.data()) = 0xFFu;
+		*reinterpret_cast<uint8_t*>(data.data()) = 0xFFui32;
 	});
 
 	// All-zero RGBA disables rock, sand, snow, and flow until the real BC7 mask chunk adopts.
 	// Bindless slots permit different formats: this placeholder uses R8G8B8A8, while island masks use BC7.
 	CreatePlaceholderTexture(mIslandPlaceholderMasks, "IslandPlaceholderMasks", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*reinterpret_cast<uint32_t*>(data.data()) = 0x00000000u;
+		*reinterpret_cast<uint32_t*>(data.data()) = 0x00000000ui32;
 	});
 
 	// Create deferred textures from ChunkHeader metadata for all texture chunks (real GPU resources allocated when data arrives)
@@ -176,7 +176,7 @@ TextureManager::TextureManager()
 			.vkFormat = rLazyChunk.header.textureHeader.vkFormat,
 			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth), .height = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight), .depth = 1},
 			.uiMipLevels = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iMipLevels),
-			.uiArrayLayers = bCubemap ? 6u : 1u,
+			.uiArrayLayers = bCubemap ? 6ui32 : 1ui32,
 			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 			.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			.vkImageViewType = bCubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,

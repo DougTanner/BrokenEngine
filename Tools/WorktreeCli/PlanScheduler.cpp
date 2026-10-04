@@ -11,7 +11,7 @@
 
 namespace toolcli
 {
-	constexpr uint64_t kuiClaimLifetimeTicks = 48ull * 60ull * 60ull * 10'000'000ull;
+	constexpr uint64_t kuiClaimLifetimeTicks = 48ui64 * 60ui64 * 60ui64 * 10'000'000ui64;
 	// Scheduler changes queue behind peer sessions, so the guard waits far longer than the
 	// Guard default; deliberately separate from the build lock's wait.
 	constexpr int64_t kiSchedulerGuardWaitSeconds = 500;

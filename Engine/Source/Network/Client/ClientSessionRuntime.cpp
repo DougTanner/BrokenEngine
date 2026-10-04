@@ -699,7 +699,7 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 	{
 		miLastClockErrorLogTick = -1;
 	}
-	int64_t iSteps = std::clamp(miClockError, -4LL, 4LL);
+	int64_t iSteps = std::clamp(miClockError, -4i64, 4i64);
 	int64_t iDivisor = std::abs(miClockError) >= 4 ? 8 : 64;
 	return std::chrono::nanoseconds(-iSteps * game::NetworkSessionContract::kTickDuration.count() / iDivisor);
 }

@@ -141,7 +141,7 @@ void SwapchainManager::CreateRenderPass()
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.attachmentCount = gMultisampling.Get<bool>() ? 3u : 2u,
+		.attachmentCount = gMultisampling.Get<bool>() ? 3ui32 : 2ui32,
 		.pAttachments = pVkHdrAttachmentDescriptions,
 		.subpassCount = 1,
 		.pSubpasses = &vkHdrSubpassDescription,
@@ -279,7 +279,7 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 	mfAspectRatio = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width) / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 
 	// Prefer at least three swapchain images within surface limits so rendering below the vsync rate can use triple buffering.
-	uint32_t uiMinImageCount = std::max(3u, vkSurfaceCapabilitiesKHR.minImageCount);
+	uint32_t uiMinImageCount = std::max(3ui32, vkSurfaceCapabilitiesKHR.minImageCount);
 	if (vkSurfaceCapabilitiesKHR.maxImageCount > 0)
 	{
 		uiMinImageCount = std::min(uiMinImageCount, vkSurfaceCapabilitiesKHR.maxImageCount);
@@ -309,7 +309,7 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 		.imageArrayLayers = 1,
 		.imageUsage = vkSwapchainUsageFlags,
 		.imageSharingMode = bDifferentQueueFamilies ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount = bDifferentQueueFamilies ? 2u : 0u,
+		.queueFamilyIndexCount = bDifferentQueueFamilies ? 2ui32 : 0ui32,
 		.pQueueFamilyIndices = bDifferentQueueFamilies ? &pQueueFamilyIndices[0] : nullptr,
 		.preTransform = (vkSurfaceCapabilitiesKHR.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) != 0 ? VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR : vkSurfaceCapabilitiesKHR.currentTransform,
 		.compositeAlpha = (vkSurfaceCapabilitiesKHR.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) != 0 ? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR : VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
@@ -402,7 +402,7 @@ void SwapchainManager::CreateFramebuffers()
 		.pNext = nullptr,
 		.flags = 0,
 		.renderPass = mHdrVkRenderPass,
-		.attachmentCount = gMultisampling.Get<bool>() ? 3u : 2u,
+		.attachmentCount = gMultisampling.Get<bool>() ? 3ui32 : 2ui32,
 		.pAttachments = pVkHdrImageViews,
 		.width = gpGraphics->mFramebufferVkExtent2D.width,
 		.height = gpGraphics->mFramebufferVkExtent2D.height,

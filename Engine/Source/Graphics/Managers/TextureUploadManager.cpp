@@ -272,8 +272,8 @@ void TextureUploadManager::UploadThread()
 			{
 				.bCubemap = bCubemap,
 				.vkFormat = vkFormat,
-				.uiBlockHeight = bCompressed ? 4u : 1u,
-				.uiArrayLayers = bCubemap ? 6u : 1u,
+				.uiBlockHeight = bCompressed ? 4ui32 : 1ui32,
+				.uiArrayLayers = bCubemap ? 6ui32 : 1ui32,
 				.uiMipLevels = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iMipLevels),
 				.uiBaseWidth = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth),
 				.uiBaseHeight = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight),
@@ -464,8 +464,8 @@ void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, cons
 
 	while (vkStagingUsed < mStagingVkDeviceSize && muiCurrentLayer < rDimensions.uiArrayLayers)
 	{
-		uint32_t uiMipWidth = std::max(rDimensions.uiBaseWidth >> muiCurrentMip, 1u);
-		uint32_t uiMipHeight = std::max(rDimensions.uiBaseHeight >> muiCurrentMip, 1u);
+		uint32_t uiMipWidth = std::max(rDimensions.uiBaseWidth >> muiCurrentMip, 1ui32);
+		uint32_t uiMipHeight = std::max(rDimensions.uiBaseHeight >> muiCurrentMip, 1ui32);
 		uint32_t uiRemainingHeight = uiMipHeight - muiCurrentMipY;
 		int64_t iRemainingMipBytes = common::SizeInBytes(rDimensions.vkFormat, uiMipWidth, uiRemainingHeight);
 		VkDeviceSize vkRemainingStaging = mStagingVkDeviceSize - vkStagingUsed;
@@ -503,7 +503,7 @@ void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, cons
 			// degenerates to `granularity.height` pixels per chunk; for BCn (blockHeight == 4)
 			// it scales up to `granularity.height * 4 = 64` pixels per chunk on hardware that
 			// reports granularity.height == 16.
-			uint32_t uiChunkHeight = std::max(1u, gpInstanceManager->mTransferImageGranularityVkExtent3D.height) * rDimensions.uiBlockHeight;
+			uint32_t uiChunkHeight = std::max(1ui32, gpInstanceManager->mTransferImageGranularityVkExtent3D.height) * rDimensions.uiBlockHeight;
 			int64_t iBytesPerChunk = common::SizeInBytes(rDimensions.vkFormat, uiMipWidth, uiChunkHeight);
 			int64_t iChunksThatFit = static_cast<int64_t>(vkRemainingStaging) / iBytesPerChunk;
 			if (iChunksThatFit == 0)

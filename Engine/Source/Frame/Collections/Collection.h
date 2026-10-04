@@ -213,7 +213,7 @@ struct OptionalIdToIndex<T, FLAGS>
 			{
 				throw std::ios_base::failure("OptionalIdToIndex::Read");
 			}
-			uint64_t uiBit = 1ULL << (iValue & 63);
+			uint64_t uiBit = 1ui64 << (iValue & 63);
 			if ((pSeen[iValue >> 6] & uiBit) != 0)
 			{
 				throw std::ios_base::failure("OptionalIdToIndex::Read");

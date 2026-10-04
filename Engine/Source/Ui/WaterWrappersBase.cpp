@@ -5,7 +5,7 @@ namespace engine
 
 // Specular - Normals
 // Water normal map atlas: 3 weighted samples each indexed into TextureManager::kpWaterNormalCrcs.
-Wrapper gWaterNormalIndexOne(int64_t {12}, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+Wrapper gWaterNormalIndexOne(12i64, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
 Wrapper gLightingSampledNormalsOneSize(0.2f, 0.05f, 1.0f);
 Wrapper gLightingSampledNormalsWeightOneMinimum(1.5f, 0.0f, 4.0f);
 Wrapper gLightingSampledNormalsWeightOneMaximum(2.0f, 0.0f, 4.0f);
@@ -13,7 +13,7 @@ Wrapper gWaterNormalRotationOne(0.16f, -XM_PI, XM_PI);
 Wrapper gLightingSampledNormalsSpeedOneMinimum(0.035f, 0.0f, 0.1f);
 Wrapper gLightingSampledNormalsSpeedOneMaximum(0.15f, 0.0f, 1.0f);
 Wrapper gWaterNormalSpeedDirectionOne(-2.3f, -XM_PI, XM_PI);
-Wrapper gWaterNormalIndexTwo(int64_t {15}, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+Wrapper gWaterNormalIndexTwo(15i64, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
 Wrapper gLightingSampledNormalsTwoSize(0.05f, 0.025f, 0.1f);
 Wrapper gLightingSampledNormalsWeightTwoMinimum(0.25f, 0.0f, 4.0f);
 Wrapper gLightingSampledNormalsWeightTwoMaximum(0.75f, 0.0f, 4.0f);
@@ -21,7 +21,7 @@ Wrapper gWaterNormalRotationTwo(0.75f, -XM_PI, XM_PI);
 Wrapper gLightingSampledNormalsSpeedTwoMinimum(0.0f, 0.0f, 0.2f);
 Wrapper gLightingSampledNormalsSpeedTwoMaximum(0.075f, 0.0f, 1.0f);
 Wrapper gWaterNormalSpeedDirectionTwo(-1.0f, -XM_PI, XM_PI);
-Wrapper gWaterNormalIndexThree(int64_t {4}, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+Wrapper gWaterNormalIndexThree(4i64, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
 Wrapper gLightingSampledNormalsThreeSize(0.02f, 0.02f, 0.1f);
 Wrapper gLightingSampledNormalsWeightThreeMinimum(0.5f, 0.0f, 4.0f);
 Wrapper gLightingSampledNormalsWeightThreeMaximum(0.8f, 0.0f, 4.0f);
@@ -64,7 +64,7 @@ Wrapper gWaterHeightDarkenSource(0.0f, 0.0f, 1.0f);
 Wrapper gWaterHeightDarkenLighting(0.1f, 0.0f, 1.0f);
 
 // Low frequency waves
-Wrapper gWaterLowCount(int64_t {31}, std::vector<int64_t> {15, 31, 63, 127, 255});
+Wrapper gWaterLowCount(31i64, std::vector<int64_t> {15, 31, 63, 127, 255});
 Wrapper gWaterLowMaximum(255.0f, 0.0f, 255.0f, 1.0f);
 Wrapper gWaterLowAngle(4.8f, 0.0f, XM_2PI);
 Wrapper gWaterLowWavelength(4.0f, 1.0f, 20.0f);
@@ -80,7 +80,7 @@ Wrapper gWaterLowAmplitudeFadeStart(300.0f, 0.0f, 1'000.0f);
 Wrapper gWaterLowAmplitudeFadeEnd(600.0f, 0.0f, 1'000.0f);
 
 // Medium frequency waves
-Wrapper gWaterMediumCount(int64_t {255}, std::vector<int64_t> {15, 31, 63, 127, 255});
+Wrapper gWaterMediumCount(255i64, std::vector<int64_t> {15, 31, 63, 127, 255});
 Wrapper gWaterMediumWavelength(5.0f, 0.01f, 10.0f);
 Wrapper gWaterMediumAmplitude(0.012f, 0.0f, 0.02f);
 Wrapper gWaterMediumSpeed(0.2f, 0.001f, 0.3f);

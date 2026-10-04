@@ -529,7 +529,7 @@ void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceR
 			}
 			double fWindow = BesselI0(kfKaiserBeta * std::sqrt(1.0 - fWindowArgument * fWindowArgument)) * fInverseI0Beta;
 			double fWeight = NormalizedSinc(fCutoff * fDelta) * fWindow;
-			int64_t iClampedTap = std::clamp(j, static_cast<int64_t>(0), iSourceFrames - 1); // repeat edges
+			int64_t iClampedTap = std::clamp(j, 0i64, iSourceFrames - 1); // repeat edges
 			for (int64_t k = 0; k < iChannels; ++k)
 			{
 				fAccumulator[k] += static_cast<double>(rfSamples[iClampedTap * iChannels + k]) * fWeight;

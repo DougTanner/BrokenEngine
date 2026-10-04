@@ -479,7 +479,7 @@ RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR*
 	int64_t iAscendingCount = std::max(iSpaceshipCount, iSubscriberCount);
 	int64_t iAscendingBytes = iAscendingCount * static_cast<int64_t>(sizeof(int64_t));
 	int64_t iScratchBytes = engine::RegistryScratchBytes(iEligibleCount);
-	int64_t iLayerOffset = common::RoundUp(iAscendingBytes + iScratchBytes, static_cast<int64_t>(16));
+	int64_t iLayerOffset = common::RoundUp(iAscendingBytes + iScratchBytes, 16i64);
 	int64_t iTotalBytes = iLayerOffset + static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
 	auto pBuffer = rWorkbuffer.PushBuffer<std::byte*>(iTotalBytes);
 	std::byte* pBufferBytes = static_cast<std::byte*>(pBuffer.mpData);
@@ -487,10 +487,7 @@ RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR*
 	std::byte* pScratch = pBufferBytes + iAscendingBytes;
 	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iLayerOffset);
 
-	for (int64_t i = 0; i < iAscendingCount; ++i)
-	{
-		pAscendingRows[i] = i;
-	}
+	std::iota(pAscendingRows, pAscendingRows + iAscendingCount, 0i64);
 
 	// The registry block stores caller-filled eligible rows before derived subscriber counts; ascending row order
 	// resolves exact ranking ties deterministically.

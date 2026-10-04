@@ -203,11 +203,11 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 		[[maybe_unused]] uint32_t uiParticleColor = rType.uiParticleColor;
 		if (rSpawnInformation.flags & kYellow)
 		{
-			uiParticleColor |= ((100 + common::Random(25u, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25u, rFrame.postRender.randomEngine)) << 8);
+			uiParticleColor |= ((100 + common::Random(25ui32, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25ui32, rFrame.postRender.randomEngine)) << 8);
 		}
 		else if (rSpawnInformation.flags & kRed)
 		{
-			uiParticleColor |= ((50 + common::Random(25u, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25u, rFrame.postRender.randomEngine)) << 8);
+			uiParticleColor |= ((50 + common::Random(25ui32, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25ui32, rFrame.postRender.randomEngine)) << 8);
 		}
 
 		[[maybe_unused]] float fParticleIntensity = (rType.fParticleIntensityMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleIntensityRandom * fIntensitySpreadScale) * fVisibleIntensityScale;

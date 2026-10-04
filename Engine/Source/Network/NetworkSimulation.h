@@ -82,7 +82,7 @@ struct DelayedPacket
 // Each Client or Server owns one simulation state, shared across its connections.
 struct NetworkSimulationState
 {
-	static constexpr uint32_t kuiSeed = 0x9E3779B9u; // Constant seed keeps simulated latency and loss reproducible across runs.
+	static constexpr uint32_t kuiSeed = 0x9E3779B9ui32; // Constant seed keeps simulated latency and loss reproducible across runs.
 	uint32_t uiRandomState = kuiSeed;
 	int64_t iConsecutiveDrops[NetworkManager::kuiChannelCount] {};
 	std::chrono::steady_clock::time_point channelReleaseTimes[NetworkManager::kuiChannelCount] {};

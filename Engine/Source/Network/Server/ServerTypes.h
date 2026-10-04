@@ -16,8 +16,8 @@ namespace engine
 
 enum class SubscriptionFlags : uint8_t
 {
-	kActive            = 1u << 0,
-	kFirstUpdateLogged = 1u << 1,
+	kActive            = 1ui32 << 0,
+	kFirstUpdateLogged = 1ui32 << 1,
 };
 
 struct ClientCoordSubscription

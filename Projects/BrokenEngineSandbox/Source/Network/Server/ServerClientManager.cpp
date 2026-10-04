@@ -156,7 +156,7 @@ void ServerClientManager::Disconnects()
 		LOG(kNetwork, kVerbose, "ServerClientManager::Disconnects Client: {} Players: {}", rDisconnect.iClientId, [&]()
 		{
 			auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(rDisconnect.iClientId);
-			return ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::ssize(ownedIt->second) : static_cast<int64_t>(0);
+			return ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::ssize(ownedIt->second) : 0i64;
 		}());
 		mDeadClientIds.erase(rDisconnect.iClientId);
 		mProcessedClientIds.erase(rDisconnect.iClientId);

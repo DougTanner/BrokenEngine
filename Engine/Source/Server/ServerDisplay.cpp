@@ -136,11 +136,11 @@ bool ServerDisplayContentChanged()
 	// stats. The free-running tick/time and CPU-timer values are deliberately excluded so an idle server
 	// (stable entity/map state) stops repainting instead of blitting an all-but-identical frame at 4 Hz.
 	// POD-only fold — no heap allocation, so it stays inside the caller's ScopedSuppressAllocationTracking.
-	uint64_t uiHash = 14'695'981'039'346'656'037ULL;
+	uint64_t uiHash = 14'695'981'039'346'656'037ui64;
 	auto Mix = [&uiHash](int64_t iValue)
 	{
 		uiHash ^= static_cast<uint64_t>(iValue);
-		uiHash *= 1'099'511'628'211ULL;
+		uiHash *= 1'099'511'628'211ui64;
 	};
 
 	Mix(static_cast<int64_t>(seActiveTab));
@@ -425,7 +425,7 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int iLeft, int iTop, [[m
 	sProfileText.clear();
 
 	char pcLine[256] {};
-	int iLineLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "FPS: %lld  Potential: %lld", gpProfileManager->mFullUpdatesInTheLastSecond.Get(), gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() > 0 ? 1'000'000 / gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() : static_cast<int64_t>(0)), static_cast<int>(sizeof(pcLine)) - 1);
+	int iLineLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "FPS: %lld  Potential: %lld", gpProfileManager->mFullUpdatesInTheLastSecond.Get(), gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() > 0 ? 1'000'000 / gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() : 0i64), static_cast<int>(sizeof(pcLine)) - 1);
 	SetTextColor(hDeviceContextBuffer, RGB(100, 180, 255));
 	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, iLineLength);
 	sProfileText += pcLine;

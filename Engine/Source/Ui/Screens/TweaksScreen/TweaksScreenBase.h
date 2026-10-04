@@ -17,7 +17,7 @@ enum class TweakSectionFlags : uint32_t
 
 inline TweakSectionFlags SectionFlag(int64_t iSection)
 {
-	return static_cast<TweakSectionFlags>(1u << iSection);
+	return static_cast<TweakSectionFlags>(1ui32 << iSection);
 }
 
 class TweaksScreenBase;

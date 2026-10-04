@@ -278,8 +278,8 @@ void Texture::MakeMipmaps(VkFormat vkFormat, int64_t iMaxLevel, int64_t iPreviou
 
 	while (iSourceWidth > 1 && iSourceHeight > 1 && iLevel + 1 < iMaxLevel)
 	{
-		int64_t iDestinationWidth = std::max(iSourceWidth / 2, 1ll);
-		int64_t iDestinationHeight = std::max(iSourceHeight / 2, 1ll);
+		int64_t iDestinationWidth = std::max(iSourceWidth / 2, 1i64);
+		int64_t iDestinationHeight = std::max(iSourceHeight / 2, 1i64);
 
 		if (vkFormat == VK_FORMAT_BC4_UNORM_BLOCK || vkFormat == VK_FORMAT_BC5_UNORM_BLOCK || vkFormat == VK_FORMAT_BC7_UNORM_BLOCK)
 		{
@@ -563,8 +563,8 @@ void Texture::Export(std::vector<std::byte>& rData, VkFormat vkFormat, TextureOp
 		}
 
 		puiCurrentPosition += common::SizeInBytes(vkFormat, iMipWidth, iMipHeight);
-		iMipWidth = std::max(iMipWidth / 2, 1ll);
-		iMipHeight = std::max(iMipHeight / 2, 1ll);
+		iMipWidth = std::max(iMipWidth / 2, 1i64);
+		iMipHeight = std::max(iMipHeight / 2, 1i64);
 	}
 
 	rData.insert(rData.end(), data.begin(), data.end());

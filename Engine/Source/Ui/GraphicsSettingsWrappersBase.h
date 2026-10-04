@@ -39,7 +39,7 @@ extern Wrapper gSunAngleOverride;
 // Clamps because the backing value crosses a trust boundary (persisted GameSettings.bin) and Wrapper::Set<T> soft-falls without clamping
 inline UiTheme GetUiTheme()
 {
-	return static_cast<UiTheme>(std::clamp(gUiTheme.Get<int64_t>(), 0ll, static_cast<int64_t>(UiTheme::kCount) - 1));
+	return static_cast<UiTheme>(std::clamp(gUiTheme.Get<int64_t>(), 0i64, static_cast<int64_t>(UiTheme::kCount) - 1));
 }
 
 } // namespace engine

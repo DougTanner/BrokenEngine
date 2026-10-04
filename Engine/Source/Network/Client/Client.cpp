@@ -295,22 +295,22 @@ void Client::TrackReceivedTick(int64_t iSlot, int64_t iTick)
 	// Mark this frame as received and advance the floor past any contiguous run
 	if (iBitIndex < 64)
 	{
-		rAcknowledgementState.uiReceivedBitfieldLow |= (1ULL << iBitIndex);
+		rAcknowledgementState.uiReceivedBitfieldLow |= (1ui64 << iBitIndex);
 	}
 	else
 	{
-		rAcknowledgementState.uiReceivedBitfieldHigh |= (1ULL << (iBitIndex - 64));
+		rAcknowledgementState.uiReceivedBitfieldHigh |= (1ui64 << (iBitIndex - 64));
 	}
 	mFramesReceived.Set(1);
 
 	int64_t iPreviousFloor = rAcknowledgementState.iAcknowledgmentFloor;
-	while ((rAcknowledgementState.uiReceivedBitfieldLow & 1ULL) != 0u)
+	while ((rAcknowledgementState.uiReceivedBitfieldLow & 1ui64) != 0ui32)
 	{
 		++rAcknowledgementState.iAcknowledgmentFloor;
 		rAcknowledgementState.uiReceivedBitfieldLow >>= 1;
-		if ((rAcknowledgementState.uiReceivedBitfieldHigh & 1ULL) != 0u)
+		if ((rAcknowledgementState.uiReceivedBitfieldHigh & 1ui64) != 0ui32)
 		{
-			rAcknowledgementState.uiReceivedBitfieldLow |= (1ULL << 63);
+			rAcknowledgementState.uiReceivedBitfieldLow |= (1ui64 << 63);
 		}
 		rAcknowledgementState.uiReceivedBitfieldHigh >>= 1;
 	}

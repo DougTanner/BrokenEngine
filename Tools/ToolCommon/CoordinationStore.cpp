@@ -25,7 +25,7 @@ namespace toolcli::coordination
 	{
 		rbContentionObserved = false;
 		rFailureReason = FailureReasonFor(ERROR_SUCCESS);
-		std::chrono::milliseconds maximumWait = std::chrono::milliseconds((std::max)(static_cast<int64_t>(0), iMaximumWaitMilliseconds));
+		std::chrono::milliseconds maximumWait = std::chrono::milliseconds((std::max)(0i64, iMaximumWaitMilliseconds));
 		if (maximumWait == std::chrono::milliseconds::zero())
 		{
 			return;

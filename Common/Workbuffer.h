@@ -120,7 +120,7 @@ private:
 		mSavedSize[miDepth] = miSize; // Capture parent's exact size before we advance miSize below, so Pop restores it.
 		++miDepth;
 		// 16-byte frame-start guarantee: keep the empty-frame invariant miBase == miSize by advancing both.
-		miSize = common::RoundUp(miSize, static_cast<int64_t>(16));
+		miSize = common::RoundUp(miSize, 16i64);
 		miBase = miSize;
 		miLastPushBufferDepth = -1;
 	}
@@ -136,7 +136,7 @@ private:
 			mSavedSize.Resize(mSavedSize.Size() * 2);
 		}
 		// 16-byte frame-start guarantee: align the base up; the padding falls before miBase so the reservation is SIMD-safe.
-		int64_t iAlignedBase = common::RoundUp(miSize, static_cast<int64_t>(16));
+		int64_t iAlignedBase = common::RoundUp(miSize, 16i64);
 		int64_t iNeeded = iAlignedBase + iSizeInBytes;
 		// Grow before mutating frame accounting so a throw mid-grow unwinds with a balanced (still-closed) frame.
 		if (iNeeded > mBuffer.Size()) [[unlikely]]

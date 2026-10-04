@@ -143,7 +143,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			{
 				fNextJitter = common::Random<kfJitterIntervalRandom>(rFrame.postRender.randomEngine);
 
-				uint32_t uiRandom = common::Random(2u, rFrame.postRender.randomEngine);
+				uint32_t uiRandom = common::Random(2ui32, rFrame.postRender.randomEngine);
 				float fDeltaAnglePercentExtra = 1.0f + 3.0f * fDeltaAnglePercent;
 				float fDeltaAngleJitter = !(uiTarget.uuid.iValue != 0) ? kfDeltaAngleJitterRandom : kfDeltaAngleJitterRandomWithTarget;
 				if (uiRandom == 0)

@@ -5,11 +5,11 @@
 namespace engine
 {
 
-constexpr uint64_t kuiCrcPickSeedMultiplier = 0xD1B5'4A32'D192'ED03ull;
-constexpr uint64_t kuiPositionSeedMultiplier = 0xCBF2'9CE4'8422'2325ull;
-constexpr uint64_t kuiRotationSeedMultiplier = 0x9E37'79B9'7F4A'7C15ull;
-constexpr uint64_t kuiAnchorSeedMultiplier = 0xFF51'AFD7'ED55'8CCDull;
-constexpr uint64_t kuiCurveSeedMultiplier = 0xC4CE'B9FE'1A85'EC53ull;
+constexpr uint64_t kuiCrcPickSeedMultiplier = 0xD1B5'4A32'D192'ED03ui64;
+constexpr uint64_t kuiPositionSeedMultiplier = 0xCBF2'9CE4'8422'2325ui64;
+constexpr uint64_t kuiRotationSeedMultiplier = 0x9E37'79B9'7F4A'7C15ui64;
+constexpr uint64_t kuiAnchorSeedMultiplier = 0xFF51'AFD7'ED55'8CCDui64;
+constexpr uint64_t kuiCurveSeedMultiplier = 0xC4CE'B9FE'1A85'EC53ui64;
 
 // Anchor: large island centered at 1/3 of the cell from the SW (min) corner.
 constexpr float kfAnchorFraction = 1.0f / 3.0f;
@@ -141,7 +141,7 @@ static const std::vector<common::crc_t>& PickBucket(Role eRole)
 static common::crc_t PickCrc(Role eRole, common::RandomEngine& rCrcRandom)
 {
 	const std::vector<common::crc_t>& rBucket = PickBucket(eRole);
-	return rBucket.at(common::Random(static_cast<uint32_t>(rBucket.size() - 1u), rCrcRandom));
+	return rBucket.at(common::Random(static_cast<uint32_t>(rBucket.size() - 1ui32), rCrcRandom));
 }
 
 // Long islands follow the attachment direction with jitter; squarer islands rotate freely.

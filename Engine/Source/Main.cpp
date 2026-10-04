@@ -122,10 +122,10 @@ static int MainThread(HINSTANCE hInstance)
 
 #if defined(BT_CLIENT)
 	// Save one core for the main thread, and one core for the render thread
-	int64_t iBackgroundThreadCount = std::max(1ll, common::HardwareCoreCount() - 1 - 1);
+	int64_t iBackgroundThreadCount = std::max(1i64, common::HardwareCoreCount() - 1 - 1);
 #else
 	// Server has no render thread
-	int64_t iBackgroundThreadCount = std::max(1ll, common::HardwareCoreCount() - 1);
+	int64_t iBackgroundThreadCount = std::max(1i64, common::HardwareCoreCount() - 1);
 #endif
 	auto pMultithreading = std::make_unique<common::Multithreading>(iBackgroundThreadCount);
 

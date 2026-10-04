@@ -411,7 +411,7 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 			bool bAligned = (reinterpret_cast<uintptr_t>(pSource) % 16 == 0) && (reinterpret_cast<uintptr_t>(pDestination) % 16 == 0);
 			if (bAligned)
 			{
-				int64_t iStreamBytes = iCopySize & ~15LL;
+				int64_t iStreamBytes = iCopySize & ~15i64;
 				for (int64_t i = 0; i < iStreamBytes; i += 16)
 				{
 					_mm_stream_si128(reinterpret_cast<__m128i*>(pDestination + i), _mm_loadu_si128(reinterpret_cast<const __m128i*>(pSource + i)));

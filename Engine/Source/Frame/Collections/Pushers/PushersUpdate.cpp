@@ -70,10 +70,10 @@ void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] const game::Fra
 			continue;
 		}
 
-		iZoneStartX = std::clamp(iZoneStartX, 0ll, kiPusherZones - 1);
-		iZoneEndX = std::clamp(iZoneEndX, 0ll, kiPusherZones - 1);
-		iZoneStartY = std::clamp(iZoneStartY, 0ll, kiPusherZones - 1);
-		iZoneEndY = std::clamp(iZoneEndY, 0ll, kiPusherZones - 1);
+		iZoneStartX = std::clamp(iZoneStartX, 0i64, kiPusherZones - 1);
+		iZoneEndX = std::clamp(iZoneEndX, 0i64, kiPusherZones - 1);
+		iZoneStartY = std::clamp(iZoneStartY, 0i64, kiPusherZones - 1);
+		iZoneEndY = std::clamp(iZoneEndY, 0i64, kiPusherZones - 1);
 
 		for (int64_t j = iZoneStartY; j <= iZoneEndY; ++j)
 		{
@@ -106,8 +106,8 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 	XMFLOAT2A f2Position {};
 	XMStoreFloat2A(&f2Position, vecPosition);
 
-	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - sfPusherAreaMinX) / sfPusherZoneWidth), 0ll, kiPusherZones - 1);
-	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - sfPusherAreaMinY) / sfPusherZoneHeight), 0ll, kiPusherZones - 1);
+	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - sfPusherAreaMinX) / sfPusherZoneWidth), 0i64, kiPusherZones - 1);
+	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - sfPusherAreaMinY) / sfPusherZoneHeight), 0i64, kiPusherZones - 1);
 	int16_t* piZone = spppiPusherZones[iZoneX][iZoneY];
 	int64_t iPushersInZone = sppuiPushersPerZone[iZoneX][iZoneY];
 
@@ -133,12 +133,12 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 
 		PusherFlags_t flags = rCurrent.pFlags[i];
 
-		if (flags.Mask(excludeFlags) != 0u) [[unlikely]]
+		if (flags.Mask(excludeFlags) != 0ui32) [[unlikely]]
 		{
 			continue;
 		}
 
-		if (flags.Mask(includeFlags) == 0u) [[unlikely]]
+		if (flags.Mask(includeFlags) == 0ui32) [[unlikely]]
 		{
 			continue;
 		}

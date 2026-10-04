@@ -28,9 +28,9 @@ void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, VkDeviceSize v
 	// Caller memory flags are requirements, not hints: host-visible callers read and write the persistent mapping with no flush or invalidate, so that memory must be host-visible and coherent.
 	vmaAllocationCreateInfo.requiredFlags = vkMemoryPropertyFlags;
 
-	if ((vkMemoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0u)
+	if ((vkMemoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0ui32)
 	{
-		bool bIsReadbackBuffer = (vkBufferUsageFlags & VK_BUFFER_USAGE_TRANSFER_DST_BIT) != 0u && (vkBufferUsageFlags & VK_BUFFER_USAGE_TRANSFER_SRC_BIT) == 0u;
+		bool bIsReadbackBuffer = (vkBufferUsageFlags & VK_BUFFER_USAGE_TRANSFER_DST_BIT) != 0ui32 && (vkBufferUsageFlags & VK_BUFFER_USAGE_TRANSFER_SRC_BIT) == 0ui32;
 		if (bIsReadbackBuffer)
 		{
 			// Readback buffer (GPU→CPU): Must have mapped pointer for CPU reads

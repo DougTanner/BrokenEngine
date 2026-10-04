@@ -586,7 +586,7 @@ void PipelineCreator::CreateGraphicsPipeline(Pipeline& rPipeline)
 
 	// Use max of actual count and 3 to handle swapchain recreation scenarios
 	int64_t iFramebufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
-	int64_t iCommandBufferCount = std::max(iFramebufferCount, int64_t{3});
+	int64_t iCommandBufferCount = std::max(iFramebufferCount, 3i64);
 	SetupIndirectBuffer(rPipeline, iCommandBufferCount);
 
 	CreateDescriptorSetLayouts(rPipeline, vkUniformTextureDescriptorSetLayoutCreateInfo, vkPipelineLayoutCreateInfo);
@@ -626,7 +626,7 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		// frame (WriteIndirectComputeBuffer), and RecordComputeIndirect reads slot iCommandBuffer — so size it
 		// like the graphics indirect path (SetupIndirectBuffer), not the single-slot device-local branch below.
 		int64_t iFramebufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
-		int64_t iCommandBufferCount = std::max(iFramebufferCount, int64_t{3});
+		int64_t iCommandBufferCount = std::max(iFramebufferCount, 3i64);
 		rPipeline.miIndirectSlotCount = iCommandBufferCount;
 		rPipeline.mpIndirectComputeVkDispatchIndirectCommand = static_cast<VkDispatchIndirectCommand*>(CreateHostVisibleIndirectBuffer(rPipeline, iCommandBufferCount, sizeof(VkDispatchIndirectCommand)));
 	}

@@ -32,9 +32,9 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParameters, 
 
 		// The consumer alignment collides with the source alignment and with nothing else, so a consumer bound
 		// to the neutral alignment must be refused every candidate.
-		static constexpr engine::AlignmentIdentifier kConsumerAlignment {1u};
-		static constexpr engine::AlignmentIdentifier kSourceAlignment {2u};
-		static constexpr engine::AlignmentIdentifier kNeutralAlignment {3u};
+		static constexpr engine::AlignmentIdentifier kConsumerAlignment {1ui32};
+		static constexpr engine::AlignmentIdentifier kSourceAlignment {2ui32};
+		static constexpr engine::AlignmentIdentifier kNeutralAlignment {3ui32};
 		engine::Alignments alignments;
 		alignments.AddAlignment(kConsumerAlignment, kSourceAlignment, engine::AlignmentFlags::kuiEnemies);
 
@@ -377,8 +377,8 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParameters, 
 		bool bUuidLookupWithoutGlobalIds = engine::RegistryUuidByGlobalId(anonymousLayer, pOwnerGlobalIds[2]) == engine::Uuid {};
 
 		// Ownership writes affect only the matched client-GUID row; a missing global ID leaves all rows unchanged.
-		static constexpr engine::ClientGuid kAssignedGuid {.uiHigh = 0x1122'3344'5566'7788ULL, .uiLow = 0x99aa'bbcc'ddee'ff00ULL};
-		static constexpr engine::ClientGuid kRejectedGuid {.uiHigh = 0x0123'4567'89ab'cdefULL, .uiLow = 0xfedc'ba98'7654'3210ULL};
+		static constexpr engine::ClientGuid kAssignedGuid {.uiHigh = 0x1122'3344'5566'7788ui64, .uiLow = 0x99aa'bbcc'ddee'ff00ui64};
+		static constexpr engine::ClientGuid kRejectedGuid {.uiHigh = 0x0123'4567'89ab'cdefui64, .uiLow = 0xfedc'ba98'7654'3210ui64};
 		bool bAssignHitReturnedTrue = engine::AssignRegistryClientGuid(ownerLayer, pOwnerGlobalIds[1], kAssignedGuid);
 		bool bAssignHitIsolated = pOwnerClientGuids[1] == kAssignedGuid;
 		for (int64_t i = 0; i < kiOwnerCount; ++i)

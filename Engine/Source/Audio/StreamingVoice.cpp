@@ -174,7 +174,7 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 
 		XAUDIO2_BUFFER xaudio2Buffer
 		{
-			.Flags = bLastBuffer ? XAUDIO2_END_OF_STREAM : 0u,
+			.Flags = bLastBuffer ? XAUDIO2_END_OF_STREAM : 0ui32,
 			.AudioBytes = static_cast<UINT32>(iBytesRead),
 			.pAudioData = mBuffers[miNextSubmit],
 			.PlayBegin = 0,

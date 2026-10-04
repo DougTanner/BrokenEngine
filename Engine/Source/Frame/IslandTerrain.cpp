@@ -297,8 +297,8 @@ static bool SamplePlacementHeightmap(float fDeltaX, float fDeltaY, float fCosine
 		iX = static_cast<int64_t>(fU * static_cast<float>(iHeightmapWidth - 1));
 		iY = static_cast<int64_t>(fV * static_cast<float>(iHeightmapHeight - 1));
 	}
-	iX = std::clamp(iX, static_cast<int64_t>(0), static_cast<int64_t>(iHeightmapWidth - 1));
-	iY = std::clamp(iY, static_cast<int64_t>(0), static_cast<int64_t>(iHeightmapHeight - 1));
+	iX = std::clamp(iX, 0i64, static_cast<int64_t>(iHeightmapWidth - 1));
+	iY = std::clamp(iY, 0i64, static_cast<int64_t>(iHeightmapHeight - 1));
 
 	rfSample = DirectX::PackedVector::XMConvertHalfToFloat(puiHeightmapHalf[iY * iHeightmapWidth + iX]);
 	return true;
@@ -432,10 +432,10 @@ static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const Isla
 	int64_t iMaximumGridX = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMaximumX - kfBaseAreaMinimumX) / kfGridPitchX - 0.5f));
 	int64_t iMinimumGridY = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMinimumY - kfBaseAreaMinimumY) / kfGridPitchY - 0.5f));
 	int64_t iMaximumGridY = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMaximumY - kfBaseAreaMinimumY) / kfGridPitchY - 0.5f));
-	iMinimumGridX = std::clamp(iMinimumGridX, static_cast<int64_t>(0), kiGridDimension - 1);
-	iMaximumGridX = std::clamp(iMaximumGridX, static_cast<int64_t>(0), kiGridDimension - 1);
-	iMinimumGridY = std::clamp(iMinimumGridY, static_cast<int64_t>(0), kiGridDimension - 1);
-	iMaximumGridY = std::clamp(iMaximumGridY, static_cast<int64_t>(0), kiGridDimension - 1);
+	iMinimumGridX = std::clamp(iMinimumGridX, 0i64, kiGridDimension - 1);
+	iMaximumGridX = std::clamp(iMaximumGridX, 0i64, kiGridDimension - 1);
+	iMinimumGridY = std::clamp(iMinimumGridY, 0i64, kiGridDimension - 1);
+	iMaximumGridY = std::clamp(iMaximumGridY, 0i64, kiGridDimension - 1);
 
 	float fHeightmapMaximumU = static_cast<float>(rTemplate.iHeightmapWidth - 1);
 	float fHeightmapMaximumV = static_cast<float>(rTemplate.iHeightmapHeight - 1);

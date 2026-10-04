@@ -587,14 +587,14 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		{
 			if (bServerTakesDebugControl)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>(0));
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 0ui8);
 			}
 		}
 		else if (rMenuInput.flags & engine::MenuInputFlags::kSpeedUpTime)
 		{
 			if (bServerTakesDebugControl)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>(1));
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 1ui8);
 			}
 		}
 

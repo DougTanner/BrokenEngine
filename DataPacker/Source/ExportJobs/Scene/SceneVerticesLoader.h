@@ -7,7 +7,7 @@ struct MaterialNodeKeyHash
 {
 	size_t operator()(const std::tuple<int, int, bool>& rKey) const
 	{
-		return std::hash<int>()(std::get<0>(rKey)) ^ (std::hash<int>()(std::get<1>(rKey)) << 1) ^ (std::get<2>(rKey) ? 0x9e3779b9u : 0u);
+		return std::hash<int>()(std::get<0>(rKey)) ^ (std::hash<int>()(std::get<1>(rKey)) << 1) ^ (std::get<2>(rKey) ? 0x9e3779b9ui32 : 0ui32);
 	}
 };
 

@@ -82,7 +82,7 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 
 		if (!bAlreadyValid)
 		{
-			int64_t iRandom = static_cast<int64_t>(common::Random(3u, rFrame.postRender.randomEngine));
+			int64_t iRandom = static_cast<int64_t>(common::Random(3ui32, rFrame.postRender.randomEngine));
 			if (iDeltaX != 0 && iDeltaY != 0)
 			{
 				riNavigationDirection = (iRandom < 2)
@@ -312,7 +312,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		// selecting a destination. Both skip draws without islands. Every Random call advances once regardless of bound.
 		if (!rStaticData.islands.empty())
 		{
-			common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
+			common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1ui32, rFrame.postRender.randomEngine);
 			const engine::IslandPlacement& rRandomPlacement = rStaticData.islands.at(static_cast<size_t>(i) % rStaticData.islands.size());
 			const engine::IslandTemplate& rRandomTemplate = engine::gpIslandTerrain->mIslands.at(rRandomPlacement.islandCrc);
 			common::Random(rRandomTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
@@ -340,7 +340,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 			}
 			else
 			{
-				uint32_t uiRandomPick = common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
+				uint32_t uiRandomPick = common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1ui32, rFrame.postRender.randomEngine);
 				int64_t iPlacement = SelectIslandPlacement(rStaticData, riNavigationWaypointIndex, uiRandomPick);
 				if (riNavigationWaypointIndex < 2)
 				{

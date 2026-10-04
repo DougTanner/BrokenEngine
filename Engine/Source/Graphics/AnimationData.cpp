@@ -386,7 +386,7 @@ void AnimationData::EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pma
 	const common::MaterialInfo& rMaterialInfo = mpMaterialInfos[iMaterialIndex];
 
 	// The shader skins only when the joint count is nonzero
-	pMeshData->uiJointCount = (rMaterialInfo.flags & common::MaterialFlags::kSkinned) ? mHeader.skeleton.uiSkinJointCount : 0u;
+	pMeshData->uiJointCount = (rMaterialInfo.flags & common::MaterialFlags::kSkinned) ? mHeader.skeleton.uiSkinJointCount : 0ui32;
 	pMeshData->uiJointMatrixOffset = static_cast<uint32_t>(iJointMatrixOffset);
 
 	XMMATRIX matMeshWorld = XMMatrixIdentity();

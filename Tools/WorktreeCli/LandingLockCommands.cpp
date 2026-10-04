@@ -191,7 +191,7 @@ namespace toolcli
 			return EmitLandingConflict(rLocator, rMetadata, LandingRecordState::kReadable);
 		}
 		rMetadata["heartbeatAt"] = timestamp;
-		rMetadata["expiresAt"] = FormatUtcTimestamp(uiHeartbeatTicks + static_cast<uint64_t>(lease->duration.count()) * 10'000'000ull);
+		rMetadata["expiresAt"] = FormatUtcTimestamp(uiHeartbeatTicks + static_cast<uint64_t>(lease->duration.count()) * 10'000'000ui64);
 		if (!WriteMetadataAtomic(rLocator.path, rMetadata))
 		{
 			FailWindows("refresh lock metadata");
@@ -358,7 +358,7 @@ namespace toolcli
 				else
 				{
 					// Wake just after the foreign lease expires when that comes first.
-					iSleepMilliseconds = std::min<int64_t>(iSleepMilliseconds, static_cast<int64_t>((lease->uiExpiresTicks - uiNow) / 10'000ull) + 1);
+					iSleepMilliseconds = std::min<int64_t>(iSleepMilliseconds, static_cast<int64_t>((lease->uiExpiresTicks - uiNow) / 10'000ui64) + 1);
 				}
 			}
 

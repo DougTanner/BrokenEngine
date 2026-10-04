@@ -73,9 +73,9 @@ static void CreateElevationTextureFromHeightmap(IslandTemplate& rTemplate, std::
 	{
 		.name = name,
 		.vkFormat = shaders::kVkFormatElevation,
-		.vkExtent3D = {static_cast<uint32_t>(rTemplate.iHeightmapWidth), static_cast<uint32_t>(rTemplate.iHeightmapHeight), 1u},
-		.uiMipLevels = 1u,
-		.uiArrayLayers = 1u,
+		.vkExtent3D = {static_cast<uint32_t>(rTemplate.iHeightmapWidth), static_cast<uint32_t>(rTemplate.iHeightmapHeight), 1ui32},
+		.uiMipLevels = 1ui32,
+		.uiArrayLayers = 1ui32,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,

@@ -294,7 +294,7 @@ template <typename STRUCT_TYPE>
 void WriteVersionHeader(std::fstream& rFileStream)
 {
 	common::Write(rFileStream, static_cast<int64_t>(STRUCT_TYPE::kiVersion));
-	common::Write(rFileStream, std::is_trivially_copyable_v<STRUCT_TYPE> ? static_cast<int64_t>(sizeof(STRUCT_TYPE)) : int64_t{0});
+	common::Write(rFileStream, std::is_trivially_copyable_v<STRUCT_TYPE> ? static_cast<int64_t>(sizeof(STRUCT_TYPE)) : 0i64);
 }
 
 // Callers need the decoded version and size to diagnose mismatches and detect missing layout-version bumps.

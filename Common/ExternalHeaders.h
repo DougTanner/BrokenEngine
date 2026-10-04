@@ -185,12 +185,12 @@ inline constexpr float kfEpsilon = 1.192092896e-7f; // g_XMEpsilon
 inline constexpr bool XmIsNan(float fValue)
 {
 	uint32_t uiBits = std::bit_cast<uint32_t>(fValue);
-	return (uiBits & 0x7F800000u) == 0x7F800000u && (uiBits & 0x007FFFFFu) != 0u;
+	return (uiBits & 0x7F800000ui32) == 0x7F800000ui32 && (uiBits & 0x007FFFFFui32) != 0ui32;
 }
 
 inline constexpr bool XmIsInf(float fValue)
 {
-	return (std::bit_cast<uint32_t>(fValue) & 0x7FFFFFFFu) == 0x7F800000u;
+	return (std::bit_cast<uint32_t>(fValue) & 0x7FFFFFFFui32) == 0x7F800000ui32;
 }
 
 // Deterministic exact (non-epsilon) IEEE operator== for XMVECTOR / XMFLOAT2/3/4 lives in Determinism.h

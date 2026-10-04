@@ -391,3 +391,16 @@ What a comment should say, in the fewest sentences that carry it: an invariant, 
 66. Do not open an anonymous namespace. File-local functions, including `constexpr` functions and function templates, and file-local non-const variables are `static` in the file's named namespace, or at global scope where the file has none. File-local namespace-scope `const`/`constexpr` variables in a `.cpp` file already have internal linkage and take neither `static` nor `inline` (header globals keep rule 25's `inline constexpr`). A file-local type has external linkage, so its name must be unique among the files in the same executable and namespace.
 
 67. A type declared with the "class" keyword keeps every member definition that is not in its header in one .cpp file; never split one class's member definitions across several .cpp files. Types declared with "struct" (including frame Collections) and free functions are exempt. Example: ClientSession.cpp defines every ClientSession member.
+
+68. When an integer literal must have a specific fixed-width type, write it with the MSVC sized suffix: i64 for int64_t, ui64 for uint64_t, i32 for int32_t, ui32 for uint32_t, i16 for int16_t, ui16 for uint16_t, ui8 for uint8_t. Never spell such a literal as static_cast<T>(N), T{N}, or with an ll, LL, ull, ULL, u, or U suffix. A literal whose default int type is already what the expression needs stays unsuffixed. Two cases keep their cast: an int8_t literal keeps static_cast<int8_t>(N), because i8 is char, not signed char, and a cast to a named API alias or enum type (UINT, DWORD, VkImageCreateFlags, common::crc_t, an enum) stays a cast, because the name carries the meaning. A literal in a header compiled as both C++ and GLSL keeps its u suffix, because GLSL has no sized suffixes:
+
+	Bad:
+	std::iota(pRows, pRows + iCount, int64_t{0});
+	iX = std::clamp(iX, static_cast<int64_t>(0), iMaximum);
+	uint64_t uiBit = 1ULL << iIndex;
+
+	Good:
+	std::iota(pRows, pRows + iCount, 0i64);
+	iX = std::clamp(iX, 0i64, iMaximum);
+	uint64_t uiBit = 1ui64 << iIndex;
+	kMouseButtonLeft = 1ui32 << 0,

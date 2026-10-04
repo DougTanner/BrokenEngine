@@ -98,8 +98,8 @@ void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char*
 	NetworkMessages::ServerConnectionResponseMessage message
 	{
 		.uiLoadGeneration = muiLoadGeneration,
-		.uiAccepted = bAccepted ? 1u : 0u,
-		.uiDebugInput = kbDebugInput ? 1u : 0u,
+		.uiAccepted = bAccepted ? 1ui32 : 0ui32,
+		.uiDebugInput = kbDebugInput ? 1ui32 : 0ui32,
 		.guid = (pGloballyUniqueIdentifier != nullptr) ? *pGloballyUniqueIdentifier : ClientGuid {},
 		.bHasGuid = bAccepted && pGloballyUniqueIdentifier != nullptr,
 		.rejectionMessage = (!bAccepted && pcMessage != nullptr) ? pcMessage : "",
@@ -248,7 +248,7 @@ void Server::SendResends(ClientConnection& rClient, int64_t iTick)
 		int64_t iSlotResendCount = 0;
 		for (int64_t j = 0; j < iScanLimit && iSlotResendCount < kiMaximumResendFrames; ++j)
 		{
-			bool bReceived = (j < 64) ? (rAcknowledgmentState.uiReceivedBitfieldLow & (1ULL << j)) != 0 : (rAcknowledgmentState.uiReceivedBitfieldHigh & (1ULL << (j - 64))) != 0;
+			bool bReceived = (j < 64) ? (rAcknowledgmentState.uiReceivedBitfieldLow & (1ui64 << j)) != 0 : (rAcknowledgmentState.uiReceivedBitfieldHigh & (1ui64 << (j - 64))) != 0;
 			if (bReceived)
 			{
 				continue;

@@ -35,7 +35,7 @@ void TweaksScreenBase::RegisterSection(int64_t& riSection, const TweakSectionDes
 
 common::Flags<TweakSectionFlags> TweaksScreenBase::AllSectionFlags()
 {
-	return static_cast<TweakSectionFlags>((1u << msiSectionCount) - 1u);
+	return static_cast<TweakSectionFlags>((1ui32 << msiSectionCount) - 1ui32);
 }
 
 void RegisterEngineTweakSections()
@@ -134,7 +134,7 @@ void TweaksScreenBase::ChevronIndexSelector(std::string_view label, Wrapper& rWr
 	}
 
 	int64_t iCount = std::ssize(names);
-	int64_t iIndex = std::clamp(rWrapper.GetIndex(), static_cast<int64_t>(0), iCount - 1);
+	int64_t iIndex = std::clamp(rWrapper.GetIndex(), 0i64, iCount - 1);
 
 	// Render << and >> adjacent first, then the label — keeps button positions fixed when the displayed name changes width.
 	char pcIdentifier[128];

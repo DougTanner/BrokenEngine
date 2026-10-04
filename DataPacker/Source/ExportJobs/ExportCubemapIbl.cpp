@@ -614,7 +614,7 @@ static bool ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClC
 
 bool GeneratePreFilteredCubemaps()
 {
-	static const uint8_t suiCpuThreads = static_cast<uint8_t>(std::max(1u, std::thread::hardware_concurrency()));
+	static const uint8_t suiCpuThreads = static_cast<uint8_t>(std::max(1ui32, std::thread::hardware_concurrency()));
 
 	// OpenCL radiance convolution produces GPU/driver-dependent half-float output; the CPU fallback
 	// depends on suiCpuThreads. R16G16B16A16_SFLOAT intermediates rely on a single canonical bake host
