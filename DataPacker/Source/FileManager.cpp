@@ -20,7 +20,7 @@ struct SymbolicLinkReparseDataBuffer
 
 static std::filesystem::path PathFromUtf8(std::string_view utf8Value)
 {
-	std::u8string value(reinterpret_cast<const char8_t*>(utf8Value.data()), utf8Value.size());
+	std::u8string value(utf8Value.begin(), utf8Value.end());
 	return std::filesystem::path(value);
 }
 
