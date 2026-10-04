@@ -75,9 +75,15 @@ resumes where it stopped.
 
 ## Setup
 
-1. Write the four appendix blocks verbatim to `Temp/StyleSweep/prompts/Find.md`,
-   `Temp/StyleSweep/prompts/Fix.md`, `Temp/StyleSweep/prompts/Propagate.md` and
-   `Temp/StyleSweep/Run-Sweep.ps1`.
+1. One fresh `implementer` writes the four appendix blocks verbatim to
+   `Temp/StyleSweep/prompts/Find.md`, `Temp/StyleSweep/prompts/Fix.md`,
+   `Temp/StyleSweep/prompts/Propagate.md` and `Temp/StyleSweep/Run-Sweep.ps1`
+   — each block is the fenced block under its `###` path heading in
+   `## Appendix — prompts and coordinator`, read through its closing fence,
+   since the prompt blocks contain `##` lines of their own — and applies only
+   the prompt corrections the stage's Plan names, which the brief cites as that
+   Plan's path and section. It returns the four paths written. Main never reads
+   the appendix.
 2. Open SmartGit on the worktree (`smartgit.exe --open <worktree root>`). The
    user browses the uncommitted changes there, so the session makes no commit
    before landing.
