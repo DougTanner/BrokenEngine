@@ -9,13 +9,16 @@
 # self-block).
 #
 # Transaction: snapshot the complete previous canonical pair (both-present or
-# both-absent; a partial pair blocks), replace both executables as one logical
-# promotion, re-run the capability contract from the canonical paths, verify the
-# promoted hashes, and write AgentToolsSourceStamp.txt from the landed commit. On
-# any replacement or post-promotion failure, restore the complete previous pair,
-# re-verify the rollback, and report it before releasing coordination. A
-# schema-versioned broken-engine-agenttools-promotion/v1 receipt records the
-# previous, candidate, and promoted identities.
+# both-absent; a partial pair blocks), rename each previous executable aside
+# within its Output directory as the backup and move its staged candidate into
+# the freed name, re-run the capability contract from the canonical paths, verify
+# the promoted hashes, and write AgentToolsSourceStamp.txt from the landed commit.
+# A running image can be renamed but not overwritten, so a session already
+# running a tool finishes on the old copy. On any replacement or post-promotion
+# failure, rename the candidates aside and the backups back, re-verify the
+# rollback, and report it before releasing coordination. A schema-versioned
+# broken-engine-agenttools-promotion/v2 receipt records the previous, candidate,
+# and promoted identities and the backup paths.
 #
 # Result contract: one broken-engine-agenttools-promotion-result/v1 JSON object on
 # stdout. Exit 0 = promoted, 2 = deterministic blocker (mismatch, blocked
@@ -151,11 +154,17 @@ try {
 		}
 		$firstRollout = -not $previous.WorktreeCli.present
 
-		$backupDirectory = Join-Path $env:LOCALAPPDATA "BrokenEngine\AgentToolsPromotions\backup-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ'))-$PID"
-		if (-not $firstRollout) {
-			New-Item -ItemType Directory -Force $backupDirectory | Out-Null
-			Copy-Item -LiteralPath $canonical.WorktreeCli -Destination (Join-Path $backupDirectory 'WorktreeCli.exe') -Force
-			Copy-Item -LiteralPath $canonical.AgentHarness -Destination (Join-Path $backupDirectory 'AgentHarness.exe') -Force
+		$asideTag = "$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ'))-$PID"
+		$backup = [ordered]@{}
+		$failedAside = [ordered]@{}
+		foreach ($name in @('WorktreeCli', 'AgentHarness')) {
+			$backup[$name] = "$($canonical[$name]).previous-$asideTag"
+			$failedAside[$name] = "$($canonical[$name]).failed-$asideTag"
+			# Best-effort: an aside still running in another session cannot be deleted yet.
+			$leaf = Split-Path -Leaf $canonical[$name]
+			foreach ($kind in @('previous', 'failed')) {
+				try { Get-ChildItem -LiteralPath (Split-Path -Parent $canonical[$name]) -Filter "$leaf.$kind-*" -File -Force | ForEach-Object { try { [IO.File]::Delete($_.FullName) } catch { } } } catch { }
+			}
 		}
 		# The stamp belongs to the promoted state; snapshot it so rollback can restore it
 		# even after a failed WriteAllText truncated the file.
@@ -163,12 +172,17 @@ try {
 		$previousStamp = if (Test-Path -LiteralPath $stampPath -PathType Leaf) { [IO.File]::ReadAllBytes($stampPath) } else { $null }
 
 		$failure = $null
+		$renamedAside = @()
 		$replaced = @()
 		try {
 			foreach ($name in @('WorktreeCli', 'AgentHarness')) {
 				$staging = "$($canonical[$name]).promoting"
 				Copy-Item -LiteralPath $candidates[$name].path -Destination $staging -Force
-				[IO.File]::Move($staging, $canonical[$name], $true)
+				if (-not $firstRollout) {
+					[IO.File]::Move($canonical[$name], $backup[$name])
+					$renamedAside += $name
+				}
+				[IO.File]::Move($staging, $canonical[$name])
 				$replaced += $name
 			}
 			& $capabilityScript -WorktreeCliExecutable $canonical.WorktreeCli -AgentHarnessExecutable $canonical.AgentHarness | Out-Null
@@ -193,15 +207,9 @@ try {
 					$staging = "$($canonical[$name]).promoting"
 					if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Force -Confirm:$false -ErrorAction SilentlyContinue }
 				}
-				if ($firstRollout) {
-					foreach ($name in $replaced) {
-						if (Test-Path -LiteralPath $canonical[$name]) { Remove-Item -LiteralPath $canonical[$name] -Force -Confirm:$false }
-					}
-				}
-				else {
-					foreach ($name in $replaced) {
-						Copy-Item -LiteralPath (Join-Path $backupDirectory "$name.exe") -Destination $canonical[$name] -Force
-					}
+				foreach ($name in $replaced) { [IO.File]::Move($canonical[$name], $failedAside[$name]) }
+				foreach ($name in $renamedAside) { [IO.File]::Move($backup[$name], $canonical[$name]) }
+				if (-not $firstRollout) {
 					foreach ($name in @('WorktreeCli', 'AgentHarness')) {
 						$restoredIdentity = Get-ExecutableIdentity $canonical[$name]
 						if (-not $restoredIdentity.present -or $restoredIdentity.sha256 -cne $previous[$name].sha256) {
@@ -223,12 +231,15 @@ try {
 			}
 			catch {
 				$result.rollback = 'failed'
-				Complete-Promotion 1 'error' 'promotion.rollback-failed' "Promotion failed AND rollback could not restore the complete previous state (canonical pair or stamp may be partial; backup retained at '$backupDirectory'). Promotion failure: $failure. Rollback failure: $($_.Exception.Message)" 'authority-required' $true
+				$rollbackFailure = $_.Exception.Message
+				$asides = @(foreach ($name in @('WorktreeCli', 'AgentHarness')) { foreach ($path in @($backup[$name], $failedAside[$name])) { if (Test-Path -LiteralPath $path) { $path } } })
+				$asideText = if ($asides.Count -ne 0) { "asides retained at '$($asides -join "', '")'" } else { 'no aside remains' }
+				Complete-Promotion 1 'error' 'promotion.rollback-failed' "Promotion failed AND rollback could not restore the complete previous state (canonical pair or stamp may be partial; $asideText). Promotion failure: $failure. Rollback failure: $rollbackFailure" 'authority-required' $true
 			}
 		}
 
 		$receiptValue = [ordered]@{
-			schemaVersion = 'broken-engine-agenttools-promotion/v1'
+			schemaVersion = 'broken-engine-agenttools-promotion/v2'
 			promotedAt = [DateTime]::UtcNow.ToString('O')
 			primaryRoot = $primaryRoot
 			landedCommit = $LandedCommit
@@ -241,7 +252,7 @@ try {
 				WorktreeCli = Get-ExecutableIdentity $canonical.WorktreeCli
 				AgentHarness = Get-ExecutableIdentity $canonical.AgentHarness
 			}
-			backupDirectory = $(if ($firstRollout) { $null } else { $backupDirectory })
+			backup = $(if ($firstRollout) { $null } else { $backup })
 			capabilityCheck = 'pass'
 		}
 		$result.promoted = $true

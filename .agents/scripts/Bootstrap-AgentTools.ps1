@@ -81,10 +81,30 @@ try {
 	$dataPackerStampPath = Join-Path $dataPackerOutput 'DataPackerPrebuildStamp.txt'
 
 	$commonBuildArguments = @('/p:Platform=x64', '/p:EnableClangTidyCodeAnalysis=false', '/p:RunCodeAnalysis=false', '/verbosity:minimal')
-	function Invoke-BootstrapBuild([string] $Solution, [string] $Configuration) {
+	function Invoke-BootstrapBuild([string] $Solution, [string] $Configuration, [string] $Executable) {
 		# Blank line so each build's MSBuild output reads as its own block in the session start transcript.
 		Write-Host ''
-		$exitCode = Invoke-WorktreeCliTrackedProcess -Executable $msBuild -ArgumentList (@($Solution, "/p:Configuration=$Configuration") + $commonBuildArguments) -WorkingDirectory $root
+		# A link in place fails while another session runs $Executable, so the original is renamed aside
+		# (running processes keep it) and a copy takes its name. The copy keeps the original
+		# LastWriteTimeUtc, so unchanged sources still skip the link.
+		$aside = $null
+		if ($Executable) {
+			# Best-effort: an aside still running in another session cannot be deleted yet.
+			$leaf = Split-Path -Leaf $Executable
+			try { Get-ChildItem -LiteralPath (Split-Path -Parent $Executable) -Filter "$leaf.bootstrap-*" -File -Force | ForEach-Object { try { [IO.File]::Delete($_.FullName) } catch { } } } catch { }
+			if (Test-Path -LiteralPath $Executable -PathType Leaf) {
+				$aside = "$Executable.bootstrap-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ'))-$PID"
+				[IO.File]::Copy($Executable, "$aside.staging")
+				[IO.File]::Move($Executable, $aside)
+			}
+		}
+		try {
+			if ($null -ne $aside) { [IO.File]::Move("$aside.staging", $Executable) }
+			$exitCode = Invoke-WorktreeCliTrackedProcess -Executable $msBuild -ArgumentList (@($Solution, "/p:Configuration=$Configuration") + $commonBuildArguments) -WorkingDirectory $root
+		}
+		finally {
+			if ($null -ne $aside -and -not (Test-Path -LiteralPath $Executable)) { [IO.File]::Move($aside, $Executable) }
+		}
 		if ($exitCode -ne 0) { throw "AgentTools bootstrap build failed for '$Solution' with exit code $exitCode. If another live worktree session is holding these executables, wrap up active worktree sessions and retry." }
 	}
 
@@ -100,8 +120,8 @@ try {
 		try { $held = $mutex.WaitOne([int]$milliseconds) } catch [Threading.AbandonedMutexException] { $held = $true }
 		if (-not $held) { throw "Timed out after $WaitSeconds seconds waiting for the AgentTools bootstrap mutex. If another live worktree session is holding these executables, wrap up active worktree sessions and retry." }
 
-		Invoke-BootstrapBuild $worktreeCliSolution 'Release'
-		Invoke-BootstrapBuild $agentHarnessSolution 'Release'
+		Invoke-BootstrapBuild $worktreeCliSolution 'Release' $worktreeCli
+		Invoke-BootstrapBuild $agentHarnessSolution 'Release' $agentHarness
 		& $capabilityScript -WorktreeCliExecutable $worktreeCli -AgentHarnessExecutable $agentHarness | Out-Null
 		$builtStamp = Get-AgentToolsSourceStamp
 		if ($null -ne $builtStamp) { [IO.File]::WriteAllText($stampPath, $builtStamp + "`n") }
@@ -132,7 +152,7 @@ try {
 		# 48-57) plus this scoped gate keep the normal path clean.
 		try {
 			if ($null -ne $dataPackerPreTrees -and $dataPackerPreDirty.Count -eq 0) {
-				Invoke-BootstrapBuild $dataPackerSolution 'Release'
+				Invoke-BootstrapBuild $dataPackerSolution 'Release' $dataPackerExe
 				if (-not (Test-Path -LiteralPath $dataPackerExe -PathType Leaf)) { throw "DataPacker executable is missing after the prebuild: '$dataPackerExe'." }
 				$dataPackerBytes = [IO.File]::ReadAllBytes($dataPackerExe)
 				$dataPackerHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($dataPackerBytes)).ToLowerInvariant()
