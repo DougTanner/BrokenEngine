@@ -1,4 +1,3 @@
-// Note: Not using precompiled header so that this file can be optimized in Debug builds
 #include "Pch.h"
 
 #include "Blasters.h"
@@ -9,24 +8,18 @@ namespace engine
 {
 template struct Collection<game::BlastersInterpolate>;
 template struct Collection<game::BlastersPostRender>;
-}
+} // namespace engine
 
 namespace game
 {
 
 using enum BlasterFlags;
 
-#if defined(BT_CLIENT)
-// Defined in BlastersUpdate.cpp
-void RegisterBlasterTerrainEffects();
-#endif
-
+#if !defined(BT_CLIENT)
 void BlastersInterpolate::Register()
 {
-#if defined(BT_CLIENT)
-	RegisterBlasterTerrainEffects();
-#endif
 }
+#endif
 
 void BlastersInterpolate::AllocateAndCopy(BlastersInterpolate& rCurrent, const BlastersInterpolate& rPrevious)
 {
@@ -39,35 +32,34 @@ void BlastersPostRender::AllocateAndCopy(BlastersPostRender& rCurrent, const Bla
 }
 
 #if defined(BT_CLIENT)
-void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
+void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 {
 	BlastersInterpolate& rBlasters = *rFrame.interpolate.pBlasters;
 
 	// Add client-only owned objects
 	const BlastersType& rType = sTypes.at(rBlasters.puiTypeIndices[iIndex]);
 
-	rBlasters.puiAreaLights[iIndex] = {};
-	rBlasters.puiPointLights[iIndex] = {};
+	rBlasters.pAreaLights[iIndex] = {};
+	rBlasters.pPointLights[iIndex] = {};
 
 	if (rType.uiPointLightTypeIndex != 0xFF)
 	{
-		engine::PointLightsPostRender::Add(rFrame, rBlasters.puiPointLights[iIndex], rType.uiPointLightTypeIndex);
+		engine::PointLightsPostRender::Add(rFrame, rBlasters.pPointLights[iIndex], rType.uiPointLightTypeIndex);
 	}
 	else
 	{
-		rFrame.postRender.areaLights.Add(rFrame, rBlasters.puiAreaLights[iIndex], rType.uiAreaLightTypeIndex);
+		rFrame.postRender.areaLights.Add(rFrame, rBlasters.pAreaLights[iIndex], rType.uiAreaLightTypeIndex);
 	}
 
-	rBlasters.puiWindTrails[iIndex] = {};
+	rBlasters.pWindTrails[iIndex] = {};
 	if (rBlasters.pfWindTrailIntensities[iIndex] > 0.0f)
 	{
-		engine::WindTrailsPostRender::Add(rFrame, rBlasters.puiWindTrails[iIndex]);
+		engine::WindTrailsPostRender::Add(rFrame, rBlasters.pWindTrails[iIndex]);
 	}
 
-	// Sync wind trail
 	if (rBlasters.pfWindTrailIntensities[iIndex] > 0.0f)
 	{
-		engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rBlasters.puiWindTrails[iIndex],
+		engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rBlasters.pWindTrails[iIndex],
 		{
 			.vecPosition = rBlasters.pVecPositions[iIndex],
 			.fIntensity = rBlasters.pfWindTrailIntensities[iIndex],
@@ -76,12 +68,11 @@ void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 		});
 	}
 
-	// Sync light
-	if ((rBlasters.puiPointLights[iIndex].uuid.iValue != 0))
+	if ((rBlasters.pPointLights[iIndex].uuid.iValue != 0))
 	{
 		float fSize = rType.f2Size.x;
 		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(rType.uiPointLightTypeIndex);
-		engine::PointLightsInterpolate::Sync(rFrame.interpolate, rBlasters.puiPointLights[iIndex],
+		engine::PointLightsInterpolate::Sync(rFrame.interpolate, rBlasters.pPointLights[iIndex],
 		{
 			.vecPosition = rBlasters.pVecPositions[iIndex],
 			.fVisibleArea = fSize,
@@ -99,7 +90,7 @@ void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 		XMVECTOR vecDirection = rBlasters.pVecDirections[iIndex];
 		auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(rBlasters.pVecPositions[iIndex], vecDirection, fLength, fLength, fWidth);
 
-		engine::AreaLightsInterpolate::Sync(rFrame.interpolate, rBlasters.puiAreaLights[iIndex],
+		engine::AreaLightsInterpolate::Sync(rFrame.interpolate, rBlasters.pAreaLights[iIndex],
 		{
 			.uiTypeIndex = rType.uiAreaLightTypeIndex,
 			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
@@ -107,18 +98,18 @@ void BlastersInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 	}
 }
 
-void BlastersInterpolate::ClientInitAll(Frame& rFrame)
+void BlastersInterpolate::ClientInitializeAll(Frame& rFrame)
 {
 	for (int64_t i = 0; i < rFrame.interpolate.pBlasters->iCount; ++i)
 	{
-		ClientInit(rFrame, i);
+		ClientInitialize(rFrame, i);
 	}
 }
 #endif // BT_CLIENT
 
-bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
+bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawnInformation)
 {
-	if (!common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()))
+	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalFrameArea()))
 	{
 		return false;
 	}
@@ -126,29 +117,27 @@ bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
-	common::ValidateVector<true >(rInfo.vecPosition);
-	common::ValidateVector<false>(rInfo.vecVelocity);
+	common::ValidateVector<true >(rSpawnInformation.vecPosition);
+	common::ValidateVector<false>(rSpawnInformation.vecVelocity);
 
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	int64_t iIndex = engine::AddElement(rCurrentInterpolate, rCurrentPostRender);
 
-	// Initialize interpolate state
-	rCurrentInterpolate.pVecPositions[iIndex] = rInfo.vecPosition;
-	rCurrentInterpolate.pVecDirections[iIndex] = XMVector3Normalize(rInfo.vecVelocity);
-	rCurrentInterpolate.puiTypeIndices[iIndex] = rInfo.uiTypeIndex;
+	rCurrentInterpolate.pVecPositions[iIndex] = rSpawnInformation.vecPosition;
+	rCurrentInterpolate.pVecDirections[iIndex] = XMVector3Normalize(rSpawnInformation.vecVelocity);
+	rCurrentInterpolate.puiTypeIndices[iIndex] = rSpawnInformation.uiTypeIndex;
 #if defined(BT_CLIENT)
-	rCurrentInterpolate.pfWindTrailIntensities[iIndex] = rInfo.fWindTrailIntensity;
-	rCurrentInterpolate.pfWindTrailWidths[iIndex] = rInfo.fWindTrailWidth;
-	rCurrentInterpolate.pfWindTrailLengthMultipliers[iIndex] = rInfo.fWindTrailLengthMultiplier;
+	rCurrentInterpolate.pfWindTrailIntensities[iIndex] = rSpawnInformation.fWindTrailIntensity;
+	rCurrentInterpolate.pfWindTrailWidths[iIndex] = rSpawnInformation.fWindTrailWidth;
+	rCurrentInterpolate.pfWindTrailLengthMultipliers[iIndex] = rSpawnInformation.fWindTrailLengthMultiplier;
 #endif
 
-	// Initialize post-render state
-	rCurrentPostRender.pFlags[iIndex] = rInfo.flags;
-	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
-	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
+	rCurrentPostRender.pFlags[iIndex] = rSpawnInformation.flags;
+	rCurrentPostRender.pVecVelocities[iIndex] = rSpawnInformation.vecVelocity;
+	rCurrentPostRender.pAlignments[iIndex] = rSpawnInformation.alignment;
 
 #if defined(BT_CLIENT)
-	BlastersInterpolate::ClientInit(rFrame, iIndex);
+	BlastersInterpolate::ClientInitialize(rFrame, iIndex);
 #endif
 
 	return true;
@@ -157,17 +146,17 @@ bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] BlastersInterpolate& rCurrentInterpolate, [[maybe_unused]] int64_t i)
 {
 #if defined(BT_CLIENT)
-	if ((rCurrentInterpolate.puiPointLights[i].uuid.iValue != 0))
+	if ((rCurrentInterpolate.pPointLights[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rCurrentInterpolate.puiPointLights[i], rFrame.interpolate.pointLights.Members(), rFrame.postRender.pointLights.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rCurrentInterpolate.pPointLights[i], rFrame.interpolate.pointLights.Members(), rFrame.postRender.pointLights.Members());
 	}
 	else
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.areaLights, rFrame.postRender.areaLights, rCurrentInterpolate.puiAreaLights[i], rFrame.interpolate.areaLights.Members(), rFrame.postRender.areaLights.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.areaLights, rFrame.postRender.areaLights, rCurrentInterpolate.pAreaLights[i], rFrame.interpolate.areaLights.Members(), rFrame.postRender.areaLights.Members());
 	}
-	if ((rCurrentInterpolate.puiWindTrails[i].uuid.iValue != 0))
+	if ((rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.windTrails, rFrame.postRender.windTrails, rCurrentInterpolate.puiWindTrails[i], rFrame.interpolate.windTrails.Members(), rFrame.postRender.windTrails.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.windTrails, rFrame.postRender.windTrails, rCurrentInterpolate.pWindTrails[i], rFrame.interpolate.windTrails.Members(), rFrame.postRender.windTrails.Members());
 	}
 #endif // BT_CLIENT
 }
@@ -188,7 +177,6 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 
-		// Build transfer request
 		TransferRequest request
 		{
 			.eType = StatusChangeType::kTransferBlaster,
@@ -201,7 +189,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 		};
 		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{
-			LOG(kDefault, kError, "Blaster Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) TypeIndex: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), static_cast<int32_t>(rCurrentInterpolate.puiTypeIndices[i]), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Blaster Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) TypeIndex: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int64_t>(request.iDeltaX), static_cast<int64_t>(request.iDeltaY), static_cast<int64_t>(rCurrentInterpolate.puiTypeIndices[i]), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		PushTransferRequest(rFrame.postRender, request);
@@ -220,8 +208,7 @@ void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
 		return rCurrentPostRender.pFlags[i] & kDestroy;
-	},
-	[&](int64_t i)
+	}, [&](int64_t i)
 	{
 		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
 

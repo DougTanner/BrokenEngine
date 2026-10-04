@@ -8,10 +8,10 @@ namespace engine
 
 // Proper intersections between non-adjacent edges indicate self-intersecting contours.
 // Cross-placement overlap is allowed: visibility building and runtime queries test every polygon
-// in the shared cell-local frame. This O(edges^2) diagnostic is enabled by kbDebugNavCrossingCheck.
+// in the shared cell-local frame. This O(edges^2) diagnostic is enabled by kbDebugNavigationCrossingCheck.
 static void DebugCheckCrossingEdges([[maybe_unused]] const NavData& rNavigationData)
 {
-	if constexpr (kbDebugNavCrossingCheck)
+	if constexpr (kbDebugNavigationCrossingCheck)
 	{
 		int32_t iVertexCount = static_cast<int32_t>(rNavigationData.vertices.size());
 		int64_t iPolygonCount = std::ssize(rNavigationData.polygonOffsets);

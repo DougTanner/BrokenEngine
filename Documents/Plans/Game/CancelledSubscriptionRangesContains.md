@@ -13,10 +13,10 @@ The author's recommendation is to replace exactly these complete conditions:
 
 | Existing condition | Replacement |
 |---|---|
-| `std::ranges::find(rRuntime.mDesiredCoordinates, coord) != rRuntime.mDesiredCoordinates.end()` | `std::ranges::contains(rRuntime.mDesiredCoordinates, coord)` |
-| `std::ranges::find(rRuntime.mSubscriptionQueue, coord) != rRuntime.mSubscriptionQueue.end()` | `std::ranges::contains(rRuntime.mSubscriptionQueue, coord)` |
+| `std::ranges::find(rRuntime.mDesiredCoordinates, coordinate) != rRuntime.mDesiredCoordinates.end()` | `std::ranges::contains(rRuntime.mDesiredCoordinates, coordinate)` |
+| `std::ranges::find(rRuntime.mSubscriptionQueue, coordinate) != rRuntime.mSubscriptionQueue.end()` | `std::ranges::contains(rRuntime.mSubscriptionQueue, coordinate)` |
 
-Keep the order and bodies of both guards, their error text, and the following `mUnwantedTimestamps.contains(coord)` guard unchanged.
+Keep the order and bodies of both guards, their error text, and the following `mUnwantedTimestamps.contains(coordinate)` guard unchanged.
 
 The [standard draft, alg.contains paragraph 1](https://eel.is/c++draft/alg.contains#1) defines the non-policy membership result using the corresponding find-and-end comparison. Both ranges and the coordinate here are existing lvalues, with the same default equality and identity projection. Empty ranges, absent coordinates, and present coordinates therefore produce the same Boolean result. No iterator escapes, no range is materialized, and no ownership, element copy, allocation, or lifetime change is introduced. The same linear search can stop at the first match; no speedup is claimed.
 

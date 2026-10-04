@@ -145,7 +145,7 @@ DeviceManager::DeviceManager()
 		.runtimeDescriptorArray = VK_TRUE,
 		.scalarBlockLayout = VK_TRUE,
 	};
-	if constexpr (kbGpuAssistedValidation || kbDebugPrintf)
+	if constexpr (kbGraphicsProcessingUnitAssistedValidation || kbDebugPrintf)
 	{
 		vkPhysicalDeviceVulkan12Features.storageBuffer8BitAccess = VK_TRUE;
 		vkPhysicalDeviceVulkan12Features.timelineSemaphore = VK_TRUE;
@@ -205,7 +205,7 @@ DeviceManager::DeviceManager()
 	{
 		vkPhysicalDeviceFeatures.fillModeNonSolid = VK_TRUE;
 	}
-	if constexpr (kbGpuAssistedValidation || kbDebugPrintf)
+	if constexpr (kbGraphicsProcessingUnitAssistedValidation || kbDebugPrintf)
 	{
 		vkPhysicalDeviceFeatures.vertexPipelineStoresAndAtomics = VK_TRUE;
 		vkPhysicalDeviceFeatures.shaderInt64 = VK_TRUE;

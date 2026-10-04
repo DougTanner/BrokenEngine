@@ -25,14 +25,15 @@ namespace engine
 {
 template struct Collection<game::SpaceshipsInterpolate>;
 template struct Collection<game::SpaceshipsPostRender>;
-}
+} // namespace engine
 
 namespace game
 {
 
+constexpr float kfDeathKnockbackSpeed = 20.0f;
+
 using enum SpaceshipFlags;
 
-// Explosion
 constexpr float kfSpaceshipExplosionParticleCount = 8.0f;
 constexpr float kfSpaceshipExplosionSizeStart = kfSpaceshipRadius * 0.625f;
 constexpr float kfSpaceshipExplosionSizeEnd = kfSpaceshipRadius * 0.25f;
@@ -41,29 +42,27 @@ constexpr float kfSpaceshipExplosionPositionJitter = kfSpaceshipRadius * 0.375f;
 constexpr float kfSpaceshipExplosionDirectionJitter = 0.5f;
 constexpr uint32_t kuiSpaceshipExplosionTrailCount = 5;
 
-// Forward declarations for registration functions (called from Register())
 static void RegisterEnemyBlasterType();
 
 // Shared type indices (accessible from SpaceshipsCombat.cpp via extern)
-uint8_t gSpaceshipExplosionTypeIndex = 0xFF;
+uint8_t guiSpaceshipExplosionTypeIndex = 0xFF;
 #if defined(BT_CLIENT)
 static uint8_t suiSpaceshipHitFlashTypeIndex = 0xFF;
-uint8_t gSpaceshipHitFlashControllerTypeIndex = 0xFF;
+uint8_t guiSpaceshipHitFlashControllerTypeIndex = 0xFF;
 
 static void RegisterSpaceshipHitFlashEffect();
 #endif
 
 constexpr uint32_t kuiSpaceshipExplosionBaseParticleCount = 16;
 constexpr uint32_t kuiSpaceshipExplosionParticleColor = 0xFF0000FF;
-constexpr float kfSpaceshipExplosionParticleVelocityMin = 1.0f;
+constexpr float kfSpaceshipExplosionParticleVelocityMinimum = 1.0f;
 constexpr float kfSpaceshipExplosionParticleVelocityRandom = 9.0f;
-constexpr float kfSpaceshipExplosionParticleVerticalVelocityMin = -5.0f;
+constexpr float kfSpaceshipExplosionParticleVerticalVelocityMinimum = -5.0f;
 constexpr float kfSpaceshipExplosionParticleVerticalVelocityRandom = 10.0f;
 constexpr float kfSpaceshipExplosionParticleIntensityDecay = 2.4f;
 constexpr float kfSpaceshipExplosionTrailLengthRandom = kfSpaceshipRadius * 1.25f;
 constexpr uint32_t kuiSpaceshipExplosionSecondaryCount = 1;
 
-// Enemy blaster
 constexpr float kfSpawnBlasterPlayerAngle = 0.1f;
 constexpr float kfBlastersSpeed = 50.0f;
 constexpr float kfBlastersSpawnCooldown = 1.0f;
@@ -72,14 +71,13 @@ constexpr float kfEnemyBlasterSize = kfSpaceshipRadius * 0.15f;
 // Enemy blaster lighting tuning is supplied by LightingWrappers (gEnemyBlaster*).
 
 #if defined(BT_CLIENT)
-// Hit flash effect timing
-constexpr float kfHitFlashDuration = 0.3f;
+constexpr std::chrono::duration<float> kHitFlashDuration(0.3f);
 #endif // BT_CLIENT
 
-// Find the nearest alive (non-exploding) player position. Returns false if no alive players exist.
+// Returns false when no player is both non-exploding and outside arrival grace.
 [[nodiscard]] bool XM_CALLCONV NearestAlivePlayerPosition(const PlayersInterpolate& rPlayers, const PlayersPostRender& rPlayersPostRender, FXMVECTOR vecFrom, XMVECTOR& rVecResult)
 {
-	float fClosestDistanceSq = std::numeric_limits<float>::max();
+	float fClosestDistanceSquared = std::numeric_limits<float>::max();
 	bool bFound = false;
 
 	for (int64_t i = 0; i < rPlayers.iCount; ++i)
@@ -94,10 +92,10 @@ constexpr float kfHitFlashDuration = 0.3f;
 			continue;
 		}
 
-		float fDistanceSq = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(rPlayers.pVecPositions[i], vecFrom)));
-		if (fDistanceSq < fClosestDistanceSq)
+		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(rPlayers.pVecPositions[i], vecFrom)));
+		if (fDistanceSquared < fClosestDistanceSquared)
 		{
-			fClosestDistanceSq = fDistanceSq;
+			fClosestDistanceSquared = fDistanceSquared;
 			rVecResult = rPlayers.pVecPositions[i];
 			bFound = true;
 		}
@@ -108,8 +106,7 @@ constexpr float kfHitFlashDuration = 0.3f;
 
 void SpaceshipsInterpolate::Register()
 {
-	// Spaceship explosion type
-	engine::ExplosionsInterpolate::RegisterType(gSpaceshipExplosionTypeIndex,
+	engine::ExplosionsInterpolate::RegisterType(guiSpaceshipExplosionTypeIndex,
 	{
 #if defined(BT_CLIENT)
 		.uiPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
@@ -121,9 +118,9 @@ void SpaceshipsInterpolate::Register()
 #endif // BT_CLIENT
 		.uiBaseParticleCount = kuiSpaceshipExplosionBaseParticleCount,
 		.uiParticleColor = kuiSpaceshipExplosionParticleColor,
-		.fParticleVelocityMinimum = kfSpaceshipExplosionParticleVelocityMin,
+		.fParticleVelocityMinimum = kfSpaceshipExplosionParticleVelocityMinimum,
 		.fParticleVelocityRandom = kfSpaceshipExplosionParticleVelocityRandom,
-		.fParticleVerticalVelocityMinimum = kfSpaceshipExplosionParticleVerticalVelocityMin,
+		.fParticleVerticalVelocityMinimum = kfSpaceshipExplosionParticleVerticalVelocityMinimum,
 		.fParticleVerticalVelocityRandom = kfSpaceshipExplosionParticleVerticalVelocityRandom,
 		.fParticleIntensityDecay = kfSpaceshipExplosionParticleIntensityDecay,
 		.fTrailLengthRandom = kfSpaceshipExplosionTrailLengthRandom,
@@ -150,7 +147,6 @@ void SpaceshipsInterpolate::Register()
 #endif
 }
 
-// Enemy blaster type registration
 static uint8_t suiEnemyBlasterPointLightTypeIndex = 0xFF;
 static uint8_t suiEnemyBlasterTypeIndex = 0xFF;
 
@@ -162,7 +158,6 @@ static void RegisterEnemyBlasterType()
 	}
 
 #if defined(BT_CLIENT)
-	// Register camera-aligned point light type for enemy blasters
 	engine::PointLightsInterpolate::RegisterType(suiEnemyBlasterPointLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBlasterBC72pngCrc,
@@ -175,7 +170,6 @@ static void RegisterEnemyBlasterType()
 	});
 #endif // BT_CLIENT
 
-	// Register blaster type with point light
 	BlastersInterpolate::RegisterType(suiEnemyBlasterTypeIndex,
 	{
 		.f2Size = {kfEnemyBlasterSize, kfEnemyBlasterSize},
@@ -183,11 +177,9 @@ static void RegisterEnemyBlasterType()
 	});
 }
 
-// Helper to sync owned objects for a spaceship. The registry id needs no sync: the registry binds this
-// collection's position column directly instead of holding a copy to drive each tick.
+// The registry binds this collection's position column directly, so its ID needs no per-tick sync.
 void XM_CALLCONV SyncSpaceship(FrameInterpolate& rFrameInterpolate, engine::pusher_t uiPusher, FXMVECTOR vecPosition)
 {
-	// Sync pusher
 	engine::PushersInterpolate::Sync(rFrameInterpolate, uiPusher,
 	{
 		.vecPosition = vecPosition,
@@ -209,12 +201,12 @@ static void RegisterSpaceshipHitFlashEffect()
 			.uiColor = 0xFFFFFFFF,
 		});
 
-		engine::PointLightsInterpolate::RegisterControllerType(gSpaceshipHitFlashControllerTypeIndex,
+		engine::PointLightsInterpolate::RegisterControllerType(guiSpaceshipHitFlashControllerTypeIndex,
 		{
 			.uiBaseTypeIndex = suiSpaceshipHitFlashTypeIndex,
 			.uiKeyframeCount = 2,
 			.bDestroysSelf = true,
-			.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfHitFlashDuration), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+			.times = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 			.keyframes =
 			{
 				{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -238,7 +230,7 @@ void SpawnSpaceshipExplosion(Frame& __restrict rFrame, XMVECTOR vecPosition, XMV
 
 	engine::ExplosionsPostRender::Spawn(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 	{
-		.uiTypeIndex = gSpaceshipExplosionTypeIndex,
+		.uiTypeIndex = guiSpaceshipExplosionTypeIndex,
 		.vecPosition = vecJitteredPosition,
 		.vecDirection = vecJitteredDirection,
 		.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kRed},
@@ -254,7 +246,7 @@ void SpawnSpaceshipExplosion(Frame& __restrict rFrame, XMVECTOR vecPosition, XMV
 
 #if defined(BT_CLIENT)
 // Spaceship model (defined in SpaceshipsRender.cpp)
-extern const common::crc_t kSpaceshipModel;
+extern const common::crc_t kuiSpaceshipModel;
 #endif
 
 void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
@@ -266,18 +258,16 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 	const SpaceshipsPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pSpaceships;
 	float fDeltaTime = rCurrentFrameInterpolate.fDeltaTime;
 
-	// Hoist animation duration lookup outside the loop
 #if defined(BT_CLIENT)
 	float fAnimationDuration = 0.0f;
-	if (engine::gAnimationDataMap.contains(kSpaceshipModel))
+	if (engine::gAnimationDataMap.contains(kuiSpaceshipModel))
 	{
-		fAnimationDuration = engine::gAnimationDataMap.at(kSpaceshipModel).mpAnimations[0].fDuration;
+		fAnimationDuration = engine::gAnimationDataMap.at(kuiSpaceshipModel).mpAnimations[0].fDuration;
 	}
 #endif
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		float fDestroyedTime = rPrevious.pfDestroyedTimes[i];
@@ -286,21 +276,18 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 		float fAnimationTime = rPrevious.pfAnimationTimes[i];
 #endif
 
-		// Add velocity to position
 		vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
-		// Add delta rotation to direction
 		vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(fDeltaTime * fDeltaRotation)));
 
-		// Decay destroyed time (only when exploding, i.e., > 0.0f; sentinel -1.0f stays unchanged)
+		// The -1.0f sentinel means not exploding and must remain unchanged.
 		if (fDestroyedTime > 0.0f)
 		{
 			fDestroyedTime = std::max(fDestroyedTime - fDeltaTime, 0.0f);
 		}
 
-		// Advance animation time
 #if defined(BT_CLIENT)
 		if (fAnimationDuration > 0.0f)
 		{
@@ -312,7 +299,6 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 		}
 #endif // BT_CLIENT
 
-		// Save
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pfDestroyedTimes[i] = fDestroyedTime;
@@ -324,7 +310,6 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 		// Sync owned objects (IDs copied in AllocateAndCopy)
 		SyncSpaceship(rCurrentFrameInterpolate, rCurrent.puiPushers[i], vecPosition);
 
-		// Sync wind deposit
 #if defined(BT_CLIENT)
 		if ((rCurrent.puiWindTrails[i].uuid.iValue != 0))
 		{
@@ -382,17 +367,17 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 
-		// Build transfer request
 		TransferRequest request
 		{
 			.eType = StatusChangeType::kTransferSpaceship,
-			.data = {
+			.data =
+			{
 				.vecPosition = vecPosition,
 				.vecDirection = rCurrentInterpolate.pVecDirections[i],
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.fHealth = rCurrentPostRender.pfHealths[i],
-				.fNextBlasterSpawnTime = rCurrentPostRender.pfNextBlasterSpawnTimes[i],
+				.nextBlasterSpawnTimeSeconds = std::chrono::duration<float>(rCurrentPostRender.pfNextBlasterSpawnTimes[i]),
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
 			},
 		};
@@ -417,8 +402,7 @@ void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
 		return (rCurrentPostRender.pFlags[i] & kExploding) && !(rCurrentInterpolate.pfDestroyedTimes[i] > 0.0f);
-	},
-	[&](int64_t i)
+	}, [&](int64_t i)
 	{
 		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, false);
 
@@ -436,7 +420,6 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		// Spawn staggered explosions during death animation
 		if ((rCurrentPostRender.pFlags[i] & kExploding) && rCurrentPostRender.pfDestroyedExplosionTimes[i] <= 0.0f)
 		{
 			rCurrentPostRender.pfDestroyedExplosionTimes[i] = kfSpaceshipDestroyExplosionInterval;
@@ -447,7 +430,6 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			continue;
 		}
 
-		// Exploding ships stop firing blasters through the death animation
 		if (rCurrentPostRender.pFlags[i] & kExploding)
 		{
 			continue;
@@ -458,20 +440,17 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			continue;
 		}
 
-		// Find nearest alive player for blaster targeting
 		XMVECTOR vecNearestPlayer = XMVectorZero();
 		if (!NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer))
 		{
 			continue;
 		}
 
-		// Skip blaster firing if spaceship not visible to nearest player
 		if (!FrameInterpolate::IsVisible(vecNearestPlayer, rCurrentInterpolate.pVecPositions[i]))
 		{
 			continue;
 		}
 
-		// Fire blasters at player when facing them
 		XMVECTOR vecToPlayer = XMVectorSubtract(vecNearestPlayer, rCurrentInterpolate.pVecPositions[i]);
 		XMVECTOR vecToPlayerNormal = XMVector3Normalize(vecToPlayer);
 		float fAngleToPlayer = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToPlayerNormal));
@@ -482,7 +461,6 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		{
 			rCurrentPostRender.pfNextBlasterSpawnTimes[i] = kfBlastersSpawnCooldown;
 
-			// Spawn blaster
 			XMVECTOR vecDirection = rCurrentInterpolate.pVecDirections[i];
 			XMVECTOR vecBlasterVelocity = XMVectorScale(vecDirection, kfBlastersSpeed);
 			XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
@@ -500,22 +478,20 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			});
 
 #if defined(BT_CLIENT)
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecPosition, gEnemyBlasterVolume.mfCurrent, gEnemyBlasterPitchMin.mfCurrent, gEnemyBlasterPitchRandom.mfCurrent);
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecPosition, gEnemyBlasterVolume.mfCurrent, gEnemyBlasterPitchMinimum.mfCurrent, gEnemyBlasterPitchRandom.mfCurrent);
 #endif
 		}
 	}
 }
 
 #if defined(BT_CLIENT)
-void SpaceshipsInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
+void SpaceshipsInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 {
 	SpaceshipsInterpolate& rSpaceships = *rFrame.interpolate.pSpaceships;
 
-	// Add client-only owned objects
 	rSpaceships.puiWindTrails[iIndex] = {};
 	engine::WindTrailsPostRender::Add(rFrame, rSpaceships.puiWindTrails[iIndex]);
 
-	// Sync wind trail
 	engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rSpaceships.puiWindTrails[iIndex],
 	{
 		.vecPosition = rSpaceships.pVecPositions[iIndex],
@@ -525,7 +501,7 @@ void SpaceshipsInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 	});
 }
 
-void SpaceshipsInterpolate::ClientInitAll(Frame& rFrame)
+void SpaceshipsInterpolate::ClientInitializeAll(Frame& rFrame)
 {
 	SpaceshipsInterpolate& rSpaceships = *rFrame.interpolate.pSpaceships;
 	for (int64_t i = 0; i < rSpaceships.iCount; ++i)
@@ -534,7 +510,7 @@ void SpaceshipsInterpolate::ClientInitAll(Frame& rFrame)
 		{
 			continue;
 		}
-		ClientInit(rFrame, i);
+		ClientInitialize(rFrame, i);
 	}
 }
 #endif // BT_CLIENT
@@ -556,7 +532,6 @@ bool SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInf
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	int64_t iIndex = engine::AddElement(rCurrentInterpolate, rCurrentPostRender);
 
-	// Initialize interpolate state
 	rCurrentInterpolate.pVecPositions[iIndex] = rInfo.vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pfDestroyedTimes[iIndex] = -1.0f; // Sentinel: -1.0f = not exploding
@@ -565,20 +540,17 @@ bool SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInf
 	rCurrentInterpolate.pfAnimationTimes[iIndex] = 0.0f;
 #endif
 
-	// Create owned pusher
 	rCurrentInterpolate.puiPushers[iIndex] = {};
 	engine::PushersPostRender::Add(rFrame, rCurrentInterpolate.puiPushers[iIndex]);
 
-	// Create owned wind deposit
 #if defined(BT_CLIENT)
-	SpaceshipsInterpolate::ClientInit(rFrame, iIndex);
+	SpaceshipsInterpolate::ClientInitialize(rFrame, iIndex);
 #endif
 
 	// Generate the missile-homing registry ID with one frame UUID after the pusher ID, preserving per-spawn UUID
 	// order for replay.
 	rCurrentInterpolate.puiRegistryIds[iIndex] = engine::registry_id_t::Generate(rFrame.postRender);
 
-	// Initialize post-render state
 	// Flags describe reactions to the previous frame, so each spawned row starts from defaults.
 	rCurrentPostRender.pFlags[iIndex] = {};
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
@@ -603,22 +575,20 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	const SpaceshipsPostRender& rPrevious = *rPreviousFrame.postRender.pSpaceships;
 	const SpaceshipsInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pSpaceships;
-	// Keep Update's previous-frame player read; the phase-specific reason is intentional.
+	// Steering and health regeneration use previous-frame players; AvoidTerrain and Spawn use current-frame players.
 	const PlayersInterpolate& rPlayers = *rPreviousFrame.interpolate.pPlayers;
 	const PlayersPostRender& rPlayersPostRender = *rPreviousFrame.postRender.pPlayers;
 	float fDeltaTime = rFrame.interpolate.fDeltaTime;
 
-	// Hoist tick-invariant per-cell island-center candidates out of the per-ship steering loop: the island set and
-	// base height are fixed per coord, so build the XMVectorSet(x, y, gBaseHeight.mfCurrent, 1.0f) candidates once (into
-	// the per-thread workbuffer) instead of N ships x M islands times. Values feed ComputeSteering bit-identically.
-	int64_t iIslandCount = static_cast<int64_t>(rStaticData.islands.size());
-	auto pIslandCandidates = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMFLOAT4*>(iIslandCount * static_cast<int64_t>(sizeof(XMFLOAT4)));
-	for (int64_t iIsland = 0; iIsland < iIslandCount; ++iIsland)
+	// Island centers and base height are fixed for this cell's tick; the per-thread workbuffer shares candidates across ships.
+	int64_t iIslandCount = std::ssize(rStaticData.islands);
+	auto islandCandidatesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMFLOAT4*>(iIslandCount * static_cast<int64_t>(sizeof(XMFLOAT4)));
+	for (int64_t i = 0; i < iIslandCount; ++i)
 	{
-		const engine::IslandPlacement& rPlacement = rStaticData.islands[iIsland];
-		XMStoreFloat4(&pIslandCandidates.mpData[iIsland], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gBaseHeight.mfCurrent, 1.0f));
+		const engine::IslandPlacement& rPlacement = rStaticData.islands.at(i);
+		XMStoreFloat4(&islandCandidatesAllocation.mpData[i], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gBaseHeight.mfCurrent, 1.0f));
 	}
-	std::span<const XMFLOAT4> islandCandidates(static_cast<XMFLOAT4*>(pIslandCandidates.mpData), static_cast<size_t>(iIslandCount));
+	std::span<const XMFLOAT4> islandCandidates(static_cast<XMFLOAT4*>(islandCandidatesAllocation.mpData), static_cast<size_t>(iIslandCount));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -640,11 +610,10 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 			}
 			else
 			{
-				// Find nearest alive player (shared input for RegenerateHealth + ComputeSteering)
 				XMVECTOR vecNearestPlayer = XMVectorZero();
 				bool bPlayerAlive = NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer);
 
-				RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, fDeltaTime, fHealth);
+				RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, std::chrono::duration<float>(fDeltaTime), fHealth);
 				ComputeSteering(islandCandidates, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], bPlayerAlive, vecNearestPlayer, fDeltaTime, flags, fDeltaRotation);
 				ApplyMovement(rFrame, rCurrentInterpolate, i, flags, fDeltaTime, vecVelocity);
 			}
@@ -653,16 +622,14 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 		{
 			XMVECTOR vecNearestPlayer = XMVectorZero();
 			bool bPlayerAlive = NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer);
-			RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, fDeltaTime, fHealth);
-			ApplyDeathKnockback(rPrevious.pVecDamageDirections[i], vecVelocity);
+			RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, std::chrono::duration<float>(fDeltaTime), fHealth);
+			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
 		}
 
 		ApplyTerrainBounce(rStaticData, rCurrentInterpolate, i, fDeltaTime, fDeltaRotation, vecVelocity);
 
-		// Clamp delta rotation
 		fDeltaRotation = common::ClampMagnitude(fDeltaRotation, kfSpaceshipMaxTurnRate);
 
-		// Save to PostRender (static fields copied via memcpy in AllocateAndCopy)
 		rCurrent.pFlags[i] = flags;
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pfHealths[i] = fHealth;

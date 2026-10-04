@@ -100,7 +100,7 @@ void ServerUpdateDisplayStatistics()
 
 	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{
-		game::ServerCellStats cellStatistics = game::GetServerCellStats((*game::gpGame->mCoordinateFrames.at(rCoordinate).pCurrent));
+		game::ServerCellStats cellStatistics = game::GetServerCellStatistics((*game::gpGame->mCoordinateFrames.at(rCoordinate).pCurrent));
 		siTotalPlayers += cellStatistics.iPlayers;
 		siTotalSpaceships += cellStatistics.iSpaceships;
 		siTotalBlasters += cellStatistics.iBlasters;
@@ -152,7 +152,7 @@ bool ServerDisplayContentChanged()
 
 		// Mix each count separately — summing would alias conversions (e.g. spaceship death -1 spaceship
 		// +1 explosion leaves the sum unchanged) and skip a repaint whose displayed numbers did change.
-		game::ServerCellStats cellStatistics = game::GetServerCellStats((*game::gpGame->mCoordinateFrames.at(rCoordinate).pCurrent));
+		game::ServerCellStats cellStatistics = game::GetServerCellStatistics((*game::gpGame->mCoordinateFrames.at(rCoordinate).pCurrent));
 		Mix(cellStatistics.iPlayers);
 		Mix(cellStatistics.iSpaceships);
 		Mix(cellStatistics.iBlasters);
@@ -312,7 +312,7 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int i
 			// Cell labels for active cells
 			if (bIsActive && iCellSize >= 24)
 			{
-				game::ServerCellStats cellStatistics = game::GetServerCellStats((*game::gpGame->mCoordinateFrames.at(coordinate).pCurrent));
+				game::ServerCellStats cellStatistics = game::GetServerCellStatistics((*game::gpGame->mCoordinateFrames.at(coordinate).pCurrent));
 				int64_t iEntityCount = cellStatistics.iPlayers + cellStatistics.iSpaceships + cellStatistics.iBlasters + cellStatistics.iMissiles + cellStatistics.iExplosions;
 
 				SetTextColor(hDeviceContextBuffer, RGB(220, 220, 220));
@@ -563,9 +563,9 @@ void PaintServerDisplay(HWND hWindow)
 	SelectObject(hDeviceContextBuffer, shFont);
 	SetBkMode(hDeviceContextBuffer, TRANSPARENT);
 
-	game::ServerCellStats originStatistics = game::GetServerCellStats((*game::gpGame->mCoordinateFrames.at(kOriginCoordinate).pCurrent));
+	game::ServerCellStats originStatistics = game::GetServerCellStatistics((*game::gpGame->mCoordinateFrames.at(kOriginCoordinate).pCurrent));
 	int64_t iTick = originStatistics.iTick;
-	float fCurrentTime = originStatistics.fCurrentTime;
+	float fCurrentTime = originStatistics.durationCurrentTime.count();
 
 	const std::vector<ClientConnection>& rClients = gpServer->mClients;
 	int64_t iClientCount = std::ssize(rClients);

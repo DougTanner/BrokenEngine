@@ -18,7 +18,7 @@
 namespace game
 {
 
-int32_t ClientGridCoordValue(const nlohmann::json& rValue, std::string_view command)
+int32_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view command)
 {
 	if (!rValue.is_number_integer())
 	{
@@ -48,7 +48,7 @@ int32_t ClientGridCoordValue(const nlohmann::json& rValue, std::string_view comm
 
 // set_client_grid_coord: move the client's grid cell so automation can drive the cross-cell subscribe and
 // full-state adoption path. Schema: {"coord":[x,y]}.
-static void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohmann::json& rResult)
+static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	// Heap: validation errors and JSON result
 	ScopedSuppressAllocationTracking suppress;
@@ -62,13 +62,13 @@ static void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohman
 		throw std::runtime_error("set_client_grid_coord accepts only 'coord'");
 	}
 
-	const nlohmann::json& rCoord = rParameters.at("coord");
-	if (!rCoord.is_array() || rCoord.size() != 2)
+	const nlohmann::json& rCoordinate = rParameters.at("coord");
+	if (!rCoordinate.is_array() || rCoordinate.size() != 2)
 	{
 		throw std::runtime_error("set_client_grid_coord 'coord' must be an array of 2 integers");
 	}
 
-	engine::GridCoord coord {ClientGridCoordValue(rCoord.at(0), "set_client_grid_coord"), ClientGridCoordValue(rCoord.at(1), "set_client_grid_coord")};
+	engine::GridCoord coordinate {.iX = ClientGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord"), .iY = ClientGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord")};
 
 	// Before player assignment the subscription policy falls back to origin, so the requested cell would be dropped.
 	if (gpGame == nullptr)
@@ -95,63 +95,63 @@ static void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohman
 	{
 		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
 	}
-	if (!(gpGame->ClientPlayerId().iValue != 0))
+	if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
 	{
 		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
 	}
 
 	// Order is an invariant: the setter clears the visible-neighbour cache keyed by the old cell.
-	gpGame->SetClientGridCoord(coord);
-	gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kPollTick);
+	gpGame->SetClientGridCoordinate(coordinate);
+	gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kPollTick);
 
-	rResult["clientGridCoord"] = {coord.iX, coord.iY};
+	rResult["clientGridCoord"] = {coordinate.iX, coordinate.iY};
 }
 
-bool ExecuteAgentCommandClient(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
+bool ExecuteAgentCommandClient(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (cmd == "audio_streaming_fixture")
+	if (command == "audio_streaming_fixture")
 	{
-		CommandAudioStreamingFixture(rParams, rResult);
+		CommandAudioStreamingFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "client_subscribe_accept_fixture")
+	if (command == "client_subscribe_accept_fixture")
 	{
-		CommandClientSubscribeAcceptFixture(rParams, rResult);
+		CommandClientSubscribeAcceptFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "client_stale_update_fixture")
+	if (command == "client_stale_update_fixture")
 	{
-		CommandClientStaleUpdateFixture(rParams, rResult);
+		CommandClientStaleUpdateFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "client_cancelled_subscription_fixture")
+	if (command == "client_cancelled_subscription_fixture")
 	{
-		CommandClientCancelledSubscriptionFixture(rParams, rResult);
+		CommandClientCancelledSubscriptionFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "client_packet_fault_fixture")
+	if (command == "client_packet_fault_fixture")
 	{
-		CommandClientPacketFaultFixture(rParams, rResult);
+		CommandClientPacketFaultFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "client_full_state_fixture")
+	if (command == "client_full_state_fixture")
 	{
-		CommandClientFullStateFixture(rParams, rResult);
+		CommandClientFullStateFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "describe_scene")
+	if (command == "describe_scene")
 	{
-		CommandDescribeScene(rParams, rResult);
+		CommandDescribeScene(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "desync_probe")
+	if (command == "desync_probe")
 	{
-		CommandDesyncProbe(rParams, rResult);
+		CommandDesynchronizationProbe(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "set_client_grid_coord")
+	if (command == "set_client_grid_coord")
 	{
-		CommandSetClientGridCoord(rParams, rResult);
+		CommandSetClientGridCoordinate(rParameters, rResult);
 		return true;
 	}
 	return false;

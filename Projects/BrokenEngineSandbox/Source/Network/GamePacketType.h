@@ -24,36 +24,53 @@ enum class GamePacketType : uint8_t
 	kClientTimespeedRequest,      // Client requests timescale change (debug only)
 };
 
-// Declarative per-packet contract for game-range client -> server packets, checked once at the ParseReceivedGamePackets
-// dispatch choke point (ServerSession.cpp). Sizes are the FULL packet including the type byte; the dispatch site strips
-// the type byte, so it compares each row against payload.size() + 1. A sentinel {} row (iMaximumSize == 0) means the type is
-// not client-sendable (server->client or unknown) -> contract violation.
+// Game-range contracts are checked once before dispatch in ServerSession::ParseReceivedGamePackets.
+// Sizes include the type byte; Server::Receive strips it, and Server::AdmitGamePacket checks payload size + 1.
+// A zero iMaximumSize marks server-to-client or unknown types as not client-sendable: a contract violation.
 constexpr engine::ClientPacketContract GetGamePacketContract(GamePacketType eType)
 {
 	switch (eType)
 	{
-		case GamePacketType::kClientUpdatePlayerRequest: return {14, 14, 8};   // 8B globalId + 1B bUseMissiles + 4B navDelay + 1B type
-		case GamePacketType::kClientFleetNavigationDelay: return {21, 21, 8};  // 16B fleetGuid + 4B delay + 1B type (edge-triggered send)
-		case GamePacketType::kClientCreateFleetRequest: return {1, 1, 4};      // 1B type only
-		case GamePacketType::kClientDeleteFleetRequest: return {17, 17, 8};    // 16B fleetGuid + 1B type
-		case GamePacketType::kClientSpawnIntoFleetRequest: return {17, 17, 8}; // 16B fleetGuid + 1B type
-		case GamePacketType::kClientRespawnInFleetRequest: return {25, 25, 16}; // 16B fleetGuid + 8B member globalId + 1B type
+		case GamePacketType::kClientUpdatePlayerRequest: return {.iMinimumSize = 14, .iMaximumSize = 14, .iMaximumPerTick = 8};   // 8B globalId + 1B bUseMissiles + 4B navDelay + 1B type
+		case GamePacketType::kClientFleetNavigationDelay: return {.iMinimumSize = 21, .iMaximumSize = 21, .iMaximumPerTick = 8};  // 16B fleetGuid + 4B delay + 1B type (edge-triggered send)
+		case GamePacketType::kClientCreateFleetRequest: return {.iMinimumSize = 1, .iMaximumSize = 1, .iMaximumPerTick = 4};      // 1B type only
+		case GamePacketType::kClientDeleteFleetRequest: return {.iMinimumSize = 17, .iMaximumSize = 17, .iMaximumPerTick = 8};    // 16B fleetGuid + 1B type
+		case GamePacketType::kClientSpawnIntoFleetRequest: return {.iMinimumSize = 17, .iMaximumSize = 17, .iMaximumPerTick = 8}; // 16B fleetGuid + 1B type
+		case GamePacketType::kClientRespawnInFleetRequest: return {.iMinimumSize = 25, .iMaximumSize = 25, .iMaximumPerTick = 16}; // 16B fleetGuid + 8B member globalId + 1B type
 
-		// Debug-control packets: compile-time gated on kbDebugInput. When debug input is disabled the contract returns the
-		// sentinel so a non-debug server treats them as not-client-sendable -> violation. Rationale: without the gate any
-		// handshaken client could reset / pause / re-speed the whole server.
+		// With kbDebugInput false, debug-control requests return the non-sendable sentinel, preventing handshaken clients from resetting, pausing, or changing server speed.
 		case GamePacketType::kClientSaveRequest:
 		case GamePacketType::kClientLoadRequest:
 		case GamePacketType::kClientResetRequest:
 		case GamePacketType::kClientReplayRecordRequest:
 		case GamePacketType::kClientReplayPlaybackRequest:
-			if constexpr (kbDebugInput) { return {1, 1, 2}; } else { return {}; } // 1B type only
+			if constexpr (kbDebugInput)
+			{
+				return {.iMinimumSize = 1, .iMaximumSize = 1, .iMaximumPerTick = 2}; // 1B type only
+			}
+			else
+			{
+				return {};
+			}
 		case GamePacketType::kClientPauseRequest:
-			if constexpr (kbDebugInput) { return {2, 2, 4}; } else { return {}; } // 1B paused + 1B type
+			if constexpr (kbDebugInput)
+			{
+				return {.iMinimumSize = 2, .iMaximumSize = 2, .iMaximumPerTick = 4}; // 1B paused + 1B type
+			}
+			else
+			{
+				return {};
+			}
 		case GamePacketType::kClientTimespeedRequest:
-			if constexpr (kbDebugInput) { return {2, 2, 8}; } else { return {}; } // 1B direction + 1B type
+			if constexpr (kbDebugInput)
+			{
+				return {.iMinimumSize = 2, .iMaximumSize = 2, .iMaximumPerTick = 8}; // 1B direction + 1B type
+			}
+			else
+			{
+				return {};
+			}
 
-		// Server -> client types and unknown -> not client-sendable.
 		default: return {};
 	}
 }

@@ -15,7 +15,7 @@ struct OwnedEntity;
 namespace game
 {
 
-struct ClientSpawnInfo;
+struct ClientSpawnInformation;
 
 struct PendingCreateFleetRequest
 {
@@ -56,14 +56,10 @@ public:
 
 	void SendFleetSyncToClient(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 
-	void QueueCreateRequest(const PendingCreateFleetRequest& rRequest);
-	void QueueDeleteRequest(const PendingDeleteFleetRequest& rRequest);
-	void QueueSpawnIntoRequest(const PendingSpawnIntoFleetRequest& rRequest);
-	void QueueRespawnRequest(const PendingRespawnInFleetRequest& rRequest);
 	void ClearPendingRequests();
 
 	void OnPlayerDeath(const engine::ClientGuid& rGuid, engine::GlobalId globalId);
-	void OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInfo& rSpawnInfo, engine::GlobalId globalPlayerId);
+	void OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInformation& rSpawnInfo, engine::GlobalId globalPlayerId);
 	void OnPlayerTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalPlayerId, engine::GridCoord destination);
 	void OnClientConnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void OnClientDisconnected(const engine::ClientGuid& rClientGuid);
@@ -84,7 +80,7 @@ public:
 	};
 	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId);
 
-	void UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, float fDelay);
+	void UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, std::chrono::duration<float> navigationDelaySeconds);
 
 	void DetectDisconnectedPlayerDeaths();
 
@@ -110,10 +106,11 @@ private:
 	// Position of rFleetGuid within one client's fleet vector; -1 when absent. Delete needs the position, not just the fleet.
 	int64_t FindFleetIndexByGuid(const std::vector<Fleet>& rFleets, const FleetGuid& rFleetGuid) const;
 
-	// Drains each dead member's respawn countdown for connected owners and queues its respawn on expiry.
 	void TickRespawnTimers();
 	void RefreshFleetMembers(Fleet& rFleet, std::span<const engine::OwnedEntity> ownedPlayers);
 	void ResetFleetForLoad(Fleet& rFleet, const engine::ClientGuid& rClientGuid);
+
+public:
 
 	std::vector<PendingCreateFleetRequest> mPendingCreateFleetRequests;
 	std::vector<PendingDeleteFleetRequest> mPendingDeleteFleetRequests;

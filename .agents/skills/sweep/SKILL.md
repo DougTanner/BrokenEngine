@@ -74,18 +74,14 @@ DataPacker, WorktreeCli, and AgentHarness build in Release only (`/compile`
    then ask the user to pick one listed slug, offering the one marked
    `(recommended)` first. Done when the user has chosen; that slug is `-Model`
    for every `-Batch` and `-Close` launch.
-2. Start `C:\Program Files\SmartGit\bin\smartgit.exe` (the default install
-   path; `smartgit.exe` from PATH when installed elsewhere) with the arguments
-   `--open <worktree root>`, so the user browses the uncommitted changes there.
-   Done when SmartGit is launched.
-3. Run `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Plan <Plan> -List`.
+2. Run `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Plan <Plan> -List`.
    Done when it prints each batch name with its unit count.
 
 ### Per batch
 
 Run the batches one after another, with no commit before landing.
 
-4. Delete `Temp/Sweep/Status.txt` if present, then launch the coordinator
+3. Delete `Temp/Sweep/Status.txt` if present, then launch the coordinator
    detached, because a batch outlives the 2-hour background-task limit:
 
    ```powershell
@@ -93,13 +89,15 @@ Run the batches one after another, with no commit before landing.
    ```
 
    Done when the process has started.
-5. Wait with a Monitor until-loop until `Temp/Sweep/Status.txt` exists and no
-   longer reads `RUNNING`; the delete in step 4 keeps the previous run's final
-   line from ending the wait early. Done when `Status.txt` holds a final line.
-6. On `INCOMPLETE` or `PROPAGATE-FAILED`, repeat steps 4-5 for the same batch;
+4. Wait with a Monitor until-loop until `Temp/Sweep/Status.txt` exists and no
+   longer reads `RUNNING`; the delete in step 3 keeps the previous run's final
+   line from ending the wait early. Set the Monitor to its maximum timeout, and
+   re-arm it with the same loop whenever it expires while `Status.txt` still
+   reads `RUNNING`. Done when `Status.txt` holds a final line.
+5. On `INCOMPLETE` or `PROPAGATE-FAILED`, repeat steps 3-4 for the same batch;
    the coordinator resumes from `Temp/Sweep/Progress.md` and reruns the units
    `Temp/Sweep/Failures.txt` lists. Done when `Status.txt` reads `BATCH-DONE`.
-7. When the `BATCH-DONE` line reads `cpp=yes`, dispatch one `builder` running
+6. When the `BATCH-DONE` line reads `cpp=yes`, dispatch one `builder` running
    `/compile` for its `builds=` targets: Client and Server in Debug, the others
    in Release. A failure goes to an
    `implementer` running `/resolve-findings`. Done when every build passes or
@@ -107,28 +105,28 @@ Run the batches one after another, with no commit before landing.
 
 ### Stage close
 
-8. Delete `Temp/Sweep/Status.txt`, launch as step 4 with `'-Close'` in place of
-   `'-Batch','<batch>'`, and wait as step 5. On `CLOSE-FAILED <run>`, repeat;
+7. Delete `Temp/Sweep/Status.txt`, launch as step 3 with `'-Close'` in place of
+   `'-Batch','<batch>'`, and wait as step 4. On `CLOSE-FAILED <run>`, repeat;
    finished runs are skipped. Done when `Status.txt` reads `CLOSE-DONE`.
-9. When the `CLOSE-DONE` line reads `ordering=` above 0, dispatch an
+8. When the `CLOSE-DONE` line reads `ordering=` above 0, dispatch an
    `implementer` running `/resolve-findings` on `Temp/Sweep/Ordering.md`
    `## Findings`; each finding is fixed, never ledgered. Done when every
    finding has a passing `/resolve-findings` handoff.
-10. Run the static checks:
+9. Run the static checks:
 
-    ```powershell
-    pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline>
-    ```
+   ```powershell
+   pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline>
+   ```
 
-    Done when they pass.
-11. When the `CLOSE-DONE` line reads `cpp=yes`, dispatch one `builder` running
+   Done when they pass.
+10. When the `CLOSE-DONE` line reads `cpp=yes`, dispatch one `builder` running
     `/compile` for its `builds=` targets: Client and Server in Debug and
     Release, plus Profile when the line reads `profile=yes`; the others in
     Release. Done when every build passes or the line reads `cpp=no`.
-12. When the `CLOSE-DONE` line reads `replay=yes`, run the `/agent-harness`
+11. When the `CLOSE-DONE` line reads `replay=yes`, run the `/agent-harness`
     replay determinism check. Done when it passes or the line reads
     `replay=no`.
-13. Report the stage per `## Handoff`, then land through `/next-plan` steps
+12. Report the stage per `## Handoff`, then land through `/next-plan` steps
     9-11. Done when `/next-plan` step 11 is done.
 
 ## Handoff

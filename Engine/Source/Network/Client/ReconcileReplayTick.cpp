@@ -169,7 +169,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 
 	if (bHadTransfers)
 	{
-		pNext->postRender.uiSharedCrc = pNext->Crcs();
+		pNext->postRender.uiSharedCrc = pNext->Crc();
 	}
 
 	rScratch.replayStack.push_back(pNext);
@@ -201,7 +201,7 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 		rScratch.iDesyncTick = iTick;
 		rScratch.desyncExpectedCrc = rUpdate.uiSharedCrc;
 		rScratch.desyncActualCrc = uiClientCrc;
-		if constexpr (kbDesyncDebugFrames)
+		if constexpr (kbDesynchronizationDebugFrames)
 		{
 			rScratch.pDesyncClientFrame = std::make_unique<game::Frame>();
 			TransferViaStream(rCurrentFrame, *rScratch.pDesyncClientFrame);

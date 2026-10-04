@@ -15,8 +15,8 @@ ProfileManager::ProfileManager()
 	if constexpr (kbProfiling)
 	{
 #if defined(BT_SERVER)
-		RegisterRawCpuTimer(kCpuTimerPostRenderUpdateNavQuery);
-		RegisterRawCpuTimerEvent(kCpuTimerPostRenderUpdateNavQuery);
+		RegisterRawCpuTimer(kCpuTimerPostRenderUpdateNavigationQuery);
+		RegisterRawCpuTimerEvent(kCpuTimerPostRenderUpdateNavigationQuery);
 #endif // BT_SERVER
 
 		BootStart(engine::kBootTimerTotal);
@@ -29,10 +29,10 @@ void ProfileManager::OnRawCpuTimersLatched(int64_t iSampleTick)
 {
 	if constexpr (kbProfiling)
 	{
-		engine::RawCpuTimerRecord rawRecord = mpRawCpuTimers[static_cast<size_t>(kCpuTimerPostRenderUpdateNavQuery)].record;
+		engine::RawCpuTimerRecord rawRecord = mpRawCpuTimers[static_cast<size_t>(kCpuTimerPostRenderUpdateNavigationQuery)].record;
 		if (rawRecord.iInvocationCount == 8)
 		{
-			PublishRawCpuTimerEvent(kCpuTimerPostRenderUpdateNavQuery, iSampleTick);
+			PublishRawCpuTimerEvent(kCpuTimerPostRenderUpdateNavigationQuery, iSampleTick);
 		}
 	}
 }

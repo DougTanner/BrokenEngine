@@ -26,14 +26,13 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 {
 	const FrameInterpolate& rGameInterpolate = static_cast<const FrameInterpolate&>(rFrameInterpolate);
 
-	// Main menu, or no fleet found for this client — use the canonical menu pose so we don't strand
-	// the camera at whatever stale gameplay position last set mVecPosition.
+	// Main-menu frames and an invalid client-player identity use the canonical menu pose to avoid retaining a stale gameplay target.
 	if (rGameInterpolate.gameFlags & GameFlags::kMainMenu)
 	{
 		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 0.0f)));
 	}
 
-	if (!(gpGame->ClientPlayerId().iValue != 0))
+	if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
 	{
 		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 0.0f)));
 	}
@@ -41,32 +40,32 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	// The interpolate's own cell, not the client cell: its positions are local to that cell, and the camera works in
 	// that same frame, so a target taken from it needs no conversion. Reading the index from a different cell's
 	// players would pick a position a whole cell away.
-	engine::GridCoord coord = rGameInterpolate.renderBasis.coordinate;
-	auto coordIt = gpGame->mCoordinateFrames.find(coord);
-	bool bHasCoord = coordIt != gpGame->mCoordinateFrames.end() && coordIt->second.iSnapshotCount > 0;
-	std::optional<int64_t> oIdx = bHasCoord ? gpGame->ClientPlayerIndex(*gpGame->RenderFrame(coord).postRender.pPlayers) : std::nullopt;
-	if (oIdx)
+	engine::GridCoord coordinate = rGameInterpolate.renderBasis.coordinate;
+	auto it = gpGame->mCoordinateFrames.find(coordinate);
+	bool bHasCoordinate = it != gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0;
+	std::optional<int64_t> oPlayerIndex = bHasCoordinate ? gpGame->ClientPlayerIndex(*gpGame->RenderFrame(coordinate).postRender.pPlayers) : std::nullopt;
+	if (oPlayerIndex)
 	{
-		engine::GlobalId focusedId = gpGame->ClientPlayerId();
-		XMVECTOR vecPlayerPos = rGameInterpolate.pPlayers->pVecPositions[*oIdx];
+		engine::GlobalId focusedPlayerIdentifier = gpGame->ClientPlayerIdentifier();
+		XMVECTOR vecPlayerPosition = rGameInterpolate.pPlayers->pVecPositions[*oPlayerIndex];
 
-		if (focusedId != mLastTrackedPlayerId)
+		if (focusedPlayerIdentifier != mLastTrackedPlayerIdentifier)
 		{
-			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalPlayerId: {} Coord: ({},{}) Index: {}", focusedId, coord.iX, coord.iY, *oIdx);
-			mLastTrackedPlayerId = focusedId;
+			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalPlayerId: {} Coord: ({},{}) Index: {}", focusedPlayerIdentifier, coordinate.iX, coordinate.iY, *oPlayerIndex);
+			mLastTrackedPlayerIdentifier = focusedPlayerIdentifier;
 		}
 
-		return engine::CameraTarget::Tracked(vecPlayerPos, gpGame->mVecVisualErrorOffset);
+		return engine::CameraTarget::Tracked(vecPlayerPosition, gpGame->mVecVisualErrorOffset);
 	}
 
-	static float sfLastLogTime = -1.0f;
-	if (mfTime - sfLastLogTime >= 1.0f)
+	static std::chrono::duration<float> sLastLogTime(-1.0f);
+	if (std::chrono::duration<float>(mfTime) - sLastLogTime >= 1s)
 	{
-		sfLastLogTime = mfTime;
-		if (bHasCoord)
+		sLastLogTime = std::chrono::duration<float>(mfTime);
+		if (bHasCoordinate)
 		{
-			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(coord).postRender.pPlayers;
-			LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}", gpGame->ClientPlayerId(), coord.iX, coord.iY, rPlayers.iCount, rGameInterpolate.pPlayers->iCount);
+			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(coordinate).postRender.pPlayers;
+			LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}", gpGame->ClientPlayerIdentifier(), coordinate.iX, coordinate.iY, rPlayers.iCount, rGameInterpolate.pPlayers->iCount);
 			for (int64_t i = 0; i < rPlayers.iCount; ++i)
 			{
 				LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalPlayerId: {}", i, rPlayers.pGlobalPlayerIds[i]);
@@ -74,7 +73,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		}
 		else
 		{
-			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientPlayerId(), coord.iX, coord.iY);
+			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientPlayerIdentifier(), coordinate.iX, coordinate.iY);
 		}
 	}
 
@@ -91,7 +90,6 @@ void Camera::OnUpdateComplete()
 // Return sun angle, applying UI slider override when in Graphics or ImGui mode
 float Camera::SunAngle() const
 {
-	// Apply time of day slider override when in Graphics or Tweaks UI
 	bool bUseOverride = (game::gpGame->meUiState == engine::UiState::kGraphicsSettings);
 	if constexpr (kbDebugInput)
 	{

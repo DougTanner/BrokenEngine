@@ -22,7 +22,7 @@ void ReconcileInjectPendingFullState(CoordWork& rWork)
 	engine::CoordFrames::PendingFullState& rPending = *rFrames.pendingFullState;
 	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
 	int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
-	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crcs();
+	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crc();
 	rFrames.snapshots[iSlot] = std::move(rPending.pFrame);
 	rScratch.replayStack.clear();
 	rScratch.replayStack.push_back(rFrames.snapshots[iSlot].get());
@@ -64,7 +64,7 @@ static void AdoptUnreachablePendingFullState(CoordWork& rWork)
 
 	int64_t iAdoptedTick = rPending.iTick;
 	int64_t iAdoptedSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
-	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crcs();
+	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crc();
 	rFrames.snapshots[iAdoptedSlot] = std::move(rPending.pFrame);
 
 	rScratch.replayStack.clear();

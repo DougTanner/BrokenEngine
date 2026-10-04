@@ -8,7 +8,10 @@
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
 
-namespace engine { struct FrameStaticData; }
+namespace engine
+{
+struct FrameStaticData;
+} // namespace engine
 
 
 namespace game
@@ -20,25 +23,22 @@ inline constexpr float kfDestroyExplosionInterval = 0.005f;
 inline constexpr float kfPlayerBlastersSpeed = 150.0f;
 inline constexpr float kfBlasterFireInterval = 0.05f;
 
-// Collision
 inline constexpr float kfPlayerRadius = 1.1f;
 
-// Terrain push
 inline constexpr float kfPushMargin = kfPlayerRadius * 0.6667f;
 
 // Movement — three independent tuning axes
 inline constexpr float kfPlayerAcceleration = 75.0f;
 inline constexpr float kfPlayerCatchUpAcceleration = 100.0f;
 inline constexpr float kfPlayerDrag = 1.0f;
-inline constexpr float kfPlayerMaxSpeed = 33.33f;
-inline constexpr float kfPlayerCatchUpMaxSpeed = 33.33f;
+inline constexpr float kfPlayerMaximumSpeed = 33.33f;
+inline constexpr float kfPlayerCatchUpMaximumSpeed = 33.33f;
 inline constexpr float kfPlayerJitterRange = 0.60f;
 
-// Pusher
 inline constexpr float kfPlayerPusherRadius = kfPlayerRadius * 3.3333f;
 inline constexpr float kfPlayerPusherIntensity = 50.0f;
 inline constexpr float kfPlayerPusherPower = 2.0f;
-inline constexpr float kfPlayerMaxPusherPushVelocity = kfPlayerMaxSpeed * 0.5f;
+inline constexpr float kfPlayerMaximumPusherPushVelocity = kfPlayerMaximumSpeed * 0.5f;
 
 #if defined(BT_CLIENT)
 struct HexShieldDirections
@@ -58,10 +58,8 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 	static constexpr char kName[] = "Player";
 	static constexpr common::crc_t kCrc = common::CrcConsteval(kName);
 
-	// Register
 	static void Register();
 
-	// Graphics resources
 	static void GraphicsResources();
 
 	static inline uint8_t suiAreaLightTypeIndex = 0xFF;
@@ -71,17 +69,14 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 	static inline uint8_t suiImpactPointLightControllerTypeIndex = 0xFF;
 	static inline uint8_t suiHexShieldTypeIndex = 0xFF;
 
-	// Allocate and copy
-	static void AllocateAndCopy(PlayersInterpolate& rCurrent, const PlayersInterpolate& rPrevious);
 
-	// Interpolate
 	static void Update(FrameInterpolate& __restrict rFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
 	float* __restrict pfDestroyedTimes = nullptr;
 	float* __restrict pfAnimationTimes = nullptr;
-	engine::pusher_t* __restrict puiPushers = nullptr;
+	engine::pusher_t* __restrict pPushers = nullptr;
 #if defined(BT_CLIENT)
 	float* __restrict pfRotationAccelerationXs = nullptr;
 	float* __restrict pfRotationAccelerationYs = nullptr;
@@ -90,18 +85,18 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 	float* __restrict pfShieldRotations = nullptr;
 	float* __restrict pfShieldShrinks = nullptr;
 	HexShieldDirections* __restrict pHexShieldDirections = nullptr;
-	HexShieldIntensities* __restrict pHexShieldVertIntensities = nullptr;
-	HexShieldIntensities* __restrict pHexShieldFragIntensities = nullptr;
+	HexShieldIntensities* __restrict pHexShieldVertexIntensities = nullptr;
+	HexShieldIntensities* __restrict pHexShieldFragmentIntensities = nullptr;
 #endif // BT_CLIENT
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.pfAnimationTimes, rSelf.puiPushers);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.pfAnimationTimes, rSelf.pPushers);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pfRotationAccelerationXs, rSelf.pfRotationAccelerationYs, rSelf.pWindTrails, rSelf.pHexShields, rSelf.pfShieldRotations, rSelf.pfShieldShrinks, rSelf.pHexShieldDirections, rSelf.pHexShieldVertIntensities, rSelf.pHexShieldFragIntensities);
+		return std::tie(rSelf.pfRotationAccelerationXs, rSelf.pfRotationAccelerationYs, rSelf.pWindTrails, rSelf.pHexShields, rSelf.pfShieldRotations, rSelf.pfShieldShrinks, rSelf.pHexShieldDirections, rSelf.pHexShieldVertexIntensities, rSelf.pHexShieldFragmentIntensities);
 	}
 #endif // BT_CLIENT
 	auto Members(this auto&& rSelf)
@@ -115,25 +110,23 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 	auto PersistentMembers(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.puiPushers, rSelf.pWindTrails, rSelf.pHexShields);
+		return std::tie(rSelf.pPushers, rSelf.pWindTrails, rSelf.pHexShields);
 #else
-		return std::tie(rSelf.puiPushers);
+		return std::tie(rSelf.pPushers);
 #endif
 	}
 
-	// CRC-only subset: excludes pfAnimationTimes (client-only update) and puiPushers (local collection index)
+	// CRC excludes client-only animation time and cell-local pusher handles.
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
 		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes);
 	}
 
-	// Render
-	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords);
+	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
-	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coord);
+	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);
 
-	// Utility
 	bool LogDifferences(const PlayersInterpolate& rOther) const;
 
 #if defined(BT_CLIENT)
@@ -154,37 +147,37 @@ enum class PlayerFlags : uint16_t
 	kIsFlagship       = 0x0080,
 
 	// Nav direction in bits 8-10 (3 bits, stored as value+1: 0-6 representing -1 to 5)
-	kNavDirectionBit0 = 0x0100,
-	kNavDirectionBit1 = 0x0200,
-	kNavDirectionBit2 = 0x0400,
+	kNavigationDirectionBit0 = 0x0100,
+	kNavigationDirectionBit1 = 0x0200,
+	kNavigationDirectionBit2 = 0x0400,
 
 	// Pending weapon mode (bit 11)
 	kPendingUseMissiles = 0x0800,
 
 	// Nav waypoint index in bits 12-13 (2 bits): 0 = largest island, 1 = smallest, 2 = random (saturates at 2)
-	kNavWaypointBit0 = 0x1000,
-	kNavWaypointBit1 = 0x2000,
+	kNavigationWaypointBit0 = 0x1000,
+	kNavigationWaypointBit1 = 0x2000,
 };
 using PlayerFlags_t = common::Flags<PlayerFlags>;
 
-inline constexpr int8_t GetNavDirection(PlayerFlags_t flags)
+inline constexpr int8_t GetNavigationDirection(PlayerFlags_t flags)
 {
 	return static_cast<int8_t>(((std::to_underlying(flags.meFlags) >> 8) & 0x7) - 1);
 }
 
-inline void SetNavDirection(PlayerFlags_t& rFlags, int8_t iDirection)
+inline void SetNavigationDirection(PlayerFlags_t& rFlags, int8_t iDirection)
 {
 	uint16_t uiRaw = std::to_underlying(rFlags.meFlags);
 	uiRaw = static_cast<uint16_t>((uiRaw & ~0x0700) | (static_cast<uint16_t>(iDirection + 1) << 8));
 	rFlags.meFlags = static_cast<PlayerFlags>(uiRaw);
 }
 
-inline constexpr int8_t GetNavWaypointIndex(PlayerFlags_t flags)
+inline constexpr int8_t GetNavigationWaypointIndex(PlayerFlags_t flags)
 {
 	return static_cast<int8_t>((std::to_underlying(flags.meFlags) >> 12) & 0x3);
 }
 
-inline void SetNavWaypointIndex(PlayerFlags_t& rFlags, int8_t iIndex)
+inline void SetNavigationWaypointIndex(PlayerFlags_t& rFlags, int8_t iIndex)
 {
 	uint16_t uiRaw = std::to_underlying(rFlags.meFlags);
 	uiRaw = static_cast<uint16_t>((uiRaw & ~0x3000) | (static_cast<uint16_t>(iIndex) << 12));
@@ -199,8 +192,6 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 	// thread_local: parallel per-Frame tick via Dispatch
 	static inline thread_local int64_t siCollisionLayerIndex = 0;
 
-	// Allocate and copy
-	static void AllocateAndCopy(PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious);
 
 	// Simulation keeps the blaster countdown in [0, kfBlasterFireInterval], which bounds SpawnBlasters to one shot per tick.
 	// Written as one range test so NaN and both infinities fail it too.
@@ -248,19 +239,19 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 private:
 	// Per-player Update helpers (called from PlayersPostRender::Update orchestrator)
 	// Defined in PlayersNavigation.cpp:
-	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecFrameCenter, engine::GridCoord fleetWantedCoord, uint8_t uiPendingFleetWantedCoordTicks, PlayerFlags_t flags, float fDeltaTime, int8_t& riNavDirection, int8_t& riNavWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer);
-	static void XM_CALLCONV ApplyMovement(int8_t iNavDirection, FXMVECTOR vecAiDirection, float fDeltaTime, float fAccelMul, float fDecayMul, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecFrameCenter, engine::GridCoord fleetWantedCoordinate, uint8_t uiPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int8_t& riNavigationDirection, int8_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer);
+	static void XM_CALLCONV ApplyMovement(int8_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, float fDeltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ApplyTerrainPush(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
-	static void XM_CALLCONV ApplyPusherPush(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
 
 	// Defined in PlayersCombat.cpp:
 	static void XM_CALLCONV AcquireTarget(const Frame& __restrict rPreviousFrame, FXMVECTOR vecPosition, PlayerFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
 	static void XM_CALLCONV UpdateFacing(FXMVECTOR vecPosition, FXMVECTOR vecLookPosition, XMVECTOR& rVecWantedDirection);
-	static void RegenerateShield(float fDeltaTime, float fShieldCooldown, float& rfShield);
+	static void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float& rfShield);
 
 	// Weapon and death-explosion spawn helpers (called from PlayersPostRender::Spawn). Defined in PlayersCombat.cpp.
-	static void SpawnBlasters(Frame& __restrict rFrame, engine::GridCoord emitterCoord);
-	static void SpawnMissiles(Frame& __restrict rFrame, engine::GridCoord emitterCoord);
+	static void SpawnBlasters(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
+	static void SpawnMissiles(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
 	static void SpawnDeathExplosions(Frame& __restrict rFrame);
 
 public:
@@ -285,21 +276,21 @@ public:
 	engine::ClientGuid* __restrict pClientGuids = nullptr;
 	engine::GlobalId* __restrict pGlobalPlayerIds = nullptr;
 	float* __restrict pfNavigationDelays = nullptr;
-	engine::GridCoord* __restrict pFleetWantedCoords = nullptr;
-	uint8_t* __restrict puiPendingFleetWantedCoordTicks = nullptr;
+	engine::GridCoord* __restrict pFleetWantedCoordinates = nullptr;
+	uint8_t* __restrict puiPendingFleetWantedCoordinateTicks = nullptr;
 	uint8_t* __restrict puiPendingWeaponModeTicks = nullptr;
 #if defined(BT_CLIENT)
-	XMVECTOR* __restrict pVecDebugNavWaypoints = nullptr;
+	XMVECTOR* __restrict pVecDebugNavigationWaypoints = nullptr;
 #endif // BT_CLIENT
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoords, rSelf.puiPendingFleetWantedCoordTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecDebugNavWaypoints);
+		return std::tie(rSelf.pVecDebugNavigationWaypoints);
 	}
 #endif // BT_CLIENT
 	auto Members(this auto&& rSelf)
@@ -318,13 +309,11 @@ public:
 	// CRC-only subset: excludes pClientGuids and pGlobalPlayerIds which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoords, rSelf.puiPendingFleetWantedCoordTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 
-	// Utility
 	bool LogDifferences(const PlayersPostRender& rOther) const;
 
-	// SpawnInfo for spawn parameters
 	struct SpawnInfo
 	{
 		XMVECTOR vecPosition = DirectX::XMVectorZero();
@@ -347,10 +336,10 @@ public:
 		float fNavigationDelay = 60.0f;
 		engine::GlobalId globalPlayerId {};
 		engine::ClientGuid clientGuid {};
-		engine::GridCoord fleetWantedCoord {};
-		uint8_t uiPendingFleetWantedCoordTicks = 0;
+		engine::GridCoord fleetWantedCoordinate {};
+		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 		uint8_t uiPendingWeaponModeTicks = 0;
-		// Arrival from a neighbouring cell: restore gameplay transfer fields verbatim; client-only visual animation fields use defaults.
+		// Transfers preserve supplied combat fields and animation time; navigation resets at spawn, and shield rotation and shrink use defaults.
 		bool bTransfer = false;
 	};
 
@@ -363,4 +352,4 @@ namespace engine
 {
 extern template struct Collection<game::PlayersInterpolate, CollectionFlags::kIdToIndex>;
 extern template struct Collection<game::PlayersPostRender>;
-}
+} // namespace engine

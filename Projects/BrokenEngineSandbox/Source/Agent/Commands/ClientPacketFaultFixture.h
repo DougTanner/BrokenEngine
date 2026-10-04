@@ -7,10 +7,9 @@ namespace game
 
 class ClientSession;
 
-void CommandClientPacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult);
+void CommandClientPacketFaultFixture(const nlohmann::json& rParameters, nlohmann::json& rResult);
 void InjectArmedClientPacketFault();
-void ResetClientPacketFaultFixture(ClientSession& rSession);
-void DetachClientPacketFaultFixture(ClientSession& rSession);
+void ResetClientPacketFaultFixture(const ClientSession& rSession);
 
 } // namespace game
 

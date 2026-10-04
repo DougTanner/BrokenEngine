@@ -11,15 +11,13 @@
 namespace game
 {
 
-// OptionalCount reads an agent parameter by key; a wrongly typed parameter or a negative count throws.
-
-static int64_t OptionalCount(const nlohmann::json& rParams, std::string_view key, int64_t iDefault)
+static int64_t OptionalCount(const nlohmann::json& rParameters, std::string_view key, int64_t iDefault)
 {
-	if (!rParams.contains(key))
+	if (!rParameters.contains(key))
 	{
 		return iDefault;
 	}
-	int64_t iCount = rParams.at(std::string(key)).get<int64_t>();
+	int64_t iCount = rParameters.at(std::string(key)).get<int64_t>();
 	if (iCount < 0)
 	{
 		std::string message("'");
@@ -30,7 +28,7 @@ static int64_t OptionalCount(const nlohmann::json& rParams, std::string_view key
 	return iCount;
 }
 
-static nlohmann::json Vec3ToJson(XMVECTOR vec)
+static nlohmann::json Vector3ToJson(XMVECTOR vec)
 {
 	return nlohmann::json::array({XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec)});
 }
@@ -42,12 +40,11 @@ static void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t
 	riEnd = iLimit >= iTotal - riBegin ? iTotal : riBegin + iLimit;
 }
 
-// Minimum+cheap field set per collection: index, local/dir, health, alignment, id — wherever the member exists.
 // Every row of one of these reports belongs to the cell the request named, so the position is the local
 // component alone; the caller's own 'coord' parameter identifies the cell.
 static nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
-	const PlayersInterpolate& rInterp = *rFrame.interpolate.pPlayers;
+	const PlayersInterpolate& rInterpolate = *rFrame.interpolate.pPlayers;
 	const PlayersPostRender& rPost = *rFrame.postRender.pPlayers;
 	int64_t iBegin = 0;
 	int64_t iEnd = 0;
@@ -60,8 +57,8 @@ static nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64
 			{"index", i},
 			{"uuid", rPost.pIds[i].uuid.iValue},
 			{"globalId", rPost.pGlobalPlayerIds[i].iValue},
-			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
-			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
+			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
+			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
 			{"armor", rPost.pfArmors[i]},
 			{"shield", rPost.pfShields[i]},
 			{"flags", std::to_underlying(rPost.pFlags[i].meFlags)},
@@ -73,7 +70,7 @@ static nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64
 
 static nlohmann::json ExtractSpaceships(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
-	const SpaceshipsInterpolate& rInterp = *rFrame.interpolate.pSpaceships;
+	const SpaceshipsInterpolate& rInterpolate = *rFrame.interpolate.pSpaceships;
 	const SpaceshipsPostRender& rPost = *rFrame.postRender.pSpaceships;
 	int64_t iBegin = 0;
 	int64_t iEnd = 0;
@@ -84,12 +81,12 @@ static nlohmann::json ExtractSpaceships(const Frame& rFrame, int64_t iOffset, in
 		items.push_back(
 		{
 			{"index", i},
-			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
-			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
+			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
+			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
 			{"health", rPost.pfHealths[i]},
-			{"deltaRotation", rInterp.pfDeltaRotations[i]},
+			{"deltaRotation", rInterpolate.pfDeltaRotations[i]},
 			{"alignment", rPost.pAlignments[i].uiValue},
-			{"registryId", rInterp.puiRegistryIds[i].uuid.iValue},
+			{"registryId", rInterpolate.puiRegistryIds[i].uuid.iValue},
 		});
 	}
 	return items;
@@ -97,7 +94,7 @@ static nlohmann::json ExtractSpaceships(const Frame& rFrame, int64_t iOffset, in
 
 static nlohmann::json ExtractMissiles(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
-	const MissilesInterpolate& rInterp = *rFrame.interpolate.pMissiles;
+	const MissilesInterpolate& rInterpolate = *rFrame.interpolate.pMissiles;
 	const MissilesPostRender& rPost = *rFrame.postRender.pMissiles;
 	int64_t iBegin = 0;
 	int64_t iEnd = 0;
@@ -108,8 +105,8 @@ static nlohmann::json ExtractMissiles(const Frame& rFrame, int64_t iOffset, int6
 		items.push_back(
 		{
 			{"index", i},
-			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
-			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
+			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
+			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
 			{"deltaRotation", rPost.pfDeltaRotations[i]},
 			{"deltaRotationDelay", rPost.pfDeltaRotationDelays[i]},
 			{"alignment", rPost.pAlignments[i].uiValue},
@@ -121,7 +118,7 @@ static nlohmann::json ExtractMissiles(const Frame& rFrame, int64_t iOffset, int6
 
 static nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
-	const BlastersInterpolate& rInterp = *rFrame.interpolate.pBlasters;
+	const BlastersInterpolate& rInterpolate = *rFrame.interpolate.pBlasters;
 	const BlastersPostRender& rPost = *rFrame.postRender.pBlasters;
 	int64_t iBegin = 0;
 	int64_t iEnd = 0;
@@ -132,59 +129,59 @@ static nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int6
 		items.push_back(
 		{
 			{"index", i},
-			{"local", engine::AgentLocalPositionJson(rInterp.pVecPositions[i])},
-			{"dir", Vec3ToJson(rInterp.pVecDirections[i])},
+			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
+			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
 			{"alignment", rPost.pAlignments[i].uiValue},
 		});
 	}
 	return items;
 }
 
-static const Frame& QueryFrame(const nlohmann::json& rParams)
+static const Frame& QueryFrame(const nlohmann::json& rParameters)
 {
-	engine::GridCoord coord = CoordFromParam(rParams);
-	auto framesIt = gpGame->mCoordinateFrames.find(coord);
-	if (framesIt == gpGame->mCoordinateFrames.end())
+	engine::GridCoord coordinate = CoordinateFromParameter(rParameters);
+	auto it = gpGame->mCoordinateFrames.find(coordinate);
+	if (it == gpGame->mCoordinateFrames.end())
 	{
 		throw std::runtime_error("coord has no loaded frame");
 	}
-	// pCurrent is null for a just-activated coord until the first post-tick SwapFrames (never happens while paused);
-	// CurrentFrame would deref it. Coord is agent input, so throw rather than ASSERT.
-	if (framesIt->second.pCurrent == nullptr)
+	// Newly activated coordinates can have no current frame until the next post-tick SwapFrames; paused simulation does not swap.
+	// The coordinate comes from agent input, so an unavailable frame raises a command error.
+	if (it->second.pCurrent == nullptr)
 	{
 		throw std::runtime_error("coord frame not ready");
 	}
-	return (*gpGame->mCoordinateFrames.at(coord).pCurrent);
+	return (*gpGame->mCoordinateFrames.at(coordinate).pCurrent);
 }
 
-void CommandQueryFrame(const nlohmann::json& rParams, nlohmann::json& rResult)
+void CommandQueryFrame(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	const Frame& rFrame = QueryFrame(rParams);
+	const Frame& rFrame = QueryFrame(rParameters);
 	rResult["players"] = {{"count", rFrame.postRender.pPlayers->iCount}};
 	rResult["spaceships"] = {{"count", rFrame.postRender.pSpaceships->iCount}};
 	rResult["missiles"] = {{"count", rFrame.postRender.pMissiles->iCount}};
 	rResult["blasters"] = {{"count", rFrame.postRender.pBlasters->iCount}};
 }
 
-void CommandQueryPlayers(const nlohmann::json& rParams, nlohmann::json& rResult)
+void CommandQueryPlayers(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	const Frame& rFrame = QueryFrame(rParams);
-	int64_t iOffset = OptionalCount(rParams, "offset", 0);
-	int64_t iLimit = OptionalCount(rParams, "limit", 256);
+	const Frame& rFrame = QueryFrame(rParameters);
+	int64_t iOffset = OptionalCount(rParameters, "offset", 0);
+	int64_t iLimit = OptionalCount(rParameters, "limit", 256);
 	rResult["total"] = rFrame.postRender.pPlayers->iCount;
 	rResult["players"] = ExtractPlayers(rFrame, iOffset, iLimit);
 }
 
-void CommandQueryCollection(const nlohmann::json& rParams, nlohmann::json& rResult)
+void CommandQueryCollection(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	const Frame& rFrame = QueryFrame(rParams);
-	if (!rParams.contains("collection") || !rParams.at("collection").is_string())
+	const Frame& rFrame = QueryFrame(rParameters);
+	if (!rParameters.contains("collection") || !rParameters.at("collection").is_string())
 	{
 		throw std::runtime_error("query_collection requires string 'collection'");
 	}
-	std::string collection = rParams.at("collection").get<std::string>();
-	int64_t iOffset = OptionalCount(rParams, "offset", 0);
-	int64_t iLimit = OptionalCount(rParams, "limit", 256);
+	std::string collection = rParameters.at("collection").get<std::string>();
+	int64_t iOffset = OptionalCount(rParameters, "offset", 0);
+	int64_t iLimit = OptionalCount(rParameters, "limit", 256);
 
 	int64_t iTotal = 0;
 	nlohmann::json items;

@@ -16,12 +16,10 @@ namespace game
 
 using enum SpaceshipFlags;
 
-// Ai / combat
-constexpr float kfHealthRegen = 0.1f;
-constexpr float kfHealthRegenDistance = 60.0f;
-constexpr float kfDeathKnockbackSpeed = 20.0f;
+constexpr float kfHealthRegeneration = 0.1f;
+constexpr float kfHealthRegenerationDistance = 60.0f;
 
-// Collision layer index (set each frame in PreCollision)
+// PreCollision sets the collision layer index when spaceships are present.
 // thread_local: parallel per-Frame tick via Dispatch
 static thread_local int64_t siCollisionLayerIndex = 0;
 static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
@@ -32,27 +30,27 @@ struct SpaceshipCollisionIntervalScratch
 {
 	std::vector<float> startTimes;
 	std::vector<float> endTimes;
-	std::vector<float> maxTimes;
+	std::vector<float> maximumTimes;
 };
 
 static SpaceshipCollisionIntervalScratch& GetSpaceshipCollisionIntervalScratch()
 {
-	// Function-local TLS defers construction until first use; default construction is allocation-free
-	// (empty vectors), so it is safe even before allocator startup completes. Growth sites suppress tracking.
+	// Function-local TLS defers construction until first use; empty vectors require no allocation before allocator startup.
+	// Vector growth suppresses allocation tracking.
 	static thread_local SpaceshipCollisionIntervalScratch sScratch;
 	return sScratch;
 }
 
 // Shared type indices (defined in Spaceships.cpp, set during Register())
-extern uint8_t gSpaceshipExplosionTypeIndex;
+extern uint8_t guiSpaceshipExplosionTypeIndex;
 #if defined(BT_CLIENT)
-extern uint8_t gSpaceshipHitFlashControllerTypeIndex;
+extern uint8_t guiSpaceshipHitFlashControllerTypeIndex;
 #endif
 
-// Forward declaration (defined in Spaceships.cpp)
+// Defined in Spaceships.cpp.
 void SpawnSpaceshipExplosion(Frame& __restrict rFrame, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent);
 
-static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoord, int64_t i, FXMVECTOR vecDamageDirection)
+static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecDamageDirection)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
@@ -67,26 +65,20 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	// Clear the registry id so missiles stop tracking
 	rCurrentInterpolate.puiRegistryIds[i] = {};
 
-	// Play explosion audio
 #if defined(BT_CLIENT)
-	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, emitterCoord, rCurrentInterpolate.pVecPositions[i], gSpaceshipDeathVolume.mfCurrent, gSpaceshipDeathPitchMin.mfCurrent, gSpaceshipDeathPitchRandom.mfCurrent);
+	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], gSpaceshipDeathVolume.mfCurrent, gSpaceshipDeathPitchMinimum.mfCurrent, gSpaceshipDeathPitchRandom.mfCurrent);
 #endif
 
 	XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
 	SpawnSpaceshipExplosion(rFrame, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
 }
 
-void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, SpaceshipFlags_t flags, float fDeltaTime, float& rfHealth)
+void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth)
 {
-	if (!(flags & kExploding) && bPlayerAlive && common::Distance(vecPosition, vecNearestPlayer) > kfHealthRegenDistance) [[unlikely]]
+	if (!(flags & kExploding) && bPlayerAlive && common::Distance(vecPosition, vecNearestPlayer) > kfHealthRegenerationDistance) [[unlikely]]
 	{
-		rfHealth = std::min(rfHealth + fDeltaTime * kfHealthRegen, kfSpaceshipHealth);
+		rfHealth = std::min(rfHealth + deltaTime.count() * kfHealthRegeneration, kfSpaceshipHealth);
 	}
-}
-
-void XM_CALLCONV SpaceshipsPostRender::ApplyDeathKnockback(FXMVECTOR vecDamageDirection, XMVECTOR& rVecVelocity)
-{
-	rVecVelocity = XMVectorScale(XMVectorNegate(vecDamageDirection), kfDeathKnockbackSpeed);
 }
 
 void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
@@ -104,14 +96,13 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 		return;
 	}
 
-	// Build collision arrays
 	size_t uiCount = static_cast<size_t>(rCurrentInterpolate.iCount);
 	sCollisionFlags.resize(uiCount);
 	sCollisionRadii.resize(uiCount);
 	sCollisionDamages.resize(uiCount);
 	rCollisionScratch.startTimes.resize(uiCount);
 	rCollisionScratch.endTimes.resize(uiCount);
-	rCollisionScratch.maxTimes.resize(uiCount);
+	rCollisionScratch.maximumTimes.resize(uiCount);
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
@@ -120,24 +111,23 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 		rCollisionScratch.startTimes.at(static_cast<size_t>(i)) = 0.0f;
 		rCollisionScratch.endTimes.at(static_cast<size_t>(i)) = 1.0f;
 		engine::SegmentHit boundaryHit = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.maxTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
+		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
 
-	// Add spaceship layer to Collision
 	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
 		.pVecStartPositions = rPreviousFrame.interpolate.pSpaceships->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
 		.pfStartTimes = rCollisionScratch.startTimes.data(),
 		.pfEndTimes = rCollisionScratch.endTimes.data(),
-		.pfMaxTimes = rCollisionScratch.maxTimes.data(),
+		.pfMaxTimes = rCollisionScratch.maximumTimes.data(),
 		.pfRadii = sCollisionRadii.data(),
 		.pfDamages = sCollisionDamages.data(),
 		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
-		.uiCategory = CollisionCategory::kSpaceship,
-		.uiCollidesWith = CollidesWith::kSpaceship,
+		.uiCategory = CollisionCategory::kuiSpaceship,
+		.uiCollidesWith = CollidesWith::kuiSpaceship,
 		.pAlignments = rCurrentPostRender.pAlignments,
 	});
 }
@@ -168,18 +158,16 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 			std::span<const engine::CollisionResult> collisions = engine::Collision::GetCollisions(siCollisionLayerIndex, i);
 			for (const engine::CollisionResult& rResult : collisions)
 			{
-				if (rResult.uiOtherCategory == CollisionCategory::kBlaster)
+				if (rResult.uiOtherCategory == CollisionCategory::kuiBlaster)
 				{
 					rCurrentPostRender.pfHealths[i] -= rResult.fDamageReceived;
 
-					// Play hit sound
 #if defined(BT_CLIENT)
 					engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.mfCurrent);
 #endif
 
-					// Spawn hit flash effect at collision point
 #if defined(BT_CLIENT)
-					engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), gSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+					engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), guiSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 
 					if (rCurrentPostRender.pfHealths[i] <= 0.0f)
@@ -194,7 +182,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 
 		if (!(rCurrentPostRender.pFlags[i] & kExploding) && engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
-			// Entity candidates at or beyond frame exit were filtered during PreCollision.
+			// PreCollision's exclusive maximum-time cutoff excludes entity contacts at or beyond frame exit.
 			rCurrentPostRender.pFlags[i].Set(kTransfer);
 		}
 	}
@@ -207,7 +195,6 @@ void SpaceshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame,
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		// Skip already exploding or transferring spaceships
 		if (rCurrentPostRender.pFlags[i] & kExploding)
 		{
 			continue;
@@ -218,16 +205,14 @@ void SpaceshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame,
 			continue;
 		}
 
-		// Query area damage from missiles (filter by kMissile category)
 		XMVECTOR vecClosestSource {};
-		float fDamage = engine::AreaDamage::Get(rCurrentInterpolate.pVecPositions[i], CollisionCategory::kMissile, vecClosestSource);
+		float fDamage = engine::AreaDamage::Get(rCurrentInterpolate.pVecPositions[i], CollisionCategory::kuiMissile, vecClosestSource);
 
 		if (fDamage <= 0.0f)
 		{
 			continue;
 		}
 
-		// Apply damage
 		rCurrentPostRender.pfHealths[i] -= fDamage;
 
 		if (rCurrentPostRender.pfHealths[i] <= 0.0f)

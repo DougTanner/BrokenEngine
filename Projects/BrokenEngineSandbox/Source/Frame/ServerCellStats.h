@@ -11,7 +11,7 @@ struct Frame;
 struct ServerCellStats
 {
 	int64_t iTick = 0;
-	float fCurrentTime = 0.0f;
+	std::chrono::duration<float> durationCurrentTime = std::chrono::duration<float>::zero();
 	int64_t iPlayers = 0;
 	int64_t iSpaceships = 0;
 	int64_t iBlasters = 0;
@@ -19,7 +19,7 @@ struct ServerCellStats
 	int64_t iExplosions = 0;
 };
 
-[[nodiscard]] ServerCellStats GetServerCellStats(const Frame& rFrame);
+[[nodiscard]] ServerCellStats GetServerCellStatistics(const Frame& rFrame);
 
 // Sums the active cells into the game entity counters the profile overlay and the agent profile query read.
 void PublishServerEntityCounts();

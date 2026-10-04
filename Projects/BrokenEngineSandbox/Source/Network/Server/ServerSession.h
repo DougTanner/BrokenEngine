@@ -23,7 +23,7 @@ class ServerClientManager;
 struct SubscriptionUpdate
 {
 	int64_t iClientId = 0;
-	engine::GridCoord newCoord {};
+	engine::GridCoord newCoordinate {};
 	engine::GlobalId globalPlayerId {};
 };
 
@@ -42,8 +42,8 @@ public:
 
 	void PrepareTick();
 	void ParseReceivedGamePackets();
-	void SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coord);
-	void SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coord);
+	void SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate);
+	void SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coordinate);
 	void StepTimescale(bool bFaster); // step time scale one notch (faster/slower) and broadcast; shared by the packet handler and the agent command
 	void SubscriptionUpdates();
 	void ResetClientsForLoad();
@@ -69,9 +69,8 @@ private:
 	void AfterNetworkPoll();
 	void FinalizeTickClients();
 
-	// ServerSessionRuntime::ComputeActiveSet hooks
-	void AddGameRequiredCoords();
-	void OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame> pFrame);
+	// ServerSessionRuntime::ComputeActiveSet hook
+	void AddGameRequiredCoordinates();
 
 };
 

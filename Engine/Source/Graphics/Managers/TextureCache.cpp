@@ -97,7 +97,7 @@ void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExt
 
 void TextureCache::GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTable()
 {
-	if constexpr (kbRandomlyInvalidatePbrCubemapCache)
+	if constexpr (kbRandomlyInvalidatePhysicallyBasedRenderingCubemapCache)
 	{
 		common::RandomEngine randomEngine(static_cast<uint32_t>(std::chrono::steady_clock::now().time_since_epoch().count()));
 		if (common::Random(10u, randomEngine) == 0)

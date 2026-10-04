@@ -56,8 +56,8 @@ struct SpawnPlayerData
 {
 	int64_t iGlobalId = 0;
 	bool bIsFlagship = false;
-	engine::GridCoord fleetWantedCoord {};
-	uint8_t uiPendingFleetWantedCoordTicks = 0;
+	engine::GridCoord fleetWantedCoordinate {};
+	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 	// Spawn point in meters from the target cell's center.
 	float fSpawnOffsetX = 45.0f;
 	float fSpawnOffsetY = -12.0f;
@@ -76,7 +76,7 @@ struct UpdatePlayerData
 {
 	int64_t iPlayerUuid = 0;
 	bool bUseMissiles = false;
-	float fNavigationDelay = 60.0f;
+	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 	uint8_t uiPendingWeaponModeTicks = 0;
 	bool operator==(const UpdatePlayerData&) const = default;
 };
@@ -85,8 +85,8 @@ struct UpdateFleetData
 {
 	int64_t iPlayerUuid = 0;
 	bool bIsFlagship = false;
-	engine::GridCoord fleetWantedCoord {};
-	uint8_t uiPendingFleetWantedCoordTicks = 0;
+	engine::GridCoord fleetWantedCoordinate {};
+	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 	bool operator==(const UpdateFleetData&) const = default;
 };
 
@@ -94,7 +94,7 @@ struct TransferData
 {
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity, rSelf.alignment, rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex, rSelf.fAcceleration, rSelf.fNextBlasterFireTime, rSelf.fNextSecondarySpawnTime, rSelf.fShieldCooldown, rSelf.fShieldDownSoundCooldown, rSelf.fAnimationTime, rSelf.uiPlayerFlags, rSelf.fNextBlasterSpawnTime, rSelf.fNavigationDelay, rSelf.fDeltaRotationDelay, rSelf.fTime, rSelf.fNextJitter, rSelf.fDeltaRotation, rSelf.fDeltaRotationMax, rSelf.fPitch, rSelf.globalPlayerId, rSelf.fleetWantedCoord, rSelf.uiPendingFleetWantedCoordTicks, rSelf.uiPendingWeaponModeTicks);
+		return std::tie(rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity, rSelf.alignment, rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex, rSelf.fAcceleration, rSelf.nextBlasterFireTimeSeconds, rSelf.nextSecondarySpawnTimeSeconds, rSelf.shieldCooldownSeconds, rSelf.shieldDownSoundCooldownSeconds, rSelf.animationTimeSeconds, rSelf.uiPlayerFlags, rSelf.nextBlasterSpawnTimeSeconds, rSelf.navigationDelaySeconds, rSelf.deltaRotationDelaySeconds, rSelf.timeSeconds, rSelf.nextJitterSeconds, rSelf.fDeltaRotation, rSelf.fDeltaRotationMaximum, rSelf.fPitch, rSelf.globalPlayerId, rSelf.fleetWantedCoordinate, rSelf.uiPendingFleetWantedCoordinateTicks, rSelf.uiPendingWeaponModeTicks);
 	}
 
 	bool operator==(const TransferData& rOther) const
@@ -112,39 +112,39 @@ struct TransferData
 	float fAcceleration = 0.0f;
 
 	// Player timers
-	float fNextBlasterFireTime = 0.0f;
-	float fNextSecondarySpawnTime = 0.0f;
-	float fShieldCooldown = 0.0f;
-	float fShieldDownSoundCooldown = 0.0f;
+	std::chrono::duration<float> nextBlasterFireTimeSeconds = std::chrono::duration<float>(0.0f);
+	std::chrono::duration<float> nextSecondarySpawnTimeSeconds = std::chrono::duration<float>(0.0f);
+	std::chrono::duration<float> shieldCooldownSeconds = std::chrono::duration<float>(0.0f);
+	std::chrono::duration<float> shieldDownSoundCooldownSeconds = std::chrono::duration<float>(0.0f);
 
 	// Player interpolate state
-	float fAnimationTime = 0.0f;
+	std::chrono::duration<float> animationTimeSeconds = std::chrono::duration<float>(0.0f);
 	uint16_t uiPlayerFlags = 0;
 
 	// Spaceship timers
-	float fNextBlasterSpawnTime = 0.0f;
+	std::chrono::duration<float> nextBlasterSpawnTimeSeconds = std::chrono::duration<float>(0.0f);
 
 	// Navigation delay (player transfers only)
-	float fNavigationDelay = 60.0f;
+	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 
 	// Missile timers
-	float fDeltaRotationDelay = 0.0f;
-	float fTime = 0.0f;
-	float fNextJitter = 0.0f;
+	std::chrono::duration<float> deltaRotationDelaySeconds = std::chrono::duration<float>(0.0f);
+	std::chrono::duration<float> timeSeconds = std::chrono::duration<float>(0.0f);
+	std::chrono::duration<float> nextJitterSeconds = std::chrono::duration<float>(0.0f);
 
 	// Live turn rate (spaceship and missile transfers)
 	float fDeltaRotation = 0.0f;
-	float fDeltaRotationMax = 0.0f;
+	float fDeltaRotationMaximum = 0.0f;
 	float fPitch = 0.0f;
 
 	// Global player ID (player transfers only)
 	engine::GlobalId globalPlayerId {};
 
 	// Fleet wanted coord (player transfers only)
-	engine::GridCoord fleetWantedCoord {};
+	engine::GridCoord fleetWantedCoordinate {};
 
 	// Pending countdown ticks (player transfers only)
-	uint8_t uiPendingFleetWantedCoordTicks = 0;
+	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 	uint8_t uiPendingWeaponModeTicks = 0;
 
 	// Client GUID (player transfers only, not serialized over network)

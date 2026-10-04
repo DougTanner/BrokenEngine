@@ -4,6 +4,7 @@
 
 #if defined(BT_SERVER)
 
+#include "File/Replay.h"
 #include "Network/Server/Server.h"
 #include "Network/Server/ServerBroadcaster.h"
 #include "Network/NetworkDiscoveryResponder.h"
@@ -321,7 +322,7 @@ void ServerSessionRuntime::SyncActiveFrames()
 			continue;
 		}
 
-		mrSession.OnFrameRetiring(it->first, std::move(it->second.pCurrent));
+		engine::gpReplay->RetireCoordinate(it->first, std::move(it->second.pCurrent));
 		it = game::gpGame->mCoordinateFrames.erase(it);
 	}
 }
@@ -333,7 +334,7 @@ void ServerSessionRuntime::ComputeActiveSet()
 
 	game::gpGame->mActiveCoordinates.clear();
 	AddSubscribedCoords();
-	mrSession.AddGameRequiredCoords();
+	mrSession.AddGameRequiredCoordinates();
 
 	if (!std::ranges::contains(game::gpGame->mActiveCoordinates, engine::kOriginCoordinate))
 	{

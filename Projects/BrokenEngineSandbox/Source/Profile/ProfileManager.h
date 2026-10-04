@@ -30,7 +30,7 @@ enum GameCpuTimers : int64_t
 		kCpuTimerFramePostRender,
 			kCpuTimerPostRenderAllocateAndCopy,
 			kCpuTimerPostRenderUpdate,
-				kCpuTimerPostRenderUpdateNavQuery,
+				kCpuTimerPostRenderUpdateNavigationQuery,
 				kCpuTimerPostRenderUpdateSpaceships,
 			kCpuTimerPostRenderPreCollision,
 			kCpuTimerPostRenderCollide,
@@ -100,10 +100,14 @@ private:
 	void OnRawCpuTimersLatched(int64_t iSampleTick) override;
 #endif // BT_SERVER
 
-	// Names live in the kGameCpu*Names tables above (static_assert-guarded); these arrays carry only per-row runtime state.
-	engine::CpuCounter mGameCpuCounters[static_cast<int64_t>(kGameCpuCounterCount) - static_cast<int64_t>(engine::kEngineCpuCounterCount)];
+public:
 
-	engine::CpuTimer mGameCpuTimers[static_cast<int64_t>(kGameCpuTimerCount) - static_cast<int64_t>(engine::kEngineCpuTimerCount)];
+	// Names live in the kGameCpu*Names tables above (static_assert-guarded); these arrays carry only per-row runtime state.
+	engine::CpuCounter mGameCpuCounters[static_cast<int64_t>(kGameCpuCounterCount) - static_cast<int64_t>(engine::kEngineCpuCounterCount)] {};
+
+private:
+
+	engine::CpuTimer mGameCpuTimers[static_cast<int64_t>(kGameCpuTimerCount) - static_cast<int64_t>(engine::kEngineCpuTimerCount)] {};
 };
 
 extern ProfileManager* gpProfileManager;

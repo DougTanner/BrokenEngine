@@ -22,7 +22,7 @@ private:
 	static float PanelWidth();
 	engine::SlidePanelState mFleetSlide {};
 	engine::SlidePanelState mFocusedPlayerSlide {};
-	float mfTimeWantingForceOpen = 0.0f;
+	std::chrono::duration<float> mTimeWantingForceOpen = 0s;
 	bool mbPreviousForceOpen = false;
 #endif
 };

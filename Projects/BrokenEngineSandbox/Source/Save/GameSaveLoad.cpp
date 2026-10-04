@@ -17,25 +17,25 @@
 namespace game
 {
 
-bool WriteReplayMeta(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename)
+bool WriteReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename)
 {
-	ReplayMeta meta
+	ReplayMeta metadata
 	{
-		.clientGridCoord = game::gpGame->mClientGridCoordinate,
-		.iClientPlayerIdValue = game::gpGame->ClientPlayerId().iValue,
+		.clientGridCoordinate = game::gpGame->mClientGridCoordinate,
+		.iClientPlayerIdentifierValue = game::gpGame->ClientPlayerIdentifier().iValue,
 		.fPreviousClientArmor = game::gpGame->mfPreviousClientArmor,
 	};
-	return engine::WriteVersionedFile(rFlags, rFilename, meta);
+	return engine::WriteVersionedFile(rFlags, rFilename, metadata);
 }
 
-bool ReadReplayMeta(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename, ReplayStagedMeta& rStagedMeta)
+bool ReadReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename, ReplayStagedMeta& rStagedMetadata)
 {
-	return engine::ReadVersionedFile(rFlags, rFilename, rStagedMeta.meta);
+	return engine::ReadVersionedFile(rFlags, rFilename, rStagedMetadata.metadata);
 }
 
-void AdoptReplayMeta(ReplayStagedMeta&& rStagedMeta)
+void AdoptReplayMetadata(const ReplayStagedMeta&& rStagedMetadata)
 {
-	game::gpGame->RestoreReplayMeta(rStagedMeta.meta);
+	game::gpGame->RestoreReplayMetadata(rStagedMetadata.metadata);
 }
 
 void OnReplayStreamsInvalidated()
@@ -48,20 +48,10 @@ void OnStateReplaced()
 	game::gpServerSession->ResetClientsForLoad();
 }
 
-bool GameSaveLoad::ServerSave()
-{
-	return ServerSave(game::gpGame->QuicksaveFile());
-}
-
 bool GameSaveLoad::ServerSave(const std::filesystem::path& rFilename)
 {
 	ScopedSuppressAllocationTracking suppress;
 	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, rFilename, game::gpGame->mClientGridCoordinate);
-}
-
-bool GameSaveLoad::ServerLoad()
-{
-	return ServerLoad(game::gpGame->QuicksaveFile());
 }
 
 bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
@@ -69,8 +59,8 @@ bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 	ScopedSuppressAllocationTracking suppress;
 	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->miTickCounter);
 
-	engine::GridCoord loadedClientGridCoord {};
-	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, loadedClientGridCoord))
+	engine::GridCoord loadedClientGridCoordinate {};
+	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, loadedClientGridCoordinate))
 	{
 		return false;
 	}
@@ -83,7 +73,7 @@ bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 	ASSERT(iTickCounter >= 0);
 	game::gpGame->miTickCounter = iTickCounter;
 	game::gpGame->mfCurrentTime = fLoadedTime;
-	game::gpGame->SetClientGridCoord(loadedClientGridCoord);
+	game::gpGame->SetClientGridCoordinate(loadedClientGridCoordinate);
 	game::OnStateReplaced();
 	game::gpServerSession->mpRuntime->ComputeActiveSet();
 
@@ -113,7 +103,17 @@ bool GameSaveLoad::Autosave()
 
 void GameSaveLoad::TickAutosave()
 {
-	if (game::gpGame->mbReplaying || (!engine::gpReplay->mReplayWriters.empty()) || (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay))
+	if (game::gpGame->mbReplaying)
+	{
+		return;
+	}
+
+	if (!engine::gpReplay->mReplayWriters.empty())
+	{
+		return;
+	}
+
+	if (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay)
 	{
 		return;
 	}
@@ -142,13 +142,13 @@ bool GameSaveLoad::Autoload()
 		return false;
 	}
 
-	engine::GridCoord loadedClientGridCoord {};
-	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save"), loadedClientGridCoord))
+	engine::GridCoord loadedClientGridCoordinate {};
+	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save"), loadedClientGridCoordinate))
 	{
 		return false;
 	}
 
-	game::gpGame->SetClientGridCoord(loadedClientGridCoord);
+	game::gpGame->SetClientGridCoordinate(loadedClientGridCoordinate);
 	return true;
 }
 

@@ -15,7 +15,7 @@
 namespace game
 {
 
-// UTF-8 filesystem path -> UTF-8 std::string for JSON result echoing (no heap-narrow-conversion surprises).
+// JSON path echoes require UTF-8 bytes.
 static std::string PathToUtf8(const std::filesystem::path& rPath)
 {
 	std::u8string u8String = rPath.u8string();
@@ -55,11 +55,10 @@ static bool IsWindowsReservedDeviceBasename(std::string_view utf8)
 	return basename.size() == 4 && (basename.starts_with("COM") || basename.starts_with("LPT")) && basename[3] >= '1' && basename[3] <= '9';
 }
 
-// The agent-supplied save/load filename lands in the user's appdata directory. Reject anything
-// but a bare filename (no path separators, no "..") and Windows reserved device basenames.
-static std::filesystem::path BareFilenameParam(const nlohmann::json& rValue)
+// Save/load filenames must stay within the user's appdata directory and cannot name Windows devices.
+static std::filesystem::path BareFilenameParameter(const nlohmann::json& rValue)
 {
-	std::string utf8 = rValue.get<std::string>(); // throws on a non-string
+	std::string utf8 = rValue.get<std::string>();
 	if (utf8.empty())
 	{
 		throw std::runtime_error("'file' must be a non-empty bare filename");
@@ -79,7 +78,7 @@ static std::filesystem::path BareFilenameParam(const nlohmann::json& rValue)
 	return std::filesystem::path(reinterpret_cast<const char8_t*>(utf8.c_str()));
 }
 
-static void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandStatus([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	rResult["tick"] = gpGame->miTickCounter;
 	rResult["paused"] = gpGame->mGameFlags & engine::GameFlags::kPaused;
@@ -96,12 +95,12 @@ static void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohma
 	}
 	rResult["clientCount"] = iClientCount;
 
-	nlohmann::json activeCoords = nlohmann::json::array();
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoordinates)
+	nlohmann::json activeCoordinates = nlohmann::json::array();
+	for (const engine::GridCoord& rCoordinate : gpGame->mActiveCoordinates)
 	{
-		activeCoords.push_back({rCoord.iX, rCoord.iY});
+		activeCoordinates.push_back({rCoordinate.iX, rCoordinate.iY});
 	}
-	rResult["activeCoords"] = std::move(activeCoords);
+	rResult["activeCoords"] = std::move(activeCoordinates);
 
 	rResult["nextGlobalId"] = gpGame->miNextGlobalId;
 	rResult["pendingFlagshipUpdateCount"] = std::ssize(gpServerSession->mpFleetManager->mNavigation.mPendingFlagshipUpdates);
@@ -110,32 +109,32 @@ static void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohma
 	rResult["pendingAgentStatusChangeCount"] = CountPendingAgentStatusChanges(*gpServerSession);
 }
 
-static void CommandPause(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandPause(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.contains("paused") || !rParams.at("paused").is_boolean())
+	if (!rParameters.contains("paused") || !rParameters.at("paused").is_boolean())
 	{
 		throw std::runtime_error("pause requires bool 'paused'");
 	}
-	bool bPaused = rParams.at("paused").get<bool>();
+	bool bPaused = rParameters.at("paused").get<bool>();
 	gpGame->mGameFlags.Set(engine::GameFlags::kPaused, bPaused); // mirrors kClientPauseRequest
 	rResult["paused"] = bPaused;
 }
 
-static void CommandTimescale(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandTimescale(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.contains("faster") || !rParams.at("faster").is_boolean())
+	if (!rParameters.contains("faster") || !rParameters.at("faster").is_boolean())
 	{
 		throw std::runtime_error("timescale requires bool 'faster'");
 	}
-	bool bFaster = rParams.at("faster").get<bool>();
+	bool bFaster = rParameters.at("faster").get<bool>();
 	gpServerSession->StepTimescale(bFaster); // shared with kClientTimespeedRequest — steps + broadcasts to clients
 	rResult["numerator"] = gpGame->mTimeStep.miTimeMultiply;
 	rResult["denominator"] = gpGame->mTimeStep.miTimeDivide;
 }
 
-static void CommandSave(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandSave(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	std::filesystem::path file = rParams.contains("file") ? BareFilenameParam(rParams.at("file")) : gpGame->QuicksaveFile();
+	std::filesystem::path file = rParameters.contains("file") ? BareFilenameParameter(rParameters.at("file")) : std::filesystem::path("ServerQuicksave.save");
 	if (!gpGame->mGameSaveLoad.ServerSave(file))
 	{
 		throw std::runtime_error("save failed to write '" + PathToUtf8(file) + "'");
@@ -143,20 +142,20 @@ static void CommandSave(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["file"] = PathToUtf8(file);
 }
 
-static void CommandLoad(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandLoad(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (rParams.contains("pauseAfterLoad") && !rParams.at("pauseAfterLoad").is_boolean())
+	if (rParameters.contains("pauseAfterLoad") && !rParameters.at("pauseAfterLoad").is_boolean())
 	{
 		throw std::runtime_error("load requires bool 'pauseAfterLoad'");
 	}
-	bool bPauseAfterLoad = rParams.value("pauseAfterLoad", false);
-	std::filesystem::path file = rParams.contains("file") ? BareFilenameParam(rParams.at("file")) : gpGame->QuicksaveFile();
+	bool bPauseAfterLoad = rParameters.value("pauseAfterLoad", false);
+	std::filesystem::path file = rParameters.contains("file") ? BareFilenameParameter(rParameters.at("file")) : std::filesystem::path("ServerQuicksave.save");
 
 	bool bResetToFresh = false;
 	if (!gpGame->mGameSaveLoad.ServerLoad(file))
 	{
-		// Corrupt/truncated save: engine::ReadGridSave already left a clean-slate grid, but ServerLoad's success tail never ran.
-		// Fall back to a fresh game exactly like kClientLoadRequest rather than ticking a torn grid.
+		// A load failure after header validation clears the grid without running ServerLoad's success tail.
+		// Rebuild a fresh game as kClientLoadRequest does before simulation resumes.
 		gpGame->mGameSaveLoad.ServerReset();
 		bResetToFresh = true;
 	}
@@ -170,22 +169,22 @@ static void CommandLoad(const nlohmann::json& rParams, nlohmann::json& rResult)
 	rResult["pendingFlagshipUpdateCount"] = std::ssize(gpServerSession->mpFleetManager->mNavigation.mPendingFlagshipUpdates);
 }
 
-static void CommandReset([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandReset([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	gpGame->mGameSaveLoad.ServerReset();
 	rResult = nlohmann::json::object();
 }
 
-static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& rResult)
+static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.is_object())
+	if (!rParameters.is_object())
 	{
 		throw std::runtime_error("query_profile params must be an object");
 	}
 
 	bool bAcknowledgementRequested = false;
 	uint64_t uiAcknowledgementSequence = 0;
-	for (const auto& [rKey, rValue] : rParams.items())
+	for (const auto& [rKey, rValue] : rParameters.items())
 	{
 		if (rKey != "ackActivationEventSequence")
 		{
@@ -214,7 +213,7 @@ static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& r
 		{
 			if (bAcknowledgementRequested)
 			{
-				bActivationEventAcknowledged = gpProfileManager->AcknowledgeRawCpuTimerEvent(game::kCpuTimerPostRenderUpdateNavQuery, uiAcknowledgementSequence);
+				bActivationEventAcknowledged = gpProfileManager->AcknowledgeRawCpuTimerEvent(game::kCpuTimerPostRenderUpdateNavigationQuery, uiAcknowledgementSequence);
 			}
 		}
 
@@ -231,7 +230,7 @@ static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& r
 			timer["threads"] = rTimer.iThreads;
 			if constexpr (kbProfiling)
 			{
-				if (i == game::kCpuTimerPostRenderUpdateNavQuery)
+				if (i == game::kCpuTimerPostRenderUpdateNavigationQuery)
 				{
 					engine::RawCpuTimerRecord rawRecord = gpProfileManager->mpRawCpuTimers[static_cast<size_t>(i)].record;
 					timer["sampleSequence"] = rawRecord.uiSampleSequence;
@@ -277,92 +276,90 @@ static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& r
 	rResult["counters"] = std::move(counters);
 }
 
-// Shared agent helpers validate agent parameters and throw on a bad one.
-
-// Parse a [x,y] JSON array into a GridCoord; each element must be an integer that fits int32_t.
-engine::GridCoord CoordFromParam(const nlohmann::json& rParams, std::string_view key)
+// Coordinate elements must be integers representable by int32_t.
+engine::GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std::string_view key)
 {
-	if (!rParams.contains(key) || !rParams.at(std::string(key)).is_array() || rParams.at(std::string(key)).size() != 2)
+	if (!rParameters.contains(key) || !rParameters.at(std::string(key)).is_array() || rParameters.at(std::string(key)).size() != 2)
 	{
 		std::string message("'");
 		message.append(key);
 		message.append("' must be a [x,y] array");
 		throw std::runtime_error(message);
 	}
-	const nlohmann::json& rCoord = rParams.at(std::string(key));
+	const nlohmann::json& rCoordinate = rParameters.at(std::string(key));
 	std::string name = std::format("'{}'", key);
-	return engine::GridCoord {engine::AgentGridCoordinateValue(rCoord.at(0), name), engine::AgentGridCoordinateValue(rCoord.at(1), name)};
+	return engine::GridCoord {.iX = engine::AgentGridCoordinateValue(rCoordinate.at(0), name), .iY = engine::AgentGridCoordinateValue(rCoordinate.at(1), name)};
 }
 
-bool ExecuteAgentCommandServer(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
+bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (cmd == "status")
+	if (command == "status")
 	{
-		CommandStatus(rParams, rResult);
+		CommandStatus(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "game_packet_fault_fixture")
+	if (command == "game_packet_fault_fixture")
 	{
-		CommandGamePacketFaultFixture(rParams, rResult);
+		CommandGamePacketFaultFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "engine_packet_fault_fixture")
+	if (command == "engine_packet_fault_fixture")
 	{
-		CommandEnginePacketFaultFixture(rParams, rResult);
+		CommandEnginePacketFaultFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "server_pre_handshake_ack_fixture")
+	if (command == "server_pre_handshake_ack_fixture")
 	{
-		CommandServerPreHandshakeAckFixture(rParams, rResult);
+		CommandServerPreHandshakeAcknowledgmentFixture(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "pause")
+	if (command == "pause")
 	{
-		CommandPause(rParams, rResult);
+		CommandPause(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "timescale")
+	if (command == "timescale")
 	{
-		CommandTimescale(rParams, rResult);
+		CommandTimescale(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "save")
+	if (command == "save")
 	{
-		CommandSave(rParams, rResult);
+		CommandSave(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "load")
+	if (command == "load")
 	{
-		CommandLoad(rParams, rResult);
+		CommandLoad(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "reset")
+	if (command == "reset")
 	{
-		CommandReset(rParams, rResult);
+		CommandReset(rParameters, rResult);
 		return true;
 	}
-	if (ExecuteServerSimulationFixtureCommand(cmd, rParams, rResult))
+	if (ExecuteServerSimulationFixtureCommand(command, rParameters, rResult))
 	{
 		return true;
 	}
-	if (cmd == "query_frame")
+	if (command == "query_frame")
 	{
-		CommandQueryFrame(rParams, rResult);
+		CommandQueryFrame(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "query_players")
+	if (command == "query_players")
 	{
-		CommandQueryPlayers(rParams, rResult);
+		CommandQueryPlayers(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "query_collection")
+	if (command == "query_collection")
 	{
-		CommandQueryCollection(rParams, rResult);
+		CommandQueryCollection(rParameters, rResult);
 		return true;
 	}
-	if (cmd == "query_profile")
+	if (command == "query_profile")
 	{
-		CommandQueryProfile(rParams, rResult);
+		CommandQueryProfile(rParameters, rResult);
 		return true;
 	}
 	return false;

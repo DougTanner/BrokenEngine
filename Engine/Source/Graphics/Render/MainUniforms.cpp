@@ -7,6 +7,7 @@
 #include "Ui/WrapperBase.h"
 #include "Render.h"
 
+#include "Frame/Collections/Players/Players.h"
 #include "Game.h"
 
 namespace engine
@@ -553,7 +554,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 			auto it = rRenderInterpolates.find(rCoordinate);
 			if (it != rRenderInterpolates.end())
 			{
-				game::FrameInterpolate::DebugRender(it->second, rCoordinate);
+				game::PlayersInterpolate::DebugRender(it->second, rCoordinate);
 			}
 		}
 	}

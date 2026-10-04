@@ -3,6 +3,7 @@
 #include "Frame/Collections/Collection.h"
 #include "Frame/FrameStaticData.h"
 
+#include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 
@@ -12,8 +13,7 @@ namespace game
 
 using enum MissileFlags;
 
-// Collision layer index (set each frame in PreCollision)
-// thread_local: parallel per-Frame tick via Dispatch
+// Collision storage is thread-local because frame ticks run in parallel.
 static thread_local int64_t siCollisionLayerIndex = 0;
 static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
 static thread_local std::vector<float> sCollisionRadii;
@@ -23,21 +23,19 @@ struct MissileCollisionIntervalScratch
 {
 	std::vector<float> startTimes;
 	std::vector<float> endTimes;
-	std::vector<float> maxTimes;
+	std::vector<float> maximumTimes;
 	std::vector<engine::SegmentHit> terrainHits;
 	std::vector<engine::SegmentHit> boundaryHits;
 };
 
 static MissileCollisionIntervalScratch& GetMissileCollisionIntervalScratch()
 {
-	// Function-local TLS defers construction until first use; default construction is allocation-free
-	// (empty vectors), so it is safe even before allocator startup completes. Growth sites suppress tracking.
+	// Function-local thread-local storage defers allocation-free vector construction until first use; growth sites suppress allocation tracking.
 	static thread_local MissileCollisionIntervalScratch sScratch;
 	return sScratch;
 }
 
-// Missile AI
-constexpr float kfAccelerationAtMaxDeltaAngle = 0.9f;
+constexpr float kfAccelerationAtMaximumDeltaAngle = 0.9f;
 constexpr float kfVelocityDecay = 1.0f;
 constexpr float kfVelocityToDirection = 16.0f;
 constexpr float kfJitterIntervalRandom = 0.0025f;
@@ -50,9 +48,9 @@ constexpr float kfDeltaRotationTowardsTarget = 10.0f;
 constexpr float kfDeltaRotationTowardsStored = 3.0f;
 
 #if defined(BT_CLIENT)
-// Forward declaration of SyncMissile (defined in Missiles.cpp, also used by ClientInit)
-void XM_CALLCONV SyncMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, float fPitch, float fDeltaRotation, float fExhaustLength);
-void XM_CALLCONV SyncMissileTrail(FrameInterpolate& rFrameInterpolate, engine::smoke_trails_t uiSmokeTrail, FXMVECTOR vecPosition);
+// Forward declaration of SynchronizeMissile (defined in Missiles.cpp, also used by ClientInit)
+void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, float fPitch, float fDeltaRotation, float fExhaustLength);
+void XM_CALLCONV SynchronizeMissileTrail(FrameInterpolate& rFrameInterpolate, engine::smoke_trails_t uiSmokeTrail, FXMVECTOR vecPosition);
 #endif
 
 void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
@@ -64,7 +62,6 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
 		XMVECTOR vecPreviousPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecPosition = vecPreviousPosition;
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
@@ -79,25 +76,23 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 			if (!(flags & kFalling))
 			{
-				// Add delta rotation to direction (delay percentage already applied in PostRender::Update)
+				// PostRender::Update already applies the rotation delay percentage.
 				vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(fDeltaTime * rPreviousPostRender.pfDeltaRotations[i])));
 			}
 		}
 
-		// Decay destroyed time
 		if (fDestroyedTime > 0.0f)
 		{
 			fDestroyedTime = std::max(fDestroyedTime - fDeltaTime, 0.0f);
 		}
 
-		// Save
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pfDestroyedTimes[i] = fDestroyedTime;
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
 #if defined(BT_CLIENT)
-		SyncMissile(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiSmokeTrails[i], rPreviousPostRender.puiSounds[i], vecPosition, vecDirection, rPreviousPostRender.pVecVelocities[i], vecPreviousPosition, flags, rPreviousPostRender.pfPitches[i], rPreviousPostRender.pfDeltaRotations[i], rPreviousPostRender.pfExhaustLengths[i]);
+		SynchronizeMissile(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiSmokeTrails[i], rPreviousPostRender.puiSounds[i], vecPosition, vecDirection, rPreviousPostRender.pVecVelocities[i], vecPreviousPosition, flags, rPreviousPostRender.pfPitches[i], rPreviousPostRender.pfDeltaRotations[i], rPreviousPostRender.pfExhaustLengths[i]);
 #endif // BT_CLIENT
 	}
 }
@@ -109,9 +104,10 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	const MissilesPostRender& rPrevious = *rPreviousFrame.postRender.pMissiles;
 	float fDeltaTime = rFrame.interpolate.fDeltaTime;
 
-	// One query window for the whole phase. Spaceships update after Missiles, so the source positions and
-	// eligibility it binds are still this tick's Interpolate state, unchanged by any later phase.
-	RegistryWindow window = Frame::MissileUpdateWindow(rFrame, rPreviousFrame);
+	// Before Spaceships Update, current registry ids and interpolated positions still align with previous rows.
+	// Bind previous positions for retained-target homing, previous arrival grace for eligibility, and previous
+	// missile handles while current handles are being updated.
+	RegistryWindow window = BuildSpaceshipRegistryWindow(rFrame, rPreviousFrame.interpolate.pSpaceships->pVecPositions, rPreviousFrame.postRender.pSpaceships->pfArrivalGracePeriods, *rPreviousFrame.postRender.pMissiles);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -125,29 +121,24 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		float fNextJitter = rPrevious.pfNextJitter[i];
 		XMVECTOR vecStoredDirection = rPrevious.pVecStoredDirections[i];
 
-		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && fTime < kfMissileLifetime) [[likely]]
+		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && fTime < kMissileLifetime.count()) [[likely]]
 		{
 			fNextJitter -= fDeltaTime;
 
-			// Decay velocity
 			vecVelocity = XMVectorMultiply(XMVectorReplicate(1.0f - fDeltaTime * kfVelocityDecay), vecVelocity);
 
-			// Accelerate
-			float fDeltaAnglePercent = std::abs(fDeltaRotation) / rCurrent.pfDeltaRotationMax[i];
+			float fDeltaAnglePercent = std::abs(fDeltaRotation) / rCurrent.pfDeltaRotationMaximum[i];
 			fDeltaAnglePercent = std::clamp(fDeltaAnglePercent, 0.0f, 1.0f);
-			float fAdjustedAcceleration = (1.0f - fDeltaAnglePercent) * rCurrent.pfAccelerations[i] + fDeltaAnglePercent * kfAccelerationAtMaxDeltaAngle * rCurrent.pfAccelerations[i];
+			float fAdjustedAcceleration = (1.0f - fDeltaAnglePercent) * rCurrent.pfAccelerations[i] + fDeltaAnglePercent * kfAccelerationAtMaximumDeltaAngle * rCurrent.pfAccelerations[i];
 			vecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * fAdjustedAcceleration), rCurrentInterpolate.pVecDirections[i], vecVelocity);
 
-			// Rotate velocity towards direction
 			float fVelocityToDirectionPercent = 1.0f - fDeltaTime * kfVelocityToDirection;
 			XMVECTOR vecVelocityComponent = XMVectorMultiply(XMVectorReplicate(fVelocityToDirectionPercent), XMVector3Normalize(vecVelocity));
 			XMVECTOR vecDirectionComponent = XMVectorMultiply(XMVectorReplicate(1.0f - fVelocityToDirectionPercent), rCurrentInterpolate.pVecDirections[i]);
 			vecVelocity = XMVectorMultiply(XMVector3Length(vecVelocity), XMVector3Normalize(XMVectorAdd(vecVelocityComponent, vecDirectionComponent)));
 
-			// Decay delta rotation
 			fDeltaRotation = (1.0f - fDeltaTime * kfDeltaRotationDecay) * fDeltaRotation;
 
-			// Jitter direction
 			if (fNextJitter < 0.0f)
 			{
 				fNextJitter = common::Random<kfJitterIntervalRandom>(rFrame.postRender.randomEngine);
@@ -158,9 +149,10 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				if (uiRandom == 0)
 				{
 					vecVelocity = XMVector3RotateSafe(vecVelocity, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, fDeltaAnglePercentExtra * (-kfDirectionJitterRandom + common::Random(2.0f * kfDirectionJitterRandom, rFrame.postRender.randomEngine))));
-#if defined(BT_DEBUG)
-					common::ValidateVector<false>(vecVelocity);
-#endif
+					if constexpr (kbDebugBreak)
+					{
+						common::ValidateVector<false>(vecVelocity);
+					}
 				}
 				if (uiRandom == 1)
 				{
@@ -168,7 +160,6 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				}
 			}
 
-			// Generate new random exhaust length every frame
 			fExhaustLength = kfMissileExhaustLength + common::Random<kfMissileExhaustLengthRandom>(rFrame.postRender.randomEngine);
 
 			// Validate the retained handle against the rows the registry currently considers eligible; a source
@@ -188,8 +179,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			// A targetless missile re-acquires every tick, in the post-loop pass, so the handle it produces is
 			// stored but does not steer until the next tick.
 
-			// Home only on a target that was already valid coming into this tick, steering toward where that
-			// source stood last tick (matches engine's read-previous / write-current pattern)
+			// Retained targets steer toward the source's previous-frame position.
 			if (bRetained)
 			{
 				fDeltaRotationDelay -= fDeltaTime;
@@ -199,7 +189,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				float fDirectionDestinationCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], vecToTargetNormal));
 				float fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? kfDeltaRotationTowardsTarget : -kfDeltaRotationTowardsTarget;
 
-				float fDelayPercent = std::clamp(1.0f - fDeltaRotationDelay / kfMissileDeltaRotationDelay, 0.0f, 1.0f);
+				float fDelayPercent = std::clamp(1.0f - fDeltaRotationDelay / kMissileDeltaRotationDelay.count(), 0.0f, 1.0f);
 				fWantedDeltaRotation *= fDelayPercent;
 
 				fDeltaRotation = kfDeltaRotationChange * fDeltaRotation + (1.0f - kfDeltaRotationChange) * fWantedDeltaRotation;
@@ -212,16 +202,14 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				float fDirectionCrossZ = XMVectorGetZ(XMVector3Cross(vecCurrentDirection, vecStoredDirection));
 				float fWantedDeltaRotation = fDirectionCrossZ > 0.0f ? kfDeltaRotationTowardsStored : -kfDeltaRotationTowardsStored;
 
-				float fDelayPercent = std::clamp(1.0f - fDeltaRotationDelay / kfMissileDeltaRotationDelay, 0.0f, 1.0f);
+				float fDelayPercent = std::clamp(1.0f - fDeltaRotationDelay / kMissileDeltaRotationDelay.count(), 0.0f, 1.0f);
 				fWantedDeltaRotation *= fDelayPercent;
 
 				fDeltaRotation = kfDeltaRotationChange * fDeltaRotation + (1.0f - kfDeltaRotationChange) * fWantedDeltaRotation;
 			}
 
-			// Clamp delta rotation
-			fDeltaRotation = common::ClampMagnitude(fDeltaRotation, rCurrent.pfDeltaRotationMax[i]);
+			fDeltaRotation = common::ClampMagnitude(fDeltaRotation, rCurrent.pfDeltaRotationMaximum[i]);
 
-			// Keep velocity in XY plane
 			vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
 		}
 		else if (rCurrent.pFlags[i] & kFalling)
@@ -230,9 +218,10 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		}
 
 		// Save dynamic fields (static fields copied via memcpy in AllocateAndCopy)
-#if defined(BT_DEBUG)
-		common::ValidateVector<false>(vecVelocity);
-#endif
+		if constexpr (kbDebugBreak)
+		{
+			common::ValidateVector<false>(vecVelocity);
+		}
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pVecStoredDirections[i] = vecStoredDirection;
 		rCurrent.puiRegistryTargets[i] = uiTarget;
@@ -242,20 +231,16 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrent.pfExhaustLengths[i] = fExhaustLength;
 		rCurrent.pfNextJitter[i] = fNextJitter;
 
-		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && fTime >= kfMissileLifetime)
+		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && fTime >= kMissileLifetime.count())
 		{
 			// The only release site: this is the one missile transition that happens while the window is live.
 			engine::ReleaseRegistryTarget(window.context, rCurrent.puiRegistryTargets[i]);
-			Fall(rFrame, i, fDeltaTime);
+			Fall(rFrame, i, std::chrono::duration<float>(fDeltaTime));
 		}
 	}
 
-	// Acquisition runs after the loop so every missile has published this tick's handle and released the
-	// subscription of every missile that expired this tick, and so it runs in ascending missile order. A row that
-	// is still flying and holds no handle is exactly the targetless set the loop decided on. Fixed-size chunks keep
-	// both spans off the workbuffer, which a per-missile span would overrun on a worker thread; each chunk folds its
-	// subscriptions into the shared counts before the next one starts, so chunked ascending order assigns exactly
-	// what one whole-collection batch assigns.
+	// Acquire targetless flying missiles in ascending row order after all handles and expiry releases are published.
+	// Fixed-size stack arrays bound acquisition scratch storage; each chunk updates shared subscription counts before the next.
 	static constexpr int64_t kiAcquireChunk = 64;
 	int64_t piAcquireRows[kiAcquireChunk] {};
 	engine::RegistryResult pAcquireResults[kiAcquireChunk] {};
@@ -288,7 +273,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			continue;
 		}
 
-		if (rCurrent.pfTimes[i] >= kfMissileLifetime)
+		if (rCurrent.pfTimes[i] >= kMissileLifetime.count())
 		{
 			continue;
 		}
@@ -317,8 +302,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
 {
 	MissileCollisionIntervalScratch& rCollisionScratch = GetMissileCollisionIntervalScratch();
-	// Heap: static vectors resized each frame, only allocates on first call or when count grows (capacity retained).
-	// .data() pointers are passed to AddLayer and must survive until PostCollision, so workbuffer can't be used
+	// Collision array pointers passed to AddLayer must remain valid through PostCollision; thread-local vectors retain capacity.
 	ScopedSuppressAllocationTracking suppress;
 
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
@@ -329,14 +313,13 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		return;
 	}
 
-	// Build collision arrays
 	size_t uiCount = static_cast<size_t>(rCurrentInterpolate.iCount);
 	sCollisionFlags.resize(uiCount);
 	sCollisionRadii.resize(uiCount);
 	sCollisionDamages.resize(uiCount);
 	rCollisionScratch.startTimes.resize(uiCount);
 	rCollisionScratch.endTimes.resize(uiCount);
-	rCollisionScratch.maxTimes.resize(uiCount);
+	rCollisionScratch.maximumTimes.resize(uiCount);
 	rCollisionScratch.terrainHits.resize(uiCount);
 	rCollisionScratch.boundaryHits.resize(uiCount);
 	const MissilesInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pMissiles;
@@ -350,34 +333,33 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		rCollisionScratch.endTimes.at(uiIndex) = 1.0f;
 		rCollisionScratch.terrainHits.at(uiIndex) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.boundaryHits.at(uiIndex) = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		float fMaxTime = std::numeric_limits<float>::max();
+		float fMaximumTime = std::numeric_limits<float>::max();
 		if (rCollisionScratch.terrainHits.at(uiIndex).bHit)
 		{
-			fMaxTime = rCollisionScratch.terrainHits.at(uiIndex).fTime;
+			fMaximumTime = rCollisionScratch.terrainHits.at(uiIndex).fTime;
 		}
 		if (rCollisionScratch.boundaryHits.at(uiIndex).bHit)
 		{
-			fMaxTime = std::min(fMaxTime, rCollisionScratch.boundaryHits.at(uiIndex).fTime);
+			fMaximumTime = std::min(fMaximumTime, rCollisionScratch.boundaryHits.at(uiIndex).fTime);
 		}
-		rCollisionScratch.maxTimes.at(uiIndex) = fMaxTime;
+		rCollisionScratch.maximumTimes.at(uiIndex) = fMaximumTime;
 	}
 
-	// Note: Damage is applied via area damage system, not direct collision
 	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
 		.pVecStartPositions = rPreviousInterpolate.pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
 		.pfStartTimes = rCollisionScratch.startTimes.data(),
 		.pfEndTimes = rCollisionScratch.endTimes.data(),
-		.pfMaxTimes = rCollisionScratch.maxTimes.data(),
+		.pfMaxTimes = rCollisionScratch.maximumTimes.data(),
 		.pfRadii = sCollisionRadii.data(),
 		.pfDamages = sCollisionDamages.data(),
 		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
 		.bSweptTest = true,
-		.uiCategory = CollisionCategory::kMissile,
-		.uiCollidesWith = CollidesWith::kMissile,
+		.uiCategory = CollisionCategory::kuiMissile,
+		.uiCollidesWith = CollidesWith::kuiMissile,
 		.pAlignments = rCurrentPostRender.pAlignments,
 	});
 }
@@ -412,7 +394,7 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 			const engine::CollisionResult& rResult = engine::Collision::GetCollisions(siCollisionLayerIndex, i).front();
 			rCurrentInterpolate.pVecPositions[i] = rResult.vecSelfPosition;
 #if defined(BT_CLIENT)
-			SyncMissileTrail(rFrame.interpolate, rCurrentInterpolate.puiSmokeTrails[i], rResult.vecSelfPosition);
+			SynchronizeMissileTrail(rFrame.interpolate, rCurrentInterpolate.puiSmokeTrails[i], rResult.vecSelfPosition);
 #endif
 			Explode(rFrame, rStaticData, i, false);
 			continue;
@@ -424,7 +406,7 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		{
 			rCurrentInterpolate.pVecPositions[i] = rTerrainHit.vecPosition;
 #if defined(BT_CLIENT)
-			SyncMissileTrail(rFrame.interpolate, rCurrentInterpolate.puiSmokeTrails[i], rTerrainHit.vecPosition);
+			SynchronizeMissileTrail(rFrame.interpolate, rCurrentInterpolate.puiSmokeTrails[i], rTerrainHit.vecPosition);
 #endif
 			if ((rCurrentPostRender.pFlags[i] & kFalling) && XMVectorGetZ(rTerrainHit.vecPosition) <= 0.0f)
 			{

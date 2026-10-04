@@ -3,7 +3,6 @@
 namespace game
 {
 
-// Wind - Per-entity deposits
 engine::Wrapper gWindDepositPlayerWidth(3.0f, 0.1f, 5.0f);
 engine::Wrapper gWindDepositPlayerIntensity(0.03f, 0.0f, 0.1f);
 engine::Wrapper gWindDepositPlayerLengthMultiplier(5.0f, 0.5f, 10.0f);

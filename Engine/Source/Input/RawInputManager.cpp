@@ -131,7 +131,7 @@ void RawInputManager::Update(bool bLostFocus)
 	else
 	{
 		// Suppressed harness client forces the trap off regardless of game setting so a physical cursor is never clipped to the window.
-		TrapCursor(PhysicalInputSuppressed() ? false : game::gpGame->ShouldTrapCursor());
+		TrapCursor(PhysicalInputSuppressed() ? false : !(game::gpGame->mGameFlags & engine::GameFlags::kMainMenu));
 	}
 
 	// A running agent input script relaxes the unfocused early-out so it can publish + overlay while the window is

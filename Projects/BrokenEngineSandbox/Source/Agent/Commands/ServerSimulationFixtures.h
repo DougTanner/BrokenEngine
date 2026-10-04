@@ -8,7 +8,7 @@ namespace engine
 class ServerTransferManager;
 struct GridCoord;
 
-}
+} // namespace engine
 
 namespace game
 {
@@ -24,16 +24,16 @@ struct ReplayTransferCaptureCounts
 	int64_t iMissileCount = 0;
 };
 
-bool ExecuteServerSimulationFixtureCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult);
-void QueueAgentStatusChange(ServerSession& rSession, engine::GridCoord coord, const StatusChange& rChange);
-bool QueueReplayTransferFixture(ServerSession& rSession, engine::GridCoord destination, StatusChange transfer);
-void DrainPendingAgentStatusChanges(ServerSession& rSession);
-void DrainReplayTransferFixtures(ServerSession& rSession, engine::ServerTransferManager& rTransferManager);
-void ResetPendingAgentStatusChanges(ServerSession& rSession);
-void ResetReplayTransferFixtures(ServerSession& rSession);
-int64_t CountPendingAgentStatusChanges(ServerSession& rSession);
-int64_t CountReplayTransferFixtures(ServerSession& rSession);
-void DetachServerSimulationFixtures(ServerSession& rSession);
+bool ExecuteServerSimulationFixtureCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult);
+void QueueAgentStatusChange(const ServerSession& rSession, engine::GridCoord coordinate, const StatusChange& rChange);
+bool QueueReplayTransferFixture(const ServerSession& rSession, engine::GridCoord destination, StatusChange transfer);
+void DrainPendingAgentStatusChanges(const ServerSession& rSession);
+void DrainReplayTransferFixtures(const ServerSession& rSession, engine::ServerTransferManager& rTransferManager);
+void ResetPendingAgentStatusChanges(const ServerSession& rSession);
+void ResetReplayTransferFixtures(const ServerSession& rSession);
+int64_t CountPendingAgentStatusChanges(const ServerSession& rSession);
+int64_t CountReplayTransferFixtures(const ServerSession& rSession);
+void DetachServerSimulationFixtures(const ServerSession& rSession);
 void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, ReplayTransferCaptureCounts& rCounts);
 
 } // namespace game

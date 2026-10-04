@@ -11,24 +11,23 @@ namespace game
 
 #if defined(BT_SERVER)
 
-// Nav direction to coord offset mapping (0=+Y, 1=-Y, 2=+X, 3=-X)
-static engine::GridCoord NavDirectionOffset(int8_t iNavDirection)
+static engine::GridCoord NavigationDirectionOffset(int64_t iNavigationDirection)
 {
-	switch (iNavDirection)
+	switch (iNavigationDirection)
 	{
-		case 0: return {0, 1};
-		case 1: return {0, -1};
-		case 2: return {1, 0};
-		case 3: return {-1, 0};
-		default: return {0, 0};
+		case 0: return {.iX = 0, .iY = 1};
+		case 1: return {.iX = 0, .iY = -1};
+		case 2: return {.iX = 1, .iY = 0};
+		case 3: return {.iX = -1, .iY = 0};
+		default: return {.iX = 0, .iY = 0};
 	}
 }
 
 void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets, common::RandomEngine& rRandom)
 {
-	for (auto& [rGuid, rFleetVec] : rFleets)
+	for (auto& [rGuid, rFleetVector] : rFleets)
 	{
-		for (Fleet& rFleet : rFleetVec)
+		for (Fleet& rFleet : rFleetVector)
 		{
 			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
 			if (!(rFleet.flagshipGlobalPlayerId.iValue != 0) || flagshipIt == rFleet.members.end())
@@ -42,69 +41,70 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				continue;
 			}
 
-			// Drain fFrameChangeTimer only while the flagship is at wantedCoord, so the cycle is transit plus
-			// fNavigationDelay of idle time. Drain there even in cardinal mode; an expired timer fires when that mode
+			// Drain frameChangeTimerSeconds only while the flagship is at wantedCoordinate, so the cycle is transit plus
+			// navigationDelaySeconds of idle time. Drain there even in cardinal mode; an expired timer fires when that mode
 			// ends instead of freezing. GameBase::ServerUpdate supplies mfLastDeltaTime = iFullTicks * kfDeltaTime
 			// after pause/time-scale resolution. BuildFrameInputs runs this only for advancing updates, including
 			// mTimeStep fast-forward/slow-motion scaling, keeping it in tick lockstep.
-			if (rFlagship.coord == rFleet.wantedCoord)
+			if (rFlagship.coordinate == rFleet.wantedCoordinate)
 			{
-				rFleet.fFrameChangeTimer -= gpGame->mfLastDeltaTime;
+				rFleet.frameChangeTimerSeconds -= std::chrono::duration<float>(gpGame->mfLastDeltaTime);
 			}
 
-			if (rFleet.fFrameChangeTimer > 0.0f)
+			if (rFleet.frameChangeTimerSeconds.count() > 0.0f)
 			{
 				continue;
 			}
 
-			// Fire preconditions: timer expiring is necessary but not sufficient — re-verify coord
-			// match (drain implies coord==wantedCoord at last tick, but a cardinal-eject between
-			// ticks could move the flagship), the cell is locally available, and the flagship isn't
-			// already mid-cardinal toward an edge.
-			if (!(rFlagship.coord == rFleet.wantedCoord))
+			// Cardinal ejection between ticks can move the flagship after the timer last drained.
+			if (!(rFlagship.coordinate == rFleet.wantedCoordinate))
 			{
 				continue;
 			}
-			if (!gpGame->mCoordinateFrames.contains(rFlagship.coord))
+			if (!gpGame->mCoordinateFrames.contains(rFlagship.coordinate))
 			{
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rFlagship.coord).pCurrent).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rFlagship.coordinate).pCurrent).postRender.pPlayers;
 			bool bFoundFlagship = false;
-			int8_t iFlagshipNavDirection = -1;
+			int8_t iFlagshipNavigationDirection = -1;
 			for (int64_t k = 0; k < rPlayers.iCount; ++k)
 			{
 				if (rPlayers.pGlobalPlayerIds[k] == rFlagship.globalPlayerId)
 				{
-					iFlagshipNavDirection = GetNavDirection(rPlayers.pFlags[k]);
+					iFlagshipNavigationDirection = GetNavigationDirection(rPlayers.pFlags[k]);
 					bFoundFlagship = true;
 					break;
 				}
 			}
-			if (!bFoundFlagship || (iFlagshipNavDirection >= 0 && iFlagshipNavDirection <= 3))
+			if (!bFoundFlagship)
 			{
 				continue;
 			}
 
-			// Pick random cardinal direction and reset timer.
-			int8_t iDirection = static_cast<int8_t>(common::Random(3u, rRandom));
-			engine::GridCoord offset = NavDirectionOffset(iDirection);
+			if (iFlagshipNavigationDirection >= 0 && iFlagshipNavigationDirection <= 3)
+			{
+				continue;
+			}
+
+			int64_t iDirection = common::Random(3u, rRandom);
+			engine::GridCoord offset = NavigationDirectionOffset(iDirection);
 			engine::GridCoord destination {};
-			if (!engine::TryAddGridCoordinate(rFlagship.coord, offset.iX, offset.iY, destination)) [[unlikely]]
+			if (!engine::TryAddGridCoordinate(rFlagship.coordinate, offset.iX, offset.iY, destination)) [[unlikely]]
 			{
 				// A flagship at a numeric coordinate edge has no neighbour that way, so this move never happens
-				// rather than wrapping to the far side of the grid. wantedCoord already equals the flagship coord,
-				// so resetting the timer alone spends a full fNavigationDelay before the next draw instead of
+				// rather than wrapping to the far side of the grid. wantedCoordinate already equals the flagship coord,
+				// so resetting the timer alone spends a full navigationDelaySeconds before the next draw instead of
 				// redrawing a direction every tick.
-				rFleet.fFrameChangeTimer = rFleet.fNavigationDelay;
+				rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
 				continue;
 			}
 			uint8_t uiPendingTicks = static_cast<uint8_t>(engine::kiTickRate);
-			rFleet.wantedCoord = destination;
-			rFleet.uiPendingFleetWantedCoordTicks = uiPendingTicks;
-			rFleet.fFrameChangeTimer = rFleet.fNavigationDelay;
-			mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoord = destination, .uiPendingFleetWantedCoordTicks = uiPendingTicks});
+			rFleet.wantedCoordinate = destination;
+			rFleet.uiPendingFleetWantedCoordinateTicks = uiPendingTicks;
+			rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
+			mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = destination, .uiPendingFleetWantedCoordinateTicks = uiPendingTicks});
 			LOG(kNetwork, kVerbose, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{})", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.iX, destination.iY);
 		}
 	}
@@ -132,7 +132,6 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 			continue;
 		}
 
-		// Send fleet wanted coord to all alive members
 		int64_t iMembersUpdated = 0;
 		for (const FleetMember& rMember : rFleet.members)
 		{
@@ -141,32 +140,34 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 				continue;
 			}
 
-			engine::GridCoord memberCoord = rMember.coord;
+			engine::GridCoord memberCoordinate = rMember.coordinate;
 			bool bMemberIsFlagship = (rMember.globalPlayerId == rFleet.flagshipGlobalPlayerId);
 
-			auto frameInputIt = gpGame->mFrameInputs.find(memberCoord);
+			auto frameInputIt = gpGame->mFrameInputs.find(memberCoordinate);
 			if (frameInputIt == gpGame->mFrameInputs.end())
 			{
 				continue;
 			}
-			if (!gpGame->mCoordinateFrames.contains(memberCoord))
+			if (!gpGame->mCoordinateFrames.contains(memberCoordinate))
 			{
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(memberCoord).pCurrent).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(memberCoordinate).pCurrent).postRender.pPlayers;
 			for (int64_t k = 0; k < rPlayers.iCount; ++k)
 			{
 				if (rPlayers.pGlobalPlayerIds[k] == rMember.globalPlayerId)
 				{
 					int64_t iPlayerUuid = rPlayers.pIds[k].uuid.iValue;
-					frameInputIt->second.statusChanges.push_back({
+					frameInputIt->second.statusChanges.push_back(
+					{
 						.eType = StatusChangeType::kUpdateFleet,
-						.data = UpdateFleetData {
+						.data = UpdateFleetData
+						{
 							.iPlayerUuid = iPlayerUuid,
 							.bIsFlagship = bMemberIsFlagship,
-							.fleetWantedCoord = rUpdate.newWantedCoord,
-							.uiPendingFleetWantedCoordTicks = rUpdate.uiPendingFleetWantedCoordTicks,
+							.fleetWantedCoordinate = rUpdate.newWantedCoordinate,
+							.uiPendingFleetWantedCoordinateTicks = rUpdate.uiPendingFleetWantedCoordinateTicks,
 						},
 					});
 					++iMembersUpdated;
@@ -174,18 +175,8 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 				}
 			}
 		}
-		LOG(kNetwork, kVerbose, "FleetNavigationController::ProcessFlagshipUpdates Guid: ({},{}) FleetGuid: ({},{}) MembersUpdated: {} WantedCoord: ({},{})", rUpdate.clientGuid.uiHigh, rUpdate.clientGuid.uiLow, rUpdate.fleetGuid.uiHigh, rUpdate.fleetGuid.uiLow, iMembersUpdated, rUpdate.newWantedCoord.iX, rUpdate.newWantedCoord.iY);
+		LOG(kNetwork, kVerbose, "FleetNavigationController::ProcessFlagshipUpdates Guid: ({},{}) FleetGuid: ({},{}) MembersUpdated: {} WantedCoord: ({},{})", rUpdate.clientGuid.uiHigh, rUpdate.clientGuid.uiLow, rUpdate.fleetGuid.uiHigh, rUpdate.fleetGuid.uiLow, iMembersUpdated, rUpdate.newWantedCoordinate.iX, rUpdate.newWantedCoordinate.iY);
 	}
-	mPendingFlagshipUpdates.clear();
-}
-
-void FleetNavigationController::QueueFlagshipUpdate(const PendingFlagshipUpdate& rUpdate)
-{
-	mPendingFlagshipUpdates.push_back(rUpdate);
-}
-
-void FleetNavigationController::ClearPendingFlagshipUpdates()
-{
 	mPendingFlagshipUpdates.clear();
 }
 
@@ -210,9 +201,9 @@ void FleetNavigationController::ShiftFlagshipAfterDeath(const engine::ClientGuid
 
 	const FleetMember& rNewFlagship = rFleet.members.at(static_cast<size_t>(iNewFlagship));
 	rFleet.flagshipGlobalPlayerId = rNewFlagship.globalPlayerId;
-	rFleet.wantedCoord = rNewFlagship.coord;
-	rFleet.fFrameChangeTimer = rFleet.fNavigationDelay;
-	mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoord = rFleet.wantedCoord});
+	rFleet.wantedCoordinate = rNewFlagship.coordinate;
+	rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
+	mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});
 }
 
 #endif // BT_SERVER

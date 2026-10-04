@@ -41,7 +41,6 @@ extern const common::crc_t kPlayerModel = data::kModelsSpaceshipscenegltfCrc;
 constexpr float kfModelScale = 0.0667f;
 #endif
 
-// Render
 constexpr float kfDeathShrinkPower = 2.0f;
 
 void PlayersInterpolate::GraphicsResources()
@@ -56,8 +55,7 @@ static int64_t siRendered = 0;
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
 static std::atomic<bool> sbRenderActive = false;
 
-// RAII tripwire guard: sets sbRenderActive on entry, clears it on scope exit — so an exception between the
-// capacity ASSERT and the slab writes unwinds it instead of wedging it true (every later Render would else false-assert).
+// The guard clears sbRenderActive on scope exit, including exception unwinding after a failed capacity ASSERT.
 struct PlayersRenderActiveGuard
 {
 	PlayersRenderActiveGuard()
@@ -75,8 +73,7 @@ struct PlayersRenderActiveGuard
 // handed to the debug renderer; the distances and directions are computed in the local frame, which is the same.
 static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict rSpaceships, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPosition, FXMVECTOR vecWantedDirection, const engine::RenderBasis& rBasis)
 {
-	// Red line to nearest alive spaceship
-	float fClosestDistanceSq = std::numeric_limits<float>::max();
+	float fClosestDistanceSquared = std::numeric_limits<float>::max();
 	XMVECTOR vecClosestPosition = XMVectorZero();
 	int64_t iClosestSpaceship = -1;
 
@@ -87,10 +84,10 @@ static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict 
 			continue;
 		}
 
-		float fDistanceSq = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, rSpaceships.pVecPositions[j])));
-		if (fDistanceSq < fClosestDistanceSq)
+		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, rSpaceships.pVecPositions[j])));
+		if (fDistanceSquared < fClosestDistanceSquared)
 		{
-			fClosestDistanceSq = fDistanceSq;
+			fClosestDistanceSquared = fDistanceSquared;
 			vecClosestPosition = rSpaceships.pVecPositions[j];
 			iClosestSpaceship = j;
 		}
@@ -104,9 +101,7 @@ static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict 
 		XMStoreFloat3A(&f3Lead, engine::Rebase(rBasis, vecLead));
 		engine::DebugRender::Circle(f3Lead, kfPlayerRadius * 0.5f, {1.0f, 1.0f, 0.0f, 1.0f});
 
-		// Red line shows the player's wanted-aim direction scaled to the lead distance. The wanted
-		// direction is set directly to the lead-intercept direction in UpdateFacing, so the line
-		// endpoint should always coincide with the yellow reticle; divergence means a bug upstream.
+		// The red line uses PostRender's wanted-aim direction; the yellow reticle recomputes the nearest alive spaceship's intercept from interpolated positions.
 		float fDistanceToLead = common::Distance(vecPosition, vecLead);
 		XMVECTOR vecLineEnd = XMVectorAdd(vecPosition, XMVectorScale(vecWantedDirection, fDistanceToLead));
 		XMFLOAT3A f3Start {};
@@ -137,61 +132,58 @@ static std::pair<bool, XMVECTOR> FindFlagshipPosition(const PlayersInterpolate& 
 
 static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rPlayers, const PlayersPostRender& __restrict rPostRender, int64_t i, int64_t iCount, FXMVECTOR vecPosition, const engine::RenderBasis& rBasis)
 {
-	int8_t iNavDirection = GetNavDirection(rPostRender.pFlags[i]);
+	int8_t iNavigationDirection = GetNavigationDirection(rPostRender.pFlags[i]);
 	bool bFlagshipFound = false;
 	XMVECTOR vecFlagshipPosition = XMVectorZero();
-	if (iNavDirection == 5)
+	if (iNavigationDirection == 5)
 	{
 		auto [bFound, vecFoundPosition] = FindFlagshipPosition(rPlayers, rPostRender, i, iCount);
 		bFlagshipFound = bFound;
 		vecFlagshipPosition = vecFoundPosition;
 	}
 
-	// Green line and circle at nav waypoint (when navigating)
-	if (XMVectorGetW(rPostRender.pVecDebugNavWaypoints[i]) > 0.0f && (iNavDirection != 5 || bFlagshipFound))
+	if (XMVectorGetW(rPostRender.pVecDebugNavigationWaypoints[i]) > 0.0f && (iNavigationDirection != 5 || bFlagshipFound))
 	{
 		// In mode 5 (flagship follow), use the flagship's interpolated position as the waypoint
-		XMVECTOR vecWaypoint = (iNavDirection == 5) ? vecFlagshipPosition : rPostRender.pVecDebugNavWaypoints[i];
-		XMFLOAT3A f3NavStart {};
-		XMFLOAT3A f3NavEnd {};
-		XMStoreFloat3A(&f3NavStart, engine::Rebase(rBasis, vecPosition));
-		XMStoreFloat3A(&f3NavEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gBaseHeight.mfCurrent)));
-		engine::DebugRender::Line(f3NavStart, f3NavEnd, {0.0f, 1.0f, 0.0f, 1.0f});
-		engine::DebugRender::Circle(f3NavEnd, kfPlayerRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});
+		XMVECTOR vecWaypoint = (iNavigationDirection == 5) ? vecFlagshipPosition : rPostRender.pVecDebugNavigationWaypoints[i];
+		XMFLOAT3A f3NavigationStart {};
+		XMFLOAT3A f3NavigationEnd {};
+		XMStoreFloat3A(&f3NavigationStart, engine::Rebase(rBasis, vecPosition));
+		XMStoreFloat3A(&f3NavigationEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gBaseHeight.mfCurrent)));
+		engine::DebugRender::Line(f3NavigationStart, f3NavigationEnd, {0.0f, 1.0f, 0.0f, 1.0f});
+		engine::DebugRender::Circle(f3NavigationEnd, kfPlayerRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
 
-	// Green circle at island destination
-	if (iNavDirection == 5)
+	if (iNavigationDirection == 5)
 	{
 		if (bFlagshipFound)
 		{
-			// Flagship follow: use the flagship's interpolated position
-			XMFLOAT3A f3Dest {};
-			XMStoreFloat3A(&f3Dest, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gBaseHeight.mfCurrent)));
-			engine::DebugRender::Circle(f3Dest, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
+			XMFLOAT3A f3Destination {};
+			XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gBaseHeight.mfCurrent)));
+			engine::DebugRender::Circle(f3Destination, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 		}
 	}
 	else if (XMVectorGetW(rPostRender.pVecIslandDestinations[i]) > 0.0f)
 	{
-		XMFLOAT3A f3Dest {};
-		XMStoreFloat3A(&f3Dest, engine::Rebase(rBasis, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gBaseHeight.mfCurrent)));
-		engine::DebugRender::Circle(f3Dest, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
+		XMFLOAT3A f3Destination {};
+		XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gBaseHeight.mfCurrent)));
+		engine::DebugRender::Circle(f3Destination, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
 }
 
-void PlayersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords)
+void PlayersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
 
 	int64_t iTotalCount = 0;
-	for (const engine::GridCoord& rCoord : rActiveCoords)
+	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = rRenderInterpolates.find(rCoord);
+		auto it = rRenderInterpolates.find(rCoordinate);
 		if (it != rRenderInterpolates.end())
 		{
 			// Players uses iCount not iCapacity for buffer sizing since count is always small
-			const game::FrameInterpolate& rInterp = it->second;
-			int64_t iCount = (rInterp.gameFlags & GameFlags::kMainMenu) ? 0 : rInterp.pPlayers->iCount;
+			const game::FrameInterpolate& rInterpolate = it->second;
+			int64_t iCount = (rInterpolate.gameFlags & GameFlags::kMainMenu) ? 0 : rInterpolate.pPlayers->iCount;
 			iTotalCount += iCount;
 		}
 	}
@@ -201,11 +193,11 @@ void PlayersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, co
 		return;
 	}
 
-	VkDeviceSize requiredSize = iTotalCount * sizeof(shaders::ModelLayout);
+	VkDeviceSize vkRequiredSize = iTotalCount * sizeof(shaders::ModelLayout);
 	engine::Buffer& rBuffer = engine::gpBufferManager->mDynamicStorageBuffers[engine::kBufferMain].at(kCrc).at(iCommandBuffer);
-	if (rBuffer.mInfo.vkDataSize < requiredSize)
+	if (rBuffer.mInfo.vkDataSize < vkRequiredSize)
 	{
-		engine::gpBufferManager->ResizeDynamicBuffer(kCrc, engine::kBufferMain, kName, requiredSize, iCommandBuffer);
+		engine::gpBufferManager->ResizeDynamicBuffer(kCrc, engine::kBufferMain, kName, vkRequiredSize, iCommandBuffer);
 		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, &rBuffer);
 		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, &rBuffer);
 	}
@@ -259,30 +251,23 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 		rPlayerLayout.f4ColorAdd = {0.0f, 0.0f, 0.0f, 0.0f};
 		rPlayerLayout.uiMeshDataBase = 0;
 
-		// Evaluate animation and upload mesh shader data (only if model has skeletal animation)
 		if (engine::gAnimationDataMap.contains(kPlayerModel))
 		{
 			const engine::AnimationData& rAnimationData = engine::gAnimationDataMap.at(kPlayerModel);
 			const engine::EagerChunk& rChunk = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kPlayerModel);
 			uint32_t uiMaterialCount = rChunk.pHeader->sceneHeader.uiMaterialCount;
 
-			// Allocate mesh data region
 			int64_t iMeshDataBase = engine::gpBufferManager->AllocateMeshData(iCommandBuffer, uiMaterialCount);
 			rPlayerLayout.uiMeshDataBase = static_cast<uint32_t>(iMeshDataBase);
 
-			// Get mesh data buffer
 			common::MeshData* pMeshData = reinterpret_cast<common::MeshData*>(engine::gpBufferManager->mMeshDataStorageBuffers.at(iCommandBuffer).mpMappedMemory) + iMeshDataBase;
 
-			// Count skinned materials for joint matrix allocation
 			int64_t iSkinnedMaterialCount = rAnimationData.SkinnedMaterialCount(uiMaterialCount);
 
-			// Allocate joint matrix region
 			int64_t iJointMatrixOffset = engine::gpBufferManager->AllocateJointMatrices(iCommandBuffer, iSkinnedMaterialCount * rAnimationData.mHeader.skeleton.uiSkinJointCount);
 
-			// Get joint matrix buffer
 			common::JointMatrix* pJointMatrices = reinterpret_cast<common::JointMatrix*>(engine::gpBufferManager->mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory);
 
-			// Evaluate animation for all materials
 			rAnimationData.EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(uiMaterialCount)), pJointMatrices, iJointMatrixOffset);
 		}
 
@@ -296,7 +281,7 @@ void PlayersInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 
-void PlayersInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coord)
+void PlayersInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate)
 {
 	if constexpr (!kbDebugRender)
 	{
@@ -308,8 +293,8 @@ void PlayersInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameIn
 	// Only flags, metadata, and static world positions (nav waypoints, island destinations) come from PostRender.
 	const PlayersInterpolate& rPlayers = *rFrameInterpolate.pPlayers;
 	const SpaceshipsInterpolate& rSpaceships = *rFrameInterpolate.pSpaceships;
-	const PlayersPostRender& rPostRender = *gpGame->RenderFrame(coord).postRender.pPlayers;
-	const SpaceshipsPostRender& rSpaceshipsPostRender = *gpGame->RenderFrame(coord).postRender.pSpaceships;
+	const PlayersPostRender& rPostRender = *gpGame->RenderFrame(coordinate).postRender.pPlayers;
+	const SpaceshipsPostRender& rSpaceshipsPostRender = *gpGame->RenderFrame(coordinate).postRender.pSpaceships;
 
 	int64_t iCount = (rFrameInterpolate.gameFlags & GameFlags::kMainMenu) ? 0 : rPlayers.iCount;
 

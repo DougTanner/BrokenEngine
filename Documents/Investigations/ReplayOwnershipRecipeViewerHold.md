@@ -41,12 +41,12 @@ scratch, `Temp/subreq-harness-evidence.md` `## Check 7` with
   `PlayerEventType::kChangedFrame` for the client's own player, and
   `ClientSession::ApplyPlayerEvent`
   (`Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`
-  ~:131-137) calls `Game::SetClientGridCoord(rEvent.coord)` then
-  `UpdateDesiredCoords`. The desired set becomes B plus B's visible neighbors
-  (`ClientSession.cpp` `UpdateDesiredCoords`), and
+  ~:131-137) calls `Game::SetClientGridCoordinate(rEvent.coordinate)` then
+  `UpdateDesiredCoordinates`. The desired set becomes B plus B's visible neighbors
+  (`ClientSession.cpp` `UpdateDesiredCoordinates`), and
   `ClientSessionRuntime::SynchronizeSubscriptions` unsubscribes A once its
   sticky window (`kStickySubscriptionDuration`, 2 s) expires.
-  `FleetSelection::SyncFleets` (`Projects/BrokenEngineSandbox/Source/FleetSelection.cpp`
+  `FleetSelection::SynchronizeFleets` (`Projects/BrokenEngineSandbox/Source/FleetSelection.cpp`
   ~:241-261) also resets the viewer to the focused player's coordinate on every
   fleet sync.
 - During recording the same auto-follow runs, which is why steps 5-7 park the

@@ -5,7 +5,6 @@
 namespace game
 {
 
-// Frame
 struct FrameInput
 {
 	static constexpr int64_t kiVersion = 20;

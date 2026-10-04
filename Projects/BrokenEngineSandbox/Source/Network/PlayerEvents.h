@@ -26,11 +26,11 @@ struct ReceivedPlayerEvent
 {
 	PlayerEventType eType {};
 	engine::GlobalId globalPlayerId {};
-	engine::GridCoord coord {};
+	engine::GridCoord coordinate {};
 };
 
-void ParsePlayerEvents(const std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutEventsArena);
+void ParsePlayerEvents(const std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutputEventsArena);
 
-bool ParseFleetSync(std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, std::vector<Fleet>& rOutFleets);
+bool ParseFleetSynchronization(std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, std::vector<Fleet>& rOutputFleets);
 
 } // namespace game

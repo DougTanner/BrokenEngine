@@ -128,7 +128,7 @@ flowchart TD
 
 ## Desync Recovery and Optional Debug Frames
 
-CRC mismatch always reports the differing CRCs. The manual `kbDesyncDebugFrames` switch is disabled by default; disabled builds immediately enter the normal recovery/disconnect policy without requesting or waiting for a full frame, while matching enabled client/server builds retain the per-field diagnostic comparison.
+CRC mismatch always reports the differing CRCs. The manual `kbDesynchronizationDebugFrames` switch is disabled by default; disabled builds immediately enter the normal recovery/disconnect policy without requesting or waiting for a full frame, while matching enabled client/server builds retain the per-field diagnostic comparison.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -138,13 +138,13 @@ sequenceDiagram
     participant Server
 
     Main->>Main: ClientReconciler::Run() detects CRC mismatch
-    opt kbDesyncDebugFrames enabled on client and server
+    opt kbDesynchronizationDebugFrames enabled on client and server
         Main->>Main: Deep-copy client Frame
     end
     Main->>Net: SendDesynchronizationReport()
     Net->>Server: Desync report
 
-    alt kbDesyncDebugFrames enabled on client and server
+    alt kbDesynchronizationDebugFrames enabled on client and server
         Main->>Net: SendDebugFrameRequest()
         Main->>Net: Set Client::mStateFlags kDesynchronizationDebugMode
         Net->>Server: Debug frame request
@@ -156,7 +156,7 @@ sequenceDiagram
         else kDesyncDebugTimeout expires
             Main->>Main: Recover or disconnect without debug frame
         end
-    else kbDesyncDebugFrames disabled
+    else kbDesynchronizationDebugFrames disabled
         Main->>Main: Run recovery/disconnect policy immediately
     end
 ```

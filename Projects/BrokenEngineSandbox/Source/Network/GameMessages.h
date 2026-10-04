@@ -11,14 +11,14 @@ struct AssignPlayerMessage
 	static constexpr int64_t kiSize = sizeof(int64_t) + engine::NetworkMessages::kiGridCoordSize;
 	static_assert(kiSize == 16);
 
-	int64_t iGlobalPlayerId = 0;
-	engine::GridCoord coord {};
+	int64_t iGlobalPlayerIdentifier = 0;
+	engine::GridCoord coordinate {};
 
 	template <typename TVISITOR>
 	static void Visit(TVISITOR& rVisitor, AssignPlayerMessage& rMessage)
 	{
-		rVisitor.Field(rMessage.iGlobalPlayerId);
-		rVisitor.Field(rMessage.coord);
+		rVisitor.Field(rMessage.iGlobalPlayerIdentifier);
+		rVisitor.Field(rMessage.coordinate);
 	}
 };
 
@@ -28,15 +28,15 @@ struct PlayerStateMessage
 	static_assert(kiSize == 17);
 
 	uint8_t uiWireType = 0;
-	int64_t iGlobalPlayerId = 0;
-	engine::GridCoord coord {};
+	int64_t iGlobalPlayerIdentifier = 0;
+	engine::GridCoord coordinate {};
 
 	template <typename TVISITOR>
 	static void Visit(TVISITOR& rVisitor, PlayerStateMessage& rMessage)
 	{
 		rVisitor.Field(rMessage.uiWireType);
-		rVisitor.Field(rMessage.iGlobalPlayerId);
-		rVisitor.Field(rMessage.coord);
+		rVisitor.Field(rMessage.iGlobalPlayerIdentifier);
+		rVisitor.Field(rMessage.coordinate);
 	}
 };
 
@@ -55,11 +55,6 @@ inline constexpr PlayerStateDescriptor kpPlayerStateDescriptors[] =
 };
 static_assert(std::size(kpPlayerStateDescriptors) == static_cast<size_t>(PlayerStateWireType::kCount));
 
-inline constexpr const PlayerStateDescriptor& GetPlayerStateDescriptor(PlayerStateWireType eWireType)
-{
-	return kpPlayerStateDescriptors[static_cast<size_t>(eWireType)];
-}
-
 struct FleetSyncMessage
 {
 	static constexpr int64_t kiFleetCountSize = sizeof(int64_t);
@@ -77,7 +72,12 @@ struct FleetSyncMessage
 		rVisitor.Field(rFleet.guid.uiLow);
 		rVisitor.BoundedCount(riMemberCount, kiFleetMemberSize, sizeof(int64_t) + sizeof(float));
 		rVisitor.Field(rFleet.flagshipGlobalPlayerId.iValue);
-		rVisitor.Field(rFleet.fNavigationDelay);
+		float fNavigationDelay = rFleet.navigationDelaySeconds.count();
+		rVisitor.Field(fNavigationDelay);
+		if constexpr (!std::is_const_v<TFLEET>)
+		{
+			rFleet.navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay);
+		}
 	}
 
 	template <typename TVISITOR, typename TFLEETMEMBER, typename TFLAGS>

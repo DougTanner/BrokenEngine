@@ -16,22 +16,19 @@ using enum PlayerFlags;
 
 // Terrain collision
 constexpr float kfTerrainPushVelocity = 15.0f;
-constexpr float kfMaxPushVelocity = 20.0f;
+constexpr float kfMaximumPushVelocity = 20.0f;
 
 // Flagship follow
 constexpr float kfFlagshipFollowDistanceSquared = 50.0f * 50.0f;
 constexpr float kfFlagshipCloseDistanceSquared = 12.5f * 12.5f;
 
-// Pathfinding is re-run at most every kiNavRecomputeInterval ticks per player (staggered by globalId);
-// between recomputes the unit keeps steering along the cached rVecAiDirection. A mode or destination
-// change forces an immediate recompute. globalId is server-minted + serialized, so the recompute cadence
-// is identical on client and server -> deterministic.
-constexpr int64_t kiNavRecomputeInterval = 16;
+// Cadence recomputations are staggered by persisted global player ID; mode changes, destination selection,
+// direction reseeding, and blocked position/lookahead probes can force earlier recomputation.
+constexpr int64_t kiNavigationRecomputeInterval = 16;
 
-// Throttle-overshoot fix: how far ahead along the held steering bearing the off-cadence recompute probes
-// for nav-polygon containment — re-path before the stale bearing drives the ship into an obstacle corner.
-// Near obstacles this collapses to per-tick pathfinding; open water keeps the throttle.
-constexpr float kfNavLookahead = 8.0f;
+// Off-cadence probes follow the held steering bearing to request a path before it enters an obstacle.
+// Blocked probes can trigger per-tick recomputation; open water retains the cadence.
+constexpr float kfNavigationLookahead = 8.0f;
 
 // Returns the index into rStaticData.islands for the next navigation waypoint:
 // 0 -> largest-area island in this frame, 1 -> smallest-area, 2+ -> the supplied random pick.
@@ -60,20 +57,20 @@ static int64_t SelectIslandPlacement(const engine::FrameStaticData& rStaticData,
 	return iSelected;
 }
 
-static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious, const PlayersInterpolate& rPreviousInterpolate, int64_t i, FXMVECTOR vecPosition, const engine::FrameStaticData& rStaticData, engine::GridCoord fleetWantedCoord, uint8_t uiPendingFleetWantedCoordTicks, PlayerFlags_t flags, float fDeltaTime, int8_t& riNavDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer)
+static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, const PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious, const PlayersInterpolate& rPreviousInterpolate, int64_t i, FXMVECTOR vecPosition, const engine::FrameStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, uint8_t uiPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int8_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer)
 {
 	// Fleet navigation: navigate toward fleet's wanted coord after countdown expires
-	if (!(fleetWantedCoord == rStaticData.coordinate) && uiPendingFleetWantedCoordTicks == 0)
+	if (!(fleetWantedCoordinate == rStaticData.coordinate) && uiPendingFleetWantedCoordinateTicks == 0)
 	{
 		// Two coords anywhere in the signed-int32 identity range can separate by more than int32 holds, so each converts to int64 ahead of the subtraction.
-		int64_t iDeltaX = static_cast<int64_t>(fleetWantedCoord.iX) - static_cast<int64_t>(rStaticData.coordinate.iX);
-		int64_t iDeltaY = static_cast<int64_t>(fleetWantedCoord.iY) - static_cast<int64_t>(rStaticData.coordinate.iY);
+		int64_t iDeltaX = static_cast<int64_t>(fleetWantedCoordinate.iX) - static_cast<int64_t>(rStaticData.coordinate.iX);
+		int64_t iDeltaY = static_cast<int64_t>(fleetWantedCoordinate.iY) - static_cast<int64_t>(rStaticData.coordinate.iY);
 
 		// Check if already heading in a valid direction toward wanted coord
 		bool bAlreadyValid = false;
-		if (riNavDirection >= 0 && riNavDirection <= 3)
+		if (riNavigationDirection >= 0 && riNavigationDirection <= 3)
 		{
-			switch (riNavDirection)
+			switch (riNavigationDirection)
 			{
 				case 0: bAlreadyValid = iDeltaY > 0; break;
 				case 1: bAlreadyValid = iDeltaY < 0; break;
@@ -85,28 +82,28 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 
 		if (!bAlreadyValid)
 		{
-			int8_t iRandom = static_cast<int8_t>(common::Random(3u, rFrame.postRender.randomEngine));
+			int64_t iRandom = static_cast<int64_t>(common::Random(3u, rFrame.postRender.randomEngine));
 			if (iDeltaX != 0 && iDeltaY != 0)
 			{
-				riNavDirection = (iRandom < 2)
+				riNavigationDirection = (iRandom < 2)
 					? (iDeltaY > 0 ? 0 : 1)
 					: (iDeltaX > 0 ? 2 : 3);
 			}
 			else if (iDeltaY != 0)
 			{
-				riNavDirection = iDeltaY > 0 ? 0 : 1;
+				riNavigationDirection = iDeltaY > 0 ? 0 : 1;
 			}
 			else
 			{
-				riNavDirection = iDeltaX > 0 ? 2 : 3;
+				riNavigationDirection = iDeltaX > 0 ? 2 : 3;
 			}
 			rVecIslandDestination = XMVectorZero();
-			LOG(kNavData, kVerbose, "Player {} GlobalId: {} fleet override NavDir: {} WantedCoord: ({},{}) CellCoord: ({},{})", i, rCurrent.pGlobalPlayerIds[i], riNavDirection, fleetWantedCoord.iX, fleetWantedCoord.iY, rStaticData.coordinate.iX, rStaticData.coordinate.iY);
+			LOG(kNavData, kVerbose, "Player {} GlobalId: {} fleet override NavDir: {} WantedCoord: ({},{}) CellCoord: ({},{})", i, rCurrent.pGlobalPlayerIds[i], riNavigationDirection, fleetWantedCoordinate.iX, fleetWantedCoordinate.iY, rStaticData.coordinate.iX, rStaticData.coordinate.iY);
 		}
 	}
 
 	// Flagship proximity: non-flagship in same cell follows flagship
-	if (!(flags & kIsFlagship) && (fleetWantedCoord == rStaticData.coordinate))
+	if (!(flags & kIsFlagship) && (fleetWantedCoordinate == rStaticData.coordinate))
 	{
 		for (int64_t j = 0; j < rPrevious.iCount; ++j)
 		{
@@ -119,20 +116,20 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 				continue;
 			}
 
-			XMVECTOR vecFlagshipPos = rPreviousInterpolate.pVecPositions[j];
-			float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, vecFlagshipPos)));
+			XMVECTOR vecFlagshipPosition = rPreviousInterpolate.pVecPositions[j];
+			float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, vecFlagshipPosition)));
 
 			if (fDistanceSquared > kfFlagshipFollowDistanceSquared)
 			{
-				riNavDirection = 5;
-				rVecIslandDestination = XMVectorSetW(vecFlagshipPos, 1.0f);
+				riNavigationDirection = 5;
+				rVecIslandDestination = XMVectorSetW(vecFlagshipPosition, 1.0f);
 			}
-			else if (riNavDirection == 5)
+			else if (riNavigationDirection == 5)
 			{
-				rVecIslandDestination = XMVectorSetW(vecFlagshipPos, 1.0f);
+				rVecIslandDestination = XMVectorSetW(vecFlagshipPosition, 1.0f);
 				if (fDistanceSquared < kfFlagshipCloseDistanceSquared)
 				{
-					riNavDirection = 4;
+					riNavigationDirection = 4;
 					rVecIslandDestination = XMVectorZero();
 				}
 			}
@@ -140,42 +137,41 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 		}
 	}
 
-	if ((flags & kIsFlagship) && riNavDirection == 5 && (fleetWantedCoord == rStaticData.coordinate))
+	if ((flags & kIsFlagship) && riNavigationDirection == 5 && (fleetWantedCoordinate == rStaticData.coordinate))
 	{
-		riNavDirection = 4;
+		riNavigationDirection = 4;
 		rVecIslandDestination = XMVectorZero();
 	}
 
 	// Frame change timer: cycle back to island destination when roaming
-	if (riNavDirection == -1)
+	if (riNavigationDirection == -1)
 	{
 		rfFrameChangeTimer -= fDeltaTime;
 		if (rfFrameChangeTimer <= 0.0f)
 		{
-			riNavDirection = 4;
+			riNavigationDirection = 4;
 		}
 	}
 }
 
-static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRender& rCurrent, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecAiDirection, int8_t iEntryNavDirection, bool bReseededDirection, int8_t iNavDirection, const engine::FrameStaticData& rStaticData)
+static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRender& rCurrent, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int8_t iEntryNavigationDirection, bool bReseededDirection, int8_t iNavigationDirection, const engine::FrameStaticData& rStaticData)
 {
-	// Re-run the full pathfind only on a staggered cadence, on a mode change, or after a direction
-	// re-seed. The mode-4 entry block (new destination) sets this true too. When false, the cached
-	// rVecAiDirection is reused unchanged and the NavQueryDirection call is skipped. RNG draws, arrival
-	// checks, and mode transitions stay unconditional regardless.
-	bool bRecompute = bReseededDirection || (iNavDirection != iEntryNavDirection)
-	               || (((rFrame.interpolate.iTick + rCurrent.pGlobalPlayerIds[i].iValue) % kiNavRecomputeInterval) == 0);
+	// Cadence, mode changes, direction reseeding, and blocked position/lookahead probes request pathfinding.
+	// Destination selection in mode 4 also forces it; otherwise cached steering is reused without NavQueryDirection.
+	// Random draws, arrival checks, and mode transitions remain unconditional.
+	bool bRecompute = bReseededDirection || (iNavigationDirection != iEntryNavigationDirection)
+	               || (((rFrame.interpolate.iTick + rCurrent.pGlobalPlayerIds[i].iValue) % kiNavigationRecomputeInterval) == 0);
 
-	// The throttle carries the shared world-space bearing for up to kiNavRecomputeInterval ticks. Recompute when
-	// either the kfNavLookahead point or current position is inside a nav polygon: lookahead alone misses ships
-	// already stranded inside. NavThresholdElevation and ApplyTerrainPush use
+	// The throttle carries the shared world-space bearing for up to kiNavigationRecomputeInterval ticks. Recompute when
+	// either the kfNavigationLookahead point or current position is inside a nav polygon: lookahead alone misses ships
+	// already stranded inside. NavigationThresholdElevation and ApplyTerrainPush use
 	// gBaseHeight - kfPlayerRadius - kfPushMargin; the nav polygon inflates that contour, leaving a no-nav band
-	// with zero terrain push. rVecAiDirection, vecPosition, and server-built, wire-shipped navigationData match on
-	// client/server, and this check draws no RNG. Roam mode -1 is exempt because ComputeAiSteering re-steers
+	// with zero terrain push. rVecArtificialIntelligenceDirection, vecPosition, and server-built, wire-shipped navigationData match on
+	// client/server, and this check draws no RNG. Roam mode -1 is exempt because ComputeArtificialIntelligenceSteering re-steers
 	// every tick.
-	if (!bRecompute && iNavDirection >= 0 && XMVectorGetX(XMVector3LengthSq(vecAiDirection)) > 0.001f)
+	if (!bRecompute && iNavigationDirection >= 0 && XMVectorGetX(XMVector3LengthSq(vecArtificialIntelligenceDirection)) > 0.001f)
 	{
-		XMVECTOR vecLookahead = XMVectorMultiplyAdd(XMVectorReplicate(kfNavLookahead), vecAiDirection, vecPosition);
+		XMVECTOR vecLookahead = XMVectorMultiplyAdd(XMVectorReplicate(kfNavigationLookahead), vecArtificialIntelligenceDirection, vecPosition);
 		if (engine::NavQueryPointBlocked(vecLookahead, rStaticData.navigationData) || engine::NavQueryPointBlocked(vecPosition, rStaticData.navigationData))
 		{
 			bRecompute = true;
@@ -185,39 +181,39 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRend
 	return bRecompute;
 }
 
-static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] PlayersPostRender& rCurrent, [[maybe_unused]] int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::FrameStaticData& rStaticData, XMVECTOR& rVecAiDirection)
+static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] PlayersPostRender& rCurrent, [[maybe_unused]] int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::FrameStaticData& rStaticData, XMVECTOR& rVecArtificialIntelligenceDirection)
 {
 	XMVECTOR vecDebugWaypoint = XMVectorZero();
-	XMVECTOR vecNavDirection = XMVectorZero();
+	XMVECTOR vecNavigationDirection = XMVectorZero();
 #if defined(BT_SERVER)
 	bool bEnteredAStar = false;
 #endif // BT_SERVER
 	{
-		engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateNavQuery);
+		engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateNavigationQuery);
 #if defined(BT_SERVER)
-		vecNavDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, &vecDebugWaypoint, &bEnteredAStar);
+		vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, &vecDebugWaypoint, &bEnteredAStar);
 #else
-		vecNavDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, &vecDebugWaypoint);
+		vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, &vecDebugWaypoint);
 #endif // BT_SERVER
 	}
 #if defined(BT_SERVER)
 	if constexpr (kbProfiling)
 	{
-		gpProfileManager->AddRawCpuTimerAuxiliaryCount(game::kCpuTimerPostRenderUpdateNavQuery, static_cast<int64_t>(bEnteredAStar));
+		gpProfileManager->AddRawCpuTimerAuxiliaryCount(game::kCpuTimerPostRenderUpdateNavigationQuery, static_cast<int64_t>(bEnteredAStar));
 	}
 #endif // BT_SERVER
-	if (XMVectorGetX(XMVector3LengthSq(vecNavDirection)) > 0.001f)
+	if (XMVectorGetX(XMVector3LengthSq(vecNavigationDirection)) > 0.001f)
 	{
-		rVecAiDirection = vecNavDirection;
+		rVecArtificialIntelligenceDirection = vecNavigationDirection;
 	}
 	else
 	{
-		rVecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
+		rVecArtificialIntelligenceDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
 	}
 #if defined(BT_CLIENT)
 	if constexpr (kbDebugRender)
 	{
-		rCurrent.pVecDebugNavWaypoints[i] = vecDebugWaypoint;
+		rCurrent.pVecDebugNavigationWaypoints[i] = vecDebugWaypoint;
 	}
 #endif // BT_CLIENT
 }
@@ -243,25 +239,26 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		TransferRequest request
 		{
 			.eType = StatusChangeType::kTransferPlayer,
-			.data = {
+			.data =
+			{
 				.vecPosition = vecPosition,
 				.vecDirection = rCurrentInterpolate.pVecDirections[i],
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.fHealth = rCurrentPostRender.pfArmors[i],
 				.fShield = rCurrentPostRender.pfShields[i],
-				.fNextBlasterFireTime = rCurrentPostRender.pfNextBlasterFireTimes[i],
-				.fNextSecondarySpawnTime = rCurrentPostRender.pfNextSecondarySpawnTimes[i],
-				.fShieldCooldown = rCurrentPostRender.pfShieldCooldowns[i],
-				.fShieldDownSoundCooldown = rCurrentPostRender.pfShieldDownSoundCooldowns[i],
-				.fAnimationTime = rCurrentInterpolate.pfAnimationTimes[i],
+				.nextBlasterFireTimeSeconds = std::chrono::duration<float>(rCurrentPostRender.pfNextBlasterFireTimes[i]),
+				.nextSecondarySpawnTimeSeconds = std::chrono::duration<float>(rCurrentPostRender.pfNextSecondarySpawnTimes[i]),
+				.shieldCooldownSeconds = std::chrono::duration<float>(rCurrentPostRender.pfShieldCooldowns[i]),
+				.shieldDownSoundCooldownSeconds = std::chrono::duration<float>(rCurrentPostRender.pfShieldDownSoundCooldowns[i]),
+				.animationTimeSeconds = std::chrono::duration<float>(rCurrentInterpolate.pfAnimationTimes[i]),
 				.uiPlayerFlags = static_cast<uint16_t>(std::to_underlying(rCurrentPostRender.pFlags[i].meFlags) & ~std::to_underlying(kTransfer)),
-				.fNavigationDelay = rCurrentPostRender.pfNavigationDelays[i],
+				.navigationDelaySeconds = std::chrono::duration<float>(rCurrentPostRender.pfNavigationDelays[i]),
 			},
 		};
 		request.data.globalPlayerId = rCurrentPostRender.pGlobalPlayerIds[i];
-		request.data.fleetWantedCoord = rCurrentPostRender.pFleetWantedCoords[i];
-		request.data.uiPendingFleetWantedCoordTicks = rCurrentPostRender.puiPendingFleetWantedCoordTicks[i];
+		request.data.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i];
+		request.data.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i];
 		request.data.uiPendingWeaponModeTicks = rCurrentPostRender.puiPendingWeaponModeTicks[i];
 		request.data.uiClientGuidHigh = rCurrentPostRender.pClientGuids[i].uiHigh;
 		request.data.uiClientGuidLow = rCurrentPostRender.pClientGuids[i].uiLow;
@@ -272,7 +269,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		}
 		PushTransferRequest(rFrame.postRender, request);
 
-		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
+		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[i]);
 #if defined(BT_CLIENT)
 		PlayersInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, i);
 #endif // BT_CLIENT
@@ -281,7 +278,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecFrameCenter, engine::GridCoord fleetWantedCoord, uint8_t uiPendingFleetWantedCoordTicks, PlayerFlags_t flags, float fDeltaTime, int8_t& riNavDirection, int8_t& riNavWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer)
+void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecFrameCenter, engine::GridCoord fleetWantedCoordinate, uint8_t uiPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int8_t& riNavigationDirection, int8_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer)
 {
 	PlayersPostRender& __restrict rCurrent = *rFrame.postRender.pPlayers;
 	const PlayersPostRender& rPrevious = *rPreviousFrame.postRender.pPlayers;
@@ -289,58 +286,53 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 
 	// Throttle bookkeeping: capture mode before the fleet/flagship/timer blocks can change it, and note
 	// when the direction is re-seeded. Both force an immediate pathfind below (see bRecompute).
-	int8_t iEntryNavDirection = riNavDirection;
+	int8_t iEntryNavigationDirection = riNavigationDirection;
 	bool bReseededDirection = false;
 
 	// Initialize direction if zero (first spawn or after reset)
-	if (XMVectorGetX(XMVector3LengthSq(rVecAiDirection)) < 0.001f)
+	if (XMVectorGetX(XMVector3LengthSq(rVecArtificialIntelligenceDirection)) < 0.001f)
 	{
 		float fAngle = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
-		rVecAiDirection = XMVector4Transform(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(fAngle));
+		rVecArtificialIntelligenceDirection = XMVector4Transform(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(fAngle));
 		bReseededDirection = true;
 	}
 
-	UpdateFleetAndFlagshipNavigation(rFrame, rCurrent, rPrevious, rPreviousInterpolate, i, vecPosition, rStaticData, fleetWantedCoord, uiPendingFleetWantedCoordTicks, flags, fDeltaTime, riNavDirection, rVecIslandDestination, rfFrameChangeTimer);
+	UpdateFleetAndFlagshipNavigation(rFrame, rCurrent, rPrevious, rPreviousInterpolate, i, vecPosition, rStaticData, fleetWantedCoordinate, uiPendingFleetWantedCoordinateTicks, flags, fDeltaTime, riNavigationDirection, rVecIslandDestination, rfFrameChangeTimer);
 
-	bool bRecompute = ShouldRecomputeNavigation(rFrame, rCurrent, i, vecPosition, rVecAiDirection, iEntryNavDirection, bReseededDirection, riNavDirection, rStaticData);
+	bool bRecompute = ShouldRecomputeNavigation(rFrame, rCurrent, i, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, bReseededDirection, riNavigationDirection, rStaticData);
 
-	if (riNavDirection == 5)
+	if (riNavigationDirection == 5)
 	{
-		// Follow the flagship via NavQuery without arrival or missing-flagship fallback. A missing flagship makes
-		// the proximity scan a no-op. OnPlayerDeath -> ShiftFlagshipAfterDeath updates the fleet's flagship after
-		// removal; ProcessFlagshipUpdates publishes kUpdateFleet, whose Update handler writes kIsFlagship. A
-		// follower normally stalls one tick before finding the replacement or taking the fleet override. A promoted
-		// flagship recovers on D+2 when its flag and same-cell wanted coord become navigation-visible; mode 4 clears
-		// the stale destination without advancing the rally timer. Agent-injected players have no Fleet and receive
-		// no kUpdateFleet. Consume mode 4's three draws (island pick, footprint X, footprint Y) on each
-		// mode-5 tick in a cell that has islands — mode 4 makes no draws in an island-free cell either, so
-		// the guard below keeps the two modes aligned. Every common::Random advances once regardless of its
-		// bound, preserving stream alignment across modes 4/5.
+		// Missing flagships leave the proximity scan empty. OnPlayerDeath shifts the flagship after removal;
+		// ProcessFlagshipUpdates queues kUpdateFleet, whose Update handler writes kIsFlagship.
+		// Followers normally stall one tick before replacement or fleet override. A same-cell promoted flagship
+		// recovers on D+2 via mode 4, clearing its stale destination without advancing the rally timer.
+		// Agent-injected players have no Fleet updates. Mode 5 follows without arrival or missing-flagship fallback.
+		// It consumes three draws (island pick, footprint X/Y) each tick with islands; mode 4 draws only when
+		// selecting a destination. Both skip draws without islands. Every Random call advances once regardless of bound.
 		if (!rStaticData.islands.empty())
 		{
 			common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
-			const engine::IslandPlacement& rRngPlacement = rStaticData.islands.at(static_cast<size_t>(i) % rStaticData.islands.size());
-			const engine::IslandTemplate& rRngTemplate = engine::gpIslandTerrain->mIslands.at(rRngPlacement.islandCrc);
-			common::Random(rRngTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
-			common::Random(rRngTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
+			const engine::IslandPlacement& rRandomPlacement = rStaticData.islands.at(static_cast<size_t>(i) % rStaticData.islands.size());
+			const engine::IslandTemplate& rRandomTemplate = engine::gpIslandTerrain->mIslands.at(rRandomPlacement.islandCrc);
+			common::Random(rRandomTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
+			common::Random(rRandomTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
 		}
 
 		if (bRecompute)
 		{
-			RecomputeNavigationPath(rCurrent, i, vecPosition, rVecIslandDestination, rStaticData, rVecAiDirection);
+			RecomputeNavigationPath(rCurrent, i, vecPosition, rVecIslandDestination, rStaticData, rVecArtificialIntelligenceDirection);
 		}
 	}
-	else if (riNavDirection == 4)
+	else if (riNavigationDirection == 4)
 	{
 		// Navigate to island destination
 		if (XMVectorGetW(rVecIslandDestination) == 0.0f)
 		{
-			// Pick the destination island by per-frame waypoint index (0 = largest, 1 = smallest,
-			// 2+ = random), then generate a random point inside its quad-footprint AABB. The random
-			// island pick is drawn unconditionally so the entry tick consumes exactly 3 randoms
-			// (pick + footprint X + footprint Y) regardless of which index selects which island —
-			// mode 5's per-tick mirror above matches this count so mode flips do not desync the
-			// shared random stream. An island-free cell skips the draws and targets the cell center.
+			// Waypoints select the largest, smallest, then random island by quad-footprint area.
+			// All waypoint indices consume the island-pick draw before the two footprint draws, keeping each
+			// destination selection at three draws. The sampled point lies in the selected island's quad-footprint
+			// AABB; island-free cells skip draws and target the cell center.
 			if (rStaticData.islands.empty())
 			{
 				rVecIslandDestination = vecFrameCenter;
@@ -349,18 +341,18 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 			else
 			{
 				uint32_t uiRandomPick = common::Random(static_cast<uint32_t>(rStaticData.islands.size()) - 1u, rFrame.postRender.randomEngine);
-				int64_t iPlacement = SelectIslandPlacement(rStaticData, riNavWaypointIndex, uiRandomPick);
-				if (riNavWaypointIndex < 2)
+				int64_t iPlacement = SelectIslandPlacement(rStaticData, riNavigationWaypointIndex, uiRandomPick);
+				if (riNavigationWaypointIndex < 2)
 				{
-					++riNavWaypointIndex;
+					++riNavigationWaypointIndex;
 				}
 				const engine::IslandPlacement& rPlacement = rStaticData.islands.at(static_cast<size_t>(iPlacement));
 				const engine::IslandTemplate& rTemplate = engine::gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-				float fIslandMinX = rPlacement.f2WorldPosition.x - 0.5f * rTemplate.fQuadFootprintX;
-				float fIslandMinY = rPlacement.f2WorldPosition.y - 0.5f * rTemplate.fQuadFootprintY;
+				float fIslandMinimumX = rPlacement.f2WorldPosition.x - 0.5f * rTemplate.fQuadFootprintX;
+				float fIslandMinimumY = rPlacement.f2WorldPosition.y - 0.5f * rTemplate.fQuadFootprintY;
 
-				float fX = fIslandMinX + common::Random(rTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
-				float fY = fIslandMinY + common::Random(rTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
+				float fX = fIslandMinimumX + common::Random(rTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
+				float fY = fIslandMinimumY + common::Random(rTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
 				rVecIslandDestination = XMVectorSet(fX, fY, engine::gBaseHeight.mfCurrent, 1.0f);
 
 				// Snap to navigable area if inside an obstacle
@@ -372,7 +364,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 
 		if (bRecompute)
 		{
-			RecomputeNavigationPath(rCurrent, i, vecPosition, rVecIslandDestination, rStaticData, rVecAiDirection);
+			RecomputeNavigationPath(rCurrent, i, vecPosition, rVecIslandDestination, rStaticData, rVecArtificialIntelligenceDirection);
 		}
 
 		// Arrival check (unconditional — independent of the pathfind throttle). Zeroing the destination
@@ -386,12 +378,12 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 			rVecIslandDestination = XMVectorZero();
 		}
 	}
-	else if (riNavDirection >= 0)
+	else if (riNavigationDirection >= 0)
 	{
 		// Navigate toward neighboring frame center
 		rVecIslandDestination = XMVectorZero();
 		XMVECTOR vecDestination = vecFrameCenter;
-		switch (riNavDirection)
+		switch (riNavigationDirection)
 		{
 			case 0:
 				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(0.0f, engine::kfCellHeight, 0.0f, 0.0f));
@@ -412,38 +404,38 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		if (bRecompute)
 		{
 			XMVECTOR vecDebugWaypoint = XMVectorZero();
-			XMVECTOR vecNavDirection = XMVectorZero();
+			XMVECTOR vecNavigationDirection = XMVectorZero();
 #if defined(BT_SERVER)
 			bool bEnteredAStar = false;
 #endif // BT_SERVER
 			{
-				engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateNavQuery);
+				engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateNavigationQuery);
 #if defined(BT_SERVER)
-				vecNavDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, kbDebugRender ? &vecDebugWaypoint : nullptr, &bEnteredAStar);
+				vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, kbDebugRender ? &vecDebugWaypoint : nullptr, &bEnteredAStar);
 #else
-				vecNavDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, kbDebugRender ? &vecDebugWaypoint : nullptr);
+				vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, kbDebugRender ? &vecDebugWaypoint : nullptr);
 #endif // BT_SERVER
 			}
 #if defined(BT_SERVER)
 			if constexpr (kbProfiling)
 			{
-				gpProfileManager->AddRawCpuTimerAuxiliaryCount(game::kCpuTimerPostRenderUpdateNavQuery, static_cast<int64_t>(bEnteredAStar));
+				gpProfileManager->AddRawCpuTimerAuxiliaryCount(game::kCpuTimerPostRenderUpdateNavigationQuery, static_cast<int64_t>(bEnteredAStar));
 			}
 #endif // BT_SERVER
-			float fNavLengthSquared = XMVectorGetX(XMVector3LengthSq(vecNavDirection));
-			if (fNavLengthSquared > 0.001f)
+			float fNavigationLengthSquared = XMVectorGetX(XMVector3LengthSq(vecNavigationDirection));
+			if (fNavigationLengthSquared > 0.001f)
 			{
-				rVecAiDirection = vecNavDirection;
+				rVecArtificialIntelligenceDirection = vecNavigationDirection;
 			}
 			else
 			{
-				rVecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
-				LOG(kNavData, kWarning, "Player {} navQuery returned zero, fallback dir={}", i, common::WbV2(rVecAiDirection, 1));
+				rVecArtificialIntelligenceDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
+				LOG(kNavData, kWarning, "Player {} navQuery returned zero, fallback dir={}", i, common::WbV2(rVecArtificialIntelligenceDirection, 1));
 			}
 #if defined(BT_CLIENT)
 			if constexpr (kbDebugRender)
 			{
-				rCurrent.pVecDebugNavWaypoints[i] = vecDebugWaypoint;
+				rCurrent.pVecDebugNavigationWaypoints[i] = vecDebugWaypoint;
 			}
 #endif // BT_CLIENT
 		}
@@ -451,22 +443,22 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 	else
 	{
 		rVecIslandDestination = XMVectorZero();
-		auto [vecNewAiDirection] = ComputeAiSteering(rStaticData, vecPosition, rVecAiDirection, vecFrameCenter, fDeltaTime, i % 2 == 0);
-		rVecAiDirection = vecNewAiDirection;
+		auto [vecNewArtificialIntelligenceDirection] = ComputeArtificialIntelligenceSteering(rStaticData, vecPosition, rVecArtificialIntelligenceDirection, vecFrameCenter, fDeltaTime, i % 2 == 0);
+		rVecArtificialIntelligenceDirection = vecNewArtificialIntelligenceDirection;
 #if defined(BT_CLIENT)
 		if constexpr (kbDebugRender)
 		{
-			rCurrent.pVecDebugNavWaypoints[i] = XMVectorZero();
+			rCurrent.pVecDebugNavigationWaypoints[i] = XMVectorZero();
 		}
 #endif // BT_CLIENT
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ApplyMovement(int8_t iNavDirection, FXMVECTOR vecAiDirection, float fDeltaTime, float fAccelMul, float fDecayMul, XMVECTOR& rVecVelocity)
+void XM_CALLCONV PlayersPostRender::ApplyMovement(int8_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, float fDeltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity)
 {
-	float fAcceleration = (iNavDirection == 5 ? kfPlayerCatchUpAcceleration : kfPlayerAcceleration) * fAccelMul;
-	float fMaxSpeed = iNavDirection == 5 ? kfPlayerCatchUpMaxSpeed : kfPlayerMaxSpeed;
-	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecAiDirection, fDeltaTime, fAcceleration, kfPlayerDrag * fDecayMul, fMaxSpeed);
+	float fAcceleration = (iNavigationDirection == 5 ? kfPlayerCatchUpAcceleration : kfPlayerAcceleration) * fAccelerationMultiplier;
+	float fMaximumSpeed = iNavigationDirection == 5 ? kfPlayerCatchUpMaximumSpeed : kfPlayerMaximumSpeed;
+	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecArtificialIntelligenceDirection, fDeltaTime, fAcceleration, kfPlayerDrag * fDecayMultiplier, fMaximumSpeed);
 }
 
 void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
@@ -479,21 +471,21 @@ void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::FrameStaticDa
 		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->FrameNormal(rStaticData, vecPosition), 0.0f));
 		float fPenetration = fElevation - fPushHeight;
 		float fPushStrength = fPenetration * fPenetration * kfTerrainPushVelocity;
-		rVecVelocity = engine::ApplyClampedPush(rVecVelocity, vecTerrainNormal, fPushStrength, kfMaxPushVelocity);
+		rVecVelocity = engine::ApplyClampedPush(rVecVelocity, vecTerrainNormal, fPushStrength, kfMaximumPushVelocity);
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ApplyPusherPush(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
+void XM_CALLCONV PlayersPostRender::ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
 {
 	const PlayersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pPlayers;
 
 	// Player-to-player push (prevents overlap)
-	XMVECTOR vecPush = engine::PushersInterpolate::ApplyPush(rFrame.interpolate, vecPosition, rPreviousInterpolate.puiPushers[i]);
+	XMVECTOR vecPush = engine::PushersInterpolate::ApplyPush(rFrame.interpolate, vecPosition, rPreviousInterpolate.pPushers[i]);
 	float fPushLength = XMVectorGetX(XMVector3Length(vecPush));
 	if (fPushLength > 0.0f)
 	{
 		XMVECTOR vecPushDirection = XMVectorDivide(vecPush, XMVectorReplicate(fPushLength));
-		rVecVelocity = engine::ApplyClampedPush(rVecVelocity, vecPushDirection, fPushLength, kfPlayerMaxPusherPushVelocity);
+		rVecVelocity = engine::ApplyClampedPush(rVecVelocity, vecPushDirection, fPushLength, kfPlayerMaximumPusherPushVelocity);
 	}
 }
 

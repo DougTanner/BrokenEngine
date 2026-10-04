@@ -12,7 +12,7 @@
 namespace game
 {
 
-// Forward declarations (definitions in individual collection headers)
+struct Frame;
 struct PlayersInterpolate;
 struct PlayersPostRender;
 struct BlastersInterpolate;
@@ -41,16 +41,13 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	static void GraphicsResources();
 #endif
 
-	// Interpolate phases
 	static void AllocateAndCopy(FrameInterpolate& __restrict rCurrent, const FrameInterpolate& __restrict rPrevious);
 	static void Update(FrameInterpolate& __restrict rCurrent, const Frame& __restrict rPreviousFrame, float fDeltaTime);
 
 #if defined(BT_CLIENT)
-	// Render
-	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords);
+	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
-	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coord);
 #endif
 
 	FrameInterpolate();
@@ -89,7 +86,6 @@ struct FramePostRender : public engine::FramePostRenderBase
 	FramePostRender(FramePostRender&&) noexcept;
 	FramePostRender& operator=(FramePostRender&&) noexcept;
 
-	// Post render phases
 	static void AllocateAndCopy(FramePostRender& __restrict rCurrent, const FramePostRender& __restrict rPrevious);
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
@@ -122,7 +118,7 @@ struct FramePostRender : public engine::FramePostRenderBase
 // and DEBUG_BREAK between them, reading the pre-push size and capacity.
 // PrepareTransferRequest fills the per-axis delta and rewrites rRequest.data.vecPosition into the
 // destination cell's local frame; no consumer downstream converts it again.
-[[nodiscard]] bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest);
+[[nodiscard]] bool PrepareTransferRequest(const FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest);
 void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rRequest);
 
 // One registry query window: the context plus the single workbuffer allocation its spans point into. The owner
@@ -133,6 +129,8 @@ struct RegistryWindow
 	engine::RegistryQueryContext context {};
 };
 
+[[nodiscard]] RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const float* pfArrivalGracePeriods, const MissilesPostRender& rSubscribers);
+
 struct Frame
 {
 	Frame();
@@ -142,15 +140,6 @@ struct Frame
 
 	static const int64_t kiVersion;
 
-	// Missile homing window, built before Spaceships Update: source positions and eligibility are this tick's
-	// Interpolate state, and the subscriber counts come from the previous frame's Missile handles because the
-	// current ones are still being written during Update.
-	[[nodiscard]] static RegistryWindow MissileUpdateWindow(const Frame& rFrame, const Frame& rPreviousFrame);
-
-	// Player missile-spawn window, rebuilt after Update, Transfer, and Destroy over current spaceship lifecycle
-	// state and the fully initialized current Missile handles.
-	[[nodiscard]] static RegistryWindow PlayerSpawnWindow(const Frame& rFrame);
-
 	// Post-tick main-thread identity view over the player rows. Held by value by its caller for as long as it is
 	// used, and never across a tick, a transfer, or a reallocation.
 	[[nodiscard]] static engine::RegistryOwnershipLayer OwnershipLayer(const Frame& rFrame);
@@ -158,7 +147,6 @@ struct Frame
 	FrameInterpolate interpolate;
 	FramePostRender postRender;
 
-	common::crc_t Crcs() const;
 	common::crc_t Crc() const;
 	bool LogDifferences(const Frame& rOther) const;
 	void ServerRead(std::istream& rStream);

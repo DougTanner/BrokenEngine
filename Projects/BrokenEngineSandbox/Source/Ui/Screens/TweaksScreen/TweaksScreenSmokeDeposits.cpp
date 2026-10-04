@@ -12,35 +12,28 @@ namespace game
 // SmokeDeposits is the sole consumer of these labels, despite their gExplosion*/gBlasterPuff*/gPlayerImpactPuff*/gMissileTrail* globals living in SmokeWrappers.h. Owning them here keeps registration co-located with the WrapperSlider call sites below.
 const engine::TweaksSliderMapRegistrar gSmokeDepositsRegistrar
 {
-	// Explosion Primary Puff
 	{"Explosion Primary Puff Area One", &gExplosionPrimaryPuffAreaOne},
 	{"Explosion Primary Puff Area Two", &gExplosionPrimaryPuffAreaTwo},
 	{"Explosion Primary Puff Intensity One", &gExplosionPrimaryPuffIntensityOne},
 	{"Explosion Primary Puff Intensity Two", &gExplosionPrimaryPuffIntensityTwo},
-	// Explosion Secondary Puff
 	{"Explosion Secondary Puff Area One", &gExplosionSecondaryPuffAreaOne},
 	{"Explosion Secondary Puff Area Two", &gExplosionSecondaryPuffAreaTwo},
 	{"Explosion Secondary Puff Intensity One", &gExplosionSecondaryPuffIntensityOne},
 	{"Explosion Secondary Puff Intensity Two", &gExplosionSecondaryPuffIntensityTwo},
-	// Explosion Primary Trail
 	{"Explosion Primary Trail Intensity", &gExplosionPrimaryTrailIntensity},
 	{"Explosion Primary Trail Length", &gExplosionPrimaryTrailLength},
 	{"Explosion Primary Trail Duration", &gExplosionPrimaryTrailDuration},
-	// Explosion Secondary Trail
 	{"Explosion Secondary Trail Intensity", &gExplosionSecondaryTrailIntensity},
 	{"Explosion Secondary Trail Length", &gExplosionSecondaryTrailLength},
 	{"Explosion Secondary Trail Duration", &gExplosionSecondaryTrailDuration},
-	// Blaster Puff
 	{"Blaster Puff Area Start", &gBlasterPuffAreaStart},
 	{"Blaster Puff Area End", &gBlasterPuffAreaEnd},
 	{"Blaster Puff Intensity Start", &gBlasterPuffIntensityStart},
 	{"Blaster Puff Intensity End", &gBlasterPuffIntensityEnd},
-	// Player Impact Puff
 	{"Player Impact Puff Area One", &gPlayerImpactPuffAreaOne},
 	{"Player Impact Puff Area Two", &gPlayerImpactPuffAreaTwo},
 	{"Player Impact Puff Intensity One", &gPlayerImpactPuffIntensityOne},
 	{"Player Impact Puff Intensity Two", &gPlayerImpactPuffIntensityTwo},
-	// Missile Trail
 	{"Missile Trail Intensity", &gMissileTrailIntensity},
 };
 
@@ -50,7 +43,6 @@ void RenderSmokeDepositsTab(engine::TweaksScreenBase& rScreen)
 
 	if (ImGui::BeginTable("SmokeDepositsColumns", 3))
 	{
-		// Column 1: Explosions
 		ImGui::TableNextColumn();
 
 		rScreen.WrapperSeparatorText("Explosions - Primary Puff");
@@ -75,7 +67,6 @@ void RenderSmokeDepositsTab(engine::TweaksScreenBase& rScreen)
 		rScreen.WrapperSlider("Length", iSection, 1.0f, "Explosion Secondary Trail Length");
 		rScreen.WrapperSlider("Duration", iSection, 1.0f, "Explosion Secondary Trail Duration");
 
-		// Column 2: Blasters / Players / Missiles
 		ImGui::TableNextColumn();
 
 		rScreen.WrapperSeparatorText("Blasters - Terrain Puff");

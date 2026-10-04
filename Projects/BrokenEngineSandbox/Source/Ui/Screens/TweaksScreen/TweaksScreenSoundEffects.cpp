@@ -11,33 +11,25 @@ namespace game
 
 const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 {
-	// Blasters - Player
 	{"Player Blaster Volume", &gPlayerBlasterVolume},
-	{"Player Blaster Pitch Min", &gPlayerBlasterPitchMin},
+	{"Player Blaster Pitch Min", &gPlayerBlasterPitchMinimum},
 	{"Player Blaster Pitch Random", &gPlayerBlasterPitchRandom},
-	// Blasters - Enemy
 	{"Enemy Blaster Volume", &gEnemyBlasterVolume},
-	{"Enemy Blaster Pitch Min", &gEnemyBlasterPitchMin},
+	{"Enemy Blaster Pitch Min", &gEnemyBlasterPitchMinimum},
 	{"Enemy Blaster Pitch Random", &gEnemyBlasterPitchRandom},
-	// Blasters - Terrain Impact
 	{"Terrain Impact Volume", &gTerrainImpactVolume},
-	// Missiles
 	{"Missile Launch Volume", &gMissileLaunchVolume},
 	{"Missile Loop Volume", &gMissileLoopVolume},
 	{"Missile Pitch Min", &gMissilePitchMin},
 	{"Missile Pitch Random", &gMissilePitchRandom},
-	// Explosions
 	{"Explosion Volume", &gExplosionVolume},
-	// Players - Shield
 	{"Shield Hit Volume Base", &gShieldHitVolumeBase},
 	{"Shield Hit Volume Scale", &gShieldHitVolumeScale},
 	{"Shield Down Volume", &gShieldDownVolume},
-	// Players - Armor
 	{"Armor Hit Volume Base", &gArmorHitVolumeBase},
 	{"Armor Hit Volume Scale", &gArmorHitVolumeScale},
-	// Spaceships
 	{"Spaceship Death Volume", &gSpaceshipDeathVolume},
-	{"Spaceship Death Pitch Min", &gSpaceshipDeathPitchMin},
+	{"Spaceship Death Pitch Min", &gSpaceshipDeathPitchMinimum},
 	{"Spaceship Death Pitch Random", &gSpaceshipDeathPitchRandom},
 	{"Spaceship Hit Volume", &gSpaceshipHitVolume},
 };

@@ -7,7 +7,6 @@ namespace game
 
 // Lighting wrappers control scene-light contributions.
 
-// Explosions - Primary light
 engine::Wrapper gExplosionPrimaryLightingAreaOne(16.0f, 1.0f, 32.0f);
 engine::Wrapper gExplosionPrimaryLightingAreaTwo(8.0f, 1.0f, 16.0f);
 engine::Wrapper gExplosionPrimaryLightingAreaThree(0.0f, 0.0f, 4.0f);
@@ -15,7 +14,6 @@ engine::Wrapper gExplosionPrimaryLightingIntensityOne(0.6f, 0.0f, 1.0f);
 engine::Wrapper gExplosionPrimaryLightingIntensityTwo(0.15f, 0.0f, 1.0f);
 engine::Wrapper gExplosionPrimaryLightingIntensityThree(0.0f, 0.0f, 2.0f);
 
-// Explosions - Secondary light
 engine::Wrapper gExplosionSecondaryLightingAreaOne(8.0f, 0.0f, 16.0f);
 engine::Wrapper gExplosionSecondaryLightingAreaTwo(2.0f, 1.0f, 4.0f);
 engine::Wrapper gExplosionSecondaryLightingAreaThree(0.0f, 0.0f, 4.0f);
@@ -46,7 +44,6 @@ engine::Wrapper gPlayerImpactLightingIntensityTwo(0.0f, 0.0f, 2.0f);
 // Players - Hex shield
 engine::Wrapper gHexShieldLightingIntensity(4.0f, 0.0f, 8.0f);
 
-// Missiles - Exhaust
 engine::Wrapper gMissileExhaustLightingArea(2.0f, 1.0f, 4.0f);
 engine::Wrapper gMissileExhaustLightingIntensity(3.5f, 0.0f, 5.0f);
 
@@ -62,7 +59,6 @@ engine::Wrapper gHitFlashLightingIntensityTwo(0.0f, 0.0f, 2.0f);
 
 // Visible wrappers control visual area and intensity.
 
-// Explosions - Primary light
 engine::Wrapper gExplosionPrimaryVisibleAreaOne(4.0f, 0.1f, 5.0f);
 engine::Wrapper gExplosionPrimaryVisibleAreaTwo(2.0f, 0.1f, 5.0f);
 engine::Wrapper gExplosionPrimaryVisibleAreaThree(0.0f, 0.0f, 5.0f);
@@ -70,7 +66,6 @@ engine::Wrapper gExplosionPrimaryVisibleIntensityOne(3.0f, 0.0f, 3.0f);
 engine::Wrapper gExplosionPrimaryVisibleIntensityTwo(1.0f, 0.0f, 3.0f);
 engine::Wrapper gExplosionPrimaryVisibleIntensityThree(0.0f, 0.0f, 3.0f);
 
-// Explosions - Secondary light
 engine::Wrapper gExplosionSecondaryVisibleAreaOne(2.0f, 0.0f, 4.0f);
 engine::Wrapper gExplosionSecondaryVisibleAreaTwo(0.5f, 0.1f, 4.0f);
 engine::Wrapper gExplosionSecondaryVisibleAreaThree(0.0f, 0.0f, 4.0f);
@@ -88,7 +83,6 @@ engine::Wrapper gCraterVisibleIntensityTwo(2.0f, 0.2f, 10.0f);
 engine::Wrapper gCraterVisibleIntensityThree(1.0f, 0.1f, 5.0f);
 engine::Wrapper gCraterVisibleIntensityFour(0.0f, 0.0f, 5.0f);
 
-// Players - Area light
 engine::Wrapper gPlayerAreaLightVisibleIntensity(1.0f, 0.1f, 1.0f);
 
 // Players - Impact point light
@@ -100,7 +94,6 @@ engine::Wrapper gPlayerImpactVisibleIntensityTwo(0.5f, 0.0f, 2.5f);
 // Players - Hex shield
 engine::Wrapper gHexShieldIntensityDecay(1.25f, 0.1f, 6.0f);
 
-// Missiles - Exhaust
 engine::Wrapper gMissileExhaustVisibleIntensity(1.0f, 0.1f, 5.0f);
 
 // Spaceships - Enemy blaster

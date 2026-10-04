@@ -146,7 +146,7 @@ Changes (8 files)
 
 5. Projects/BrokenEngineSandbox/Source/Frame/Collections/
    Spaceships/SpaceshipsRender.cpp
-   In the processRange lambda, after setting f4ColorAdd, compute
+   In the ProcessRange lambda, after setting f4ColorAdd, compute
    and write fDamageFraction from the previous frame's health:
 
      float fMaxHealth = kfSpaceshipHealth;

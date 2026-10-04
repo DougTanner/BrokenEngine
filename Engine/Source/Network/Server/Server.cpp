@@ -380,7 +380,7 @@ void Server::BufferFrame(int64_t iTick, std::span<const std::pair<GridCoord, Gri
 			}
 			else
 			{
-				int64_t iCompressedSize = game::NetworkSessionContract::CompressStatusChanges(rUpdateData.statusChanges.data(), iStatusChangeCount, mCompressionBuffer.data(), std::ssize(mCompressionBuffer));
+				int64_t iCompressedSize = game::NetworkSessionContract::CompressStatusChanges(std::span<const game::StatusChange>(rUpdateData.statusChanges.data(), static_cast<size_t>(iStatusChangeCount)), std::span<uint8_t>(mCompressionBuffer));
 				if (iCompressedSize > 0)
 				{
 					buffered.compressedData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);

@@ -2,15 +2,15 @@
 
 #include "ExternalHeaders.h"
 
-inline constexpr bool kbDesyncRecovery = true; // DT: Recovery enabled; confirm in playtest
-inline constexpr bool kbDesyncDebugFrames = false; // Manual client/server diagnostic switch; both targets must match
+inline constexpr bool kbDesynchronizationRecovery = true;
+inline constexpr bool kbDesynchronizationDebugFrames = false; // Manual client/server diagnostic switch; both targets must match
 inline constexpr bool kbFrameDispatch = true;
 inline constexpr bool kbLogging = true;
 inline constexpr bool kbInvincibility = true;
 inline constexpr bool kbRenderThread = true;
 
 inline constexpr bool kbAlsoLogToPrintf = false;
-inline constexpr bool kbGpuAssistedValidation = false;
+inline constexpr bool kbGraphicsProcessingUnitAssistedValidation = false;
 inline constexpr bool kbRecording = false;
 inline constexpr bool kbRenderDoc = true; // Compile-time gate for RenderDoc in-app capture; runtime activation still requires --renderdoc
 inline constexpr bool kbScreenshots = true;
@@ -26,14 +26,13 @@ inline constexpr bool kbSingleInstance = false;
 #endif
 
 #if defined(BT_DEBUG)
-// #define ENABLE_CRT_DEBUG_HEAP
-inline constexpr const char* kpcBuildConfigName = "Debug";
+inline constexpr const char* kpcBuildConfigurationName = "Debug";
 inline constexpr bool kbMimallocDiagnostics = true;
 
 inline constexpr bool kbAutoConnect = true;
 inline constexpr bool kbDebugBreak = true;
 inline constexpr bool kbDebugInput = true;
-inline constexpr bool kbDebugNavCrossingCheck = false;
+inline constexpr bool kbDebugNavigationCrossingCheck = false;
 inline constexpr bool kbDebugRender = true;
 inline constexpr bool kbDxDiag = true;
 inline constexpr bool kbFreeCamera = true;
@@ -42,16 +41,16 @@ inline constexpr bool kbProfilingDump = false;
 inline constexpr bool kbProfilingFrameSpike = false;
 inline constexpr bool kbReplayFullFrames = true;
 inline constexpr bool kbVulkanDebugLayers = true;
-inline constexpr bool kbRandomlyInvalidatePbrCubemapCache = true;
+inline constexpr bool kbRandomlyInvalidatePhysicallyBasedRenderingCubemapCache = true;
 inline constexpr bool kbShowProfileTextByDefault = false;
 #elif defined(BT_PROFILE)
-inline constexpr const char* kpcBuildConfigName = "Profile";
+inline constexpr const char* kpcBuildConfigurationName = "Profile";
 inline constexpr bool kbMimallocDiagnostics = false;
 
 inline constexpr bool kbAutoConnect = true;
 inline constexpr bool kbDebugBreak = false;
 inline constexpr bool kbDebugInput = false;
-inline constexpr bool kbDebugNavCrossingCheck = false;
+inline constexpr bool kbDebugNavigationCrossingCheck = false;
 inline constexpr bool kbDebugRender = false;
 inline constexpr bool kbDxDiag = false;
 inline constexpr bool kbFreeCamera = true;
@@ -60,16 +59,16 @@ inline constexpr bool kbProfilingDump = true;
 inline constexpr bool kbProfilingFrameSpike = true;
 inline constexpr bool kbReplayFullFrames = false;
 inline constexpr bool kbVulkanDebugLayers = false;
-inline constexpr bool kbRandomlyInvalidatePbrCubemapCache = false;
+inline constexpr bool kbRandomlyInvalidatePhysicallyBasedRenderingCubemapCache = false;
 inline constexpr bool kbShowProfileTextByDefault = true;
 #elif defined(BT_RELEASE)
-inline constexpr const char* kpcBuildConfigName = "Release";
+inline constexpr const char* kpcBuildConfigurationName = "Release";
 inline constexpr bool kbMimallocDiagnostics = false;
 
 inline constexpr bool kbAutoConnect = false;
 inline constexpr bool kbDebugBreak = false;
 inline constexpr bool kbDebugInput = false;
-inline constexpr bool kbDebugNavCrossingCheck = false;
+inline constexpr bool kbDebugNavigationCrossingCheck = false;
 inline constexpr bool kbDebugRender = false;
 inline constexpr bool kbDxDiag = true;
 inline constexpr bool kbFreeCamera = false;
@@ -78,7 +77,7 @@ inline constexpr bool kbProfilingDump = false;
 inline constexpr bool kbProfilingFrameSpike = false;
 inline constexpr bool kbReplayFullFrames = false;
 inline constexpr bool kbVulkanDebugLayers = false;
-inline constexpr bool kbRandomlyInvalidatePbrCubemapCache = false;
+inline constexpr bool kbRandomlyInvalidatePhysicallyBasedRenderingCubemapCache = false;
 inline constexpr bool kbShowProfileTextByDefault = false;
 #endif
 

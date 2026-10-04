@@ -8,38 +8,38 @@
 namespace game
 {
 
-void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
+void CommandGamePacketFaultFixture(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.is_object())
+	if (!rParameters.is_object())
 	{
 		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
 	}
-	if (rParams.size() != 1)
+	if (rParameters.size() != 1)
 	{
 		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
 	}
-	if (!rParams.contains("case"))
+	if (!rParameters.contains("case"))
 	{
 		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
 	}
-	if (!rParams.at("case").is_string())
+	if (!rParameters.at("case").is_string())
 	{
 		throw std::runtime_error("game_packet_fault_fixture requires exactly {\"case\":\"server_only|undersized|oversized|over_cap\"}");
 	}
 
-	std::string caseName = rParams.at("case").get<std::string>();
+	std::string caseName = rParameters.at("case").get<std::string>();
 	if (caseName != "server_only" && caseName != "undersized" && caseName != "oversized" && caseName != "over_cap")
 	{
 		throw std::runtime_error("game_packet_fault_fixture 'case' must be server_only|undersized|oversized|over_cap");
 	}
 
-	int64_t iClientId = 0;
+	int64_t iClientIdentifier = 0;
 	int64_t iHandshakenClientCount = 0;
 	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
 	{
 		if (rClient.bHandshakeComplete)
 		{
-			iClientId = rClient.iClientId;
+			iClientIdentifier = rClient.iClientId;
 			++iHandshakenClientCount;
 		}
 	}
@@ -81,26 +81,26 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json
 	if (caseName == "over_cap")
 	{
 		// Start the fixed burst at zero for its raw packet type; all other client counters remain unchanged.
-		engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
+		engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientIdentifier);
 		pClient->uiTickTypeCounts[static_cast<uint8_t>(GamePacketType::kClientUpdatePlayerRequest)] = 0;
 	}
 	if (caseName == "server_only")
 	{
-		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(0, 0)});
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(0, 0)});
 	}
 	else if (caseName == "undersized")
 	{
-		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(12, 0)});
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(12, 0)});
 	}
 	else if (caseName == "oversized")
 	{
-		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(14, 0)});
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(14, 0)});
 	}
 	else
 	{
 		for (int64_t i = 0; i < 9; ++i)
 		{
-			engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(13, 0)});
+			engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(13, 0)});
 		}
 	}
 
@@ -108,7 +108,7 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json
 	// Consume the fixture's game-layer disconnect bookkeeping before the next poll clears it.
 	gpServerSession->mpClientManager->Disconnects();
 
-	rResult["clientId"] = iClientId;
+	rResult["clientId"] = iClientIdentifier;
 	rResult["case"] = caseName;
 	rResult["type"] = static_cast<uint8_t>(eType);
 	rResult["payloadSize"] = iPayloadSize;
@@ -116,44 +116,42 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json
 	rResult["entryCount"] = iEntryCount;
 }
 
-// engine_packet_fault_fixture: dispatch one malformed engine packet through the real Server::Receive path, so the
-// admission gates, the dispatch catch, and RecordContractViolation all run. Ungated, mirroring
-// game_packet_fault_fixture, because it only drops a packet. Both cases use kClientAcknowledgmentStream: it is the one
-// client-sendable engine row whose [min,max] size range admits a packet the reader can still reject, so the failure
-// lands in decode rather than at the exact-size admission gate.
-void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::json& rResult)
+// This fixture and CommandGamePacketFaultFixture run without kbDebugInput. kClientAcknowledgmentStream's admitted
+// size range permits reader rejection. Server::Receive records "truncated" through its dispatch catch and
+// "size_mismatch" through the handler's size check; RecordContractViolation can disconnect the client.
+void CommandEnginePacketFaultFixture(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParams.is_object())
+	if (!rParameters.is_object())
 	{
 		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
 	}
-	if (rParams.size() != 1)
+	if (rParameters.size() != 1)
 	{
 		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
 	}
-	if (!rParams.contains("case"))
+	if (!rParameters.contains("case"))
 	{
 		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
 	}
-	if (!rParams.at("case").is_string())
+	if (!rParameters.at("case").is_string())
 	{
 		throw std::runtime_error("engine_packet_fault_fixture requires exactly {\"case\":\"truncated|size_mismatch\"}");
 	}
 
-	std::string caseName = rParams.at("case").get<std::string>();
+	std::string caseName = rParameters.at("case").get<std::string>();
 	if (caseName != "truncated" && caseName != "size_mismatch")
 	{
 		throw std::runtime_error("engine_packet_fault_fixture 'case' must be truncated|size_mismatch");
 	}
 
-	int64_t iClientId = 0;
+	int64_t iClientIdentifier = 0;
 	ENetPeer* pPeer = nullptr;
 	int64_t iHandshakenClientCount = 0;
 	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
 	{
 		if (rClient.bHandshakeComplete)
 		{
-			iClientId = rClient.iClientId;
+			iClientIdentifier = rClient.iClientId;
 			pPeer = rClient.pPeer;
 			++iHandshakenClientCount;
 		}
@@ -179,13 +177,13 @@ void CommandEnginePacketFaultFixture(const nlohmann::json& rParams, nlohmann::js
 	// RecordContractViolation may remove the client, so nothing below touches the connection again.
 	engine::gpServer->Receive(packet, pPeer);
 
-	rResult["clientId"] = iClientId;
+	rResult["clientId"] = iClientIdentifier;
 	rResult["case"] = caseName;
 	rResult["type"] = packet.at(0);
 	rResult["size"] = iSize;
 }
 
-void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+void CommandServerPreHandshakeAcknowledgmentFixture([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -193,11 +191,11 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 	}
 	else
 	{
-		if (!rParams.is_object())
+		if (!rParameters.is_object())
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture requires exactly {}");
 		}
-		if (!rParams.empty())
+		if (!rParameters.empty())
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture requires exactly {}");
 		}
@@ -233,8 +231,8 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 			throw std::runtime_error("server_pre_handshake_ack_fixture requires byte-count headroom");
 		}
 
-		int64_t iClientId = pClient->iClientId;
-		ENetPeer* const pPeer = pClient->pPeer;
+		int64_t iClientIdentifier = pClient->iClientId;
+		ENetPeer* pPeer = pClient->pPeer;
 		bool bHandshakeComplete = pClient->bHandshakeComplete;
 		int64_t iCorruptViolations = pClient->iCorruptViolations;
 		int64_t iRateViolations = pClient->iRateViolations;
@@ -242,15 +240,15 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		int64_t iByteCount = pClient->iTickByteCount;
 		static constexpr uint8_t kuiPacketType = static_cast<uint8_t>(engine::PacketType::kClientAcknowledgmentStream);
 		uint16_t uiTypeCount = pClient->uiTickTypeCounts[kuiPacketType];
-		int64_t iClientTimestampNs = pClient->iClientTimestampNanoseconds;
-		int64_t iConsecutiveZeroAdvanceAcks = pClient->iConsecutiveZeroAdvanceAcks;
+		int64_t iClientTimestampNanoseconds = pClient->iClientTimestampNanoseconds;
+		int64_t iConsecutiveZeroAdvanceAcknowledgments = pClient->iConsecutiveZeroAdvanceAcks;
 		bool bFloorStalled = pClient->bFloorStalled;
-		int64_t iPeakConsecutiveStallAcks = pClient->iPeakConsecutiveStallAcks;
-		std::vector<engine::AckState> ackStates;
-		ackStates.reserve(pClient->slots.size());
+		int64_t iPeakConsecutiveStallAcknowledgments = pClient->iPeakConsecutiveStallAcks;
+		std::vector<engine::AckState> acknowledgmentStates;
+		acknowledgmentStates.reserve(pClient->slots.size());
 		for (const engine::ClientConnection::SlotState& rSlot : pClient->slots)
 		{
-			ackStates.push_back(rSlot.ack);
+			acknowledgmentStates.push_back(rSlot.ack);
 		}
 
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
@@ -266,9 +264,9 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 
 		{
 			pClient->bHandshakeComplete = false;
-			common::ScopedLambda restoreHandshake([iClientId]()
+			common::ScopedLambda restoreHandshake([iClientIdentifier]()
 			{
-				if (engine::ClientConnection* pRestoreClient = engine::gpServer->FindClient(iClientId); pRestoreClient != nullptr)
+				if (engine::ClientConnection* pRestoreClient = engine::gpServer->FindClient(iClientIdentifier); pRestoreClient != nullptr)
 				{
 					pRestoreClient->bHandshakeComplete = true;
 				}
@@ -276,7 +274,7 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 			engine::gpServer->Receive(packetData, pPeer);
 		}
 
-		pClient = engine::gpServer->FindClient(iClientId);
+		pClient = engine::gpServer->FindClient(iClientIdentifier);
 		if (pClient == nullptr)
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture client identity changed during receive");
@@ -286,23 +284,22 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 			throw std::runtime_error("server_pre_handshake_ack_fixture client identity changed during receive");
 		}
 
-		bool bAckSlotsUnchanged = pClient->slots.size() == ackStates.size();
-		for (int64_t i = 0; bAckSlotsUnchanged && i < std::ssize(pClient->slots); ++i)
+		bool bAcknowledgmentSlotsUnchanged = pClient->slots.size() == acknowledgmentStates.size();
+		for (int64_t i = 0; bAcknowledgmentSlotsUnchanged && i < std::ssize(pClient->slots); ++i)
 		{
-			const engine::AckState& rBefore = ackStates.at(i);
+			const engine::AckState& rBefore = acknowledgmentStates.at(i);
 			const engine::AckState& rAfter = pClient->slots.at(i).ack;
-			bAckSlotsUnchanged = rAfter.iAcknowledgmentFloor == rBefore.iAcknowledgmentFloor && rAfter.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow
-			                  && rAfter.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh && rAfter.uiEpoch == rBefore.uiEpoch;
+			bAcknowledgmentSlotsUnchanged = rAfter.iAcknowledgmentFloor == rBefore.iAcknowledgmentFloor && rAfter.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow && rAfter.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh && rAfter.uiEpoch == rBefore.uiEpoch;
 		}
 
 		bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1
 		                       && pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;
 		bool bHandshakeRestored = bHandshakeComplete && pClient->bHandshakeComplete;
 		bool bTypeCountUnchanged = pClient->uiTickTypeCounts[kuiPacketType] == uiTypeCount;
-		bool bAckStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcks
-		                       && pClient->bFloorStalled == bFloorStalled
-		                       && pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcks;
-		bool bTimestampUnchanged = pClient->iClientTimestampNanoseconds == iClientTimestampNs;
+		bool bAcknowledgmentStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcknowledgments
+		                                  && pClient->bFloorStalled == bFloorStalled
+		                                  && pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcknowledgments;
+		bool bTimestampUnchanged = pClient->iClientTimestampNanoseconds == iClientTimestampNanoseconds;
 		bool bContractViolationsUnchanged = pClient->iCorruptViolations == iCorruptViolations && pClient->iRateViolations == iRateViolations;
 		if (!bAdmissionAdvanced)
 		{
@@ -316,11 +313,11 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
 		}
-		if (!bAckSlotsUnchanged)
+		if (!bAcknowledgmentSlotsUnchanged)
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
 		}
-		if (!bAckStallUnchanged)
+		if (!bAcknowledgmentStallUnchanged)
 		{
 			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
 		}
@@ -333,7 +330,7 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 			throw std::runtime_error("server_pre_handshake_ack_fixture observed unexpected state mutation");
 		}
 
-		rResult["clientId"] = iClientId;
+		rResult["clientId"] = iClientIdentifier;
 		rResult["type"] = kuiPacketType;
 		rResult["size"] = iPacketSize;
 		rResult["packetCountBefore"] = iPacketCount;
@@ -344,8 +341,8 @@ void CommandServerPreHandshakeAckFixture([[maybe_unused]] const nlohmann::json& 
 		rResult["clientPreserved"] = true;
 		rResult["peerPreserved"] = true;
 		rResult["typeCountUnchanged"] = bTypeCountUnchanged;
-		rResult["ackSlotsUnchanged"] = bAckSlotsUnchanged;
-		rResult["ackStallUnchanged"] = bAckStallUnchanged;
+		rResult["ackSlotsUnchanged"] = bAcknowledgmentSlotsUnchanged;
+		rResult["ackStallUnchanged"] = bAcknowledgmentStallUnchanged;
 		rResult["timestampUnchanged"] = bTimestampUnchanged;
 		rResult["contractViolationsUnchanged"] = bContractViolationsUnchanged;
 	}

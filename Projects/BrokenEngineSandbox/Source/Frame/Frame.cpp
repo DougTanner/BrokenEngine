@@ -28,7 +28,6 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
 const int64_t Frame::kiVersion = 132 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
 
-// FrameInterpolate
 FrameInterpolate::FrameInterpolate()
 : pPlayers(std::make_unique<PlayersInterpolate>())
 , pBlasters(std::make_unique<BlastersInterpolate>())
@@ -41,7 +40,6 @@ FrameInterpolate::~FrameInterpolate() = default;
 FrameInterpolate::FrameInterpolate(FrameInterpolate&&) noexcept = default;
 FrameInterpolate& FrameInterpolate::operator=(FrameInterpolate&&) noexcept = default;
 
-// FramePostRender
 FramePostRender::FramePostRender()
 : pPlayers(std::make_unique<PlayersPostRender>())
 , pBlasters(std::make_unique<BlastersPostRender>())
@@ -55,7 +53,6 @@ FramePostRender::~FramePostRender() = default;
 FramePostRender::FramePostRender(FramePostRender&&) noexcept = default;
 FramePostRender& FramePostRender::operator=(FramePostRender&&) noexcept = default;
 
-// Frame
 Frame::Frame() = default;
 Frame::~Frame() = default;
 Frame::Frame(Frame&&) noexcept = default;
@@ -111,26 +108,20 @@ void FrameInterpolate::Register()
 	};
 #endif // BT_CLIENT
 
-	// Parent
 	engine::ForEachRegister(engine::InterpolateTypes {});
 
-	// Player
 	PlayersInterpolate::Register();
 
-	// Collections
 	engine::ForEachRegister(GameInterpolateTypes {});
 }
 
 #if defined(BT_CLIENT)
 void FrameInterpolate::GraphicsResources()
 {
-	// Parent
 	engine::ForEachGraphicsResources(engine::InterpolateTypes {});
 
-	// Player
 	PlayersInterpolate::GraphicsResources();
 
-	// Collections
 	engine::ForEachGraphicsResources(GameInterpolateTypes {});
 }
 #endif // BT_CLIENT
@@ -139,14 +130,11 @@ void FrameInterpolate::AllocateAndCopy(FrameInterpolate& __restrict rCurrent, co
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerInterpolateAllocateAndCopy);
 
-	// Parent
 	FrameInterpolateBase::AllocateAndCopy(rCurrent, rPrevious);
 
-	// Player
-	PlayersInterpolate::AllocateAndCopy(*rCurrent.pPlayers, *rPrevious.pPlayers);
+	engine::AllocateAndCopyMembers(*rCurrent.pPlayers, *rPrevious.pPlayers);
 
-	// Collections
-	engine::AllocateAndCopyCollections(GameInterpolateCollections(rCurrent), GameInterpolateCollections(rPrevious), std::make_index_sequence<std::tuple_size_v<decltype(GameInterpolateCollections(rCurrent))>>{});
+	engine::AllocateAndCopyCollections(GameInterpolateCollections(rCurrent), GameInterpolateCollections(rPrevious), std::make_index_sequence<std::tuple_size_v<decltype(GameInterpolateCollections(rCurrent))>> {});
 }
 
 void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame& __restrict rPreviousFrame, float fDeltaTime)
@@ -155,10 +143,8 @@ void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame
 
 	const FrameInterpolate& rPrevious = rPreviousFrame.interpolate;
 
-	// Parent
 	FrameInterpolateBase::Update(rCurrent, rPreviousFrame, fDeltaTime);
 
-	// Load
 	GameFlags_t gameFlags = rPrevious.gameFlags;
 	float fSpawnTimer = rPrevious.fSpawnTimer;
 
@@ -169,14 +155,11 @@ void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame
 		fSpawnTimer += fDeltaTime;
 	}
 
-	// Save
 	rCurrent.gameFlags = gameFlags;
 	rCurrent.fSpawnTimer = fSpawnTimer;
 
-	// Player
 	PlayersInterpolate::Update(rCurrent, rPreviousFrame);
 
-	// Collections
 	engine::ForEachInterpolateUpdate(GameInterpolateTypes {}, rCurrent, rPreviousFrame);
 }
 
@@ -184,14 +167,11 @@ void FramePostRender::AllocateAndCopy(FramePostRender& __restrict rCurrent, cons
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderAllocateAndCopy);
 
-	// Parent
 	engine::FramePostRenderBase::AllocateAndCopy(rCurrent, rPrevious);
 
-	// Player
-	PlayersPostRender::AllocateAndCopy(*rCurrent.pPlayers, *rPrevious.pPlayers);
+	engine::AllocateAndCopyMembers(*rCurrent.pPlayers, *rPrevious.pPlayers);
 
-	// Collections
-	engine::AllocateAndCopyCollections(GamePostRenderCollections(rCurrent), GamePostRenderCollections(rPrevious), std::make_index_sequence<std::tuple_size_v<decltype(GamePostRenderCollections(rCurrent))>>{});
+	engine::AllocateAndCopyCollections(GamePostRenderCollections(rCurrent), GamePostRenderCollections(rPrevious), std::make_index_sequence<std::tuple_size_v<decltype(GamePostRenderCollections(rCurrent))>> {});
 }
 
 void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData)
@@ -200,30 +180,23 @@ void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict r
 
 	rFrame.postRender.transferRequests.clear();
 
-	// Parent
 	FramePostRenderBase::Update(rFrame, rPreviousFrame, rFrameInput, rStaticData);
 
-	// Propagate game-specific fields
 	rFrame.postRender.enemyAlignment = rPreviousFrame.postRender.enemyAlignment;
 	rFrame.postRender.playerAlignment = rPreviousFrame.postRender.playerAlignment;
 
-	// Player
 	PlayersPostRender::Update(rFrame, rPreviousFrame, rStaticData);
 	PlayersPostRender::ProcessUpdateStatusChanges(rFrame, rFrameInput, rStaticData);
 
-	// Collections
 	engine::ForEachPostRenderUpdate(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
 void FramePostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
 {
-	// Parent
 	engine::ForEachPostRenderTransfer(engine::PostRenderBaseTypes {}, rFrame, rStaticData);
 
-	// Player
 	PlayersPostRender::Transfer(rFrame, rStaticData);
 
-	// Collections
 	engine::ForEachPostRenderTransfer(GamePostRenderTypes {}, rFrame, rStaticData);
 }
 
@@ -231,13 +204,10 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderDestroy);
 
-	// Parent
 	engine::ForEachPostRenderDestroy(engine::PostRenderBaseTypes {}, rFrame, rStaticData);
 
-	// Player
 	PlayersPostRender::Destroy(rFrame, rStaticData);
 
-	// Collections
 	engine::ForEachPostRenderDestroy(GamePostRenderTypes {}, rFrame, rStaticData);
 }
 
@@ -245,10 +215,10 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 {
 	FrameInterpolate& rInterpolate = rFrame.interpolate;
 
-	static constexpr int64_t kiGridDim = 20;
-	static constexpr int64_t kiMaxFleetSize = 16;
+	static constexpr int64_t kiGridDimension = 20;
+	static constexpr int64_t kiMaximumFleetSize = 16;
 	static constexpr float kfTerrainClearance = kfSpaceshipRadius * 2.0f;
-	static constexpr float kfMinPlayerDistance = 120.0f;
+	static constexpr float kfMinimumPlayerDistance = 120.0f;
 	static constexpr float kfDesiredAnchorDistance = 150.0f;
 	static constexpr float kfChevronStagger = kfSpaceshipRadius * 2.0f;
 	static constexpr float kfShipSideSpacing = kfSpaceshipRadius * 3.0f;
@@ -273,7 +243,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 	{
 		return;
 	}
-	int64_t iShipCount = std::min(iSpawnCount, kiMaxFleetSize);
+	int64_t iShipCount = std::min(iSpawnCount, kiMaximumFleetSize);
 
 	// Reject positions outside the cell, inside terrain (with full body clearance), or within visible range of any alive player
 	auto IsSpawnPositionValid = [&](FXMVECTOR vecPosition) -> bool
@@ -293,7 +263,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 				continue;
 			}
 			XMVECTOR vecDelta = XMVectorSubtract(vecPosition, rInterpolate.pPlayers->pVecPositions[j]);
-			if (XMVectorGetX(XMVector3LengthSq(vecDelta)) < kfMinPlayerDistance * kfMinPlayerDistance)
+			if (XMVectorGetX(XMVector3LengthSq(vecDelta)) < kfMinimumPlayerDistance * kfMinimumPlayerDistance)
 			{
 				return false;
 			}
@@ -304,25 +274,25 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 	// Cell-area extents and grid pitch (area layout: x=minX, y=maxY, z=maxX, w=minY — see common::InsideArea)
 	XMFLOAT4A f4Area;
 	XMStoreFloat4A(&f4Area, engine::LocalFrameArea());
-	float fAreaMinX = f4Area.x;
-	float fAreaMinY = f4Area.w;
-	float fPitchX = (f4Area.z - f4Area.x) / static_cast<float>(kiGridDim);
-	float fPitchY = (f4Area.y - f4Area.w) / static_cast<float>(kiGridDim);
+	float fAreaMinimumX = f4Area.x;
+	float fAreaMinimumY = f4Area.w;
+	float fPitchX = (f4Area.z - f4Area.x) / static_cast<float>(kiGridDimension);
+	float fPitchY = (f4Area.y - f4Area.w) / static_cast<float>(kiGridDimension);
 
 	// Step 1: rasterize cell into a validity grid sampled at cell centers
-	bool aValidGrid[kiGridDim * kiGridDim] {};
-	for (int64_t iGridY = 0; iGridY < kiGridDim; ++iGridY)
+	bool aValidGrid[kiGridDimension * kiGridDimension] {};
+	for (int64_t i = 0; i < kiGridDimension; ++i)
 	{
-		for (int64_t iGridX = 0; iGridX < kiGridDim; ++iGridX)
+		for (int64_t j = 0; j < kiGridDimension; ++j)
 		{
-			auto vecGridCell = XMVectorSet(fAreaMinX + (static_cast<float>(iGridX) + 0.5f) * fPitchX, fAreaMinY + (static_cast<float>(iGridY) + 0.5f) * fPitchY, engine::gBaseHeight.mfCurrent, 1.0f);
-			aValidGrid[iGridY * kiGridDim + iGridX] = IsSpawnPositionValid(vecGridCell);
+			auto vecGridCell = XMVectorSet(fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX, fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY, engine::gBaseHeight.mfCurrent, 1.0f);
+			aValidGrid[i * kiGridDimension + j] = IsSpawnPositionValid(vecGridCell);
 		}
 	}
 
 	// Step 2: chevron template — anchor at front, ships fan back-and-side in local frame (forward = +x)
 	float fCenterOffset = static_cast<float>(iShipCount - 1) * 0.5f;
-	XMFLOAT2 aLocalOffsets[kiMaxFleetSize] {};
+	XMFLOAT2 aLocalOffsets[kiMaximumFleetSize] {};
 	for (int64_t i = 0; i < iShipCount; ++i)
 	{
 		float fOffset = static_cast<float>(i) - fCenterOffset;
@@ -334,41 +304,41 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 	int64_t iBestScore = 0;
 	float fBestDistanceCost = std::numeric_limits<float>::max();
 	int64_t iBestAnchorIndex = -1;
-	float fBestFacingCos = 1.0f;
-	float fBestFacingSin = 0.0f;
-	for (int64_t iGridY = 0; iGridY < kiGridDim; ++iGridY)
+	float fBestFacingCosine = 1.0f;
+	float fBestFacingSine = 0.0f;
+	for (int64_t i = 0; i < kiGridDimension; ++i)
 	{
-		for (int64_t iGridX = 0; iGridX < kiGridDim; ++iGridX)
+		for (int64_t j = 0; j < kiGridDimension; ++j)
 		{
-			float fAnchorX = fAreaMinX + (static_cast<float>(iGridX) + 0.5f) * fPitchX;
-			float fAnchorY = fAreaMinY + (static_cast<float>(iGridY) + 0.5f) * fPitchY;
+			float fAnchorX = fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX;
+			float fAnchorY = fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY;
 
 			// Facing direction: anchor -> spawn-center player (XY only)
 			float fToPlayerX = XMVectorGetX(vecPlayerPosition) - fAnchorX;
 			float fToPlayerY = XMVectorGetY(vecPlayerPosition) - fAnchorY;
 			float fDistance = std::sqrt(fToPlayerX * fToPlayerX + fToPlayerY * fToPlayerY);
-			if (fDistance < kfMinPlayerDistance)
+			if (fDistance < kfMinimumPlayerDistance)
 			{
 				continue;
 			}
-			float fFacingCos = fToPlayerX / fDistance;
-			float fFacingSin = fToPlayerY / fDistance;
+			float fFacingCosine = fToPlayerX / fDistance;
+			float fFacingSine = fToPlayerY / fDistance;
 
 			// Score: count chevron ships landing on valid grid cells
 			int64_t iScore = 0;
-			for (int64_t i = 0; i < iShipCount; ++i)
+			for (int64_t k = 0; k < iShipCount; ++k)
 			{
-				float fLocalForward = aLocalOffsets[i].x;
-				float fLocalSide = aLocalOffsets[i].y;
-				float fWorldX = fAnchorX + fFacingCos * fLocalForward - fFacingSin * fLocalSide;
-				float fWorldY = fAnchorY + fFacingSin * fLocalForward + fFacingCos * fLocalSide;
-				int64_t iShipGridX = static_cast<int64_t>(std::floor((fWorldX - fAreaMinX) / fPitchX));
-				int64_t iShipGridY = static_cast<int64_t>(std::floor((fWorldY - fAreaMinY) / fPitchY));
-				if (iShipGridX < 0 || iShipGridX >= kiGridDim || iShipGridY < 0 || iShipGridY >= kiGridDim)
+				float fLocalForward = aLocalOffsets[k].x;
+				float fLocalSide = aLocalOffsets[k].y;
+				float fWorldX = fAnchorX + fFacingCosine * fLocalForward - fFacingSine * fLocalSide;
+				float fWorldY = fAnchorY + fFacingSine * fLocalForward + fFacingCosine * fLocalSide;
+				int64_t iShipGridX = static_cast<int64_t>(std::floor((fWorldX - fAreaMinimumX) / fPitchX));
+				int64_t iShipGridY = static_cast<int64_t>(std::floor((fWorldY - fAreaMinimumY) / fPitchY));
+				if (iShipGridX < 0 || iShipGridX >= kiGridDimension || iShipGridY < 0 || iShipGridY >= kiGridDimension)
 				{
 					continue;
 				}
-				if (aValidGrid[iShipGridY * kiGridDim + iShipGridX])
+				if (aValidGrid[iShipGridY * kiGridDimension + iShipGridX])
 				{
 					++iScore;
 				}
@@ -383,9 +353,9 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 			{
 				iBestScore = iScore;
 				fBestDistanceCost = fDistanceCost;
-				iBestAnchorIndex = iGridY * kiGridDim + iGridX;
-				fBestFacingCos = fFacingCos;
-				fBestFacingSin = fFacingSin;
+				iBestAnchorIndex = i * kiGridDimension + j;
+				fBestFacingCosine = fFacingCosine;
+				fBestFacingSine = fFacingSine;
 			}
 		}
 	}
@@ -395,16 +365,16 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 	}
 
 	// Step 4: place ships at the chosen anchor (subset fallback — skip ships whose exact position fails the precise validity check)
-	int64_t iBestGridX = iBestAnchorIndex % kiGridDim;
-	int64_t iBestGridY = iBestAnchorIndex / kiGridDim;
-	float fBestAnchorX = fAreaMinX + (static_cast<float>(iBestGridX) + 0.5f) * fPitchX;
-	float fBestAnchorY = fAreaMinY + (static_cast<float>(iBestGridY) + 0.5f) * fPitchY;
+	int64_t iBestGridX = iBestAnchorIndex % kiGridDimension;
+	int64_t iBestGridY = iBestAnchorIndex / kiGridDimension;
+	float fBestAnchorX = fAreaMinimumX + (static_cast<float>(iBestGridX) + 0.5f) * fPitchX;
+	float fBestAnchorY = fAreaMinimumY + (static_cast<float>(iBestGridY) + 0.5f) * fPitchY;
 	for (int64_t i = 0; i < iShipCount; ++i)
 	{
 		float fLocalForward = aLocalOffsets[i].x;
 		float fLocalSide = aLocalOffsets[i].y;
-		float fWorldX = fBestAnchorX + fBestFacingCos * fLocalForward - fBestFacingSin * fLocalSide;
-		float fWorldY = fBestAnchorY + fBestFacingSin * fLocalForward + fBestFacingCos * fLocalSide;
+		float fWorldX = fBestAnchorX + fBestFacingCosine * fLocalForward - fBestFacingSine * fLocalSide;
+		float fWorldY = fBestAnchorY + fBestFacingSine * fLocalForward + fBestFacingCosine * fLocalSide;
 		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, engine::gBaseHeight.mfCurrent, 1.0f);
 		if (!IsSpawnPositionValid(vecSpawnPosition))
 		{
@@ -425,13 +395,10 @@ void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderSpawn);
 
-	// Parent
 	engine::ForEachPostRenderSpawn(engine::PostRenderBaseTypes {}, rFrame, rStaticData);
 
-	// Player
 	PlayersPostRender::Spawn(rFrame, rFrameInput, rStaticData);
 
-	// Collections
 	engine::ForEachPostRenderSpawn(GamePostRenderTypes {}, rFrame, rStaticData);
 
 	FrameInterpolate& rInterpolate = rFrame.interpolate;
@@ -440,7 +407,7 @@ void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 		return;
 	}
 
-	// Spawn one spaceship per player every half second
+	// Each interval attempts a fleet capped by kiMaximumFleetSize and the non-exploding player count; invalid positions are skipped.
 	while (rInterpolate.fSpawnTimer >= kfSpaceshipSpawnInterval)
 	{
 		rInterpolate.fSpawnTimer -= kfSpaceshipSpawnInterval;
@@ -452,13 +419,10 @@ void FramePostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderPreCollision);
 
-	// Parent
 	engine::ForEachPostRenderPreCollision(engine::PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
-	// Player
 	PlayersPostRender::PreCollision(rFrame, rPreviousFrame, rStaticData);
 
-	// Collections
 	engine::ForEachPostRenderPreCollision(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
@@ -466,13 +430,10 @@ void FramePostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderPostCollision);
 
-	// Parent
 	engine::ForEachPostRenderPostCollision(engine::PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
-	// Player
 	PlayersPostRender::PostCollision(rFrame, rPreviousFrame, rStaticData);
 
-	// Collections
 	engine::ForEachPostRenderPostCollision(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	engine::Collision::siLayerCount = 0;
@@ -482,10 +443,8 @@ void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[ma
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderAreaDamage);
 
-	// Parent
 	engine::ForEachPostRenderAreaDamage(engine::PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
-	// Collections
 	engine::ForEachPostRenderAreaDamage(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	engine::AreaDamage::siAreaDamageSourceCount = 0;
@@ -493,7 +452,7 @@ void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 // Both spatial windows bind the same single spaceship source layer and the same missile subscription layer; they
 // differ only in which arrival-grace column decides eligibility and whether previous positions are available.
-static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const float* pfArrivalGracePeriods, const MissilesPostRender& rSubscribers)
+RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const float* pfArrivalGracePeriods, const MissilesPostRender& rSubscribers)
 {
 	const SpaceshipsInterpolate& rSpaceships = *rFrame.interpolate.pSpaceships;
 	const SpaceshipsPostRender& rSpaceshipsPostRender = *rFrame.postRender.pSpaceships;
@@ -570,20 +529,6 @@ static RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XM
 	};
 }
 
-RegistryWindow Frame::MissileUpdateWindow(const Frame& rFrame, const Frame& rPreviousFrame)
-{
-	// Missiles update before Spaceships, so the current rows still line up with the previous frame's: previous
-	// positions are what a retained missile homes on, and previous arrival grace is the eligibility this phase saw.
-	return BuildSpaceshipRegistryWindow(rFrame, rPreviousFrame.interpolate.pSpaceships->pVecPositions, rPreviousFrame.postRender.pSpaceships->pfArrivalGracePeriods, *rPreviousFrame.postRender.pMissiles);
-}
-
-RegistryWindow Frame::PlayerSpawnWindow(const Frame& rFrame)
-{
-	// Transfer and Destroy have already moved rows this tick, so previous-frame rows no longer line up and no
-	// previous positions are bound. A missile acquiring here does not home until the next tick, which needs none.
-	return BuildSpaceshipRegistryWindow(rFrame, nullptr, rFrame.postRender.pSpaceships->pfArrivalGracePeriods, *rFrame.postRender.pMissiles);
-}
-
 engine::RegistryOwnershipLayer Frame::OwnershipLayer(const Frame& rFrame)
 {
 	PlayersPostRender& rPlayers = *rFrame.postRender.pPlayers;
@@ -598,17 +543,14 @@ engine::RegistryOwnershipLayer Frame::OwnershipLayer(const Frame& rFrame)
 }
 
 #if defined(BT_CLIENT)
-void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords)
+void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
-	// Parent
 	engine::ExplosionsInterpolate::siTotalCount = 0;
-	engine::ForEachBeginRender(engine::InterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
+	engine::ForEachBeginRender(engine::InterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 
-	// Player
-	PlayersInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
+	PlayersInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 
-	// Collections
-	engine::ForEachBeginRender(GameInterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoords);
+	engine::ForEachBeginRender(GameInterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 
 	// Population counters: one sum over the cells this transaction renders, published once so a render with no
 	// renderable cell reads zero.
@@ -616,9 +558,9 @@ void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_
 	int64_t iTotalBlasters = 0;
 	int64_t iTotalMissiles = 0;
 	int64_t iTotalSpaceships = 0;
-	for (const engine::GridCoord& rCoord : rActiveCoords)
+	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = rRenderInterpolates.find(rCoord);
+		auto it = rRenderInterpolates.find(rCoordinate);
 		if (it != rRenderInterpolates.end())
 		{
 			iTotalPlayers += it->second.pPlayers->iCount;
@@ -657,49 +599,40 @@ void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpola
 	engine::ExplosionsInterpolate::siTotalCount += rFrameInterpolate.explosions.iCount;
 	engine::ForEachInterpolateRender(engine::InterpolateTypes {}, rFrameInterpolate, iCommandBuffer);
 
-	// Player
 	PlayersInterpolate::Render(rFrameInterpolate, iCommandBuffer);
 
-	// Collections
 	engine::ForEachInterpolateRender(GameInterpolateTypes {}, rFrameInterpolate, iCommandBuffer);
 }
 
 void FrameInterpolate::EndRender(int64_t iCommandBuffer)
 {
-	// Parent
 	if constexpr (kbProfiling)
 	{
 		gpProfileManager->GetCpuCounter(engine::kCpuCounterExplosions).iCount = engine::ExplosionsInterpolate::siTotalCount;
 	}
 	engine::ForEachEndRender(engine::InterpolateTypes {}, iCommandBuffer);
 
-	// Player
 	PlayersInterpolate::EndRender(iCommandBuffer);
 
-	// Collections
 	engine::ForEachEndRender(GameInterpolateTypes {}, iCommandBuffer);
 }
 
-void FrameInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coord)
-{
-	PlayersInterpolate::DebugRender(rFrameInterpolate, coord);
-}
 #endif // BT_CLIENT
 
 common::crc_t FrameInterpolate::Crcs(const FrameInterpolate& rCurrent)
 {
-	common::crc_t sharedCrc = static_cast<const engine::FrameInterpolateBase&>(rCurrent).Crcs();
+	common::crc_t uiSharedCrc = static_cast<const engine::FrameInterpolateBase&>(rCurrent).Crcs();
 
-	sharedCrc = (sharedCrc ^ common::Crc(rCurrent.gameFlags)) * common::kCrcMultiplier;
-	sharedCrc = (sharedCrc ^ common::Crc(rCurrent.fSpawnTimer)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.gameFlags)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.fSpawnTimer)) * common::kCrcMultiplier;
 
 	// A SharedCrcMembers entry absent from SharedMembers would CRC client-local state — permanent false desync
 	ASSERT(engine::IsMemberTupleSubset(rCurrent.pPlayers->SharedCrcMembers(), rCurrent.pPlayers->SharedMembers()));
-	sharedCrc = (sharedCrc ^ engine::CollectionCrc(*rCurrent.pPlayers, rCurrent.pPlayers->SharedCrcMembers())) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ engine::CollectionCrc(*rCurrent.pPlayers, rCurrent.pPlayers->SharedCrcMembers())) * common::kCrcMultiplier;
 
-	sharedCrc = engine::CollectionsCrc(sharedCrc, GameInterpolateCollections(rCurrent));
+	uiSharedCrc = engine::CollectionsCrc(uiSharedCrc, GameInterpolateCollections(rCurrent));
 
-	return sharedCrc;
+	return uiSharedCrc;
 }
 
 bool FrameInterpolate::LogDifferences(const FrameInterpolate& rOther) const
@@ -710,7 +643,7 @@ bool FrameInterpolate::LogDifferences(const FrameInterpolate& rOther) const
 	bEqual &= common::LogDifference<"fSpawnTimer">(fSpawnTimer, rOther.fSpawnTimer);
 	bEqual &= common::LogDifference<"gameFlags">(gameFlags, rOther.gameFlags);
 	bEqual &= pPlayers->LogDifferences(*rOther.pPlayers);
-	bEqual &= engine::LogDifferencesCollections(GameInterpolateCollections(*this), GameInterpolateCollections(rOther), std::make_index_sequence<std::tuple_size_v<decltype(GameInterpolateCollections(*this))>>{});
+	bEqual &= engine::LogDifferencesCollections(GameInterpolateCollections(*this), GameInterpolateCollections(rOther), std::make_index_sequence<std::tuple_size_v<decltype(GameInterpolateCollections(*this))>> {});
 	return bEqual;
 }
 
@@ -753,18 +686,18 @@ void FrameInterpolate::ServerRead(std::istream& rStream)
 
 common::crc_t FramePostRender::Crcs(const FramePostRender& rCurrent)
 {
-	common::crc_t sharedCrc = static_cast<const engine::FramePostRenderBase&>(rCurrent).Crcs();
+	common::crc_t uiSharedCrc = static_cast<const engine::FramePostRenderBase&>(rCurrent).Crcs();
 
-	sharedCrc = (sharedCrc ^ common::Crc(rCurrent.enemyAlignment)) * common::kCrcMultiplier;
-	sharedCrc = (sharedCrc ^ common::Crc(rCurrent.playerAlignment)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.enemyAlignment)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.playerAlignment)) * common::kCrcMultiplier;
 
 	// A SharedCrcMembers entry absent from SharedMembers would CRC client-local state — permanent false desync
 	ASSERT(engine::IsMemberTupleSubset(rCurrent.pPlayers->SharedCrcMembers(), rCurrent.pPlayers->SharedMembers()));
-	sharedCrc = (sharedCrc ^ engine::CollectionCrc(*rCurrent.pPlayers, rCurrent.pPlayers->SharedCrcMembers())) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ engine::CollectionCrc(*rCurrent.pPlayers, rCurrent.pPlayers->SharedCrcMembers())) * common::kCrcMultiplier;
 
-	sharedCrc = engine::CollectionsCrc(sharedCrc, GamePostRenderCollections(rCurrent));
+	uiSharedCrc = engine::CollectionsCrc(uiSharedCrc, GamePostRenderCollections(rCurrent));
 
-	return sharedCrc;
+	return uiSharedCrc;
 }
 
 bool FramePostRender::LogDifferences(const FramePostRender& rOther) const
@@ -775,7 +708,7 @@ bool FramePostRender::LogDifferences(const FramePostRender& rOther) const
 	bEqual &= common::LogDifference<"enemyAlignment">(enemyAlignment, rOther.enemyAlignment);
 	bEqual &= common::LogDifference<"playerAlignment">(playerAlignment, rOther.playerAlignment);
 	bEqual &= pPlayers->LogDifferences(*rOther.pPlayers);
-	bEqual &= engine::LogDifferencesCollections(GamePostRenderCollections(*this), GamePostRenderCollections(rOther), std::make_index_sequence<std::tuple_size_v<decltype(GamePostRenderCollections(*this))>>{});
+	bEqual &= engine::LogDifferencesCollections(GamePostRenderCollections(*this), GamePostRenderCollections(rOther), std::make_index_sequence<std::tuple_size_v<decltype(GamePostRenderCollections(*this))>> {});
 	return bEqual;
 }
 
@@ -815,7 +748,7 @@ void FramePostRender::ServerRead(std::istream& rStream)
 	engine::SharedCollectionsRead(rStream, GamePostRenderCollections(*this));
 }
 
-bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest)
+bool PrepareTransferRequest(const FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest)
 {
 	engine::ComputeTransferDelta(rBounds, rRequest.data.vecPosition, rRequest.iDeltaX, rRequest.iDeltaY);
 
@@ -824,10 +757,8 @@ bool PrepareTransferRequest(FramePostRender& rPostRender, const engine::FrameBou
 	// forwards the position unchanged, so this is the single conversion point.
 	rRequest.data.vecPosition = XMVectorSubtract(rRequest.data.vecPosition, XMVectorSet(static_cast<float>(rRequest.iDeltaX) * engine::kfCellWidth, static_cast<float>(rRequest.iDeltaY) * engine::kfCellHeight, 0.0f, 0.0f));
 
-	// Heap realloc warning: capacity exceeded during a shared per-tick burst. Producers are
-	// unbounded, so investigate entities re-flagging kTransfer across iterations or an
-	// unexpected push path.
-	return rPostRender.transferRequests.size() == rPostRender.transferRequests.capacity();
+	// Transfer producers are unbounded, so a full buffer can reallocate during a shared per-tick burst.
+	return std::ssize(rPostRender.transferRequests) == static_cast<int64_t>(rPostRender.transferRequests.capacity());
 }
 
 void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rRequest)
@@ -843,16 +774,11 @@ void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rR
 	}
 }
 
-common::crc_t Frame::Crcs() const
-{
-	common::crc_t crc = FrameInterpolate::Crcs(interpolate);
-	crc = (crc ^ FramePostRender::Crcs(postRender)) * common::kCrcMultiplier;
-	return crc;
-}
-
 common::crc_t Frame::Crc() const
 {
-	return Crcs();
+	common::crc_t uiCrc = FrameInterpolate::Crcs(interpolate);
+	uiCrc = (uiCrc ^ FramePostRender::Crcs(postRender)) * common::kCrcMultiplier;
+	return uiCrc;
 }
 
 bool Frame::LogDifferences(const Frame& rOther) const

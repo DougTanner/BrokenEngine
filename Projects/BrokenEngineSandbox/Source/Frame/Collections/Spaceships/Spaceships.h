@@ -8,25 +8,24 @@
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
 
-namespace engine { struct FrameStaticData; }
+namespace engine
+{
+struct FrameStaticData;
+} // namespace engine
 
 namespace game
 {
 
-// Shared constants (used across Spaceships*.cpp files)
 inline constexpr float kfSpaceshipDestroyTime = 0.25f;
 inline constexpr float kfSpaceshipDestroyExplosionInterval = 0.024f;
 
-// Collision
 inline constexpr float kfSpaceshipRadius = 1.5f;
 
-// Movement — three independent tuning axes
 inline constexpr float kfSpaceshipAcceleration = 10.0f;
 inline constexpr float kfSpaceshipDrag = 0.25f;
 inline constexpr float kfSpaceshipMaxSpeed = 40.0f;
 inline constexpr float kfSpaceshipMaxTurnRate = 4.0f;
 
-// Pusher
 inline constexpr float kfSpaceshipPusherRadius = kfSpaceshipRadius * 1.5f;
 inline constexpr float kfSpaceshipPusherIntensity = 36.0f;
 inline constexpr float kfSpaceshipPusherPower = 3.0f;
@@ -35,21 +34,18 @@ inline constexpr float kfSpaceshipMaxPusherPushVelocity = kfSpaceshipMaxSpeed * 
 struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 {
 	static constexpr int64_t kiVersion = 3;
-	static constexpr const char* kName = "Spaceships";
-	static constexpr common::crc_t kCrc = common::CrcConsteval("Spaceships");
+	static constexpr const char* kpcName = "Spaceships";
+	static constexpr common::crc_t kuiCrc = common::CrcConsteval("Spaceships");
 
-	// Register
 	static void Register();
 
-	// Allocate and copy
 	static void AllocateAndCopy(SpaceshipsInterpolate& rCurrent, const SpaceshipsInterpolate& rPrevious);
 
-	// Interpolate
 	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
 #if defined(BT_CLIENT)
-	static void ClientInit(Frame& rFrame, int64_t iIndex);
-	static void ClientInitAll(Frame& rFrame);
+	static void ClientInitialize(Frame& rFrame, int64_t iIndex);
+	static void ClientInitializeAll(Frame& rFrame);
 #endif
 
 	XMVECTOR* __restrict pVecPositions = nullptr;
@@ -64,7 +60,10 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 #if defined(BT_CLIENT)
 	float* __restrict pfAnimationTimes = nullptr;
 #endif
-	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.puiPushers, rSelf.puiRegistryIds, rSelf.pfDeltaRotations); }
+	auto SharedMembers(this auto&& rSelf)
+	{
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.puiPushers, rSelf.puiRegistryIds, rSelf.pfDeltaRotations);
+	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
@@ -88,14 +87,11 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 #endif
 	}
 
-	// Utility
 	bool LogDifferences(const SpaceshipsInterpolate& rOther) const;
 
-	// Graphics resources
 	static void GraphicsResources();
 
-	// Render
-	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords);
+	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 };
@@ -113,7 +109,6 @@ struct SpaceshipsPostRender : public engine::Collection<SpaceshipsPostRender>
 {
 	static constexpr int64_t kiVersion = 6;
 
-	// Allocate and copy
 	static void AllocateAndCopy(SpaceshipsPostRender& rCurrent, const SpaceshipsPostRender& rPrevious);
 
 	// Simulation never produces non-finite health; reject it as a corrupt stream, since NaN or +inf health never dies.
@@ -128,7 +123,6 @@ struct SpaceshipsPostRender : public engine::Collection<SpaceshipsPostRender>
 		}
 	}
 
-	// Post render phases
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
 	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
@@ -138,16 +132,14 @@ struct SpaceshipsPostRender : public engine::Collection<SpaceshipsPostRender>
 	static void Spawn(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
 
 private:
-	// Per-spaceship Update helpers (called from SpaceshipsPostRender::Update orchestrator)
 	// Defined in SpaceshipsNavigation.cpp:
 	static void XM_CALLCONV ComputeSteering(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, FXMVECTOR vecDirection, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, float fDeltaTime, SpaceshipFlags_t& rFlags, float& rfDeltaRotation);
-	static void XM_CALLCONV ApplyMovement(Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, SpaceshipFlags_t flags, float fDeltaTime, XMVECTOR& rVecVelocity);
-	static void XM_CALLCONV ApplyPusherResponse(Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV ApplyMovement(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, SpaceshipFlags_t flags, float fDeltaTime, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV ApplyPusherResponse(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, XMVECTOR& rVecVelocity);
 	static void ApplyTerrainBounce(const engine::FrameStaticData& rStaticData, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, float fDeltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity);
 
 	// Defined in SpaceshipsCombat.cpp:
-	static void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, SpaceshipFlags_t flags, float fDeltaTime, float& rfHealth);
-	static void XM_CALLCONV ApplyDeathKnockback(FXMVECTOR vecDamageDirection, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth);
 
 public:
 	SpaceshipFlags_t* __restrict pFlags = nullptr;
@@ -158,21 +150,23 @@ public:
 	float* __restrict pfNextBlasterSpawnTimes = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	float* __restrict pfArrivalGracePeriods = nullptr;
-	// All fields are shared; Members() forwards SharedMembers() so CRC and server reads use the explicit shared
-	// subset. Client-only fields belong in ClientMembers() outside CRC; server kbServerMembersParity asserts
-	// Members()==SharedMembers().
-	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pfDestroyedExplosionTimes, rSelf.pfNextBlasterSpawnTimes, rSelf.pAlignments, rSelf.pfArrivalGracePeriods); }
-	auto Members(this auto&& rSelf) { return rSelf.SharedMembers(); }
+	// Server Members() must match SharedMembers() for wire/CRC parity; client-only fields stay outside SharedMembers().
+	auto SharedMembers(this auto&& rSelf)
+	{
+		return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pfDestroyedExplosionTimes, rSelf.pfNextBlasterSpawnTimes, rSelf.pAlignments, rSelf.pfArrivalGracePeriods);
+	}
+	auto Members(this auto&& rSelf)
+	{
+		return rSelf.SharedMembers();
+	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
 		return std::tie(rSelf.pVecDamageDirections, rSelf.pAlignments);
 	}
 
-	// Utility
 	bool LogDifferences(const SpaceshipsPostRender& rOther) const;
 	static void AvoidTerrain(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData, int64_t iStart, int64_t iEnd);
 
-	// SpawnInfo for spawn parameters
 	struct SpawnInfo
 	{
 		XMVECTOR vecPosition = DirectX::XMVectorZero();
@@ -194,4 +188,4 @@ namespace engine
 {
 extern template struct Collection<game::SpaceshipsInterpolate>;
 extern template struct Collection<game::SpaceshipsPostRender>;
-}
+} // namespace engine

@@ -338,7 +338,7 @@ static int MainThread(HINSTANCE hInstance)
 	{
 		return 1;
 	}
-	gpIslandTerrain->WaitForElevationMaps(game::NavThresholdElevation(gBaseHeight.mfCurrent), game::NavClearanceMeters());
+	gpIslandTerrain->WaitForElevationMaps(game::NavigationThresholdElevation(gBaseHeight.mfCurrent), game::NavigationClearanceMeters());
 
 	auto pGame = std::make_unique<game::Game>();
 

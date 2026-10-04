@@ -14,7 +14,7 @@ namespace game
 #if defined(BT_SERVER)
 
 // 32 ticks at engine::kiTickRate; exact in float, so the countdown expires on a tick boundary.
-constexpr float kfRespawnDelay = 1.0f;
+constexpr std::chrono::duration<float> kRespawnDelay = 1s;
 
 ServerFleetManager::ServerFleetManager()
 {
@@ -58,16 +58,16 @@ void ServerFleetManager::ProcessCreateFleetRequests()
 
 		engine::ClientGuid guid = pClient->clientGuid;
 		auto it = mFleets.find(guid);
-		if (it != mFleets.end() && std::ssize(it->second) >= kiMaxFleetsPerClient)
+		if (it != mFleets.end() && std::ssize(it->second) >= kiMaximumFleetsPerClient)
 		{
-			LOG(kNetwork, kWarning, "ServerFleetManager::ProcessCreateFleetRequests Client: {} at fleet cap {}, ignoring create", rRequest.iClientId, kiMaxFleetsPerClient);
+			LOG(kNetwork, kWarning, "ServerFleetManager::ProcessCreateFleetRequests Client: {} at fleet cap {}, ignoring create", rRequest.iClientId, kiMaximumFleetsPerClient);
 			continue;
 		}
 		Fleet& rNewFleet = mFleets.try_emplace(guid).first->second.emplace_back();
 		rNewFleet.guid.uiHigh = common::RandomNext(mRandomEngine);
 		rNewFleet.guid.uiLow = common::RandomNext(mRandomEngine);
 		mGuidToClientId.insert_or_assign(guid, rRequest.iClientId);
-		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessCreateFleetRequests Client: {} FleetCount: {} FleetGuid: ({},{})", rRequest.iClientId, mFleets.at(guid).size(), rNewFleet.guid.uiHigh, rNewFleet.guid.uiLow);
+		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessCreateFleetRequests Client: {} FleetCount: {} FleetGuid: ({},{})", rRequest.iClientId, std::ssize(mFleets.at(guid)), rNewFleet.guid.uiHigh, rNewFleet.guid.uiLow);
 		SendFleetSyncToClient(rRequest.iClientId, guid);
 	}
 
@@ -106,7 +106,7 @@ void ServerFleetManager::ProcessDeleteFleetRequests()
 		}
 
 		it->second.erase(it->second.begin() + iFleetIndex);
-		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessDeleteFleetRequests Client: {} FleetGuid: ({},{}) FleetCount: {}", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, it->second.size());
+		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessDeleteFleetRequests Client: {} FleetGuid: ({},{}) FleetCount: {}", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, std::ssize(it->second));
 		SendFleetSyncToClient(rRequest.iClientId, guid);
 	}
 
@@ -140,9 +140,9 @@ void ServerFleetManager::ProcessSpawnIntoFleetRequests()
 		}
 
 		const Fleet& rFleet = it->second.at(static_cast<size_t>(iFleetIndex));
-		if (rFleet.members.size() >= kuiMaxFleetMembers)
+		if (std::ssize(rFleet.members) >= kiMaximumFleetMembers)
 		{
-			LOG(kNetwork, kWarning, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, kuiMaxFleetMembers);
+			LOG(kNetwork, kWarning, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, kiMaximumFleetMembers);
 			continue;
 		}
 
@@ -222,8 +222,8 @@ void ServerFleetManager::TickRespawnTimers()
 					continue;
 				}
 
-				rMember.fRespawnTimer -= gpGame->mfLastDeltaTime;
-				if (rMember.fRespawnTimer > 0.0f)
+				rMember.respawnTimerSeconds -= std::chrono::duration<float>(gpGame->mfLastDeltaTime);
+				if (rMember.respawnTimerSeconds.count() > 0.0f)
 				{
 					continue;
 				}
@@ -256,26 +256,6 @@ void ServerFleetManager::SendFleetSyncToClient(int64_t iClientId, const engine::
 	}
 }
 
-void ServerFleetManager::QueueCreateRequest(const PendingCreateFleetRequest& rRequest)
-{
-	mPendingCreateFleetRequests.push_back(rRequest);
-}
-
-void ServerFleetManager::QueueDeleteRequest(const PendingDeleteFleetRequest& rRequest)
-{
-	mPendingDeleteFleetRequests.push_back(rRequest);
-}
-
-void ServerFleetManager::QueueSpawnIntoRequest(const PendingSpawnIntoFleetRequest& rRequest)
-{
-	mPendingSpawnIntoFleetRequests.push_back(rRequest);
-}
-
-void ServerFleetManager::QueueRespawnRequest(const PendingRespawnInFleetRequest& rRequest)
-{
-	mPendingRespawnInFleetRequests.push_back(rRequest);
-}
-
 void ServerFleetManager::ClearPendingRequests()
 {
 	mPendingCreateFleetRequests.clear();
@@ -299,14 +279,13 @@ void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::
 			if (rMember.globalPlayerId == globalId && !(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				rMember.flags.Set(FleetMemberFlags::kIsDead);
-				rMember.fRespawnTimer = kfRespawnDelay;
+				rMember.respawnTimerSeconds = kRespawnDelay;
 
 				if (globalId == rFleet.flagshipGlobalPlayerId)
 				{
 					mNavigation.ShiftFlagshipAfterDeath(rGuid, rFleet);
 				}
 
-				// Send fleet sync only if client is connected
 				int64_t iClientId = FindClientIdForGuid(rGuid);
 				if (iClientId != 0)
 				{
@@ -318,7 +297,7 @@ void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::
 	}
 }
 
-void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInfo& rSpawnInfo, engine::GlobalId globalPlayerId)
+void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInformation& rSpawnInfo, engine::GlobalId globalPlayerId)
 {
 	if ((rSpawnInfo.fleetGuid.uiHigh == 0 && rSpawnInfo.fleetGuid.uiLow == 0))
 	{
@@ -345,31 +324,28 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 			return;
 		}
 		memberIt->flags.Set(FleetMemberFlags::kIsDead, false);
-		memberIt->coord = engine::kOriginCoordinate;
+		memberIt->coordinate = engine::kOriginCoordinate;
 	}
 	else
 	{
-		// New member — cap per-fleet member count so a spamming client can't grow members unboundedly.
-		// At cap, drop this spawn from the fleet roster entirely (return before flagship mutation)
-		// rather than skip only the push: a phantom member would corrupt flagship assignment.
-		if (rFleet.members.size() >= kuiMaxFleetMembers)
+		// The member cap bounds client-driven growth; rejection must precede flagship mutation to keep the flagship in the roster.
+		if (std::ssize(rFleet.members) >= kiMaximumFleetMembers)
 		{
-			LOG(kNetwork, kWarning, "ServerFleetManager::OnPlayerSpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kuiMaxFleetMembers);
+			LOG(kNetwork, kWarning, "ServerFleetManager::OnPlayerSpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kiMaximumFleetMembers);
 			return;
 		}
-		rFleet.members.push_back(FleetMember {.globalPlayerId = globalPlayerId, .coord = engine::kOriginCoordinate});
+		rFleet.members.push_back(FleetMember {.globalPlayerId = globalPlayerId, .coordinate = engine::kOriginCoordinate});
 	}
 
-	// Queue flagship update if this member is or becomes the Flagship
 	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
 	bool bHasAliveFlagship = (rFleet.flagshipGlobalPlayerId.iValue != 0) && flagshipIt != rFleet.members.end() && !(flagshipIt->flags & FleetMemberFlags::kIsDead)
 	                      && rFleet.flagshipGlobalPlayerId != globalPlayerId;
 	if (!bHasAliveFlagship)
 	{
 		rFleet.flagshipGlobalPlayerId = globalPlayerId;
-		rFleet.wantedCoord = engine::kOriginCoordinate;
-		rFleet.fFrameChangeTimer = common::Random(rFleet.fNavigationDelay, mRandomEngine);
-		mNavigation.QueueFlagshipUpdate({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoord = rFleet.wantedCoord});
+		rFleet.wantedCoordinate = engine::kOriginCoordinate;
+		rFleet.frameChangeTimerSeconds = std::chrono::duration<float>(common::Random(rFleet.navigationDelaySeconds.count(), mRandomEngine));
+		mNavigation.mPendingFlagshipUpdates.push_back({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});
 	}
 
 	// After the flagship assignment: clients trust the sync, so it must never carry a nonempty fleet without a flagship.
@@ -390,7 +366,7 @@ void ServerFleetManager::OnPlayerTransferred(const engine::ClientGuid& rGuid, en
 		{
 			if (rMember.globalPlayerId == globalPlayerId)
 			{
-				rMember.coord = destination;
+				rMember.coordinate = destination;
 				return;
 			}
 		}
@@ -455,13 +431,13 @@ void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const engi
 	for (FleetMember& rMember : rFleet.members)
 	{
 		rMember.flags.Set(FleetMemberFlags::kIsDead);
-		rMember.fRespawnTimer = kfRespawnDelay;
+		rMember.respawnTimerSeconds = kRespawnDelay;
 		for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
 		{
 			if (rOwnedPlayer.globalId == rMember.globalPlayerId)
 			{
 				rMember.flags.Set(FleetMemberFlags::kIsDead, false);
-				rMember.coord = rOwnedPlayer.coord;
+				rMember.coordinate = rOwnedPlayer.coord;
 				break;
 			}
 		}
@@ -480,17 +456,15 @@ void ServerFleetManager::ResetFleetForLoad(Fleet& rFleet, const engine::ClientGu
 		return;
 	}
 
-	// Shift flagship to next alive member if current flagship is dead
 	if (flagshipIt->flags & FleetMemberFlags::kIsDead)
 	{
 		mNavigation.ShiftFlagshipAfterDeath(rClientGuid, rFleet);
 	}
 	else
 	{
-		// Flagship still alive — set wantedCoord and queue update
-		rFleet.wantedCoord = flagshipIt->coord;
-		rFleet.fFrameChangeTimer = rFleet.fNavigationDelay;
-		mNavigation.QueueFlagshipUpdate({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoord = rFleet.wantedCoord});
+		rFleet.wantedCoordinate = flagshipIt->coordinate;
+		rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
+		mNavigation.mPendingFlagshipUpdates.push_back({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});
 	}
 }
 
@@ -524,7 +498,7 @@ ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord
 
 	FleetLookupFlags_t flags {FleetLookupFlags::kFound};
 	flags.Set(FleetLookupFlags::kIsFlagship, bIsFlagship);
-	return {.flags = flags, .fleetWantedCoord = rFleet.wantedCoord, .uiPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordTicks};
+	return {.flags = flags, .fleetWantedCoord = rFleet.wantedCoordinate, .uiPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordinateTicks};
 }
 
 void ServerFleetManager::DetectDisconnectedPlayerDeaths()
@@ -550,12 +524,12 @@ void ServerFleetManager::DetectDisconnectedPlayerDeaths()
 					continue;
 				}
 
-				if (!gpGame->mCoordinateFrames.contains(rMember.coord))
+				if (!gpGame->mCoordinateFrames.contains(rMember.coordinate))
 				{
 					continue;
 				}
 
-				const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rMember.coord).pCurrent).postRender.pPlayers;
+				const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rMember.coordinate).pCurrent).postRender.pPlayers;
 				bool bFound = false;
 				for (int64_t k = 0; k < rPlayers.iCount; ++k)
 				{
@@ -579,7 +553,7 @@ void ServerFleetManager::DetectDisconnectedPlayerDeaths()
 	}
 }
 
-void ServerFleetManager::UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, float fDelay)
+void ServerFleetManager::UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, std::chrono::duration<float> navigationDelaySeconds)
 {
 	auto fleetIt = mFleets.find(rGuid);
 	if (fleetIt == mFleets.end())
@@ -593,8 +567,8 @@ void ServerFleetManager::UpdateFleetNavigationDelay(const engine::ClientGuid& rG
 		return;
 	}
 
-	fleetIt->second.at(static_cast<size_t>(iFleetIndex)).fNavigationDelay = fDelay;
-	LOG(kNetwork, kDebug, "ServerFleetManager::UpdateFleetNavigationDelay Guid: ({},{}) FleetGuid: ({},{}) Delay: {}", rGuid.uiHigh, rGuid.uiLow, rFleetGuid.uiHigh, rFleetGuid.uiLow, common::Wb(fDelay, 3));
+	fleetIt->second.at(static_cast<size_t>(iFleetIndex)).navigationDelaySeconds = navigationDelaySeconds;
+	LOG(kNetwork, kDebug, "ServerFleetManager::UpdateFleetNavigationDelay Guid: ({},{}) FleetGuid: ({},{}) Delay: {}", rGuid.uiHigh, rGuid.uiLow, rFleetGuid.uiHigh, rFleetGuid.uiLow, common::Wb(navigationDelaySeconds.count(), 3));
 
 	// Resync fleet to client so UI updates
 	int64_t iClientId = FindClientIdForGuid(rGuid);

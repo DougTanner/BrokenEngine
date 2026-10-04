@@ -262,10 +262,10 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 	}
 
 	int64_t iClientFrameVersion = message.iFrameVersion;
-	if (iClientFrameVersion != game::NetworkSessionContract::GetFrameVersion())
+	if (iClientFrameVersion != game::NetworkSessionContract::Frame::kiVersion)
 	{
 		char pcMessage[256] {};
-		std::snprintf(pcMessage, sizeof(pcMessage), "Frame version mismatch: server is %lld, client is %lld", game::NetworkSessionContract::GetFrameVersion(), iClientFrameVersion);
+		std::snprintf(pcMessage, sizeof(pcMessage), "Frame version mismatch: server is %lld, client is %lld", game::NetworkSessionContract::Frame::kiVersion, iClientFrameVersion);
 		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", iClientId, pcMessage);
 
 		RejectHello(pPeer, iClientId, pcMessage);
@@ -288,9 +288,9 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 	size_t uiCopyLength = std::min(message.buildConfiguration.size(), sizeof(pcClientConfiguration) - 1);
 	std::memcpy(pcClientConfiguration, message.buildConfiguration.data(), uiCopyLength);
 
-	if (std::strcmp(pcClientConfiguration, kpcBuildConfigName) != 0)
+	if (std::strcmp(pcClientConfiguration, kpcBuildConfigurationName) != 0)
 	{
-		LOG(kNetwork, kWarning, "Server::ClientHello Client {} build config mismatch: server is {}, client is {}", iClientId, kpcBuildConfigName, pcClientConfiguration);
+		LOG(kNetwork, kWarning, "Server::ClientHello Client {} build config mismatch: server is {}, client is {}", iClientId, kpcBuildConfigurationName, pcClientConfiguration);
 	}
 
 	ClientGuid clientGuid = message.bHasGuid ? message.guid : ClientGuid {};
@@ -411,7 +411,7 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 		return;
 	}
 
-	int64_t iSlot = pClient->AllocateSlot(game::NetworkSessionContract::kiCoordSlots);
+	int64_t iSlot = pClient->AllocateSlot(game::NetworkSessionContract::kiCoordinateSlots);
 	if (iSlot < 0)
 	{
 		LOG(kNetwork, kWarning, "Server::ClientSubscribe No free slot Client: {} Coord: ({},{})", iClientId, coordinate.iX, coordinate.iY);

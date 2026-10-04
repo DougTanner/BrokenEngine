@@ -1,4 +1,3 @@
-// Note: Not using precompiled header so that this file can be optimized in Debug builds
 #include "Pch.h"
 
 #include "Blasters.h"
@@ -40,43 +39,35 @@ struct BlasterCollisionIntervalScratch
 
 static BlasterCollisionIntervalScratch& GetBlasterCollisionIntervalScratch()
 {
-	// Function-local TLS defers construction until first use; default construction is allocation-free
-	// (empty vectors), so it is safe even before allocator startup completes. Growth sites suppress tracking.
+	// Function-local TLS is constructed allocation-free on first use, including before allocator startup; growth sites suppress allocation tracking.
 	static thread_local BlasterCollisionIntervalScratch sScratch;
 	return sScratch;
 }
 
-// Collision
 constexpr float kfBlasterCollisionRadius = 0.5f;
 
-// Terrain impact
 constexpr float kfTerrainImpactJitter = 0.25f;
 
 #if defined(BT_CLIENT)
-// Terrain effect registrations
 static uint8_t suiTerrainCraterTypeIndex = 0xFF;
 static uint8_t suiTerrainCraterControllerIndex = 0xFF;
 static uint8_t suiTerrainPuffTypeIndex = 0xFF;
 static uint8_t suiTerrainPuffControllerIndex = 0xFF;
 
-// Terrain crater effect timing
-constexpr float kfTerrainCraterTimeOne = 0.1f;
-constexpr float kfTerrainCraterTimeTwo = 3.0f;
-constexpr float kfTerrainCraterTimeThree = 5.1f;
+constexpr std::chrono::duration<float> kTerrainCraterTimeOne = 0.1s;
+constexpr std::chrono::duration<float> kTerrainCraterTimeTwo = 3s;
+constexpr std::chrono::duration<float> kTerrainCraterTimeThree = 5.1s;
 
-// Terrain puff effect timing
-constexpr float kfTerrainPuffTime = 0.15f;
+constexpr std::chrono::duration<float> kTerrainPuffTime = 0.15s;
 constexpr float kfTerrainPuffRotationEnd = 10.0f;
 
-// Called from Register() in Blasters.cpp
-void RegisterBlasterTerrainEffects()
+void BlastersInterpolate::Register()
 {
 	if (suiTerrainCraterTypeIndex != 0xFF)
 	{
 		return;
 	}
 
-	// Terrain crater effect
 	engine::PointLightsInterpolate::RegisterType(suiTerrainCraterTypeIndex,
 	{
 		.uiCrc = data::kTexturesBlasterBC7TerrainImpactpngCrc,
@@ -88,7 +79,7 @@ void RegisterBlasterTerrainEffects()
 		.uiBaseTypeIndex = suiTerrainCraterTypeIndex,
 		.uiKeyframeCount = 4,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfTerrainCraterTimeOne), std::chrono::duration<float>(kfTerrainCraterTimeTwo), std::chrono::duration<float>(kfTerrainCraterTimeThree)},
+		.times = {0s, kTerrainCraterTimeOne, kTerrainCraterTimeTwo, kTerrainCraterTimeThree},
 		.keyframes =
 		{
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -102,7 +93,6 @@ void RegisterBlasterTerrainEffects()
 		.ppLightingIntensityScales = {&gCraterLightingIntensityOne, &gCraterLightingIntensityTwo, &gCraterLightingIntensityThree, &gCraterLightingIntensityFour},
 	});
 
-	// Terrain impact smoke puff effect
 	engine::PuffsInterpolate::RegisterType(suiTerrainPuffTypeIndex,
 	{
 		.uiCrc = data::kTexturesSmokeBC44jpgCrc,
@@ -114,7 +104,7 @@ void RegisterBlasterTerrainEffects()
 		.uiBaseTypeIndex = suiTerrainPuffTypeIndex,
 		.uiKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfTerrainPuffTime), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.times = {0s, kTerrainPuffTime, 0s, 0s},
 		.keyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -127,17 +117,15 @@ void RegisterBlasterTerrainEffects()
 	});
 }
 
-// Helper to sync owned objects for a blaster
-static void XM_CALLCONV SyncBlaster(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::point_lights_t uiPointLight, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, uint8_t uiTypeIndex)
+static void XM_CALLCONV SynchronizeBlaster(FrameInterpolate& rFrameInterpolate, engine::area_lights_t areaLight, engine::point_lights_t pointLight, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, uint8_t uiTypeIndex)
 {
 	const BlastersType& rType = BlastersInterpolate::sTypes.at(uiTypeIndex);
 
-	// Sync light (point light or area light)
-	if ((uiPointLight.uuid.iValue != 0))
+	if ((pointLight.uuid.iValue != 0))
 	{
 		float fSize = rType.f2Size.x;
 		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(rType.uiPointLightTypeIndex);
-		engine::PointLightsInterpolate::Sync(rFrameInterpolate, uiPointLight,
+		engine::PointLightsInterpolate::Sync(rFrameInterpolate, pointLight,
 		{
 			.vecPosition = vecPosition,
 			.fVisibleArea = fSize,
@@ -155,7 +143,7 @@ static void XM_CALLCONV SyncBlaster(FrameInterpolate& rFrameInterpolate, engine:
 		XMVECTOR vecDirection = XMVector3Normalize(vecVelocity);
 		auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(vecPosition, vecDirection, fLength, fLength, fWidth);
 
-		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
+		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, areaLight,
 		{
 			.uiTypeIndex = rType.uiAreaLightTypeIndex,
 			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
@@ -169,7 +157,7 @@ void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 	BlastersInterpolate& rCurrent = *rCurrentFrameInterpolate.pBlasters;
 	const BlastersInterpolate& rPrevious = *rPreviousFrame.interpolate.pBlasters;
 	const BlastersPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pBlasters;
-	float fDeltaTime = rCurrentFrameInterpolate.fDeltaTime;
+	std::chrono::duration<float> deltaTime(rCurrentFrameInterpolate.fDeltaTime);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -177,25 +165,21 @@ void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		[[maybe_unused]] uint8_t uiTypeIndex = rCurrent.puiTypeIndices[i];
 		XMVECTOR vecVelocity = rPreviousPostRender.pVecVelocities[i];
 
-		XMVECTOR vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), vecVelocity, rPrevious.pVecPositions[i]);
+		XMVECTOR vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), vecVelocity, rPrevious.pVecPositions[i]);
 		// Positions must always have W=1.0 — prevents W-lane drift via MultiplyAdd.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
-		// Direction from velocity
 		XMVECTOR vecDirection = XMVector3Normalize(vecVelocity);
 
-		// Save
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
 
 #if defined(BT_CLIENT)
-		// Sync owned objects
-		SyncBlaster(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiPointLights[i], vecPosition, vecVelocity, uiTypeIndex);
+		SynchronizeBlaster(rCurrentFrameInterpolate, rCurrent.pAreaLights[i], rCurrent.pPointLights[i], vecPosition, vecVelocity, uiTypeIndex);
 
-		// Sync wind deposit
-		if ((rCurrent.puiWindTrails[i].uuid.iValue != 0))
+		if ((rCurrent.pWindTrails[i].uuid.iValue != 0))
 		{
-			engine::WindTrailsInterpolate::Sync(rCurrentFrameInterpolate, rCurrent.puiWindTrails[i],
+			engine::WindTrailsInterpolate::Sync(rCurrentFrameInterpolate, rCurrent.pWindTrails[i],
 			{
 				.vecPosition = vecPosition,
 				.fIntensity = rCurrent.pfWindTrailIntensities[i],
@@ -226,7 +210,6 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		return;
 	}
 
-	// Build collision arrays
 	size_t uiCount = static_cast<size_t>(rCurrentInterpolate.iCount);
 	sCollisionFlags.resize(uiCount);
 	sCollisionRadii.resize(uiCount);
@@ -272,8 +255,8 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
 		.bSweptTest = true,
-		.uiCategory = CollisionCategory::kBlaster,
-		.uiCollidesWith = CollidesWith::kBlaster,
+		.uiCategory = CollisionCategory::kuiBlaster,
+		.uiCollidesWith = CollidesWith::kuiBlaster,
 		.pAlignments = rCurrentPostRender.pAlignments,
 	});
 }
@@ -309,14 +292,12 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 			// Add jitter for visual variety
 			vecCollisionPosition = common::RandomPositionJitter<kfTerrainImpactJitter>(vecCollisionPosition, rFrame.postRender.randomEngine);
 
-			// Spawn terrain effects
 			[[maybe_unused]] float fRotation = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
 #if defined(BT_CLIENT)
 			engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), suiTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
 			engine::PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), suiTerrainPuffControllerIndex, vecCollisionPosition);
 #endif
 
-			// Play terrain impact sound
 #if defined(BT_CLIENT)
 			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster16793__pushtobreak__earth1wavCrc, rStaticData.coordinate, vecCollisionPosition, gTerrainImpactVolume.mfCurrent);
 #endif

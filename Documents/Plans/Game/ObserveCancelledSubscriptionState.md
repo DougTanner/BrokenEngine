@@ -3,7 +3,7 @@
 
 ## Context
 
-`Projects/BrokenEngineSandbox/Source/Agent/Commands/ClientSubscriptionFixtures.cpp` allocates a `CancelledSubscriptionState` for its deferred response and a second `shared_ptr<int>` solely to tell whether that response remains alive. The anonymous-namespace `sCancelledFixture` observes the integer; `CommandClientCancelledSubscriptionFixture` captures both pointers and casts the unused integer pointer to void. Observing the existing state directly removes the redundant allocation, control block, and capture while preserving the fixture's admission lifetime.
+`Projects/BrokenEngineSandbox/Source/Agent/Commands/ClientSubscriptionFixtures.cpp` allocates a `CancelledSubscriptionState` for its deferred response and a second `shared_ptr<int>` solely to tell whether that response remains alive. The anonymous-namespace `spCancelledFixture` observes the integer; `CommandClientCancelledSubscriptionFixture` captures both pointers and casts the unused integer pointer to void. Observing the existing state directly removes the redundant allocation, control block, and capture while preserving the fixture's admission lifetime.
 
 Source evidence was checked against baseline `d29fed456d3ede935c5e672f95f13d6733f0660c`:
 
@@ -15,8 +15,8 @@ No existing Plan found by a search for cancelled-subscription fixture/state/toke
 
 ## Design
 
-1. Change `sCancelledFixture` to `std::weak_ptr<engine::ClientNetworkFixtures::CancelledSubscriptionState>`.
-2. In `CommandClientCancelledSubscriptionFixture`, remove `std::shared_ptr<int> pLifetime = std::make_shared<int>(0);` and assign `sCancelledFixture = pState` at the existing assignment location after `ArmCancelledSubscription`.
+1. Change `spCancelledFixture` to `std::weak_ptr<engine::ClientNetworkFixtures::CancelledSubscriptionState>`.
+2. In `CommandClientCancelledSubscriptionFixture`, remove `std::shared_ptr<int> pLifetime = std::make_shared<int>(0);` and assign `spCancelledFixture = pState` at the existing assignment location after `ArmCancelledSubscription`.
 3. Remove `pLifetime` from the deferred lambda capture and remove `(void)pLifetime;`. Keep the existing `pState` capture and all other callback code.
 
 The old token and state share the callback's persistent lifetime. Temporary engine locks do not overlap subsequent command admission, and dropping the engine observer on reset does not release callback ownership. Game detach explicitly clears its observer today and must continue to do so. This equivalence is the basis for the local refactor; do not replace the weak observer with a strong owner or add `enable_shared_from_this`.
@@ -32,7 +32,7 @@ The change removes one `make_shared` allocation/control block and one strong cal
 
 ## In scope
 
-Only the anonymous-namespace `sCancelledFixture` declaration and the dummy-token declaration, observer assignment, lambda capture, and void cast in `CommandClientCancelledSubscriptionFixture`. Verify the unchanged admission check and `DetachClientSubscriptionFixtures` reset against the ownership evidence above.
+Only the anonymous-namespace `spCancelledFixture` declaration and the dummy-token declaration, observer assignment, lambda capture, and void cast in `CommandClientCancelledSubscriptionFixture`. Verify the unchanged admission check and `DetachClientSubscriptionFixtures` reset against the ownership evidence above.
 
 ## Out of scope
 
@@ -43,7 +43,7 @@ Changes to other subscription fixtures, engine hooks, transport cancellation, co
 Future implementation is Tier 1: a local behavior-preserving simplification with no public-signature or invariant exposure. The implementation must preserve the existing ownership contract rather than change it. If ownership inspection discovers a persistent additional strong owner or cross-thread ownership, return that evidence for reclassification instead of broadening this Plan.
 
 - The deferred callback remains the persistent strong owner between command frames.
-- `sCancelledFixture.expired()` admission and detach reset remain unchanged.
+- `spCancelledFixture.expired()` admission and detach reset remain unchanged.
 - Reset, completion, failure, connection cancellation, timeout, and teardown preserve their existing next-admission behavior.
 - Every command result, transition, timeout, and failure envelope remains unchanged.
 - No deterministic state, CRC, wire format, serialization, or threading behavior changes.
@@ -62,7 +62,7 @@ Future implementation is Tier 1: a local behavior-preserving simplification with
 
 These checks are required during future implementation; none has been run by this Plan-writing task.
 
-1. Review every use of `CancelledSubscriptionState`, `sCancelledFixture`, `ArmCancelledSubscription`, `ObserveUnsubscribeAck`, `Reset`, and deferred-poll clearing. Confirm no state reference escapes an engine hook, and no owning cycle or asynchronous owner was introduced. Confirm the diff is limited to the five edits above. Preserve allocation suppression as written.
+1. Review every use of `CancelledSubscriptionState`, `spCancelledFixture`, `ArmCancelledSubscription`, `ObserveUnsubscribeAck`, `Reset`, and deferred-poll clearing. Confirm no state reference escapes an engine hook, and no owning cycle or asynchronous owner was introduced. Confirm the diff is limited to the five edits above. Preserve allocation suppression as written.
 2. Run `/compile` for BrokenEngineSandbox client and server, `Debug|x64`, explicitly naming the following agent-harness scenario as the build trigger. Use Shared runtime data: only this game Agent C++ file changes, with no asset or data-generation change. The build result must provide both executables and the harness-required `DataBuildMode`, `RunDataPacker=false`, and normalized `GameDataDirectory`.
 3. Through `/agent-harness`, launch and connect those endpoints, wait for an assigned player and settled subscriptions, and choose a coordinate outside active slots and desired/sticky/queued policy with no outstanding subscribe record and a clean unsubscribed slot. Set client `set_log_level {"category":"Network","level":"Debug"}`. Run `client_cancelled_subscription_fixture {"coord":[x,y]}` with that eligible coordinate. Require `initialState="subscribing"`, `afterCancelState="unsubscribed"`, `afterAcceptState="unsubscribing"`; require `subscribingToUnsubscribed`, `acceptToUnsubscribing`, `policyUnchanged`, and `ackRetired` all true. Retain the `Client::ServerSubscribeAccept Cancelled` log and response.
 4. After the first response completes and the same prerequisites are satisfied, invoke the fixture again in the same session with an eligible coordinate. Require the same successful fields and absence of a stale `is already active` failure. This exercises callback completion and subsequent admission through existing capabilities. Cancellation/reset ownership equivalence is settled by A2; no new mechanism to force those timings is required.

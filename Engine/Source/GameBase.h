@@ -203,9 +203,7 @@ public:
 	virtual ~GameBase();
 
 #if defined(BT_CLIENT)
-	virtual bool ShouldTrapCursor() = 0;
 	virtual bool ShouldUseCrosshair() = 0;
-	virtual bool ShouldShowInGameUi() = 0;
 	virtual void ProcessGameMenuInput(const MenuInput& rMenuInput, const InputPoll& rInputPoll) = 0;
 
 	// The standard menu screens read this every render pass, and again after any action that can
@@ -250,7 +248,7 @@ public:
 	// client is watching a cell, so liveness checks must not be derived from it.
 	std::vector<GridCoord> mActiveCoordinates;
 	// game::Game caches the visible-neighbor ring keyed off this coord, so every write goes through
-	// Game::SetClientGridCoord, which invalidates that cache.
+	// Game::SetClientGridCoordinate, which invalidates that cache.
 	GridCoord mClientGridCoordinate {};
 
 	std::unordered_map<GridCoord, game::FrameInput> mFrameInputs;

@@ -5,7 +5,6 @@
 namespace game
 {
 
-// Wind - Per-entity deposits
 extern engine::Wrapper gWindDepositPlayerWidth;
 extern engine::Wrapper gWindDepositPlayerIntensity;
 extern engine::Wrapper gWindDepositPlayerLengthMultiplier;

@@ -156,7 +156,7 @@ static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSetting
 		.pValues = &kVkLayerSettingTrue,
 	};
 	uint32_t uiLayerSettingCount = 2;
-	if constexpr (kbGpuAssistedValidation)
+	if constexpr (kbGraphicsProcessingUnitAssistedValidation)
 	{
 		rVkLayerSettings[uiLayerSettingCount++] =
 		{

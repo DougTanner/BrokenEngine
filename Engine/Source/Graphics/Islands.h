@@ -13,9 +13,9 @@ struct GridCoord;
 // Global SSBO arena capacity: every subscribed coordinate slot plus the local unconfirmed cell can contribute
 // at most kiMaximumIslandsPerCell placements. Per-template runs are packed contiguously into this shared arena,
 // with mesh-visible placements first. Resident allocation is kiMaxFramebuffers × kiMaxActivePlacements ×
-// sizeof(AxisAlignedQuadLayout): with kiCoordSlots = 16 and kiMaximumIslandsPerCell = 107 this is 436,560 bytes
+// sizeof(AxisAlignedQuadLayout): with kiCoordinateSlots = 16 and kiMaximumIslandsPerCell = 107 this is 436,560 bytes
 // (426.33 KiB), independent of the number of island templates.
-inline constexpr int64_t kiMaxActivePlacements = (game::NetworkSessionContract::kiCoordSlots + 1) * kiMaximumIslandsPerCell;
+inline constexpr int64_t kiMaxActivePlacements = (game::NetworkSessionContract::kiCoordinateSlots + 1) * kiMaximumIslandsPerCell;
 inline constexpr VkDeviceSize kVkIslandMeshArenaBytes = 64ull * 1'024ull * 1'024ull;
 
 // SSBO and indirect buffers have one instance per framebuffer index, sized by kiMaxFramebuffers. UpdateActiveIslands runs before

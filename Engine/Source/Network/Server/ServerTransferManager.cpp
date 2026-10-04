@@ -169,7 +169,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 		{
 			game::Frame& rDestinationFrame = *game::gpGame->mCoordinateFrames.at(rCoord).pNext;
 			common::crc_t uiPreCrc = preCrcsArena.mBuffer.Span<const common::crc_t>()[i++];
-			rDestinationFrame.postRender.uiSharedCrc = rDestinationFrame.Crcs();
+			rDestinationFrame.postRender.uiSharedCrc = rDestinationFrame.Crc();
 
 			char acCrcPre[20] {}, acCrcPost[20] {};
 			common::ToHex(std::span<char, 20>(acCrcPre), uiPreCrc);
@@ -263,7 +263,7 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 					game::gpServerSession->mPendingSubscriptionUpdates.push_back(
 					{
 						.iClientId = rClient.iClientId,
-						.newCoord = rClientTransfer.destination,
+						.newCoordinate = rClientTransfer.destination,
 						.globalPlayerId = rClientTransfer.globalPlayerId,
 					});
 

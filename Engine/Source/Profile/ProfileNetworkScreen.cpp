@@ -162,11 +162,11 @@ static void FormatNetworkPrediction(common::Workbuffer& rWorkbuffer)
 	rWorkbuffer.Append("  Buffer: ");
 	rWorkbuffer.Append(gpProfileManager->mSmoothedBuffer.mSmoothedValue);
 	rWorkbuffer.Append("\nDesync: ");
-	bool bDesynchronization = game::gpClientSession->mpDesyncCore->mDesyncDebugState.iTick >= 0;
+	bool bDesynchronization = game::gpClientSession->mpDesynchronizationCore->mDesyncDebugState.iTick >= 0;
 	if (bDesynchronization)
 	{
 		rWorkbuffer.Append("Yes (");
-		rWorkbuffer.Append(game::gpClientSession->mpDesyncCore->mDesyncDebugState.iTick);
+		rWorkbuffer.Append(game::gpClientSession->mpDesynchronizationCore->mDesyncDebugState.iTick);
 		rWorkbuffer.Append(")");
 		if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 		{

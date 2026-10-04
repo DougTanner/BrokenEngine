@@ -286,7 +286,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, 
 	game::FramePostRender::Spawn(rNext, *rReference.pFrameInput, rStaticData);
 
 	// Compute CRCs after all phases complete
-	rNext.postRender.uiSharedCrc = rNext.Crcs();
+	rNext.postRender.uiSharedCrc = rNext.Crc();
 }
 
 } // namespace engine

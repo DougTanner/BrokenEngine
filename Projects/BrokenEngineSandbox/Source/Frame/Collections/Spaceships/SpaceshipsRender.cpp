@@ -12,22 +12,21 @@ namespace game
 
 // Spaceship model (also used by Spaceships.cpp for animation lookup)
 #if 1
-extern const common::crc_t kSpaceshipModel = data::kModelsSpaceshipscenegltfCrc;
+extern const common::crc_t kuiSpaceshipModel = data::kModelsSpaceshipscenegltfCrc;
 constexpr float kfModelScale = 0.00175f;
 #endif
 #if 0
-extern const common::crc_t kSpaceshipModel = data::kModelschernovan_nemesisscenegltfCrc;
+extern const common::crc_t kuiSpaceshipModel = data::kModelschernovan_nemesisscenegltfCrc;
 constexpr float kfModelScale = 0.15f;
 #endif
 
-// Spaceship rendering
 constexpr float kfRoll = 0.2f;
 
 void SpaceshipsInterpolate::GraphicsResources()
 {
-	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kCrc, engine::kBufferMain, kName, sizeof(shaders::ModelLayout));
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipeline(kCrc, kName, kSpaceshipModel, pStorageBuffers);
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelineShadow(kCrc, kName, kSpaceshipModel, pStorageBuffers);
+	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout));
+	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipeline(kuiCrc, kpcName, kuiSpaceshipModel, pStorageBuffers);
+	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelineShadow(kuiCrc, kpcName, kuiSpaceshipModel, pStorageBuffers);
 }
 
 static int64_t siRendered = 0;
@@ -35,8 +34,7 @@ static int64_t siRendered = 0;
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
 static std::atomic<bool> sbRenderActive = false;
 
-// RAII tripwire guard: sets sbRenderActive on entry, clears it on scope exit — so an exception between the
-// capacity ASSERT and the slab writes unwinds it instead of wedging it true (every later Render would else false-assert).
+// sbRenderActive must clear during exception unwinding so subsequent Render calls do not fail the concurrency ASSERT.
 struct SpaceshipsRenderActiveGuard
 {
 	SpaceshipsRenderActiveGuard()
@@ -50,14 +48,14 @@ struct SpaceshipsRenderActiveGuard
 	}
 };
 
-void SpaceshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoords)
+void SpaceshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
 
 	int64_t iTotalCapacity = 0;
-	for (const engine::GridCoord& rCoord : rActiveCoords)
+	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = rRenderInterpolates.find(rCoord);
+		auto it = rRenderInterpolates.find(rCoordinate);
 		if (it != rRenderInterpolates.end())
 		{
 			iTotalCapacity += it->second.pSpaceships->iCapacity;
@@ -69,10 +67,10 @@ void SpaceshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 		return;
 	}
 
-	if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, engine::kBufferMain, kName, sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer))
+	if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, pBuffer);
-		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, pBuffer);
+		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kuiCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, pBuffer);
+		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kuiCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -90,25 +88,24 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 	SpaceshipsRenderActiveGuard renderActiveGuard;
 
-	static const XMMATRIX sMatPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
+	static XMMATRIX smatPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 
-	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kCrc, engine::kBufferMain, iCommandBuffer);
+	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiCrc, engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
 
-	// Look up animation data and chunk info (hoisted outside loop)
 	const engine::AnimationData* pAnimationData = nullptr;
 	uint32_t uiMaterialCount = 0;
 	int64_t iSkinnedMaterialCount = 0;
-	if (engine::gAnimationDataMap.contains(kSpaceshipModel))
+	if (engine::gAnimationDataMap.contains(kuiSpaceshipModel))
 	{
-		pAnimationData = &engine::gAnimationDataMap.at(kSpaceshipModel);
-		uiMaterialCount = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kSpaceshipModel).pHeader->sceneHeader.uiMaterialCount;
+		pAnimationData = &engine::gAnimationDataMap.at(kuiSpaceshipModel);
+		uiMaterialCount = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kuiSpaceshipModel).pHeader->sceneHeader.uiMaterialCount;
 
 		iSkinnedMaterialCount = pAnimationData->SkinnedMaterialCount(uiMaterialCount);
 	}
 
-	// Pass 1: Visibility cull (main thread) — build compacted visible index list
-	auto pVisibleIndices = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>(rCurrent.iCount * static_cast<int64_t>(sizeof(int64_t)));
+	// Visibility culling runs on the main thread before worker dispatch.
+	auto visibleIndicesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>(rCurrent.iCount * static_cast<int64_t>(sizeof(int64_t)));
 	int64_t iVisibleCount = 0;
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -126,10 +123,10 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 			continue;
 		}
 
-		pVisibleIndices.mpData[iVisibleCount++] = i;
+		visibleIndicesAllocation.mpData[iVisibleCount++] = i;
 	}
 
-	// Bulk skinning pre-allocation (main thread) — one call instead of N per-spaceship calls
+	// Skinning output for all visible spaceships is allocated on the main thread before worker dispatch.
 	int64_t iMeshDataBase = 0;
 	int64_t iJointBase = 0;
 	common::MeshData* pMeshDataBuffer = nullptr;
@@ -150,15 +147,14 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 		pJointMatricesBuffer = reinterpret_cast<common::JointMatrix*>(engine::gpBufferManager->mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory);
 	}
 
-	// Capture current siRendered offset for this frame's writes
 	int64_t iRenderedOffset = siRendered;
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
-	auto processRange = [&](int64_t iStart, int64_t iEnd)
+	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
 	{
 		for (int64_t j = iStart; j < iEnd; ++j)
 		{
-			int64_t i = pVisibleIndices.mpData[j];
+			int64_t i = visibleIndicesAllocation.mpData[j];
 
 			float fSize = kfSpaceshipRadius * kfModelScale;
 			if (rCurrent.pfDestroyedTimes[i] > 0.0f)
@@ -166,7 +162,6 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 				fSize *= std::pow(rCurrent.pfDestroyedTimes[i] / kfSpaceshipDestroyTime, 0.75f);
 			}
 
-			// One conversion into the camera cell's frame feeds both the layout position and the translation.
 			XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 			XMFLOAT4A f4Position {};
 			XMStoreFloat4A(&f4Position, vecPosition);
@@ -175,7 +170,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = matScaling * sMatPreRotate * matRoll * matYaw * matTranslation;
+			XMMATRIX matTransform = matScaling * smatPreRotate * matRoll * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4Position = f4Position;
@@ -200,7 +195,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 	};
 
 	gpProfileManager->GetCpuTimer(game::kCpuTimerRenderSpaceships).iThreads = common::gpMultithreading->WorkerCount() + 1;
-	common::gpMultithreading->Dispatch(iVisibleCount, processRange);
+	common::gpMultithreading->Dispatch(iVisibleCount, ProcessRange);
 
 	siRendered += iVisibleCount;
 }
@@ -211,8 +206,8 @@ void SpaceshipsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		gpProfileManager->GetCpuCounter(game::kCpuCounterSpaceshipsRendered).iCount = siRendered;
 	}
-	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
-	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 
 } // namespace game

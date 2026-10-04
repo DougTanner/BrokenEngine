@@ -18,7 +18,7 @@ void ClientDesyncCore::OnDesyncDetected(ReconcileDesyncInfo&& rDesyncInfo)
 	ScopedSuppressAllocationTracking suppress;
 
 	game::gpClientSession->mpRuntime->mpClient->SendDesynchronizationReport(rDesyncInfo.iDesyncTick, rDesyncInfo.desyncCoord, rDesyncInfo.desyncExpectedCrc, rDesyncInfo.desyncActualCrc);
-	if constexpr (kbDesyncDebugFrames)
+	if constexpr (kbDesynchronizationDebugFrames)
 	{
 		game::gpClientSession->mpRuntime->mpClient->SendDebugFrameRequest(rDesyncInfo.iDesyncTick, rDesyncInfo.desyncCoord);
 		game::gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesynchronizationDebugMode);
@@ -28,7 +28,7 @@ void ClientDesyncCore::OnDesyncDetected(ReconcileDesyncInfo&& rDesyncInfo)
 		mDesyncDebugState.pClientFrame = std::move(rDesyncInfo.pDesyncClientFrame);
 		mDesyncDebugState.entryTime = std::chrono::steady_clock::now();
 	}
-	else if constexpr (kbDesyncRecovery)
+	else if constexpr (kbDesynchronizationRecovery)
 	{
 		RecoverFromDesync();
 	}
@@ -60,10 +60,10 @@ void ClientDesyncCore::PollDebugFrameResponse()
 	}
 
 	LOG(kNetwork, kError, "ClientDesyncCore::PollDebugFrameResponse Frame: {} Coord: ({},{}) matched, dumping diff", mDesyncDebugState.iTick, mDesyncDebugState.coord.iX, mDesyncDebugState.coord.iY);
-	game::gpClientSession->LogDesyncFrameDifferences(*mDesyncDebugState.pClientFrame, *pDebugFrame->pFrame);
+	mDesyncDebugState.pClientFrame->LogDifferences(*pDebugFrame->pFrame);
 	mDesyncDebugState = {};
 
-	if constexpr (kbDesyncRecovery)
+	if constexpr (kbDesynchronizationRecovery)
 	{
 		if constexpr (kbDebugBreak)
 		{
@@ -87,7 +87,7 @@ bool ClientDesyncCore::PollDesyncTimeout()
 	}
 
 	mDesyncDebugState = {};
-	if constexpr (kbDesyncRecovery)
+	if constexpr (kbDesynchronizationRecovery)
 	{
 		LOG(kNetwork, kError, "ClientDesyncCore::PollDesyncTimeout Desync debug mode timed out, recovering without debug frame");
 		RecoverFromDesync();
@@ -128,7 +128,7 @@ void ClientDesyncCore::RecoverFromDesync()
 
 	game::gpClientSession->mpRuntime->mpClient->SendResynchronizationRequest();
 	game::gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesynchronizationDebugMode, false);
-	game::gpClientSession->ResetCoordStatesForResync();
+	game::gpClientSession->ResetCoordinateStatesForResynchronization();
 }
 
 void ClientDesyncCore::Reset()

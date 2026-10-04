@@ -3,6 +3,6 @@
 namespace game
 {
 
-void CommandRegistryFixture(const nlohmann::json& rParams, nlohmann::json& rResult);
+void CommandRegistryFixture(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
 } // namespace game

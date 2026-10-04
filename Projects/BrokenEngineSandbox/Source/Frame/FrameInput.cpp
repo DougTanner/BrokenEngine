@@ -10,13 +10,16 @@ namespace game
 // when the mixing algorithm changes.
 common::crc_t FrameInput::Crc() const
 {
-	common::crc_t checksum = 0;
+	common::crc_t uiChecksum = 0;
 	for (const StatusChange& rStatusChange : statusChanges)
 	{
-		checksum = (checksum ^ common::Crc(rStatusChange.eType)) * common::kCrcMultiplier;
-		std::visit([&](const auto& payload) { checksum = (checksum ^ common::Crc(payload)) * common::kCrcMultiplier; }, rStatusChange.data);
+		uiChecksum = (uiChecksum ^ common::Crc(rStatusChange.eType)) * common::kCrcMultiplier;
+		std::visit([&](const auto& rPayload)
+		{
+			uiChecksum = (uiChecksum ^ common::Crc(rPayload)) * common::kCrcMultiplier;
+		}, rStatusChange.data);
 	}
-	return checksum;
+	return uiChecksum;
 }
 
 std::ostream& operator<<(std::ostream& rStream, const FrameInput& rInput)
@@ -26,7 +29,10 @@ std::ostream& operator<<(std::ostream& rStream, const FrameInput& rInput)
 	for (const StatusChange& rChange : rInput.statusChanges)
 	{
 		common::Write(rStream, rChange.eType);
-		std::visit([&](const auto& payload) { common::Write(rStream, payload); }, rChange.data);
+		std::visit([&](const auto& rPayload)
+		{
+			common::Write(rStream, rPayload);
+		}, rChange.data);
 	}
 
 	return rStream;
@@ -50,7 +56,10 @@ std::istream& operator>>(std::istream& rStream, FrameInput& rInput)
 			throw std::ios_base::failure("FrameInput StatusChange type");
 		}
 		rChange.data = DefaultDataForType(rChange.eType);
-		std::visit([&](auto& payload) { common::Read(rStream, payload); }, rChange.data);
+		std::visit([&](auto& rPayload)
+		{
+			common::Read(rStream, rPayload);
+		}, rChange.data);
 		// Reject a payload the game cannot adopt before the replay reaches the simulation.
 		if (!IsAdoptableStatusChange(rChange))
 		{

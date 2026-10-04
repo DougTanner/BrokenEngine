@@ -15,7 +15,7 @@
 namespace game
 {
 
-static std::weak_ptr<int> sCancelledFixture;
+static std::weak_ptr<int64_t> spCancelledFixture;
 
 static engine::Client& RequireFixtureClient(std::string_view command)
 {
@@ -108,18 +108,18 @@ void CommandClientStaleUpdateFixture(const nlohmann::json& rParams, [[maybe_unus
 			throw std::runtime_error("client_stale_update_fixture requires exactly {}");
 		}
 		engine::Client& rClient = RequireFixtureClient("client_stale_update_fixture");
-		bool bHasActiveConfirmedCoord = false;
+		bool bHasActiveConfirmedCoordinate = false;
 		for (const engine::ClientCoordSlot& rSlot : rClient.mSubscriptions.mCoordinateSlots)
 		{
-			auto coordIt = gpGame->mCoordinateFrames.find(rSlot.coordinate);
-			if (rSlot.eState == engine::CoordSubscriptionState::kActive && coordIt != gpGame->mCoordinateFrames.end()
-			 && coordIt->second.iConfirmedTick >= 0)
+			auto it = gpGame->mCoordinateFrames.find(rSlot.coordinate);
+			if (rSlot.eState == engine::CoordSubscriptionState::kActive && it != gpGame->mCoordinateFrames.end()
+			 && it->second.iConfirmedTick >= 0)
 			{
-				bHasActiveConfirmedCoord = true;
+				bHasActiveConfirmedCoordinate = true;
 				break;
 			}
 		}
-		if (!bHasActiveConfirmedCoord)
+		if (!bHasActiveConfirmedCoordinate)
 		{
 			throw std::runtime_error("client_stale_update_fixture requires an active confirmed coord");
 		}
@@ -189,32 +189,32 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture requires exactly {\"coord\":[x,y]}");
 		}
-		const nlohmann::json& rCoord = rParams.at("coord");
-		if (!rCoord.is_array())
+		const nlohmann::json& rCoordinate = rParams.at("coord");
+		if (!rCoordinate.is_array())
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture 'coord' must be an array of 2 integers");
 		}
-		if (rCoord.size() != 2)
+		if (rCoordinate.size() != 2)
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture 'coord' must be an array of 2 integers");
 		}
-		engine::GridCoord coord
+		engine::GridCoord coordinate
 		{
-			ClientGridCoordValue(rCoord.at(0), "client_cancelled_subscription_fixture"),
-			ClientGridCoordValue(rCoord.at(1), "client_cancelled_subscription_fixture"),
+			.iX = ClientGridCoordinateValue(rCoordinate.at(0), "client_cancelled_subscription_fixture"),
+			.iY = ClientGridCoordinateValue(rCoordinate.at(1), "client_cancelled_subscription_fixture"),
 		};
 		engine::Client& rClient = RequireFixtureClient("client_cancelled_subscription_fixture");
-		if (!(gpGame->ClientPlayerId().iValue != 0))
+		if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture requires an assigned player");
 		}
-		if (!sCancelledFixture.expired())
+		if (!spCancelledFixture.expired())
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture is already active");
 		}
 		for (const engine::ClientCoordSlot& rSlot : rClient.mSubscriptions.mCoordinateSlots)
 		{
-			if (rSlot.eState != engine::CoordSubscriptionState::kUnsubscribed && rSlot.coordinate == coord)
+			if (rSlot.eState != engine::CoordSubscriptionState::kUnsubscribed && rSlot.coordinate == coordinate)
 			{
 				throw std::runtime_error("client_cancelled_subscription_fixture coord is already active");
 			}
@@ -225,15 +225,15 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			throw std::runtime_error("client_cancelled_subscription_fixture requires no outstanding subscribe request");
 		}
 		engine::ClientSessionRuntime& rRuntime = *gpClientSession->mpRuntime;
-		if (std::ranges::find(rRuntime.mDesiredCoordinates, coord) != rRuntime.mDesiredCoordinates.end())
+		if (std::ranges::find(rRuntime.mDesiredCoordinates, coordinate) != rRuntime.mDesiredCoordinates.end())
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture coord is owned by subscription policy");
 		}
-		if (std::ranges::find(rRuntime.mSubscriptionQueue, coord) != rRuntime.mSubscriptionQueue.end())
+		if (std::ranges::find(rRuntime.mSubscriptionQueue, coordinate) != rRuntime.mSubscriptionQueue.end())
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture coord is owned by subscription policy");
 		}
-		if (rRuntime.mUnwantedTimestamps.contains(coord))
+		if (rRuntime.mUnwantedTimestamps.contains(coordinate))
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture coord is owned by subscription policy");
 		}
@@ -256,15 +256,15 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		std::unordered_map<engine::GridCoord, std::chrono::steady_clock::time_point> stickyBefore = rRuntime.mUnwantedTimestamps;
 		std::vector<engine::GridCoord> queueBefore = rRuntime.mSubscriptionQueue;
 		engine::ClientCoordSlot& rSlot = rClient.mSubscriptions.mCoordinateSlots.at(iSlot);
-		rClient.mSubscriptions.mSubscribeRequests.Add(coord);
+		rClient.mSubscriptions.mSubscribeRequests.Add(coordinate);
 		uint16_t uiRetainedEpoch = rSlot.acknowledgementState.uiEpoch;
 		uint16_t uiEpoch = static_cast<uint16_t>(uiRetainedEpoch + 1);
 		if (uiEpoch == 0)
 		{
 			uiEpoch = 1;
 		}
-		rClient.mSubscriptions.mSubscribeRequests.Cancel(coord);
-		bool bCancelledToUnsubscribed = !rClient.mSubscriptions.mSubscribeRequests.IsLive(coord) && rSlot.eState == engine::CoordSubscriptionState::kUnsubscribed;
+		rClient.mSubscriptions.mSubscribeRequests.Cancel(coordinate);
+		bool bCancelledToUnsubscribed = !rClient.mSubscriptions.mSubscribeRequests.IsLive(coordinate) && rSlot.eState == engine::CoordSubscriptionState::kUnsubscribed;
 
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -273,7 +273,7 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			.uiLoadGeneration = rClient.muiCommittedLoadGeneration,
 			.uiSlotIndex = static_cast<uint8_t>(iSlot),
 			.uiEpoch = uiEpoch,
-			.coord = coord,
+			.coord = coordinate,
 		};
 		engine::NetworkMessages::Write(rWorkbuffer, accept);
 		rClient.Receive(rWorkbuffer.Span<uint8_t>());
@@ -303,11 +303,11 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			std::make_shared<engine::ClientNetworkFixtures::CancelledSubscriptionState>();
 		pState->iSlot = iSlot;
 		engine::ClientNetworkFixtures::ArmCancelledSubscription(rClient, pState);
-		std::shared_ptr<int> pLifetime = std::make_shared<int>(0);
-		sCancelledFixture = pLifetime;
+		std::shared_ptr<int64_t> pLifetime = std::make_shared<int64_t>(0);
+		spCancelledFixture = pLifetime;
 		engine::Client* pClient = &rClient;
 		std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + 4s;
-		engine::gpAgentCommandServer->DeferResponse([pState, pLifetime, pClient, coord, iSlot, bPolicyUnchanged, bCancelledToUnsubscribed, bAcceptToUnsubscribing, deadline]() -> std::optional<nlohmann::json>
+		engine::gpAgentCommandServer->DeferResponse([pState, pLifetime, pClient, coordinate, iSlot, bPolicyUnchanged, bCancelledToUnsubscribed, bAcceptToUnsubscribing, deadline]() -> std::optional<nlohmann::json>
 		{
 			(void)pLifetime;
 			if (gpClientSession == nullptr)
@@ -331,7 +331,7 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			 && eState == engine::CoordSubscriptionState::kUnsubscribed)
 			{
 				nlohmann::json result;
-				result["coord"] = {coord.iX, coord.iY};
+				result["coord"] = {coordinate.iX, coordinate.iY};
 				result["slot"] = iSlot;
 				result["initialState"] = "subscribing";
 				result["afterCancelState"] = "unsubscribed";
@@ -359,10 +359,10 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 	}
 }
 
-void DetachClientSubscriptionFixtures([[maybe_unused]] ClientSession& rSession)
+void DetachClientSubscriptionFixtures([[maybe_unused]] const ClientSession& rSession)
 {
 	engine::ClientNetworkFixtures::Detach();
-	sCancelledFixture.reset();
+	spCancelledFixture.reset();
 }
 
 } // namespace game

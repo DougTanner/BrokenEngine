@@ -8,7 +8,10 @@
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
 
-namespace engine { struct FrameStaticData; }
+namespace engine
+{
+struct FrameStaticData;
+} // namespace engine
 
 namespace game
 {
@@ -26,10 +29,8 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, pub
 	static constexpr char kName[] = "Blasters";
 	static constexpr common::crc_t kCrc = common::CrcConsteval(kName);
 
-	// Register
 	static void Register();
 
-	// Allocate and copy
 	static void AllocateAndCopy(BlastersInterpolate& rCurrent, const BlastersInterpolate& rPrevious);
 
 	// Trust boundary: a type index this build never registered is a corrupt stream; reject it before client hydration looks it up.
@@ -37,35 +38,34 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, pub
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
 		{
-			if (rCurrent.puiTypeIndices[i] >= sTypes.size())
+			if (rCurrent.puiTypeIndices[i] >= std::ssize(sTypes))
 			{
 				throw std::ios_base::failure("BlastersInterpolate puiTypeIndices");
 			}
 		}
 	}
 
-	// Interpolate
 	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
 #if defined(BT_CLIENT)
-	static void ClientInit(Frame& rFrame, int64_t iIndex);
-	static void ClientInitAll(Frame& rFrame);
+	static void ClientInitialize(Frame& rFrame, int64_t iIndex);
+	static void ClientInitializeAll(Frame& rFrame);
 #endif
 
 	uint8_t* __restrict puiTypeIndices = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
 #if defined(BT_CLIENT)
-	engine::area_lights_t* __restrict puiAreaLights = nullptr;
-	engine::point_lights_t* __restrict puiPointLights = nullptr;
-	engine::wind_trail_t* __restrict puiWindTrails = nullptr;
+	engine::area_lights_t* __restrict pAreaLights = nullptr;
+	engine::point_lights_t* __restrict pPointLights = nullptr;
+	engine::wind_trail_t* __restrict pWindTrails = nullptr;
 	float* __restrict pfWindTrailIntensities = nullptr;
 	float* __restrict pfWindTrailWidths = nullptr;
 	float* __restrict pfWindTrailLengthMultipliers = nullptr;
 #endif
 	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pVecDirections); }
 #if defined(BT_CLIENT)
-	auto ClientMembers(this auto&& rSelf) { return std::tie(rSelf.puiAreaLights, rSelf.puiPointLights, rSelf.puiWindTrails, rSelf.pfWindTrailIntensities, rSelf.pfWindTrailWidths, rSelf.pfWindTrailLengthMultipliers); }
+	auto ClientMembers(this auto&& rSelf) { return std::tie(rSelf.pAreaLights, rSelf.pPointLights, rSelf.pWindTrails, rSelf.pfWindTrailIntensities, rSelf.pfWindTrailWidths, rSelf.pfWindTrailLengthMultipliers); }
 #endif
 	auto Members(this auto&& rSelf)
 	{
@@ -78,13 +78,12 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, pub
 	auto PersistentMembers(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.puiTypeIndices, rSelf.puiAreaLights, rSelf.puiPointLights, rSelf.puiWindTrails, rSelf.pfWindTrailIntensities, rSelf.pfWindTrailWidths, rSelf.pfWindTrailLengthMultipliers);
+		return std::tie(rSelf.puiTypeIndices, rSelf.pAreaLights, rSelf.pPointLights, rSelf.pWindTrails, rSelf.pfWindTrailIntensities, rSelf.pfWindTrailWidths, rSelf.pfWindTrailLengthMultipliers);
 #else
 		return std::tie(rSelf.puiTypeIndices);
 #endif
 	}
 
-	// Utility
 	bool LogDifferences(const BlastersInterpolate& rOther) const;
 };
 
@@ -99,10 +98,8 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 {
 	static constexpr int64_t kiVersion = 2;
 
-	// Allocate and copy
 	static void AllocateAndCopy(BlastersPostRender& rCurrent, const BlastersPostRender& rPrevious);
 
-	// Update
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
 	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
@@ -115,10 +112,8 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pAlignments); }
 	auto Members(this auto&& rSelf) { return rSelf.SharedMembers(); }
 
-	// Utility
 	bool LogDifferences(const BlastersPostRender& rOther) const;
 
-	// SpawnInfo for spawn parameters
 	struct SpawnInfo
 	{
 		XMVECTOR vecPosition = DirectX::XMVectorZero();
@@ -131,7 +126,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 		float fWindTrailLengthMultiplier = 1.0f;
 	};
 
-	static bool Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);
+	static bool Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawnInformation);
 };
 
 } // namespace game
@@ -140,4 +135,4 @@ namespace engine
 {
 extern template struct Collection<game::BlastersInterpolate>;
 extern template struct Collection<game::BlastersPostRender>;
-}
+} // namespace engine

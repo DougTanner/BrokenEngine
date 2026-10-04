@@ -14,8 +14,8 @@ namespace game
 
 constexpr float kfHudEdgeMarginFraction = 0.05f;
 constexpr float kfHudPanelTopFraction = 0.125f;
-constexpr float kfHudPanelMaxHeightFraction = 0.75f;
-constexpr float kfForceOpenGracePeriodSeconds = 2.0f;
+constexpr float kfHudPanelMaximumHeightFraction = 0.75f;
+constexpr std::chrono::seconds kForceOpenGracePeriod = 2s;
 
 void HudScreen::Render()
 {
@@ -38,7 +38,7 @@ void HudScreen::Render()
 	const char* pcWantReason = "fleet member present";
 	int64_t iSubscribedFrameCount = 0;
 
-	if (!(gpGame->ClientPlayerId().iValue != 0))
+	if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
 	{
 		bWantsForceOpen = true;
 		pcWantReason = "ClientPlayerId invalid";
@@ -51,14 +51,14 @@ void HudScreen::Render()
 	else
 	{
 		bool bFoundAny = false;
-		for (const auto& [coord, frames] : gpGame->mCoordinateFrames)
+		for (const auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
 		{
-			if (frames.iSnapshotCount == 0)
+			if (rFrames.iSnapshotCount == 0)
 			{
 				continue;
 			}
 			++iSubscribedFrameCount;
-			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(coord).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(rCoordinate).postRender.pPlayers;
 			for (int64_t i = 0; i < rPlayers.iCount && !bFoundAny; ++i)
 			{
 				engine::GlobalId globalPlayerId = rPlayers.pGlobalPlayerIds[i];
@@ -86,17 +86,17 @@ void HudScreen::Render()
 	}
 
 	// Grace period: only force-open once the want-state has been sustained. Absorbs the brief gap during cell-boundary
-	// hand-offs when the player snapshot is momentarily absent from every subscribed frame, plus ClientPlayerId blips.
-	ImGuiIO& rIo = ImGui::GetIO();
+	// hand-offs when the player snapshot is momentarily absent from every subscribed frame, plus ClientPlayerIdentifier blips.
+	ImGuiIO& rInputOutput = ImGui::GetIO();
 	if (bWantsForceOpen)
 	{
-		mfTimeWantingForceOpen += rIo.DeltaTime;
+		mTimeWantingForceOpen += std::chrono::duration<float>(rInputOutput.DeltaTime);
 	}
 	else
 	{
-		mfTimeWantingForceOpen = 0.0f;
+		mTimeWantingForceOpen = 0s;
 	}
-	bool bForceOpen = (mfTimeWantingForceOpen >= kfForceOpenGracePeriodSeconds);
+	bool bForceOpen = (mTimeWantingForceOpen >= kForceOpenGracePeriod);
 
 	// Durable log on rising edge of the genuine auto-un-hide trigger — fires once per recovery event.
 	// kWarning clears both the compile floor (keLogLevelDefault, kDebug) and the runtime default threshold (kInfo).
@@ -117,9 +117,9 @@ void HudScreen::Render()
 	}
 	bool bRightHasContent = oPlayerIndex.has_value();
 
-	// Mouse proximity to either anchor opens both panels (strict sync for the mouse path).
-	ImVec2 vLeftAnchor(rIo.DisplaySize.x * kfHudEdgeMarginFraction, rIo.DisplaySize.y * kfHudPanelTopFraction);
-	ImVec2 vRightAnchor(rIo.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rIo.DisplaySize.y * kfHudPanelTopFraction);
+	// With focused-player content, mouse proximity to either anchor opens both panels together.
+	ImVec2 vLeftAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
+	ImVec2 vRightAnchor(rInputOutput.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 
 	// Hover activation zone is a fixed-extent strip (PanelWidth x max-height fraction at the anchor), decoupled from the
 	// panels' content-driven live size so hover behavior is unchanged even as the panels visually shrink. Measure
@@ -128,7 +128,7 @@ void HudScreen::Render()
 	{
 		engine::ScopedMenuScale menuScale;
 		engine::ScopedMenuFont menuFont;
-		vHoverExtent = ImVec2(PanelWidth(), rIo.DisplaySize.y * kfHudPanelMaxHeightFraction);
+		vHoverExtent = ImVec2(PanelWidth(), rInputOutput.DisplaySize.y * kfHudPanelMaximumHeightFraction);
 	}
 	float fMouseLeft = engine::ComputeMouseOpennessTarget(vHoverExtent, vLeftAnchor, 0.0f);
 	float fMouseRight = engine::ComputeMouseOpennessTarget(vHoverExtent, vRightAnchor, 1.0f);
@@ -146,7 +146,7 @@ void HudScreen::Render()
 
 float HudScreen::PanelWidth()
 {
-	// Fixed worst-case templates measured under the pushed menu font (caller pushes ScopedMenuFont first). Fixed
+	// Fixed row templates measured under the pushed menu font (caller pushes ScopedMenuFont first). Fixed
 	// templates — not live content — keep the width stable as fleet members churn; measuring under the font auto-tracks
 	// gUiFontScale/UiScale() with no magnifying multiplier.
 	const ImGuiStyle& rStyle = ImGui::GetStyle();
@@ -157,50 +157,49 @@ float HudScreen::PanelWidth()
 	// Nav-row template: [<] 88/88 [>] [+] [-]. Padding-dominated — at low gUiFontScale text shrinks but the per-button
 	// FramePadding and per-joint ItemSpacing don't, so measure them explicitly: 4 buttons × 2 edges (8× FramePadding.x),
 	// 4 SameLine joints (4× ItemSpacing.x). Otherwise the row can exceed the text-only width and clip trailing buttons.
-	float fNavTextWidth = ImGui::CalcTextSize("[<]88/88[>][+][-]").x;
-	float fNavRowWidth = fNavTextWidth + 8.0f * rStyle.FramePadding.x + 4.0f * rStyle.ItemSpacing.x;
+	float fNavigationTextWidth = ImGui::CalcTextSize("[<]88/88[>][+][-]").x;
+	float fNavigationRowWidth = fNavigationTextWidth + 8.0f * rStyle.FramePadding.x + 4.0f * rStyle.ItemSpacing.x;
 
 	// ScrollbarSize added unconditionally (not gated on list length) so the width stays frame-to-frame stable when a
 	// vertical scrollbar appears on long fleet lists — otherwise it would clip the exact-fit member rows.
-	return std::max(fMemberRowWidth, fNavRowWidth) + rStyle.WindowPadding.x * 2.0f + rStyle.ScrollbarSize;
+	return std::max(fMemberRowWidth, fNavigationRowWidth) + rStyle.WindowPadding.x * 2.0f + rStyle.ScrollbarSize;
 }
 
 void HudScreen::RenderFleetPanel(float fTarget)
 {
-	ImGuiIO& rIo = ImGui::GetIO();
+	ImGuiIO& rInputOutput = ImGui::GetIO();
 	engine::ScopedMenuScale menuScale;
 
-	ImVec2 vAnchor(rIo.DisplaySize.x * kfHudEdgeMarginFraction, rIo.DisplaySize.y * kfHudPanelTopFraction);
+	ImVec2 vAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFleetSlide, vAnchor, -1.0f, fTarget);
-	ImGuiWindowFlags eFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize;
+	ImGuiWindowFlags iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize;
 	engine::ScopedMenuFont menuFont;
-	// Content-driven height: auto-resize to the fleet list, capped at kfHudPanelMaxHeightFraction (long lists scroll). Width
+	// Content-driven height: auto-resize to the fleet list, capped at kfHudPanelMaximumHeightFraction (long lists scroll). Width
 	// pinned to PanelWidth() via the matching min/max constraint x.
 	float fPanelWidth = PanelWidth();
-	float fMaxHeight = rIo.DisplaySize.y * kfHudPanelMaxHeightFraction;
+	float fMaximumHeight = rInputOutput.DisplaySize.y * kfHudPanelMaximumHeightFraction;
 	ImGui::SetNextWindowSize(ImVec2(fPanelWidth, 0.0f), ImGuiCond_Always);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(fPanelWidth, 0.0f), ImVec2(fPanelWidth, fMaxHeight));
+	ImGui::SetNextWindowSizeConstraints(ImVec2(fPanelWidth, 0.0f), ImVec2(fPanelWidth, fMaximumHeight));
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
-	ImGui::Begin("FleetPanel", nullptr, eFlags);
+	ImGui::Begin("FleetPanel", nullptr, iWindowFlags);
 	mFleetSlide.vLastSize = ImGui::GetWindowSize();
 	engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 
 	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRectangle occlusion
-	ImVec2 vPanelPos = ImGui::GetWindowPos();
+	ImVec2 vPanelPosition = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
-	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
+	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPosition, ImVec2(vPanelPosition.x + vPanelSize.x, vPanelPosition.y + vPanelSize.y));
 
 	int64_t iFleetCount = std::ssize(gpGame->mFleetSelection.mClientFleets);
 
 	// Update fleet toggle: clears pending when fleet count changes
 	gpGame->mFleetSelection.mCreateFleetToggle.Update(iFleetCount);
 
-	// Fleet navigation row: [<] fleet_index/fleet_count [>] [+]
 	ImGui::BeginDisabled(gpGame->mFleetSelection.miFocusedFleetIndex <= 0);
 	if (ImGui::Button("[<]"))
 	{
-		gpGame->mFleetSelection.FocusPrevFleet();
-		gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kFocusPrevFleet);
+		gpGame->mFleetSelection.FocusPreviousFleet();
+		gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kFocusPreviousFleet);
 		LOG(kDefault, kVerbose, "HUD FocusPrevFleet NewIndex: {} FleetCount: {}", gpGame->mFleetSelection.miFocusedFleetIndex, iFleetCount);
 	}
 	ImGui::EndDisabled();
@@ -220,13 +219,13 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	if (ImGui::Button("[>]"))
 	{
 		gpGame->mFleetSelection.FocusNextFleet();
-		gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kFocusNextFleet);
+		gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kFocusNextFleet);
 		LOG(kDefault, kVerbose, "HUD FocusNextFleet NewIndex: {} FleetCount: {}", gpGame->mFleetSelection.miFocusedFleetIndex, iFleetCount);
 	}
 	ImGui::EndDisabled();
 
 	ImGui::SameLine();
-	ImGui::BeginDisabled((gpGame->mFleetSelection.mCreateFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || iFleetCount >= kiMaxFleetsPerClient);
+	ImGui::BeginDisabled((gpGame->mFleetSelection.mCreateFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || iFleetCount >= kiMaximumFleetsPerClient);
 	if (ImGui::Button("[+]##Fleet"))
 	{
 		if (gpClientSession != nullptr)
@@ -240,7 +239,6 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 	const Fleet* pFleet = gpGame->mFleetSelection.FocusedFleet();
 
-	// Delete empty fleet button
 	gpGame->mFleetSelection.mDeleteFleetToggle.Update(iFleetCount);
 	bool bCanDelete = pFleet != nullptr && pFleet->members.empty();
 	ImGui::SameLine();
@@ -256,25 +254,22 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	}
 	ImGui::EndDisabled();
 
-	// Fleet member list
 	if (pFleet != nullptr)
 	{
 		ImGui::Separator();
 
-		// Update spawn into fleet toggle based on member count
 		gpGame->mFleetSelection.mSpawnIntoFleetToggle.Update(std::ssize(pFleet->members));
 
 		for (int64_t i = 0; const FleetMember& rMember : pFleet->members)
 		{
 			bool bSelected = (rMember.globalPlayerId.iValue != 0) && rMember.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
 
-			// Find coord for display
-			engine::GridCoord memberCoord {};
-			for (int64_t j = 0; j < std::ssize(gpGame->mClientPlayerIds); ++j)
+			engine::GridCoord memberCoordinate {};
+			for (int64_t j = 0; j < std::ssize(gpGame->mClientPlayerIdentifiers); ++j)
 			{
-				if (gpGame->mClientPlayerIds.at(j) == rMember.globalPlayerId)
+				if (gpGame->mClientPlayerIdentifiers.at(j) == rMember.globalPlayerId)
 				{
-					memberCoord = gpGame->mClientPlayerCoords.at(j);
+					memberCoordinate = gpGame->mClientPlayerCoordinates.at(j);
 					break;
 				}
 			}
@@ -283,11 +278,11 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			if (!(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoord.iX, memberCoord.iY, rMember.globalPlayerId.iValue);
+				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoordinate.iX, memberCoordinate.iY, rMember.globalPlayerId.iValue);
 				if (ImGui::Selectable(pcLabel, bSelected))
 				{
 					gpGame->mFleetSelection.SelectPlayerInFleet(rMember.globalPlayerId);
-					gpClientSession->UpdateDesiredCoords(SubscriptionChangeReason::kSelectPlayer);
+					gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kSelectPlayer);
 				}
 			}
 			else
@@ -309,8 +304,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			++i;
 		}
 
-		// Add player button at bottom of list
-		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || pFleet->members.size() >= kuiMaxFleetMembers);
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers);
 		if (ImGui::Button("[+]##Player"))
 		{
 			if (gpClientSession != nullptr)
@@ -322,9 +316,8 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		}
 		ImGui::EndDisabled();
 
-		// Fleet navigation delay slider
 		ImGui::Separator();
-		gpGame->mFleetSelection.mNavigationDelayControl.Update(NavigationDelayKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->fNavigationDelay});
+		gpGame->mFleetSelection.mNavigationDelayControl.Update(NavigationDelayKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->navigationDelaySeconds.count()});
 		ImGui::BeginDisabled((gpGame->mFleetSelection.mNavigationDelayControl.mFlags & engine::NetworkUiControlFlags::kPending));
 		static float sfNavigationDelayEditValue = 0.0f;
 		static bool sbNavigationDelaySliderWasActive = false;
@@ -332,7 +325,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		// sends exactly the value the user let go on
 		if (!sbNavigationDelaySliderWasActive)
 		{
-			sfNavigationDelayEditValue = pFleet->fNavigationDelay;
+			sfNavigationDelayEditValue = pFleet->navigationDelaySeconds.count();
 		}
 		// Reserve the trailing label's width — AlwaysAutoResize windows default the item width to the full content
 		// width, which would push the label past the clip edge
@@ -345,10 +338,10 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		{
 			if (!PlayersPostRender::IsNavigationDelayInRange(sfNavigationDelayEditValue))
 			{
-				sfNavigationDelayEditValue = pFleet->fNavigationDelay;
+				sfNavigationDelayEditValue = pFleet->navigationDelaySeconds.count();
 			}
-			// An unchanged release would get back an equal FleetSync, which never clears pending
-			if (gpClientSession != nullptr && sfNavigationDelayEditValue != pFleet->fNavigationDelay)
+			// An unchanged synchronized delay leaves this fleet's request pending.
+			if (gpClientSession != nullptr && sfNavigationDelayEditValue != pFleet->navigationDelaySeconds.count())
 			{
 				gpGame->mFleetSelection.mNavigationDelayControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				gpClientSession->SendFleetNavigationDelayRequest(pFleet->guid, sfNavigationDelayEditValue);
@@ -362,7 +355,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 {
-	ImGuiIO& rIo = ImGui::GetIO();
+	ImGuiIO& rInputOutput = ImGui::GetIO();
 	engine::ScopedMenuScale menuScale;
 
 	std::optional<int64_t> oPlayerIndex = std::nullopt;
@@ -374,46 +367,46 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 		}
 	}
 
-	ImVec2 vAnchor(rIo.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rIo.DisplaySize.y * kfHudPanelTopFraction);
+	ImVec2 vAnchor(rInputOutput.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedPlayerSlide, vAnchor, 1.0f, fTarget);
-	ImGuiWindowFlags eFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+	ImGuiWindowFlags iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	engine::ScopedMenuFont menuFont;
 	// Match the left FleetPanel's size exactly (symmetry): same PanelWidth(), height forced to the left panel's live height
 	// captured earlier this frame (RenderFleetPanel runs first). First frame (vLastSize.y still zero): fall back to the cap.
-	float fLeftHeight = (mFleetSlide.vLastSize.y > 0.0f) ? mFleetSlide.vLastSize.y : (rIo.DisplaySize.y * kfHudPanelMaxHeightFraction);
+	float fLeftHeight = (mFleetSlide.vLastSize.y > 0.0f) ? mFleetSlide.vLastSize.y : (rInputOutput.DisplaySize.y * kfHudPanelMaximumHeightFraction);
 	ImGui::SetNextWindowSize(ImVec2(PanelWidth(), fLeftHeight), ImGuiCond_Always);
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(0.0f, 0.0f));
-	ImGui::Begin("FocusedPlayerPanel", nullptr, eFlags);
+	ImGui::Begin("FocusedPlayerPanel", nullptr, iWindowFlags);
 	mFocusedPlayerSlide.vLastSize = ImGui::GetWindowSize();
 	engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 
 	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRectangle occlusion
-	ImVec2 vPanelPos = ImGui::GetWindowPos();
+	ImVec2 vPanelPosition = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
-	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
+	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPosition, ImVec2(vPanelPosition.x + vPanelSize.x, vPanelPosition.y + vPanelSize.y));
 
 	if (oPlayerIndex.has_value())
 	{
 		PlayersPostRender& rPlayers = *gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers;
 		bool bUseMissiles = static_cast<bool>(rPlayers.pFlags[*oPlayerIndex] & PlayerFlags::kUseMissiles);
-		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.playerId = gpGame->ClientPlayerId(), .bUseMissiles = bUseMissiles});
+		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.playerIdentifier = gpGame->ClientPlayerIdentifier(), .bUseMissiles = bUseMissiles});
 
-		const char* pLabel = bUseMissiles ? "Missiles" : "Blasters";
+		const char* pcLabel = bUseMissiles ? "Missiles" : "Blasters";
 		const ImGuiStyle& rStyle = ImGui::GetStyle();
-		ImVec2 vLabelSize = ImGui::CalcTextSize(pLabel);
+		ImVec2 vLabelSize = ImGui::CalcTextSize(pcLabel);
 		ImVec2 vButtonSize(vLabelSize.x + 2.0f * rStyle.FramePadding.x, vLabelSize.y + 2.0f * rStyle.FramePadding.y);
 		ImVec2 vAvailable = ImGui::GetContentRegionAvail();
 		ImVec2 vCursor = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(vCursor.x + std::max(0.0f, 0.5f * (vAvailable.x - vButtonSize.x)), vCursor.y + std::max(0.0f, 0.5f * (vAvailable.y - vButtonSize.y))));
 
 		ImGui::BeginDisabled((gpGame->mWeaponModeToggle.mFlags & engine::NetworkUiControlFlags::kPending));
-		if (ImGui::Button(pLabel, vButtonSize))
+		if (ImGui::Button(pcLabel, vButtonSize))
 		{
-			if (gpClientSession != nullptr && (gpGame->ClientPlayerId().iValue != 0))
+			if (gpClientSession != nullptr && (gpGame->ClientPlayerIdentifier().iValue != 0))
 			{
 				gpGame->mWeaponModeToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				float fNavigationDelay = rPlayers.pfNavigationDelays[*oPlayerIndex];
-				gpClientSession->SendUpdatePlayerRequest(gpGame->ClientPlayerId().iValue, !bUseMissiles, fNavigationDelay);
+				gpClientSession->SendUpdatePlayerRequest(gpGame->ClientPlayerIdentifier().iValue, !bUseMissiles, fNavigationDelay);
 			}
 		}
 		ImGui::EndDisabled();

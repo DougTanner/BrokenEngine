@@ -3,9 +3,9 @@
 #if defined(BT_CLIENT)
 
 // The engine owns desync reporting and escalation: the debug-frame request and correlation and the repeated-desync
-// window that escalates to disconnect. The game supplies the two
-// policy operations this core calls back into — resetting per-coord client state for a resync and logging the
-// captured client/server Frame differences. Naming the game Frame the captured snapshot holds keeps this header out
+// window that escalates to disconnect. The game supplies the policy operation this core calls back into —
+// resetting per-coord client state for a resync. The core logs captured client/server Frame differences directly.
+// Naming the game Frame the captured snapshot holds keeps this header out
 // of the Engine.h aggregation; its consumers include it directly.
 
 namespace game

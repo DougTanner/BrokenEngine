@@ -56,12 +56,11 @@ void ServerSession::PrepareTick()
 	mpRuntime->ComputeActiveSet();
 	gpGame->EnsureNextFrames();
 
-	// Add empty frame inputs for any newly active coords
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoordinates)
+	for (const engine::GridCoord& rCoordinate : gpGame->mActiveCoordinates)
 	{
-		if (!gpGame->mFrameInputs.contains(rCoord))
+		if (!gpGame->mFrameInputs.contains(rCoordinate))
 		{
-			gpGame->mFrameInputs.try_emplace(rCoord);
+			gpGame->mFrameInputs.try_emplace(rCoordinate);
 		}
 	}
 }
@@ -77,8 +76,7 @@ static float AdmitNavigationDelay(float fDelay)
 	return fDelay;
 }
 
-// Reject a wire-supplied Boolean byte other than 0 or 1.
-static bool ReadBoolByte(const uint8_t*& pCursor)
+static bool ReadBooleanByte(const uint8_t*& pCursor)
 {
 	uint8_t uiValue = engine::ReadUint8(pCursor);
 	if (uiValue > 1)
@@ -98,7 +96,7 @@ void ServerSession::ParseReceivedGamePackets()
 		// Every client-sendable game contract row has min == max (GamePacketType.h), so this gate settles each admitted
 		// payload's size exactly and the cases below add no per-case size check; only residual value checks a row
 		// cannot express — navigation-delay range and Boolean bytes — stay, and they throw to drop the packet.
-		engine::ClientPacketContract contract = NetworkSessionContract::GetClientPacketContract(eType);
+		engine::ClientPacketContract contract = GetGamePacketContract(eType);
 		if (!engine::gpServer->AdmitGamePacket(rPacket, contract))
 		{
 			continue;
@@ -114,14 +112,14 @@ void ServerSession::ParseReceivedGamePackets()
 					const uint8_t* pCursor = rPacket.payload.data();
 					engine::GlobalId globalId {};
 					globalId.iValue = engine::ReadInt64(pCursor);
-					bool bUseMissiles = ReadBoolByte(pCursor);
+					bool bUseMissiles = ReadBooleanByte(pCursor);
 					float fNavigationDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
 					mpBroadcaster->mPendingUpdatePlayerRequests.push_back({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay)});
 					break;
 				}
 				case GamePacketType::kClientCreateFleetRequest:
 				{
-					mpFleetManager->QueueCreateRequest({.iClientId = rPacket.iClientId});
+					mpFleetManager->mPendingCreateFleetRequests.push_back({.iClientId = rPacket.iClientId});
 					break;
 				}
 				case GamePacketType::kClientDeleteFleetRequest:
@@ -131,7 +129,7 @@ void ServerSession::ParseReceivedGamePackets()
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					mpFleetManager->QueueDeleteRequest({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid});
+					mpFleetManager->mPendingDeleteFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid});
 					break;
 				}
 				case GamePacketType::kClientSpawnIntoFleetRequest:
@@ -141,7 +139,7 @@ void ServerSession::ParseReceivedGamePackets()
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					mpFleetManager->QueueSpawnIntoRequest({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid});
+					mpFleetManager->mPendingSpawnIntoFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid});
 					break;
 				}
 				case GamePacketType::kClientRespawnInFleetRequest:
@@ -151,8 +149,8 @@ void ServerSession::ParseReceivedGamePackets()
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					engine::GlobalId memberGlobalPlayerId {engine::ReadInt64(pCursor)};
-					mpFleetManager->QueueRespawnRequest({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .memberGlobalPlayerId = memberGlobalPlayerId});
+					engine::GlobalId memberGlobalPlayerId {.iValue = engine::ReadInt64(pCursor)};
+					mpFleetManager->mPendingRespawnInFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .memberGlobalPlayerId = memberGlobalPlayerId});
 					break;
 				}
 				case GamePacketType::kClientFleetNavigationDelay:
@@ -166,14 +164,14 @@ void ServerSession::ParseReceivedGamePackets()
 					const engine::ClientConnection* pClient = engine::gpServer->FindClient(rPacket.iClientId);
 					if (pClient != nullptr)
 					{
-						mpFleetManager->UpdateFleetNavigationDelay(pClient->clientGuid, fleetGuid, fDelay);
+						mpFleetManager->UpdateFleetNavigationDelay(pClient->clientGuid, fleetGuid, std::chrono::duration<float>(fDelay));
 					}
 					break;
 				}
 				case GamePacketType::kClientSaveRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientSaveRequest Client: {}", rPacket.iClientId);
-					if (!gpGame->mGameSaveLoad.ServerSave())
+					if (!gpGame->mGameSaveLoad.ServerSave(std::filesystem::path("ServerQuicksave.save")))
 					{
 						LOG(kDefault, kWarning, "ServerSession::kClientSaveRequest ServerSave failed");
 					}
@@ -182,7 +180,7 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientLoadRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientLoadRequest Client: {}", rPacket.iClientId);
-					if (!gpGame->mGameSaveLoad.ServerLoad())
+					if (!gpGame->mGameSaveLoad.ServerLoad(std::filesystem::path("ServerQuicksave.save")))
 					{
 						// Corrupt/truncated save: engine::ReadGridSave already left a clean-slate grid, but ServerLoad's success
 						// tail (client reset + active-set recompute) never ran. Fall back exactly like ServerReset
@@ -224,7 +222,7 @@ void ServerSession::ParseReceivedGamePackets()
 				{
 					// 1B paused (type byte already stripped)
 					const uint8_t* pCursor = rPacket.payload.data();
-					bool bPaused = ReadBoolByte(pCursor);
+					bool bPaused = ReadBooleanByte(pCursor);
 					gpGame->mGameFlags.Set(engine::GameFlags::kPaused, bPaused);
 					LOG(kDefault, kDebug, "Server paused: {}", bPaused);
 					break;
@@ -233,7 +231,7 @@ void ServerSession::ParseReceivedGamePackets()
 				{
 					// 1B direction (type byte already stripped); 0 = slower, 1 = faster
 					const uint8_t* pCursor = rPacket.payload.data();
-					StepTimescale(ReadBoolByte(pCursor));
+					StepTimescale(ReadBooleanByte(pCursor));
 					break;
 				}
 				default:
@@ -287,26 +285,21 @@ void ServerSession::FinalizeTickClients()
 	PublishServerEntityCounts();
 }
 
-void ServerSession::AddGameRequiredCoords()
+void ServerSession::AddGameRequiredCoordinates()
 {
-	for (const auto& [rCoord, rFrames] : gpGame->mCoordinateFrames)
+	for (const auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
 	{
 		if (rFrames.pCurrent->postRender.pPlayers->iCount > 0)
 		{
-			if (!std::ranges::contains(gpGame->mActiveCoordinates, rCoord))
+			if (!std::ranges::contains(gpGame->mActiveCoordinates, rCoordinate))
 			{
-				gpGame->mActiveCoordinates.push_back(rCoord);
+				gpGame->mActiveCoordinates.push_back(rCoordinate);
 			}
 		}
 	}
 }
 
-void ServerSession::OnFrameRetiring(engine::GridCoord coord, std::unique_ptr<game::Frame> pFrame)
-{
-	engine::gpReplay->RetireCoordinate(coord, std::move(pFrame));
-}
-
-void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coord)
+void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate)
 {
 	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
 	if (pClient == nullptr)
@@ -317,13 +310,13 @@ void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalI
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(GamePacketType::kServerAssignPlayer));
-	GameMessages::AssignPlayerMessage message {.iGlobalPlayerId = globalId.iValue, .coord = coord};
+	GameMessages::AssignPlayerMessage message {.iGlobalPlayerIdentifier = globalId.iValue, .coordinate = coordinate};
 	engine::NetworkMessages::Write(rWorkbuffer, message);
 	ASSERT(rWorkbuffer.Count<uint8_t>() == sizeof(uint8_t) + GameMessages::AssignPlayerMessage::kiSize);
 	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
-void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coord)
+void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coordinate)
 {
 	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
 	if (pClient == nullptr)
@@ -331,13 +324,13 @@ void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWire
 		return;
 	}
 
-	const GameMessages::PlayerStateDescriptor& rDescriptor = GameMessages::GetPlayerStateDescriptor(eWireType);
-	LOG(kNetwork, kInfo, "ServerSession::SendPlayerState State: {} Client: {} GlobalPlayer: {} Grid: ({},{})", rDescriptor.pcName, iClientId, iGlobalPlayerId, coord.iX, coord.iY);
+	const GameMessages::PlayerStateDescriptor& rDescriptor = GameMessages::kpPlayerStateDescriptors[static_cast<size_t>(eWireType)];
+	LOG(kNetwork, kInfo, "ServerSession::SendPlayerState State: {} Client: {} GlobalPlayer: {} Grid: ({},{})", rDescriptor.pcName, iClientId, iGlobalPlayerId, coordinate.iX, coordinate.iY);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(GamePacketType::kServerPlayerState));
-	GameMessages::PlayerStateMessage message {.uiWireType = static_cast<uint8_t>(eWireType), .iGlobalPlayerId = iGlobalPlayerId, .coord = coord};
+	GameMessages::PlayerStateMessage message {.uiWireType = static_cast<uint8_t>(eWireType), .iGlobalPlayerIdentifier = iGlobalPlayerId, .coordinate = coordinate};
 	engine::NetworkMessages::Write(rWorkbuffer, message);
 	ASSERT(rWorkbuffer.Count<uint8_t>() == sizeof(uint8_t) + GameMessages::PlayerStateMessage::kiSize);
 	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
@@ -366,11 +359,11 @@ void ServerSession::SubscriptionUpdates()
 		return;
 	}
 
-	// Client handles subscriptions — server just sends player assignment with global ID
+	// Clients update desired subscriptions from player assignments and frame-change notifications.
 	for (const SubscriptionUpdate& rUpdate : rPendingUpdates)
 	{
-		SendAssignPlayer(rUpdate.iClientId, rUpdate.globalPlayerId, rUpdate.newCoord);
-		SendPlayerState(rUpdate.iClientId, PlayerStateWireType::kChangedFrame, rUpdate.globalPlayerId.iValue, rUpdate.newCoord);
+		SendAssignPlayer(rUpdate.iClientId, rUpdate.globalPlayerId, rUpdate.newCoordinate);
+		SendPlayerState(rUpdate.iClientId, PlayerStateWireType::kChangedFrame, rUpdate.globalPlayerId.iValue, rUpdate.newCoordinate);
 	}
 
 	rPendingUpdates.clear();
@@ -380,18 +373,16 @@ void ServerSession::ResetClientsForLoad()
 {
 	mpRuntime->mpServer->AdvanceLoadGeneration();
 	LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad");
-	// Heap: re-link rebuilds registry entries and authorizedCoordinates; pending state cleared across managers
+	// Relinking may allocate registry entries and authorizedCoordinates.
 	ScopedSuppressAllocationTracking suppress;
 
 	mpRuntime->mpServer->BroadcastLoadNotification();
 
-	mpFleetManager->mNavigation.ClearPendingFlagshipUpdates();
+	mpFleetManager->mNavigation.mPendingFlagshipUpdates.clear();
 	std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
 
-	// Try to re-link each client to their players by GUID
 	for (engine::ClientConnection& rClient : rClients)
 	{
-		// Free all subscription slots
 		for (int64_t i = 0; i < std::ssize(rClient.slots); ++i)
 		{
 			if (rClient.slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive)
@@ -400,7 +391,6 @@ void ServerSession::ResetClientsForLoad()
 			}
 		}
 
-		// Clear owned players and rebuild from loaded frames.
 		mClientPlayers.Clear(rClient.iClientId);
 		if (RelinkFromFrames(rClient.iClientId, rClient.clientGuid, RelinkContext::kLoad) == 0)
 		{
@@ -410,16 +400,13 @@ void ServerSession::ResetClientsForLoad()
 		mpFleetManager->OnResetForLoad(rClient.iClientId, rClient.clientGuid);
 	}
 
-	// Clear all pending state across managers
 	mpClientManager->ResetState();
 	mpTransferManager->ResetState();
 	miHarvestedTransferTotal = 0;
 	mpBroadcaster->ResetState();
-	// Fleet manager: only drop pending request queues. mFleets / mGuidToClientId
-	// were just authoritatively restored by ReadFleetData + per-client OnResetForLoad above;
-	// a full ResetState() here would annihilate that restoration.
+	// ReadFleetData restores mFleets and OnResetForLoad restores mGuidToClientId; preserve both while clearing pending requests.
 	mpFleetManager->ClearPendingRequests();
-	// Pending flagship updates were cleared at the start of this function via mNavigation.ClearPendingFlagshipUpdates(); fleet restoration above re-queued entries — do NOT clear again here.
+	// OnResetForLoad queues flagship updates after the initial clear; retain those updates.
 
 	mpRuntime->ResetTransportForLoad();
 }
@@ -433,14 +420,14 @@ int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientG
 
 	std::vector<engine::OwnedEntity> relinkEntries;
 	relinkEntries.reserve(gpGame->mCoordinateFrames.size());
-	for (const auto& [rCoord, rFrames] : gpGame->mCoordinateFrames)
+	for (const auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
 	{
 		const PlayersPostRender& rPlayers = *rFrames.pCurrent->postRender.pPlayers;
 		for (int64_t i = 0; i < rPlayers.iCount; ++i)
 		{
 			if (rPlayers.pClientGuids[i] == rGuid)
 			{
-				relinkEntries.push_back({.globalId = rPlayers.pGlobalPlayerIds[i], .coord = rCoord});
+				relinkEntries.push_back({.globalId = rPlayers.pGlobalPlayerIds[i], .coord = rCoordinate});
 			}
 		}
 	}
@@ -467,7 +454,7 @@ int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientG
 		}
 	}
 
-	return static_cast<int64_t>(relinkEntries.size());
+	return std::ssize(relinkEntries);
 }
 
 void ServerSession::WriteFleetData(std::fstream& rFileStream) const

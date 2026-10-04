@@ -13,14 +13,14 @@ public:
 	// so this is just the (0, 0) cell center; the camera converges on the focused player anyway.
 	static constexpr XMVECTOR kVecMenuIslandCenter {0.0f, 0.0f, 0.0f, 1.0f};
 
-	// Main-menu camera target, as world-space XY offset from the menu island center.
+	// Main-menu XY offset from the menu island center is local to the origin cell.
 	static constexpr XMVECTOR kVecMenuCameraOffset {20.4f, -76.3f, 0.0f, 0.0f};
 
 	Camera();
 
 	float SunAngle() const override;
 
-	engine::GlobalId mLastTrackedPlayerId {};
+	engine::GlobalId mLastTrackedPlayerIdentifier {};
 
 protected:
 

@@ -539,7 +539,7 @@ void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData,
 
 		if (rMessage.compressedPayload.iSize > 0)
 		{
-			int64_t iCount = game::NetworkSessionContract::DecompressStatusChanges(rMessage.compressedPayload.puiData, rMessage.compressedPayload.iSize, mStatusChangeScratch.data());
+			int64_t iCount = game::NetworkSessionContract::DecompressStatusChanges(std::span<const uint8_t>(rMessage.compressedPayload.puiData, static_cast<size_t>(rMessage.compressedPayload.iSize)), mStatusChangeScratch.data());
 			// Heap: exact-size copy out of the reused 1024-cap decode scratch, so the buffered update carries no capacity slack
 			update.statusChanges.assign(mStatusChangeScratch.begin(), mStatusChangeScratch.begin() + iCount);
 		}
@@ -956,9 +956,9 @@ void Client::SendHello()
 	NetworkMessages::ClientHelloMessage message
 	{
 		.uiProtocolVersion = kuiProtocolVersion,
-		.iFrameVersion = game::NetworkSessionContract::GetFrameVersion(),
+		.iFrameVersion = game::NetworkSessionContract::Frame::kiVersion,
 		.uiPackIntegrityToken = gpFileManager->mpPackChunks->mPackIntegrityToken,
-		.buildConfiguration = kpcBuildConfigName,
+		.buildConfiguration = kpcBuildConfigurationName,
 		.guid = mClientGuid,
 		.bHasGuid = true,
 	};

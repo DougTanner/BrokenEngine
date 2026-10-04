@@ -22,40 +22,35 @@ namespace engine
 {
 template struct Collection<game::PlayersInterpolate, CollectionFlags::kIdToIndex>;
 template struct Collection<game::PlayersPostRender>;
-}
+} // namespace engine
 
 namespace game
 {
 
 using enum PlayerFlags;
 
-// Type registration constants (used by Register)
 constexpr float kfBlasterSizeX = kfPlayerRadius * 0.3333f;
 constexpr float kfBlasterSizeY = kfPlayerRadius * 1.0f;
 
 
 constexpr uint32_t kuiExplosionBaseParticleCount = 16;
-constexpr float kfExplosionParticleVelocityMin = 5.0f;
+constexpr float kfExplosionParticleVelocityMinimum = 5.0f;
 constexpr float kfExplosionParticleVelocityRandom = 15.0f;
-constexpr float kfExplosionParticleVerticalVelocityMin = 0.0f;
+constexpr float kfExplosionParticleVerticalVelocityMinimum = 0.0f;
 constexpr float kfExplosionParticleVerticalVelocityRandom = 20.0f;
 constexpr float kfExplosionParticleIntensityDecay = 2.4f;
 
 #if defined(BT_CLIENT)
-// Impact point light timing
-constexpr float kfImpactPointLightDuration = 0.4f;
+constexpr std::chrono::duration<float> kImpactPointLightDuration(0.4f);
 
-// Impact puff timing
-constexpr float kfImpactPuffDuration = 0.1f;
+constexpr std::chrono::duration<float> kImpactPuffDuration(0.1f);
 #endif // BT_CLIENT
 
-// PlayersInterpolate::Update constants
 constexpr float kfRotateTowardsSpeed = 10.0f;
 #if defined(BT_CLIENT)
 constexpr float kfShieldShrinkSpeed = 1.5f;
 constexpr float kfShieldRotationSpeed = 4.0f;
 
-// Hex shield rendering
 constexpr float kfHexShieldSizeScale = kfPlayerRadius * 0.0667f;
 constexpr float kfHexShieldColorMix = 0.85f;
 constexpr float kfHexShieldFadeThreshold = 0.25f;
@@ -63,9 +58,8 @@ constexpr float kfHexShieldFadeThreshold = 0.25f;
 // Player model (defined in PlayersRender.cpp)
 extern const common::crc_t kPlayerModel;
 
-// Rotation tilt
 constexpr float kfRotationTiltFactor = 0.015f;
-constexpr float kfRotationTiltMax = 0.4f;
+constexpr float kfRotationTiltMaximum = 0.4f;
 #endif // BT_CLIENT
 
 void PlayersInterpolate::Register()
@@ -91,7 +85,6 @@ void PlayersInterpolate::Register()
 		.uiAreaLightTypeIndex = suiAreaLightTypeIndex,
 	});
 
-	// Register player explosion type
 	engine::ExplosionsInterpolate::RegisterType(suiExplosionTypeIndex,
 	{
 #if defined(BT_CLIENT)
@@ -104,9 +97,9 @@ void PlayersInterpolate::Register()
 #endif // BT_CLIENT
 		.uiBaseParticleCount = kuiExplosionBaseParticleCount,
 		.uiParticleColor = 0xFF0000FF,
-		.fParticleVelocityMinimum = kfExplosionParticleVelocityMin,
+		.fParticleVelocityMinimum = kfExplosionParticleVelocityMinimum,
 		.fParticleVelocityRandom = kfExplosionParticleVelocityRandom,
-		.fParticleVerticalVelocityMinimum = kfExplosionParticleVerticalVelocityMin,
+		.fParticleVerticalVelocityMinimum = kfExplosionParticleVerticalVelocityMinimum,
 		.fParticleVerticalVelocityRandom = kfExplosionParticleVerticalVelocityRandom,
 		.fParticleIntensityDecay = kfExplosionParticleIntensityDecay,
 		.pParticleWidthScale = &gPlayerExplosionParticleWidth,
@@ -126,7 +119,7 @@ void PlayersInterpolate::Register()
 	});
 
 #if defined(BT_CLIENT)
-	// Register impact point light type and controller (flash effect when hit)
+	// Hits trigger the impact light controller.
 	uint8_t uiImpactPointLightTypeIndex = 0xFF;
 	engine::PointLightsInterpolate::RegisterType(uiImpactPointLightTypeIndex,
 	{
@@ -138,7 +131,7 @@ void PlayersInterpolate::Register()
 		.uiBaseTypeIndex = uiImpactPointLightTypeIndex,
 		.uiKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfImpactPointLightDuration), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.times = {std::chrono::duration<float>::zero(), kImpactPointLightDuration, std::chrono::duration<float>::zero(), std::chrono::duration<float>::zero()},
 		.keyframes =
 		{
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -152,7 +145,7 @@ void PlayersInterpolate::Register()
 		.ppLightingIntensityScales = {&gPlayerImpactLightingIntensityOne, &gPlayerImpactLightingIntensityTwo, nullptr, nullptr},
 	});
 
-	// Register impact puff type and controller (smoke puff when hit)
+	// Hits trigger the impact puff controller.
 	uint8_t uiImpactPuffTypeIndex = 0xFF;
 	engine::PuffsInterpolate::RegisterType(uiImpactPuffTypeIndex,
 	{
@@ -164,7 +157,7 @@ void PlayersInterpolate::Register()
 		.uiBaseTypeIndex = uiImpactPuffTypeIndex,
 		.uiKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfImpactPuffDuration), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.times = {std::chrono::duration<float>::zero(), kImpactPuffDuration, std::chrono::duration<float>::zero(), std::chrono::duration<float>::zero()},
 		.keyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -176,7 +169,6 @@ void PlayersInterpolate::Register()
 		.ppIntensityScales = {&gPlayerImpactPuffIntensityOne, &gPlayerImpactPuffIntensityTwo, nullptr, nullptr},
 	});
 
-	// Register hex shield type for player
 	engine::HexShieldsInterpolate::RegisterType(suiHexShieldTypeIndex,
 	{
 		.uiColor = 0x40FFFF00,        // Cyan with 25% alpha (ABGR)
@@ -184,16 +176,6 @@ void PlayersInterpolate::Register()
 		.fMinimumIntensity = 0.0f,    // Shield invisible when idle
 	});
 #endif // BT_CLIENT
-}
-
-void PlayersInterpolate::AllocateAndCopy(PlayersInterpolate& rCurrent, const PlayersInterpolate& rPrevious)
-{
-	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
-void PlayersPostRender::AllocateAndCopy(PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious)
-{
-	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
 }
 
 #if defined(BT_CLIENT)
@@ -232,7 +214,7 @@ void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[may
 	},
 	[&](int64_t i)
 	{
-		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
+		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[i]);
 		engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.pIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	});
 }
@@ -249,12 +231,12 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			int64_t iPlayerUuid = std::get<DestroyPlayerData>(rStatusChange.data).iPlayerUuid;
 			player_t destroyId {engine::Uuid {iPlayerUuid}};
 
-			auto idIt = rCurrentInterpolate.idToIndexMap.find(destroyId);
-			if (idIt != rCurrentInterpolate.idToIndexMap.end())
+			auto it = rCurrentInterpolate.idToIndexMap.find(destroyId);
+			if (it != rCurrentInterpolate.idToIndexMap.end())
 			{
-				engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[idIt->second]);
+				engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[it->second]);
 #if defined(BT_CLIENT)
-				PlayersInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, idIt->second);
+				PlayersInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, it->second);
 #endif // BT_CLIENT
 
 				engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, destroyId, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
@@ -288,12 +270,12 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 				.vecVelocity = XMVectorZero(),
 				.alignment = rFrame.postRender.playerAlignment,
 				.flags = spawnFlags,
-				.fArrivalGracePeriod = kfArrivalGracePeriod,
-				.globalPlayerId = {rSpawnData.iGlobalId},
+				.fArrivalGracePeriod = kArrivalGracePeriod.count(),
+				.globalPlayerId = {.iValue = rSpawnData.iGlobalId},
 				// Empty unless the spawn request carries an owning client: agent-injected rows are born unowned.
 				.clientGuid = rSpawnData.clientGuid,
-				.fleetWantedCoord = rSpawnData.fleetWantedCoord,
-				.uiPendingFleetWantedCoordTicks = rSpawnData.uiPendingFleetWantedCoordTicks,
+				.fleetWantedCoordinate = rSpawnData.fleetWantedCoordinate,
+				.uiPendingFleetWantedCoordinateTicks = rSpawnData.uiPendingFleetWantedCoordinateTicks,
 			});
 		}
 	}
@@ -305,7 +287,7 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
 	int64_t iUpdateFleetCount = 0;
-	engine::GridCoord updateFleetNewCoord {};
+	engine::GridCoord updateFleetNewCoordinate {};
 	int64_t iUpdateFleetFlagshipGlobalId = 0;
 
 	for (const StatusChange& rStatusChange : rFrameInput.statusChanges)
@@ -314,10 +296,10 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 		{
 			const UpdateFleetData& rUpdate = std::get<UpdateFleetData>(rStatusChange.data);
 			player_t updateId {engine::Uuid {rUpdate.iPlayerUuid}};
-			auto idIt = rCurrentInterpolate.idToIndexMap.find(updateId);
-			if (idIt != rCurrentInterpolate.idToIndexMap.end())
+			auto it = rCurrentInterpolate.idToIndexMap.find(updateId);
+			if (it != rCurrentInterpolate.idToIndexMap.end())
 			{
-				int64_t iIndex = idIt->second;
+				int64_t iIndex = it->second;
 				if (rUpdate.bIsFlagship)
 				{
 					rCurrentPostRender.pFlags[iIndex].Set(kIsFlagship);
@@ -329,9 +311,9 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 					rCurrentPostRender.pFlags[iIndex].Set(kIsFlagship, false);
 				}
 				++iUpdateFleetCount;
-				updateFleetNewCoord = rUpdate.fleetWantedCoord;
-				rCurrentPostRender.pFleetWantedCoords[iIndex] = rUpdate.fleetWantedCoord;
-				rCurrentPostRender.puiPendingFleetWantedCoordTicks[iIndex] = rUpdate.uiPendingFleetWantedCoordTicks;
+				updateFleetNewCoordinate = rUpdate.fleetWantedCoordinate;
+				rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rUpdate.fleetWantedCoordinate;
+				rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rUpdate.uiPendingFleetWantedCoordinateTicks;
 			}
 			continue;
 		}
@@ -341,15 +323,15 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 			const UpdatePlayerData& rUpdate = std::get<UpdatePlayerData>(rStatusChange.data);
 			player_t updateId {engine::Uuid {rUpdate.iPlayerUuid}};
 
-			auto idIt = rCurrentInterpolate.idToIndexMap.find(updateId);
-			if (idIt != rCurrentInterpolate.idToIndexMap.end())
+			auto it = rCurrentInterpolate.idToIndexMap.find(updateId);
+			if (it != rCurrentInterpolate.idToIndexMap.end())
 			{
-				int64_t iIndex = idIt->second;
+				int64_t iIndex = it->second;
 				// Weapon mode change is deferred via countdown ticks
 				rCurrentPostRender.pFlags[iIndex].Set(kPendingUseMissiles, rUpdate.bUseMissiles);
 				rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rUpdate.uiPendingWeaponModeTicks;
-				rCurrentPostRender.pfNavigationDelays[iIndex] = rUpdate.fNavigationDelay;
-				rCurrentPostRender.pfFrameChangeTimers[iIndex] = rUpdate.fNavigationDelay;
+				rCurrentPostRender.pfNavigationDelays[iIndex] = rUpdate.navigationDelaySeconds.count();
+				rCurrentPostRender.pfFrameChangeTimers[iIndex] = rUpdate.navigationDelaySeconds.count();
 			}
 			else
 			{
@@ -361,7 +343,7 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 
 	if (iUpdateFleetCount > 0)
 	{
-		LOG(kNetwork, kVerbose, "ProcessUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Players: {} Flagship: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, updateFleetNewCoord.iX, updateFleetNewCoord.iY, iUpdateFleetCount, iUpdateFleetFlagshipGlobalId);
+		LOG(kNetwork, kVerbose, "ProcessUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Players: {} Flagship: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, updateFleetNewCoordinate.iX, updateFleetNewCoordinate.iY, iUpdateFleetCount, iUpdateFleetFlagshipGlobalId);
 	}
 }
 
@@ -375,7 +357,6 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		// Create wind trail if it doesn't exist and not exploding
 		if (!(rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0) && !(rCurrentPostRender.pFlags[i] & kExploding))
 		{
 			engine::WindTrailsPostRender::Add(rFrame, rCurrentInterpolate.pWindTrails[i]);
@@ -388,7 +369,6 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 			});
 		}
 
-		// Create hex shield if it doesn't exist and not exploding
 		if (!(rCurrentInterpolate.pHexShields[i].uuid.iValue != 0) && !(rCurrentPostRender.pFlags[i] & kExploding))
 		{
 			engine::HexShieldsPostRender::Add(rFrame, rCurrentInterpolate.pHexShields[i], PlayersInterpolate::suiHexShieldTypeIndex);
@@ -416,13 +396,12 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	auto [iIndex, newId] = engine::AddIndexableElement(rCurrentInterpolate, rCurrentPostRender, rFrame.postRender);
 
-	// Initialize interpolate state
 	rCurrentInterpolate.pVecPositions[iIndex] = rInfo.vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pfDestroyedTimes[iIndex] = 0.0f;
 	rCurrentInterpolate.pfAnimationTimes[iIndex] = rInfo.fAnimationTime;
-	rCurrentInterpolate.puiPushers[iIndex] = {};
-	engine::PushersPostRender::Add(rFrame, rCurrentInterpolate.puiPushers[iIndex]);
+	rCurrentInterpolate.pPushers[iIndex] = {};
+	engine::PushersPostRender::Add(rFrame, rCurrentInterpolate.pPushers[iIndex]);
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pfRotationAccelerationXs[iIndex] = 0.0f;
 	rCurrentInterpolate.pfRotationAccelerationYs[iIndex] = 0.0f;
@@ -431,11 +410,10 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentInterpolate.pfShieldRotations[iIndex] = rInfo.fShieldRotation;
 	rCurrentInterpolate.pfShieldShrinks[iIndex] = rInfo.fShieldShrink;
 	rCurrentInterpolate.pHexShieldDirections[iIndex] = {};
-	rCurrentInterpolate.pHexShieldVertIntensities[iIndex] = {};
-	rCurrentInterpolate.pHexShieldFragIntensities[iIndex] = {};
+	rCurrentInterpolate.pHexShieldVertexIntensities[iIndex] = {};
+	rCurrentInterpolate.pHexShieldFragmentIntensities[iIndex] = {};
 #endif // BT_CLIENT
 
-	// Initialize post render state
 	rCurrentPostRender.pIds[iIndex] = newId;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pfNextBlasterFireTimes[iIndex] = rInfo.fNextBlasterFireTime;
@@ -457,24 +435,23 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows flagship via proximity
 	PlayerFlags_t spawnFlags = rInfo.flags;
-	SetNavDirection(spawnFlags, (rInfo.flags & kIsFlagship) ? static_cast<int8_t>(4) : static_cast<int8_t>(-1));
-	SetNavWaypointIndex(spawnFlags, 0);
+	SetNavigationDirection(spawnFlags, (rInfo.flags & kIsFlagship) ? static_cast<int8_t>(4) : static_cast<int8_t>(-1));
+	SetNavigationWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pfNavigationDelays[iIndex] = rInfo.fNavigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
 	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
 	rCurrentPostRender.pGlobalPlayerIds[iIndex] = rInfo.globalPlayerId;
-	rCurrentPostRender.pFleetWantedCoords[iIndex] = rInfo.fleetWantedCoord;
-	rCurrentPostRender.puiPendingFleetWantedCoordTicks[iIndex] = rInfo.uiPendingFleetWantedCoordTicks;
+	rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rInfo.fleetWantedCoordinate;
+	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
 	rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rInfo.uiPendingWeaponModeTicks;
 #if defined(BT_CLIENT)
-	rCurrentPostRender.pVecDebugNavWaypoints[iIndex] = XMVectorZero();
+	rCurrentPostRender.pVecDebugNavigationWaypoints[iIndex] = XMVectorZero();
 #endif // BT_CLIENT
 
 	return true;
 }
 
-// PlayersInterpolate::Update synchronizes per-player state.
 
 void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
 {
@@ -485,13 +462,11 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		float fDestroyedTime = rPrevious.pfDestroyedTimes[i];
 		float fAnimationTime = rPrevious.pfAnimationTimes[i];
 
-		// Position
 		if (!(rPreviousPostRender.pFlags[i] & kExploding)) [[likely]]
 		{
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), rPreviousPostRender.pVecVelocities[i], vecPosition);
@@ -500,23 +475,19 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation (pos.W += dt * vel.W).
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
-		// Direction
 		vecDirection = common::RotateTowardsPercent(vecDirection, rPreviousPostRender.pVecWantedDirections[i], common::ExponentialInterpolant(kfRotateTowardsSpeed, fDeltaTime));
 
-		// Death countdown
 		if (rPreviousPostRender.pFlags[i] & kExploding) [[unlikely]]
 		{
 			fDestroyedTime = std::max(fDestroyedTime - fDeltaTime, 0.0f);
 		}
 
-		// Save
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pfDestroyedTimes[i] = fDestroyedTime;
 		rCurrent.pfAnimationTimes[i] = fAnimationTime;
 
-		// Sync pusher
-		engine::PushersInterpolate::Sync(rFrameInterpolate, rCurrent.puiPushers[i],
+		engine::PushersInterpolate::Sync(rFrameInterpolate, rCurrent.pPushers[i],
 		{
 			.vecPosition = vecPosition,
 			.fRadius = kfPlayerPusherRadius,
@@ -526,13 +497,11 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 		});
 
 #if defined(BT_CLIENT)
-		// Rotation tilt from velocity
-		float fRotationAccelerationX = std::clamp(kfRotationTiltFactor * XMVectorGetX(rPreviousPostRender.pVecVelocities[i]), -kfRotationTiltMax, kfRotationTiltMax);
-		float fRotationAccelerationY = std::clamp(-kfRotationTiltFactor * XMVectorGetY(rPreviousPostRender.pVecVelocities[i]), -kfRotationTiltMax, kfRotationTiltMax);
+		float fRotationAccelerationX = std::clamp(kfRotationTiltFactor * XMVectorGetX(rPreviousPostRender.pVecVelocities[i]), -kfRotationTiltMaximum, kfRotationTiltMaximum);
+		float fRotationAccelerationY = std::clamp(-kfRotationTiltFactor * XMVectorGetY(rPreviousPostRender.pVecVelocities[i]), -kfRotationTiltMaximum, kfRotationTiltMaximum);
 		rCurrent.pfRotationAccelerationXs[i] = fRotationAccelerationX;
 		rCurrent.pfRotationAccelerationYs[i] = fRotationAccelerationY;
 
-		// Hex shield animation
 		float fShieldRotation = rPrevious.pfShieldRotations[i];
 		float fShieldShrink = rPrevious.pfShieldShrinks[i];
 		fShieldRotation += fDeltaTime * kfShieldRotationSpeed;
@@ -540,7 +509,6 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 		rCurrent.pfShieldRotations[i] = fShieldRotation;
 		rCurrent.pfShieldShrinks[i] = fShieldShrink;
 
-		// Animation time (only if model has skeletal animation)
 		if (engine::gAnimationDataMap.contains(kPlayerModel))
 		{
 			const engine::AnimationData& rAnimationData = engine::gAnimationDataMap.at(kPlayerModel);
@@ -553,7 +521,6 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 			rCurrent.pfAnimationTimes[i] = fAnimationTime;
 		}
 
-		// Sync wind trail
 		if ((rCurrent.pWindTrails[i].uuid.iValue != 0))
 		{
 			engine::WindTrailsInterpolate::Sync(rFrameInterpolate, rCurrent.pWindTrails[i],
@@ -565,30 +532,26 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 			});
 		}
 
-		// Copy and decay hex shield direction intensities
 		HexShieldDirections hexShieldDirections = rPrevious.pHexShieldDirections[i];
-		HexShieldIntensities hexShieldVertIntensities {};
-		HexShieldIntensities hexShieldFragIntensities {};
+		HexShieldIntensities hexShieldVertexIntensities {};
+		HexShieldIntensities hexShieldFragmentIntensities {};
 		for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 		{
-			hexShieldVertIntensities.data[j] = std::max(rPrevious.pHexShieldVertIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * fDeltaTime, 0.0f);
-			hexShieldFragIntensities.data[j] = std::max(rPrevious.pHexShieldFragIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * fDeltaTime, 0.0f);
+			hexShieldVertexIntensities.data[j] = std::max(rPrevious.pHexShieldVertexIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * fDeltaTime, 0.0f);
+			hexShieldFragmentIntensities.data[j] = std::max(rPrevious.pHexShieldFragmentIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * fDeltaTime, 0.0f);
 		}
 		rCurrent.pHexShieldDirections[i] = hexShieldDirections;
-		rCurrent.pHexShieldVertIntensities[i] = hexShieldVertIntensities;
-		rCurrent.pHexShieldFragIntensities[i] = hexShieldFragIntensities;
+		rCurrent.pHexShieldVertexIntensities[i] = hexShieldVertexIntensities;
+		rCurrent.pHexShieldFragmentIntensities[i] = hexShieldFragmentIntensities;
 
-		// Sync hex shield to engine collection (if exists and not exploding)
 		if ((rCurrent.pHexShields[i].uuid.iValue != 0) && !(rPreviousPostRender.pFlags[i] & kExploding))
 		{
-			// Build transform (rotation around Z)
 			XMMATRIX matRotation = XMMatrixRotationZ(rCurrent.pfShieldRotations[i]);
 			XMFLOAT3X4 f3x4Transform {};
 			XMFLOAT3X4 f3x4TransformNormal {};
 			XMStoreFloat3x4(&f3x4Transform, matRotation);
 			XMStoreFloat3x4(&f3x4TransformNormal, XMMatrixTranspose(XMMatrixInverse(nullptr, matRotation)));
 
-			// Build SyncData
 			engine::HexShieldsInterpolate::SyncData syncData
 			{
 				.vecPosition = rCurrent.pVecPositions[i],
@@ -615,12 +578,12 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 			// Copy direction arrays (per-slot smoothstep tail so fade-out eases to zero)
 			for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 			{
-				float fFragIntensity = rCurrent.pHexShieldFragIntensities[i].data[j];
-				float fFade = std::clamp(fFragIntensity / kfHexShieldFadeThreshold, 0.0f, 1.0f);
+				float fFragmentIntensity = rCurrent.pHexShieldFragmentIntensities[i].data[j];
+				float fFade = std::clamp(fFragmentIntensity / kfHexShieldFadeThreshold, 0.0f, 1.0f);
 				float fSmoothFade = fFade * fFade * (3.0f - 2.0f * fFade);
 				syncData.pf4Directions[j] = rCurrent.pHexShieldDirections[i].data[j];
-				syncData.pfVertexIntensities[j] = rCurrent.pHexShieldVertIntensities[i].data[j] * fSmoothFade;
-				syncData.pfFragmentIntensities[j] = fFragIntensity * fSmoothFade;
+				syncData.pfVertexIntensities[j] = rCurrent.pHexShieldVertexIntensities[i].data[j] * fSmoothFade;
+				syncData.pfFragmentIntensities[j] = fFragmentIntensity * fSmoothFade;
 			}
 
 			engine::HexShieldsInterpolate::Sync(rFrameInterpolate, rCurrent.pHexShields[i], syncData);
@@ -630,7 +593,6 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 	}
 }
 
-// PlayersPostRender::PreCollision builds player collision layers.
 
 // Player collision arrays
 // thread_local: parallel per-Frame tick via Dispatch
@@ -642,20 +604,15 @@ struct PlayerCollisionIntervalScratch
 {
 	std::vector<float> startTimes;
 	std::vector<float> endTimes;
-	std::vector<float> maxTimes;
+	std::vector<float> maximumTimes;
 };
 
-static PlayerCollisionIntervalScratch& GetPlayerCollisionIntervalScratch()
+void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
 {
 	// Function-local TLS defers construction until first use; default construction is allocation-free
 	// (empty vectors), so it is safe even before allocator startup completes. Growth sites suppress tracking.
 	static thread_local PlayerCollisionIntervalScratch sScratch;
-	return sScratch;
-}
-
-void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
-{
-	PlayerCollisionIntervalScratch& rCollisionScratch = GetPlayerCollisionIntervalScratch();
+	PlayerCollisionIntervalScratch& rCollisionScratch = sScratch;
 	// Heap: static vectors resized each frame, only allocates on first call or when count grows (capacity retained).
 	// .data() pointers are passed to AddLayer and must survive until PostCollision, so workbuffer can't be used
 	ScopedSuppressAllocationTracking suppress;
@@ -668,14 +625,13 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 		return;
 	}
 
-	// Build collision arrays
 	size_t uiCount = static_cast<size_t>(rCurrentInterpolate.iCount);
 	sCollisionRadii.resize(uiCount);
 	sCollisionDamages.resize(uiCount);
 	sCollisionFlags.resize(uiCount);
 	rCollisionScratch.startTimes.resize(uiCount);
 	rCollisionScratch.endTimes.resize(uiCount);
-	rCollisionScratch.maxTimes.resize(uiCount);
+	rCollisionScratch.maximumTimes.resize(uiCount);
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		sCollisionRadii.at(static_cast<size_t>(i)) = kfPlayerRadius;
@@ -684,24 +640,23 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 		rCollisionScratch.startTimes.at(static_cast<size_t>(i)) = 0.0f;
 		rCollisionScratch.endTimes.at(static_cast<size_t>(i)) = 1.0f;
 		engine::SegmentHit boundaryHit = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.maxTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
+		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
 
-	// Add player layer to CollisionSystem
 	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
 		.pVecStartPositions = rPreviousFrame.interpolate.pPlayers->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
 		.pfStartTimes = rCollisionScratch.startTimes.data(),
 		.pfEndTimes = rCollisionScratch.endTimes.data(),
-		.pfMaxTimes = rCollisionScratch.maxTimes.data(),
+		.pfMaxTimes = rCollisionScratch.maximumTimes.data(),
 		.pfRadii = sCollisionRadii.data(),
 		.pfDamages = sCollisionDamages.data(),
 		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
-		.uiCategory = CollisionCategory::kPlayer,
-		.uiCollidesWith = CollidesWith::kPlayer,
+		.uiCategory = CollisionCategory::kuiPlayer,
+		.uiCollidesWith = CollidesWith::kuiPlayer,
 		.pAlignments = rCurrentPostRender.pAlignments,
 	});
 }
@@ -727,7 +682,6 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load
 		PlayerFlags_t flags = rPrevious.pFlags[i];
 		float fNextBlasterFireTime = rPrevious.pfNextBlasterFireTimes[i];
 		float fNextSecondarySpawnTime = rPrevious.pfNextSecondarySpawnTimes[i];
@@ -743,11 +697,11 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		float fArrivalGracePeriod = std::max(0.0f, rPrevious.pfArrivalGracePeriods[i] - fDeltaTime);
 		float fFrameChangeTimer = rPrevious.pfFrameChangeTimers[i];
 		float fNavigationDelay = rPrevious.pfNavigationDelays[i];
-		engine::GridCoord fleetWantedCoord = rPrevious.pFleetWantedCoords[i];
-		uint8_t uiPendingFleetWantedCoordTicks = rPrevious.puiPendingFleetWantedCoordTicks[i];
+		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
+		uint8_t uiPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
 		uint8_t uiPendingWeaponModeTicks = rPrevious.puiPendingWeaponModeTicks[i];
-		int8_t iNavDirection = GetNavDirection(flags);
-		int8_t iNavWaypointIndex = GetNavWaypointIndex(flags);
+		int8_t iNavigationDirection = GetNavigationDirection(flags);
+		int8_t iNavigationWaypointIndex = GetNavigationWaypointIndex(flags);
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
 		XMVECTOR vecPosition = rPreviousInterpolate.pVecPositions[i];
 
@@ -758,14 +712,13 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 			// overwrites it only on a recompute tick, so carry the previous tick's value forward here.
 			// Also covers the transfer-lock path, where ComputeNavigation is skipped. Without this the
 			// non-recompute ticks render stale buffer contents (line flashes to random positions).
-			rCurrent.pVecDebugNavWaypoints[i] = rPrevious.pVecDebugNavWaypoints[i];
+			rCurrent.pVecDebugNavigationWaypoints[i] = rPrevious.pVecDebugNavigationWaypoints[i];
 		}
 #endif // BT_CLIENT
 
-		// Decrement pending countdown ticks
-		if (uiPendingFleetWantedCoordTicks > 0)
+		if (uiPendingFleetWantedCoordinateTicks > 0)
 		{
-			uiPendingFleetWantedCoordTicks--;
+			uiPendingFleetWantedCoordinateTicks--;
 		}
 		if (uiPendingWeaponModeTicks > 0)
 		{
@@ -783,23 +736,22 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 			}
 		}
 
-		// Transfer lock: maintain constant velocity, skip AI and weapon logic
+		// Transfer lock skips navigation, target acquisition, and movement acceleration.
 		if (fTransferLockTimer > 0.0f)
 		{
 			fTransferLockTimer -= fDeltaTime;
 		}
 		else
 		{
-			// AI block — see PlayersNavigation.cpp / PlayersCombat.cpp for the helpers
-			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecFrameCenter, fleetWantedCoord, uiPendingFleetWantedCoordTicks, flags, fDeltaTime, iNavDirection, iNavWaypointIndex, vecAiDirection, vecIslandDestination, fFrameChangeTimer);
+			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecFrameCenter, fleetWantedCoordinate, uiPendingFleetWantedCoordinateTicks, flags, fDeltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, fFrameChangeTimer);
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
 			AcquireTarget(rPreviousFrame, vecPosition, flags, bLookTargetFound, vecLookPosition);
 
-			float fAccelMul = (1.0f - kfPlayerJitterRange * 0.5f) + common::Random<kfPlayerJitterRange>(rFrame.postRender.randomEngine);
-			float fDecayMul = (1.0f - kfPlayerJitterRange * 0.5f) + common::Random<kfPlayerJitterRange>(rFrame.postRender.randomEngine);
-			ApplyMovement(iNavDirection, vecAiDirection, fDeltaTime, fAccelMul, fDecayMul, vecVelocity);
+			float fAccelerationMultiplier = (1.0f - kfPlayerJitterRange * 0.5f) + common::Random<kfPlayerJitterRange>(rFrame.postRender.randomEngine);
+			float fDecayMultiplier = (1.0f - kfPlayerJitterRange * 0.5f) + common::Random<kfPlayerJitterRange>(rFrame.postRender.randomEngine);
+			ApplyMovement(iNavigationDirection, vecAiDirection, fDeltaTime, fAccelerationMultiplier, fDecayMultiplier, vecVelocity);
 
 			if (bLookTargetFound)
 			{
@@ -807,14 +759,13 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 			}
 		}
 
-		// Outside transfer-lock: always runs
-		RegenerateShield(fDeltaTime, fShieldCooldown, fShield);
+		// Shield regeneration and pushes also run while transfer-locked.
+		RegenerateShield(std::chrono::duration<float>(fDeltaTime), std::chrono::duration<float>(fShieldCooldown), fShield);
 		ApplyTerrainPush(rStaticData, vecPosition, vecVelocity);
 		ApplyPusherPush(rFrame, rPreviousFrame, i, vecPosition, vecVelocity);
 
-		// Save
-		SetNavDirection(flags, iNavDirection);
-		SetNavWaypointIndex(flags, iNavWaypointIndex);
+		SetNavigationDirection(flags, iNavigationDirection);
+		SetNavigationWaypointIndex(flags, iNavigationWaypointIndex);
 		rCurrent.pFlags[i] = flags;
 		rCurrent.pfNextBlasterFireTimes[i] = fNextBlasterFireTime;
 		rCurrent.pfNextSecondarySpawnTimes[i] = fNextSecondarySpawnTime;
@@ -831,8 +782,8 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		rCurrent.pfFrameChangeTimers[i] = fFrameChangeTimer;
 		rCurrent.pfNavigationDelays[i] = fNavigationDelay;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
-		rCurrent.pFleetWantedCoords[i] = fleetWantedCoord;
-		rCurrent.puiPendingFleetWantedCoordTicks[i] = uiPendingFleetWantedCoordTicks;
+		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
+		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = uiPendingFleetWantedCoordinateTicks;
 		rCurrent.puiPendingWeaponModeTicks[i] = uiPendingWeaponModeTicks;
 	}
 }
@@ -848,7 +799,7 @@ bool PlayersInterpolate::LogDifferences(const PlayersInterpolate& rOther) const
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 		bEqual &= common::LogDifference<"pfDestroyedTimes">(i, pfDestroyedTimes[i], rOther.pfDestroyedTimes[i]);
-		bEqual &= common::LogDifference<"puiPushers">(i, puiPushers[i], rOther.puiPushers[i]);
+		bEqual &= common::LogDifference<"puiPushers">(i, pPushers[i], rOther.pPushers[i]);
 	}
 
 	return bEqual;
@@ -883,9 +834,9 @@ bool PlayersPostRender::LogDifferences(const PlayersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);
 		bEqual &= common::LogDifference<"pGlobalPlayerIds">(i, pGlobalPlayerIds[i], rOther.pGlobalPlayerIds[i]);
-		bEqual &= common::LogDifference<"pFleetWantedCoords.iX">(i, pFleetWantedCoords[i].iX, rOther.pFleetWantedCoords[i].iX);
-		bEqual &= common::LogDifference<"pFleetWantedCoords.iY">(i, pFleetWantedCoords[i].iY, rOther.pFleetWantedCoords[i].iY);
-		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordTicks">(i, puiPendingFleetWantedCoordTicks[i], rOther.puiPendingFleetWantedCoordTicks[i]);
+		bEqual &= common::LogDifference<"pFleetWantedCoords.iX">(i, pFleetWantedCoordinates[i].iX, rOther.pFleetWantedCoordinates[i].iX);
+		bEqual &= common::LogDifference<"pFleetWantedCoords.iY">(i, pFleetWantedCoordinates[i].iY, rOther.pFleetWantedCoordinates[i].iY);
+		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
 		bEqual &= common::LogDifference<"puiPendingWeaponModeTicks">(i, puiPendingWeaponModeTicks[i], rOther.puiPendingWeaponModeTicks[i]);
 	}
 

@@ -7,7 +7,6 @@
 namespace game
 {
 
-// Explosions - Primary light
 extern engine::Wrapper gExplosionPrimaryVisibleAreaOne;
 extern engine::Wrapper gExplosionPrimaryVisibleAreaTwo;
 extern engine::Wrapper gExplosionPrimaryVisibleAreaThree;
@@ -21,7 +20,6 @@ extern engine::Wrapper gExplosionPrimaryLightingIntensityOne;
 extern engine::Wrapper gExplosionPrimaryLightingIntensityTwo;
 extern engine::Wrapper gExplosionPrimaryLightingIntensityThree;
 
-// Explosions - Secondary light
 extern engine::Wrapper gExplosionSecondaryVisibleAreaOne;
 extern engine::Wrapper gExplosionSecondaryVisibleAreaTwo;
 extern engine::Wrapper gExplosionSecondaryVisibleAreaThree;
@@ -72,7 +70,6 @@ extern engine::Wrapper gPlayerImpactLightingIntensityTwo;
 extern engine::Wrapper gHexShieldIntensityDecay;
 extern engine::Wrapper gHexShieldLightingIntensity;
 
-// Missiles - Exhaust
 extern engine::Wrapper gMissileExhaustVisibleIntensity;
 extern engine::Wrapper gMissileExhaustLightingArea;
 extern engine::Wrapper gMissileExhaustLightingIntensity;

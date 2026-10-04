@@ -16,14 +16,14 @@ struct TweaksSettings
 
 	// uint8_t, not bool: the file is opaque input and a non-0/1 byte read into a bool is an invalid object representation
 	uint8_t uiShowImGui = 0;
-	uint8_t uiPad[3] {};
+	uint8_t uiPadding[3] {};
 	float fSunAngle = 1.15f;
 	// Engine-owned layout POD, embedded by value: one array bound and one sizeof for the whole program.
 	engine::TweakSectionState sectionState {};
 };
 static_assert(std::is_trivially_copyable_v<TweaksSettings>);
 static_assert(sizeof(TweaksSettings) == 304, "kiVersion must be bumped with this layout");
-static constexpr char kpcTweaksSettingsPath[] = "TweaksSettings.bin";
+constexpr char kpcTweaksSettingsPath[] = "TweaksSettings.bin";
 
 void SaveTweaksSettings()
 {
@@ -48,18 +48,15 @@ void LoadTweaksSettings()
 	}
 
 	TweaksSettings settings {};
-	if (engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, kpcTweaksSettingsPath, settings)
-	 && settings.uiShowImGui <= 1 && settings.fSunAngle >= engine::gSunAngleOverride.mfMin
-	 && settings.fSunAngle <= engine::gSunAngleOverride.mfMax)
-	{
-		gpGame->mbShowImGui = settings.uiShowImGui != 0;
-		engine::gpImGuiManager->mpTweaksScreen->LoadState(settings.sectionState);
-		engine::gSunAngleOverride.Set(settings.fSunAngle);
-	}
-	else
+	if (!(engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, kpcTweaksSettingsPath, settings) && settings.uiShowImGui <= 1 && settings.fSunAngle >= engine::gSunAngleOverride.mfMin && settings.fSunAngle <= engine::gSunAngleOverride.mfMax))
 	{
 		LOG(kDefault, kWarning, "LoadTweaks FAILED to read file");
+		return;
 	}
+
+	gpGame->mbShowImGui = settings.uiShowImGui != 0;
+	engine::gpImGuiManager->mpTweaksScreen->LoadState(settings.sectionState);
+	engine::gSunAngleOverride.Set(settings.fSunAngle);
 }
 
 struct ClientStateSettings
@@ -69,9 +66,9 @@ struct ClientStateSettings
 	game::FleetGuid fleetGuid {};
 	int64_t iFocusedShipId = 0;
 	float fCameraEyeHeightTarget = engine::Camera::kfCameraEyeHeightInitial;
-	uint8_t uiPad[4] {};
+	uint8_t uiPadding[4] {};
 };
-static constexpr char kpcClientStatePath[] = "ClientState.bin";
+constexpr char kpcClientStatePath[] = "ClientState.bin";
 
 void SaveClientState()
 {
@@ -81,7 +78,7 @@ void SaveClientState()
 	ClientStateSettings settings
 	{
 		.fleetGuid              = gpGame->mRememberedFleetGuid,
-		.iFocusedShipId         = gpGame->mRememberedFocusedShipId.iValue,
+		.iFocusedShipId         = gpGame->mRememberedFocusedShipIdentifier.iValue,
 		.fCameraEyeHeightTarget = gpGame->mfRememberedCameraEyeHeightTarget,
 	};
 	engine::WriteVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, kpcClientStatePath, settings);
@@ -105,7 +102,7 @@ void LoadClientState()
 	}
 
 	gpGame->mRememberedFleetGuid = settings.fleetGuid;
-	gpGame->mRememberedFocusedShipId = engine::GlobalId {settings.iFocusedShipId};
+	gpGame->mRememberedFocusedShipIdentifier = engine::GlobalId {.iValue = settings.iFocusedShipId};
 	gpGame->mfRememberedCameraEyeHeightTarget = settings.fCameraEyeHeightTarget;
 
 	// Apply zoom directly so the camera starts AT the saved zoom rather than easing from the default.

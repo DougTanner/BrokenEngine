@@ -5,14 +5,12 @@
 namespace game
 {
 
-// collection_layout_capacity_fixture verifies physical-layout capacity retention.
-
 // Deterministic per-row shared-member values. The identical formulas drive the source-stream writer and the
 // post-read verification, and they cover every MissilesPostRender::SharedMembers() column, so any column or row
 // SharedCollectionRead fails to preserve is caught. ([[maybe_unused]]: the sole callers live in the fixture's
 // kbDebugInput-only branch, discarded on non-debug builds.)
 
-// Distinct exactly-representable value per (row, column), so a column swapped with its neighbour cannot match.
+// Adjacent columns have distinct exactly representable values for the fixture's seeds and row counts.
 static constexpr float MissileSharedRowScalar(int64_t i, int64_t iSeed, int64_t iColumn)
 {
 	return static_cast<float>(iSeed * 100'000 + i * 10 + iColumn);
@@ -20,7 +18,7 @@ static constexpr float MissileSharedRowScalar(int64_t i, int64_t iSeed, int64_t 
 
 static constexpr MissileFlags_t MissileSharedRowFlags(int64_t i, int64_t iSeed)
 {
-	return ((i + iSeed) & 1) ? MissileFlags_t {MissileFlags::kTransfer} : MissileFlags_t {MissileFlags::kExploding};
+	return ((static_cast<uint64_t>(i + iSeed) & 1ULL) != 0) ? MissileFlags_t {MissileFlags::kTransfer} : MissileFlags_t {MissileFlags::kExploding};
 }
 
 static constexpr engine::AlignmentIdentifier MissileSharedRowAlignment(int64_t i, int64_t iSeed)
@@ -50,7 +48,7 @@ static XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn
 	rMissiles.pfDeltaRotationDelays[i] = MissileSharedRowScalar(i, iSeed, 10);
 	rMissiles.pfDeltaRotations[i] = MissileSharedRowScalar(i, iSeed, 11);
 	rMissiles.pfNextJitter[i] = MissileSharedRowScalar(i, iSeed, 12);
-	rMissiles.pfDeltaRotationMax[i] = MissileSharedRowScalar(i, iSeed, 13);
+	rMissiles.pfDeltaRotationMaximum[i] = MissileSharedRowScalar(i, iSeed, 13);
 	rMissiles.pfAccelerations[i] = MissileSharedRowScalar(i, iSeed, 14);
 	rMissiles.pfPitches[i] = MissileSharedRowScalar(i, iSeed, 15);
 	rMissiles.pfExhaustLengths[i] = MissileSharedRowScalar(i, iSeed, 16);
@@ -68,17 +66,12 @@ static XMVECTOR MissileSharedRowVector(int64_t i, int64_t iSeed, int64_t iColumn
 	    && rMissiles.pfDeltaRotationDelays[i] == MissileSharedRowScalar(i, iSeed, 10)
 	    && rMissiles.pfDeltaRotations[i] == MissileSharedRowScalar(i, iSeed, 11)
 	    && rMissiles.pfNextJitter[i] == MissileSharedRowScalar(i, iSeed, 12)
-	    && rMissiles.pfDeltaRotationMax[i] == MissileSharedRowScalar(i, iSeed, 13)
+	    && rMissiles.pfDeltaRotationMaximum[i] == MissileSharedRowScalar(i, iSeed, 13)
 	    && rMissiles.pfAccelerations[i] == MissileSharedRowScalar(i, iSeed, 14)
 	    && rMissiles.pfPitches[i] == MissileSharedRowScalar(i, iSeed, 15)
 	    && rMissiles.pfExhaustLengths[i] == MissileSharedRowScalar(i, iSeed, 16)
 	    && rMissiles.pAlignments[i] == MissileSharedRowAlignment(i, iSeed);
 }
-
-// Drives the real MissilesPostRender deserialization helpers through logical capacities 100 -> 70 -> 60 -> 150 on one
-// reused instance, proving the transient iPhysicalLayoutCapacity holds the true buffer stride across shrink-reuse:
-// the two shrinks reuse the 100-wide buffer and (client) zero the full physical layout including rows 70-99, while the
-// >100-row read reallocates exactly once and publishes the new capacity only after the allocation succeeds.
 
 void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
 {
@@ -94,7 +87,6 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		rResult["build"] = "server";
 #endif
 
-		// Writes one shared-wire stream (metadata + SharedMembers) at (iCapacity, iCount) through the production Write path.
 		auto BuildStream = [](int64_t iCapacity, int64_t iCount, int64_t iSeed, std::stringstream& rStream)
 		{
 			MissilesPostRender source;
@@ -110,7 +102,6 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		MissilesPostRender destination;
 		nlohmann::json steps = nlohmann::json::array();
 
-		// Runs one production SharedCollectionRead into dest and records the capacity metadata and buffer-reuse decision.
 		auto RunRead = [&](std::string_view label, int64_t iCapacity, int64_t iCount, int64_t iSeed)
 		{
 			std::stringstream stream(std::ios::in | std::ios::out | std::ios::binary);
@@ -133,7 +124,7 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		{
 			for (int64_t i = 0; i < destination.iPhysicalLayoutCapacity; ++i)
 			{
-				destination.puiSounds[i] = engine::sound_t {engine::Uuid {0x7fffffffffffffffLL}};
+				destination.puiSounds[i] = engine::sound_t {engine::Uuid {0x7fff'ffff'ffff'ffffLL}};
 			}
 		};
 		auto CountNonZeroSounds = [&]() -> int64_t
@@ -190,11 +181,11 @@ void CommandCollectionLayoutCapacityFixture([[maybe_unused]] const nlohmann::jso
 		// A >100-row read must reallocate exactly once, growing the physical layout and publishing it only after success.
 		RunRead("read150", 150, 150, 4);
 
-		bool bReuseOk = steps[1]["reused"].get<bool>() && steps[2]["reused"].get<bool>() && !steps[3]["reused"].get<bool>()
-		             && steps[1]["physicalCapacity"].get<int64_t>() == 100 && steps[2]["physicalCapacity"].get<int64_t>() == 100
-		             && steps[3]["physicalCapacity"].get<int64_t>() == 150;
+		bool bReuseOkay = steps[1]["reused"].get<bool>() && steps[2]["reused"].get<bool>() && !steps[3]["reused"].get<bool>()
+		               && steps[1]["physicalCapacity"].get<int64_t>() == 100 && steps[2]["physicalCapacity"].get<int64_t>() == 100
+		               && steps[3]["physicalCapacity"].get<int64_t>() == 150;
 
-		bool bPassed = (iSharedMismatches == 0) && bReuseOk;
+		bool bPassed = (iSharedMismatches == 0) && bReuseOkay;
 #if defined(BT_CLIENT)
 		bPassed = bPassed && (iSoundsNonZeroTotal == 0);
 #endif

@@ -31,7 +31,7 @@ void ServerBroadcaster::BuildFrameInputs()
 	bool bAdvancing = game::gpGame->mfLastDeltaTime > 0.0f;
 	if (bAdvancing)
 	{
-		std::erase_if(game::gpServerSession->mpClientManager->mClientsWaitingForSpawn, [&](const game::ClientSpawnInfo& rClientSpawnInformation)
+		std::erase_if(game::gpServerSession->mpClientManager->mClientsWaitingForSpawn, [&](const game::ClientSpawnInformation& rClientSpawnInformation)
 		{
 			if ((rClientSpawnInformation.fleetGuid.uiHigh == 0 && rClientSpawnInformation.fleetGuid.uiLow == 0))
 			{
@@ -142,8 +142,8 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	int64_t iStatusChangesOffset = common::RoundUp(iGridUpdatesOffset + iGridUpdatesBytes, static_cast<int64_t>(16));
 	int64_t iStatusChangesBytes = iStatusChangeCount * static_cast<int64_t>(sizeof(game::StatusChange));
 	int64_t iFullFramesOffset = common::RoundUp(iStatusChangesOffset + iStatusChangesBytes, static_cast<int64_t>(16));
-	int64_t iFullFramesBytes = kbDesyncDebugFrames ? iPublicationCoordCount * static_cast<int64_t>(sizeof(std::pair<engine::GridCoord, const game::Frame*>)) : 0;
-	int64_t iPublicationBytes = kbDesyncDebugFrames ? iFullFramesOffset + iFullFramesBytes : iStatusChangesOffset + iStatusChangesBytes;
+	int64_t iFullFramesBytes = kbDesynchronizationDebugFrames ? iPublicationCoordCount * static_cast<int64_t>(sizeof(std::pair<engine::GridCoord, const game::Frame*>)) : 0;
+	int64_t iPublicationBytes = kbDesynchronizationDebugFrames ? iFullFramesOffset + iFullFramesBytes : iStatusChangesOffset + iStatusChangesBytes;
 	int64_t iPublicationHighWaterBytes = common::RoundUp(iPublicationBytes, static_cast<int64_t>(16)) + engine::kiMaxCompressStatusChangeWorkbufferBytes;
 	// Grow before any publication pointer exists, then retain that capacity for nested status compression.
 	{
@@ -194,7 +194,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 		pGridUpdates[iGridUpdateIndex++] = {rCoord, updateData};
 	}
 
-	if constexpr (kbDesyncDebugFrames)
+	if constexpr (kbDesynchronizationDebugFrames)
 	{
 		std::pair<engine::GridCoord, const game::Frame*>* pFullFrames = reinterpret_cast<std::pair<engine::GridCoord, const game::Frame*>*>(pPublicationBytes + iFullFramesOffset);
 		int64_t iFullFrameCount = 0;
@@ -266,7 +266,7 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 		}
 
 		uint8_t uiPendingWeaponModeTicks = static_cast<uint8_t>(engine::kiTickRate);
-		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData{.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .fNavigationDelay = rRequest.navigationDelaySeconds.count(), .uiPendingWeaponModeTicks = uiPendingWeaponModeTicks}};
+		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData{.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = uiPendingWeaponModeTicks}};
 		it->second.statusChanges.push_back(updateChange);
 
 		LOG(kNetwork, kDebug, "ServerBroadcaster::ProcessUpdatePlayerRequests Client: {} GlobalPlayer: {} PlayerUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iPlayerUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));

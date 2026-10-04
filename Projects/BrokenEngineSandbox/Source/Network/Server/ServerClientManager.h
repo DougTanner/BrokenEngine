@@ -7,7 +7,7 @@
 namespace game
 {
 
-struct ClientSpawnInfo
+struct ClientSpawnInformation
 {
 	int64_t iClientId = 0;
 	engine::ClientGuid clientGuid {};
@@ -28,13 +28,12 @@ public:
 	void DetectPlayerDeaths();
 	void ResetState();
 
-	std::vector<ClientSpawnInfo> mClientsWaitingForSpawn;
+	std::vector<ClientSpawnInformation> mClientsWaitingForSpawn;
 	std::unordered_set<int64_t> mDeadClientIds;
 	std::unordered_set<int64_t> mProcessedClientIds;
 
 private:
 
-	// NewClients helpers
 	void LogConnectingClientDiagnostic(const engine::ClientConnection& rClient);
 };
 

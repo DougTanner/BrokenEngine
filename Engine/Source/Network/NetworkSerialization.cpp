@@ -24,7 +24,7 @@ static void SerializeSpaceshipTransfer(uint8_t*& rpCursor, const game::TransferD
 	WriteVector4(rpCursor, rData.vecVelocity);
 	WriteUint32(rpCursor, rData.alignment.uiValue);
 	WriteFloat(rpCursor, rData.fHealth);
-	WriteFloat(rpCursor, rData.fNextBlasterSpawnTime);
+	WriteFloat(rpCursor, rData.nextBlasterSpawnTimeSeconds.count());
 	WriteFloat(rpCursor, rData.fDeltaRotation);
 }
 
@@ -35,11 +35,11 @@ static void SerializeMissileTransfer(uint8_t*& rpCursor, const game::TransferDat
 	WriteVector4(rpCursor, rData.vecVelocity);
 	WriteUint32(rpCursor, rData.alignment.uiValue);
 	WriteFloat(rpCursor, rData.fAcceleration);
-	WriteFloat(rpCursor, rData.fDeltaRotationDelay);
-	WriteFloat(rpCursor, rData.fTime);
-	WriteFloat(rpCursor, rData.fNextJitter);
+	WriteFloat(rpCursor, rData.deltaRotationDelaySeconds.count());
+	WriteFloat(rpCursor, rData.timeSeconds.count());
+	WriteFloat(rpCursor, rData.nextJitterSeconds.count());
 	WriteFloat(rpCursor, rData.fDeltaRotation);
-	WriteFloat(rpCursor, rData.fDeltaRotationMax);
+	WriteFloat(rpCursor, rData.fDeltaRotationMaximum);
 	WriteFloat(rpCursor, rData.fPitch);
 }
 
@@ -51,16 +51,16 @@ static void SerializePlayerTransfer(uint8_t*& rpCursor, const game::TransferData
 	WriteUint32(rpCursor, rData.alignment.uiValue);
 	WriteFloat(rpCursor, rData.fHealth);
 	WriteFloat(rpCursor, rData.fShield);
-	WriteFloat(rpCursor, rData.fNextBlasterFireTime);
-	WriteFloat(rpCursor, rData.fNextSecondarySpawnTime);
-	WriteFloat(rpCursor, rData.fShieldCooldown);
-	WriteFloat(rpCursor, rData.fShieldDownSoundCooldown);
-	WriteFloat(rpCursor, rData.fAnimationTime);
+	WriteFloat(rpCursor, rData.nextBlasterFireTimeSeconds.count());
+	WriteFloat(rpCursor, rData.nextSecondarySpawnTimeSeconds.count());
+	WriteFloat(rpCursor, rData.shieldCooldownSeconds.count());
+	WriteFloat(rpCursor, rData.shieldDownSoundCooldownSeconds.count());
+	WriteFloat(rpCursor, rData.animationTimeSeconds.count());
 	WriteUint16(rpCursor, rData.uiPlayerFlags);
-	WriteFloat(rpCursor, rData.fNavigationDelay);
+	WriteFloat(rpCursor, rData.navigationDelaySeconds.count());
 	WriteInt64(rpCursor, rData.globalPlayerId.iValue);
-	WriteGridCoord(rpCursor, rData.fleetWantedCoord);
-	WriteUint8(rpCursor, rData.uiPendingFleetWantedCoordTicks);
+	WriteGridCoord(rpCursor, rData.fleetWantedCoordinate);
+	WriteUint8(rpCursor, rData.uiPendingFleetWantedCoordinateTicks);
 	WriteUint8(rpCursor, rData.uiPendingWeaponModeTicks);
 }
 
@@ -79,7 +79,7 @@ static void DeserializeSpaceshipTransfer(const uint8_t*& rpCursor, game::Transfe
 	rData.vecVelocity = ReadVector4(rpCursor);
 	rData.alignment = AlignmentIdentifier(ReadUint32(rpCursor));
 	rData.fHealth = ReadFloat(rpCursor);
-	rData.fNextBlasterSpawnTime = ReadFloat(rpCursor);
+	rData.nextBlasterSpawnTimeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
 	rData.fDeltaRotation = ReadFloat(rpCursor);
 }
 
@@ -90,11 +90,11 @@ static void DeserializeMissileTransfer(const uint8_t*& rpCursor, game::TransferD
 	rData.vecVelocity = ReadVector4(rpCursor);
 	rData.alignment = AlignmentIdentifier(ReadUint32(rpCursor));
 	rData.fAcceleration = ReadFloat(rpCursor);
-	rData.fDeltaRotationDelay = ReadFloat(rpCursor);
-	rData.fTime = ReadFloat(rpCursor);
-	rData.fNextJitter = ReadFloat(rpCursor);
+	rData.deltaRotationDelaySeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
+	rData.timeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
+	rData.nextJitterSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
 	rData.fDeltaRotation = ReadFloat(rpCursor);
-	rData.fDeltaRotationMax = ReadFloat(rpCursor);
+	rData.fDeltaRotationMaximum = ReadFloat(rpCursor);
 	rData.fPitch = ReadFloat(rpCursor);
 }
 
@@ -106,16 +106,16 @@ static void DeserializePlayerTransfer(const uint8_t*& rpCursor, game::TransferDa
 	rData.alignment = AlignmentIdentifier(ReadUint32(rpCursor));
 	rData.fHealth = ReadFloat(rpCursor);
 	rData.fShield = ReadFloat(rpCursor);
-	rData.fNextBlasterFireTime = ReadFloat(rpCursor);
-	rData.fNextSecondarySpawnTime = ReadFloat(rpCursor);
-	rData.fShieldCooldown = ReadFloat(rpCursor);
-	rData.fShieldDownSoundCooldown = ReadFloat(rpCursor);
-	rData.fAnimationTime = ReadFloat(rpCursor);
+	rData.nextBlasterFireTimeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
+	rData.nextSecondarySpawnTimeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
+	rData.shieldCooldownSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
+	rData.shieldDownSoundCooldownSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
+	rData.animationTimeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
 	rData.uiPlayerFlags = ReadUint16(rpCursor);
-	rData.fNavigationDelay = ReadFloat(rpCursor);
+	rData.navigationDelaySeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
 	rData.globalPlayerId.iValue = ReadInt64(rpCursor);
-	rData.fleetWantedCoord = ReadGridCoord(rpCursor);
-	rData.uiPendingFleetWantedCoordTicks = ReadUint8(rpCursor);
+	rData.fleetWantedCoordinate = ReadGridCoord(rpCursor);
+	rData.uiPendingFleetWantedCoordinateTicks = ReadUint8(rpCursor);
 	rData.uiPendingWeaponModeTicks = ReadUint8(rpCursor);
 }
 
@@ -144,8 +144,8 @@ static void SerializeGroup(uint8_t*& rpCursor, game::StatusChangeType eType, con
 				const game::SpawnPlayerData& rSpawn = std::get<game::SpawnPlayerData>(rData);
 				WriteInt64(rpCursor, rSpawn.iGlobalId);
 				WriteUint8(rpCursor, rSpawn.bIsFlagship ? 1 : 0);
-				WriteGridCoord(rpCursor, rSpawn.fleetWantedCoord);
-				WriteUint8(rpCursor, rSpawn.uiPendingFleetWantedCoordTicks);
+				WriteGridCoord(rpCursor, rSpawn.fleetWantedCoordinate);
+				WriteUint8(rpCursor, rSpawn.uiPendingFleetWantedCoordinateTicks);
 				WriteFloat(rpCursor, rSpawn.fSpawnOffsetX);
 				WriteFloat(rpCursor, rSpawn.fSpawnOffsetY);
 				break;
@@ -170,7 +170,7 @@ static void SerializeGroup(uint8_t*& rpCursor, game::StatusChangeType eType, con
 				const game::UpdatePlayerData& rUpdate = std::get<game::UpdatePlayerData>(rData);
 				WriteInt64(rpCursor, rUpdate.iPlayerUuid);
 				WriteUint8(rpCursor, rUpdate.bUseMissiles ? 1 : 0);
-				WriteFloat(rpCursor, rUpdate.fNavigationDelay);
+				WriteFloat(rpCursor, rUpdate.navigationDelaySeconds.count());
 				WriteUint8(rpCursor, rUpdate.uiPendingWeaponModeTicks);
 				break;
 			}
@@ -179,8 +179,8 @@ static void SerializeGroup(uint8_t*& rpCursor, game::StatusChangeType eType, con
 				const game::UpdateFleetData& rUpdate = std::get<game::UpdateFleetData>(rData);
 				WriteInt64(rpCursor, rUpdate.iPlayerUuid);
 				WriteUint8(rpCursor, rUpdate.bIsFlagship ? 1 : 0);
-				WriteGridCoord(rpCursor, rUpdate.fleetWantedCoord);
-				WriteUint8(rpCursor, rUpdate.uiPendingFleetWantedCoordTicks);
+				WriteGridCoord(rpCursor, rUpdate.fleetWantedCoordinate);
+				WriteUint8(rpCursor, rUpdate.uiPendingFleetWantedCoordinateTicks);
 				break;
 			}
 		}
@@ -278,8 +278,8 @@ int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, game::Stat
 					game::SpawnPlayerData& rSpawn = std::get<game::SpawnPlayerData>(rChange.data);
 					rSpawn.iGlobalId = ReadInt64(cursor.pCursor);
 					rSpawn.bIsFlagship = ReadUint8(cursor.pCursor) != 0;
-					rSpawn.fleetWantedCoord = ReadGridCoord(cursor.pCursor);
-					rSpawn.uiPendingFleetWantedCoordTicks = ReadUint8(cursor.pCursor);
+					rSpawn.fleetWantedCoordinate = ReadGridCoord(cursor.pCursor);
+					rSpawn.uiPendingFleetWantedCoordinateTicks = ReadUint8(cursor.pCursor);
 					rSpawn.fSpawnOffsetX = ReadFloat(cursor.pCursor);
 					rSpawn.fSpawnOffsetY = ReadFloat(cursor.pCursor);
 					break;
@@ -304,7 +304,7 @@ int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, game::Stat
 					game::UpdatePlayerData& rUpdate = std::get<game::UpdatePlayerData>(rChange.data);
 					rUpdate.iPlayerUuid = ReadInt64(cursor.pCursor);
 					rUpdate.bUseMissiles = ReadUint8(cursor.pCursor) != 0;
-					rUpdate.fNavigationDelay = ReadFloat(cursor.pCursor);
+					rUpdate.navigationDelaySeconds = std::chrono::duration<float>(ReadFloat(cursor.pCursor));
 					rUpdate.uiPendingWeaponModeTicks = ReadUint8(cursor.pCursor);
 					break;
 				}
@@ -313,8 +313,8 @@ int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, game::Stat
 					game::UpdateFleetData& rUpdate = std::get<game::UpdateFleetData>(rChange.data);
 					rUpdate.iPlayerUuid = ReadInt64(cursor.pCursor);
 					rUpdate.bIsFlagship = ReadUint8(cursor.pCursor) != 0;
-					rUpdate.fleetWantedCoord = ReadGridCoord(cursor.pCursor);
-					rUpdate.uiPendingFleetWantedCoordTicks = ReadUint8(cursor.pCursor);
+					rUpdate.fleetWantedCoordinate = ReadGridCoord(cursor.pCursor);
+					rUpdate.uiPendingFleetWantedCoordinateTicks = ReadUint8(cursor.pCursor);
 					break;
 				}
 			}

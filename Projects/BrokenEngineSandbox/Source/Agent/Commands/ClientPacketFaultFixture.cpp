@@ -15,7 +15,7 @@ namespace game
 static ClientSession* spSession = nullptr;
 static std::vector<uint8_t> sArmedPacketFault;
 
-void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rParams, [[maybe_unused]] nlohmann::json& rResult)
+void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -26,23 +26,23 @@ void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rPar
 		// Heap: validation errors, the armed packet buffer, and the JSON result
 		ScopedSuppressAllocationTracking suppress;
 
-		if (!rParams.is_object())
+		if (!rParameters.is_object())
 		{
 			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
-		if (rParams.size() != 1)
+		if (rParameters.size() != 1)
 		{
 			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
-		if (!rParams.contains("case"))
+		if (!rParameters.contains("case"))
 		{
 			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
-		if (!rParams.at("case").is_string())
+		if (!rParameters.at("case").is_string())
 		{
 			throw std::runtime_error("client_packet_fault_fixture requires exactly {\"case\":\"engine_envelope\"}");
 		}
-		std::string caseName = rParams.at("case").get<std::string>();
+		std::string caseName = rParameters.at("case").get<std::string>();
 		if (caseName != "engine_envelope")
 		{
 			throw std::runtime_error("client_packet_fault_fixture 'case' must be engine_envelope");
@@ -108,18 +108,13 @@ void InjectArmedClientPacketFault()
 	pSession->mpRuntime->mpClient->Receive(packet);
 }
 
-void ResetClientPacketFaultFixture(ClientSession& rSession)
+void ResetClientPacketFaultFixture(const ClientSession& rSession)
 {
 	if (spSession == &rSession)
 	{
 		sArmedPacketFault.clear();
 		spSession = nullptr;
 	}
-}
-
-void DetachClientPacketFaultFixture(ClientSession& rSession)
-{
-	ResetClientPacketFaultFixture(rSession);
 }
 
 } // namespace game

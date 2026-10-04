@@ -98,9 +98,9 @@ Changes (3 files)
 
    Game.h:
    - Add #include "AdaptiveMusic.h"
-   - Replace mGameMusicPlaylist[4] and miGameMusicIndex with:
+   - Replace kGameMusicPlaylist[4] and miGameMusicIndex with:
        AdaptiveMusic mAdaptiveMusic {};
-   - Keep mMenuMusicPlaylist and miMenuMusicIndex unchanged (menu stays sequential)
+   - Keep kMenuMusicPlaylist and miMenuMusicIndex unchanged (menu stays sequential)
 
    Game.cpp:
    - In the mpStreamingVoices->mGetNextTrack lambda (Game constructor), change the
@@ -135,7 +135,7 @@ Changes (3 files)
 Notes
 -----
 - Menu music is unchanged -- adaptive music only applies during gameplay
-- The current live mGameMusicPlaylist order is: UnexpectedTrouble, HighAlert,
+- The current live kGameMusicPlaylist order is: UnexpectedTrouble, HighAlert,
   OnPatrol, TheGearsofProgress (Game.h:179) -- the tier->CRC map in GetTrack()
   should be written against the CRC constants, not playlist indices
 - No new audio assets required; the 4 existing game tracks map directly to

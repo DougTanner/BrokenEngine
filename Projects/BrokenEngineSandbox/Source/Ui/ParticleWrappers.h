@@ -6,10 +6,9 @@ namespace game
 {
 
 // Per-explosion-type particle multipliers (Tweaks → Particles tab).
-// Default 1.0f leaves base ExplosionType values unchanged.
+// A multiplier of 1.0f leaves the corresponding base ExplosionType value unchanged.
 // Declaration order must match slider order in TweaksScreenParticles.cpp.
 
-// Missile explosion particles
 extern engine::Wrapper gMissileExplosionParticleWidth;
 extern engine::Wrapper gMissileExplosionParticleLength;
 extern engine::Wrapper gMissileExplosionParticleLengthSpread;
@@ -25,7 +24,6 @@ extern engine::Wrapper gMissileExplosionParticleIntensitySpread;
 extern engine::Wrapper gMissileExplosionParticleIntensityDecay;
 extern engine::Wrapper gMissileExplosionParticleIntensityPower;
 
-// Player explosion particles
 extern engine::Wrapper gPlayerExplosionParticleWidth;
 extern engine::Wrapper gPlayerExplosionParticleLength;
 extern engine::Wrapper gPlayerExplosionParticleLengthSpread;
@@ -41,7 +39,6 @@ extern engine::Wrapper gPlayerExplosionParticleIntensitySpread;
 extern engine::Wrapper gPlayerExplosionParticleIntensityDecay;
 extern engine::Wrapper gPlayerExplosionParticleIntensityPower;
 
-// Spaceship explosion particles
 extern engine::Wrapper gSpaceshipExplosionParticleWidth;
 extern engine::Wrapper gSpaceshipExplosionParticleLength;
 extern engine::Wrapper gSpaceshipExplosionParticleLengthSpread;

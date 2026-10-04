@@ -11,39 +11,39 @@
 namespace game
 {
 
-void ExecuteAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
+void ExecuteAgentCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (engine::ExecuteSharedAgentCommand(cmd, rParams, rResult, gpGame != nullptr ? gpGame->miTickCounter : -1))
+	if (engine::ExecuteSharedAgentCommand(command, rParameters, rResult, gpGame != nullptr ? gpGame->miTickCounter : -1))
 	{
 		return;
 	}
 
 	// Game-owned commands reachable on both endpoints dispatch before the side-specific fallthrough.
-	if (cmd == "collection_layout_capacity_fixture")
+	if (command == "collection_layout_capacity_fixture")
 	{
-		CommandCollectionLayoutCapacityFixture(rParams, rResult);
+		CommandCollectionLayoutCapacityFixture(rParameters, rResult);
 		return;
 	}
 
-	if (cmd == "registry_fixture")
+	if (command == "registry_fixture")
 	{
-		CommandRegistryFixture(rParams, rResult);
+		CommandRegistryFixture(rParameters, rResult);
 		return;
 	}
 
 #if defined(BT_CLIENT)
 	// Engine-generic client automation (capture, window, UI, synthetic input, GPU profile) runs before the game client handler.
-	if (engine::ExecuteClientAgentCommand(cmd, rParams, rResult))
+	if (engine::ExecuteClientAgentCommand(command, rParameters, rResult))
 	{
 		return;
 	}
 
-	if (!ExecuteAgentCommandClient(cmd, rParams, rResult))
+	if (!ExecuteAgentCommandClient(command, rParameters, rResult))
 	{
 		throw std::runtime_error("unknown command");
 	}
 #elif defined(BT_SERVER)
-	if (!ExecuteAgentCommandServer(cmd, rParams, rResult))
+	if (!ExecuteAgentCommandServer(command, rParameters, rResult))
 	{
 		throw std::runtime_error("unknown command");
 	}

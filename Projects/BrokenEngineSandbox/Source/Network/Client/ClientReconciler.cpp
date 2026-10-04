@@ -12,25 +12,29 @@ namespace game
 
 #if defined(BT_CLIENT)
 
-static bool GetClientSnapshotPosition(XMVECTOR& rOut)
+static bool GetClientSnapshotPosition(XMVECTOR& rVecPosition)
 {
-	auto coordIt = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
-	if (coordIt == gpGame->mCoordinateFrames.end() || coordIt->second.iSnapshotCount <= 0)
+	auto it = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
+	if (it == gpGame->mCoordinateFrames.end())
 	{
 		return false;
 	}
-	int64_t iPhysical = engine::SnapshotIndex(coordIt->second.iSnapshotHead, coordIt->second.iSnapshotCount - 1);
-	const std::unique_ptr<game::Frame>& pSnapshot = coordIt->second.snapshots[iPhysical];
-	if (pSnapshot == nullptr)
+	if (it->second.iSnapshotCount <= 0)
 	{
 		return false;
 	}
-	std::optional<int64_t> oClientPlayerIndex = gpGame->ClientPlayerIndex(*pSnapshot->postRender.pPlayers);
+	int64_t iPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
+	const std::unique_ptr<game::Frame>& rpSnapshot = it->second.snapshots[iPhysical];
+	if (rpSnapshot == nullptr)
+	{
+		return false;
+	}
+	std::optional<int64_t> oClientPlayerIndex = gpGame->ClientPlayerIndex(*rpSnapshot->postRender.pPlayers);
 	if (!oClientPlayerIndex.has_value())
 	{
 		return false;
 	}
-	rOut = pSnapshot->interpolate.pPlayers->pVecPositions[*oClientPlayerIndex];
+	rVecPosition = rpSnapshot->interpolate.pPlayers->pVecPositions[*oClientPlayerIndex];
 	return true;
 }
 
@@ -40,8 +44,8 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	ScopedSuppressAllocationTracking suppress;
 
 	// Re-sync client identity from main thread
-	mConfirmedClientState.clientGridCoord = gpGame->mClientGridCoordinate;
-	mConfirmedClientState.clientGlobalPlayerId = gpGame->ClientPlayerId();
+	mConfirmedClientState.clientGridCoordinate = gpGame->mClientGridCoordinate;
+	mConfirmedClientState.clientGlobalPlayerIdentifier = gpGame->ClientPlayerIdentifier();
 	mConfirmedClientState.fPreviousClientArmor = gpGame->mfPreviousClientArmor;
 
 	engine::ReconcileInputs inputs;
@@ -63,27 +67,26 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 
 	if (dispatch.pDesyncWork != nullptr)
 	{
-		engine::CoordWork* pDesyncWork = dispatch.pDesyncWork;
+		engine::CoordWork* pDesynchronizationWork = dispatch.pDesyncWork;
 		char acExpected[20] {}, acActual[20] {};
-		common::ToHex(std::span<char, 20>(acExpected), pDesyncWork->scratch.desyncExpectedCrc);
-		common::ToHex(std::span<char, 20>(acActual), pDesyncWork->scratch.desyncActualCrc);
-		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iX, pDesyncWork->coord.iY, pDesyncWork->scratch.iDesyncTick, acExpected, acActual, pDesyncWork->scratch.iReplayStackCount, pDesyncWork->scratch.iNewConfirmedTick);
+		common::ToHex(std::span<char, 20>(acExpected), pDesynchronizationWork->scratch.desyncExpectedCrc);
+		common::ToHex(std::span<char, 20>(acActual), pDesynchronizationWork->scratch.desyncActualCrc);
+		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesynchronizationWork->coord.iX, pDesynchronizationWork->coord.iY, pDesynchronizationWork->scratch.iDesyncTick, acExpected, acActual, pDesynchronizationWork->scratch.iReplayStackCount, pDesynchronizationWork->scratch.iNewConfirmedTick);
 
-		engine::ReconcileDesyncInfo desyncInfo;
-		desyncInfo.bDesync = true;
-		desyncInfo.iDesyncTick = pDesyncWork->scratch.iDesyncTick;
-		desyncInfo.desyncCoord = pDesyncWork->coord;
-		desyncInfo.desyncExpectedCrc = pDesyncWork->scratch.desyncExpectedCrc;
-		desyncInfo.desyncActualCrc = pDesyncWork->scratch.desyncActualCrc;
-		desyncInfo.pDesyncClientFrame = std::move(pDesyncWork->scratch.pDesyncClientFrame);
-		return desyncInfo;
+		engine::ReconcileDesyncInfo desynchronizationInformation;
+		desynchronizationInformation.bDesync = true;
+		desynchronizationInformation.iDesyncTick = pDesynchronizationWork->scratch.iDesyncTick;
+		desynchronizationInformation.desyncCoord = pDesynchronizationWork->coord;
+		desynchronizationInformation.desyncExpectedCrc = pDesynchronizationWork->scratch.desyncExpectedCrc;
+		desynchronizationInformation.desyncActualCrc = pDesynchronizationWork->scratch.desyncActualCrc;
+		desynchronizationInformation.pDesyncClientFrame = std::move(pDesynchronizationWork->scratch.pDesyncClientFrame);
+		return desynchronizationInformation;
 	}
 
-	// Compute new confirmed client state (client coord time advance + transfer migration)
+	// Player-transfer migration updates previous client armor.
 	ConfirmedClientState newConfirmedClientState = mConfirmedClientState;
 	ReconcileUpdateClientState(std::span<const engine::CoordWork>(mDispatcher.mWorks.data(), static_cast<size_t>(mDispatcher.miActiveCount)), dispatch.bAnyFullReplay, newConfirmedClientState);
 
-	// Visual error offset: pre/post client position delta accumulated into gpGame
 	if (bCapturedPrePosition && dispatch.bAnyFullReplay)
 	{
 		XMVECTOR vecPostWritebackPosition {};
@@ -128,10 +131,10 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	gpProfileManager->mKnockOnReplayTicksPerSecond.Set(dispatch.profiling.iKnockOnReplayTicks);
 
 	// Large single-frame re-sim bursts are frame-time spike candidates
-	int64_t iReSimTicks = dispatch.profiling.iStatusChangeReplayTicks + dispatch.profiling.iKnockOnReplayTicks;
-	if (iReSimTicks >= 8)
+	int64_t iResimulationTicks = dispatch.profiling.iStatusChangeReplayTicks + dispatch.profiling.iKnockOnReplayTicks;
+	if (iResimulationTicks >= 8)
 	{
-		LOG(kNetwork, kVerbose, "Replay burst ReSimTicks: {} StatusChange: {} KnockOn: {} Assumed: {} CrcValidated: {} Coords: {}", iReSimTicks, dispatch.profiling.iStatusChangeReplayTicks, dispatch.profiling.iKnockOnReplayTicks, dispatch.profiling.iAssumedFrameTicks, dispatch.profiling.iCrcValidatedFrameTicks, dispatch.iActiveCount);
+		LOG(kNetwork, kVerbose, "Replay burst ReSimTicks: {} StatusChange: {} KnockOn: {} Assumed: {} CrcValidated: {} Coords: {}", iResimulationTicks, dispatch.profiling.iStatusChangeReplayTicks, dispatch.profiling.iKnockOnReplayTicks, dispatch.profiling.iAssumedFrameTicks, dispatch.profiling.iCrcValidatedFrameTicks, dispatch.iActiveCount);
 	}
 
 	if (dispatch.bAnyFullReplay && engine::gpAudioManager != nullptr)

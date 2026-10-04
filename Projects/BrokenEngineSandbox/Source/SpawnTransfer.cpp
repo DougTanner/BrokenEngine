@@ -22,8 +22,8 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.vecVelocity = rData.vecVelocity,
 				.alignment = rData.alignment,
 				.fHealth = rData.fHealth,
-				.fNextBlasterSpawnTime = rData.fNextBlasterSpawnTime,
-				.fArrivalGracePeriod = kfArrivalGracePeriod,
+				.fNextBlasterSpawnTime = rData.nextBlasterSpawnTimeSeconds.count(),
+				.fArrivalGracePeriod = kArrivalGracePeriod.count(),
 				.fDeltaRotation = rData.fDeltaRotation,
 			});
 			break;
@@ -64,12 +64,12 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.fAcceleration = rData.fAcceleration,
 				.flags = missileFlags,
 				.alignment = rData.alignment,
-				.fDeltaRotationDelay = rData.fDeltaRotationDelay,
+				.deltaRotationDelay = std::chrono::duration<float>(rData.deltaRotationDelaySeconds.count()),
 				.fDeltaRotation = rData.fDeltaRotation,
-				.fDeltaRotationMax = rData.fDeltaRotationMax,
+				.fDeltaRotationMaximum = rData.fDeltaRotationMaximum,
 				.fPitch = rData.fPitch,
-				.fTime = rData.fTime,
-				.fNextJitter = rData.fNextJitter,
+				.time = std::chrono::duration<float>(rData.timeSeconds.count()),
+				.nextJitter = std::chrono::duration<float>(rData.nextJitterSeconds.count()),
 				.bTransfer = true,
 			});
 			break;
@@ -84,18 +84,18 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.alignment = rData.alignment,
 				.fArmor = rData.fHealth,
 				.fShield = rData.fShield,
-				.fNextBlasterFireTime = rData.fNextBlasterFireTime,
-				.fNextSecondarySpawnTime = rData.fNextSecondarySpawnTime,
-				.fShieldCooldown = rData.fShieldCooldown,
-				.fShieldDownSoundCooldown = rData.fShieldDownSoundCooldown,
-				.fAnimationTime = rData.fAnimationTime,
+				.fNextBlasterFireTime = rData.nextBlasterFireTimeSeconds.count(),
+				.fNextSecondarySpawnTime = rData.nextSecondarySpawnTimeSeconds.count(),
+				.fShieldCooldown = rData.shieldCooldownSeconds.count(),
+				.fShieldDownSoundCooldown = rData.shieldDownSoundCooldownSeconds.count(),
+				.fAnimationTime = rData.animationTimeSeconds.count(),
 				.flags = PlayerFlags_t {static_cast<PlayerFlags>(rData.uiPlayerFlags)},
 				.fTransferLockTimer = 1.0f,
-				.fArrivalGracePeriod = kfArrivalGracePeriod,
-				.fNavigationDelay = rData.fNavigationDelay,
+				.fArrivalGracePeriod = kArrivalGracePeriod.count(),
+				.fNavigationDelay = rData.navigationDelaySeconds.count(),
 				.globalPlayerId = rData.globalPlayerId,
-				.fleetWantedCoord = rData.fleetWantedCoord,
-				.uiPendingFleetWantedCoordTicks = rData.uiPendingFleetWantedCoordTicks,
+				.fleetWantedCoordinate = rData.fleetWantedCoordinate,
+				.uiPendingFleetWantedCoordinateTicks = rData.uiPendingFleetWantedCoordinateTicks,
 				.uiPendingWeaponModeTicks = rData.uiPendingWeaponModeTicks,
 				.bTransfer = true,
 			});
@@ -113,7 +113,7 @@ bool IsAdoptableStatusChange(const StatusChange& rChange)
 		return true;
 	}
 
-	return std::get<TransferData>(rChange.data).uiTypeIndex < BlastersInterpolate::sTypes.size();
+	return std::get<TransferData>(rChange.data).uiTypeIndex < std::ssize(BlastersInterpolate::sTypes);
 }
 
 } // namespace game

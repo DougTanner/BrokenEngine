@@ -30,23 +30,23 @@ inline constexpr std::string_view kGameName = "Broken Engine Sandbox Server";
 struct ReplayMeta
 {
 	static constexpr int64_t kiVersion = 2;
-	engine::GridCoord clientGridCoord {};
-	int64_t iClientPlayerIdValue = 0;
+	engine::GridCoord clientGridCoordinate {};
+	int64_t iClientPlayerIdentifierValue = 0;
 	float fPreviousClientArmor = 0.0f;
-	uint8_t uiPad[4] {};
+	uint8_t uiPadding[4] {};
 };
 
-// Isolated replay metadata: staged by ReadReplayMeta, applied only once the whole replay generation validates.
+// Isolated replay metadata: staged by ReadReplayMetadata, applied only once the whole replay generation validates.
 struct ReplayStagedMeta
 {
-	ReplayMeta meta {};
+	ReplayMeta metadata {};
 };
 
 #if defined(BT_CLIENT)
 // The ship ID is part of the key so a pending request clears when focus moves to another ship, even one with the same mode.
 struct WeaponModeKey
 {
-	engine::GlobalId playerId {};
+	engine::GlobalId playerIdentifier {};
 	bool bUseMissiles = false;
 
 	bool operator==(const WeaponModeKey&) const = default;
@@ -61,14 +61,8 @@ public:
 	~Game() override;
 
 	void Reset();
-	std::filesystem::path QuicksaveFile()
-	{
-		return std::filesystem::path("ServerQuicksave.save");
-	}
 #if defined(BT_CLIENT)
-	bool ShouldTrapCursor() override;
 	bool ShouldUseCrosshair() override;
-	bool ShouldShowInGameUi() override;
 #endif
 
 	void ChangeFrame(GameFlags_t gameFlags);
@@ -81,7 +75,6 @@ public:
 	void ApplyStandardMenuAction(engine::StandardMenuAction eAction) override;
 #endif
 
-	// Multi-frame grid
 	void ComputeActiveSet();
 #if defined(BT_CLIENT)
 	void UpdateActiveIslands();
@@ -101,11 +94,10 @@ public:
 #endif
 
 	// Client player tracking (multi-player per client)
-	engine::GlobalId ClientPlayerId() const;
-	bool IsClientPlayer(engine::GlobalId id) const;
-	void AddClientPlayer(engine::GlobalId id, engine::GridCoord coord);
-	void RemoveClientPlayer(engine::GlobalId id);
-	void RestoreReplayMeta(const ReplayMeta& rMeta);
+	engine::GlobalId ClientPlayerIdentifier() const;
+	void AddClientPlayer(engine::GlobalId identifier, engine::GridCoord coordinate);
+	void RemoveClientPlayer(engine::GlobalId identifier);
+	void RestoreReplayMetadata(const ReplayMeta& rMetadata);
 	std::optional<int64_t> ClientPlayerIndex(const PlayersPostRender& rPlayers) const;
 
 #if defined(BT_CLIENT)
@@ -128,7 +120,7 @@ public:
 
 	// In-memory mirror of ClientState.bin; loaded at startup, refreshed whenever any tracked field changes, and written on orderly exit.
 	game::FleetGuid mRememberedFleetGuid {};
-	engine::GlobalId mRememberedFocusedShipId {};
+	engine::GlobalId mRememberedFocusedShipIdentifier {};
 	float mfRememberedCameraEyeHeightTarget = engine::Camera::kfCameraEyeHeightInitial;
 
 	static constexpr float kfVisualErrorDecayRate = 15.0f;
@@ -143,47 +135,45 @@ public:
 	engine::GridCoord mVisibleNeighbors[8] {};
 	int64_t miVisibleNeighborCount = 0;
 
-	void SetClientGridCoord(engine::GridCoord coord)
+	void SetClientGridCoordinate(engine::GridCoord coordinate)
 	{
-		mClientGridCoordinate = coord;
+		mClientGridCoordinate = coordinate;
 		miVisibleNeighborCount = 0;
 	}
 
 private:
 
 #if defined(BT_CLIENT)
-	static constexpr common::crc_t mMenuMusicPlaylist[4] {data::kAudioMusicdoodlewavCrc, data::kAudioMusicMandatoryOvertimewavCrc, data::kAudioMusicsong18wavCrc, data::kAudioMusicTyhosibzzzzwavCrc};
-	static constexpr common::crc_t mGameMusicPlaylist[4] {data::kAudioMusicS31UnexpectedTroublewavCrc, data::kAudioMusicS31HighAlertwavCrc, data::kAudioMusicS31OnPatrolwavCrc, data::kAudioMusicS31TheGearsofProgresswavCrc};
+	static constexpr common::crc_t kMenuMusicPlaylist[4] {data::kAudioMusicdoodlewavCrc, data::kAudioMusicMandatoryOvertimewavCrc, data::kAudioMusicsong18wavCrc, data::kAudioMusicTyhosibzzzzwavCrc};
+	static constexpr common::crc_t kGameMusicPlaylist[4] {data::kAudioMusicS31UnexpectedTroublewavCrc, data::kAudioMusicS31HighAlertwavCrc, data::kAudioMusicS31OnPatrolwavCrc, data::kAudioMusicS31TheGearsofProgresswavCrc};
 
 	int64_t miMenuMusicIndex = 0;
 	int64_t miGameMusicIndex = 0;
 #endif
 
 public:
-	std::vector<engine::GlobalId> mClientPlayerIds;
-	std::vector<engine::GridCoord> mClientPlayerCoords;
+	std::vector<engine::GlobalId> mClientPlayerIdentifiers;
+	std::vector<engine::GridCoord> mClientPlayerCoordinates;
 	float mfPreviousClientArmor = 0.0f;
 	engine::AlignmentIdentifier mPlayerAlignment {};
-private:
 	engine::AlignmentIdentifier mEnemyAlignment {};
-public:
 	engine::Alignments mAlignments {};
 
 #if defined(BT_CLIENT)
 	void StartMenuMusic()
 	{
 		miMenuMusicIndex = 0;
-		engine::gpAudioManager->PlayMusic(mMenuMusicPlaylist[0]);
+		engine::gpAudioManager->PlayMusic(kMenuMusicPlaylist[0]);
 	}
 
 	void StartGameMusic()
 	{
 		miGameMusicIndex = 0;
-		engine::gpAudioManager->PlayMusic(mGameMusicPlaylist[0]);
+		engine::gpAudioManager->PlayMusic(kGameMusicPlaylist[0]);
 	}
 #endif
 
-	void InitFramePostRender(Frame& rFrame);
+	void InitializeFramePostRender(Frame& rFrame);
 
 private:
 };

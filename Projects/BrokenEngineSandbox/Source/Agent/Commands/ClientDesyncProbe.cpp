@@ -11,7 +11,7 @@
 namespace game
 {
 
-static int64_t DesyncProbeCountParameter(const nlohmann::json& rParameters, std::string_view parameterName)
+static int64_t DesynchronizationProbeCountParameter(const nlohmann::json& rParameters, std::string_view parameterName)
 {
 	std::string parameterNameString(parameterName);
 	if (!rParameters.contains(parameterNameString))
@@ -45,7 +45,7 @@ static int64_t DesyncProbeCountParameter(const nlohmann::json& rParameters, std:
 	return iCount;
 }
 
-void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
+void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	// Heap: validation errors, JSON result, and triggerRecovery's serialized Frame snapshot
 	ScopedSuppressAllocationTracking suppress;
@@ -55,14 +55,14 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 		throw std::runtime_error("desync_probe params must be an object");
 	}
 
-	size_t iKnownParameterCount = static_cast<size_t>(rParameters.contains("desyncReports")) + static_cast<size_t>(rParameters.contains("debugFrameRequests")) + static_cast<size_t>(rParameters.contains("triggerRecovery"));
-	if (rParameters.size() != iKnownParameterCount)
+	size_t uiKnownParameterCount = static_cast<size_t>(rParameters.contains("desyncReports")) + static_cast<size_t>(rParameters.contains("debugFrameRequests")) + static_cast<size_t>(rParameters.contains("triggerRecovery"));
+	if (rParameters.size() != uiKnownParameterCount)
 	{
 		throw std::runtime_error("desync_probe accepts only 'desyncReports', 'debugFrameRequests', and 'triggerRecovery'");
 	}
 
-	int64_t iDesyncReportCount = rParameters.contains("desyncReports") ? DesyncProbeCountParameter(rParameters, "desyncReports") : 0;
-	int64_t iDebugFrameRequestCount = rParameters.contains("debugFrameRequests") ? DesyncProbeCountParameter(rParameters, "debugFrameRequests") : 0;
+	int64_t iDesynchronizationReportCount = rParameters.contains("desyncReports") ? DesynchronizationProbeCountParameter(rParameters, "desyncReports") : 0;
+	int64_t iDebugFrameRequestCount = rParameters.contains("debugFrameRequests") ? DesynchronizationProbeCountParameter(rParameters, "debugFrameRequests") : 0;
 	bool bTriggerRecovery = false;
 	if (rParameters.contains("triggerRecovery"))
 	{
@@ -113,63 +113,63 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 		throw std::runtime_error("desync_probe requires a connected live client/server session");
 	}
 
-	auto coordIt = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
-	if (coordIt == gpGame->mCoordinateFrames.end())
+	auto it = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
+	if (it == gpGame->mCoordinateFrames.end())
 	{
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}
-	if (coordIt->second.iSnapshotCount <= 0)
+	if (it->second.iSnapshotCount <= 0)
 	{
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}
-	int64_t iSnapshotIndex = engine::SnapshotIndex(coordIt->second.iSnapshotHead, coordIt->second.iSnapshotCount - 1);
-	const std::unique_ptr<Frame>& pCurrentFrame = coordIt->second.snapshots[iSnapshotIndex];
-	if (pCurrentFrame == nullptr)
+	int64_t iSnapshotIndex = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
+	const std::unique_ptr<Frame>& rpCurrentFrame = it->second.snapshots[iSnapshotIndex];
+	if (rpCurrentFrame == nullptr)
 	{
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}
 
-	int64_t iTick = pCurrentFrame->interpolate.iTick;
-	engine::GridCoord coord = gpGame->mClientGridCoordinate;
-	common::crc_t uiExpectedCrc = pCurrentFrame->postRender.uiSharedCrc;
+	int64_t iTick = rpCurrentFrame->interpolate.iTick;
+	engine::GridCoord coordinate = gpGame->mClientGridCoordinate;
+	common::crc_t uiExpectedCrc = rpCurrentFrame->postRender.uiSharedCrc;
 	common::crc_t uiActualCrc = uiExpectedCrc ^ static_cast<common::crc_t>(1);
 
-	for (int64_t i = 0; i < iDesyncReportCount; ++i)
+	for (int64_t i = 0; i < iDesynchronizationReportCount; ++i)
 	{
-		gpClientSession->mpRuntime->mpClient->SendDesynchronizationReport(iTick, coord, uiExpectedCrc, uiActualCrc);
+		gpClientSession->mpRuntime->mpClient->SendDesynchronizationReport(iTick, coordinate, uiExpectedCrc, uiActualCrc);
 	}
 	for (int64_t i = 0; i < iDebugFrameRequestCount; ++i)
 	{
-		gpClientSession->mpRuntime->mpClient->SendDebugFrameRequest(iTick, coord);
+		gpClientSession->mpRuntime->mpClient->SendDebugFrameRequest(iTick, coordinate);
 	}
 
 	if (bTriggerRecovery)
 	{
-		if (gpClientSession->mpDesyncCore->IsStalled())
+		if (gpClientSession->mpDesynchronizationCore->IsStalled())
 		{
 			throw std::runtime_error("desync_probe cannot trigger recovery while desync debug mode is already stalled");
 		}
 
 		std::unique_ptr<Frame> pSnapshot = std::make_unique<Frame>();
-		engine::TransferViaStream(*pCurrentFrame, *pSnapshot);
+		engine::TransferViaStream(*rpCurrentFrame, *pSnapshot);
 
-		engine::ReconcileDesyncInfo desyncInfo
+		engine::ReconcileDesyncInfo desynchronizationInformation
 		{
 			.bDesync = true,
 			.iDesyncTick = iTick,
-			.desyncCoord = coord,
+			.desyncCoord = coordinate,
 			.desyncExpectedCrc = uiExpectedCrc,
 			.desyncActualCrc = uiActualCrc,
 			.pDesyncClientFrame = std::move(pSnapshot),
 		};
-		gpClientSession->mpDesyncCore->OnDesyncDetected(std::move(desyncInfo));
+		gpClientSession->mpDesynchronizationCore->OnDesyncDetected(std::move(desynchronizationInformation));
 	}
 
 	rResult["tick"] = iTick;
-	rResult["coord"] = {coord.iX, coord.iY};
-	rResult["desyncDebugFrames"] = kbDesyncDebugFrames;
-	rResult["stalled"] = gpClientSession->mpDesyncCore->IsStalled();
-	rResult["desyncReports"] = iDesyncReportCount;
+	rResult["coord"] = {coordinate.iX, coordinate.iY};
+	rResult["desyncDebugFrames"] = kbDesynchronizationDebugFrames;
+	rResult["stalled"] = gpClientSession->mpDesynchronizationCore->IsStalled();
+	rResult["desyncReports"] = iDesynchronizationReportCount;
 	rResult["debugFrameRequests"] = iDebugFrameRequestCount;
 	rResult["triggerRecovery"] = bTriggerRecovery;
 }

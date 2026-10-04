@@ -219,7 +219,7 @@ void GameBase::ClientUpdate()
 		game::gpClientSession->mpRuntime->PollAndDrain(networkTimeState);
 	}
 
-	if (game::gpClientSession->mpDesyncCore->IsStalled())
+	if (game::gpClientSession->mpDesynchronizationCore->IsStalled())
 	{
 		return;
 	}
@@ -231,8 +231,8 @@ void GameBase::ClientUpdate()
 		iFullTicks = 0;
 	}
 
-	game::gpClientSession->UpdateDesiredCoords(game::SubscriptionChangeReason::kPollTick);
-	game::gpClientSession->UpdateSubscriptions();
+	game::gpClientSession->UpdateDesiredCoordinates(game::SubscriptionChangeReason::kPollTick);
+	game::gpClientSession->mpRuntime->SynchronizeSubscriptions();
 	PrepareActiveSet();
 
 	// Hard ceiling: clock-servo target + kiSimulationCeilingSlackTicks. EvaluateClock steers the
@@ -933,7 +933,7 @@ void GameBase::CreateFrameAtCoordinate(GridCoord coordinate)
 	rFrame.interpolate.iTick = miTickCounter;
 	rFrame.interpolate.fCurrentTime = mfCurrentTime;
 	rFrame.interpolate.gameFlags.Set(game::GameFlags::kGame);
-	game::gpGame->InitFramePostRender(rFrame);
+	game::gpGame->InitializeFramePostRender(rFrame);
 
 	FrameStaticData& rStaticData = rFrames.staticData;
 	rStaticData.coordinate = coordinate;

@@ -11,12 +11,10 @@ namespace game
 
 using enum SpaceshipFlags;
 
-// Spaceship AI — acceleration per behavior
 constexpr float kfSpaceshipChaseAcceleration = 4.0f;
 constexpr float kfSpaceshipFleeAcceleration = 6.0f;
 constexpr float kfSpaceshipReturnAcceleration = kfSpaceshipAcceleration;
 
-// Steering
 constexpr float kfSpaceshipSteeringSmoothing = 0.064f;
 constexpr float kfSpaceshipSteeringDecay = 6.0f;
 constexpr float kfSpaceshipChaseTurnRate = 32.0f;
@@ -31,7 +29,6 @@ constexpr float kfSpaceshipFleeEndDistance = 25.0f;
 constexpr float kfSpaceshipReturnDistance = 180.0f;
 constexpr float kfSpaceshipReturnedDistance = kfSpaceshipReturnDistance - 20.0f;
 
-// Terrain collision
 constexpr float kfSpaceshipTerrainBounceRotation = 8.0f;
 constexpr float kfSpaceshipTerrainBounceMove = kfSpaceshipRadius * 2.0f;
 constexpr float kfSpaceshipTerrainBounceVelocity = 4.0f;
@@ -78,14 +75,14 @@ void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4>
 	// Return-to-island steering selects the nearest center from candidates precomputed once per coord in Update.
 	// The tick-invariant candidates use the placement's x/y, gBaseHeight, and w=1 for every ship.
 	XMVECTOR vecIslandCenter = XMLoadFloat4(&islandCandidates[0]);
-	float fNearestDistanceSq = std::numeric_limits<float>::max();
-	for (const XMFLOAT4& rCandidate : islandCandidates)
+	float fNearestDistanceSquared = std::numeric_limits<float>::max();
+	for (const XMFLOAT4& rf4Candidate : islandCandidates)
 	{
-		XMVECTOR vecCandidate = XMLoadFloat4(&rCandidate);
-		float fDistSq = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecCandidate, vecPosition)));
-		if (fDistSq < fNearestDistanceSq)
+		XMVECTOR vecCandidate = XMLoadFloat4(&rf4Candidate);
+		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecCandidate, vecPosition)));
+		if (fDistanceSquared < fNearestDistanceSquared)
 		{
-			fNearestDistanceSq = fDistSq;
+			fNearestDistanceSquared = fDistanceSquared;
 			vecIslandCenter = vecCandidate;
 		}
 	}
@@ -116,7 +113,7 @@ void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4>
 	rfDeltaRotation = common::ExponentialDecay(kfSpaceshipSteeringDecay, fDeltaTime) * rfDeltaRotation;
 }
 
-void XM_CALLCONV SpaceshipsPostRender::ApplyMovement(Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, SpaceshipFlags_t flags, float fDeltaTime, XMVECTOR& rVecVelocity)
+void XM_CALLCONV SpaceshipsPostRender::ApplyMovement(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, SpaceshipFlags_t flags, float fDeltaTime, XMVECTOR& rVecVelocity)
 {
 	float fAcceleration = flags & kReturnToIslandCenter ? kfSpaceshipReturnAcceleration
 	                    : flags & kFleePlayer ? kfSpaceshipFleeAcceleration
@@ -125,7 +122,7 @@ void XM_CALLCONV SpaceshipsPostRender::ApplyMovement(Frame& __restrict rFrame, c
 	ApplyPusherResponse(rFrame, rCurrentInterpolate, i, rVecVelocity);
 }
 
-void XM_CALLCONV SpaceshipsPostRender::ApplyPusherResponse(Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, XMVECTOR& rVecVelocity)
+void XM_CALLCONV SpaceshipsPostRender::ApplyPusherResponse(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, XMVECTOR& rVecVelocity)
 {
 	// Apply push from nearby pushers (pass own pusher ID to ignore self-push)
 	XMVECTOR vecPush = engine::PushersInterpolate::ApplyPush(rFrame.interpolate, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.puiPushers[i]);
@@ -152,8 +149,7 @@ void SpaceshipsPostRender::ApplyTerrainBounce(const engine::FrameStaticData& rSt
 		float fDirectionTerrainCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], vecTerrainNormal));
 		rfDeltaRotation = fDirectionTerrainCrossZ > 0.0f ? kfSpaceshipTerrainBounceRotation : -kfSpaceshipTerrainBounceRotation;
 
-		// Velocity W stays exactly 0 only because vecTerrainNormal's W is exactly 0 (XMVector3Cross zeroes it in
-		// IslandTerrain::NormalFromElevation); a normal from another source would drift the velocity W lane.
+		// Velocity W stays exactly 0 because vecTerrainNormal inherits W=0 from XMVector3Cross in IslandTerrain.cpp's NormalFromElevation.
 		rVecVelocity = XMVector3Reflect(rVecVelocity, vecTerrainNormal);
 		rVecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * kfSpaceshipTerrainBounceVelocity), vecTerrainNormal, rVecVelocity);
 	}
@@ -194,7 +190,6 @@ void SpaceshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFram
 
 		rCurrentInterpolate.pfDeltaRotations[i] = ComputeTerrainAvoidance(rStaticData, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], rCurrentInterpolate.pfDeltaRotations[i]);
 
-		// Clamp delta rotation
 		rCurrentInterpolate.pfDeltaRotations[i] = common::ClampMagnitude(rCurrentInterpolate.pfDeltaRotations[i], kfSpaceshipMaxTurnRate);
 	}
 }

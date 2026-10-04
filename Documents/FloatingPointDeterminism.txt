@@ -110,7 +110,7 @@ iterated in simulation-critical paths:
     iterate the map itself, in unspecified hash order, in two places:
     the erase pass in ServerSessionRuntime::SyncActiveFrames
     (Engine/Source/Network/Server/ServerSessionRuntime.cpp:299) and
-    the AddGameRequiredCoords game hook
+    the AddGameRequiredCoordinates game hook
     (Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp:320).
     Hash order is safe at both because they decide set membership
     rather than compute a value: the erase pass removes exactly the

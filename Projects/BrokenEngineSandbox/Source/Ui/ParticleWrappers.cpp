@@ -3,7 +3,6 @@
 namespace game
 {
 
-// Missile explosion particles
 engine::Wrapper gMissileExplosionParticleWidth(0.75f, 0.0f, 3.0f);
 engine::Wrapper gMissileExplosionParticleLength(2.0f, 0.0f, 3.0f);
 engine::Wrapper gMissileExplosionParticleLengthSpread(2.0f, 0.0f, 6.0f);
@@ -19,7 +18,6 @@ engine::Wrapper gMissileExplosionParticleIntensitySpread(5.0f, 0.0f, 6.0f);
 engine::Wrapper gMissileExplosionParticleIntensityDecay(2.5f, 0.0f, 5.0f);
 engine::Wrapper gMissileExplosionParticleIntensityPower(0.75f, 0.0f, 5.0f);
 
-// Player explosion particles
 engine::Wrapper gPlayerExplosionParticleWidth(1.0f, 0.0f, 3.0f);
 engine::Wrapper gPlayerExplosionParticleLength(1.0f, 0.0f, 3.0f);
 engine::Wrapper gPlayerExplosionParticleLengthSpread(0.0f, 0.0f, 3.0f);
@@ -35,7 +33,6 @@ engine::Wrapper gPlayerExplosionParticleIntensitySpread(1.0f, 0.0f, 3.0f);
 engine::Wrapper gPlayerExplosionParticleIntensityDecay(1.0f, 0.0f, 5.0f);
 engine::Wrapper gPlayerExplosionParticleIntensityPower(1.0f, 0.0f, 5.0f);
 
-// Spaceship explosion particles
 engine::Wrapper gSpaceshipExplosionParticleWidth(0.75f, 0.0f, 3.0f);
 engine::Wrapper gSpaceshipExplosionParticleLength(0.5f, 0.0f, 3.0f);
 engine::Wrapper gSpaceshipExplosionParticleLengthSpread(2.0f, 0.0f, 6.0f);

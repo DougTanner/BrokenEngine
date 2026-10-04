@@ -14,7 +14,6 @@
 namespace game
 {
 
-// Camera shake
 static constexpr float kfCameraShakeAdd = 0.25f;
 static constexpr float kfCameraShakeMax = 1.0f;
 
@@ -23,11 +22,11 @@ static constexpr float kfCameraShakeMax = 1.0f;
 // first). clear()+push_back reuses the vector's capacity (grown once under
 // ScopedSuppressAllocationTracking in CreateNewFrame), so the cycle path never heap-allocates in the
 // main loop.
-static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<engine::IslandPlacement>& rOut)
+static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<engine::IslandPlacement>& rOutput)
 {
-	rOut.clear();
+	rOutput.clear();
 	common::crc_t islandCrc = engine::gpIslandTerrain->mIslandCrcsByArea.at(static_cast<size_t>(iIndex));
-	rOut.push_back({.islandCrc = islandCrc, .f2WorldPosition = {0.0f, 0.0f}, .fRotation = 0.0f});
+	rOutput.push_back({.islandCrc = islandCrc, .f2WorldPosition = {0.0f, 0.0f}, .fRotation = 0.0f});
 }
 
 Game::Game()
@@ -38,13 +37,11 @@ Game::Game()
 
 	InitializeLocalization();
 
-	// Set up alignments
 	uint32_t uiNextAlignment = 1;
 	mPlayerAlignment = engine::AlignmentIdentifier {uiNextAlignment++};
 	mEnemyAlignment = engine::AlignmentIdentifier {uiNextAlignment++};
 	mAlignments.AddAlignment(mPlayerAlignment, mEnemyAlignment, engine::AlignmentFlags::kuiEnemies);
 
-	// Allocate frames
 #if defined(BT_SERVER)
 	mpServerSession = std::make_unique<ServerSession>();
 	if (!mGameSaveLoad.Autoload())
@@ -61,7 +58,6 @@ Game::Game()
 	mpClientSession = std::make_unique<ClientSession>();
 #endif
 
-	// Start music
 #if defined(BT_CLIENT)
 	StartMenuMusic();
 	engine::gpAudioManager->mpStreamingVoices->mGetNextTrack = [this]()
@@ -72,45 +68,40 @@ Game::Game()
 
 }
 
-engine::GlobalId Game::ClientPlayerId() const
+engine::GlobalId Game::ClientPlayerIdentifier() const
 {
 #if defined(BT_CLIENT)
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
-		engine::GlobalId focusedMemberGlobalId = mFleetSelection.mFocusedMemberGlobalId;
-		auto memberIt = std::ranges::find(pFleet->members, focusedMemberGlobalId, &FleetMember::globalPlayerId);
-		if ((focusedMemberGlobalId.iValue != 0) && memberIt != pFleet->members.end() && !(memberIt->flags & FleetMemberFlags::kIsDead))
+		engine::GlobalId focusedMemberGlobalIdentifier = mFleetSelection.mFocusedMemberGlobalId;
+		auto it = std::ranges::find(pFleet->members, focusedMemberGlobalIdentifier, &FleetMember::globalPlayerId);
+		if ((focusedMemberGlobalIdentifier.iValue != 0) && it != pFleet->members.end() && !(it->flags & FleetMemberFlags::kIsDead))
 		{
-			return memberIt->globalPlayerId;
+			return it->globalPlayerId;
 		}
 	}
 #endif
 	return {};
 }
 
-bool Game::IsClientPlayer(engine::GlobalId id) const
+void Game::AddClientPlayer(engine::GlobalId identifier, engine::GridCoord coordinate)
 {
-	return (id.iValue != 0) && std::ranges::contains(mClientPlayerIds, id);
-}
-
-void Game::AddClientPlayer(engine::GlobalId id, engine::GridCoord coord)
-{
-	// Heap: mClientPlayerIds / mClientPlayerCoords push_back may grow vectors
+	// Heap: mClientPlayerIdentifiers / mClientPlayerCoordinates push_back may grow vectors
 	ScopedSuppressAllocationTracking suppress;
-	mClientPlayerIds.push_back(id);
-	mClientPlayerCoords.push_back(coord);
+	mClientPlayerIdentifiers.push_back(identifier);
+	mClientPlayerCoordinates.push_back(coordinate);
 }
 
-void Game::RemoveClientPlayer(engine::GlobalId id)
+void Game::RemoveClientPlayer(engine::GlobalId identifier)
 {
-	for (int64_t i = 0; i < std::ssize(mClientPlayerIds); ++i)
+	for (int64_t i = 0; i < std::ssize(mClientPlayerIdentifiers); ++i)
 	{
-		if (mClientPlayerIds.at(i) == id)
+		if (mClientPlayerIdentifiers.at(i) == identifier)
 		{
-			LOG(kNetwork, kVerbose, "RemoveClientPlayer GlobalPlayerId: {} Index: {} OldPlayerCount: {}", id, i, std::ssize(mClientPlayerIds));
-			mClientPlayerIds.erase(mClientPlayerIds.begin() + i);
-			mClientPlayerCoords.erase(mClientPlayerCoords.begin() + i);
+			LOG(kNetwork, kVerbose, "RemoveClientPlayer GlobalPlayerId: {} Index: {} OldPlayerCount: {}", identifier, i, std::ssize(mClientPlayerIdentifiers));
+			mClientPlayerIdentifiers.erase(mClientPlayerIdentifiers.begin() + i);
+			mClientPlayerCoordinates.erase(mClientPlayerCoordinates.begin() + i);
 			return;
 		}
 	}
@@ -118,12 +109,12 @@ void Game::RemoveClientPlayer(engine::GlobalId id)
 
 std::optional<int64_t> Game::ClientPlayerIndex(const PlayersPostRender& rPlayers) const
 {
-	engine::GlobalId focusedId = ClientPlayerId();
-	if ((focusedId.iValue != 0))
+	engine::GlobalId focusedIdentifier = ClientPlayerIdentifier();
+	if ((focusedIdentifier.iValue != 0))
 	{
 		for (int64_t i = 0; i < rPlayers.iCount; ++i)
 		{
-			if (rPlayers.pGlobalPlayerIds[i] == focusedId)
+			if (rPlayers.pGlobalPlayerIds[i] == focusedIdentifier)
 			{
 				return i;
 			}
@@ -140,13 +131,13 @@ XMVECTOR Game::GetClientPlayerPosition() const
 	if (rFrames.iSnapshotCount > 0)
 	{
 		int64_t iTailPhysical = engine::SnapshotIndex(rFrames.iSnapshotHead, rFrames.iSnapshotCount - 1);
-		const std::unique_ptr<Frame>& pTail = rFrames.snapshots[iTailPhysical];
-		if (pTail != nullptr)
+		const std::unique_ptr<Frame>& rpTail = rFrames.snapshots[iTailPhysical];
+		if (rpTail != nullptr)
 		{
-			std::optional<int64_t> oIdx = ClientPlayerIndex(*pTail->postRender.pPlayers);
-			if (oIdx)
+			std::optional<int64_t> playerIndex = ClientPlayerIndex(*rpTail->postRender.pPlayers);
+			if (playerIndex)
 			{
-				return pTail->interpolate.pPlayers->pVecPositions[*oIdx];
+				return rpTail->interpolate.pPlayers->pVecPositions[*playerIndex];
 			}
 		}
 	}
@@ -166,11 +157,11 @@ void Game::ComputeActiveSet()
 	if (!(mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		mActiveCoordinates.clear();
-		for (const auto& [rCoord, rFrames] : mCoordinateFrames)
+		for (const auto& [rCoordinate, rFrames] : mCoordinateFrames)
 		{
-			if (rFrames.iSnapshotCount > 0 && (rFrames.iConfirmedTick >= 0 || rCoord == mClientGridCoordinate))
+			if (rFrames.iSnapshotCount > 0 && (rFrames.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
 			{
-				mActiveCoordinates.push_back(rCoord);
+				mActiveCoordinates.push_back(rCoordinate);
 			}
 		}
 
@@ -187,10 +178,10 @@ void Game::ComputeActiveSet()
 		}
 
 		miVisibleNeighborCount = 0;
-		if ((ClientPlayerId().iValue != 0))
+		if ((ClientPlayerIdentifier().iValue != 0))
 		{
 			// Camera-zoom-dependent VisibleArea: mf4LargeVisibleArea packs (minX, maxY, maxX, minY).
-			const XMFLOAT4& f4Visible = engine::gpCamera->mf4LargeVisibleArea;
+			const XMFLOAT4& rf4Visible = engine::gpCamera->mf4LargeVisibleArea;
 			// The visible area is in the camera basis cell's frame, which is not always the client cell: it lags a
 			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
 			// neighbour rectangle therefore offsets the one local area every cell has by that neighbour's own offset
@@ -201,7 +192,7 @@ void Game::ComputeActiveSet()
 			float fCellMaxX = XMVectorGetZ(vecArea);
 			float fCellMinY = XMVectorGetW(vecArea);
 
-			auto ensureNeighbor = [&](engine::GridCoord neighbor)
+			auto EnsureNeighbor = [&](engine::GridCoord neighbor)
 			{
 				auto it = mCoordinateFrames.find(neighbor);
 				if (it == mCoordinateFrames.end() || it->second.iSnapshotCount == 0)
@@ -236,11 +227,11 @@ void Game::ComputeActiveSet()
 					float fNeighborMaxX = fCellMaxX + f2Offset.x;
 					float fNeighborMinY = fCellMinY + f2Offset.y;
 					float fNeighborMaxY = fCellMaxY + f2Offset.y;
-					if (f4Visible.x < fNeighborMaxX && f4Visible.z > fNeighborMinX && f4Visible.w < fNeighborMaxY
-					 && f4Visible.y > fNeighborMinY)
+					if (rf4Visible.x < fNeighborMaxX && rf4Visible.z > fNeighborMinX && rf4Visible.w < fNeighborMaxY
+					 && rf4Visible.y > fNeighborMinY)
 					{
 						mVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
-						ensureNeighbor(neighbor);
+						EnsureNeighbor(neighbor);
 					}
 				}
 			}
@@ -270,16 +261,15 @@ void Game::ComputeActiveSet()
 #if defined(BT_CLIENT)
 void Game::UpdateActiveIslands()
 {
-	// Update island rendering only for subscribed frames (confirmed server data). Build the filtered
-	// coord list in the workbuffer (per-frame, no heap) and pass it as a span; UpdateActiveIslands' own
-	// nested PushBuffer is LIFO and pops before this arena does.
+	// Include confirmed cells and the client cell's provisional frame.
+	// The filtered coordinates use per-frame workbuffer storage; UpdateActiveIslands' nested reservation pops before this arena.
 	common::ScopedWorkbufferArena subscribedArena = common::gpThreadLocal->mWorkbuffer.Push();
-	for (const engine::GridCoord& rCoord : mActiveCoordinates)
+	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
 	{
-		auto it = mCoordinateFrames.find(rCoord);
-		if (it != mCoordinateFrames.end() && (it->second.iConfirmedTick >= 0 || rCoord == mClientGridCoordinate))
+		auto it = mCoordinateFrames.find(rCoordinate);
+		if (it != mCoordinateFrames.end() && (it->second.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
 		{
-			subscribedArena.mBuffer.PushBack<engine::GridCoord>(rCoord);
+			subscribedArena.mBuffer.PushBack<engine::GridCoord>(rCoordinate);
 		}
 	}
 	engine::gpIslands->UpdateActiveIslands(mCoordinateFrames, subscribedArena.mBuffer.Span<const engine::GridCoord>());
@@ -289,14 +279,14 @@ void Game::UpdateActiveIslands()
 #if defined(BT_SERVER)
 void Game::EnsureNextFrames()
 {
-	// Heap: unordered_map insertion + make_unique<Frame>. Frames persist in mNextFrames across game lifetime
+	// Heap: coordinate-frame entries and their next frames persist across ticks.
 	ScopedSuppressAllocationTracking suppress;
 
-	for (const engine::GridCoord& rCoord : mActiveCoordinates)
+	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
 	{
-		if (mCoordinateFrames.try_emplace(rCoord).first->second.pNext == nullptr)
+		if (mCoordinateFrames.try_emplace(rCoordinate).first->second.pNext == nullptr)
 		{
-			mCoordinateFrames.at(rCoord).pNext = std::make_unique<Frame>();
+			mCoordinateFrames.at(rCoordinate).pNext = std::make_unique<Frame>();
 		}
 	}
 }
@@ -312,14 +302,14 @@ void Game::BuildFrameInputs()
 
 	mFrameInputs.clear();
 
-	for (const engine::GridCoord& rCoord : mActiveCoordinates)
+	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
 	{
-		if (!mCoordinateFrames.contains(rCoord))
+		if (!mCoordinateFrames.contains(rCoordinate))
 		{
 			continue;
 		}
 
-		mFrameInputs.try_emplace(rCoord);
+		mFrameInputs.try_emplace(rCoordinate);
 	}
 
 	// Camera shake — read most recent ring frame (head + count - 1)
@@ -330,16 +320,15 @@ void Game::BuildFrameInputs()
 		int64_t iTailPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
 		pTailFrame = it->second.snapshots[iTailPhysical].get();
 	}
-	if ((ClientPlayerId().iValue != 0) && pTailFrame != nullptr)
+	if ((ClientPlayerIdentifier().iValue != 0) && pTailFrame != nullptr)
 	{
 		const Frame& rCurrentFrame = *pTailFrame;
 		const PlayersPostRender& rPlayersPostRender = *rCurrentFrame.postRender.pPlayers;
 
-		std::optional<int64_t> oIdx = ClientPlayerIndex(rPlayersPostRender);
-		if (oIdx)
+		std::optional<int64_t> playerIndex = ClientPlayerIndex(rPlayersPostRender);
+		if (playerIndex)
 		{
-			// Camera shake: detect armor damage on flagship player
-			float fCurrentArmor = rPlayersPostRender.pfArmors[*oIdx];
+			float fCurrentArmor = rPlayersPostRender.pfArmors[*playerIndex];
 			if (fCurrentArmor < mfPreviousClientArmor)
 			{
 				engine::gpCamera->mfShake = std::min(engine::gpCamera->mfShake + kfCameraShakeAdd, kfCameraShakeMax);
@@ -355,7 +344,7 @@ void Game::HarvestTransfers()
 #if defined(BT_SERVER)
 	gpServerSession->mpTransferManager->HarvestTransfers();
 	// mTransfers still holds the batch just applied; the broadcaster clears it later this tick.
-	for (const auto& [rCoord, rTransfers] : gpServerSession->mpTransferManager->mTransfers)
+	for (const auto& [rCoordinate, rTransfers] : gpServerSession->mpTransferManager->mTransfers)
 	{
 		gpServerSession->miHarvestedTransferTotal += std::ssize(rTransfers);
 	}
@@ -410,13 +399,13 @@ void Game::Reset()
 #endif // BT_CLIENT
 
 	mGameFlags.Set(engine::GameFlags::kPaused, false);
-	mClientPlayerIds.clear();
-	mClientPlayerCoords.clear();
+	mClientPlayerIdentifiers.clear();
+	mClientPlayerCoordinates.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
 #endif
 	mfPreviousClientArmor = 0.0f;
-	SetClientGridCoord(engine::kOriginCoordinate);
+	SetClientGridCoordinate(engine::kOriginCoordinate);
 	mActiveCoordinates.clear();
 	mActiveCoordinates.push_back(mClientGridCoordinate);
 }
@@ -439,7 +428,7 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 	Frame& rFrame = *rFrames.pCurrent;
 #endif
 	rFrame.interpolate.gameFlags.Set(gameFlags.meFlags);
-	InitFramePostRender(rFrame);
+	InitializeFramePostRender(rFrame);
 
 	// Populate static data for origin coord (used as the main-menu cell)
 	engine::FrameStaticData& rStaticData = rFrames.staticData;
@@ -467,32 +456,24 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 }
 
 #if defined(BT_CLIENT)
-bool Game::ShouldTrapCursor()
-{
-	return !(mGameFlags & engine::GameFlags::kMainMenu);
-}
-#endif // BT_CLIENT
-
-#if defined(BT_CLIENT)
 bool Game::ShouldUseCrosshair()
 {
 	auto it = mCoordinateFrames.find(mClientGridCoordinate);
-	if (it == mCoordinateFrames.end() || it->second.iSnapshotCount == 0)
+	if (it == mCoordinateFrames.end())
+	{
+		return false;
+	}
+	if (it->second.iSnapshotCount == 0)
 	{
 		return false;
 	}
 	int64_t iTailPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
-	const std::unique_ptr<Frame>& pTail = it->second.snapshots[iTailPhysical];
-	if (pTail == nullptr)
+	const std::unique_ptr<Frame>& rpTail = it->second.snapshots[iTailPhysical];
+	if (rpTail == nullptr)
 	{
 		return false;
 	}
-	return pTail->interpolate.gameFlags & GameFlags::kGame && meUiState == engine::UiState::kNone;
-}
-
-bool Game::ShouldShowInGameUi()
-{
-	return !mbShowImGui;
+	return rpTail->interpolate.gameFlags & GameFlags::kGame && meUiState == engine::UiState::kNone;
 }
 
 engine::StandardMenuModel Game::GetStandardMenuModel() const
@@ -523,7 +504,7 @@ void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
 			gpClientSession->mpRuntime->StartDiscovery();
 			break;
 		case engine::StandardMenuAction::kConnectToDiscoveredServer:
-			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots);
+			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
 			break;
 		case engine::StandardMenuAction::kChangeFrameToMainMenu:
 			ChangeFrame(GameFlags::kMainMenu);
@@ -544,7 +525,6 @@ void Game::ChangeFrame(GameFlags_t gameFlags)
 		return;
 	}
 
-	// Start appropriate music playlist for menu or game mode
 #if defined(BT_CLIENT)
 	if (gameFlags & GameFlags::kMainMenu)
 	{
@@ -631,7 +611,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		{
 			if (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered)
 			{
-				gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordSlots);
+				gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
 			}
 			else
 			{
@@ -668,24 +648,24 @@ void Game::CaptureClientStateIfChanged()
 	// When no fleet is focused (boot before first sync, or post-disconnect cleared fleets), preserve the remembered fleet/ship —
 	// don't overwrite the just-loaded saved state with zeros. The next valid focus (user click or post-sync auto-activate) updates it.
 	game::FleetGuid newFleetGuid = mRememberedFleetGuid;
-	engine::GlobalId newShipId = mRememberedFocusedShipId;
+	engine::GlobalId newShipIdentifier = mRememberedFocusedShipIdentifier;
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
 		newFleetGuid = pFleet->guid;
-		newShipId = mFleetSelection.mFocusedMemberGlobalId;
+		newShipIdentifier = mFleetSelection.mFocusedMemberGlobalId;
 	}
 
 	float fNewCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget;
 
-	if (newFleetGuid == mRememberedFleetGuid && newShipId == mRememberedFocusedShipId
+	if (newFleetGuid == mRememberedFleetGuid && newShipIdentifier == mRememberedFocusedShipIdentifier
 	 && fNewCameraEyeHeightTarget == mfRememberedCameraEyeHeightTarget)
 	{
 		return;
 	}
 
 	mRememberedFleetGuid              = newFleetGuid;
-	mRememberedFocusedShipId          = newShipId;
+	mRememberedFocusedShipIdentifier          = newShipIdentifier;
 	mfRememberedCameraEyeHeightTarget = fNewCameraEyeHeightTarget;
 }
 #endif // BT_CLIENT
@@ -695,18 +675,18 @@ common::crc_t Game::GetNextMusicTrack()
 {
 	if ((mGameFlags & engine::GameFlags::kMainMenu))
 	{
-		miMenuMusicIndex = (miMenuMusicIndex + 1) % static_cast<int64_t>(std::size(mMenuMusicPlaylist));
-		return mMenuMusicPlaylist[miMenuMusicIndex];
+		miMenuMusicIndex = (miMenuMusicIndex + 1) % static_cast<int64_t>(std::size(kMenuMusicPlaylist));
+		return kMenuMusicPlaylist[miMenuMusicIndex];
 	}
 	else
 	{
-		miGameMusicIndex = (miGameMusicIndex + 1) % static_cast<int64_t>(std::size(mGameMusicPlaylist));
-		return mGameMusicPlaylist[miGameMusicIndex];
+		miGameMusicIndex = (miGameMusicIndex + 1) % static_cast<int64_t>(std::size(kGameMusicPlaylist));
+		return kGameMusicPlaylist[miGameMusicIndex];
 	}
 }
 #endif // BT_CLIENT
 
-void Game::InitFramePostRender(Frame& rFrame)
+void Game::InitializeFramePostRender(Frame& rFrame)
 {
 	rFrame.postRender.uiFrameIdentifier = muiNextFrameId++;
 	rFrame.postRender.randomEngine.TimeSeed();
@@ -715,15 +695,15 @@ void Game::InitFramePostRender(Frame& rFrame)
 	rFrame.postRender.alignments = mAlignments;
 }
 
-void Game::RestoreReplayMeta(const ReplayMeta& rMeta)
+void Game::RestoreReplayMetadata(const ReplayMeta& rMetadata)
 {
-	SetClientGridCoord(rMeta.clientGridCoord);
-	if (rMeta.iClientPlayerIdValue != 0)
+	SetClientGridCoordinate(rMetadata.clientGridCoordinate);
+	if (rMetadata.iClientPlayerIdentifierValue != 0)
 	{
-		engine::GlobalId globalId {rMeta.iClientPlayerIdValue};
-		AddClientPlayer(globalId, rMeta.clientGridCoord);
+		engine::GlobalId globalIdentifier {.iValue = rMetadata.iClientPlayerIdentifierValue};
+		AddClientPlayer(globalIdentifier, rMetadata.clientGridCoordinate);
 	}
-	mfPreviousClientArmor = rMeta.fPreviousClientArmor;
+	mfPreviousClientArmor = rMetadata.fPreviousClientArmor;
 }
 
 } // namespace game

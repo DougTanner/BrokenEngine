@@ -43,7 +43,7 @@ should be a fifth.
 | `spawn_players` (`:677-721`) | `kSpawnPlayer` with `SpawnPlayerData` at the struct's default offset `[45,-12]` (`Frame/StatusChange.h:61-62`), fresh global id per entry (`:712`) | `QueueAgentStatusChange` (`:886-891`) → `DrainPendingAgentStatusChanges` | replay playback (`:679-682`); clients waiting for spawn (`:683-686`); `coord` not active (`:687-691`); `count` outside `[0,256]` (`:692-706`) | nothing beyond the id mint | none |
 | `inject_status_changes` (`:514-675`) | one of four `StatusChange` kinds per entry through `BuildInjectedChange` (`:432-505`); `SpawnPlayer` mints the id at command time (`:452`), `UpdatePlayer` fixes the weapon countdown at one tick-rate (`:492`), `navigationDelay` is clamped like the wire (`:420-428`) | same queue and drain | exact top-level keys (`:520-526`); `changes` array (`:527-534`); nested `navQueryActivation` shape (`:536-564`); replay playback (`:568-571`); clients waiting for spawn (`:572-575`); profiler-arm state gates (`:576-610`); per-entry active `coord` (`:434-438`) and type whitelist (`:450-503`); `pos` shape (`:456-478`) | `pos` is validated for shape only; an out-of-cell spawn is refused where it is consumed (`Frame/Collections/Players/Players.cpp:295-300`) and the response still says `ok` (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:48`) | none for injection; `navQueryActivation` needs `kbProfiling` (`:578-581`) |
 | `replay_transfer_fixture` (`:247-408`) | one `kTransfer*` with a full `TransferData` of fixture defaults: destination-cell centre, unit velocity along +x, health and shield 1, blaster type index, missile turn rate 2, fresh global id for `player` only (`:380-392`); the blaster branch searches a 20x20 grid for a terrain-clear point and materializes the destination's elevation grid to do it (`:336-378`) | `QueueReplayTransferFixture` (`:893-916`) → `DrainReplayTransferFixtures` | `kbDebugInput` (`:249-252`); replay playback (`:255-258`); recording active or a paused pending start (`:259-264`); `type` (`:265-272, 287-308`); `pauseAfterWriterInput` shape and double-arm (`:273-285`); `source`/`destination` distinct and Chebyshev-adjacent (`:310-315`); `source` active with both frames ready (`:316-332`); non-player destination live, inside the queue call (`:908-911`) | arrival position, terrain clearance for blasters, every `TransferData` default | `kbDebugInput` |
-| `inject_outward_transfer` (`:726-825`) | one `kTransferPlayer` at the midpoint of the requested edge, inset by `(16 - 0.5)` tick-steps of `kfPlayerMaxSpeed`, velocity outward at `kfPlayerMaxSpeed`, health and shield 1, `fleetWantedCoord` = the seeded cell, fresh global id (`:788-815`) | same queue and drain as above (`:817-820`) | `kbDebugInput` (`:728-731`); replay playback (`:734-737`); clients waiting for spawn (`:738-741`); exactly two keys (`:742-749`); `delta` two integers in `[-1,1]`, not both zero (`:752-786`) | edge geometry, coast margin, velocity, armor above zero so the arrival is not flagged exploding (`:809-811`; `Frame/Collections/Players/PlayersCombat.cpp:281-286`) | `kbDebugInput` |
+| `inject_outward_transfer` (`:726-825`) | one `kTransferPlayer` at the midpoint of the requested edge, inset by `(16 - 0.5)` tick-steps of `kfPlayerMaximumSpeed`, velocity outward at `kfPlayerMaximumSpeed`, health and shield 1, `fleetWantedCoordinate` = the seeded cell, fresh global id (`:788-815`) | same queue and drain as above (`:817-820`) | `kbDebugInput` (`:728-731`); replay playback (`:734-737`); clients waiting for spawn (`:738-741`); exactly two keys (`:742-749`); `delta` two integers in `[-1,1]`, not both zero (`:752-786`) | edge geometry, coast margin, velocity, armor above zero so the arrival is not flagged exploding (`:809-811`; `Frame/Collections/Players/PlayersCombat.cpp:281-286`) | `kbDebugInput` |
 
 Unqualified `:line` ranges in this document are into
 `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp`;
@@ -103,7 +103,7 @@ non-replay tick (`GameBase.cpp:510-513`), so a queued transfer waits for the
 next finalized tick — paused means deferred — and there is no other deferral.
 The drain creates the destination frame if it is missing (`:976-983`), which is
 what lets a player fixture seed a cell that nothing else keeps alive:
-`AddGameRequiredCoords` keeps any cell holding a player active
+`AddGameRequiredCoordinates` keeps any cell holding a player active
 (`Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp:270-282`)
 once `ComputeActiveSet` runs on the next update
 (`Engine/Source/Network/Server/ServerSessionRuntime.cpp:312-327`), while
@@ -304,7 +304,7 @@ read-back its acceptance rows will need. Neither depends on this decision.
 ## What a generic injector does not solve
 
 - Geometry helpers leave C++. The edge placement in `inject_outward_transfer`
-  needs the cell half-extent from `engine::LocalFrameArea()`, `kfPlayerMaxSpeed`
+  needs the cell half-extent from `engine::LocalFrameArea()`, `kfPlayerMaximumSpeed`
   (`Frame/Collections/Players/Players.h:32`), and `engine::kfDeltaTime`; the
   blaster placement needs the destination's elevation grid. None of these is
   visible to the harness today. Under Option A the harness either receives
@@ -351,8 +351,8 @@ read-back its acceptance rows will need. Neither depends on this decision.
    needs the geometry inputs in item 5 first.
 3. The server-owned field list per kind: at least the global id, the
    alignment, and the client GUID; whether `uiPendingWeaponModeTicks` and
-   `uiPendingFleetWantedCoordTicks` keep their fixture values (`:492, 498`) or
-   become caller-settable; whether `fleetWantedCoord` defaults to `coord`.
+   `uiPendingFleetWantedCoordinateTicks` keep their fixture values (`:492, 498`) or
+   become caller-settable; whether `fleetWantedCoordinate` defaults to `coord`.
 4. Build gate: the generic command is `kbDebugInput`-only in full, or the
    status-change kinds stay available on a non-debug server as
    `inject_status_changes` and `spawn_players` are today. The transfer queue

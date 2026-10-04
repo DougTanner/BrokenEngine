@@ -131,7 +131,7 @@ Files:
     kfMainMenuHeadingScale = 1.3, kfLanguageMenuFontScale = 1.0
     kfLanguageMenuGeometryScale = 0.5
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:14-16
-    kfHudEdgeMarginFraction = 0.05f, kfHudPanelTopFraction = 0.125f, kfHudPanelMaxHeightFraction = 0.75f
+    kfHudEdgeMarginFraction = 0.05f, kfHudPanelTopFraction = 0.125f, kfHudPanelMaximumHeightFraction = 0.75f
   Engine/Source/Ui/Screens/GraphicsMenuScreen.cpp
     responsive width/font curve, heading scale, and semantic column gutter
   Engine/Source/Ui/Screens/SoundMenuScreen.cpp
@@ -185,14 +185,14 @@ from 0.5 to 0.9 of the display width across the supported preference range so
 its two-column panel remains usable at the largest setting.
 
 The HUD panels are the canonical "hug content" example: their height auto-sizes
-to the fleet member list, capped at kfHudPanelMaxHeightFraction of the screen
+to the fleet member list, capped at kfHudPanelMaximumHeightFraction of the screen
 (long lists scroll). The right FocusedPlayer panel then matches the left panel's
 live height for symmetry rather than hugging its own smaller content.
 
 Files:
   Engine/Source/Ui/Screens/PauseMenuScreen.cpp:34  ImGuiWindowFlags_AlwaysAutoResize
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:182-187  (content-driven height, capped via SetNextWindowSizeConstraints)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:16  kfHudPanelMaxHeightFraction (height cap)
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:16  kfHudPanelMaximumHeightFraction (height cap)
 
 
 7. Layout Primitives
@@ -295,7 +295,7 @@ Screen-specific commitments this contract makes, each verified visually:
     matches the left Fleet panel's live size rather than hugging its own
     (smaller) content; symmetry beats content-hugging on the right.
   - HUD: the mouse-proximity activation zone is a fixed-extent strip
-    (kfHudPanelMaxHeightFraction of the screen at the anchor), decoupled from
+    (kfHudPanelMaximumHeightFraction of the screen at the anchor), decoupled from
     the live panel size, so hover behavior is unchanged as panels shrink.
   - HUD: the focused-player weapon action is centered within the right panel's
     live content area while the panel continues to match the left panel's size.

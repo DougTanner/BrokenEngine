@@ -5,7 +5,7 @@
 namespace game
 {
 
-void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResult);
+void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
 } // namespace game
 

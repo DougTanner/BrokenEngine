@@ -488,7 +488,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	mpModalScreen->Render();
 
 	// Hide in-game UI when Tweaks menu is active
-	if (game::gpGame->ShouldShowInGameUi())
+	if (!game::gpGame->mbShowImGui)
 	{
 		mpHudScreen->Render();
 		mpPauseMenuScreen->Render();

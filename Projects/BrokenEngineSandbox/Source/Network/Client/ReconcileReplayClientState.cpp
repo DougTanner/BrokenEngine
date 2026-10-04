@@ -9,42 +9,42 @@ namespace game
 
 #if defined(BT_CLIENT)
 
-static bool FindMatchingPlayerInCoord(std::span<const engine::CoordWork> works, engine::GridCoord destination, engine::GlobalId globalPlayerId)
+static bool FindMatchingPlayerInCoordinate(std::span<const engine::CoordWork> works, engine::GridCoord destination, engine::GlobalId globalPlayerId)
 {
-	for (const engine::CoordWork& rDestWork : works)
+	for (const engine::CoordWork& rDestinationWork : works)
 	{
-		if (rDestWork.coord != destination)
+		if (rDestinationWork.coord != destination)
 		{
 			continue;
 		}
 
-		const engine::CoordFrames& rDestFrames = *rDestWork.pFrames;
-		const engine::CoordScratch& rDestScratch = rDestWork.scratch;
+		const engine::CoordFrames& rDestinationFrames = *rDestinationWork.pFrames;
+		const engine::CoordScratch& rDestinationScratch = rDestinationWork.scratch;
 
-		const Frame* pDestFrame = nullptr;
-		if (rDestScratch.iReplayStackCount > 0)
+		const Frame* pDestinationFrame = nullptr;
+		if (rDestinationScratch.iReplayStackCount > 0)
 		{
-			pDestFrame = rDestScratch.replayStack.at(static_cast<size_t>(rDestScratch.iReplayStackCount - 1));
+			pDestinationFrame = rDestinationScratch.replayStack.at(static_cast<size_t>(rDestinationScratch.iReplayStackCount - 1));
 		}
-		else if ((rDestScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath) && rDestScratch.outputLayout.iHead >= 0)
+		else if ((rDestinationScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath) && rDestinationScratch.outputLayout.iHead >= 0)
 		{
-			int64_t iConfirmedPhysical = SnapshotIndex(rDestScratch.outputLayout.iHead, rDestScratch.outputLayout.iConfirmedInner);
-			pDestFrame = rDestFrames.snapshots[iConfirmedPhysical].get();
+			int64_t iConfirmedPhysical = SnapshotIndex(rDestinationScratch.outputLayout.iHead, rDestinationScratch.outputLayout.iConfirmedInner);
+			pDestinationFrame = rDestinationFrames.snapshots[iConfirmedPhysical].get();
 		}
-		if (pDestFrame == nullptr)
+		if (pDestinationFrame == nullptr)
 		{
 			continue;
 		}
-		const Frame& rDestFrame = *pDestFrame;
-		for (int64_t j = 0; j < rDestFrame.postRender.pPlayers->iCount; ++j)
+		const Frame& rDestinationFrame = *pDestinationFrame;
+		for (int64_t j = 0; j < rDestinationFrame.postRender.pPlayers->iCount; ++j)
 		{
-			if (rDestFrame.postRender.pPlayers->pGlobalPlayerIds[j] == globalPlayerId)
+			if (rDestinationFrame.postRender.pPlayers->pGlobalPlayerIds[j] == globalPlayerId)
 			{
 				LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer matched GlobalPlayerId: {} Coord: ({},{})", globalPlayerId, destination.iX, destination.iY);
 				return true;
 			}
 		}
-		LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer global ID match failed Coord: ({},{}) PlayerCount: {}", destination.iX, destination.iY, rDestFrame.postRender.pPlayers->iCount);
+		LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer global ID match failed Coord: ({},{}) PlayerCount: {}", destination.iX, destination.iY, rDestinationFrame.postRender.pPlayers->iCount);
 		break;
 	}
 	return false;
@@ -56,7 +56,6 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 
 	if (bAnyFullReplay)
 	{
-		// Scan full-replay coords for client migration via transfer requests
 		for (const engine::CoordWork& rWork : works)
 		{
 			const engine::CoordScratch& rScratch = rWork.scratch;
@@ -75,18 +74,18 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 					{
 						continue;
 					}
-					if (!(clientState.clientGlobalPlayerId.iValue != 0))
+					if (!(clientState.clientGlobalPlayerIdentifier.iValue != 0))
 					{
 						continue;
 					}
-					if (rRequest.data.globalPlayerId != clientState.clientGlobalPlayerId)
+					if (rRequest.data.globalPlayerId != clientState.clientGlobalPlayerIdentifier)
 					{
 						continue;
 					}
 
 					if (std::abs(rRequest.iDeltaX) > 1 || std::abs(rRequest.iDeltaY) > 1) [[unlikely]]
 					{
-						LOG(kDefault, kError, "ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalPlayerId: {}", rFrame.interpolate.iTick, rWork.coord.iX, rWork.coord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), clientState.clientGlobalPlayerId);
+						LOG(kDefault, kError, "ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalPlayerId: {}", rFrame.interpolate.iTick, rWork.coord.iX, rWork.coord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), clientState.clientGlobalPlayerIdentifier);
 						DEBUG_BREAK();
 					}
 					// Checked exactly like the server's transfer destination, so a cell at a numeric coordinate edge
@@ -96,10 +95,10 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 					{
 						continue;
 					}
-					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferPlayer GlobalPlayerId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalPlayerId, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
+					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferPlayer GlobalPlayerId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalPlayerIdentifier, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
 					clientState.fPreviousClientArmor = rRequest.data.fHealth;
 
-					FindMatchingPlayerInCoord(works, destination, clientState.clientGlobalPlayerId);
+					FindMatchingPlayerInCoordinate(works, destination, clientState.clientGlobalPlayerIdentifier);
 				}
 			}
 		}

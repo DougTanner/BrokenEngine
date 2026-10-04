@@ -5,16 +5,14 @@
 namespace game
 {
 
-// Frame-read query commands (query_frame / query_players / query_collection); packet fault fixtures live in
-// Commands/ServerFaultFixtures.cpp, and other server agent commands (sim-control, injection, dispatcher) live in
-// AgentCommandsServer.cpp. rParams is the request "params" object,
-// rResult the response "result" to populate. Throw on bad params, caught by
-// AgentCommandServer::Drain(). nlohmann::json / engine::GridCoord arrive via the game Pch. CoordFromParam is shared
-// with the injection group in AgentCommandsServer.cpp.
-engine::GridCoord CoordFromParam(const nlohmann::json& rParams, std::string_view key = "coord");
-void CommandQueryFrame(const nlohmann::json& rParams, nlohmann::json& rResult);
-void CommandQueryPlayers(const nlohmann::json& rParams, nlohmann::json& rResult);
-void CommandQueryCollection(const nlohmann::json& rParams, nlohmann::json& rResult);
+// rParameters is the request "params" object; rResult receives the response "result" object.
+// Invalid parameters throw into AgentCommandServer::Drain()'s failure envelope.
+// Fault fixtures are in Commands/ServerFaultFixtures.cpp; injection commands are in Commands/ServerSimulationFixtures.cpp.
+// AgentCommandsServer.cpp owns simulation control, dispatch, and the coordinate parser shared with injection commands.
+engine::GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std::string_view key = "coord");
+void CommandQueryFrame(const nlohmann::json& rParameters, nlohmann::json& rResult);
+void CommandQueryPlayers(const nlohmann::json& rParameters, nlohmann::json& rResult);
+void CommandQueryCollection(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
 } // namespace game
 

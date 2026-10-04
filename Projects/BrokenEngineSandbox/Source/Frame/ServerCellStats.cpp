@@ -14,12 +14,12 @@
 namespace game
 {
 
-ServerCellStats GetServerCellStats(const Frame& rFrame)
+ServerCellStats GetServerCellStatistics(const Frame& rFrame)
 {
 	return ServerCellStats
 	{
 		.iTick = rFrame.interpolate.iTick,
-		.fCurrentTime = rFrame.interpolate.fCurrentTime,
+		.durationCurrentTime = std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 		.iPlayers = rFrame.interpolate.pPlayers->iCount,
 		.iSpaceships = rFrame.interpolate.pSpaceships->iCount,
 		.iBlasters = rFrame.interpolate.pBlasters->iCount,
@@ -40,13 +40,13 @@ void PublishServerEntityCounts()
 	int64_t iTotalBlasters = 0;
 	int64_t iTotalMissiles = 0;
 
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoordinates)
+	for (const engine::GridCoord& rCoordinate : gpGame->mActiveCoordinates)
 	{
-		ServerCellStats cellStats = GetServerCellStats((*gpGame->mCoordinateFrames.at(rCoord).pCurrent));
-		iTotalPlayers += cellStats.iPlayers;
-		iTotalSpaceships += cellStats.iSpaceships;
-		iTotalBlasters += cellStats.iBlasters;
-		iTotalMissiles += cellStats.iMissiles;
+		ServerCellStats cellStatistics = GetServerCellStatistics((*gpGame->mCoordinateFrames.at(rCoordinate).pCurrent));
+		iTotalPlayers += cellStatistics.iPlayers;
+		iTotalSpaceships += cellStatistics.iSpaceships;
+		iTotalBlasters += cellStatistics.iBlasters;
+		iTotalMissiles += cellStatistics.iMissiles;
 	}
 
 	if constexpr (kbProfiling)

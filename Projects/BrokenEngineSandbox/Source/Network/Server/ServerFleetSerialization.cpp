@@ -20,7 +20,7 @@ void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets)
 		return;
 	}
 
-	LOG(kNetwork, kVerbose, "SendFleetSync Client: {} Fleets: {}", iClientId, rFleets.size());
+	LOG(kNetwork, kVerbose, "SendFleetSync Client: {} Fleets: {}", iClientId, std::ssize(rFleets));
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -38,17 +38,17 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	int64_t iMemberCount = std::ssize(rFleet.members);
 	common::Write(rFileStream, iMemberCount);
 	common::Write(rFileStream, rFleet.flagshipGlobalPlayerId.iValue);
-	common::Write(rFileStream, rFleet.wantedCoord.iX);
-	common::Write(rFileStream, rFleet.wantedCoord.iY);
-	common::Write(rFileStream, rFleet.uiPendingFleetWantedCoordTicks);
-	common::Write(rFileStream, rFleet.fNavigationDelay);
-	common::Write(rFileStream, rFleet.fFrameChangeTimer);
+	common::Write(rFileStream, rFleet.wantedCoordinate.iX);
+	common::Write(rFileStream, rFleet.wantedCoordinate.iY);
+	common::Write(rFileStream, rFleet.uiPendingFleetWantedCoordinateTicks);
+	common::Write(rFileStream, rFleet.navigationDelaySeconds.count());
+	common::Write(rFileStream, rFleet.frameChangeTimerSeconds.count());
 	for (const FleetMember& rMember : rFleet.members)
 	{
 		common::Write(rFileStream, rMember.globalPlayerId.iValue);
 		rMember.flags.Write(rFileStream);
-		common::Write(rFileStream, rMember.coord.iX);
-		common::Write(rFileStream, rMember.coord.iY);
+		common::Write(rFileStream, rMember.coordinate.iX);
+		common::Write(rFileStream, rMember.coordinate.iY);
 	}
 }
 
@@ -67,26 +67,30 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	int32_t iWantedY = 0;
 	common::Read(rFileStream, iWantedX);
 	common::Read(rFileStream, iWantedY);
-	rFleet.wantedCoord = engine::GridCoord {iWantedX, iWantedY};
-	common::Read(rFileStream, rFleet.uiPendingFleetWantedCoordTicks);
-	common::Read(rFileStream, rFleet.fNavigationDelay);
+	rFleet.wantedCoordinate = engine::GridCoord {.iX = iWantedX, .iY = iWantedY};
+	common::Read(rFileStream, rFleet.uiPendingFleetWantedCoordinateTicks);
+	float fNavigationDelay = 0.0f;
+	common::Read(rFileStream, fNavigationDelay);
+	rFleet.navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay);
 	// Trust boundary (save / replay file): the wire admits only [0, 60], so reject any other fleet delay. It
-	// resets fFrameChangeTimer, whose > 0.0f test gates the fire: +Inf freezes fleet nav forever and NaN fires
+	// resets frameChangeTimerSeconds, whose count > 0.0f test gates the fire: +Inf freezes fleet nav forever and NaN fires
 	// every tick; it also feeds a common::Random bound.
-	if (!PlayersPostRender::IsNavigationDelayInRange(rFleet.fNavigationDelay))
+	if (!PlayersPostRender::IsNavigationDelayInRange(rFleet.navigationDelaySeconds.count()))
 	{
 		throw std::ios_base::failure("Fleet navigation delay");
 	}
-	common::Read(rFileStream, rFleet.fFrameChangeTimer);
-	// Trust boundary (save / replay file): finite-check only — fFrameChangeTimer legitimately goes/stays
+	float fFrameChangeTimer = 0.0f;
+	common::Read(rFileStream, fFrameChangeTimer);
+	rFleet.frameChangeTimerSeconds = std::chrono::duration<float>(fFrameChangeTimer);
+	// Trust boundary (save / replay file): finite-check only — frameChangeTimerSeconds legitimately goes/stays
 	// negative in cardinal mode (FleetNavigationController fires without resetting), so a range test would
 	// reject valid data. A saved +Inf would freeze fleet nav forever.
-	if (!std::isfinite(rFleet.fFrameChangeTimer))
+	if (!std::isfinite(rFleet.frameChangeTimerSeconds.count()))
 	{
 		throw std::ios_base::failure("Fleet frame change timer");
 	}
 	// Trust boundary (save / replay file): bound the member count against the cap and stream before resize.
-	common::ValidateDeserializedCountCapacity(iMemberCount, static_cast<int64_t>(kuiMaxFleetMembers), sizeof(int64_t) + sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
+	common::ValidateDeserializedCountCapacity(iMemberCount, kiMaximumFleetMembers, sizeof(int64_t) + sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
 	rFleet.members.resize(static_cast<size_t>(iMemberCount));
 	for (FleetMember& rMember : rFleet.members)
 	{
@@ -105,7 +109,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		int32_t iCoordY = 0;
 		common::Read(rFileStream, iCoordX);
 		common::Read(rFileStream, iCoordY);
-		rMember = FleetMember {.globalPlayerId = engine::GlobalId {iGlobalPlayerId}, .flags = flags, .coord = engine::GridCoord {iCoordX, iCoordY}};
+		rMember = FleetMember {.globalPlayerId = engine::GlobalId {.iValue = iGlobalPlayerId}, .flags = flags, .coordinate = engine::GridCoord {.iX = iCoordX, .iY = iCoordY}};
 	}
 	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, so each member ID
 	// must be valid and unique within its fleet, and the flagship must name a member ({} only for an empty fleet).
@@ -117,9 +121,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 			throw std::ios_base::failure("Fleet member global ID");
 		}
 	}
-	bool bFlagshipValid = rFleet.members.empty()
-		? !(rFleet.flagshipGlobalPlayerId.iValue != 0)
-		: std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
+	bool bFlagshipValid = rFleet.members.empty() ? !(rFleet.flagshipGlobalPlayerId.iValue != 0) : std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
 	if (!bFlagshipValid)
 	{
 		throw std::ios_base::failure("Fleet flagship global ID");
@@ -132,7 +134,7 @@ void WriteFleetData(std::fstream& rFileStream, const std::unordered_map<engine::
 	ScopedSuppressAllocationTracking suppress;
 	std::vector<engine::ClientGuid> fleetOwnerGuids;
 	fleetOwnerGuids.reserve(rFleets.size());
-	for (const auto& [rGuid, rFleetVec] : rFleets)
+	for (const auto& [rGuid, rFleetVector] : rFleets)
 	{
 		fleetOwnerGuids.push_back(rGuid);
 	}
@@ -146,12 +148,12 @@ void WriteFleetData(std::fstream& rFileStream, const std::unordered_map<engine::
 
 	for (const engine::ClientGuid& rGuid : fleetOwnerGuids)
 	{
-		const std::vector<Fleet>& rFleetVec = rFleets.at(rGuid);
+		const std::vector<Fleet>& rFleetVector = rFleets.at(rGuid);
 		common::Write(rFileStream, rGuid.uiHigh);
 		common::Write(rFileStream, rGuid.uiLow);
-		int64_t iFleetCount = std::ssize(rFleetVec);
+		int64_t iFleetCount = std::ssize(rFleetVector);
 		common::Write(rFileStream, iFleetCount);
-		for (const Fleet& rFleet : rFleetVec)
+		for (const Fleet& rFleet : rFleetVector)
 		{
 			WriteFleet(rFileStream, rFleet);
 		}
@@ -176,7 +178,7 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 		uint64_t uiGuidLow = 0;
 		common::Read(rFileStream, uiGuidHigh);
 		common::Read(rFileStream, uiGuidLow);
-		engine::ClientGuid guid {uiGuidHigh, uiGuidLow};
+		engine::ClientGuid guid {.uiHigh = uiGuidHigh, .uiLow = uiGuidLow};
 		if ((guid.uiHigh == 0 && guid.uiLow == 0))
 		{
 			throw std::ios_base::failure("Fleet owner ClientGuid");
@@ -185,7 +187,7 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 		common::Read(rFileStream, iFleetCount);
 		// Trust boundary (save / replay file): bound the fleet count against the cap before constructing the vector
 		// (each fleet serializes at least its 16-byte GUID).
-		common::ValidateDeserializedCountCapacity(iFleetCount, kiMaxFleetsPerClient, 2 * sizeof(uint64_t), rFileStream, "ReadFleetData fleets");
+		common::ValidateDeserializedCountCapacity(iFleetCount, kiMaximumFleetsPerClient, 2 * sizeof(uint64_t), rFileStream, "ReadFleetData fleets");
 		std::vector<Fleet> fleets(static_cast<size_t>(iFleetCount));
 		for (Fleet& rFleet : fleets)
 		{

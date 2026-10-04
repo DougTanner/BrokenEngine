@@ -30,10 +30,10 @@ enum class SubscriptionChangeReason : uint8_t
 	kSpawned,
 	kChangedFrame,
 	kDied,
-	kFleetSync,
+	kFleetSynchronization,
 	kPollTick,
 	kFocusNextFleet,
-	kFocusPrevFleet,
+	kFocusPreviousFleet,
 	kSelectPlayer,
 };
 
@@ -46,20 +46,13 @@ public:
 	ClientSession();
 	~ClientSession();
 
-	// Connection
 	void ConnectToServer(std::string_view serverAddress);
 
-	// Main-loop integration
 	void Reconcile();
 
-	// Subscriptions
-	void UpdateSubscriptions();
 
-	// Update buffering
 	void ApplyReceivedStaticData();
 
-	// Clock correction
-	// Game packet sends
 	void SendUpdatePlayerRequest(int64_t iGlobalPlayerId, bool bUseMissiles, float fNavigationDelay);
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid);
@@ -67,15 +60,12 @@ public:
 	void SendDeleteFleetRequest(const FleetGuid& rFleetGuid);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
 
-	// Subscriptions
-	void UpdateDesiredCoords(SubscriptionChangeReason eReason);
+	void UpdateDesiredCoordinates(SubscriptionChangeReason eReason);
 
 	// Game policy the engine desync core calls back into
-	void ResetCoordStatesForResync();
-	void LogDesyncFrameDifferences(const Frame& rClientFrame, const Frame& rServerFrame);
+	void ResetCoordinateStatesForResynchronization();
 
-	// Managers
-	std::unique_ptr<engine::ClientDesyncCore> mpDesyncCore;
+	std::unique_ptr<engine::ClientDesyncCore> mpDesynchronizationCore;
 	std::unique_ptr<ClientReconciler> mpReconciler;
 	std::unique_ptr<engine::ClientSessionRuntime> mpRuntime;
 
@@ -85,17 +75,15 @@ private:
 	void OnConnectionRejected(std::string_view reason);
 	void OnConnectionFailed();
 	void OnConnectionAccepted();
-	void PollDesyncState();
+	void PollDesynchronizationState();
 	void OnConnectionLost();
 	void OnServerLoad();
 	void OnRuntimeDisconnected();
 	void ProcessReceivedGamePackets();
-	void OnCoordReleased(engine::GridCoord coord);
 	void HydrateReceivedFullState(Frame& rReceived, const Frame* pRingTail);
 
-	// Game packet helpers
 	void ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent);
-	void UpdatePlayerCoord(engine::GlobalId globalPlayerId, engine::GridCoord coord);
+	void UpdatePlayerCoordinate(engine::GlobalId globalPlayerId, engine::GridCoord coordinate);
 
 };
 

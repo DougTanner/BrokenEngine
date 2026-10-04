@@ -21,7 +21,7 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 
 ## Deterministic Tick Contracts
 
-- The engine runtime owns the active set and calls two hooks here: contribute every coordinate holding at least one Player, and forward ownership of each departing current Frame to the engine replay owner before the runtime erases the coordinate storage. Retention after that handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
+- The engine runtime owns the active set and calls the game hook to contribute every coordinate holding at least one Player. It forwards ownership of each departing current Frame directly to the engine replay owner before erasing the coordinate storage. Retention after that handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
 - Normal update prepares tick inputs; replay uses coordinates with live readers and consumes its recorded `FrameInput` order exactly, without sorting it again.
 - Apply transfer ownership relinks before death detection: a transferred Player updates its client/GUID ownership record before the tick's death pass, so a live handoff is never treated as a death. A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
 - Spawn assignment completes on the advancing update that builds the spawn status change: the player row is born owned by the requesting client's GUID carried in the spawn status change, and no pairing pass runs after the tick. That GUID is the persistent relink key.

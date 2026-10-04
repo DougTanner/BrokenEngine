@@ -11,7 +11,6 @@ namespace game
 
 const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 {
-	// Missile
 	{"Missile Particle Width", &gMissileExplosionParticleWidth},
 	{"Missile Particle Length", &gMissileExplosionParticleLength},
 	{"Missile Particle Length Spread", &gMissileExplosionParticleLengthSpread},
@@ -26,7 +25,6 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Missile Particle Intensity Spread", &gMissileExplosionParticleIntensitySpread},
 	{"Missile Particle Intensity Decay", &gMissileExplosionParticleIntensityDecay},
 	{"Missile Particle Intensity Power", &gMissileExplosionParticleIntensityPower},
-	// Player
 	{"Player Particle Width", &gPlayerExplosionParticleWidth},
 	{"Player Particle Length", &gPlayerExplosionParticleLength},
 	{"Player Particle Length Spread", &gPlayerExplosionParticleLengthSpread},
@@ -41,7 +39,6 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Player Particle Intensity Spread", &gPlayerExplosionParticleIntensitySpread},
 	{"Player Particle Intensity Decay", &gPlayerExplosionParticleIntensityDecay},
 	{"Player Particle Intensity Power", &gPlayerExplosionParticleIntensityPower},
-	// Spaceship
 	{"Spaceship Particle Width", &gSpaceshipExplosionParticleWidth},
 	{"Spaceship Particle Length", &gSpaceshipExplosionParticleLength},
 	{"Spaceship Particle Length Spread", &gSpaceshipExplosionParticleLengthSpread},

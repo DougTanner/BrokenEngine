@@ -248,7 +248,7 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	}
 
 	mrSession.OnConnectionAccepted();
-	mrSession.PollDesyncState();
+	mrSession.PollDesynchronizationState();
 	if (mpClient == nullptr)
 	{
 		return;
@@ -311,7 +311,7 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 
 			rCoordinateFrames.iSnapshotHead = 0;
 			rCoordinateFrames.snapshots[0] = std::move(rFullState.pFrame);
-			rCoordinateFrames.snapshots[0]->postRender.uiSharedCrc = rCoordinateFrames.snapshots[0]->Crcs();
+			rCoordinateFrames.snapshots[0]->postRender.uiSharedCrc = rCoordinateFrames.snapshots[0]->Crc();
 			rCoordinateFrames.iSnapshotCount = 1;
 			rCoordinateFrames.iConfirmedTick = iTick;
 			rCoordinateFrames.iLastFullStateTick = iTick;
@@ -399,7 +399,7 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 				// when several coords are over budget, and the reset plus the discard below empties every
 				// serverUpdates map, so this branch cannot arm again for at least kiMaximumBufferedFrames ticks.
 				mpClient->SendResynchronizationRequest();
-				mrSession.ResetCoordStatesForResync();
+				mrSession.ResetCoordinateStatesForResynchronization();
 				for (std::vector<ReceivedCoordUpdate>& rDrainedUpdates : rAllUpdates)
 				{
 					rDrainedUpdates.clear();
@@ -560,7 +560,7 @@ void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord
 		mpClient->SendUnsubscribe(i);
 		if (rSlots.at(i).eState == CoordSubscriptionState::kUnsubscribing)
 		{
-			mrSession.OnCoordReleased(coordinate);
+			game::gpGame->mCoordinateFrames.erase(coordinate);
 		}
 	}
 
@@ -569,7 +569,7 @@ void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord
 		if (!(rRecord.flags & SubscribeRequestFlags::kCancelled) &&!ContainsCoordinate(desiredCoordinates, rRecord.coordinate))
 		{
 			mpClient->mSubscriptions.mSubscribeRequests.Cancel(rRecord.coordinate);
-			mrSession.OnCoordReleased(rRecord.coordinate);
+			game::gpGame->mCoordinateFrames.erase(rRecord.coordinate);
 		}
 	}
 }

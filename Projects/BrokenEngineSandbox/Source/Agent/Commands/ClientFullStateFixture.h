@@ -7,7 +7,7 @@ namespace game
 
 class ClientSession;
 
-void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json& rResult);
+void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::json& rResult);
 void DetachClientFullStateFixture(ClientSession& rSession);
 
 } // namespace game

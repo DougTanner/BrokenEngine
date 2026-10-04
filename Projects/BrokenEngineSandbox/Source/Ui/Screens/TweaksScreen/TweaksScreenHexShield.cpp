@@ -10,18 +10,15 @@ namespace game
 
 const engine::TweaksSliderMapRegistrar gHexShieldRegistrar
 {
-	// Edge
 	{"Grow", &engine::gHexShieldGrow},
 	{"Edge Distance", &engine::gHexShieldEdgeDistance},
 	{"Edge Power", &engine::gHexShieldEdgePower},
 	{"Edge Multiplier", &engine::gHexShieldEdgeMultiplier},
-	// Wave
 	{"Wave Multiplier", &engine::gHexShieldWaveMultiplier},
 	{"Wave Dot", &engine::gHexShieldWaveDotMultiplier},
 	{"Wave Intensity", &engine::gHexShieldWaveIntensityMultiplier},
 	{"Wave Intensity Power", &engine::gHexShieldWaveIntensityPower},
 	{"Wave Falloff Power", &engine::gHexShieldWaveFalloffPower},
-	// Direction
 	{"Direction Falloff Power", &engine::gHexShieldDirectionFalloffPower},
 	{"Direction Multiplier", &engine::gHexShieldDirectionMultiplier},
 };

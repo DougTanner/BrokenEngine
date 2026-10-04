@@ -575,7 +575,7 @@ void Replay::SaveLoadReplay()
 				const std::vector<ReplayManifestRecord>& rRecordedRecords = manifest.records;
 
 				game::ReplayStagedMeta stagedMeta {};
-				if (!game::ReadReplayMeta({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1), stagedMeta))
+				if (!game::ReadReplayMetadata({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1), stagedMeta))
 				{
 					LOG(kDefault, kError, "Failed to read replay metadata");
 					ReplayFixtures::Reset(*this);
@@ -710,7 +710,7 @@ void Replay::SaveLoadReplay()
 				game::gpGame->miTickCounter = iTickCounter;
 				game::gpGame->mfCurrentTime = fInitialTime;
 
-				game::AdoptReplayMeta(std::move(stagedMeta));
+				game::AdoptReplayMetadata(std::move(stagedMeta));
 				game::OnStateReplaced();
 
 				// Replay owns each active generation until its reader reaches the recorded end. Rebuild directly from
@@ -927,7 +927,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			miReplayInitialTick = 0;
 
 			// Write replay metadata for F8 load
-			bool bMetadataWritten = !ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kMetadata) && game::WriteReplayMeta({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1));
+			bool bMetadataWritten = !ReplayFixtures::ConsumePersistenceFailure(*this, ReplayFixtures::PersistenceFailurePoint::kMetadata) && game::WriteReplayMetadata({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1));
 			bReplayWritten = bMetadataWritten && bReplayWritten;
 
 			if (bReplayWritten)
