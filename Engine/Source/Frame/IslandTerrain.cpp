@@ -95,7 +95,7 @@ IslandTerrain::IslandTerrain()
 #if defined(BT_CLIENT)
 	// Color/normals/AO/masks chunk CRCs must be unique across templates; DataPacker derives them from each
 	// island's separate path, and boot asserts uniqueness. Eviction uses no refcounts: TextureDescriptors
-	// unregisters all five slot channels before IslandTerrain frees channel textures. Sharing a channel
+	// unregisters all five slot channels before IslandTerrainResidency frees channel textures. Sharing a channel
 	// leaves another template sampling freed storage after its generation-verifier record is removed.
 	{
 		std::vector<common::crc_t> channelCrcs;

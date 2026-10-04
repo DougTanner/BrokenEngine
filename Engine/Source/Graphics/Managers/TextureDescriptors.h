@@ -107,7 +107,7 @@ public:
 	void UnregisterBindingsForKey(common::crc_t bindingKey);
 	void AssertBindlessWriteEpoch() const;
 
-	// PipelineDescriptorWriter registers kBindlessArrayConsumer descriptors for arrays with lazily assigned per-slot binding keys, such as IslandTerrain.
+	// PipelineDescriptorWriter registers kBindlessArrayConsumer descriptors for arrays with lazily assigned per-slot binding keys, such as IslandTerrainResidency.
 	// The consumer map uses the live array pointer, such as RenderTargetTextures::mElevationTextures.data(), as its key.
 	struct BindlessArrayConsumer
 	{

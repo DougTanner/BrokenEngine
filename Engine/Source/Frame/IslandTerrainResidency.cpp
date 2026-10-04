@@ -1,10 +1,10 @@
 #if defined(BT_CLIENT)
 
-#include "Graphics/Managers/TextureManager.h"
+#include "IslandTerrainResidency.h"
 
 #include "File/PackChunks.h"
+#include "Graphics/Managers/TextureManager.h"
 #include "Graphics/Islands.h"
-#include "IslandTerrain.h"
 
 namespace engine
 {
@@ -87,7 +87,22 @@ static void CreateElevationTextureFromHeightmap(IslandTemplate& rTemplate, std::
 	});
 }
 
-int64_t IslandTerrain::FirstMintTextureSlot(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const common::crc_t (&rTextureCrcs)[4], std::string_view name)
+IslandTerrainResidency::IslandTerrainResidency()
+{
+	ASSERT(gpIslandTerrainResidency == nullptr);
+
+	gpIslandTerrainResidency = this;
+}
+
+IslandTerrainResidency::~IslandTerrainResidency()
+{
+	if (gpIslandTerrainResidency == this)
+	{
+		gpIslandTerrainResidency = nullptr;
+	}
+}
+
+int64_t IslandTerrainResidency::FirstMintTextureSlot(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const common::crc_t (&rTextureCrcs)[4], std::string_view name)
 {
 	// First-mint. Slot 0 stays the neutral placeholder anchor (no real island ever maps there).
 	// Reuse a slot reclaimed by a prior eviction before extending the high-water mark, so churn
@@ -119,9 +134,9 @@ int64_t IslandTerrain::FirstMintTextureSlot(common::crc_t uiIslandCrc, IslandTem
 	return iSlot;
 }
 
-int64_t IslandTerrain::AcquireTextureSlot(common::crc_t uiIslandCrc)
+int64_t IslandTerrainResidency::AcquireTextureSlot(common::crc_t uiIslandCrc)
 {
-	IslandTemplate& rTemplate = mIslands.at(uiIslandCrc);
+	IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(uiIslandCrc);
 
 	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	if (rTemplate.eMeshResidency == IslandMeshResidency::kNonresident)
@@ -161,13 +176,13 @@ int64_t IslandTerrain::AcquireTextureSlot(common::crc_t uiIslandCrc)
 	return rTemplate.iTextureSlot;
 }
 
-bool IslandTerrain::AnyEvictionPending() const
+bool IslandTerrainResidency::AnyEvictionPending() const
 {
 	if (gpGraphics == nullptr || gpTextureManager == nullptr)
 	{
 		return false;
 	}
-	for (const auto& [rCrc, rTemplate] : mIslands)
+	for (const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		if (IsEvictionPending(rTemplate))
 		{
@@ -177,13 +192,13 @@ bool IslandTerrain::AnyEvictionPending() const
 	return false;
 }
 
-bool IslandTerrain::AnyRestorationPending() const
+bool IslandTerrainResidency::AnyRestorationPending() const
 {
 	if (gpGraphics == nullptr || gpTextureManager == nullptr)
 	{
 		return false;
 	}
-	for (const auto& [rCrc, rTemplate] : mIslands)
+	for (const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		if (IsRestorationPending(rCrc, rTemplate))
 		{
@@ -193,13 +208,13 @@ bool IslandTerrain::AnyRestorationPending() const
 	return false;
 }
 
-bool IslandTerrain::IsEvictionPending(const IslandTemplate& rTemplate) const
+bool IslandTerrainResidency::IsEvictionPending(const IslandTemplate& rTemplate) const
 {
 	return rTemplate.iTextureSlot != 0 && rTemplate.bGpuResident && rTemplate.iReferenceCount == 0
 	    && (gpGraphics->muiFrameCounter - rTemplate.uiLastUsedRenderFrame) > kuiGraceRenderFrames;
 }
 
-bool IslandTerrain::IsRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate) const
+bool IslandTerrainResidency::IsRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate) const
 {
 	if (IsTextureRestorationPending(uiIslandCrc, rTemplate))
 	{
@@ -223,9 +238,9 @@ bool IslandTerrain::IsRestorationPending(common::crc_t uiIslandCrc, const Island
 	return false;
 }
 
-bool IslandTerrain::HasArenaEvictionCandidate(common::crc_t uiExcludedCrc) const
+bool IslandTerrainResidency::HasArenaEvictionCandidate(common::crc_t uiExcludedCrc) const
 {
-	for (const auto& [rCrc, rTemplate] : mIslands)
+	for (const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		if (rCrc != uiExcludedCrc && rTemplate.eMeshResidency == IslandMeshResidency::kResident && rTemplate.bGpuResident && rTemplate.iReferenceCount == 0)
 		{
@@ -235,7 +250,7 @@ bool IslandTerrain::HasArenaEvictionCandidate(common::crc_t uiExcludedCrc) const
 	return false;
 }
 
-bool IslandTerrain::EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, MeshEvictionReason eReason)
+bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, MeshEvictionReason eReason)
 {
 	bool bEligible = eReason == MeshEvictionReason::kGrace ? IsEvictionPending(rTemplate) : rTemplate.iTextureSlot != 0 && rTemplate.bGpuResident && rTemplate.eMeshResidency == IslandMeshResidency::kResident && rTemplate.iReferenceCount == 0;
 	if (!bEligible)
@@ -309,30 +324,32 @@ bool IslandTerrain::EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTe
 	return true;
 }
 
-void IslandTerrain::EvictionSweep()
+void IslandTerrainResidency::EvictionSweep()
 {
 	if (gpGraphics == nullptr || gpTextureManager == nullptr)
 	{
 		return;
 	}
 
-	for (auto& [rCrc, rTemplate] : mIslands)
+	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		EvictTemplate(rCrc, rTemplate);
 	}
 }
 
-void IslandTerrain::RestorationSweep()
+void IslandTerrainResidency::RestorationSweep()
 {
 	if (gpGraphics == nullptr || gpTextureManager == nullptr)
 	{
 		return;
 	}
 
+	std::unordered_map<common::crc_t, IslandTemplate>& rIslands = gpIslandTerrain->mIslands;
+
 	// First-mint assigns the four chunk-backed pointers, while elevation remains at the slot-0
 	// placeholder until this all-four-ready transition. Chunk descriptor writes flow through
 	// ProcessPendingTextures as each channel reaches kReady; RestoreIslandSlot switches elevation.
-	for (auto& [rCrc, rTemplate] : mIslands)
+	for (auto& [rCrc, rTemplate] : rIslands)
 	{
 		if (IsTextureRestorationPending(rCrc, rTemplate))
 		{
@@ -347,7 +364,7 @@ void IslandTerrain::RestorationSweep()
 		}
 	}
 
-	for (auto& [rCrc, rTemplate] : mIslands)
+	for (auto& [rCrc, rTemplate] : rIslands)
 	{
 		MeshRange range = GetMeshRange(rTemplate);
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
@@ -413,7 +430,7 @@ void IslandTerrain::RestorationSweep()
 		{
 			common::crc_t uiEvictCrc = 0;
 			IslandTemplate* pEvictTemplate = nullptr;
-			for (auto& [rCandidateCrc, rCandidate] : mIslands)
+			for (auto& [rCandidateCrc, rCandidate] : rIslands)
 			{
 				if (rCandidateCrc != rCrc && rCandidate.eMeshResidency == IslandMeshResidency::kResident && rCandidate.bGpuResident
 				 && rCandidate.iReferenceCount == 0
@@ -455,9 +472,9 @@ void IslandTerrain::RestorationSweep()
 	}
 }
 
-void IslandTerrain::ReleaseGpuResources()
+void IslandTerrainResidency::ReleaseGpuResources()
 {
-	for (auto& [rCrc, rTemplate] : mIslands)
+	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		rTemplate.meshIndexAllocation = VK_NULL_HANDLE;
 		rTemplate.meshVertexAllocation = VK_NULL_HANDLE;
@@ -480,9 +497,9 @@ void IslandTerrain::ReleaseGpuResources()
 	}
 }
 
-void IslandTerrain::ResetTextureSlots()
+void IslandTerrainResidency::ResetTextureSlots()
 {
-	for (auto& [rCrc, rTemplate] : mIslands)
+	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
 		{

@@ -216,7 +216,7 @@ TextureManager::TextureManager()
 
 	// Device-loss recovery resets per-template slot residency so AcquireTextureSlot re-registers all five channels; elevation stays on its
 	// placeholder until the four chunk-backed channels are ready. Without the reset, the initialization fan-out leaves islands on placeholders.
-	gpIslandTerrain->ResetTextureSlots();
+	gpIslandTerrainResidency->ResetTextureSlots();
 
 	// Island textures load dynamically per ClientSession::ApplyReceivedStaticData. TextureDescriptors
 	// owns the slot writes; these fixed vectors keep the stable backing addresses it registers.

@@ -47,10 +47,10 @@ enum class DescriptorFlags : uint64_t
 	kModel                          = 0x8000,
 
 	// Marks a bindless texture-array descriptor whose per-slot binding key is supplied lazily by the
-	// data subsystem (e.g., IslandTerrain) rather than derivable from ppTextures[k]->mInfo.uiCrc.
+	// data subsystem (e.g., IslandTerrainResidency) rather than derivable from ppTextures[k]->mInfo.uiCrc.
 	// PipelineDescriptorWriter routes flagged entries into TextureDescriptors::mBindlessArrayConsumers;
-	// IslandTerrain::AcquireTextureSlot iterates that registry at first-mint and registers under the
-	// correct islandCrc / chunk-CRC key.
+	// At first-mint, IslandTerrainResidency::AcquireTextureSlot calls TextureDescriptors::MintIslandSlot, whose
+	// RegisterIslandSlotBindings looks up that registry and registers under the correct islandCrc / chunk-CRC key.
 	kBindlessArrayConsumer          = 0x40000,
 };
 using DescriptorFlags_t = common::Flags<DescriptorFlags>;

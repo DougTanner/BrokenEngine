@@ -382,6 +382,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuild.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuildInternal.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavQuery.h" />

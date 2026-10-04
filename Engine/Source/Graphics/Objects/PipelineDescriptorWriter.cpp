@@ -295,7 +295,7 @@ static void RegisterCombinedSamplerBindings(Pipeline& rPipeline, const Descripto
 	{
 		if (rDescriptorInfo.flags & DescriptorFlags::kBindlessArrayConsumer)
 		{
-			// IslandTerrain supplies per-slot binding keys at first mint.
+			// IslandTerrainResidency supplies per-slot binding keys at first mint.
 			// Register the consumer here; TextureDescriptors::RewriteSamplerDescriptors reads its live array.
 			gpTextureManager->mTextureDescriptors.RegisterBindlessArrayConsumer(std::span<Texture*>(rDescriptorInfo.ppTextures, static_cast<size_t>(rDescriptorInfo.iCount)), &rPipeline, iRegisterBinding, rDescriptorInfo.flags);
 		}
@@ -472,7 +472,7 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 				break;
 			}
 
-			// Bindless array consumers require kCombinedSamplers for registration before IslandTerrain acquires slots.
+			// Bindless array consumers require kCombinedSamplers for registration before IslandTerrainResidency acquires slots.
 			ASSERT(!(rDescriptorInfo.flags & DescriptorFlags::kBindlessArrayConsumer) || (rDescriptorInfo.flags & DescriptorFlags::kCombinedSamplers));
 
 			// Deferred registrations require the shader binding number, not the descriptor-write index (VUID-00316).

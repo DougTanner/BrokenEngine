@@ -693,6 +693,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuild.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>

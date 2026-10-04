@@ -351,7 +351,7 @@ void ClientSession::ApplyReceivedStaticData()
 		// happens here so the data is in-flight before UpdateActiveIslands references the slot.
 		for (const engine::IslandPlacement& rPlacement : rFrames.staticData.islands)
 		{
-			engine::gpIslandTerrain->AcquireTextureSlot(rPlacement.islandCrc);
+			engine::gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
 		}
 	}
 }

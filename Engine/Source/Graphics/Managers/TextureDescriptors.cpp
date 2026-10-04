@@ -260,7 +260,7 @@ void TextureDescriptors::WriteFullArrayDescriptors(const Pipeline& rPipeline, in
 void TextureDescriptors::WriteArrayElementFromLive(Texture* const* ppArray, int64_t iIndex)
 {
 	// find() + ASSERT (not operator[]): the array must already be registered as a bindless consumer at
-	// pipeline-create — same invariant guard as IslandTerrain::AcquireTextureSlot's Register lambda.
+	// pipeline-create — same invariant guard as RegisterIslandSlotBindings.
 	auto it = mBindlessArrayConsumers.find(ppArray);
 	ASSERT(it != mBindlessArrayConsumers.end());
 
@@ -562,7 +562,7 @@ void TextureDescriptors::UpdateDescriptorsForTexture(common::crc_t crc)
 void TextureDescriptors::UnregisterBindingsForKey(common::crc_t bindingKey)
 {
 	// Heap: unordered_map::erase deallocates the bucket's vector<TextureBinding>; called from
-	// IslandTerrain::EvictionSweep inside RenderGlobal.
+	// IslandTerrainResidency::EvictionSweep inside RenderGlobal.
 	ScopedSuppressAllocationTracking suppress;
 	mTextureBindings.erase(bindingKey);
 }
@@ -621,7 +621,7 @@ void TextureDescriptors::RewriteSamplerDescriptors()
 		}
 	}
 
-	// IslandTerrain::AcquireTextureSlot mutates live array entries after pipeline creation, so sampler rewrites must use the consumer map's array pointer to avoid stale placeholders.
+	// IslandTerrainResidency::AcquireTextureSlot mutates live array entries after pipeline creation, so sampler rewrites must use the consumer map's array pointer to avoid stale placeholders.
 	// Per-slot TextureBinding entries in the loop above resolve to the same live Texture* and also receive a write.
 	for (const auto& [ppLiveArray, rConsumers] : mBindlessArrayConsumers)
 	{

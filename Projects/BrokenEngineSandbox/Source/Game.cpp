@@ -655,7 +655,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 			// slot this same frame. AcquireTextureSlot is idempotent (hot-path early return).
 			for (const engine::IslandPlacement& rPlacement : it->second.staticData.islands)
 			{
-				engine::gpIslandTerrain->AcquireTextureSlot(rPlacement.islandCrc);
+				engine::gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
 			}
 		}
 	}

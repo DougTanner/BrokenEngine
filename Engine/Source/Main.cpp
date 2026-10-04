@@ -269,6 +269,7 @@ static int MainThread(HINSTANCE hInstance)
 
 	// Create terrain collision data (before Graphics, which creates Islands that reads beach elevation)
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
+	auto pIslandTerrainResidency = std::make_unique<IslandTerrainResidency>();
 
 	// Wait for islands to load and initialize heightmaps before Graphics ctor. Terrain mesh CPU
 	// slices are reclaimed immediately afterward; Graphics records its stable empty arena at boot.

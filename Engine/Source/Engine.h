@@ -73,6 +73,10 @@
 
 #include "Frame/IslandTerrain.h"
 
+#if defined(BT_CLIENT)
+#include "Frame/IslandTerrainResidency.h"
+#endif
+
 #if defined(BT_SERVER)
 #include "Network/NetworkDiscoveryResponder.h"
 #include "Network/Server/OwnedEntityRegistry.h"

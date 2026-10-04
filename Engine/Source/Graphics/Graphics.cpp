@@ -203,7 +203,7 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 	// ProcessPendingTextures republishes only inside the write epoch. This drain covers Vulkan descriptor and image use only — it is not
 	// the PackChunks loader drain (Graphics::Destroy owns that), so unrelated disk loads keep running through this window.
 	gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
-	bool bDescriptorChurnPending = gpIslandTerrain->AnyEvictionPending() || gpIslandTerrain->AnyRestorationPending()
+	bool bDescriptorChurnPending = gpIslandTerrainResidency->AnyEvictionPending() || gpIslandTerrainResidency->AnyRestorationPending()
 	                            || (gpTextureUploadManager->miPendingAdoptions.load(std::memory_order_relaxed) != 0)
 	                            || (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur);
 	if (bDescriptorChurnPending)
@@ -213,14 +213,14 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 		// A completion can race the pre-scan; when no epoch opens it waits until the next frame.
 		// Every island descriptor mutation in this scope therefore follows the all-fence drain.
 		TextureDescriptors::ScopedBindlessWriteEpoch bindlessWriteEpoch(gpTextureManager->mTextureDescriptors);
-		gpIslandTerrain->EvictionSweep();
+		gpIslandTerrainResidency->EvictionSweep();
 		gpTextureManager->ProcessPendingTextures(iCommandBuffer);
 		if (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur)
 		{
 			gpTextureManager->ReblurAllLightingTextures();
 			gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingLightingReblur, false);
 		}
-		gpIslandTerrain->RestorationSweep();
+		gpIslandTerrainResidency->RestorationSweep();
 		gpTextureManager->mTextureDescriptors.VerifyAllDescriptorGenerations();
 	}
 
@@ -788,11 +788,11 @@ bool Graphics::Destroy()
 		gpTextureUploadManager->DestroyTransferResources();
 		// Reset lazy-loaded texture chunk states so they reload after device recreation
 		gpFileManager->mpPackChunks->ResetTextureChunkStates();
-		// IslandTerrain is game-frame-owned (outlives Graphics); mesh arena allocations belong to Islands,
+		// IslandTerrainResidency is owned by Main.cpp (outlives Graphics); mesh arena allocations belong to Islands,
 		// which was destroyed above before mpDeviceManager.reset(). Release only template-owned resources here.
-		if (gpIslandTerrain != nullptr)
+		if (gpIslandTerrainResidency != nullptr)
 		{
-			gpIslandTerrain->ReleaseGpuResources();
+			gpIslandTerrainResidency->ReleaseGpuResources();
 		}
 		mpDeviceManager.reset();
 		mpInstanceManager.reset();
