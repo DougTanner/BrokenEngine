@@ -1,3 +1,5 @@
+#include "Players.h"
+
 #include "Data/Audio.h"
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/FrameStaticData.h"
@@ -7,7 +9,6 @@
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Frame/HealthDamage.h"
 #include "Ui/WindDepositsWrappers.h"
-#include "Players.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"

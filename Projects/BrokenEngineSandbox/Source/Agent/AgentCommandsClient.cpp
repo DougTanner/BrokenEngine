@@ -1,9 +1,10 @@
+#include "Agent/AgentCommands.h"
+
 #include "Agent/Commands/AgentCommandsAudioStreaming.h"
 #include "Agent/Commands/ClientDesyncProbe.h"
 #include "Agent/Commands/ClientFullStateFixture.h"
 #include "Agent/Commands/ClientPacketFaultFixture.h"
 #include "Agent/Commands/ClientSubscriptionFixtures.h"
-#include "Agent/AgentCommands.h"
 
 #if defined(BT_CLIENT)
 

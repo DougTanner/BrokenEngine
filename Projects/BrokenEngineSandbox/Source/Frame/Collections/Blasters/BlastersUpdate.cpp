@@ -1,12 +1,13 @@
 // Note: Not using precompiled header so that this file can be optimized in Debug builds
 #include "Pch.h"
 
+#include "Blasters.h"
+
 #include "Data/Audio.h"
 #include "Frame/FrameStaticData.h"
 
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
-#include "Blasters.h"
 #if defined(BT_CLIENT)
 #include "Data/Texture.h"
 #include "Frame/Collections/PointLights/PointLights.h"

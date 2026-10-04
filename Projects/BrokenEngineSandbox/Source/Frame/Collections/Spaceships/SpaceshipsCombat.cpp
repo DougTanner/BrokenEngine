@@ -1,9 +1,10 @@
+#include "Spaceships.h"
+
 #include "Data/Audio.h"
 #include "Frame/FrameStaticData.h"
 
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
-#include "Spaceships.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"

@@ -1,7 +1,8 @@
 #if defined(BT_CLIENT)
 
-#include "Data/Scene.h"
+#include "Players.h"
 
+#include "Data/Scene.h"
 #include "File/PackChunks.h"
 #include "Graphics/Debug/DebugRender.h"
 #include "Ui/WrapperBase.h"
@@ -9,7 +10,6 @@
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Profile/ProfileManager.h"
 #include "Game.h"
-#include "Players.h"
 
 namespace game
 {

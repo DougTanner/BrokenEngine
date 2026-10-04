@@ -1,9 +1,10 @@
 #if defined(BT_CLIENT)
 
+#include "Missiles.h"
+
 #include "Data/Scene.h"
 
 #include "Profile/ProfileManager.h"
-#include "Missiles.h"
 
 namespace game
 {
