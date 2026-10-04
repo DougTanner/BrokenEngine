@@ -751,7 +751,7 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 	fileStreamOut.flush();
 	fileStreamOut.close();
 	VERIFY_SUCCESS(fileStreamOut.good());
-	mIntermediateFiles.push_back(path);
+	mIntermediateFiles.push_back(std::move(path));
 }
 
 void ExportScene::MainExport(const tinygltf::Model& rGltfModel)
