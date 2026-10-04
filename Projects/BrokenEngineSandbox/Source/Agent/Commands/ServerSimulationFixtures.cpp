@@ -953,19 +953,9 @@ void DrainReplayTransferFixtures(const ServerSession& rSession, engine::ServerTr
 		return;
 	}
 
-	for (auto& [rCoordinate, rTransfers] : sFixture.replayTransferFixtures)
+	for (const auto& [rCoordinate, rTransfers] : sFixture.replayTransferFixtures)
 	{
-		auto it = gpGame->mCoordinateFrames.find(rCoordinate);
-		if (it == gpGame->mCoordinateFrames.end() || it->second.pNext == nullptr)
-		{
-			gpGame->CreateFrameAtCoordinate(rCoordinate);
-			engine::CoordFrames& rFrames = gpGame->mCoordinateFrames.at(rCoordinate);
-			rFrames.pNext = std::make_unique<Frame>();
-			std::swap(rFrames.pCurrent, rFrames.pNext);
-		}
-
-		std::vector<StatusChange>& rDestinationTransfers = rTransferManager.mTransfers.try_emplace(rCoordinate).first->second;
-		rDestinationTransfers.insert(rDestinationTransfers.end(), std::make_move_iterator(rTransfers.begin()), std::make_move_iterator(rTransfers.end()));
+		rTransferManager.PrepareReplayTransfers(rCoordinate, rTransfers);
 	}
 	sFixture.replayTransferFixtures.clear();
 }
