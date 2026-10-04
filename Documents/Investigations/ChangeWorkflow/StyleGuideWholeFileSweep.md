@@ -103,11 +103,14 @@ running parallel unit pipelines whose prompts end in `FIND-DONE`, `FIX-DONE` and
 
 ## Phase 1 — per-unit pipeline
 
-Batches run one after another. For each batch, main launches the coordinator
-detached, because a batch outlives the 2-hour background-task limit:
+Batches run one after another. For each batch, main deletes
+`Temp/StyleSweep/Status.txt` if present, launches the coordinator detached,
+because a batch outlives the 2-hour background-task limit:
 `Start-Process pwsh -WindowStyle Hidden -WorkingDirectory <worktree root> -ArgumentList '-NoProfile','-File','Temp/StyleSweep/Run-Sweep.ps1','-Batch','<batch>'`,
-then waits with an until-loop on `Temp/StyleSweep/Status.txt` leaving
-`RUNNING`. The coordinator runs eight unit pipelines at a time
+then waits with an until-loop until `Temp/StyleSweep/Status.txt` exists and no
+longer reads `RUNNING`; the delete keeps the previous run's final line from
+ending the wait before the new coordinator writes `RUNNING`.
+The coordinator runs eight unit pipelines at a time
 (`-Throttle`); each pipeline is two Codex runs in order, retried once on
 failure, and a unit that still fails is listed in `Failures.txt`. Agents hand
 off through files; main reads only `Status.txt` and the propagate summary.
