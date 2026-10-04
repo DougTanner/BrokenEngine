@@ -55,8 +55,9 @@ carry the `retained` projection.
 `Get-NextPlanList.ps1` runs only when [the `/next-plan` steps](../SKILL.md#steps) step 2 calls for
 it. It reports a bounded projection: per-state counts, then the first Plans in
 selection order (default 5) as `path`/`state` rows, with `blockedBy` on a
-blocked row and `diagnostic` on an excluded one. It never emits the whole tree,
-so a large Plan queue cannot flood the session. It deliberately reads the
+blocked row and `diagnostic` on an excluded one, and `claim` (`session`,
+`worktree`, `expiresAt`) on any row with a live claim. It never emits the whole
+tree, so a large Plan queue cannot flood the session. It deliberately reads the
 session worktree's own tree and never moves it, so a Plan landed on primary
 after this session started shows up only after the claim script fast-forwards
 the session. Its eligible and claimed states are likewise an unguarded
@@ -72,16 +73,21 @@ An exact `Documents/Plans/...` path that is absent, blocked, excluded, or
 claimed by another session yields `none-available`. Its message names that
 current cause: blocked results list at most 10 sorted prerequisite paths and an
 omitted count, excluded results carry the matching row or Plan diagnostic,
-claimed results expose no claim identity, and absent results say the path is
-absent from the session tree. Because the listing is an unguarded later
-snapshot, an eligible or otherwise unclassifiable result instead directs a
-retry. A bare `none-available` result skips this diagnosis. A partial pattern
-matching several validated executable Plans yields `plan-name-ambiguous`, whose
-`message` names no match; the matching Plan paths are in the result's
-`candidates` array.
+claimed results name the holder's session, worktree, and claim expiry and
+carry them as the `holder` object (`session`, `worktree`, `expiresAt`), and
+absent results say the path is absent from the session tree. A
+`-UserAuthorizedTakeover` rerun of a claimed result releases that holder's
+claim and claims the Plan, returning the ordinary claim result with `holder`
+naming the released session; a release WorktreeCli refuses stops with
+`claim.takeover-failed` and `stop-report-to-user`, still carrying `holder`.
+Because the listing is an unguarded later snapshot, an eligible or otherwise
+unclassifiable result instead directs a retry. A bare `none-available` result
+skips this diagnosis. A partial pattern matching several validated executable
+Plans yields `plan-name-ambiguous`, whose `message` names no match; the matching
+Plan paths are in the result's `candidates` array.
 
 If an exact or resolved request differs from the Plan the session already
-holds, the `/v7` claim envelope returns
+holds, the `/v8` claim envelope returns
 `claim.plan-mismatch` with `status: blocked`, exit 2, and
 `nextAction: stop-report-to-user`. Its `conflict` object carries the normalized
 `requestedPlan` and `heldPlan`; WorktreeCli makes the comparison and the wrapper

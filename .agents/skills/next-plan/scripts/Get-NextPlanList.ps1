@@ -15,9 +15,9 @@ try {
 	$rows=@(if($listing.PSObject.Properties.Name -ccontains 'plans' -and $null -ne $listing.plans){$listing.plans}else{@()})
 	$stateCounts=[ordered]@{}
 	foreach($row in $rows){$state=[string]$row.state;if(-not $stateCounts.Contains($state)){$stateCounts[$state]=0};$stateCounts[$state]++}
-	$plans=@(foreach($row in @($rows|Select-Object -First $Top)){$plan=[ordered]@{path=[string]$row.path;state=[string]$row.state};if($row.PSObject.Properties.Name -ccontains 'blockedBy'){$plan.blockedBy=@($row.blockedBy)};if($row.PSObject.Properties.Name -ccontains 'diagnostic'){$plan.diagnostic=[string]$row.diagnostic};$plan})
+	$plans=@(foreach($row in @($rows|Select-Object -First $Top)){$plan=[ordered]@{path=[string]$row.path;state=[string]$row.state};if($row.PSObject.Properties.Name -ccontains 'blockedBy'){$plan.blockedBy=@($row.blockedBy)};if($row.PSObject.Properties.Name -ccontains 'diagnostic'){$plan.diagnostic=[string]$row.diagnostic};if($row.PSObject.Properties.Name -ccontains 'claim'){$plan.claim=$row.claim};$plan})
 	$projection=[ordered]@{
-		schemaVersion='broken-engine-next-plan-list/v1'
+		schemaVersion='broken-engine-next-plan-list/v2'
 		status='pass'
 		code=$(if($listing.PSObject.Properties.Name -ccontains 'code'){[string]$listing.code}else{'ok'})
 		message="First $($plans.Count) of $($rows.Count) Plans in selection order."

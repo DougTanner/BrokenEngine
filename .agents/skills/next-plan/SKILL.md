@@ -328,6 +328,18 @@ deferral, unknown claim state, or work still to land — never prints that line.
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md' -ResumeRetained`
   That switch is valid only with `-Plan` and changes no file. A retained-work
   resume is the one exception to step 1's clean wrapper-created worktree.
+- A targeted `none-available` result naming another session's claim keeps its
+  `nextAction`: report the result's `holder`
+  ([claim-results.md](references/claim-results.md)) and that worktree's state,
+  read only with
+  `git --no-optional-locks -C <holder worktree> status --porcelain` plus a
+  read-only check whether its HEAD is already on the primary branch, never a
+  plain `git status`. Taking the Plan over needs an explicit user takeover
+  instruction given in the current session, recorded in the handoff, and then
+  the targeted claim with `-UserAuthorizedTakeover` appended:
+`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan '<path>' -UserAuthorizedTakeover`
+  That switch is valid only with `-Plan`; nothing else releases another
+  session's claim.
 - On Claude, the checkpoint review covers friction, oversized-result telemetry,
   and isolation evidence after the previous checkpoint's dispatch in the same
   transcript, or from transcript start when none exists, through immediately

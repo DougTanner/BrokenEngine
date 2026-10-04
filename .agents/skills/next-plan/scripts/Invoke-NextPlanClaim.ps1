@@ -1,7 +1,7 @@
 [CmdletBinding()]
-param([string] $Plan,[switch] $ResumeRetained)
+param([string] $Plan,[switch] $ResumeRetained,[switch] $UserAuthorizedTakeover)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
-$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v7';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
+$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v8';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
 function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
 # NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
 # a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
@@ -21,7 +21,12 @@ function Get-TargetedNoneMessage($Context,[string]$RequestedPlan){
 			$row=$matches[0];$state=[string]$row.state
 			if($state -ceq 'blocked' -and $row.PSObject.Properties.Name -ccontains 'blockedBy'){$blockers=[Collections.Generic.List[string]]::new();foreach($path in @($row.blockedBy)){$blockers.Add([string]$path)};if($blockers.Count -eq 0){return $fallback};$blockers.Sort([StringComparer]::Ordinal);return "The requested Plan '$RequestedPlan' is blocked by prerequisite Plans: $(Format-DirtyPath $blockers.ToArray())."}
 			if($state -ceq 'excluded' -and $row.PSObject.Properties.Name -ccontains 'diagnostic' -and -not [string]::IsNullOrWhiteSpace([string]$row.diagnostic)){return "The requested Plan '$RequestedPlan' is excluded from selection: $([string]$row.diagnostic)."}
-			if($state -ceq 'claimed'){return "The requested Plan '$RequestedPlan' is claimed by another session."}
+			if($state -ceq 'claimed'){
+				# ConvertFrom-Json turned the timestamp into a UTC DateTime; ConvertTo-Json renders the same instant as ISO 8601
+				# text, though not necessarily WorktreeCli's exact digits.
+				$result.holder=[ordered]@{session=[string]$row.claim.session;worktree=[string]$row.claim.worktree;expiresAt=$row.claim.expiresAt}
+				return "The requested Plan '$RequestedPlan' is claimed by session $($result.holder.session) in worktree '$($result.holder.worktree)' until $((ConvertTo-Json -InputObject $result.holder.expiresAt -Compress).Trim('"'))."
+			}
 			if($state -ceq 'eligible'){return "A later scheduler listing currently reports the requested Plan '$RequestedPlan' as eligible; retry the targeted claim."}
 			return $fallback
 		}
@@ -37,6 +42,7 @@ try {
  Import-Module (Join-Path $PSScriptRoot 'NextPlanWorkflowCommon.psm1') -Force -DisableNameChecking
  $targeted=-not [string]::IsNullOrWhiteSpace($Plan)
  if($ResumeRetained -and -not $targeted){Complete-Claim 2 'blocked' 'claim.usage-error' '-ResumeRetained is valid only with -Plan, because only a named Plan can carry work retained by an earlier deferral; no Plan was claimed and the worktree was not touched.' 'stop-report-to-user'}
+ if($UserAuthorizedTakeover -and -not $targeted){Complete-Claim 2 'blocked' 'claim.usage-error' '-UserAuthorizedTakeover is valid only with -Plan, because only a named Plan has a holder to release; no claim was released or made and the worktree was not touched.' 'stop-report-to-user'}
  $pattern=$null
  if ($Plan) {
   $Plan=$Plan.Replace('\','/')
@@ -115,11 +121,24 @@ try {
   $Plan=$candidates[0]
  }
  $claimArguments=@('plan','claim-next','--repo',$context.CommonDirectory,'--primary-worktree',$context.Primary,'--worktree',$context.Worktree,'--branch',$context.SessionBranch,'--owner',$context.Owner,'--session',$context.Session);if($Plan){$claimArguments+=@('--plan',$Plan)}
- $response=Invoke-NextPlanProcess $context.WorktreeCli $claimArguments $context.Worktree;$claim=ConvertFrom-NextPlanProcessJson $response 'plan claim-next'
- if($response.ExitCode -eq 2 -and [string]$claim.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claim.requestedPlan;heldPlan=[string]$claim.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'}
- if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.' 'stop-report-to-user'}
- $code=[string]$claim.code
- if($code -ceq 'none'){$message=if($targeted){Get-TargetedNoneMessage $context $Plan}else{'No eligible Plan is available.'};Complete-Claim 0 'pass' 'none-available' $message 'checkpoint-followup-gate'}
+ # claim-next reports claim-plan-mismatch before none, so reaching the none branch proves this session holds no other
+ # claim; a user-authorized takeover releases the named holder's claim there at most once, then claims through this path.
+ $takeover=$UserAuthorizedTakeover.IsPresent
+ while($true){
+  $response=Invoke-NextPlanProcess $context.WorktreeCli $claimArguments $context.Worktree;$claim=ConvertFrom-NextPlanProcessJson $response 'plan claim-next'
+  if($response.ExitCode -eq 2 -and [string]$claim.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claim.requestedPlan;heldPlan=[string]$claim.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'}
+  if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.' 'stop-report-to-user'}
+  $code=[string]$claim.code
+  if($code -cne 'none'){break}
+  $message=if($targeted){Get-TargetedNoneMessage $context $Plan}else{'No eligible Plan is available.'}
+  if(-not $takeover -or -not $result.Contains('holder') -or [string]$result.holder.session -ceq $context.Session){Complete-Claim 0 'pass' 'none-available' $message 'checkpoint-followup-gate'}
+  $takeover=$false
+  # Every scheduler claim is created by this script with owner and session both set to the session ID, and plan unclaim
+  # finds a claim by owner and session alone, using --worktree only to resolve the repository.
+  $unclaim=Invoke-NextPlanProcess $context.WorktreeCli @('plan','unclaim','--repo',$context.CommonDirectory,'--worktree',$context.Worktree,'--owner',$result.holder.session,'--session',$result.holder.session) $context.Worktree
+  $releaseCode=try{[string](ConvertFrom-NextPlanProcessJson $unclaim 'plan unclaim').code}catch{''}
+  if($unclaim.ExitCode -ne 0 -or $releaseCode -notin @('released','already-absent')){$exit=if($unclaim.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.takeover-failed' "WorktreeCli did not release the claim session $($result.holder.session) holds on '$Plan' (exit $($unclaim.ExitCode), code '$releaseCode'); no Plan was claimed." 'stop-report-to-user'}
+ }
  if($code -cne 'claimed' -and $code -cne 'existing'){throw "plan claim-next returned an unknown result code '$code'."}
  $result.claim=[ordered]@{claimed=$true;plan=[string]$claim.plan;state=$code}
  if($code -ceq 'existing'){Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
