@@ -144,19 +144,15 @@ bool ArmPersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eFailu
 		const Replay::ReplayWriterState* pSelectedGeneration = &rWriterGenerations.back();
 		if (pSelectedGeneration->bTerminal)
 		{
-			pSelectedGeneration = nullptr;
-			for (auto generationIt = rWriterGenerations.rbegin(); generationIt != rWriterGenerations.rend(); ++generationIt)
+			auto selectedIt = std::ranges::find_last_if(rWriterGenerations, [](const Replay::ReplayWriterState& rGeneration)
 			{
-				if (generationIt->bTerminal && generationIt->pRetainedEndFrame != nullptr)
-				{
-					pSelectedGeneration = &*generationIt;
-					break;
-				}
-			}
-			if (pSelectedGeneration == nullptr)
+				return rGeneration.bTerminal && rGeneration.pRetainedEndFrame != nullptr;
+			}).begin();
+			if (selectedIt == rWriterGenerations.end())
 			{
 				return false;
 			}
+			pSelectedGeneration = &*selectedIt;
 		}
 		pBinding->iPersistenceFailureActivationTick = pSelectedGeneration->iActivationTick;
 	}
