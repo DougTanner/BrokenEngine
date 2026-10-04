@@ -5,6 +5,7 @@
 #include "ProfileManagerBase.h"
 
 #include "Network/Client/ClientSession.h"
+#include "Profile/ProfileManager.h"
 #include "Game.h"
 
 namespace engine
@@ -24,63 +25,7 @@ static void AppendBytes(common::Workbuffer& rWorkbuffer, int64_t iBytes)
 	}
 }
 
-void ProfileManagerBase::FormatNetworkScreen(common::Workbuffer& rWorkbuffer)
-{
-	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-
-	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
-	{
-		static constexpr engine::NetworkSimulationConfig kSimulationConfiguration = engine::GetNetworkSimulationConfiguration(keNetworkSimulation);
-		rWorkbuffer.Append("Network (Sim: ");
-		if (game::gpGame->mTimeStep.miTimeMultiply > 1)
-		{
-			rWorkbuffer.Append("BYPASS ");
-			rWorkbuffer.Append(engine::GetNetworkSimulationName(keNetworkSimulation));
-			rWorkbuffer.Append(")");
-		}
-		else
-		{
-			rWorkbuffer.Append(engine::GetNetworkSimulationName(keNetworkSimulation));
-			rWorkbuffer.Append(" ");
-			rWorkbuffer.Append(kSimulationConfiguration.iPingMinimumMilliseconds);
-			rWorkbuffer.Append("-");
-			rWorkbuffer.Append(kSimulationConfiguration.iPingMaximumMilliseconds);
-			rWorkbuffer.Append("ms)");
-		}
-	}
-	else
-	{
-		rWorkbuffer.Append("Network (Sim: Off)");
-	}
-
-	if (engine::gpClient == nullptr)
-	{
-		rWorkbuffer.Append("\n(Offline)");
-	}
-	else
-	{
-		FormatNetworkTransport(rWorkbuffer);
-		FormatNetworkSynchronization(rWorkbuffer);
-		FormatNetworkPrediction(rWorkbuffer);
-		FormatNetworkClock(rWorkbuffer);
-		FormatNetworkReconciliation(rWorkbuffer);
-	}
-
-	engine::gpImGuiManager->UpdateTextArea(engine::kTextProfileFps, rWorkbuffer.View());
-}
-
-void ProfileManagerBase::FormatNetworkTransport(common::Workbuffer& rWorkbuffer)
-{
-	rWorkbuffer.Append("\n-- Transport --\n");
-	ENetPeer* pPeer = engine::gpClient->mpServerPeer;
-	if (pPeer != nullptr)
-	{
-		FormatNetworkPeerMetrics(rWorkbuffer, *pPeer);
-	}
-	FormatNetworkTraffic(rWorkbuffer);
-}
-
-void ProfileManagerBase::FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENetPeer& rPeer)
+static void FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENetPeer& rPeer)
 {
 	[[maybe_unused]] static constexpr engine::NetworkSimulationConfig kSimulationConfiguration = engine::GetNetworkSimulationConfiguration(keNetworkSimulation);
 	int64_t iRtt = static_cast<int64_t>(rPeer.roundTripTime);
@@ -139,13 +84,13 @@ void ProfileManagerBase::FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffe
 	rWorkbuffer.AppendFloat(engine::gpClient->mSmoothedJitterMicroseconds.mSmoothedValue / 1'000.0f, 1);
 	rWorkbuffer.Append(" ms\n");
 
-	mSmoothedRoundTripTime = iRtt;
-	mSmoothedRoundTripTime.Update();
-	mSmoothedJitter = engine::gpClient->mSmoothedJitterMicroseconds.mSmoothedValue / 1'000;
-	mSmoothedJitter.Update();
+	gpProfileManager->mSmoothedRoundTripTime = iRtt;
+	gpProfileManager->mSmoothedRoundTripTime.Update();
+	gpProfileManager->mSmoothedJitter = engine::gpClient->mSmoothedJitterMicroseconds.mSmoothedValue / 1'000;
+	gpProfileManager->mSmoothedJitter.Update();
 }
 
-void ProfileManagerBase::FormatNetworkTraffic(common::Workbuffer& rWorkbuffer)
+static void FormatNetworkTraffic(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("In: ");
 	AppendBytes(rWorkbuffer, engine::gpClient->mBytesInPerSecond.Get());
@@ -153,7 +98,18 @@ void ProfileManagerBase::FormatNetworkTraffic(common::Workbuffer& rWorkbuffer)
 	AppendBytes(rWorkbuffer, engine::gpClient->mBytesOutPerSecond.Get());
 }
 
-void ProfileManagerBase::FormatNetworkSynchronization(common::Workbuffer& rWorkbuffer)
+static void FormatNetworkTransport(common::Workbuffer& rWorkbuffer)
+{
+	rWorkbuffer.Append("\n-- Transport --\n");
+	ENetPeer* pPeer = engine::gpClient->mpServerPeer;
+	if (pPeer != nullptr)
+	{
+		FormatNetworkPeerMetrics(rWorkbuffer, *pPeer);
+	}
+	FormatNetworkTraffic(rWorkbuffer);
+}
+
+static void FormatNetworkSynchronization(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("\n-- Sync --\n");
 	{
@@ -174,26 +130,26 @@ void ProfileManagerBase::FormatNetworkSynchronization(common::Workbuffer& rWorkb
 		rWorkbuffer.Append(iMinimumAcknowledgmentFloor);
 		rWorkbuffer.Append("  Conf: ");
 		rWorkbuffer.Append(game::gpClientSession->mpRuntime->GetConfirmedTick());
-		mSmoothedReceived = iTotalReceived;
+		gpProfileManager->mSmoothedReceived = iTotalReceived;
 	}
-	mSmoothedReceived.Update();
+	gpProfileManager->mSmoothedReceived.Update();
 	rWorkbuffer.Append("\nRecv: ");
-	rWorkbuffer.Append(mSmoothedReceived.mSmoothedValue);
+	rWorkbuffer.Append(gpProfileManager->mSmoothedReceived.mSmoothedValue);
 	rWorkbuffer.Append("/128");
 }
 
-void ProfileManagerBase::FormatNetworkPrediction(common::Workbuffer& rWorkbuffer)
+static void FormatNetworkPrediction(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("\n-- Prediction --\n");
 	auto it = game::gpGame->mCoordinateFrames.find(game::gpGame->mClientGridCoordinate);
 	if (it != game::gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
 	{
-		mSmoothedRollback = game::gpGame->RenderFrame(game::gpGame->mClientGridCoordinate).interpolate.iTick - game::gpClientSession->mpRuntime->GetClientConfirmedTick();
+		gpProfileManager->mSmoothedRollback = game::gpGame->RenderFrame(game::gpGame->mClientGridCoordinate).interpolate.iTick - game::gpClientSession->mpRuntime->GetClientConfirmedTick();
 	}
-	mSmoothedRollback.Update();
-	mSmoothedBuffer = game::gpClientSession->mpRuntime->GetServerUpdateBufferSize();
-	mSmoothedBuffer.Update();
-	int64_t iRollbackValue = mSmoothedRollback.mSmoothedValue;
+	gpProfileManager->mSmoothedRollback.Update();
+	gpProfileManager->mSmoothedBuffer = game::gpClientSession->mpRuntime->GetServerUpdateBufferSize();
+	gpProfileManager->mSmoothedBuffer.Update();
+	int64_t iRollbackValue = gpProfileManager->mSmoothedRollback.mSmoothedValue;
 	rWorkbuffer.Append("Rollback: ");
 	rWorkbuffer.Append(iRollbackValue);
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
@@ -204,7 +160,7 @@ void ProfileManagerBase::FormatNetworkPrediction(common::Workbuffer& rWorkbuffer
 		}
 	}
 	rWorkbuffer.Append("  Buffer: ");
-	rWorkbuffer.Append(mSmoothedBuffer.mSmoothedValue);
+	rWorkbuffer.Append(gpProfileManager->mSmoothedBuffer.mSmoothedValue);
 	rWorkbuffer.Append("\nDesync: ");
 	bool bDesynchronization = game::gpClientSession->mpDesyncCore->mDesyncDebugState.iTick >= 0;
 	if (bDesynchronization)
@@ -223,25 +179,25 @@ void ProfileManagerBase::FormatNetworkPrediction(common::Workbuffer& rWorkbuffer
 	}
 }
 
-void ProfileManagerBase::FormatNetworkClock(common::Workbuffer& rWorkbuffer)
+static void FormatNetworkClock(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("\n-- Clock --\n");
 	rWorkbuffer.Append("Offset: ");
-	rWorkbuffer.Append(mSmoothedClockOffset.mSmoothedValue);
+	rWorkbuffer.Append(gpProfileManager->mSmoothedClockOffset.mSmoothedValue);
 	rWorkbuffer.Append("  Target: -");
-	rWorkbuffer.Append(mSmoothedClockTarget.mSmoothedValue);
+	rWorkbuffer.Append(gpProfileManager->mSmoothedClockTarget.mSmoothedValue);
 	rWorkbuffer.Append("  Err: ");
-	rWorkbuffer.Append(mSmoothedClockError.mSmoothedValue);
+	rWorkbuffer.Append(gpProfileManager->mSmoothedClockError.mSmoothedValue);
 }
 
-void ProfileManagerBase::FormatNetworkReconciliation(common::Workbuffer& rWorkbuffer)
+static void FormatNetworkReconciliation(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("\n-- Reconciliation --\n");
-	int64_t iCrc = mCrcValidatedTicksPerSecond.Get();
-	int64_t iAssumed = mAssumedTicksPerSecond.Get();
-	int64_t iFast = mCrcFastPathEventsPerSecond.Get();
-	int64_t iStatus = mStatusChangeReplayTicksPerSecond.Get();
-	int64_t iKnockOn = mKnockOnReplayTicksPerSecond.Get();
+	int64_t iCrc = gpProfileManager->mCrcValidatedTicksPerSecond.Get();
+	int64_t iAssumed = gpProfileManager->mAssumedTicksPerSecond.Get();
+	int64_t iFast = gpProfileManager->mCrcFastPathEventsPerSecond.Get();
+	int64_t iStatus = gpProfileManager->mStatusChangeReplayTicksPerSecond.Get();
+	int64_t iKnockOn = gpProfileManager->mKnockOnReplayTicksPerSecond.Get();
 
 	bool bCrcFlag = false;
 	bool bAssumedFlag = false;
@@ -275,14 +231,49 @@ void ProfileManagerBase::FormatNetworkReconciliation(common::Workbuffer& rWorkbu
 	rWorkbuffer.Append(bKnockOnFlag ? " knock-on!" : " knock-on");
 }
 
-void ProfileManagerBase::SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError)
+void FormatNetworkScreen(common::Workbuffer& rWorkbuffer)
 {
-	mSmoothedClockOffset = iOffset;
-	mSmoothedClockTarget = iTargetBehind;
-	mSmoothedClockError = iError;
-	mSmoothedClockOffset.Update();
-	mSmoothedClockTarget.Update();
-	mSmoothedClockError.Update();
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+
+	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
+	{
+		static constexpr engine::NetworkSimulationConfig kSimulationConfiguration = engine::GetNetworkSimulationConfiguration(keNetworkSimulation);
+		rWorkbuffer.Append("Network (Sim: ");
+		if (game::gpGame->mTimeStep.miTimeMultiply > 1)
+		{
+			rWorkbuffer.Append("BYPASS ");
+			rWorkbuffer.Append(engine::GetNetworkSimulationName(keNetworkSimulation));
+			rWorkbuffer.Append(")");
+		}
+		else
+		{
+			rWorkbuffer.Append(engine::GetNetworkSimulationName(keNetworkSimulation));
+			rWorkbuffer.Append(" ");
+			rWorkbuffer.Append(kSimulationConfiguration.iPingMinimumMilliseconds);
+			rWorkbuffer.Append("-");
+			rWorkbuffer.Append(kSimulationConfiguration.iPingMaximumMilliseconds);
+			rWorkbuffer.Append("ms)");
+		}
+	}
+	else
+	{
+		rWorkbuffer.Append("Network (Sim: Off)");
+	}
+
+	if (engine::gpClient == nullptr)
+	{
+		rWorkbuffer.Append("\n(Offline)");
+	}
+	else
+	{
+		FormatNetworkTransport(rWorkbuffer);
+		FormatNetworkSynchronization(rWorkbuffer);
+		FormatNetworkPrediction(rWorkbuffer);
+		FormatNetworkClock(rWorkbuffer);
+		FormatNetworkReconciliation(rWorkbuffer);
+	}
+
+	engine::gpImGuiManager->UpdateTextArea(engine::kTextProfileFps, rWorkbuffer.View());
 }
 
 } // namespace engine

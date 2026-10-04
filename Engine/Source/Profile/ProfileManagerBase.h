@@ -369,8 +369,6 @@ public:
 	void GpuStop(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eGpuTimer);
 	void GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers eEnd, bool bLatchShadowSample);
 
-	void RenderImPlotGraphs();
-
 	void SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError);
 #endif // BT_CLIENT
 
@@ -477,31 +475,18 @@ protected:
 	std::chrono::steady_clock::time_point mLastDumpTime = std::chrono::steady_clock::time_point();
 #endif // BT_CLIENT
 
-private:
-
 #if defined(BT_CLIENT)
-	void FormatNetworkScreen(common::Workbuffer& rWorkbuffer);
-	void FormatNetworkTransport(common::Workbuffer& rWorkbuffer);
-	void FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENetPeer& rPeer);
-	void FormatNetworkTraffic(common::Workbuffer& rWorkbuffer);
-	void FormatNetworkSynchronization(common::Workbuffer& rWorkbuffer);
-	void FormatNetworkPrediction(common::Workbuffer& rWorkbuffer);
-	void FormatNetworkClock(common::Workbuffer& rWorkbuffer);
-	void FormatNetworkReconciliation(common::Workbuffer& rWorkbuffer);
-
+public:
 	common::Smoothed<int64_t> mSmoothedRoundTripTime;
 	common::Smoothed<int64_t> mSmoothedJitter;
-public:
 	common::Smoothed<int64_t> mSmoothedClockOffset;
 
 	common::Smoothed<int64_t> mSmoothedClockTarget;
 	common::Smoothed<int64_t> mSmoothedClockError;
-private:
 	common::Smoothed<int64_t> mSmoothedRollback;
 	common::Smoothed<int64_t> mSmoothedBuffer;
 	common::Smoothed<int64_t> mSmoothedReceived;
 
-public:
 	common::InTheLastSecond mCrcValidatedTicksPerSecond;
 
 	common::InTheLastSecond mAssumedTicksPerSecond;
@@ -509,7 +494,6 @@ public:
 
 	common::InTheLastSecond mStatusChangeReplayTicksPerSecond;
 	common::InTheLastSecond mKnockOnReplayTicksPerSecond;
-private:
 #endif // BT_CLIENT
 };
 
@@ -548,6 +532,8 @@ void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 void FormatFramesPerSecondHeader(common::Workbuffer& rWorkbuffer, std::chrono::microseconds elapsedCpuTime);
 void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 void FormatGpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate);
+void FormatNetworkScreen(common::Workbuffer& rWorkbuffer);
+void RenderImPlotGraphs();
 #endif
 
 } // namespace engine

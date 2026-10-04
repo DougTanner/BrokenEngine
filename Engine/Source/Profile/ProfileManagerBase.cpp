@@ -531,6 +531,16 @@ void ProfileManagerBase::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTi
 		}
 	}
 }
+
+void ProfileManagerBase::SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError)
+{
+	mSmoothedClockOffset = iOffset;
+	mSmoothedClockTarget = iTargetBehind;
+	mSmoothedClockError = iError;
+	mSmoothedClockOffset.Update();
+	mSmoothedClockTarget.Update();
+	mSmoothedClockError.Update();
+}
 #endif // BT_CLIENT
 
 void ProfileManagerBase::BootStart(BootTimers eBootTimer)

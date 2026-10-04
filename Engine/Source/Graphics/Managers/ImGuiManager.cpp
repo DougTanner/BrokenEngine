@@ -499,7 +499,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 
 	mpTweaksScreen->Render();
 
-	gpProfileManager->RenderImPlotGraphs();
+	RenderImPlotGraphs();
 	RenderTextAreas();
 
 	ImGui::Render();

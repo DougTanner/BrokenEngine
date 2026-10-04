@@ -5,6 +5,8 @@
 #include "Network/Client/Client.h"
 #include "ProfileManagerBase.h"
 
+#include "Profile/ProfileManager.h"
+
 namespace engine
 {
 
@@ -30,9 +32,9 @@ static void PlotSmoothed(const char* pcLabel, const common::Smoothed<int64_t>& r
 	}
 }
 
-void ProfileManagerBase::RenderImPlotGraphs()
+void RenderImPlotGraphs()
 {
-	if (meProfileScreen != engine::ProfileScreen::kNetwork)
+	if (gpProfileManager->meProfileScreen != engine::ProfileScreen::kNetwork)
 	{
 		return;
 	}
@@ -48,11 +50,11 @@ void ProfileManagerBase::RenderImPlotGraphs()
 
 	if (ImGui::Begin("Network Graphs", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
 	{
-		PlotSmoothed("RTT (ms)", mSmoothedRoundTripTime);
-		PlotSmoothed("Jitter (ms)", mSmoothedJitter);
-		PlotSmoothed("Rollback (ticks)", mSmoothedRollback);
-		PlotSmoothed("Server Buffer", mSmoothedBuffer);
-		PlotSmoothed("Clock Error", mSmoothedClockError);
+		PlotSmoothed("RTT (ms)", gpProfileManager->mSmoothedRoundTripTime);
+		PlotSmoothed("Jitter (ms)", gpProfileManager->mSmoothedJitter);
+		PlotSmoothed("Rollback (ticks)", gpProfileManager->mSmoothedRollback);
+		PlotSmoothed("Server Buffer", gpProfileManager->mSmoothedBuffer);
+		PlotSmoothed("Clock Error", gpProfileManager->mSmoothedClockError);
 	}
 	ImGui::End();
 }
