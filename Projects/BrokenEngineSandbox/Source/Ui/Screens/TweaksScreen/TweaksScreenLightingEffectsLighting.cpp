@@ -54,7 +54,7 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsLightingRegistrar
 	{"Hit Flash Lighting Intensity Two", &gHitFlashLightingIntensityTwo},
 };
 
-void TweaksScreen::RenderLightingEffectsLightingTab()
+void RenderLightingEffectsLightingTab(engine::TweaksScreenBase& rScreen)
 {
 	int64_t iSection = engine::giTweakSectionLighting;
 
@@ -62,60 +62,60 @@ void TweaksScreen::RenderLightingEffectsLightingTab()
 	{
 		ImGui::TableNextColumn();
 
-		WrapperSeparatorText("Explosions - Primary");
-		WrapperSlider("Lighting Area One", iSection, 1.0f, "Explosion Primary Lighting Area One");
-		WrapperSlider("Lighting Area Two", iSection, 1.0f, "Explosion Primary Lighting Area Two");
-		WrapperSlider("Lighting Area Three", iSection, 1.0f, "Explosion Primary Lighting Area Three");
-		WrapperSlider("Lighting Int One", iSection, 1.0f, "Explosion Primary Lighting Intensity One");
-		WrapperSlider("Lighting Int Two", iSection, 1.0f, "Explosion Primary Lighting Intensity Two");
-		WrapperSlider("Lighting Int Three", iSection, 1.0f, "Explosion Primary Lighting Intensity Three");
+		rScreen.WrapperSeparatorText("Explosions - Primary");
+		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Explosion Primary Lighting Area One");
+		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Explosion Primary Lighting Area Two");
+		rScreen.WrapperSlider("Lighting Area Three", iSection, 1.0f, "Explosion Primary Lighting Area Three");
+		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Explosion Primary Lighting Intensity One");
+		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Explosion Primary Lighting Intensity Two");
+		rScreen.WrapperSlider("Lighting Int Three", iSection, 1.0f, "Explosion Primary Lighting Intensity Three");
 
-		WrapperSeparatorText("Explosions - Secondary");
-		WrapperSlider("Lighting Area One", iSection, 1.0f, "Explosion Secondary Lighting Area One");
-		WrapperSlider("Lighting Area Two", iSection, 1.0f, "Explosion Secondary Lighting Area Two");
-		WrapperSlider("Lighting Area Three", iSection, 1.0f, "Explosion Secondary Lighting Area Three");
-		WrapperSlider("Lighting Int One", iSection, 1.0f, "Explosion Secondary Lighting Intensity One");
-		WrapperSlider("Lighting Int Two", iSection, 1.0f, "Explosion Secondary Lighting Intensity Two");
-		WrapperSlider("Lighting Int Three", iSection, 1.0f, "Explosion Secondary Lighting Intensity Three");
+		rScreen.WrapperSeparatorText("Explosions - Secondary");
+		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Explosion Secondary Lighting Area One");
+		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Explosion Secondary Lighting Area Two");
+		rScreen.WrapperSlider("Lighting Area Three", iSection, 1.0f, "Explosion Secondary Lighting Area Three");
+		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Explosion Secondary Lighting Intensity One");
+		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Explosion Secondary Lighting Intensity Two");
+		rScreen.WrapperSlider("Lighting Int Three", iSection, 1.0f, "Explosion Secondary Lighting Intensity Three");
 
-		WrapperSeparatorText("Blasters - Terrain Crater");
-		WrapperSlider("Lighting Area One", iSection, 1.0f, "Crater Lighting Area One");
-		WrapperSlider("Lighting Area Two", iSection, 1.0f, "Crater Lighting Area Two");
-		WrapperSlider("Lighting Area Three", iSection, 1.0f, "Crater Lighting Area Three");
-		WrapperSlider("Lighting Area Four", iSection, 1.0f, "Crater Lighting Area Four");
-		WrapperSlider("Lighting Int One", iSection, 1.0f, "Crater Lighting Intensity One");
-		WrapperSlider("Lighting Int Two", iSection, 1.0f, "Crater Lighting Intensity Two");
-		WrapperSlider("Lighting Int Three", iSection, 1.0f, "Crater Lighting Intensity Three");
-		WrapperSlider("Lighting Int Four", iSection, 1.0f, "Crater Lighting Intensity Four");
+		rScreen.WrapperSeparatorText("Blasters - Terrain Crater");
+		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Crater Lighting Area One");
+		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Crater Lighting Area Two");
+		rScreen.WrapperSlider("Lighting Area Three", iSection, 1.0f, "Crater Lighting Area Three");
+		rScreen.WrapperSlider("Lighting Area Four", iSection, 1.0f, "Crater Lighting Area Four");
+		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Crater Lighting Intensity One");
+		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Crater Lighting Intensity Two");
+		rScreen.WrapperSlider("Lighting Int Three", iSection, 1.0f, "Crater Lighting Intensity Three");
+		rScreen.WrapperSlider("Lighting Int Four", iSection, 1.0f, "Crater Lighting Intensity Four");
 
 		ImGui::TableNextColumn();
 
-		WrapperSeparatorText("Players - Area Light");
-		WrapperSlider("Lighting Size", iSection, 1.0f, "Player Area Light Lighting Size");
-		WrapperSlider("Lighting Intensity", iSection, 1.0f, "Player Area Light Lighting Intensity");
+		rScreen.WrapperSeparatorText("Players - Area Light");
+		rScreen.WrapperSlider("Lighting Size", iSection, 1.0f, "Player Area Light Lighting Size");
+		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Player Area Light Lighting Intensity");
 
-		WrapperSeparatorText("Players - Impact Light");
-		WrapperSlider("Lighting Area One", iSection, 1.0f, "Player Impact Lighting Area One");
-		WrapperSlider("Lighting Area Two", iSection, 1.0f, "Player Impact Lighting Area Two");
-		WrapperSlider("Lighting Int One", iSection, 1.0f, "Player Impact Lighting Intensity One");
-		WrapperSlider("Lighting Int Two", iSection, 1.0f, "Player Impact Lighting Intensity Two");
+		rScreen.WrapperSeparatorText("Players - Impact Light");
+		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Player Impact Lighting Area One");
+		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Player Impact Lighting Area Two");
+		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Player Impact Lighting Intensity One");
+		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Player Impact Lighting Intensity Two");
 
-		WrapperSeparatorText("Players - Hex Shield");
-		WrapperSlider("Lighting Intensity", iSection, 1.0f, "Hex Shield Lighting Intensity");
+		rScreen.WrapperSeparatorText("Players - Hex Shield");
+		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Hex Shield Lighting Intensity");
 
-		WrapperSeparatorText("Missiles - Exhaust");
-		WrapperSlider("Lighting Area", iSection, 1.0f, "Missile Exhaust Lighting Area");
-		WrapperSlider("Lighting Intensity", iSection, 1.0f, "Missile Exhaust Lighting Intensity");
+		rScreen.WrapperSeparatorText("Missiles - Exhaust");
+		rScreen.WrapperSlider("Lighting Area", iSection, 1.0f, "Missile Exhaust Lighting Area");
+		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Missile Exhaust Lighting Intensity");
 
-		WrapperSeparatorText("Spaceships - Enemy Blaster");
-		WrapperSlider("Lighting Area", iSection, 1.0f, "Enemy Blaster Lighting Area");
-		WrapperSlider("Lighting Intensity", iSection, 1.0f, "Enemy Blaster Lighting Intensity");
+		rScreen.WrapperSeparatorText("Spaceships - Enemy Blaster");
+		rScreen.WrapperSlider("Lighting Area", iSection, 1.0f, "Enemy Blaster Lighting Area");
+		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Enemy Blaster Lighting Intensity");
 
-		WrapperSeparatorText("Spaceships - Hit Flash");
-		WrapperSlider("Lighting Area One", iSection, 1.0f, "Hit Flash Lighting Area One");
-		WrapperSlider("Lighting Area Two", iSection, 1.0f, "Hit Flash Lighting Area Two");
-		WrapperSlider("Lighting Int One", iSection, 1.0f, "Hit Flash Lighting Intensity One");
-		WrapperSlider("Lighting Int Two", iSection, 1.0f, "Hit Flash Lighting Intensity Two");
+		rScreen.WrapperSeparatorText("Spaceships - Hit Flash");
+		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Hit Flash Lighting Area One");
+		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Hit Flash Lighting Area Two");
+		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Hit Flash Lighting Intensity One");
+		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Hit Flash Lighting Intensity Two");
 
 		ImGui::EndTable();
 	}

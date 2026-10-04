@@ -85,12 +85,7 @@ void RenderSmokeSection(TweaksScreenBase& rScreen)
 
 			ImGui::EndTabItem();
 		}
-		if (rScreen.BeginSubtab("Deposits", iSection, 1))
-		{
-			rScreen.RenderSmokeDepositsTab();
-
-			ImGui::EndTabItem();
-		}
+		RenderTweakExtensionSubtabs(rScreen, iSection, 1);
 		ImGui::EndTabBar();
 	}
 }

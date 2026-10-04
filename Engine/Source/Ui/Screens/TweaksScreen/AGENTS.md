@@ -7,7 +7,7 @@ Client-only, debug-input-gated ImGui screen for engine and game wrapper settings
 - Sections register once at startup — engine sections first, then game — before the graphics device builds the ImGui screen and before persisted settings load. Registration assigns the dense index identifying a section's window, its bit in the visibility and collapse masks, and its persisted layout slot; the 32-bit mask backing caps the section count. Registration stays out of the screen constructor because device loss reconstructs that object in place.
 - The registry is written only during that startup pass and is immutable while rendering, so render dispatch and label lookup need no synchronization. A section's display label is separate from its persisted stable key, so relabeling a section never discards saved layout.
 - Section layout persists as an engine-owned POD embedded by value in the game settings struct, gated by a CRC over the registered stable keys in order. A mismatch discards the saved layout and keeps constructor defaults, so adding, removing, or reordering sections resets window layout instead of misapplying it.
-- Whole game-owned sections enter through registration; sub-tabs inside an engine section use the base extension hooks.
+- Whole game-owned sections enter through registration. Game content inside an engine section comes from the game's `kTweakExtensionHooks` list: an engine section draws matching entries only where it calls an extension helper — the sub-tab helper appends one sub-tab per labelled entry after its own, tab indices continuing from its own, and the inline helper draws each unlabelled entry. An entry whose section makes no helper call for its kind, labelled or unlabelled, is never drawn.
 - Each slider registrar maps static, globally unique keys to wrappers. Map storage is program-lifetime and allocation suppression is required during its construction. A display label may differ from its key to avoid ImGui ID collisions.
 - Wrapper declaration order and each section's slider order stay aligned. The debug audit runs once per TweaksScreen lifetime, is re-armed by graphics reconstruction, visits every subtab, and reports missing or orphaned registrations.
 - Tabbed sections persist their active tab. Loading force-selects the saved tab for one frame, after which normal rendering updates the stored selection.
@@ -17,4 +17,4 @@ Client-only, debug-input-gated ImGui screen for engine and game wrapper settings
 ## See Also
 
 - Game screens (`../../../../../Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md`) - Screen conventions
-- Game Tweaks implementation (`../../../../../Projects/BrokenEngineSandbox/Source/Ui/Screens/TweaksScreen/`) - Extension hooks
+- Game Tweaks implementation (`../../../../../Projects/BrokenEngineSandbox/Source/Ui/Screens/TweaksScreen/`) - Game sections and extension hook list

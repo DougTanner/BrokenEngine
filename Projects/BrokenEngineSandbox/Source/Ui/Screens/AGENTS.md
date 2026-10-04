@@ -14,5 +14,5 @@ The HUD and the game extension of engine TweaksScreen. The six standard player-f
 ## Ownership
 
 - `ImGuiManager` owns screen invocation and submission; this directory owns game-state gating and interaction semantics for the HUD.
-- Engine TweaksScreen owns the section registry, persistence, tables, and slider mapping. Game Tweaks files register their own whole sections through it and implement extension hooks for sub-tabs of engine sections.
+- Engine TweaksScreen owns the section registry, persistence, tables, and slider mapping. Game Tweaks files register their own whole sections through it and list their content inside engine sections in `kTweakExtensionHooks`.
 - Making the agent UI snapshot visible to readers belongs to `../../../../../Engine/Source/Agent/AGENTS.md`; visual inspection and input command semantics are outside this directory.

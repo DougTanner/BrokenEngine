@@ -41,7 +41,7 @@ const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 	{"Spaceship Hit Volume", &gSpaceshipHitVolume},
 };
 
-void TweaksScreen::RenderSoundEffects()
+void RenderSoundEffects(engine::TweaksScreenBase& rScreen)
 {
 	int64_t iSection = engine::giTweakSectionSound;
 
@@ -49,52 +49,52 @@ void TweaksScreen::RenderSoundEffects()
 	{
 		ImGui::TableNextColumn();
 
-		WrapperSeparatorText("Blasters - Player");
-		WrapperSlider("Volume", iSection, 1.0f, "Player Blaster Volume");
+		rScreen.WrapperSeparatorText("Blasters - Player");
+		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Player Blaster Volume");
 
-		WrapperSeparatorText("Blasters - Enemy");
-		WrapperSlider("Volume", iSection, 1.0f, "Enemy Blaster Volume");
+		rScreen.WrapperSeparatorText("Blasters - Enemy");
+		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Enemy Blaster Volume");
 
-		WrapperSeparatorText("Blasters - Terrain Impact");
-		WrapperSlider("Volume", iSection, 1.0f, "Terrain Impact Volume");
+		rScreen.WrapperSeparatorText("Blasters - Terrain Impact");
+		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Terrain Impact Volume");
 
-		WrapperSeparatorText("Missiles");
-		WrapperSlider("Launch Volume", iSection, 1.0f, "Missile Launch Volume");
-		WrapperSlider("Loop Volume", iSection, 1.0f, "Missile Loop Volume");
+		rScreen.WrapperSeparatorText("Missiles");
+		rScreen.WrapperSlider("Launch Volume", iSection, 1.0f, "Missile Launch Volume");
+		rScreen.WrapperSlider("Loop Volume", iSection, 1.0f, "Missile Loop Volume");
 
-		WrapperSeparatorText("Explosions");
-		WrapperSlider("Volume", iSection, 1.0f, "Explosion Volume");
+		rScreen.WrapperSeparatorText("Explosions");
+		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Explosion Volume");
 
-		WrapperSeparatorText("Players - Shield");
-		WrapperSlider("Hit Volume Base", iSection, 1.0f, "Shield Hit Volume Base");
-		WrapperSlider("Hit Volume Scale", iSection, 1.0f, "Shield Hit Volume Scale");
-		WrapperSlider("Down Volume", iSection, 1.0f, "Shield Down Volume");
+		rScreen.WrapperSeparatorText("Players - Shield");
+		rScreen.WrapperSlider("Hit Volume Base", iSection, 1.0f, "Shield Hit Volume Base");
+		rScreen.WrapperSlider("Hit Volume Scale", iSection, 1.0f, "Shield Hit Volume Scale");
+		rScreen.WrapperSlider("Down Volume", iSection, 1.0f, "Shield Down Volume");
 
-		WrapperSeparatorText("Players - Armor");
-		WrapperSlider("Hit Volume Base", iSection, 1.0f, "Armor Hit Volume Base");
-		WrapperSlider("Hit Volume Scale", iSection, 1.0f, "Armor Hit Volume Scale");
+		rScreen.WrapperSeparatorText("Players - Armor");
+		rScreen.WrapperSlider("Hit Volume Base", iSection, 1.0f, "Armor Hit Volume Base");
+		rScreen.WrapperSlider("Hit Volume Scale", iSection, 1.0f, "Armor Hit Volume Scale");
 
-		WrapperSeparatorText("Spaceships");
-		WrapperSlider("Death Volume", iSection, 1.0f, "Spaceship Death Volume");
-		WrapperSlider("Hit Volume", iSection, 1.0f, "Spaceship Hit Volume");
+		rScreen.WrapperSeparatorText("Spaceships");
+		rScreen.WrapperSlider("Death Volume", iSection, 1.0f, "Spaceship Death Volume");
+		rScreen.WrapperSlider("Hit Volume", iSection, 1.0f, "Spaceship Hit Volume");
 
 		ImGui::TableNextColumn();
 
-		WrapperSeparatorText("Blasters - Player");
-		WrapperSlider("Pitch Min", iSection, 1.0f, "Player Blaster Pitch Min");
-		WrapperSlider("Pitch Random", iSection, 1.0f, "Player Blaster Pitch Random");
+		rScreen.WrapperSeparatorText("Blasters - Player");
+		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Player Blaster Pitch Min");
+		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Player Blaster Pitch Random");
 
-		WrapperSeparatorText("Blasters - Enemy");
-		WrapperSlider("Pitch Min", iSection, 1.0f, "Enemy Blaster Pitch Min");
-		WrapperSlider("Pitch Random", iSection, 1.0f, "Enemy Blaster Pitch Random");
+		rScreen.WrapperSeparatorText("Blasters - Enemy");
+		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Enemy Blaster Pitch Min");
+		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Enemy Blaster Pitch Random");
 
-		WrapperSeparatorText("Missiles");
-		WrapperSlider("Pitch Min", iSection, 1.0f, "Missile Pitch Min");
-		WrapperSlider("Pitch Random", iSection, 1.0f, "Missile Pitch Random");
+		rScreen.WrapperSeparatorText("Missiles");
+		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Missile Pitch Min");
+		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Missile Pitch Random");
 
-		WrapperSeparatorText("Spaceships");
-		WrapperSlider("Death Pitch Min", iSection, 1.0f, "Spaceship Death Pitch Min");
-		WrapperSlider("Death Pitch Random", iSection, 1.0f, "Spaceship Death Pitch Random");
+		rScreen.WrapperSeparatorText("Spaceships");
+		rScreen.WrapperSlider("Death Pitch Min", iSection, 1.0f, "Spaceship Death Pitch Min");
+		rScreen.WrapperSlider("Death Pitch Random", iSection, 1.0f, "Spaceship Death Pitch Random");
 
 		ImGui::EndTable();
 	}

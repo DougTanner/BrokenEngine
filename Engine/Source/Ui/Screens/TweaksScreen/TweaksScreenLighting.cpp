@@ -284,16 +284,7 @@ void RenderLightingSection(TweaksScreenBase& rScreen)
 
 			ImGui::EndTabItem();
 		}
-		if (rScreen.BeginSubtab("Visible", iSection, 3))
-		{
-			rScreen.RenderLightingEffectsVisibleTab();
-			ImGui::EndTabItem();
-		}
-		if (rScreen.BeginSubtab("Lighting", iSection, 4))
-		{
-			rScreen.RenderLightingEffectsLightingTab();
-			ImGui::EndTabItem();
-		}
+		RenderTweakExtensionSubtabs(rScreen, iSection, 3);
 		ImGui::EndTabBar();
 	}
 }

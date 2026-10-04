@@ -12,22 +12,28 @@ class TweaksScreen : public engine::TweaksScreenBase
 public:
 
 	void Render();
-
-	// Whole game sections, reached through the thunks registered by RegisterGameTweakSections().
-	void RenderHexShieldSection();
-	void RenderParticlesSection();
-
-	// Sub-section tabs owned by engine sections.
-	void RenderSmokeDepositsTab() override;
-	void RenderWindDepositsTab() override;
-	void RenderLightingEffectsVisibleTab() override;
-	void RenderLightingEffectsLightingTab() override;
-	void RenderSoundEffects() override;
 };
 
 // Startup-assigned dense section indices, written by RegisterGameTweakSections(). engine::kiInvalidTweakSection until then.
 inline int64_t giTweakSectionHexShield = engine::kiInvalidTweakSection;
 inline int64_t giTweakSectionParticles = engine::kiInvalidTweakSection;
+
+void RenderHexShieldSection(engine::TweaksScreenBase& rScreen);
+void RenderParticlesSection(engine::TweaksScreenBase& rScreen);
+void RenderSmokeDepositsTab(engine::TweaksScreenBase& rScreen);
+void RenderWindDepositsTab(engine::TweaksScreenBase& rScreen);
+void RenderLightingEffectsVisibleTab(engine::TweaksScreenBase& rScreen);
+void RenderLightingEffectsLightingTab(engine::TweaksScreenBase& rScreen);
+void RenderSoundEffects(engine::TweaksScreenBase& rScreen);
+
+inline constexpr engine::TweakExtensionHook kTweakExtensionHooks[]
+{
+	{.piSection = &engine::giTweakSectionLighting, .pcLabel = "Visible", .pRender = RenderLightingEffectsVisibleTab},
+	{.piSection = &engine::giTweakSectionLighting, .pcLabel = "Lighting", .pRender = RenderLightingEffectsLightingTab},
+	{.piSection = &engine::giTweakSectionSound, .pRender = RenderSoundEffects},
+	{.piSection = &engine::giTweakSectionSmoke, .pcLabel = "Deposits", .pRender = RenderSmokeDepositsTab},
+	{.piSection = &engine::giTweakSectionWind, .pcLabel = "Deposits", .pRender = RenderWindDepositsTab},
+};
 
 // Registers the game's tweaks sections. Called from Main.cpp immediately after engine::RegisterEngineTweakSections(),
 // before the Graphics ctor builds ImGuiManager -> TweaksScreen.

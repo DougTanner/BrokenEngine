@@ -57,83 +57,83 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Spaceship Particle Intensity Power", &gSpaceshipExplosionParticleIntensityPower},
 };
 
-void TweaksScreen::RenderParticlesSection()
+void RenderParticlesSection(engine::TweaksScreenBase& rScreen)
 {
 	int64_t iSection = giTweakSectionParticles;
 
 	if (ImGui::BeginTabBar("ParticlesTabs"))
 	{
-		if (BeginSubtab("Missile", iSection, 0))
+		if (rScreen.BeginSubtab("Missile", iSection, 0))
 		{
-			WrapperSeparatorText("Size");
-			WrapperSlider("Width",           iSection, 1.0f, "Missile Particle Width");
-			WrapperSlider("Length",          iSection, 1.0f, "Missile Particle Length");
-			WrapperSlider("Length Spread",   iSection, 1.0f, "Missile Particle Length Spread");
-			WrapperSlider("Position Jitter", iSection, 1.0f, "Missile Particle Position Jitter");
+			rScreen.WrapperSeparatorText("Size");
+			rScreen.WrapperSlider("Width",           iSection, 1.0f, "Missile Particle Width");
+			rScreen.WrapperSlider("Length",          iSection, 1.0f, "Missile Particle Length");
+			rScreen.WrapperSlider("Length Spread",   iSection, 1.0f, "Missile Particle Length Spread");
+			rScreen.WrapperSlider("Position Jitter", iSection, 1.0f, "Missile Particle Position Jitter");
 
-			WrapperSeparatorText("Speed");
-			WrapperSlider("Velocity Base",            iSection, 1.0f, "Missile Particle Velocity Base");
-			WrapperSlider("Velocity Spread",          iSection, 1.0f, "Missile Particle Velocity Spread");
-			WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Missile Particle Vertical Velocity Base");
-			WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Missile Particle Vertical Velocity Spread");
-			WrapperSlider("Velocity Decay",           iSection, 1.0f, "Missile Particle Velocity Decay");
-			WrapperSlider("Gravity",                  iSection, 1.0f, "Missile Particle Gravity");
+			rScreen.WrapperSeparatorText("Speed");
+			rScreen.WrapperSlider("Velocity Base",            iSection, 1.0f, "Missile Particle Velocity Base");
+			rScreen.WrapperSlider("Velocity Spread",          iSection, 1.0f, "Missile Particle Velocity Spread");
+			rScreen.WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Missile Particle Vertical Velocity Base");
+			rScreen.WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Missile Particle Vertical Velocity Spread");
+			rScreen.WrapperSlider("Velocity Decay",           iSection, 1.0f, "Missile Particle Velocity Decay");
+			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Missile Particle Gravity");
 
-			WrapperSeparatorText("Visible");
-			WrapperSlider("Visible Intensity", iSection, 1.0f, "Missile Particle Visible Intensity");
-			WrapperSlider("Intensity Spread",  iSection, 1.0f, "Missile Particle Intensity Spread");
-			WrapperSlider("Intensity Decay",   iSection, 1.0f, "Missile Particle Intensity Decay");
-			WrapperSlider("Intensity Power",   iSection, 1.0f, "Missile Particle Intensity Power");
+			rScreen.WrapperSeparatorText("Visible");
+			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Missile Particle Visible Intensity");
+			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Missile Particle Intensity Spread");
+			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Missile Particle Intensity Decay");
+			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Missile Particle Intensity Power");
 
 			ImGui::EndTabItem();
 		}
 
-		if (BeginSubtab("Player", iSection, 1))
+		if (rScreen.BeginSubtab("Player", iSection, 1))
 		{
-			WrapperSeparatorText("Size");
-			WrapperSlider("Width",           iSection, 1.0f, "Player Particle Width");
-			WrapperSlider("Length",          iSection, 1.0f, "Player Particle Length");
-			WrapperSlider("Length Spread",   iSection, 1.0f, "Player Particle Length Spread");
-			WrapperSlider("Position Jitter", iSection, 1.0f, "Player Particle Position Jitter");
+			rScreen.WrapperSeparatorText("Size");
+			rScreen.WrapperSlider("Width",           iSection, 1.0f, "Player Particle Width");
+			rScreen.WrapperSlider("Length",          iSection, 1.0f, "Player Particle Length");
+			rScreen.WrapperSlider("Length Spread",   iSection, 1.0f, "Player Particle Length Spread");
+			rScreen.WrapperSlider("Position Jitter", iSection, 1.0f, "Player Particle Position Jitter");
 
-			WrapperSeparatorText("Speed");
-			WrapperSlider("Velocity Base",            iSection, 1.0f, "Player Particle Velocity Base");
-			WrapperSlider("Velocity Spread",          iSection, 1.0f, "Player Particle Velocity Spread");
-			WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Player Particle Vertical Velocity Base");
-			WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Player Particle Vertical Velocity Spread");
-			WrapperSlider("Velocity Decay",           iSection, 1.0f, "Player Particle Velocity Decay");
-			WrapperSlider("Gravity",                  iSection, 1.0f, "Player Particle Gravity");
+			rScreen.WrapperSeparatorText("Speed");
+			rScreen.WrapperSlider("Velocity Base",            iSection, 1.0f, "Player Particle Velocity Base");
+			rScreen.WrapperSlider("Velocity Spread",          iSection, 1.0f, "Player Particle Velocity Spread");
+			rScreen.WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Player Particle Vertical Velocity Base");
+			rScreen.WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Player Particle Vertical Velocity Spread");
+			rScreen.WrapperSlider("Velocity Decay",           iSection, 1.0f, "Player Particle Velocity Decay");
+			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Player Particle Gravity");
 
-			WrapperSeparatorText("Visible");
-			WrapperSlider("Visible Intensity", iSection, 1.0f, "Player Particle Visible Intensity");
-			WrapperSlider("Intensity Spread",  iSection, 1.0f, "Player Particle Intensity Spread");
-			WrapperSlider("Intensity Decay",   iSection, 1.0f, "Player Particle Intensity Decay");
-			WrapperSlider("Intensity Power",   iSection, 1.0f, "Player Particle Intensity Power");
+			rScreen.WrapperSeparatorText("Visible");
+			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Player Particle Visible Intensity");
+			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Player Particle Intensity Spread");
+			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Player Particle Intensity Decay");
+			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Player Particle Intensity Power");
 
 			ImGui::EndTabItem();
 		}
 
-		if (BeginSubtab("Spaceship", iSection, 2))
+		if (rScreen.BeginSubtab("Spaceship", iSection, 2))
 		{
-			WrapperSeparatorText("Size");
-			WrapperSlider("Width",           iSection, 1.0f, "Spaceship Particle Width");
-			WrapperSlider("Length",          iSection, 1.0f, "Spaceship Particle Length");
-			WrapperSlider("Length Spread",   iSection, 1.0f, "Spaceship Particle Length Spread");
-			WrapperSlider("Position Jitter", iSection, 1.0f, "Spaceship Particle Position Jitter");
+			rScreen.WrapperSeparatorText("Size");
+			rScreen.WrapperSlider("Width",           iSection, 1.0f, "Spaceship Particle Width");
+			rScreen.WrapperSlider("Length",          iSection, 1.0f, "Spaceship Particle Length");
+			rScreen.WrapperSlider("Length Spread",   iSection, 1.0f, "Spaceship Particle Length Spread");
+			rScreen.WrapperSlider("Position Jitter", iSection, 1.0f, "Spaceship Particle Position Jitter");
 
-			WrapperSeparatorText("Speed");
-			WrapperSlider("Velocity Base",            iSection, 1.0f, "Spaceship Particle Velocity Base");
-			WrapperSlider("Velocity Spread",          iSection, 1.0f, "Spaceship Particle Velocity Spread");
-			WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Spaceship Particle Vertical Velocity Base");
-			WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Spaceship Particle Vertical Velocity Spread");
-			WrapperSlider("Velocity Decay",           iSection, 1.0f, "Spaceship Particle Velocity Decay");
-			WrapperSlider("Gravity",                  iSection, 1.0f, "Spaceship Particle Gravity");
+			rScreen.WrapperSeparatorText("Speed");
+			rScreen.WrapperSlider("Velocity Base",            iSection, 1.0f, "Spaceship Particle Velocity Base");
+			rScreen.WrapperSlider("Velocity Spread",          iSection, 1.0f, "Spaceship Particle Velocity Spread");
+			rScreen.WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Spaceship Particle Vertical Velocity Base");
+			rScreen.WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Spaceship Particle Vertical Velocity Spread");
+			rScreen.WrapperSlider("Velocity Decay",           iSection, 1.0f, "Spaceship Particle Velocity Decay");
+			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Spaceship Particle Gravity");
 
-			WrapperSeparatorText("Visible");
-			WrapperSlider("Visible Intensity", iSection, 1.0f, "Spaceship Particle Visible Intensity");
-			WrapperSlider("Intensity Spread",  iSection, 1.0f, "Spaceship Particle Intensity Spread");
-			WrapperSlider("Intensity Decay",   iSection, 1.0f, "Spaceship Particle Intensity Decay");
-			WrapperSlider("Intensity Power",   iSection, 1.0f, "Spaceship Particle Intensity Power");
+			rScreen.WrapperSeparatorText("Visible");
+			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Spaceship Particle Visible Intensity");
+			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Spaceship Particle Intensity Spread");
+			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Spaceship Particle Intensity Decay");
+			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Spaceship Particle Intensity Power");
 
 			ImGui::EndTabItem();
 		}

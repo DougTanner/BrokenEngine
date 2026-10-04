@@ -32,6 +32,15 @@ struct TweakSectionDescription
 	void (*pRender)(TweaksScreenBase& rScreen) = nullptr;
 };
 
+struct TweakExtensionHook
+{
+	// The engine section this entry extends.
+	const int64_t* piSection = nullptr;
+	// Sub-tab label; nullptr draws the content inline at the section's inline position instead of as a sub-tab.
+	const char* pcLabel = nullptr;
+	void (*pRender)(TweaksScreenBase& rScreen) = nullptr;
+};
+
 // Persisted section layout, engine-owned and embedded by value in the game settings struct so exactly one
 // array bound and one sizeof exist in the program. Padding is explicit (uiPadding) because the whole object is
 // written verbatim and repeated saves of unchanged settings must be byte-identical.
@@ -71,12 +80,6 @@ public:
 
 	void RenderToggleBar();
 	void RenderSectionWindow(int64_t iSection);
-
-	virtual void RenderLightingEffectsVisibleTab() {}
-	virtual void RenderLightingEffectsLightingTab() {}
-	virtual void RenderSoundEffects() {}
-	virtual void RenderSmokeDepositsTab() {}
-	virtual void RenderWindDepositsTab() {}
 
 	void RenderWaveCountRadioButtons(Wrapper& rCountWrapper);
 	bool BeginSubtab(const char* pcLabel, int64_t iSection, int8_t iTab);
@@ -128,6 +131,9 @@ void RenderMiscellaneousSection(TweaksScreenBase& rScreen);
 void RenderSoundSection(TweaksScreenBase& rScreen);
 void RenderSmokeSection(TweaksScreenBase& rScreen);
 void RenderWindSection(TweaksScreenBase& rScreen);
+
+void RenderTweakExtensionSubtabs(TweaksScreenBase& rScreen, int64_t iSection, int8_t iFirstSubtab);
+void RenderTweakExtensionInline(TweaksScreenBase& rScreen, int64_t iSection);
 
 // Registers the engine's sections. Called from Main.cpp immediately before the Graphics ctor (which builds
 // ImGuiManager -> TweaksScreen) and therefore before game::LoadTweaksSettings(). Deliberately not in the

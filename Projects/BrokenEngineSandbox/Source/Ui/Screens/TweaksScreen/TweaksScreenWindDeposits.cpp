@@ -30,32 +30,32 @@ const engine::TweaksSliderMapRegistrar gWindDepositsRegistrar
 	{"Explosions Deposit Intensity", &gWindDepositExplosionsIntensity},
 };
 
-void TweaksScreen::RenderWindDepositsTab()
+void RenderWindDepositsTab(engine::TweaksScreenBase& rScreen)
 {
 	int64_t iSection = engine::giTweakSectionWind;
 
-	WrapperSeparatorText("Player");
-	WrapperSlider("Player Deposit Width", iSection);
-	WrapperSlider("Player Deposit Intensity", iSection);
-	WrapperSlider("Player Deposit Length Multiplier", iSection);
+	rScreen.WrapperSeparatorText("Player");
+	rScreen.WrapperSlider("Player Deposit Width", iSection);
+	rScreen.WrapperSlider("Player Deposit Intensity", iSection);
+	rScreen.WrapperSlider("Player Deposit Length Multiplier", iSection);
 
-	WrapperSeparatorText("Spaceships");
-	WrapperSlider("Spaceships Deposit Width", iSection);
-	WrapperSlider("Spaceships Deposit Intensity", iSection);
-	WrapperSlider("Spaceships Deposit Length Multiplier", iSection);
+	rScreen.WrapperSeparatorText("Spaceships");
+	rScreen.WrapperSlider("Spaceships Deposit Width", iSection);
+	rScreen.WrapperSlider("Spaceships Deposit Intensity", iSection);
+	rScreen.WrapperSlider("Spaceships Deposit Length Multiplier", iSection);
 
-	WrapperSeparatorText("Player Blasters");
-	WrapperSlider("Player Blasters Deposit Width", iSection);
-	WrapperSlider("Player Blasters Deposit Intensity", iSection);
-	WrapperSlider("Blasters Deposit Length Multiplier", iSection);
+	rScreen.WrapperSeparatorText("Player Blasters");
+	rScreen.WrapperSlider("Player Blasters Deposit Width", iSection);
+	rScreen.WrapperSlider("Player Blasters Deposit Intensity", iSection);
+	rScreen.WrapperSlider("Blasters Deposit Length Multiplier", iSection);
 
-	WrapperSeparatorText("Spaceships Blasters");
-	WrapperSlider("Spaceships Blasters Deposit Width", iSection);
-	WrapperSlider("Spaceships Blasters Deposit Intensity", iSection);
+	rScreen.WrapperSeparatorText("Spaceships Blasters");
+	rScreen.WrapperSlider("Spaceships Blasters Deposit Width", iSection);
+	rScreen.WrapperSlider("Spaceships Blasters Deposit Intensity", iSection);
 
-	WrapperSeparatorText("Explosions");
-	WrapperSlider("Explosions Deposit Width", iSection);
-	WrapperSlider("Explosions Deposit Intensity", iSection);
+	rScreen.WrapperSeparatorText("Explosions");
+	rScreen.WrapperSlider("Explosions Deposit Width", iSection);
+	rScreen.WrapperSlider("Explosions Deposit Intensity", iSection);
 }
 
 } // namespace game

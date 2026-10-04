@@ -76,12 +76,7 @@ void RenderWindSection(TweaksScreenBase& rScreen)
 
 			ImGui::EndTabItem();
 		}
-		if (rScreen.BeginSubtab("Deposits", iSection, 1))
-		{
-			rScreen.RenderWindDepositsTab();
-
-			ImGui::EndTabItem();
-		}
+		RenderTweakExtensionSubtabs(rScreen, iSection, 1);
 		ImGui::EndTabBar();
 	}
 }

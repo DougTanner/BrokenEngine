@@ -45,7 +45,7 @@ void RenderSoundSection(TweaksScreenBase& rScreen)
 			rScreen.WrapperSlider("Music", iSection, 1.0f, "Music Volume");
 			rScreen.WrapperSlider("Sound", iSection, 1.0f, "Sound Volume");
 
-			rScreen.RenderSoundEffects();
+			RenderTweakExtensionInline(rScreen, iSection);
 
 			ImGui::EndTabItem();
 		}
