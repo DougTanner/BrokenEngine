@@ -74,20 +74,10 @@ public:
 	void RenderToggleBar();
 	void RenderSectionWindow(int64_t iSection);
 
-	void RenderPbrSection();
-	void RenderTerrainSection();
-	void RenderWaterSection();
-	void RenderLightingSection();
 	virtual void RenderLightingEffectsVisibleTab() {}
 	virtual void RenderLightingEffectsLightingTab() {}
-	void RenderShadowSection();
-	void RenderSunMoonSection();
-	void RenderMiscSection();
-	void RenderSoundSection();
 	virtual void RenderSoundEffects() {}
-	void RenderSmokeSection();
 	virtual void RenderSmokeDepositsTab() {}
-	void RenderWindSection();
 	virtual void RenderWindDepositsTab() {}
 
 	void RenderWaveCountRadioButtons(Wrapper& rCountWrapper);
@@ -129,6 +119,17 @@ inline int64_t giTweakSectionMisc = kiInvalidTweakSection;
 inline int64_t giTweakSectionSound = kiInvalidTweakSection;
 inline int64_t giTweakSectionSmoke = kiInvalidTweakSection;
 inline int64_t giTweakSectionWind = kiInvalidTweakSection;
+
+void RenderPbrSection(TweaksScreenBase& rScreen);
+void RenderTerrainSection(TweaksScreenBase& rScreen);
+void RenderWaterSection(TweaksScreenBase& rScreen);
+void RenderLightingSection(TweaksScreenBase& rScreen);
+void RenderShadowSection(TweaksScreenBase& rScreen);
+void RenderSunMoonSection(TweaksScreenBase& rScreen);
+void RenderMiscSection(TweaksScreenBase& rScreen);
+void RenderSoundSection(TweaksScreenBase& rScreen);
+void RenderSmokeSection(TweaksScreenBase& rScreen);
+void RenderWindSection(TweaksScreenBase& rScreen);
 
 // Registers the engine's sections. Called from Main.cpp immediately before the Graphics ctor (which builds
 // ImGuiManager -> TweaksScreen) and therefore before game::LoadTweaksSettings(). Deliberately not in the

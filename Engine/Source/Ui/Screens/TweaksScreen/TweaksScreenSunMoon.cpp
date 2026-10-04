@@ -45,49 +45,49 @@ const TweaksSliderMapRegistrar gSunMoonRegistrar
 	{"Shadow Sunrise End", &gSunMoonShadowSunriseEnd},
 };
 
-void TweaksScreenBase::RenderSunMoonSection()
+void RenderSunMoonSection(TweaksScreenBase& rScreen)
 {
 	int64_t iSection = giTweakSectionSunMoon;
 
-	WrapperSeparatorText("Color Phase Boundaries (radians)");
-	WrapperSlider("Morning Start", iSection);
-	WrapperSlider("Noon Start", iSection);
-	WrapperSlider("Noon End", iSection);
-	WrapperSlider("Evening Start", iSection);
-	WrapperSlider("Night Start", iSection);
+	rScreen.WrapperSeparatorText("Color Phase Boundaries (radians)");
+	rScreen.WrapperSlider("Morning Start", iSection);
+	rScreen.WrapperSlider("Noon Start", iSection);
+	rScreen.WrapperSlider("Noon End", iSection);
+	rScreen.WrapperSlider("Evening Start", iSection);
+	rScreen.WrapperSlider("Night Start", iSection);
 
-	WrapperSeparatorText("Sun Intensity");
-	WrapperSlider("Sun Terrain", iSection);
-	WrapperSlider("Sun Water", iSection);
-	WrapperSlider("Sun Objects", iSection);
-	WrapperSlider("Sun Smoke", iSection);
+	rScreen.WrapperSeparatorText("Sun Intensity");
+	rScreen.WrapperSlider("Sun Terrain", iSection);
+	rScreen.WrapperSlider("Sun Water", iSection);
+	rScreen.WrapperSlider("Sun Objects", iSection);
+	rScreen.WrapperSlider("Sun Smoke", iSection);
 
-	WrapperSeparatorText("Moon Intensity");
-	WrapperSlider("Moon Terrain", iSection);
-	WrapperSlider("Moon Water", iSection);
-	WrapperSlider("Moon Objects", iSection);
-	WrapperSlider("Moon Smoke", iSection);
-	WrapperSlider("Moon Blue Tint", iSection);
+	rScreen.WrapperSeparatorText("Moon Intensity");
+	rScreen.WrapperSlider("Moon Terrain", iSection);
+	rScreen.WrapperSlider("Moon Water", iSection);
+	rScreen.WrapperSlider("Moon Objects", iSection);
+	rScreen.WrapperSlider("Moon Smoke", iSection);
+	rScreen.WrapperSlider("Moon Blue Tint", iSection);
 
-	WrapperSeparatorText("Moon Timing (radians)");
-	WrapperSlider("Moonrise Start", iSection);
-	WrapperSlider("Moonrise End", iSection);
-	WrapperSlider("Moonset Start", iSection);
-	WrapperSlider("Moonset End", iSection);
+	rScreen.WrapperSeparatorText("Moon Timing (radians)");
+	rScreen.WrapperSlider("Moonrise Start", iSection);
+	rScreen.WrapperSlider("Moonrise End", iSection);
+	rScreen.WrapperSlider("Moonset Start", iSection);
+	rScreen.WrapperSlider("Moonset End", iSection);
 
-	WrapperSeparatorText("Ambient");
-	WrapperSlider("Minimum Ambient", iSection);
-	WrapperSlider("Ambient Multiplier", iSection);
+	rScreen.WrapperSeparatorText("Ambient");
+	rScreen.WrapperSlider("Minimum Ambient", iSection);
+	rScreen.WrapperSlider("Ambient Multiplier", iSection);
 
-	WrapperSeparatorText("Normal Tilt (radians)");
-	WrapperSlider("Normal Tilt", iSection);
+	rScreen.WrapperSeparatorText("Normal Tilt (radians)");
+	rScreen.WrapperSlider("Normal Tilt", iSection);
 
-	WrapperSeparatorText("Shadow Night-Gate (radians)");
-	WrapperSlider("Shadow Night Multiplier", iSection);
-	WrapperSlider("Shadow Sunset Start", iSection);
-	WrapperSlider("Shadow Sunset End", iSection);
-	WrapperSlider("Shadow Sunrise Start", iSection);
-	WrapperSlider("Shadow Sunrise End", iSection);
+	rScreen.WrapperSeparatorText("Shadow Night-Gate (radians)");
+	rScreen.WrapperSlider("Shadow Night Multiplier", iSection);
+	rScreen.WrapperSlider("Shadow Sunset Start", iSection);
+	rScreen.WrapperSlider("Shadow Sunset End", iSection);
+	rScreen.WrapperSlider("Shadow Sunrise Start", iSection);
+	rScreen.WrapperSlider("Shadow Sunrise End", iSection);
 }
 
 } // namespace engine

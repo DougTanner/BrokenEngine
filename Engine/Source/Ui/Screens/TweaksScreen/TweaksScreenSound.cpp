@@ -35,49 +35,49 @@ const TweaksSliderMapRegistrar gSoundRegistrar
 	{"Listener Audible Floor High", &gListenerAudibleFloor.High},
 };
 
-void TweaksScreenBase::RenderSoundSection()
+void RenderSoundSection(TweaksScreenBase& rScreen)
 {
 	int64_t iSection = giTweakSectionSound;
 
 	if (ImGui::BeginTabBar("SoundTabs"))
 	{
-		if (BeginSubtab("Volumes", iSection, 0))
+		if (rScreen.BeginSubtab("Volumes", iSection, 0))
 		{
 			// Engine settings rendered inline (no outer table) so the game-side hook can own its own 2-column table at full sub-tab width.
-			WrapperSeparatorText("Settings");
-			WrapperSlider("Master", iSection, 1.0f, "Master Volume");
-			WrapperSlider("Music", iSection, 1.0f, "Music Volume");
-			WrapperSlider("Sound", iSection, 1.0f, "Sound Volume");
+			rScreen.WrapperSeparatorText("Settings");
+			rScreen.WrapperSlider("Master", iSection, 1.0f, "Master Volume");
+			rScreen.WrapperSlider("Music", iSection, 1.0f, "Music Volume");
+			rScreen.WrapperSlider("Sound", iSection, 1.0f, "Sound Volume");
 
-			RenderSoundEffects();
+			rScreen.RenderSoundEffects();
 
 			ImGui::EndTabItem();
 		}
-		if (BeginSubtab("Tweaks", iSection, 1))
+		if (rScreen.BeginSubtab("Tweaks", iSection, 1))
 		{
-			WrapperSeparatorText("Listener Distance Start");
-			WrapperSlider("Start Height", iSection, 2.0f, "Listener Distance Start Start Height");
-			WrapperSlider("End Height", iSection, 2.0f, "Listener Distance Start End Height");
-			WrapperSlider("Low", iSection, 2.0f, "Listener Distance Start Low");
-			WrapperSlider("High", iSection, 2.0f, "Listener Distance Start High");
+			rScreen.WrapperSeparatorText("Listener Distance Start");
+			rScreen.WrapperSlider("Start Height", iSection, 2.0f, "Listener Distance Start Start Height");
+			rScreen.WrapperSlider("End Height", iSection, 2.0f, "Listener Distance Start End Height");
+			rScreen.WrapperSlider("Low", iSection, 2.0f, "Listener Distance Start Low");
+			rScreen.WrapperSlider("High", iSection, 2.0f, "Listener Distance Start High");
 
-			WrapperSeparatorText("Listener Distance End");
-			WrapperSlider("Start Height", iSection, 2.0f, "Listener Distance End Start Height");
-			WrapperSlider("End Height", iSection, 2.0f, "Listener Distance End End Height");
-			WrapperSlider("Low", iSection, 2.0f, "Listener Distance End Low");
-			WrapperSlider("High", iSection, 2.0f, "Listener Distance End High");
+			rScreen.WrapperSeparatorText("Listener Distance End");
+			rScreen.WrapperSlider("Start Height", iSection, 2.0f, "Listener Distance End Start Height");
+			rScreen.WrapperSlider("End Height", iSection, 2.0f, "Listener Distance End End Height");
+			rScreen.WrapperSlider("Low", iSection, 2.0f, "Listener Distance End Low");
+			rScreen.WrapperSlider("High", iSection, 2.0f, "Listener Distance End High");
 
-			WrapperSeparatorText("Listener Curve");
-			WrapperSlider("Start Height", iSection, 2.0f, "Listener Curve Start Height");
-			WrapperSlider("End Height", iSection, 2.0f, "Listener Curve End Height");
-			WrapperSlider("Low", iSection, 2.0f, "Listener Curve Low");
-			WrapperSlider("High", iSection, 2.0f, "Listener Curve High");
+			rScreen.WrapperSeparatorText("Listener Curve");
+			rScreen.WrapperSlider("Start Height", iSection, 2.0f, "Listener Curve Start Height");
+			rScreen.WrapperSlider("End Height", iSection, 2.0f, "Listener Curve End Height");
+			rScreen.WrapperSlider("Low", iSection, 2.0f, "Listener Curve Low");
+			rScreen.WrapperSlider("High", iSection, 2.0f, "Listener Curve High");
 
-			WrapperSeparatorText("Listener Audible Floor");
-			WrapperSlider("Start Height", iSection, 2.0f, "Listener Audible Floor Start Height");
-			WrapperSlider("End Height", iSection, 2.0f, "Listener Audible Floor End Height");
-			WrapperSlider("Low", iSection, 2.0f, "Listener Audible Floor Low");
-			WrapperSlider("High", iSection, 2.0f, "Listener Audible Floor High");
+			rScreen.WrapperSeparatorText("Listener Audible Floor");
+			rScreen.WrapperSlider("Start Height", iSection, 2.0f, "Listener Audible Floor Start Height");
+			rScreen.WrapperSlider("End Height", iSection, 2.0f, "Listener Audible Floor End Height");
+			rScreen.WrapperSlider("Low", iSection, 2.0f, "Listener Audible Floor Low");
+			rScreen.WrapperSlider("High", iSection, 2.0f, "Listener Audible Floor High");
 
 			ImGui::EndTabItem();
 		}

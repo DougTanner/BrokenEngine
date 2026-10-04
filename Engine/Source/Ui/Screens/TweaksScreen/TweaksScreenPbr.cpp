@@ -48,7 +48,7 @@ const TweaksSliderMapRegistrar gPbrRegistrar
 	{"Emissive", &gPbrEmissive},
 };
 
-void TweaksScreenBase::RenderPbrSection()
+void RenderPbrSection(TweaksScreenBase& rScreen)
 {
 	int64_t iSection = giTweakSectionPbr;
 
@@ -57,52 +57,52 @@ void TweaksScreenBase::RenderPbrSection()
 		// Left column
 		ImGui::TableNextColumn();
 
-		WrapperSeparatorText("Engine Variables");
-		WrapperSlider("Sun", iSection, 1.0f);
-		WrapperSlider("Day Brightness", iSection, 1.0f);
-		WrapperSlider("Model Data Mip Bias", iSection, 1.0f);
+		rScreen.WrapperSeparatorText("Engine Variables");
+		rScreen.WrapperSlider("Sun", iSection, 1.0f);
+		rScreen.WrapperSlider("Day Brightness", iSection, 1.0f);
+		rScreen.WrapperSlider("Model Data Mip Bias", iSection, 1.0f);
 
-		WrapperSeparatorText("BRDF");
-		WrapperSlider("BRDF Diffuse", iSection, 1.0f);
-		WrapperSlider("BRDF Diffuse Power", iSection, 1.0f);
-		WrapperSlider("BRDF Specular", iSection, 1.0f);
-		WrapperSlider("BRDF Specular Power", iSection, 1.0f);
+		rScreen.WrapperSeparatorText("BRDF");
+		rScreen.WrapperSlider("BRDF Diffuse", iSection, 1.0f);
+		rScreen.WrapperSlider("BRDF Diffuse Power", iSection, 1.0f);
+		rScreen.WrapperSlider("BRDF Specular", iSection, 1.0f);
+		rScreen.WrapperSlider("BRDF Specular Power", iSection, 1.0f);
 
-		WrapperSeparatorText("Tone Mapping");
-		WrapperSlider("Exposure", iSection, 1.0f);
-		WrapperSlider("Gamma", iSection, 1.0f);
+		rScreen.WrapperSeparatorText("Tone Mapping");
+		rScreen.WrapperSlider("Exposure", iSection, 1.0f);
+		rScreen.WrapperSlider("Gamma", iSection, 1.0f);
 
-		WrapperSeparatorText("Color Grading");
-		WrapperSlider("Saturation", iSection, 1.0f);
-		WrapperSlider("Contrast", iSection, 1.0f);
-		WrapperSlider("Temperature", iSection, 1.0f);
+		rScreen.WrapperSeparatorText("Color Grading");
+		rScreen.WrapperSlider("Saturation", iSection, 1.0f);
+		rScreen.WrapperSlider("Contrast", iSection, 1.0f);
+		rScreen.WrapperSlider("Temperature", iSection, 1.0f);
 
-		WrapperSeparatorText("Post Lighting");
-		WrapperSlider("Lighting Specular", iSection, 1.0f);
-		WrapperSlider("Lighting Specular Power", iSection, 1.0f);
-		WrapperSlider("Lighting", iSection, 1.0f);
-		WrapperSlider("Lighting Power", iSection, 1.0f);
+		rScreen.WrapperSeparatorText("Post Lighting");
+		rScreen.WrapperSlider("Lighting Specular", iSection, 1.0f);
+		rScreen.WrapperSlider("Lighting Specular Power", iSection, 1.0f);
+		rScreen.WrapperSlider("Lighting", iSection, 1.0f);
+		rScreen.WrapperSlider("Lighting Power", iSection, 1.0f);
 
 		// Right column
 		ImGui::TableNextColumn();
 
-		WrapperSeparatorText("IBL");
-		WrapperSlider("IBL Ambient", iSection, 1.0f);
-		WrapperSlider("IBL Diffuse", iSection, 1.0f);
-		WrapperSlider("IBL Diffuse Power", iSection, 1.0f);
-		WrapperSlider("IBL Specular", iSection, 1.0f);
-		WrapperSlider("IBL Specular Power", iSection, 1.0f);
-		WrapperSlider("IBL Shadow Blend", iSection, 1.0f);
-		WrapperSlider("IBL Ambient Color Blend", iSection, 1.0f);
-		WrapperSlider("Cubemap Lod Power", iSection, 1.0f);
-		WrapperSlider("Cubemap Lod Offset", iSection, 1.0f);
-		WrapperSlider("Shadow Floor", iSection, 1.0f);
+		rScreen.WrapperSeparatorText("IBL");
+		rScreen.WrapperSlider("IBL Ambient", iSection, 1.0f);
+		rScreen.WrapperSlider("IBL Diffuse", iSection, 1.0f);
+		rScreen.WrapperSlider("IBL Diffuse Power", iSection, 1.0f);
+		rScreen.WrapperSlider("IBL Specular", iSection, 1.0f);
+		rScreen.WrapperSlider("IBL Specular Power", iSection, 1.0f);
+		rScreen.WrapperSlider("IBL Shadow Blend", iSection, 1.0f);
+		rScreen.WrapperSlider("IBL Ambient Color Blend", iSection, 1.0f);
+		rScreen.WrapperSlider("Cubemap Lod Power", iSection, 1.0f);
+		rScreen.WrapperSlider("Cubemap Lod Offset", iSection, 1.0f);
+		rScreen.WrapperSlider("Shadow Floor", iSection, 1.0f);
 
-		WrapperSeparatorText("Smoke");
-		WrapperSlider("Smoke", iSection, 1.0f);
+		rScreen.WrapperSeparatorText("Smoke");
+		rScreen.WrapperSlider("Smoke", iSection, 1.0f);
 
-		WrapperSeparatorText("Emissive");
-		WrapperSlider("Emissive", iSection, 1.0f);
+		rScreen.WrapperSeparatorText("Emissive");
+		rScreen.WrapperSlider("Emissive", iSection, 1.0f);
 
 		ImGui::EndTable();
 	}

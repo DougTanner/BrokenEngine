@@ -13,12 +13,12 @@ const TweaksSliderMapRegistrar gMiscRegistrar
 	{"Debug Texture Range", &gMiscDebugTextureLinearRange},
 };
 
-void TweaksScreenBase::RenderMiscSection()
+void RenderMiscSection(TweaksScreenBase& rScreen)
 {
 	int64_t iSection = giTweakSectionMisc;
 
-	WrapperSeparatorText("Misc");
-	WrapperSlider("Debug Texture Range", iSection);
+	rScreen.WrapperSeparatorText("Misc");
+	rScreen.WrapperSlider("Debug Texture Range", iSection);
 }
 
 } // namespace engine

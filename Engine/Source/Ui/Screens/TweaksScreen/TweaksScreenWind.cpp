@@ -33,54 +33,54 @@ const TweaksSliderMapRegistrar gWindRegistrar
 	{"Wind Diffusion Low", &gWindDiffusionLow},
 };
 
-void TweaksScreenBase::RenderWindSection()
+void RenderWindSection(TweaksScreenBase& rScreen)
 {
 	int64_t iSection = giTweakSectionWind;
 
 	if (ImGui::BeginTabBar("WindTabs"))
 	{
-		if (BeginSubtab("Wind", iSection, 0))
+		if (rScreen.BeginSubtab("Wind", iSection, 0))
 		{
-			WrapperSeparatorText("Time & Global");
-			WrapperSlider("Wind Time Scale", iSection);
-			WrapperSlider("Wind Threshold Low", iSection);
-			WrapperSlider("Wind Threshold High", iSection);
+			rScreen.WrapperSeparatorText("Time & Global");
+			rScreen.WrapperSlider("Wind Time Scale", iSection);
+			rScreen.WrapperSlider("Wind Threshold Low", iSection);
+			rScreen.WrapperSlider("Wind Threshold High", iSection);
 
-			WrapperSeparatorText("Propagation");
+			rScreen.WrapperSeparatorText("Propagation");
 			if (ImGui::BeginTable("WindPropagation", 2))
 			{
-				ImGui::TableNextColumn(); WrapperSlider("Wind Advection Scale Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); WrapperSlider("Wind Advection Scale High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Advection Scale Low", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Advection Scale High", iSection, 1.0f);
 
-				ImGui::TableNextColumn(); WrapperSlider("Wind Swirl Scale Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); WrapperSlider("Wind Swirl Scale High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Scale Low", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Scale High", iSection, 1.0f);
 
-				ImGui::TableNextColumn(); WrapperSlider("Wind Swirl Amount Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); WrapperSlider("Wind Swirl Amount High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Amount Low", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Amount High", iSection, 1.0f);
 
-				ImGui::TableNextColumn(); WrapperSlider("Wind Swirl Speed Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); WrapperSlider("Wind Swirl Speed High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Speed Low", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Speed High", iSection, 1.0f);
 
-				ImGui::TableNextColumn(); WrapperSlider("Wind Vorticity Confinement Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); WrapperSlider("Wind Vorticity Confinement High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Vorticity Confinement Low", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Vorticity Confinement High", iSection, 1.0f);
 
-				ImGui::TableNextColumn(); WrapperSlider("Wind Decay Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); WrapperSlider("Wind Decay High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Decay Low", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Decay High", iSection, 1.0f);
 
-				ImGui::TableNextColumn(); WrapperSlider("Wind Momentum Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); WrapperSlider("Wind Momentum High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Momentum Low", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Momentum High", iSection, 1.0f);
 
-				ImGui::TableNextColumn(); WrapperSlider("Wind Diffusion Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); WrapperSlider("Wind Diffusion High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Diffusion Low", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Diffusion High", iSection, 1.0f);
 
 				ImGui::EndTable();
 			}
 
 			ImGui::EndTabItem();
 		}
-		if (BeginSubtab("Deposits", iSection, 1))
+		if (rScreen.BeginSubtab("Deposits", iSection, 1))
 		{
-			RenderWindDepositsTab();
+			rScreen.RenderWindDepositsTab();
 
 			ImGui::EndTabItem();
 		}
