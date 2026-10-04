@@ -268,7 +268,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParams, nlohmann::json
 		}
 
 		engine::GridCoord coord = gpGame->mClientGridCoordinate;
-		bool bActive = std::ranges::any_of(gpClientSession->mpRuntime->mpClient->mCoordinateSlots, [coord](const engine::ClientCoordSlot& rSlot)
+		bool bActive = std::ranges::any_of(gpClientSession->mpRuntime->mpClient->mSubscriptions.mCoordinateSlots, [coord](const engine::ClientCoordSlot& rSlot)
 		{
 			return rSlot.eState == engine::CoordSubscriptionState::kActive && rSlot.coordinate == coord;
 		});

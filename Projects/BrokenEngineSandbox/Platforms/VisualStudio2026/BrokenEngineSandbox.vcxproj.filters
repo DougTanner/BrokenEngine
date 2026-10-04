@@ -306,6 +306,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.h">
       <Filter>Engine\Network\Client</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSubscriptions.h">
+      <Filter>Engine\Network\Client</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.h">
       <Filter>Engine\Network\Client</Filter>
     </ClInclude>
@@ -971,10 +974,7 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplayTick.cpp">
       <Filter>Engine\Network\Client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientReceive.cpp">
-      <Filter>Engine\Network\Client</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSend.cpp">
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSubscriptions.cpp">
       <Filter>Engine\Network\Client</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryScanner.cpp">

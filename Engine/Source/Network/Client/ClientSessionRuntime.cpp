@@ -211,7 +211,7 @@ void ClientSessionRuntime::ResetForServerLoad()
 	// the control channel is left alone because it carries the load notification and handshake traffic
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 	{
-		for (int64_t i = 0; i < std::ssize(mpClient->mCoordinateSlots); ++i)
+		for (int64_t i = 0; i < std::ssize(mpClient->mSubscriptions.mCoordinateSlots); ++i)
 		{
 			NetworkSimulation::PurgeDelayedForSlot(mpClient->mDelayedPackets, i);
 		}
@@ -360,7 +360,7 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 	ScopedSuppressAllocationTracking suppress;
 
 	bool bHasNewData = false;
-	const std::vector<ClientCoordSlot>& rCoordinateSlots = mpClient->mCoordinateSlots;
+	const std::vector<ClientCoordSlot>& rCoordinateSlots = mpClient->mSubscriptions.mCoordinateSlots;
 	std::vector<std::vector<ReceivedCoordUpdate>>& rAllUpdates = mpClient->mReceivedCoordinateUpdates;
 
 	for (int64_t i = 0; i < std::ssize(rCoordinateSlots); ++i)
@@ -538,14 +538,14 @@ void ClientSessionRuntime::SynchronizeSubscriptions()
 	const GridCoord* pDesiredCoordinates = desiredArena.mBuffer.Data<GridCoord>();
 	int64_t iDesiredCount = desiredArena.mBuffer.Count<GridCoord>();
 	UnsubscribeStaleCoordinates(std::span<const GridCoord>(pDesiredCoordinates, iDesiredCount));
-	mpClient->RecoverTimedOutSubscriptions();
+	mpClient->mSubscriptions.RecoverTimedOutSubscriptions();
 	BuildSubscriptionQueue(std::span<const GridCoord>(pDesiredCoordinates, iDesiredCount));
 	TrySubscribeNext();
 }
 
 void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord> desiredCoordinates)
 {
-	const std::vector<ClientCoordSlot>& rSlots = mpClient->mCoordinateSlots;
+	const std::vector<ClientCoordSlot>& rSlots = mpClient->mSubscriptions.mCoordinateSlots;
 	for (int64_t i = 0; i < std::ssize(rSlots); ++i)
 	{
 		if (!IsSlotActive(rSlots.at(i)))
@@ -564,11 +564,11 @@ void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord
 		}
 	}
 
-	for (const SubscribeRequest& rRecord : mpClient->mSubscribeRequests.mRecords)
+	for (const SubscribeRequest& rRecord : mpClient->mSubscriptions.mSubscribeRequests.mRecords)
 	{
 		if (!(rRecord.flags & SubscribeRequestFlags::kCancelled) &&!ContainsCoordinate(desiredCoordinates, rRecord.coordinate))
 		{
-			mpClient->mSubscribeRequests.Cancel(rRecord.coordinate);
+			mpClient->mSubscriptions.mSubscribeRequests.Cancel(rRecord.coordinate);
 			mrSession.OnCoordReleased(rRecord.coordinate);
 		}
 	}
@@ -577,14 +577,14 @@ void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord
 void ClientSessionRuntime::BuildSubscriptionQueue(std::span<const GridCoord> desiredCoordinates)
 {
 	mSubscriptionQueue.clear();
-	const std::vector<ClientCoordSlot>& rSlots = mpClient->mCoordinateSlots;
+	const std::vector<ClientCoordSlot>& rSlots = mpClient->mSubscriptions.mCoordinateSlots;
 	for (const GridCoord& rCoordinate : desiredCoordinates)
 	{
 		bool bActive = std::ranges::any_of(rSlots, [&](const ClientCoordSlot& rSlot)
 		{
 			return IsSlotActive(rSlot) && rSlot.coordinate == rCoordinate;
 		});
-		if (!bActive && !mpClient->mSubscribeRequests.IsLive(rCoordinate))
+		if (!bActive && !mpClient->mSubscriptions.mSubscribeRequests.IsLive(rCoordinate))
 		{
 			mSubscriptionQueue.push_back(rCoordinate);
 		}
@@ -627,7 +627,7 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 		miLowerTargetBehindStreakStartTick = -1;
 		return 0ns;
 	}
-	bool bHasActiveSlot = std::ranges::any_of(mpClient->mCoordinateSlots, [](const ClientCoordSlot& rSlot)
+	bool bHasActiveSlot = std::ranges::any_of(mpClient->mSubscriptions.mCoordinateSlots, [](const ClientCoordSlot& rSlot)
 	{
 		return rSlot.eState == CoordSubscriptionState::kActive;
 	});

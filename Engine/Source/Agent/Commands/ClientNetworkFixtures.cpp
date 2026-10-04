@@ -83,7 +83,7 @@ void CaptureStaleUpdate(const Client& rClient, std::span<const uint8_t> packetDa
 		pState->uiSlotIndex = uiSlotIndex;
 		pState->uiEpoch = uiEpoch;
 		pState->iTick = iTick;
-		pState->coord = rClient.mCoordinateSlots.at(uiSlotIndex).coordinate;
+		pState->coord = rClient.mSubscriptions.mCoordinateSlots.at(uiSlotIndex).coordinate;
 		pState->flags.Set(StaleUpdateFlags::kCaptured);
 	}
 }
@@ -114,12 +114,12 @@ std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpd
 	{
 		return nullptr;
 	}
-	if (pState->uiSlotIndex >= std::ssize(rClient.mCoordinateSlots))
+	if (pState->uiSlotIndex >= std::ssize(rClient.mSubscriptions.mCoordinateSlots))
 	{
 		return nullptr;
 	}
 
-	ClientCoordSlot& rSlot = rClient.mCoordinateSlots.at(pState->uiSlotIndex);
+	ClientCoordSlot& rSlot = rClient.mSubscriptions.mCoordinateSlots.at(pState->uiSlotIndex);
 	CoordUpdateState coordState = pfnQueryCoordUpdateState(pState->coord, pState->iTick);
 	if (rSlot.eState != CoordSubscriptionState::kActive)
 	{

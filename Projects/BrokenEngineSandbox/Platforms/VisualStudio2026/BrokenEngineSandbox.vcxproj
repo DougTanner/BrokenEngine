@@ -450,6 +450,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\Client.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientDesyncCore.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSubscriptions.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkCursor.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryScanner.h" />
@@ -673,8 +674,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\Client.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientDesyncCore.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientReceive.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSend.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSubscriptions.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplayCrc.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplayTick.cpp" />

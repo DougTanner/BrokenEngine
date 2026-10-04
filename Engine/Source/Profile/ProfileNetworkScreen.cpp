@@ -68,7 +68,7 @@ static void FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENet
 	rWorkbuffer.Append("\n");
 
 	int64_t iActiveSlotCount = 0;
-	for (const engine::ClientCoordSlot& rSlot : engine::gpClient->mCoordinateSlots)
+	for (const engine::ClientCoordSlot& rSlot : engine::gpClient->mSubscriptions.mCoordinateSlots)
 	{
 		if (rSlot.eState == engine::CoordSubscriptionState::kActive)
 		{
@@ -115,7 +115,7 @@ static void FormatNetworkSynchronization(common::Workbuffer& rWorkbuffer)
 	{
 		int64_t iMinimumAcknowledgmentFloor = -1;
 		int64_t iTotalReceived = 0;
-		for (const engine::ClientCoordSlot& rSlot : engine::gpClient->mCoordinateSlots)
+		for (const engine::ClientCoordSlot& rSlot : engine::gpClient->mSubscriptions.mCoordinateSlots)
 		{
 			if (rSlot.eState == engine::CoordSubscriptionState::kActive)
 			{
