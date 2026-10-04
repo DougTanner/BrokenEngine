@@ -31,13 +31,14 @@ static std::optional<std::filesystem::path> FindExecutableOnPath(const wchar_t* 
 	{
 		return std::nullopt;
 	}
-	std::vector<wchar_t> path(uiCharacters);
+	std::wstring path(uiCharacters, L'\0');
 	DWORD uiWritten = SearchPathW(nullptr, pcExecutable, nullptr, static_cast<DWORD>(path.size()), path.data(), nullptr);
 	if (uiWritten == 0 || static_cast<int64_t>(uiWritten) >= std::ssize(path))
 	{
 		return std::nullopt;
 	}
-	return std::filesystem::path(std::wstring(path.data(), uiWritten));
+	path.resize(uiWritten);
+	return std::filesystem::path(std::move(path));
 }
 
 static std::string TrimLine(std::string value)
