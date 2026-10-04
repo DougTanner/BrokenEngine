@@ -217,11 +217,11 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			throw std::runtime_error("client_cancelled_subscription_fixture requires no outstanding subscribe request");
 		}
 		engine::ClientSessionRuntime& rRuntime = *gpClientSession->mpRuntime;
-		if (std::ranges::find(rRuntime.mDesiredCoordinates, coordinate) != rRuntime.mDesiredCoordinates.end())
+		if (std::ranges::contains(rRuntime.mDesiredCoordinates, coordinate))
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture coord is owned by subscription policy");
 		}
-		if (std::ranges::find(rRuntime.mSubscriptionQueue, coordinate) != rRuntime.mSubscriptionQueue.end())
+		if (std::ranges::contains(rRuntime.mSubscriptionQueue, coordinate))
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture coord is owned by subscription policy");
 		}
