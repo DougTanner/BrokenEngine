@@ -9,7 +9,6 @@
 #include <fstream>
 #include <iostream>
 #include <thread>
-#include <utility>
 #include <vector>
 
 #pragma comment(lib, "bcrypt.lib")
@@ -380,7 +379,7 @@ namespace toolcli::coordination
 	{
 		if (rValue.is_number_unsigned())
 		{
-			return iExpected >= 0 && rValue.get<uint64_t>() == static_cast<uint64_t>(iExpected);
+			return std::cmp_equal(rValue.get<uint64_t>(), iExpected);
 		}
 		return rValue.is_number_integer() && rValue.get<int64_t>() == iExpected;
 	}
@@ -390,7 +389,7 @@ namespace toolcli::coordination
 		if (rValue.is_number_unsigned())
 		{
 			uint64_t uiValue = rValue.get<uint64_t>();
-			return uiValue <= static_cast<uint64_t>(INT64_MAX) ? std::optional<int64_t>(static_cast<int64_t>(uiValue)) : std::nullopt;
+			return std::in_range<int64_t>(uiValue) ? std::optional<int64_t>(static_cast<int64_t>(uiValue)) : std::nullopt;
 		}
 		return rValue.is_number_integer() ? std::optional<int64_t>(rValue.get<int64_t>()) : std::nullopt;
 	}
@@ -411,7 +410,7 @@ namespace toolcli::coordination
 		    && rMetadata.contains("domain") && rMetadata["domain"].is_string()
 		    && rMetadata["domain"].get<std::string>() == WideToUtf8(rLocator.domain) && rMetadata.contains("logicalKey")
 		    && rMetadata["logicalKey"].is_string() && rMetadata["logicalKey"].get<std::string>() == WideToUtf8(rLocator.logicalKey)
-		    && claimantPid && *claimantPid >= 0 && *claimantPid <= UINT32_MAX
+		    && claimantPid && std::in_range<uint32_t>(*claimantPid)
 		    && ParseUtcTimestamp(rMetadata["claimedAt"].get<std::string>(), uiClaimedTicks)
 		    && ParseUtcTimestamp(rMetadata["heartbeatAt"].get<std::string>(), uiHeartbeatTicks) && uiClaimedTicks <= uiHeartbeatTicks;
 	}
