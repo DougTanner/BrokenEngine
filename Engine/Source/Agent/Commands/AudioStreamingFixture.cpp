@@ -695,7 +695,7 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 		--wrongCrc;
 	}
 	result.bMissingCrcFailed = pPackChunks->TryReadChunkData(request, missingCrc, 0, std::span(bytes).first(1)) == ChunkReadResult::kFailed;
-	static_cast<void>(pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes).first(1)));
+	std::ignore = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes).first(1));
 	result.bWrongCrcFailed = pPackChunks->TryReadChunkData(request, wrongCrc, 0, std::span(bytes).first(1)) == ChunkReadResult::kFailed;
 	request.Reset();
 	result.bOverflowFailed = pPackChunks->TryReadChunkData(request, crc, std::numeric_limits<uint64_t>::max(), std::span(bytes).first(1)) == ChunkReadResult::kFailed;

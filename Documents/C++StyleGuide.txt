@@ -70,7 +70,7 @@ Use the following rules for C++ code
 
 10. "/" for header include paths, not "\\": #include "Graphics/Graphics.h"
 
-11. Use C++-style casts, static_cast reinterpret_cast etc...: static_cast<data::DataTypes>(i)
+11. Use C++-style casts, static_cast reinterpret_cast etc...: static_cast<data::DataTypes>(i). For an intentionally discarded non-void function result, use std::ignore = call(); rather than a cast to void; retain required result checks.
 
 12. For duration and time use std::chrono, use chrono_literals suffixes for example:
 	Nanoseconds - std::chrono::nanoseconds durationNanoseconds = 10ns;

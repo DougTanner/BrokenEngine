@@ -64,7 +64,7 @@ static int HandleEagerLoadCompletion()
 {
 	try
 	{
-		static_cast<void>(gpFileManager->mpPackChunks->GetEagerChunkMap());
+		std::ignore = gpFileManager->mpPackChunks->GetEagerChunkMap();
 	}
 	catch (const std::system_error&)
 	{

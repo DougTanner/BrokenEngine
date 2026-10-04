@@ -536,7 +536,7 @@ bool PackChunks::IsChunkReady(common::crc_t crc) const
 
 void PackChunks::WaitForChunks(std::span<const common::crc_t> crcs)
 {
-	static_cast<void>(GetEagerChunkMap());
+	std::ignore = GetEagerChunkMap();
 	mLoader.WaitForChunks(crcs);
 }
 

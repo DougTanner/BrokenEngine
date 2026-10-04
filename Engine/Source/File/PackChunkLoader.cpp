@@ -391,7 +391,7 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 		overlapped.Offset = static_cast<DWORD>(iFilePosition & 0xFFFFFFFF);
 		overlapped.OffsetHigh = static_cast<DWORD>((iFilePosition >> 32) & 0xFFFFFFFF);
 		DWORD uiBytesRead = 0;
-		static_cast<void>(ReadFile(hFile, pReadBuffer, uiReadSize, &uiBytesRead, &overlapped));
+		std::ignore = ReadFile(hFile, pReadBuffer, uiReadSize, &uiBytesRead, &overlapped);
 
 		int64_t iCopySize = std::min(static_cast<int64_t>(uiBytesRead) - iSourceOffset, iOnDiskSize - iDataCopied);
 		// A truncated .pack returns a 0-byte read that never advances iDataCopied; halt rather than spin.
