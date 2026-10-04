@@ -567,8 +567,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 		}
 		if (action == "coexistence")
 		{
-			std::shared_ptr<AudioStreamingFixtureCoexistenceState> pState =
-				std::make_shared<AudioStreamingFixtureCoexistenceState>();
+			std::shared_ptr<AudioStreamingFixtureCoexistenceState> pState = std::make_shared<AudioStreamingFixtureCoexistenceState>();
 			engine::AudioStreamingFixtureSnapshot before = engine::gpAgentCommandServer->mpAudioStreamingFixture->InspectFile();
 			pState->uiStartSequence = before.uiReservationBoundary;
 			pState->flags.Set(AudioStreamingFixtureCoexistenceFlags::kControlled, engine::gpAgentCommandServer->mpAudioStreamingFixture->InspectAudio().flags & engine::AudioStreamingFixtureAudioSnapshotFlags::kControlledPublication);

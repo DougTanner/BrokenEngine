@@ -321,20 +321,24 @@ function Test-Rule62Line([string] $Path, [int] $Line, [string] $Text) {
 }
 
 function Test-Rule51Line([string] $Path, [int] $Line, [string] $Text) {
-	# A line breaks rule 51 when it leaves a parenthesis open outside comments and literals and ends in `,` or
-	# `(`, so a call's or declaration's arguments wrap, unless the next non-blank head-side line starts with `{`.
+	# A line breaks rule 51 when, outside comments and literals, it ends in an assignment operator, so a
+	# declaration or assignment wraps, or it leaves a parenthesis open and ends in `,` or `(`, so a call's or
+	# declaration's arguments wrap, unless the next non-blank head-side line starts with `{`.
 	# That exempts every next-line `{`, including a one-line braced list rule 51 keeps on the call line; the
 	# code-style-review hand read of rule 51 catches that case. A line-ending `(` counts only after a word
 	# character, `>`, `]`, `)` or an operator-function name, and not after `return`, since a `(` after
-	# another operator, `=`, `(` or `,` groups an expression rather than opening an argument list.
+	# another operator, `=`, `(` or `,` groups an expression rather than opening an argument list. A line-ending
+	# `=` after `=`, `!`, `<` or `>` is a comparison, except the `<<=` and `>>=` assignments.
 	if ($Text.Trim() -cmatch '^(?:#|/\*|\*)') { return $false }
 	$code = (($Text -replace '"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''', '""') -replace '//.*$', '').Trim()
-	if ($code -cnotmatch '[,(]$') { return $false }
-	# Counted by length rather than a pipeline, whose one-match result has no Count under strict mode.
-	if ($code.Length - $code.Replace('(', '').Length -le $code.Length - $code.Replace(')', '').Length) { return $false }
-	if ($code.EndsWith('(')) {
-		$before = $code.Substring(0, $code.Length - 1).TrimEnd()
-		if (($before -cnotmatch '[\w>\])]$' -and $before -cnotmatch '\boperator\s*\S+$') -or $before -cmatch '\breturn$') { return $false }
+	if ($code -cnotmatch '(?:<<|>>|(?<![=!<>]))=$') {
+		if ($code -cnotmatch '[,(]$') { return $false }
+		# Counted by length rather than a pipeline, whose one-match result has no Count under strict mode.
+		if ($code.Length - $code.Replace('(', '').Length -le $code.Length - $code.Replace(')', '').Length) { return $false }
+		if ($code.EndsWith('(')) {
+			$before = $code.Substring(0, $code.Length - 1).TrimEnd()
+			if (($before -cnotmatch '[\w>\])]$' -and $before -cnotmatch '\boperator\s*\S+$') -or $before -cmatch '\breturn$') { return $false }
+		}
 	}
 	$lines = Get-NewSideLine $Path
 	for ($number = $Line + 1; $number -le $lines.Count; $number++) {

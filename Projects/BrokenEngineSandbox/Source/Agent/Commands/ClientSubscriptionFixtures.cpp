@@ -15,8 +15,6 @@
 namespace game
 {
 
-static std::weak_ptr<int64_t> spCancelledFixture;
-
 static engine::Client& RequireFixtureClient(std::string_view command)
 {
 	if (gpGame == nullptr)
@@ -79,8 +77,7 @@ void CommandClientSubscribeAcceptFixture(const nlohmann::json& rParams, nlohmann
 			throw std::runtime_error("client_subscribe_accept_fixture 'slot' must be outside the client pool and below the rejection sentinel");
 		}
 
-		engine::ClientNetworkFixtures::SubscribeAcceptResult result =
-			engine::ClientNetworkFixtures::ReceiveSubscribeAccept(rClient, static_cast<uint8_t>(iSlot), 0, {});
+		engine::ClientNetworkFixtures::SubscribeAcceptResult result = engine::ClientNetworkFixtures::ReceiveSubscribeAccept(rClient, static_cast<uint8_t>(iSlot), 0, {});
 		rResult["slot"] = iSlot;
 		rResult["outOfRange"] = true;
 		rResult["cleanupSerialized"] = result.iSerializedBytes == engine::NetworkMessages::ClientUnsubscribeMessage::kiFixedSize;
@@ -124,8 +121,7 @@ void CommandClientStaleUpdateFixture(const nlohmann::json& rParams, [[maybe_unus
 			throw std::runtime_error("client_stale_update_fixture requires an active confirmed coord");
 		}
 
-		std::shared_ptr<engine::ClientNetworkFixtures::StaleUpdateState> pState =
-			std::make_shared<engine::ClientNetworkFixtures::StaleUpdateState>();
+		std::shared_ptr<engine::ClientNetworkFixtures::StaleUpdateState> pState = std::make_shared<engine::ClientNetworkFixtures::StaleUpdateState>();
 		engine::Client* pClient = &rClient;
 		engine::ClientNetworkFixtures::ArmStaleUpdate(rClient, pState);
 		engine::gpAgentCommandServer->DeferResponse([pState, pClient]() -> std::optional<nlohmann::json>
@@ -208,10 +204,6 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture requires an assigned player");
 		}
-		if (!spCancelledFixture.expired())
-		{
-			throw std::runtime_error("client_cancelled_subscription_fixture is already active");
-		}
 		for (const engine::ClientCoordSlot& rSlot : rClient.mSubscriptions.mCoordinateSlots)
 		{
 			if (rSlot.eState != engine::CoordSubscriptionState::kUnsubscribed && rSlot.coordinate == coordinate)
@@ -251,6 +243,9 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		{
 			throw std::runtime_error("client_cancelled_subscription_fixture requires a clean unsubscribed slot");
 		}
+		std::shared_ptr<engine::ClientNetworkFixtures::CancelledSubscriptionState> pState = std::make_shared<engine::ClientNetworkFixtures::CancelledSubscriptionState>();
+		pState->iSlot = iSlot;
+		engine::ClientNetworkFixtures::ArmCancelledSubscription(rClient, pState);
 
 		std::vector<engine::GridCoord> desiredBefore = rRuntime.mDesiredCoordinates;
 		std::unordered_map<engine::GridCoord, std::chrono::steady_clock::time_point> stickyBefore = rRuntime.mUnwantedTimestamps;
@@ -299,17 +294,10 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 			throw std::runtime_error("client_cancelled_subscription_fixture immediate transition or policy check failed");
 		}
 
-		std::shared_ptr<engine::ClientNetworkFixtures::CancelledSubscriptionState> pState =
-			std::make_shared<engine::ClientNetworkFixtures::CancelledSubscriptionState>();
-		pState->iSlot = iSlot;
-		engine::ClientNetworkFixtures::ArmCancelledSubscription(rClient, pState);
-		std::shared_ptr<int64_t> pLifetime = std::make_shared<int64_t>(0);
-		spCancelledFixture = pLifetime;
 		engine::Client* pClient = &rClient;
 		std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + 4s;
-		engine::gpAgentCommandServer->DeferResponse([pState, pLifetime, pClient, coordinate, iSlot, bPolicyUnchanged, bCancelledToUnsubscribed, bAcceptToUnsubscribing, deadline]() -> std::optional<nlohmann::json>
+		engine::gpAgentCommandServer->DeferResponse([pState, pClient, coordinate, iSlot, bPolicyUnchanged, bCancelledToUnsubscribed, bAcceptToUnsubscribing, deadline]() -> std::optional<nlohmann::json>
 		{
-			(void)pLifetime;
 			if (gpClientSession == nullptr)
 			{
 				throw std::runtime_error("client_cancelled_subscription_fixture client was replaced or disconnected");
@@ -362,7 +350,6 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 void DetachClientSubscriptionFixtures([[maybe_unused]] const ClientSession& rSession)
 {
 	engine::ClientNetworkFixtures::Detach();
-	spCancelledFixture.reset();
 }
 
 } // namespace game

@@ -268,8 +268,7 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		ResetForServerLoad();
 		mrSession.OnServerLoad();
 	}
-	std::shared_ptr<ClientNetworkFixtures::StaleUpdateState> pDeliveredFixture =
-		ClientNetworkFixtures::PollBeforeDrain(*mpClient, &QueryFixtureCoordinateUpdateState);
+	std::shared_ptr<ClientNetworkFixtures::StaleUpdateState> pDeliveredFixture = ClientNetworkFixtures::PollBeforeDrain(*mpClient, &QueryFixtureCoordinateUpdateState);
 	mrSession.ProcessReceivedGamePackets();
 	mrSession.ApplyReceivedStaticData();
 	ApplyReceivedFullStates();

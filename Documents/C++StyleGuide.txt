@@ -222,6 +222,8 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
 51. Keep function parameters AND arguments all on the same line, regardless of line length. This applies to BOTH function declarations and function call sites. Never split a call's arguments across multiple lines just because the line is long — long is fine. The only exception is when an argument is itself a lambda body or a struct/initializer-list literal that spans several lines, in which case the `{}` goes on the next line per rule 2 (and the other arguments still stay on the call line). A braced initializer list written on one line stays on the call line like any other argument.
 
+	The same goes for every other statement: never split a declaration, assignment, return, or other expression across lines just because it is long — long is fine. The codebase's established multi-line forms stay: a lambda body or multi-line struct/initializer-list literal (rule 2, rule 22, and the exception above), a Boolean expression past 140 columns under the threshold below, a constructor's member-initializer list written one initializer per line, a macro body continued with trailing backslashes, a long string built from adjacent string literals written one literal per line, a concept's constraint expression starting on the line after its "=", a template head (the template-parameter list) on its own line before its declaration, and a template's requires clause on its own line. Anything else is a judgement call — you'll know a random split when you see it.
+
 	Ordinary Boolean expressions follow a length threshold instead: a Boolean assignment or initializer, an if()/while() condition, or a returned Boolean expression that joins onto one line of 140 columns or fewer stays on one line — never split it at && or ||. Past 140 columns you may split it, but you are not required to. When you do split, use as few lines as possible: fill each line with operands up to 140 columns and break only at a top-level && or ||, which then starts the next line. The parentheses of "if (", "else if (" and "while (", and a pair that encloses the whole right-hand side of an assignment or return, are the opener, so the && or || directly inside them are the top-level break points and the operand aligns after the "if (", "else if (", "while (", "= (" or "return ("; never break inside any other parentheses. Count the closing ) and any terminating ; toward the line's columns, and let a single operand that cannot fit stand alone on its line even when it passes 140. Indent each continuation line with tabs up to the statement's own indent level and then pad with spaces so its operand starts in the same column as the first operand on the opening line, with "&& " or "|| " immediately to the left of that column — tabs for indentation, spaces for alignment, tabs counting as 4 columns. The exception is the same one stated above for arguments.
 
 	Declaration (good):
@@ -234,6 +236,13 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
 	Call (good — single line, however long):
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissileCrc, vecMissilePosition, gMissileLaunchVolume.Get(), gMissilePitchMin.Get(), gMissilePitchRandom.Get());
+
+	Declaration (bad — split at "="):
+	std::shared_ptr<StaleUpdateState> pState =
+		std::make_shared<StaleUpdateState>();
+
+	Declaration (good — single line, however long):
+	std::shared_ptr<StaleUpdateState> pState = std::make_shared<StaleUpdateState>();
 
 	Lambda/struct exception (good):
 	common::gpMultithreading->Dispatch(iCount, [&](int64_t i)
