@@ -379,3 +379,5 @@ What a comment should say, in the fewest sentences that carry it: an invariant, 
 	} // namespace engine::NetworkMessages
 
 66. Do not open an anonymous namespace. File-local functions, including `constexpr` functions and function templates, and file-local non-const variables are `static` in the file's named namespace, or at global scope where the file has none. File-local namespace-scope `const`/`constexpr` variables in a `.cpp` file already have internal linkage and take neither `static` nor `inline` (header globals keep rule 25's `inline constexpr`). A file-local type has external linkage, so its name must be unique among the files in the same executable and namespace.
+
+67. A type declared with the "class" keyword keeps every member definition that is not in its header in one .cpp file; never split one class's member definitions across several .cpp files. Types declared with "struct" (including frame Collections) and free functions are exempt. Example: ClientSession.cpp defines every ClientSession member.

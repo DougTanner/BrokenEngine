@@ -750,8 +750,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\ClientSettings.cpp" />
     <ClCompile Include="..\..\Source\FleetSelection.cpp" />
     <ClCompile Include="..\..\Source\Network\Client\ClientSession.cpp" />
-    <ClCompile Include="..\..\Source\Network\Client\ClientSessionSubscriptions.cpp" />
-    <ClCompile Include="..\..\Source\Network\Client\ClientSessionReceive.cpp" />
     <ClCompile Include="..\..\Source\Network\Client\ClientReconciler.cpp" />
     <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayClientState.cpp" />
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp" />

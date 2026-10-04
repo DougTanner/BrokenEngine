@@ -200,8 +200,9 @@ ordering. Do not apply this check to semantic codecs or serialization adapters.
 
 ### Style guide contracts
 
-Rules 9, 53 and 60 of `Documents/C++StyleGuide.txt` state correctness or
-cost contracts that need producer, consumer, and type tracing.
+Rules 9, 53, 60 and 67 of `Documents/C++StyleGuide.txt` state correctness,
+cost, or file-layout contracts that need producer, consumer, type, or
+cross-file tracing.
 
 - Rule 9: flag a new `throw` that a changed path catches and recovers from
   as normal control flow, and a new exception type that adds no data or
@@ -213,6 +214,10 @@ cost contracts that need producer, consumer, and type tracing.
   preceding `reserve`.
 - Rule 60: flag a `std::memcpy` whose size is taken from the source alone
   where the destination can be smaller.
+- Rule 67: flag a changed `.cpp` that defines a member of a `class`-keyword
+  type whose other out-of-header member definitions sit in another `.cpp`.
+  The split is itself the failure: report it as a finding without the
+  reachable-failure test.
 
 ### Completeness and duplication
 

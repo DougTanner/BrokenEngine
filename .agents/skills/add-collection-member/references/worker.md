@@ -126,7 +126,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 13. Create a client-owned handle or resource in per-row `ClientInit`.
 
     - Make it survive `ClientInitAll` full-state hydration through
-      `/Projects/BrokenEngineSandbox/Source/Network/Client/ClientSessionReceive.cpp`,
+      `/Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`,
       local spawn, and teardown/removal.
     - Copy it only where ownership persists.
 

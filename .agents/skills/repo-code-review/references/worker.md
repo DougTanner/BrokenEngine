@@ -17,8 +17,9 @@ report template live in [`../SKILL.md`](../SKILL.md).
    them.
 4. Apply the relevant checks from [`checks.md`](checks.md). Turn a checklist
    concern into a finding only when a concrete changed path makes the failure
-   reachable. A conventions-reference violation is the exception: it is a
-   finding without a reachable failure (head of [`checks.md`](checks.md)).
+   reachable. A conventions-reference violation (head of
+   [`checks.md`](checks.md)) and a rule 67 split (its Style guide contracts)
+   are the exceptions: each is a finding without a reachable failure.
    Done when every check the changed paths reach has been applied.
 5. Try to disprove each candidate finding against guards, caller preconditions,
    lifecycle, and current repository contracts. Done when every candidate is
@@ -87,6 +88,7 @@ reach.
 - Repository patterns — new `bool` members or parameters, and new
   standard-library or third-party includes.
 - Style guide contracts — a changed `throw`, `catch`, or exception type,
-  repeated `std::vector` appends, or a `std::memcpy`.
+  repeated `std::vector` appends, a `std::memcpy`, or a changed `.cpp` that
+  defines a `class` member.
 - Completeness and duplication — incomplete integration and substantial new
   near-copies.

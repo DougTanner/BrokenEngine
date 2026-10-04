@@ -98,7 +98,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    rules the scanner's `style-rule-<n>` kinds cover are this review's whole
    style mandate; a rule is on both lists when each covers a different form.
    Every other guide rule has another owner: `/repo-code-review` owns rules 9,
-   53 and 60 and rule 47's external-header half
+   53, 60 and 67 and rule 47's external-header half
    ([`../../repo-code-review/references/checks.md`](../../repo-code-review/references/checks.md)),
    `/comment-review` owns rule 64, and the compiler owns rules 43 (RTTI off,
    warnings as errors) and 63 (the rotate poison in `Common/ExternalHeaders.h`).

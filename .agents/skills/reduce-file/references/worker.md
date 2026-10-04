@@ -54,9 +54,10 @@ live in [`../SKILL.md`](../SKILL.md).
    1. Move independent free functions, constants, or local types into an
       existing suitable utility pair, or a new `*Utils.h` / `*Utils.cpp` pair.
    2. Extract a cohesive stateful responsibility into a new class. A concrete,
-      non-template class keeps one `.h` / `.cpp` pair. The original object owns
-      it by value unless a concrete lifetime, polymorphism, ABI, or dependency
-      reason requires a pointer. Never introduce global ownership.
+      non-template class keeps one header, and its `.cpp` follows
+      `Documents/C++StyleGuide.txt` rule 67. The original object owns it by
+      value unless a concrete lifetime, polymorphism, ABI, or dependency reason
+      requires a pointer. Never introduce global ownership.
    3. Split implementations by responsibility only when the declaration is a
       static-method struct. Keep its declarations in one header.
 
@@ -85,9 +86,9 @@ live in [`../SKILL.md`](../SKILL.md).
 ## Rules
 
 - Never add a source marker declaring an oversized file accepted.
-- Never distribute one concrete class's member definitions across sibling `.cpp`
-  files merely to reduce the measured file. Template definitions remain inline
-  in headers unless an existing explicit-instantiation design proves otherwise.
+- Keep member definitions per `Documents/C++StyleGuide.txt` rule 67. Template
+  definitions remain inline in headers unless an existing
+  explicit-instantiation design proves otherwise.
 - Prefer an existing suitable helper over a new abstraction. A proposed class
   must own meaningful data and behavior; do not wrap stateless functions in a
   class. Preserve narrow client/server guards and current public interfaces

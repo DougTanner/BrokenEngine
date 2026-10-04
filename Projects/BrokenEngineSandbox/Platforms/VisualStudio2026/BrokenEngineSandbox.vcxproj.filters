@@ -932,12 +932,6 @@
     <ClCompile Include="..\..\Source\Network\Client\ClientSession.cpp">
       <Filter>Game\Network\Client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Client\ClientSessionSubscriptions.cpp">
-      <Filter>Game\Network\Client</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Network\Client\ClientSessionReceive.cpp">
-      <Filter>Game\Network\Client</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Network\Client\ClientReconciler.cpp">
       <Filter>Game\Network\Client</Filter>
     </ClCompile>

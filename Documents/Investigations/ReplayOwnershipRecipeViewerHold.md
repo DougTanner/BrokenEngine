@@ -43,7 +43,7 @@ scratch, `Temp/subreq-harness-evidence.md` `## Check 7` with
   (`Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`
   ~:131-137) calls `Game::SetClientGridCoord(rEvent.coord)` then
   `UpdateDesiredCoords`. The desired set becomes B plus B's visible neighbors
-  (`ClientSessionSubscriptions.cpp` `UpdateDesiredCoords`), and
+  (`ClientSession.cpp` `UpdateDesiredCoords`), and
   `ClientSessionRuntime::SynchronizeSubscriptions` unsubscribes A once its
   sticky window (`kStickySubscriptionDuration`, 2 s) expires.
   `FleetSelection::SyncFleets` (`Projects/BrokenEngineSandbox/Source/FleetSelection.cpp`
