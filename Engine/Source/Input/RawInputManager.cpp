@@ -145,10 +145,7 @@ void RawInputManager::Update(bool bLostFocus)
 
 	if (bHasFocus)
 	{
-		for (int64_t i = 0; i < kiKeyboardKeyCount; ++i)
-		{
-			mRawInput.pbKeyboardKeys[i] = mpbKeyboardKeysDown[i];
-		}
+		std::copy(std::begin(mpbKeyboardKeysDown), std::end(mpbKeyboardKeysDown), std::begin(mRawInput.pbKeyboardKeys));
 	}
 	else
 	{
