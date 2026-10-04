@@ -260,7 +260,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 		gpGame->mFleetSelection.mSpawnIntoFleetToggle.Update(std::ssize(pFleet->members));
 
-		for (int64_t i = 0; const FleetMember& rMember : pFleet->members)
+		for (auto [i, rMember] : std::views::enumerate(pFleet->members))
 		{
 			bool bSelected = (rMember.globalPlayerId.iValue != 0) && rMember.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
 
@@ -301,7 +301,6 @@ void HudScreen::RenderFleetPanel(float fTarget)
 				ImGui::PopStyleColor();
 			}
 			ImGui::PopID();
-			++i;
 		}
 
 		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers);

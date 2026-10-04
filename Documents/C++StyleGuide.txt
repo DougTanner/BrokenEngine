@@ -62,9 +62,10 @@ Use the following rules for C++ code
 	constexpr uint32_t kuiThreadCount
 	template <typename T> or template <typename... TUV>
 
-8. Use i/j/k variable names in for loops, but prefer range-based for loop when possible. If a counter variable is required with a range-based for loop, use the C++20 syntax to include include an initializer statement. Use "it" for iterators.
+8. Use i/j/k variable names in for loops, but prefer range-based for loop when possible. When a counter is the zero-based ordinal of every visited element, std::views::enumerate with a structured binding is recommended over a counter initializer statement, which remains allowed; the element's reference and constness come from the underlying range, so enumerate a const range for read-only access. If any other counter variable is required with a range-based for loop, use the C++20 syntax to include an initializer statement. Use "it" for iterators.
 
 	for (int64_t i = 0; i < std::ssize(mIslands); ++i)
+	for (auto [i, rMember] : std::views::enumerate(pFleet->members))
 
 9. Exceptions are for fatal errors only (things that would cause the program to crash), not control flow. Use standard-library exception types by default. Define a custom exception only when it adds useful functionality, such as concrete data or behavior; do not add an empty derived type merely to rename or categorize a failure.
 
@@ -94,7 +95,7 @@ Use the following rules for C++ code
 	f) It is a generic lambda parameter: [](const auto& rSource) {};
 	g) It is an explicit object (this auto&&) or abbreviated-template (auto&&) parameter, and the deduced return type, of a function returning a std::tie member list: auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.a, rSelf.b); }
 
-IMPORTANT do not use auto in range-based for loops
+IMPORTANT do not use auto in range-based for loops, except for the structured binding of rule 8 enumeration or rule 38 associative-container iteration
 
 16. Never use operator[] on std::unordered_map/std::map — it silently inserts a default-constructed value when the key doesn't exist, which can mask bugs. Use these safe alternatives:
 

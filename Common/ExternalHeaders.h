@@ -95,6 +95,7 @@ using namespace std::chrono_literals;
 #include <ostream>
 #include <queue>
 #include <random>
+#include <ranges>
 #include <ratio>
 #if defined(BT_ENGINE)
 	#include <regex> // Runtime game agent command channel only (get_logs pattern match); kept out of the offline DataPacker and Common-only TUs.
