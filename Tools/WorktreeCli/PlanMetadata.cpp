@@ -308,15 +308,10 @@ namespace toolcli
 
 	bool IsBlockedByDependencies(const Plan& rPlan, const std::unordered_map<std::wstring, Plan>& rPlans)
 	{
-		for (const std::wstring& rDependency : rPlan.dependencies)
+		return std::ranges::any_of(rPlan.dependencies, [&rPlans](const std::wstring& rDependency)
 		{
-			auto it = rPlans.find(rDependency);
-			if (it != rPlans.end())
-			{
-				return true;
-			}
-		}
-		return false;
+			return rPlans.find(rDependency) != rPlans.end();
+		});
 	}
 
 	std::vector<std::wstring> GetSortedPlanPaths(const std::unordered_map<std::wstring, Plan>& rPlans)
