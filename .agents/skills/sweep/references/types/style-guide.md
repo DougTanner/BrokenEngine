@@ -56,6 +56,10 @@ A finding is out of bound, and left unfixed, when its fix would change any of:
 sim output or the per-tick CRC; serialized, save, replay, wire, or `.pack`
 bytes; threading; or what a trust-boundary check accepts.
 
+`Documents/C++StyleGuide.txt` is the rule authority, never a sweep target: no
+fix, and no reference update that follows one, edits it, rule examples
+included, even where an example names a renamed or removed identifier.
+
 ## Cleanup checklist
 
 Regressions found in earlier sweeps:
@@ -69,6 +73,8 @@ Regressions found in earlier sweeps:
 - A one-line braced list split across lines.
 - An anonymous namespace reintroduced (rule 66).
 - A named namespace's closing comment removed (rule 65).
+- A double negation such as `!(!x.empty())`, left by inlining a removed
+  boolean accessor at a negated call site.
 
 ## Deferred fixes
 

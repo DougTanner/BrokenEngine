@@ -171,9 +171,11 @@ fixes applied, deferred entries, and the deferred-fixes record path the type's
   global ignore file is harmless. Codex writing its own helper scripts and file
   backups under `Temp/Sweep/` is expected.
 - Propagation failure modes seen so far, each caught by the per-batch Debug
-  build: a rename that left callers of a removed member unchanged, and a
+  build: a rename that left callers of a removed member unchanged; a
   propagation helper script that wrote stray text before the first line of
-  seven files. A failure in the precompiled header hides every later error, so
+  seven files; and a fix that moved a symbol or constant into a file, or
+  qualified a C runtime name with `std::`, without adding the header that
+  declares it. A failure in the precompiled header hides every later error, so
   rebuild after each repair.
 - Codex agents hand off through files under `Temp/Sweep/`; main reads only
   `Status.txt` and the ordering findings it routes. `Progress.md` records each
